@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+.pnp.*
+
+# Build
+dist/
+.svelte-kit/
+build/
+.output/
+.turbo/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Data (runtime)
+data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Drizzle
+drizzle/meta/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Legacy
+old/__pycache__/
+old/*.egg-info/
+old/venv/
+old/site/
