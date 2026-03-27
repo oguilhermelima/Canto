@@ -1,0 +1,7 @@
+{
+  "name": "@canto/tsconfig",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "files": ["base.json", "nextjs.json", "react-library.json", "internal-package.json"]
+}

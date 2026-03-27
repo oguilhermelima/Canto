@@ -1,0 +1,17 @@
+{
+  "name": "@canto/prettier-config",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./index.js"
+  },
+  "files": ["index.js"],
+  "dependencies": {
+    "prettier-plugin-tailwindcss": "^0.6.11"
+  },
+  "peerDependencies": {
+    "prettier": "catalog:"
+  }
+}

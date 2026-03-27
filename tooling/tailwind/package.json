@@ -1,0 +1,17 @@
+{
+  "name": "@canto/tailwind-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./web": "./web.ts"
+  },
+  "files": ["web.ts"],
+  "devDependencies": {
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:"
+  },
+  "peerDependencies": {
+    "tailwindcss": "catalog:"
+  }
+}

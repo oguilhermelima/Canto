@@ -1,0 +1,40 @@
+{
+  "name": "@canto/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./client": {
+      "types": "./src/client.ts",
+      "default": "./src/client.ts"
+    },
+    "./schema": {
+      "types": "./src/schema.ts",
+      "default": "./src/schema.ts"
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf .cache dist node_modules",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "generate": "drizzle-kit generate",
+    "migrate": "drizzle-kit migrate",
+    "push": "drizzle-kit push",
+    "studio": "drizzle-kit studio",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "drizzle-orm": "catalog:",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "@canto/tsconfig": "workspace:*",
+    "@types/node": "^22.13.0",
+    "drizzle-kit": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:"
+  }
+}

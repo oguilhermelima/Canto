@@ -1,0 +1,25 @@
+{
+  "name": "@canto/validators",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf .cache dist node_modules",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@canto/tsconfig": "workspace:*",
+    "prettier": "catalog:",
+    "typescript": "catalog:"
+  }
+}

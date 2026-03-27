@@ -1,0 +1,25 @@
+{
+  "name": "@canto/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "clean": "rm -rf .cache dist node_modules",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@canto/db": "workspace:*",
+    "@canto/providers": "workspace:*",
+    "bullmq": "^5.34.8",
+    "drizzle-orm": "catalog:"
+  },
+  "devDependencies": {
+    "@canto/tsconfig": "workspace:*",
+    "@types/node": "^22.13.0",
+    "tsx": "^4.19.3",
+    "typescript": "catalog:"
+  }
+}

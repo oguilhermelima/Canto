@@ -1,0 +1,26 @@
+{
+  "name": "@canto/auth",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf .cache dist node_modules",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@canto/db": "workspace:*",
+    "better-auth": "^1.2.5",
+    "drizzle-orm": "catalog:"
+  },
+  "devDependencies": {
+    "@canto/tsconfig": "workspace:*",
+    "@types/node": "^22.13.0",
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "extends": "@canto/tsconfig/internal-package.json",
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

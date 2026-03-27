@@ -4,10 +4,14 @@ node_modules/
 
 # Build
 dist/
+.next/
+.expo/
 .svelte-kit/
 build/
 .output/
 .turbo/
+.cache/
+*.tsbuildinfo
 
 # Environment
 .env
@@ -33,7 +37,4 @@ drizzle/meta/
 *.iml
 
 # Legacy
-old/__pycache__/
-old/*.egg-info/
-old/venv/
-old/site/
+old/
