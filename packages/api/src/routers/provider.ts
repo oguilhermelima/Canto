@@ -14,6 +14,7 @@ async function tmdbFetch<T>(
 ): Promise<T> {
   const apiKey = process.env.TMDB_API_KEY ?? "";
   const url = new URL(`${TMDB_BASE}${path}`);
+  url.searchParams.set("api_key", apiKey);
   if (params) {
     for (const [k, v] of Object.entries(params)) {
       url.searchParams.set(k, v);
@@ -22,7 +23,6 @@ async function tmdbFetch<T>(
 
   const response = await fetch(url.toString(), {
     headers: {
-      Authorization: `Bearer ${apiKey}`,
       Accept: "application/json",
     },
   });
