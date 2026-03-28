@@ -120,13 +120,13 @@ export function FilterSidebar({
       <Button
         variant="outline"
         size="sm"
-        className="mb-4 gap-2"
+        className="mb-4 gap-2 border-neutral-200 text-neutral-700"
         onClick={onToggle}
       >
         <SlidersHorizontal className="h-4 w-4" />
         Filters
         {activeFilterCount > 0 && (
-          <Badge className="ml-1 h-5 w-5 rounded-full p-0 text-[10px]">
+          <Badge className="ml-1 h-5 w-5 rounded-full bg-black p-0 text-[10px] text-white">
             {activeFilterCount}
           </Badge>
         )}
@@ -173,7 +173,7 @@ export function FilterSidebar({
 
       {/* Sidebar content */}
       {isOpen && (
-        <div className="w-full rounded-lg border border-border bg-card p-4 lg:w-64">
+        <div className="w-full rounded-xl border border-neutral-200 bg-white p-4 lg:w-64">
           {/* Type filter */}
           <FilterSection
             title="Type"
@@ -184,9 +184,14 @@ export function FilterSidebar({
               {(["all", "movie", "show"] as const).map((t) => (
                 <Button
                   key={t}
-                  variant={filters.type === t ? "default" : "outline"}
+                  variant="outline"
                   size="sm"
-                  className="flex-1 gap-1"
+                  className={cn(
+                    "flex-1 gap-1",
+                    filters.type === t
+                      ? "border-black bg-black text-white hover:bg-neutral-800"
+                      : "border-neutral-200 text-neutral-600 hover:bg-neutral-50",
+                  )}
                   onClick={() => onFiltersChange({ ...filters, type: t })}
                 >
                   {t === "movie" && <Film className="h-3.5 w-3.5" />}
@@ -197,7 +202,7 @@ export function FilterSidebar({
             </div>
           </FilterSection>
 
-          <Separator className="my-3" />
+          <Separator className="my-3 bg-neutral-200" />
 
           {/* Genre filter */}
           <FilterSection
@@ -214,8 +219,8 @@ export function FilterSidebar({
                     className={cn(
                       "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors",
                       isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "border border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground",
+                        ? "bg-black text-white"
+                        : "border border-neutral-200 text-neutral-500 hover:border-neutral-400 hover:text-black",
                     )}
                     onClick={() =>
                       onFiltersChange({
@@ -233,7 +238,7 @@ export function FilterSidebar({
             </div>
           </FilterSection>
 
-          <Separator className="my-3" />
+          <Separator className="my-3 bg-neutral-200" />
 
           {/* Year range */}
           <FilterSection
@@ -254,14 +259,14 @@ export function FilterSidebar({
                 max={new Date().getFullYear()}
                 step={1}
               />
-              <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+              <div className="mt-2 flex justify-between text-xs text-neutral-500">
                 <span>{filters.yearRange[0]}</span>
                 <span>{filters.yearRange[1]}</span>
               </div>
             </div>
           </FilterSection>
 
-          <Separator className="my-3" />
+          <Separator className="my-3 bg-neutral-200" />
 
           {/* Rating range */}
           <FilterSection
@@ -282,14 +287,14 @@ export function FilterSidebar({
                 max={10}
                 step={0.5}
               />
-              <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+              <div className="mt-2 flex justify-between text-xs text-neutral-500">
                 <span>{filters.ratingRange[0]}</span>
                 <span>{filters.ratingRange[1]}</span>
               </div>
             </div>
           </FilterSection>
 
-          <Separator className="my-3" />
+          <Separator className="my-3 bg-neutral-200" />
 
           {/* Status filter */}
           <FilterSection
@@ -306,8 +311,8 @@ export function FilterSidebar({
                     className={cn(
                       "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors",
                       isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "border border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground",
+                        ? "bg-black text-white"
+                        : "border border-neutral-200 text-neutral-500 hover:border-neutral-400 hover:text-black",
                     )}
                     onClick={() =>
                       onFiltersChange({
@@ -323,14 +328,14 @@ export function FilterSidebar({
             </div>
           </FilterSection>
 
-          <Separator className="my-3" />
+          <Separator className="my-3 bg-neutral-200" />
 
           {/* Reset button */}
           {activeFilterCount > 0 && (
             <Button
               variant="ghost"
               size="sm"
-              className="w-full gap-2 text-muted-foreground"
+              className="w-full gap-2 text-neutral-500 hover:text-black"
               onClick={handleReset}
             >
               <RotateCcw className="h-3.5 w-3.5" />
@@ -357,14 +362,14 @@ function FilterSection({
   return (
     <div>
       <button
-        className="flex w-full items-center justify-between py-1 text-sm font-medium text-foreground"
+        className="flex w-full items-center justify-between py-1 text-sm font-medium text-black"
         onClick={onToggle}
       >
         {title}
         {expanded ? (
-          <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          <ChevronUp className="h-4 w-4 text-neutral-400" />
         ) : (
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          <ChevronDown className="h-4 w-4 text-neutral-400" />
         )}
       </button>
       {expanded && <div className="mt-2">{children}</div>}
@@ -380,18 +385,15 @@ function FilterPill({
   onRemove: () => void;
 }): React.JSX.Element {
   return (
-    <Badge
-      variant="secondary"
-      className="gap-1 pr-1 text-xs"
-    >
+    <span className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2.5 py-1 pr-1 text-xs font-medium text-neutral-700">
       {label}
       <button
         onClick={onRemove}
-        className="ml-0.5 rounded-full p-0.5 hover:bg-accent"
+        className="ml-0.5 rounded-full p-0.5 hover:bg-neutral-200"
       >
         <X className="h-3 w-3" />
       </button>
-    </Badge>
+    </span>
   );
 }
 

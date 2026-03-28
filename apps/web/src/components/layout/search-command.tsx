@@ -10,7 +10,6 @@ import {
   DialogTitle,
 } from "@canto/ui/dialog";
 import { Input } from "@canto/ui/input";
-import { Badge } from "@canto/ui/badge";
 import { Skeleton } from "@canto/ui/skeleton";
 import { Search, Star, Film, Tv } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
@@ -80,21 +79,21 @@ export function SearchCommand({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0">
+      <DialogContent className="max-w-2xl gap-0 overflow-hidden border-neutral-200 bg-white p-0">
         <DialogTitle className="sr-only">Search media</DialogTitle>
-        <div className="flex items-center border-b border-border px-4">
-          <Search className="mr-2 h-5 w-5 shrink-0 text-muted-foreground" />
+        <div className="flex items-center border-b border-neutral-200 px-4">
+          <Search className="mr-2 h-5 w-5 shrink-0 text-neutral-400" />
           <Input
             placeholder="Search movies and shows..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="h-12 border-0 bg-transparent text-base focus-visible:ring-0 focus-visible:ring-offset-0"
+            className="h-12 border-0 bg-transparent text-base text-black placeholder:text-neutral-400 focus-visible:ring-0 focus-visible:ring-offset-0"
           />
         </div>
 
         <div className="max-h-[400px] overflow-y-auto">
           {query.length < 2 && (
-            <div className="p-8 text-center text-sm text-muted-foreground">
+            <div className="p-8 text-center text-sm text-neutral-500">
               Type at least 2 characters to search...
             </div>
           )}
@@ -114,7 +113,7 @@ export function SearchCommand({
           )}
 
           {!isLoading && data?.results && data.results.length === 0 && (
-            <div className="p-8 text-center text-sm text-muted-foreground">
+            <div className="p-8 text-center text-sm text-neutral-500">
               No results found for &ldquo;{query}&rdquo;
             </div>
           )}
@@ -124,7 +123,7 @@ export function SearchCommand({
               {data.results.slice(0, 8).map((result) => (
                 <button
                   key={`${result.provider}-${result.externalId}`}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent"
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-neutral-50"
                   onClick={() =>
                     handleSelect(
                       String(result.externalId),
@@ -133,7 +132,7 @@ export function SearchCommand({
                     )
                   }
                 >
-                  <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded bg-muted">
+                  <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded bg-neutral-100">
                     {result.posterPath ? (
                       <Image
                         src={`https://image.tmdb.org/t/p/w500${result.posterPath}`}
@@ -145,31 +144,28 @@ export function SearchCommand({
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
                         {result.type === "movie" ? (
-                          <Film className="h-5 w-5 text-muted-foreground" />
+                          <Film className="h-5 w-5 text-neutral-300" />
                         ) : (
-                          <Tv className="h-5 w-5 text-muted-foreground" />
+                          <Tv className="h-5 w-5 text-neutral-300" />
                         )}
                       </div>
                     )}
                   </div>
                   <div className="flex-1 overflow-hidden">
-                    <p className="truncate text-sm font-medium text-foreground">
+                    <p className="truncate text-sm font-medium text-black">
                       {result.title}
                     </p>
                     <div className="mt-1 flex items-center gap-2">
-                      <Badge
-                        variant="secondary"
-                        className="text-[10px] uppercase"
-                      >
+                      <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-neutral-600">
                         {result.type === "movie" ? "Movie" : "TV"}
-                      </Badge>
+                      </span>
                       {result.year && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs text-neutral-500">
                           {result.year}
                         </span>
                       )}
                       {result.voteAverage != null && result.voteAverage > 0 && (
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1 text-xs text-neutral-500">
                           <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
                           {result.voteAverage.toFixed(1)}
                         </span>

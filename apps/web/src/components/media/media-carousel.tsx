@@ -3,7 +3,6 @@
 import { useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
-import { Button } from "@canto/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { MediaCard, MediaCardSkeleton } from "./media-card";
 
@@ -62,61 +61,57 @@ export function MediaCarousel({
     <section className={cn("relative", className)}>
       {/* Header */}
       <div className="mb-4 flex items-center justify-between px-4 sm:px-6 lg:px-8">
-        <h2 className="text-xl font-semibold text-foreground">{title}</h2>
+        <h2 className="text-xl font-semibold text-black">{title}</h2>
         {seeAllHref && (
           <Link
             href={seeAllHref}
-            className="text-sm font-medium text-primary hover:text-primary/80"
+            className="text-sm font-medium text-neutral-500 transition-colors hover:text-black"
           >
-            See all
+            See more &gt;
           </Link>
         )}
       </div>
 
       {/* Scroll container */}
-      <div className="group relative">
+      <div className="group/carousel relative">
         {/* Left arrow */}
         {canScrollLeft && (
-          <Button
-            variant="secondary"
-            size="icon"
-            className="absolute left-2 top-1/2 z-10 h-10 w-10 -translate-y-1/2 rounded-full opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
+          <button
+            className="absolute left-2 top-1/3 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white opacity-0 shadow-lg transition-opacity group-hover/carousel:opacity-100 hover:bg-black/70"
             onClick={() => scroll("left")}
           >
             <ChevronLeft className="h-5 w-5" />
-          </Button>
+          </button>
         )}
 
         {/* Right arrow */}
         {canScrollRight && (
-          <Button
-            variant="secondary"
-            size="icon"
-            className="absolute right-2 top-1/2 z-10 h-10 w-10 -translate-y-1/2 rounded-full opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
+          <button
+            className="absolute right-2 top-1/3 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white opacity-0 shadow-lg transition-opacity group-hover/carousel:opacity-100 hover:bg-black/70"
             onClick={() => scroll("right")}
           >
             <ChevronRight className="h-5 w-5" />
-          </Button>
+          </button>
         )}
 
         <div
           ref={scrollRef}
           onScroll={updateScrollButtons}
-          className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-4 scrollbar-none sm:gap-4 sm:px-6 lg:px-8"
+          className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 sm:px-6 lg:px-8"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           {isLoading
             ? Array.from({ length: 8 }).map((_, i) => (
                 <MediaCardSkeleton
                   key={i}
-                  className="w-[140px] shrink-0 snap-start sm:w-[160px] lg:w-[180px]"
+                  className="w-[150px] shrink-0 snap-start sm:w-[170px] lg:w-[185px]"
                 />
               ))
             : items.map((item, i) => (
                 <MediaCard
                   key={item.id ?? `${item.provider}-${item.externalId}-${i}`}
                   {...item}
-                  className="w-[140px] shrink-0 snap-start sm:w-[160px] lg:w-[180px]"
+                  className="w-[150px] shrink-0 snap-start sm:w-[170px] lg:w-[185px]"
                 />
               ))}
         </div>

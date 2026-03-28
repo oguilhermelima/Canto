@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@canto/ui/tabs";
-import { Badge } from "@canto/ui/badge";
 import { Calendar, Clock, Star } from "lucide-react";
 
 interface Episode {
@@ -48,8 +47,8 @@ export function SeasonTabs({
 
   return (
     <section className={className}>
-      <h2 className="mb-4 text-xl font-semibold text-foreground">
-        Seasons & Episodes
+      <h2 className="mb-4 text-lg font-semibold text-black">
+        Seasons
       </h2>
 
       <Tabs defaultValue={defaultSeason} className="w-full">
@@ -58,7 +57,7 @@ export function SeasonTabs({
             <TabsTrigger
               key={season.seasonNumber}
               value={season.seasonNumber.toString()}
-              className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              className="rounded-lg border border-transparent bg-neutral-100 text-neutral-600 data-[state=active]:border-neutral-300 data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm"
             >
               Season {season.seasonNumber}
             </TabsTrigger>
@@ -72,33 +71,33 @@ export function SeasonTabs({
           >
             {/* Season header */}
             <div className="mb-4 flex items-center gap-3">
-              <h3 className="text-lg font-medium text-foreground">
+              <h3 className="text-base font-medium text-black">
                 {season.name}
               </h3>
               {season.episodeCount != null && (
-                <Badge variant="secondary">
+                <span className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600">
                   {season.episodeCount} episodes
-                </Badge>
+                </span>
               )}
               {season.airDate && (
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-neutral-500">
                   {season.airDate}
                 </span>
               )}
             </div>
 
             {/* Episode list */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               {season.episodes && season.episodes.length > 0 ? (
                 season.episodes
                   .sort((a, b) => a.episodeNumber - b.episodeNumber)
                   .map((episode) => (
                     <div
                       key={episode.id}
-                      className="flex gap-4 rounded-lg border border-border bg-card p-3 transition-colors hover:bg-accent/50"
+                      className="flex gap-4 rounded-xl border border-neutral-200 bg-white p-3 transition-colors hover:bg-neutral-50"
                     >
                       {/* Episode thumbnail */}
-                      <div className="relative h-20 w-36 shrink-0 overflow-hidden rounded-md bg-muted">
+                      <div className="relative h-20 w-36 shrink-0 overflow-hidden rounded-lg bg-neutral-100">
                         {episode.stillPath ? (
                           <Image
                             src={`https://image.tmdb.org/t/p/w500${episode.stillPath}`}
@@ -108,7 +107,7 @@ export function SeasonTabs({
                             sizes="144px"
                           />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                          <div className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
                             E{episode.episodeNumber}
                           </div>
                         )}
@@ -117,8 +116,8 @@ export function SeasonTabs({
                       {/* Episode info */}
                       <div className="flex-1 overflow-hidden">
                         <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-medium text-foreground">
-                            <span className="text-muted-foreground">
+                          <p className="text-sm font-medium text-black">
+                            <span className="text-neutral-400">
                               {episode.episodeNumber}.{" "}
                             </span>
                             {episode.title}
@@ -128,20 +127,20 @@ export function SeasonTabs({
                         {/* Episode meta */}
                         <div className="mt-1 flex items-center gap-3">
                           {episode.airDate && (
-                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1 text-xs text-neutral-500">
                               <Calendar className="h-3 w-3" />
                               {episode.airDate}
                             </span>
                           )}
                           {episode.runtime != null && episode.runtime > 0 && (
-                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1 text-xs text-neutral-500">
                               <Clock className="h-3 w-3" />
                               {episode.runtime}m
                             </span>
                           )}
                           {episode.voteAverage != null &&
                             episode.voteAverage > 0 && (
-                              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1 text-xs text-neutral-500">
                                 <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
                                 {episode.voteAverage.toFixed(1)}
                               </span>
@@ -150,7 +149,7 @@ export function SeasonTabs({
 
                         {/* Episode overview */}
                         {episode.overview && (
-                          <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">
+                          <p className="mt-1.5 line-clamp-2 text-xs text-neutral-500">
                             {episode.overview}
                           </p>
                         )}
@@ -158,7 +157,7 @@ export function SeasonTabs({
                     </div>
                   ))
               ) : (
-                <p className="py-8 text-center text-sm text-muted-foreground">
+                <p className="py-8 text-center text-sm text-neutral-500">
                   No episode information available.
                 </p>
               )}

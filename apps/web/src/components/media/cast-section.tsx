@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
 import { User } from "lucide-react";
 
@@ -30,7 +29,14 @@ export function CastSection({
 
   return (
     <section className={className}>
-      <h2 className="mb-4 text-xl font-semibold text-foreground">Cast</h2>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-black">Cast & Crew</h2>
+        {credits.length > 20 && (
+          <span className="text-sm font-medium text-neutral-500 hover:text-black">
+            View all &gt;
+          </span>
+        )}
+      </div>
 
       <div
         className="flex gap-4 overflow-x-auto pb-4"
@@ -59,7 +65,7 @@ function CastCard({
   return (
     <div className="w-[120px] shrink-0">
       {/* Profile photo */}
-      <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-full bg-muted">
+      <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-full bg-neutral-100">
         {profilePath ? (
           <Image
             src={`https://image.tmdb.org/t/p/w185${profilePath}`}
@@ -70,19 +76,19 @@ function CastCard({
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
-            <User className="h-8 w-8 text-muted-foreground" />
+            <User className="h-8 w-8 text-neutral-300" />
           </div>
         )}
       </div>
 
       {/* Name */}
-      <p className="line-clamp-1 text-center text-sm font-medium text-foreground">
+      <p className="line-clamp-1 text-center text-sm font-medium text-black">
         {name}
       </p>
 
       {/* Character */}
       {character && (
-        <p className="line-clamp-1 text-center text-xs text-muted-foreground">
+        <p className="line-clamp-1 text-center text-xs text-neutral-500">
           {character}
         </p>
       )}

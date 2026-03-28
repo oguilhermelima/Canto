@@ -2,10 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Button } from "@canto/ui/button";
-import { Badge } from "@canto/ui/badge";
 import { Skeleton } from "@canto/ui/skeleton";
-import { Star, Play, Plus, Info } from "lucide-react";
+import { Star, Info, Plus } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 
 interface MediaHeroProps {
@@ -57,7 +55,7 @@ export function MediaHero({
   };
 
   return (
-    <section className="relative h-[70vh] min-h-[500px] w-full overflow-hidden">
+    <section className="relative h-[80vh] min-h-[500px] w-full overflow-hidden">
       {/* Backdrop image */}
       {backdropPath && (
         <Image
@@ -70,44 +68,41 @@ export function MediaHero({
         />
       )}
 
-      {/* Gradient overlays */}
-      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-transparent" />
+      {/* Gradient overlay — bottom fades to white */}
+      <div className="absolute inset-0 bg-gradient-to-t from-white via-black/30 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent" />
 
       {/* Content */}
-      <div className="absolute bottom-0 left-0 right-0 px-4 pb-12 sm:px-6 lg:px-8">
+      <div className="absolute bottom-0 left-0 right-0 px-6 pb-16 sm:px-8 lg:px-12">
         <div className="mx-auto max-w-screen-2xl">
-          {/* Badges */}
-          <div className="mb-3 flex items-center gap-2">
-            <Badge variant="secondary" className="uppercase">
-              {type === "movie" ? "Movie" : "TV Series"}
-            </Badge>
-            {voteAverage != null && voteAverage > 0 && (
-              <Badge
-                variant="outline"
-                className="flex items-center gap-1 border-yellow-500/50 text-yellow-500"
-              >
-                <Star className="h-3 w-3 fill-yellow-500" />
-                {voteAverage.toFixed(1)}
-              </Badge>
-            )}
-            {year && (
-              <span className="text-sm text-zinc-400">{year}</span>
-            )}
-          </div>
-
           {/* Title */}
-          <h1 className="mb-3 max-w-2xl text-4xl font-bold text-white sm:text-5xl lg:text-6xl">
+          <h1 className="mb-4 max-w-2xl text-4xl font-bold text-white sm:text-5xl">
             {title}
           </h1>
 
-          {/* Genres */}
+          {/* Meta row: rating, year, type */}
+          <div className="mb-4 flex items-center gap-3">
+            {voteAverage != null && voteAverage > 0 && (
+              <span className="flex items-center gap-1 text-sm text-white">
+                <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
+                {voteAverage.toFixed(1)}
+              </span>
+            )}
+            {year && (
+              <span className="text-sm text-white/70">{year}</span>
+            )}
+            <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-medium uppercase text-white">
+              {type === "movie" ? "Movie" : "TV Series"}
+            </span>
+          </div>
+
+          {/* Genre pills */}
           {genres && genres.length > 0 && (
             <div className="mb-4 flex flex-wrap gap-2">
               {genres.map((genre) => (
                 <span
                   key={genre}
-                  className="text-sm font-light text-zinc-400"
+                  className="rounded-full border border-white/40 px-3 py-1 text-sm text-white"
                 >
                   {genre}
                 </span>
@@ -117,30 +112,28 @@ export function MediaHero({
 
           {/* Overview */}
           {overview && (
-            <p className="mb-6 line-clamp-3 max-w-xl text-sm leading-relaxed text-zinc-300 sm:text-base">
+            <p className="mb-6 line-clamp-3 max-w-2xl text-sm leading-relaxed text-white/80">
               {overview}
             </p>
           )}
 
           {/* Actions */}
           <div className="flex items-center gap-3">
-            <Link href={detailHref}>
-              <Button size="lg" className="gap-2">
-                <Info className="h-5 w-5" />
-                View Details
-              </Button>
+            <Link
+              href={detailHref}
+              className="inline-flex items-center gap-2 rounded-full bg-black px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-neutral-900"
+            >
+              <Info className="h-4 w-4" />
+              More Info
             </Link>
             {id && !inLibrary && (
-              <Button
-                variant="secondary"
-                size="lg"
-                className="gap-2"
+              <button
                 onClick={handleAddToLibrary}
                 disabled={addToLibrary.isPending}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white text-white transition-colors hover:bg-white/10 disabled:opacity-50"
               >
                 <Plus className="h-5 w-5" />
-                Add to Library
-              </Button>
+              </button>
             )}
           </div>
         </div>
@@ -151,24 +144,25 @@ export function MediaHero({
 
 export function MediaHeroSkeleton(): React.JSX.Element {
   return (
-    <section className="relative h-[70vh] min-h-[500px] w-full overflow-hidden bg-muted">
-      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-      <div className="absolute bottom-0 left-0 right-0 px-4 pb-12 sm:px-6 lg:px-8">
+    <section className="relative h-[80vh] min-h-[500px] w-full overflow-hidden bg-neutral-200">
+      <div className="absolute inset-0 bg-gradient-to-t from-white via-black/20 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 px-6 pb-16 sm:px-8 lg:px-12">
         <div className="mx-auto max-w-screen-2xl">
-          <div className="mb-3 flex items-center gap-2">
-            <Skeleton className="h-6 w-20" />
-            <Skeleton className="h-6 w-14" />
+          <Skeleton className="mb-4 h-12 w-96 max-w-full bg-white/20" />
+          <div className="mb-4 flex items-center gap-3">
+            <Skeleton className="h-5 w-14 bg-white/20" />
+            <Skeleton className="h-5 w-12 bg-white/20" />
+            <Skeleton className="h-5 w-20 bg-white/20" />
           </div>
-          <Skeleton className="mb-3 h-14 w-96 max-w-full" />
           <div className="mb-4 flex gap-2">
-            <Skeleton className="h-5 w-16" />
-            <Skeleton className="h-5 w-20" />
-            <Skeleton className="h-5 w-14" />
+            <Skeleton className="h-8 w-20 rounded-full bg-white/20" />
+            <Skeleton className="h-8 w-24 rounded-full bg-white/20" />
+            <Skeleton className="h-8 w-16 rounded-full bg-white/20" />
           </div>
-          <Skeleton className="mb-6 h-16 w-full max-w-xl" />
+          <Skeleton className="mb-6 h-16 w-full max-w-2xl bg-white/20" />
           <div className="flex gap-3">
-            <Skeleton className="h-11 w-36" />
-            <Skeleton className="h-11 w-40" />
+            <Skeleton className="h-11 w-32 rounded-full bg-white/20" />
+            <Skeleton className="h-10 w-10 rounded-full bg-white/20" />
           </div>
         </div>
       </div>

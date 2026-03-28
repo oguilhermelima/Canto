@@ -12,7 +12,7 @@ import {
   DialogDescription,
 } from "@canto/ui/dialog";
 import { Skeleton } from "@canto/ui/skeleton";
-import { Download, ExternalLink, Play } from "lucide-react";
+import { Download, Play } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import {
   MediaDetailHero,
@@ -88,12 +88,12 @@ export default function MediaDetailPage({
 
   if (!media) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex min-h-[60vh] items-center justify-center bg-white">
         <div className="text-center">
-          <h2 className="mb-2 text-xl font-semibold text-foreground">
+          <h2 className="mb-2 text-xl font-semibold text-black">
             Media not found
           </h2>
-          <p className="text-muted-foreground">
+          <p className="text-neutral-500">
             The media you&apos;re looking for doesn&apos;t exist.
           </p>
         </div>
@@ -142,7 +142,7 @@ export default function MediaDetailPage({
     );
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-white">
       {/* Hero */}
       <MediaDetailHero
         id={media.id}
@@ -163,10 +163,38 @@ export default function MediaDetailPage({
       />
 
       <div className="mx-auto max-w-screen-2xl space-y-10 px-4 py-10 sm:px-6 lg:px-8">
+        {/* Watch Providers */}
+        {watchProviders.length > 0 && (
+          <section>
+            <h2 className="mb-4 text-lg font-semibold text-black">
+              Streaming on
+            </h2>
+            <div className="flex flex-wrap gap-3">
+              {watchProviders.map((wp) => (
+                <div
+                  key={wp.providerId}
+                  className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2"
+                >
+                  {wp.logoPath && (
+                    <img
+                      src={`https://image.tmdb.org/t/p/w300${wp.logoPath}`}
+                      alt={wp.providerName}
+                      className="h-8 w-8 rounded"
+                    />
+                  )}
+                  <span className="text-sm text-neutral-700">
+                    {wp.providerName}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Videos / Trailers */}
         {videos.length > 0 && (
           <section>
-            <h2 className="mb-4 text-xl font-semibold text-foreground">
+            <h2 className="mb-4 text-lg font-semibold text-black">
               Videos
             </h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -176,55 +204,27 @@ export default function MediaDetailPage({
                   href={`https://www.youtube.com/watch?v=${video.key}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative aspect-video overflow-hidden rounded-lg bg-muted"
+                  className="group relative aspect-video overflow-hidden rounded-xl bg-neutral-100"
                 >
                   <img
                     src={`https://img.youtube.com/vi/${video.key}/hqdefault.jpg`}
                     alt={video.name ?? "Video"}
                     className="h-full w-full object-cover transition-transform group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 transition-colors group-hover:bg-black/30">
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 transition-colors group-hover:bg-black/20">
                     <Play className="h-12 w-12 text-white" />
                   </div>
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 p-3">
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 p-3">
                     <p className="line-clamp-1 text-sm font-medium text-white">
                       {video.name}
                     </p>
                     {video.type && (
-                      <Badge variant="secondary" className="mt-1 text-[10px]">
+                      <span className="mt-1 inline-block rounded bg-white/20 px-1.5 py-0.5 text-[10px] text-white">
                         {video.type}
-                      </Badge>
+                      </span>
                     )}
                   </div>
                 </a>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Watch Providers */}
-        {watchProviders.length > 0 && (
-          <section>
-            <h2 className="mb-4 text-xl font-semibold text-foreground">
-              Where to Watch
-            </h2>
-            <div className="flex flex-wrap gap-3">
-              {watchProviders.map((wp) => (
-                <div
-                  key={wp.providerId}
-                  className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2"
-                >
-                  {wp.logoPath && (
-                    <img
-                      src={`https://image.tmdb.org/t/p/w300${wp.logoPath}`}
-                      alt={wp.providerName}
-                      className="h-8 w-8 rounded"
-                    />
-                  )}
-                  <span className="text-sm text-foreground">
-                    {wp.providerName}
-                  </span>
-                </div>
               ))}
             </div>
           </section>
@@ -270,10 +270,10 @@ export default function MediaDetailPage({
 
       {/* Torrent search dialog */}
       <Dialog open={torrentDialogOpen} onOpenChange={setTorrentDialogOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-3xl border-neutral-200 bg-white">
           <DialogHeader>
-            <DialogTitle>Download {media.title}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-black">Download {media.title}</DialogTitle>
+            <DialogDescription className="text-neutral-500">
               Search for available downloads
             </DialogDescription>
           </DialogHeader>
@@ -284,6 +284,11 @@ export default function MediaDetailPage({
               <Button
                 variant={selectedSeason === undefined ? "default" : "outline"}
                 size="sm"
+                className={
+                  selectedSeason === undefined
+                    ? "bg-black text-white"
+                    : "border-neutral-200 text-neutral-700"
+                }
                 onClick={() => setSelectedSeason(undefined)}
               >
                 Full Series
@@ -300,6 +305,11 @@ export default function MediaDetailPage({
                         : "outline"
                     }
                     size="sm"
+                    className={
+                      selectedSeason === season.number
+                        ? "bg-black text-white"
+                        : "border-neutral-200 text-neutral-700"
+                    }
                     onClick={() => setSelectedSeason(season.number)}
                   >
                     S{season.number.toString().padStart(2, "0")}
@@ -321,25 +331,25 @@ export default function MediaDetailPage({
                 {torrentSearch.data.map((torrent, i) => (
                   <div
                     key={i}
-                    className="flex items-center justify-between rounded-lg border border-border bg-card p-3"
+                    className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-3"
                   >
                     <div className="flex-1 overflow-hidden pr-4">
-                      <p className="truncate text-sm font-medium text-foreground">
+                      <p className="truncate text-sm font-medium text-black">
                         {torrent.title}
                       </p>
                       <div className="mt-1 flex items-center gap-3">
                         {torrent.size && (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-neutral-500">
                             {torrent.size}
                           </span>
                         )}
                         {torrent.seeders != null && (
-                          <span className="text-xs text-green-500">
+                          <span className="text-xs text-green-600">
                             {torrent.seeders} seeds
                           </span>
                         )}
                         {torrent.leechers != null && (
-                          <span className="text-xs text-red-400">
+                          <span className="text-xs text-red-500">
                             {torrent.leechers} peers
                           </span>
                         )}
@@ -347,7 +357,7 @@ export default function MediaDetailPage({
                     </div>
                     <Button
                       size="sm"
-                      className="shrink-0 gap-1"
+                      className="shrink-0 gap-1 bg-black text-white hover:bg-neutral-800"
                       onClick={() =>
                         torrent.magnetUrl && handleDownload(torrent.magnetUrl, torrent.title)
                       }
@@ -360,7 +370,7 @@ export default function MediaDetailPage({
                 ))}
               </div>
             ) : (
-              <div className="py-8 text-center text-sm text-muted-foreground">
+              <div className="py-8 text-center text-sm text-neutral-500">
                 No torrents found. Try a different season or check your indexer
                 configuration.
               </div>
@@ -374,7 +384,7 @@ export default function MediaDetailPage({
 
 function MediaDetailPageSkeleton(): React.JSX.Element {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-white">
       <MediaDetailHeroSkeleton />
       <div className="mx-auto max-w-screen-2xl space-y-10 px-4 py-10 sm:px-6 lg:px-8">
         <section>

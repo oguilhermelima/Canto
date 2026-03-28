@@ -6,14 +6,14 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { cn } from "@canto/ui/cn";
 import { Input } from "@canto/ui/input";
 import { Button } from "@canto/ui/button";
-import { Search, Film, Tv, Layers } from "lucide-react";
+import { Search } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { MediaGrid } from "~/components/media/media-grid";
 
 const TYPE_OPTIONS = [
-  { value: "multi", label: "All", icon: Layers },
-  { value: "movie", label: "Movies", icon: Film },
-  { value: "show", label: "TV Shows", icon: Tv },
+  { value: "multi", label: "All" },
+  { value: "movie", label: "Movies" },
+  { value: "show", label: "TV Shows" },
 ] as const;
 
 export default function SearchPage(): React.JSX.Element {
@@ -123,34 +123,36 @@ export default function SearchPage(): React.JSX.Element {
     <div className="mx-auto max-w-screen-2xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Search header */}
       <div className="mb-8">
-        <h1 className="mb-6 text-3xl font-bold text-foreground">Search</h1>
+        <h1 className="mb-6 text-3xl font-bold text-black">Search</h1>
 
         {/* Search input */}
-        <div className="relative mb-4 max-w-xl">
-          <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+        <div className="relative mb-6 max-w-2xl">
+          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-400" />
           <Input
             placeholder="Search movies and TV shows..."
             value={query}
             onChange={(e) => handleSearch(e.target.value)}
-            className="h-12 pl-10 text-base"
+            className="h-12 border-neutral-200 bg-white pl-11 text-base text-black placeholder:text-neutral-400"
           />
         </div>
 
-        {/* Type toggle */}
-        <div className="flex gap-2">
-          {TYPE_OPTIONS.map(({ value, label, icon: Icon }) => (
-            <Button
+        {/* Type tabs */}
+        <div className="flex gap-1">
+          {TYPE_OPTIONS.map(({ value, label }) => (
+            <button
               key={value}
-              variant={searchType === value ? "default" : "outline"}
-              size="sm"
-              className="gap-1.5"
               onClick={() =>
                 handleTypeChange(value as "multi" | "movie" | "show")
               }
+              className={cn(
+                "rounded-lg px-4 py-1.5 text-sm font-medium transition-colors",
+                searchType === value
+                  ? "bg-neutral-100 text-black"
+                  : "text-neutral-500 hover:text-black",
+              )}
             >
-              <Icon className="h-4 w-4" />
               {label}
-            </Button>
+            </button>
           ))}
         </div>
       </div>
@@ -159,11 +161,11 @@ export default function SearchPage(): React.JSX.Element {
       {query.length < 2 ? (
         <div className="flex min-h-[400px] items-center justify-center">
           <div className="text-center">
-            <Search className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
-            <p className="text-lg font-medium text-muted-foreground">
+            <Search className="mx-auto mb-4 h-12 w-12 text-neutral-200" />
+            <p className="text-lg font-medium text-neutral-500">
               Search for movies and TV shows
             </p>
-            <p className="mt-1 text-sm text-muted-foreground/70">
+            <p className="mt-1 text-sm text-neutral-400">
               Type at least 2 characters to start searching
             </p>
           </div>
@@ -172,7 +174,7 @@ export default function SearchPage(): React.JSX.Element {
         <>
           {/* Results count */}
           {data && !isLoading && (
-            <p className="mb-4 text-sm text-muted-foreground">
+            <p className="mb-4 text-sm text-neutral-500">
               {data.totalResults} results for &ldquo;{query}&rdquo;
             </p>
           )}
@@ -189,17 +191,19 @@ export default function SearchPage(): React.JSX.Element {
               <Button
                 variant="outline"
                 size="sm"
+                className="border-neutral-200"
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
                 Previous
               </Button>
-              <span className="text-sm text-muted-foreground">
+              <span className="text-sm text-neutral-500">
                 Page {page} of {totalPages}
               </span>
               <Button
                 variant="outline"
                 size="sm"
+                className="border-neutral-200"
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >

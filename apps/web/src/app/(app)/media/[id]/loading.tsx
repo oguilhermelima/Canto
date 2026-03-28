@@ -2,17 +2,22 @@ import { Skeleton } from "@canto/ui/skeleton";
 
 export default function MediaDetailLoading(): React.JSX.Element {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-white">
       {/* Hero skeleton */}
-      <section className="relative min-h-[60vh] w-full overflow-hidden bg-muted/30">
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/30" />
-        <div className="relative px-4 pb-10 pt-24 sm:px-6 lg:px-8">
-          <div className="mx-auto flex max-w-screen-2xl flex-col gap-8 md:flex-row md:items-end">
+      <section className="relative w-full">
+        {/* Backdrop skeleton */}
+        <div className="relative h-[400px] w-full overflow-hidden bg-neutral-100">
+          <div className="absolute inset-0 bg-gradient-to-t from-white via-white/40 to-transparent" />
+        </div>
+
+        {/* Content skeleton */}
+        <div className="relative mx-auto -mt-32 max-w-screen-2xl px-4 pb-8 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-8 md:flex-row md:items-start">
             {/* Poster skeleton */}
             <Skeleton className="mx-auto h-[300px] w-[200px] rounded-xl md:mx-0 md:h-[360px] md:w-[240px]" />
 
             {/* Info skeleton */}
-            <div className="flex-1 space-y-4">
+            <div className="flex-1 space-y-4 pt-4">
               <Skeleton className="mx-auto h-12 w-80 md:mx-0" />
               <Skeleton className="mx-auto h-5 w-48 md:mx-0" />
               <div className="flex justify-center gap-2 md:justify-start">
@@ -21,14 +26,14 @@ export default function MediaDetailLoading(): React.JSX.Element {
                 <Skeleton className="h-6 w-24" />
               </div>
               <div className="flex justify-center gap-2 md:justify-start">
-                <Skeleton className="h-6 w-16" />
-                <Skeleton className="h-6 w-20" />
-                <Skeleton className="h-6 w-14" />
+                <Skeleton className="h-8 w-20 rounded-full" />
+                <Skeleton className="h-8 w-24 rounded-full" />
+                <Skeleton className="h-8 w-16 rounded-full" />
               </div>
               <Skeleton className="mx-auto h-20 w-full max-w-2xl md:mx-0" />
               <div className="flex justify-center gap-3 md:justify-start">
-                <Skeleton className="h-11 w-40" />
-                <Skeleton className="h-11 w-36" />
+                <Skeleton className="h-11 w-40 rounded-lg" />
+                <Skeleton className="h-11 w-36 rounded-lg" />
               </div>
             </div>
           </div>

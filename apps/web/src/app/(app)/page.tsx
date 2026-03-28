@@ -61,26 +61,28 @@ export default function DiscoverPage(): React.JSX.Element {
 
   return (
     <div className="min-h-screen">
-      {/* Hero spotlight */}
-      {trendingMovies.isLoading ? (
-        <MediaHeroSkeleton />
-      ) : spotlightItem ? (
-        <MediaHero
-          externalId={String(spotlightItem.externalId)}
-          provider={spotlightItem.provider}
-          type={spotlightItem.type as "movie" | "show"}
-          title={spotlightItem.title}
-          overview={spotlightItem.overview}
-          backdropPath={spotlightItem.backdropPath ?? null}
-          posterPath={spotlightItem.posterPath ?? null}
-          year={spotlightItem.year}
-          voteAverage={spotlightItem.voteAverage}
-          genres={spotlightItem.genreIds?.map(String)}
-        />
-      ) : null}
+      {/* Hero spotlight — extends behind topbar */}
+      <div className="-mt-14">
+        {trendingMovies.isLoading ? (
+          <MediaHeroSkeleton />
+        ) : spotlightItem ? (
+          <MediaHero
+            externalId={String(spotlightItem.externalId)}
+            provider={spotlightItem.provider}
+            type={spotlightItem.type as "movie" | "show"}
+            title={spotlightItem.title}
+            overview={spotlightItem.overview}
+            backdropPath={spotlightItem.backdropPath ?? null}
+            posterPath={spotlightItem.posterPath ?? null}
+            year={spotlightItem.year}
+            voteAverage={spotlightItem.voteAverage}
+            genres={spotlightItem.genreIds?.map(String)}
+          />
+        ) : null}
+      </div>
 
-      {/* Carousels */}
-      <div className="space-y-10 py-10">
+      {/* Carousels on white background */}
+      <div className="space-y-10 bg-white py-10">
         <MediaCarousel
           title="Trending Movies"
           seeAllHref="/search?type=movie"

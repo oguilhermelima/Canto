@@ -31,7 +31,7 @@ export function MediaGrid({
     return (
       <div
         className={cn(
-          "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6",
+          "grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6",
           className,
         )}
       >
@@ -45,7 +45,7 @@ export function MediaGrid({
   if (items.length === 0) {
     return (
       <div className="flex min-h-[300px] items-center justify-center">
-        <p className="text-muted-foreground">No results found</p>
+        <p className="text-neutral-500">No results found</p>
       </div>
     );
   }
@@ -53,7 +53,7 @@ export function MediaGrid({
   return (
     <div
       className={cn(
-        "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6",
+        "grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6",
         className,
       )}
     >

@@ -6,9 +6,9 @@ export default function AppLayout({
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-white">
       <Topbar />
-      <main className="pt-16">{children}</main>
+      <main className="pt-14">{children}</main>
     </div>
   );
 }
