@@ -11,6 +11,7 @@ export const searchInput = z.object({
   type: mediaType,
   provider: providerType.default("tmdb"),
   page: z.number().int().positive().default(1),
+  cursor: z.number().int().positive().nullish(),
 });
 export type SearchInput = z.infer<typeof searchInput>;
 

@@ -22,6 +22,8 @@ interface MediaCarouselProps {
   seeAllHref?: string;
   items: MediaItem[];
   isLoading?: boolean;
+  isFetchingMore?: boolean;
+  onLoadMore?: () => void;
   className?: string;
 }
 
@@ -30,6 +32,8 @@ export function MediaCarousel({
   seeAllHref,
   items,
   isLoading = false,
+  isFetchingMore = false,
+  onLoadMore,
   className,
 }: MediaCarouselProps): React.JSX.Element {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -40,8 +44,14 @@ export function MediaCarousel({
     const el = scrollRef.current;
     if (!el) return;
     setCanScrollLeft(el.scrollLeft > 0);
+    const nearEnd = el.scrollLeft >= el.scrollWidth - el.clientWidth - 300;
     setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10);
-  }, []);
+
+    // Trigger load more when near the end
+    if (nearEnd && onLoadMore && !isFetchingMore) {
+      onLoadMore();
+    }
+  }, [onLoadMore, isFetchingMore]);
 
   const scroll = useCallback(
     (direction: "left" | "right") => {
@@ -60,60 +70,72 @@ export function MediaCarousel({
   return (
     <section className={cn("relative", className)}>
       {/* Header */}
-      <div className="mb-4 flex items-center justify-between px-4 sm:px-6 lg:px-8">
-        <h2 className="text-xl font-semibold text-black">{title}</h2>
+      <div className="mb-4 flex items-center justify-between pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24">
+        <h2 className="text-xl font-semibold text-foreground">{title}</h2>
         {seeAllHref && (
           <Link
             href={seeAllHref}
-            className="text-sm font-medium text-neutral-500 transition-colors hover:text-black"
+            className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
-            See more &gt;
+            See more
+            <ChevronRight className="h-4 w-4" />
           </Link>
         )}
       </div>
 
       {/* Scroll container */}
       <div className="group/carousel relative">
-        {/* Left arrow */}
+        {/* Left arrow with gradient */}
         {canScrollLeft && (
           <button
-            className="absolute left-2 top-1/3 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white opacity-0 shadow-lg transition-opacity group-hover/carousel:opacity-100 hover:bg-black/70"
+            className="absolute left-0 top-0 z-10 hidden h-full w-12 items-center justify-center bg-gradient-to-r from-background/90 to-transparent opacity-0 transition-opacity group-hover/carousel:opacity-100 md:flex lg:w-16"
             onClick={() => scroll("left")}
           >
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft size={28} />
           </button>
         )}
 
-        {/* Right arrow */}
+        {/* Right arrow with gradient */}
         {canScrollRight && (
           <button
-            className="absolute right-2 top-1/3 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white opacity-0 shadow-lg transition-opacity group-hover/carousel:opacity-100 hover:bg-black/70"
+            className="absolute right-0 top-0 z-10 hidden h-full w-12 items-center justify-center bg-gradient-to-l from-background/90 to-transparent opacity-0 transition-opacity group-hover/carousel:opacity-100 md:flex lg:w-16"
             onClick={() => scroll("right")}
           >
-            <ChevronRight className="h-5 w-5" />
+            <ChevronRight size={28} />
           </button>
         )}
 
         <div
           ref={scrollRef}
           onScroll={updateScrollButtons}
-          className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 sm:px-6 lg:px-8"
+          className="flex gap-6 overflow-x-auto overflow-y-visible py-2 pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           {isLoading
             ? Array.from({ length: 8 }).map((_, i) => (
                 <MediaCardSkeleton
                   key={i}
-                  className="w-[150px] shrink-0 snap-start sm:w-[170px] lg:w-[185px]"
+                  className="w-[160px] shrink-0 sm:w-[185px] lg:w-[200px] 2xl:w-[220px]"
                 />
               ))
             : items.map((item, i) => (
                 <MediaCard
                   key={item.id ?? `${item.provider}-${item.externalId}-${i}`}
                   {...item}
-                  className="w-[150px] shrink-0 snap-start sm:w-[170px] lg:w-[185px]"
+                  showTypeBadge={false}
+                  className="w-[160px] shrink-0 sm:w-[185px] lg:w-[200px] 2xl:w-[220px]"
                 />
               ))}
+          {/* Loading more skeletons */}
+          {isFetchingMore &&
+            Array.from({ length: 4 }).map((_, i) => (
+              <MediaCardSkeleton
+                key={`loading-${i}`}
+                className="w-[160px] shrink-0 sm:w-[185px] lg:w-[200px] 2xl:w-[220px]"
+              />
+            ))}
+          {/* End spacer to match page padding */}
+          <div className="w-4 shrink-0 md:w-8 lg:w-12 xl:w-16 2xl:w-24" />
         </div>
       </div>
     </section>

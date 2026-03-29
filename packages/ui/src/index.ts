@@ -95,3 +95,5 @@ export {
 export { Slider } from "./components/slider";
 
 export { Switch } from "./components/switch";
+
+export { Label } from "./components/label";

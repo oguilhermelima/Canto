@@ -1,10 +1,27 @@
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
+
 import { eq } from "drizzle-orm";
 
 import { db } from "@canto/db/client";
-import { media, mediaFile, torrent } from "@canto/db/schema";
+import { library, media, mediaFile, torrent } from "@canto/db/schema";
+
+const execAsync = promisify(exec);
 
 /* -------------------------------------------------------------------------- */
-/*  qBittorrent types                                                         */
+/*  Config                                                                     */
+/* -------------------------------------------------------------------------- */
+
+const QB_URL = process.env.QBITTORRENT_URL ?? "";
+const QB_USER = process.env.QBITTORRENT_USERNAME ?? "";
+const QB_PASS = process.env.QBITTORRENT_PASSWORD ?? "";
+const MEDIA_SERVER_HOST = process.env.MEDIA_SERVER_HOST ?? "";
+const MEDIA_SERVER_USER = process.env.MEDIA_SERVER_USER ?? "";
+const JELLYFIN_URL = process.env.JELLYFIN_URL ?? "";
+const JELLYFIN_API_KEY = process.env.JELLYFIN_API_KEY ?? "";
+
+/* -------------------------------------------------------------------------- */
+/*  qBittorrent helpers                                                        */
 /* -------------------------------------------------------------------------- */
 
 interface QBTorrent {
@@ -24,14 +41,6 @@ interface QBTorrentFile {
   size: number;
   progress: number;
 }
-
-/* -------------------------------------------------------------------------- */
-/*  qBittorrent helpers                                                       */
-/* -------------------------------------------------------------------------- */
-
-const QB_URL = process.env.QBITTORRENT_URL ?? "http://localhost:8080";
-const QB_USER = process.env.QBITTORRENT_USERNAME ?? "admin";
-const QB_PASS = process.env.QBITTORRENT_PASSWORD ?? "adminadmin";
 
 let qbCookie: string | null = null;
 
@@ -70,23 +79,63 @@ async function qbFetch<T>(path: string): Promise<T> {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Season/episode pattern matching                                           */
+/*  SSH helper                                                                 */
 /* -------------------------------------------------------------------------- */
 
-const EPISODE_PATTERN = /[Ss](\d{1,2})[Ee](\d{1,3})/;
+async function sshExec(command: string): Promise<string> {
+  const sshCmd = `ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${MEDIA_SERVER_USER}@${MEDIA_SERVER_HOST} ${JSON.stringify(command)}`;
+  const { stdout } = await execAsync(sshCmd, { timeout: 30000 });
+  return stdout.trim();
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Naming helpers                                                             */
+/* -------------------------------------------------------------------------- */
+
 const VIDEO_EXTENSIONS = new Set([
   ".mkv", ".mp4", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".ts",
 ]);
+
+const EPISODE_PATTERN = /[Ss](\d{1,2})[Ee](\d{1,3})/;
 
 function isVideoFile(filename: string): boolean {
   const ext = filename.substring(filename.lastIndexOf(".")).toLowerCase();
   return VIDEO_EXTENSIONS.has(ext);
 }
 
+function sanitizeName(name: string): string {
+  return name
+    .replace(/[<>:"/\\|?*]+/g, "")
+    .replace(/\.+$/, "")
+    .trim();
+}
+
+/**
+ * Build Jellyfin-compatible directory name.
+ * Movies:  "Title (Year) [tmdbid-12345]"
+ * Shows:   "Title (Year) [tmdbid-12345]/Season 01"
+ */
+function buildMediaDir(
+  mediaItem: { title: string; year: number | null; externalId: number; provider: string; type: string },
+  seasonNumber?: number,
+): string {
+  const safeTitle = sanitizeName(mediaItem.title);
+  const yearSuffix = mediaItem.year ? ` (${mediaItem.year})` : "";
+  const providerTag = mediaItem.provider === "tmdb" ? "tmdbid" : mediaItem.provider;
+  const idTag = `[${providerTag}-${mediaItem.externalId}]`;
+  const baseName = `${safeTitle}${yearSuffix} ${idTag}`;
+
+  if (mediaItem.type === "movie") {
+    return baseName;
+  }
+
+  const seasonPadded = String(seasonNumber ?? 1).padStart(2, "0");
+  return `${baseName}/Season ${seasonPadded}`;
+}
+
 function detectQuality(filename: string): string {
   const lower = filename.toLowerCase();
-  if (lower.includes("2160p") || lower.includes("4k") || lower.includes("uhd"))
-    return "uhd";
+  if (lower.includes("2160p") || lower.includes("4k") || lower.includes("uhd")) return "uhd";
   if (lower.includes("1080p") || lower.includes("fullhd")) return "fullhd";
   if (lower.includes("720p")) return "hd";
   if (lower.includes("480p") || lower.includes("360p")) return "sd";
@@ -94,140 +143,247 @@ function detectQuality(filename: string): string {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Main handler                                                              */
+/*  Jellyfin scan trigger                                                      */
+/* -------------------------------------------------------------------------- */
+
+async function triggerJellyfinScan(): Promise<void> {
+  if (!JELLYFIN_API_KEY) return;
+  try {
+    await fetch(`${JELLYFIN_URL}/Library/Refresh`, {
+      method: "POST",
+      headers: { "X-Emby-Token": JELLYFIN_API_KEY },
+    });
+    console.log("[import-torrents] Triggered Jellyfin library scan");
+  } catch (err) {
+    console.warn("[import-torrents] Failed to trigger Jellyfin scan:", err);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Main handler                                                               */
 /* -------------------------------------------------------------------------- */
 
 export async function handleImportTorrents(): Promise<void> {
-  // 1. Get all torrents from qBittorrent
-  const qbTorrents = await qbFetch<QBTorrent[]>("/api/v2/torrents/info");
+  // Find completed, non-imported torrents in our DB
+  const rows = await db.query.torrent.findMany({
+    where: eq(torrent.imported, false),
+  });
 
-  // 2. Find completed torrents (progress === 1)
-  const completed = qbTorrents.filter((t) => t.progress >= 1);
+  const toImport = rows.filter(
+    (r) => r.status === "completed" && r.hash && r.mediaId,
+  );
 
-  if (completed.length === 0) return;
+  if (toImport.length === 0) return;
 
-  // 3. For each completed torrent, check if we have a DB record
-  for (const qbt of completed) {
-    // Look up torrent record by hash
-    const torrentRow = await db.query.torrent.findFirst({
-      where: eq(torrent.hash, qbt.hash),
-    });
+  console.log(
+    `[import-torrents] Found ${toImport.length} completed torrent(s) to import`,
+  );
 
-    if (!torrentRow) {
-      // No DB record for this torrent — skip
-      continue;
+  let importedAny = false;
+
+  for (const row of toImport) {
+    try {
+      const success = await importTorrent(row);
+      if (success) importedAny = true;
+    } catch (err) {
+      console.error(
+        `[import-torrents] Error importing "${row.title}":`,
+        err instanceof Error ? err.message : err,
+      );
     }
+  }
 
-    if (torrentRow.imported) {
-      // Already imported — skip
-      continue;
-    }
+  // Trigger Jellyfin scan if we imported anything
+  if (importedAny) {
+    await triggerJellyfinScan();
+  }
+}
 
-    // 4. Get the list of files in this torrent
-    const files = await qbFetch<QBTorrentFile[]>(
-      `/api/v2/torrents/files?hash=${qbt.hash}`,
-    );
+async function importTorrent(row: typeof torrent.$inferSelect): Promise<boolean> {
+  if (!row.hash || !row.mediaId) return false;
 
-    const videoFiles = files.filter((f) => isVideoFile(f.name));
-
-    if (videoFiles.length === 0) {
-      // Update status to error — no video files found
-      await db
-        .update(torrent)
-        .set({ status: "error", updatedAt: new Date() })
-        .where(eq(torrent.id, torrentRow.id));
-      continue;
-    }
-
-    // 5. Try to match files to a media record
-    // Find media records that could match the torrent title (fuzzy by title)
-    // For a simple approach, look at all in_library media and try to match
-    const allMedia = await db.query.media.findMany({
-      where: eq(media.inLibrary, true),
-      with: {
-        seasons: {
-          with: {
-            episodes: true,
-          },
-        },
+  // Fetch media info
+  const mediaRow = await db.query.media.findFirst({
+    where: eq(media.id, row.mediaId),
+    with: {
+      seasons: {
+        with: { episodes: true },
       },
-    });
+    },
+  });
 
-    // Try to find which media item this torrent belongs to
-    // Match by checking if the torrent name contains the media title
-    const torrentNameLower = qbt.name.toLowerCase();
-    const matchedMedia = allMedia.find((m) => {
-      const titleLower = m.title.toLowerCase().replace(/[^a-z0-9]+/g, " ");
-      const torrentNorm = torrentNameLower.replace(/[^a-z0-9]+/g, " ");
-      return torrentNorm.includes(titleLower);
-    });
+  if (!mediaRow) {
+    console.warn(`[import-torrents] Media not found for torrent "${row.title}"`);
+    return false;
+  }
 
-    if (!matchedMedia) {
-      // Cannot match to a media item — mark as finished but do not import
-      await db
-        .update(torrent)
-        .set({ status: "finished", updatedAt: new Date() })
-        .where(eq(torrent.id, torrentRow.id));
-      continue;
+  // Fetch library info to get the base path
+  const libraryRow = mediaRow.libraryId
+    ? await db.query.library.findFirst({
+        where: eq(library.id, mediaRow.libraryId),
+      })
+    : null;
+
+  // Determine base path on the media server
+  // qBit categories map: movies → /medias/Movies, shows → /medias/Shows, animes → /medias/Animes
+  // Host paths: /home/user/Medias/Movies, /home/user/Medias/Shows, /home/user/Medias/Animes
+  const categoryMap: Record<string, string> = {
+    movies: "/home/user/Medias/Movies",
+    shows: "/home/user/Medias/Shows",
+    animes: "/home/user/Medias/Animes",
+  };
+  const qbCategory = libraryRow?.qbitCategory ?? (mediaRow.type === "show" ? "shows" : "movies");
+  const basePath = categoryMap[qbCategory] ?? "/home/user/Medias/Shows";
+
+  // Get files list from qBittorrent
+  const files = await qbFetch<QBTorrentFile[]>(
+    `/api/v2/torrents/files?hash=${row.hash}`,
+  );
+
+  const videoFiles = files.filter((f) => isVideoFile(f.name));
+  if (videoFiles.length === 0) {
+    console.warn(`[import-torrents] No video files in torrent "${row.title}"`);
+    await db
+      .update(torrent)
+      .set({ imported: true, updatedAt: new Date() })
+      .where(eq(torrent.id, row.id));
+    return false;
+  }
+
+  // Get the qBittorrent torrent info to know current save path
+  const qbTorrents = await qbFetch<QBTorrent[]>("/api/v2/torrents/info");
+  const qbt = qbTorrents.find((t) => t.hash === row.hash);
+  if (!qbt) {
+    console.warn(`[import-torrents] Torrent "${row.title}" not found in qBittorrent`);
+    return false;
+  }
+
+  let importedCount = 0;
+
+  // qBittorrent container paths → host paths mapping
+  // qBit: /medias/... → Host: /home/user/Medias/...
+  // qBit: /downloads/... → Host: /home/user/Medias/Downloads/...
+  const containerToHost = (containerPath: string): string => {
+    if (containerPath.startsWith("/medias/")) {
+      return containerPath.replace("/medias/", "/home/user/Medias/");
     }
+    if (containerPath.startsWith("/downloads/")) {
+      return containerPath.replace("/downloads/", "/home/user/Medias/Downloads/");
+    }
+    return containerPath;
+  };
 
-    // 6. Create media_file records
-    for (const vf of videoFiles) {
-      const filePath = `${qbt.save_path}/${vf.name}`;
-      const quality = detectQuality(vf.name);
-
-      // For shows, try to extract season/episode from filename
+  for (const vf of videoFiles) {
+    try {
+      // Parse season/episode from filename
+      let seasonNumber = row.seasonNumber ?? undefined;
       let episodeId: string | undefined;
-      if (matchedMedia.type === "show") {
+      const ext = vf.name.substring(vf.name.lastIndexOf("."));
+
+      if (mediaRow.type === "show") {
         const match = EPISODE_PATTERN.exec(vf.name);
         if (match) {
-          const seasonNum = parseInt(match[1]!, 10);
+          seasonNumber = parseInt(match[1]!, 10);
           const episodeNum = parseInt(match[2]!, 10);
 
-          const matchedSeason = matchedMedia.seasons?.find(
-            (s) => s.number === seasonNum,
-          );
-          if (matchedSeason) {
-            const matchedEpisode = matchedSeason.episodes?.find(
-              (e) => e.number === episodeNum,
-            );
-            if (matchedEpisode) {
-              episodeId = matchedEpisode.id;
-            }
-          }
+          const matchedSeason = mediaRow.seasons?.find((s) => s.number === seasonNumber);
+          const matchedEpisode = matchedSeason?.episodes?.find((e) => e.number === episodeNum);
+          if (matchedEpisode) episodeId = matchedEpisode.id;
         }
       }
 
-      // Check if this file already exists
+      // Build target directory and filename
+      const mediaDir = buildMediaDir(mediaRow, seasonNumber);
+      const targetDir = `${basePath}/${mediaDir}`;
+
+      // For episodes, use clean name: "S01E01.mkv"
+      // For movies, use: "Title (Year).mkv"
+      let targetFilename: string;
+      if (mediaRow.type === "show" && seasonNumber !== undefined) {
+        const match = EPISODE_PATTERN.exec(vf.name);
+        if (match) {
+          const sn = String(parseInt(match[1]!, 10)).padStart(2, "0");
+          const en = String(parseInt(match[2]!, 10)).padStart(2, "0");
+          targetFilename = `S${sn}E${en}${ext}`;
+        } else {
+          targetFilename = sanitizeName(vf.name.substring(vf.name.lastIndexOf("/") + 1));
+        }
+      } else {
+        const yearSuffix = mediaRow.year ? ` (${mediaRow.year})` : "";
+        targetFilename = `${sanitizeName(mediaRow.title)}${yearSuffix}${ext}`;
+      }
+
+      // Convert container paths to host paths for SSH
+      const sourcePath = containerToHost(`${qbt.save_path}/${vf.name}`);
+      const targetPath = `${targetDir}/${targetFilename}`;
+
+      // Create directory and move file via SSH
+      await sshExec(`mkdir -p '${targetDir}'`);
+      await sshExec(`cp '${sourcePath}' '${targetPath}'`);
+
+      console.log(`[import-torrents] Organized: ${vf.name} → ${targetPath}`);
+
+      // Create media_file record
       const existingFile = await db.query.mediaFile.findFirst({
-        where: eq(mediaFile.filePath, filePath),
+        where: eq(mediaFile.filePath, targetPath),
       });
 
       if (!existingFile) {
         await db.insert(mediaFile).values({
-          mediaId: matchedMedia.id,
+          mediaId: mediaRow.id,
           episodeId: episodeId ?? null,
-          torrentId: torrentRow.id,
-          filePath,
-          quality,
+          torrentId: row.id,
+          filePath: targetPath,
+          quality: row.quality !== "unknown" ? row.quality : detectQuality(vf.name),
           sizeBytes: vf.size,
         });
+        importedCount++;
       }
+    } catch (err) {
+      console.error(
+        `[import-torrents] Error organizing "${vf.name}":`,
+        err instanceof Error ? err.message : err,
+      );
     }
+  }
 
-    // 7. Mark torrent as imported
-    await db
-      .update(torrent)
-      .set({
-        status: "finished",
-        imported: true,
-        quality: detectQuality(qbt.name),
-        updatedAt: new Date(),
-      })
-      .where(eq(torrent.id, torrentRow.id));
+  // Mark torrent as imported
+  await db
+    .update(torrent)
+    .set({
+      imported: true,
+      contentPath: `${basePath}/${buildMediaDir(mediaRow, row.seasonNumber ?? undefined)}`,
+      updatedAt: new Date(),
+    })
+    .where(eq(torrent.id, row.id));
 
-    console.log(
-      `[import-torrents] Imported ${videoFiles.length} files for "${matchedMedia.title}" from torrent "${qbt.name}"`,
+  console.log(
+    `[import-torrents] Imported ${importedCount} file(s) for "${mediaRow.title}" from "${row.title}"`,
+  );
+
+  return importedCount > 0;
+}
+
+/**
+ * Import a single torrent by ID. Called from the API for manual imports.
+ */
+export async function importSingleTorrent(torrentId: string): Promise<boolean> {
+  const row = await db.query.torrent.findFirst({
+    where: eq(torrent.id, torrentId),
+  });
+
+  if (!row || !row.hash || !row.mediaId) return false;
+  if (row.imported) return true; // Already imported
+
+  try {
+    const success = await importTorrent(row);
+    if (success) await triggerJellyfinScan();
+    return success;
+  } catch (err) {
+    console.error(
+      `[import-torrents] Error importing "${row.title}":`,
+      err instanceof Error ? err.message : err,
     );
+    return false;
   }
 }

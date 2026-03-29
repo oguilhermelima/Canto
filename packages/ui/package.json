@@ -24,6 +24,7 @@
     "./select": "./src/components/select.tsx",
     "./slider": "./src/components/slider.tsx",
     "./switch": "./src/components/switch.tsx",
+    "./label": "./src/components/label.tsx",
     "./cn": "./src/lib/utils.ts"
   },
   "scripts": {

@@ -128,10 +128,48 @@ export interface MediaExtras {
   watchProviders?: WatchProvidersByRegion;
 }
 
+export interface PersonCredit {
+  id: number;
+  title: string;
+  character?: string;
+  posterPath?: string;
+  backdropPath?: string;
+  releaseDate?: string;
+  year?: number;
+  voteAverage?: number;
+  mediaType: "movie" | "show";
+}
+
+export interface PersonDetail {
+  id: number;
+  name: string;
+  biography: string;
+  birthday: string | null;
+  deathday: string | null;
+  placeOfBirth: string | null;
+  profilePath: string | null;
+  knownForDepartment: string | null;
+  alsoKnownAs: string[];
+  gender: number;
+  popularity: number;
+  images: { filePath: string; aspectRatio: number }[];
+  movieCredits: PersonCredit[];
+  tvCredits: PersonCredit[];
+}
+
 export interface SearchOpts {
   page?: number;
   language?: string;
   region?: string;
+}
+
+export interface DiscoverOpts {
+  page?: number;
+  with_genres?: string;
+  with_original_language?: string;
+  sort_by?: string;
+  first_air_date_gte?: string;
+  release_date_gte?: string;
 }
 
 export interface MetadataProvider {
@@ -152,5 +190,9 @@ export interface MetadataProvider {
   getTrending(
     type: MediaType,
     opts?: SearchOpts,
-  ): Promise<{ results: SearchResult[]; totalPages: number }>;
+  ): Promise<{ results: SearchResult[]; totalPages: number; totalResults: number }>;
+  discover(
+    type: MediaType,
+    opts?: DiscoverOpts,
+  ): Promise<{ results: SearchResult[]; totalPages: number; totalResults: number }>;
 }

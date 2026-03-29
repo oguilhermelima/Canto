@@ -7,7 +7,10 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Canto",
+  title: {
+    default: "Canto",
+    template: "%s — Canto",
+  },
   description: "Your personal media library",
 };
 
@@ -21,8 +24,8 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
-          enableSystem={false}
+          defaultTheme="system"
+          enableSystem
         >
           <TRPCProvider>{children}</TRPCProvider>
         </ThemeProvider>

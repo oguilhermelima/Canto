@@ -1,12 +1,15 @@
 import type {
   CastMember,
   CrewMember,
+  DiscoverOpts,
   MediaExtras,
   MediaType,
   MetadataProvider,
   NormalizedEpisode,
   NormalizedMedia,
   NormalizedSeason,
+  PersonCredit,
+  PersonDetail,
   SearchOpts,
   SearchResult,
   Video,
@@ -323,7 +326,7 @@ export class TmdbProvider implements MetadataProvider {
   async getTrending(
     type: MediaType,
     opts?: SearchOpts,
-  ): Promise<{ results: SearchResult[]; totalPages: number }> {
+  ): Promise<{ results: SearchResult[]; totalPages: number; totalResults: number }> {
     const endpoint =
       type === "movie" ? "/trending/movie/week" : "/trending/tv/week";
     const params: Record<string, string> = {};
@@ -333,11 +336,174 @@ export class TmdbProvider implements MetadataProvider {
     const data = await this.fetch<{
       results: unknown[];
       total_pages: number;
+      total_results: number;
     }>(endpoint, params);
 
     return {
       results: data.results.map((r) => this.normalizeSearchResult(r, type)),
       totalPages: data.total_pages,
+      totalResults: data.total_results,
+    };
+  }
+
+  /* ── Trending with server-side filters ────────────────────────────── */
+
+  async getTrendingFiltered(
+    type: MediaType,
+    opts?: {
+      page?: number;
+      genreIds?: number[];
+      language?: string;
+    },
+  ): Promise<{ results: SearchResult[]; totalPages: number; totalResults: number }> {
+    const endpoint =
+      type === "movie" ? "/trending/movie/week" : "/trending/tv/week";
+    const targetCount = 20;
+    const maxPages = 5;
+    const startPage = opts?.page ?? 1;
+    const allResults: SearchResult[] = [];
+
+    for (let p = startPage; p < startPage + maxPages; p++) {
+      const params: Record<string, string> = { page: String(p) };
+
+      const data = await this.fetch<{
+        results: Array<Record<string, unknown>>;
+        total_pages: number;
+      }>(endpoint, params);
+
+      if (data.results.length === 0) break;
+
+      for (const raw of data.results) {
+        const rawGenres = (raw.genre_ids ?? []) as number[];
+        const origLang = raw.original_language as string;
+
+        // Apply genre filter
+        if (opts?.genreIds && opts.genreIds.length > 0) {
+          if (!opts.genreIds.some((g) => rawGenres.includes(g))) continue;
+        }
+        // Apply language filter
+        if (opts?.language && origLang !== opts.language) continue;
+
+        allResults.push(this.normalizeSearchResult(raw, type));
+      }
+
+      if (allResults.length >= targetCount || p >= data.total_pages) break;
+    }
+
+    return {
+      results: allResults.slice(0, targetCount),
+      totalPages: Math.max(1, Math.ceil(allResults.length / targetCount)),
+      totalResults: allResults.length,
+    };
+  }
+
+  /* ── Discover ─────────────────────────────────────────────────────── */
+
+  async discover(
+    type: MediaType,
+    opts?: DiscoverOpts,
+  ): Promise<{ results: SearchResult[]; totalPages: number; totalResults: number }> {
+    const endpoint = type === "movie" ? "/discover/movie" : "/discover/tv";
+    const params: Record<string, string> = {};
+    if (opts?.page) params.page = String(opts.page);
+    if (opts?.with_genres) params.with_genres = opts.with_genres;
+    if (opts?.with_original_language) params.with_original_language = opts.with_original_language;
+    params.sort_by = opts?.sort_by ?? "popularity.desc";
+    if (type === "show" && opts?.first_air_date_gte) {
+      params["first_air_date.gte"] = opts.first_air_date_gte;
+    }
+    if (type === "movie" && opts?.release_date_gte) {
+      params["release_date.gte"] = opts.release_date_gte;
+    }
+
+    const data = await this.fetch<{
+      results: unknown[];
+      total_pages: number;
+      total_results: number;
+    }>(endpoint, params);
+
+    return {
+      results: data.results.map((r) => this.normalizeSearchResult(r, type)),
+      totalPages: data.total_pages,
+      totalResults: data.total_results,
+    };
+  }
+
+  /* ── Person detail ────────────────────────────────────────────────── */
+
+  async getPerson(personId: number): Promise<PersonDetail> {
+    const data = await this.fetch<Record<string, unknown>>(
+      `/person/${personId}`,
+      { append_to_response: "combined_credits,images" },
+    );
+
+    const combinedCredits = (data.combined_credits ?? {}) as {
+      cast?: unknown[];
+    };
+
+    const rawCast = (combinedCredits.cast ?? []) as Array<Record<string, unknown>>;
+
+    const movieCredits: PersonCredit[] = [];
+    const tvCredits: PersonCredit[] = [];
+
+    for (const c of rawCast) {
+      const mediaType = c.media_type as string;
+      const isMovie = mediaType === "movie";
+      const title = isMovie
+        ? ((c.title as string) ?? "")
+        : ((c.name as string) ?? "");
+      const releaseDate = isMovie
+        ? ((c.release_date as string) ?? undefined)
+        : ((c.first_air_date as string) ?? undefined);
+
+      const credit: PersonCredit = {
+        id: c.id as number,
+        title,
+        character: (c.character as string) ?? undefined,
+        posterPath: (c.poster_path as string | null) ?? undefined,
+        backdropPath: (c.backdrop_path as string | null) ?? undefined,
+        releaseDate,
+        year: yearFromDate(releaseDate),
+        voteAverage: (c.vote_average as number) ?? undefined,
+        mediaType: isMovie ? "movie" : "show",
+      };
+
+      if (isMovie) {
+        movieCredits.push(credit);
+      } else if (mediaType === "tv") {
+        tvCredits.push(credit);
+      }
+    }
+
+    // Sort by popularity (vote_average * vote_count approximation via popularity) descending
+    const sortByPopularity = (a: PersonCredit, b: PersonCredit): number =>
+      (b.voteAverage ?? 0) - (a.voteAverage ?? 0);
+    movieCredits.sort(sortByPopularity);
+    tvCredits.sort(sortByPopularity);
+
+    const rawImages = (data.images as { profiles?: unknown[] } | undefined);
+    const images = ((rawImages?.profiles ?? []) as Array<Record<string, unknown>>).map(
+      (img) => ({
+        filePath: img.file_path as string,
+        aspectRatio: (img.aspect_ratio as number) ?? 0.667,
+      }),
+    );
+
+    return {
+      id: data.id as number,
+      name: (data.name as string) ?? "",
+      biography: (data.biography as string) ?? "",
+      birthday: (data.birthday as string | null) ?? null,
+      deathday: (data.deathday as string | null) ?? null,
+      placeOfBirth: (data.place_of_birth as string | null) ?? null,
+      profilePath: (data.profile_path as string | null) ?? null,
+      knownForDepartment: (data.known_for_department as string | null) ?? null,
+      alsoKnownAs: (data.also_known_as as string[]) ?? [],
+      gender: (data.gender as number) ?? 0,
+      popularity: (data.popularity as number) ?? 0,
+      images,
+      movieCredits,
+      tvCredits,
     };
   }
 

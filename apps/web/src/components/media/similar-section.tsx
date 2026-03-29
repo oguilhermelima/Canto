@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@canto/ui/cn";
 import { MediaCarousel } from "./media-carousel";
 
 interface MediaItem {
@@ -34,13 +35,12 @@ export function SimilarSection({
   }
 
   return (
-    <div className={className}>
+    <div className={cn("flex flex-col gap-16 md:gap-20", className)}>
       {hasRecommendations && (
         <MediaCarousel
           title="Recommended"
           items={recommendations}
           isLoading={isLoading}
-          className="mb-8"
         />
       )}
 

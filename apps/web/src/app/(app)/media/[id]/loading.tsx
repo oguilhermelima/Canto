@@ -2,12 +2,12 @@ import { Skeleton } from "@canto/ui/skeleton";
 
 export default function MediaDetailLoading(): React.JSX.Element {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       {/* Hero skeleton */}
       <section className="relative w-full">
         {/* Backdrop skeleton */}
-        <div className="relative h-[400px] w-full overflow-hidden bg-neutral-100">
-          <div className="absolute inset-0 bg-gradient-to-t from-white via-white/40 to-transparent" />
+        <div className="relative h-[400px] w-full overflow-hidden bg-muted">
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
         </div>
 
         {/* Content skeleton */}

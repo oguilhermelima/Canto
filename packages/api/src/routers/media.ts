@@ -8,7 +8,7 @@ import {
   media,
   season,
 } from "@canto/db/schema";
-import { getProvider } from "@canto/providers";
+import { getProvider, TmdbProvider } from "@canto/providers";
 import type { NormalizedMedia } from "@canto/providers";
 import {
   addToLibraryInput,
@@ -219,8 +219,9 @@ export const mediaRouter = createTRPCRouter({
    */
   search: publicProcedure.input(searchInput).query(async ({ input }) => {
     const provider = getProvider(input.provider);
+    const page = input.cursor ?? input.page;
     return provider.search(input.query, input.type, {
-      page: input.page,
+      page,
     });
   }),
 
@@ -362,7 +363,7 @@ export const mediaRouter = createTRPCRouter({
   /**
    * Add media to the user's library.
    */
-  addToLibrary: protectedProcedure
+  addToLibrary: publicProcedure // TODO: switch to protectedProcedure when auth is implemented
     .input(addToLibraryInput)
     .mutation(async ({ ctx, input }) => {
       const [updated] = await ctx.db
@@ -388,7 +389,7 @@ export const mediaRouter = createTRPCRouter({
   /**
    * Remove media from the user's library.
    */
-  removeFromLibrary: protectedProcedure
+  removeFromLibrary: publicProcedure // TODO: switch to protectedProcedure when auth is implemented
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [updated] = await ctx.db
@@ -414,7 +415,7 @@ export const mediaRouter = createTRPCRouter({
   /**
    * Re-fetch metadata from the original provider and update the DB record.
    */
-  updateMetadata: protectedProcedure
+  updateMetadata: publicProcedure // TODO: protectedProcedure when auth ready
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const row = await ctx.db.query.media.findFirst({
@@ -442,7 +443,7 @@ export const mediaRouter = createTRPCRouter({
   /**
    * Hard delete a media record (cascades to seasons, episodes, files, cache).
    */
-  delete: protectedProcedure
+  delete: publicProcedure // TODO: protectedProcedure when auth ready
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [deleted] = await ctx.db
@@ -461,18 +462,58 @@ export const mediaRouter = createTRPCRouter({
     }),
 
   /**
-   * Get trending media from the provider.
+   * Unified discover endpoint. Supports:
+   * - mode "trending": TMDB /trending endpoint (default)
+   * - mode "discover": TMDB /discover endpoint (genre, language, sort filters)
+   * - genre/language filters: applied server-side on trending, or as API params on discover
    */
-  trending: publicProcedure
+  discover: publicProcedure
     .input(
       z.object({
         type: z.enum(["movie", "show"]),
-        provider: z.enum(["tmdb", "anilist", "tvdb"]).default("tmdb"),
+        mode: z.enum(["trending", "discover"]).default("trending"),
+        genres: z.string().optional(),
+        language: z.string().optional(),
+        sortBy: z.string().optional(),
+        dateFrom: z.string().optional(),
         page: z.number().int().min(1).default(1),
+        cursor: z.number().int().positive().nullish(),
       }),
     )
     .query(async ({ input }) => {
-      const provider = getProvider(input.provider);
-      return provider.getTrending(input.type, { page: input.page });
+      const provider = new TmdbProvider();
+      const page = input.cursor ?? input.page;
+
+      if (input.mode === "trending") {
+        // If genre/language filters are set, use filtered trending (fetches multiple pages)
+        if (input.genres || input.language) {
+          return provider.getTrendingFiltered(input.type, {
+            page,
+            genreIds: input.genres ? input.genres.split(",").map(Number) : undefined,
+            language: input.language,
+          });
+        }
+        return provider.getTrending(input.type, { page });
+      }
+
+      // Discover mode — pass all filters to TMDB Discover API
+      return provider.discover(input.type, {
+        page,
+        with_genres: input.genres,
+        with_original_language: input.language,
+        sort_by: input.sortBy ?? "popularity.desc",
+        first_air_date_gte: input.type === "show" ? input.dateFrom : undefined,
+        release_date_gte: input.type === "movie" ? input.dateFrom : undefined,
+      });
+    }),
+
+  /**
+   * Get person detail from TMDB (biography, credits, images).
+   */
+  getPerson: publicProcedure
+    .input(z.object({ personId: z.number() }))
+    .query(async ({ input }) => {
+      const provider = new TmdbProvider();
+      return provider.getPerson(input.personId);
     }),
 });

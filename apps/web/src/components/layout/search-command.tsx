@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -53,19 +53,6 @@ export function SearchCommand({
         }
       : movieSearch.data ?? showSearch.data;
 
-  // Cmd+K keyboard shortcut
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        onOpenChange(!open);
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, onOpenChange]);
-
   const handleSelect = useCallback(
     (externalId: string, provider: string, type: string) => {
       onOpenChange(false);
@@ -79,21 +66,21 @@ export function SearchCommand({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl gap-0 overflow-hidden border-neutral-200 bg-white p-0">
+      <DialogContent className="max-w-2xl gap-0 overflow-hidden border-border bg-card p-0">
         <DialogTitle className="sr-only">Search media</DialogTitle>
-        <div className="flex items-center border-b border-neutral-200 px-4">
-          <Search className="mr-2 h-5 w-5 shrink-0 text-neutral-400" />
+        <div className="flex items-center border-b border-border px-4">
+          <Search className="mr-2 h-5 w-5 shrink-0 text-muted-foreground" />
           <Input
             placeholder="Search movies and shows..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="h-12 border-0 bg-transparent text-base text-black placeholder:text-neutral-400 focus-visible:ring-0 focus-visible:ring-offset-0"
+            className="h-12 border-0 bg-transparent text-base text-foreground placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0"
           />
         </div>
 
         <div className="max-h-[400px] overflow-y-auto">
           {query.length < 2 && (
-            <div className="p-8 text-center text-sm text-neutral-500">
+            <div className="p-8 text-center text-sm text-muted-foreground">
               Type at least 2 characters to search...
             </div>
           )}
@@ -113,7 +100,7 @@ export function SearchCommand({
           )}
 
           {!isLoading && data?.results && data.results.length === 0 && (
-            <div className="p-8 text-center text-sm text-neutral-500">
+            <div className="p-8 text-center text-sm text-muted-foreground">
               No results found for &ldquo;{query}&rdquo;
             </div>
           )}
@@ -123,7 +110,7 @@ export function SearchCommand({
               {data.results.slice(0, 8).map((result) => (
                 <button
                   key={`${result.provider}-${result.externalId}`}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-neutral-50"
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent"
                   onClick={() =>
                     handleSelect(
                       String(result.externalId),
@@ -132,10 +119,10 @@ export function SearchCommand({
                     )
                   }
                 >
-                  <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded bg-neutral-100">
+                  <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded bg-muted">
                     {result.posterPath ? (
                       <Image
-                        src={`https://image.tmdb.org/t/p/w500${result.posterPath}`}
+                        src={result.posterPath.startsWith("http") ? result.posterPath : `https://image.tmdb.org/t/p/w500${result.posterPath}`}
                         alt={result.title}
                         fill
                         className="object-cover"
@@ -144,28 +131,28 @@ export function SearchCommand({
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
                         {result.type === "movie" ? (
-                          <Film className="h-5 w-5 text-neutral-300" />
+                          <Film className="h-5 w-5 text-muted-foreground/30" />
                         ) : (
-                          <Tv className="h-5 w-5 text-neutral-300" />
+                          <Tv className="h-5 w-5 text-muted-foreground/30" />
                         )}
                       </div>
                     )}
                   </div>
                   <div className="flex-1 overflow-hidden">
-                    <p className="truncate text-sm font-medium text-black">
+                    <p className="truncate text-sm font-medium text-foreground">
                       {result.title}
                     </p>
                     <div className="mt-1 flex items-center gap-2">
-                      <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-neutral-600">
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
                         {result.type === "movie" ? "Movie" : "TV"}
                       </span>
                       {result.year && (
-                        <span className="text-xs text-neutral-500">
+                        <span className="text-xs text-muted-foreground">
                           {result.year}
                         </span>
                       )}
                       {result.voteAverage != null && result.voteAverage > 0 && (
-                        <span className="flex items-center gap-1 text-xs text-neutral-500">
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
                           {result.voteAverage.toFixed(1)}
                         </span>

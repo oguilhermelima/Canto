@@ -59,7 +59,7 @@ export function MediaHero({
       {/* Backdrop image */}
       {backdropPath && (
         <Image
-          src={`https://image.tmdb.org/t/p/original${backdropPath}`}
+          src={backdropPath.startsWith("http") ? backdropPath : `https://image.tmdb.org/t/p/original${backdropPath}`}
           alt={title}
           fill
           className="object-cover"
@@ -68,8 +68,8 @@ export function MediaHero({
         />
       )}
 
-      {/* Gradient overlay — bottom fades to white */}
-      <div className="absolute inset-0 bg-gradient-to-t from-white via-black/30 to-transparent" />
+      {/* Gradient overlay — bottom fades to background */}
+      <div className="absolute inset-0 bg-gradient-to-t from-background via-black/30 to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent" />
 
       {/* Content */}
@@ -121,7 +121,7 @@ export function MediaHero({
           <div className="flex items-center gap-3">
             <Link
               href={detailHref}
-              className="inline-flex items-center gap-2 rounded-full bg-black px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-neutral-900"
+              className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <Info className="h-4 w-4" />
               More Info
@@ -144,8 +144,8 @@ export function MediaHero({
 
 export function MediaHeroSkeleton(): React.JSX.Element {
   return (
-    <section className="relative h-[80vh] min-h-[500px] w-full overflow-hidden bg-neutral-200">
-      <div className="absolute inset-0 bg-gradient-to-t from-white via-black/20 to-transparent" />
+    <section className="relative h-[80vh] min-h-[500px] w-full overflow-hidden bg-muted">
+      <div className="absolute inset-0 bg-gradient-to-t from-background via-black/20 to-transparent" />
       <div className="absolute bottom-0 left-0 right-0 px-6 pb-16 sm:px-8 lg:px-12">
         <div className="mx-auto max-w-screen-2xl">
           <Skeleton className="mb-4 h-12 w-96 max-w-full bg-white/20" />

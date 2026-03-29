@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
-import { Star, Film, Tv } from "lucide-react";
+import { Star, Film, Tv, Check } from "lucide-react";
 
 interface MediaCardProps {
   id?: string;
@@ -15,6 +15,9 @@ interface MediaCardProps {
   posterPath: string | null;
   year?: number | null;
   voteAverage?: number | null;
+  overview?: string | null;
+  inLibrary?: boolean;
+  showTypeBadge?: boolean;
   href?: string;
   className?: string;
 }
@@ -28,6 +31,8 @@ export function MediaCard({
   posterPath,
   year,
   voteAverage,
+  inLibrary,
+  showTypeBadge = true,
   href,
   className,
 }: MediaCardProps): React.JSX.Element {
@@ -40,46 +45,66 @@ export function MediaCard({
   return (
     <Link
       href={linkHref}
-      className={cn("group block", className)}
+      className={cn(
+        "group relative flex flex-col rounded-xl transition-all hover:z-10 hover:scale-[1.03]",
+        className,
+      )}
     >
       {/* Poster */}
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-neutral-100 transition-all duration-200 group-hover:scale-[1.02] group-hover:shadow-lg">
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-muted">
         {posterPath ? (
           <Image
-            src={`https://image.tmdb.org/t/p/w500${posterPath}`}
+            src={posterPath.startsWith("http") ? posterPath : `https://image.tmdb.org/t/p/w500${posterPath}`}
             alt={title}
             fill
-            className="object-cover"
+            className="object-cover transition-opacity duration-300"
+            loading="lazy"
             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             {type === "movie" ? (
-              <Film className="h-10 w-10 text-neutral-300" />
+              <Film className="h-10 w-10 text-muted-foreground/20" />
             ) : (
-              <Tv className="h-10 w-10 text-neutral-300" />
+              <Tv className="h-10 w-10 text-muted-foreground/20" />
             )}
           </div>
         )}
 
-        {/* Type badge — top right */}
-        <div
-          className={cn(
-            "absolute right-2 top-2 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase text-white",
-            type === "movie" ? "bg-red-500" : "bg-green-600",
-          )}
-        >
-          {type === "movie" ? "MOVIE" : "TV"}
-        </div>
+        {/* Rating badge — top left */}
+        {voteAverage != null && voteAverage > 0 && (
+          <div className="absolute left-2 top-2 flex items-center gap-1 rounded-md bg-black/60 px-1.5 py-0.5 backdrop-blur-sm">
+            <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+            <span className="text-[11px] font-semibold text-white">
+              {voteAverage.toFixed(1)}
+            </span>
+          </div>
+        )}
+
+        {/* In library badge — top right */}
+        {inLibrary && (
+          <div className="absolute right-2 top-2 flex items-center gap-0.5 rounded-md bg-primary px-1.5 py-0.5">
+            <Check className="h-3 w-3 text-primary-foreground" />
+          </div>
+        )}
+
+        {/* Type badge — top right (only if not in library) */}
+        {showTypeBadge && !inLibrary && (
+          <div className="absolute right-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white/80 backdrop-blur-sm">
+            {type === "movie" ? "Movie" : "TV"}
+          </div>
+        )}
       </div>
 
-      {/* Title below poster */}
-      <p className="mt-2 line-clamp-1 text-sm font-medium text-black">
-        {title}
-      </p>
-      {year && (
-        <p className="text-xs text-neutral-500">{year}</p>
-      )}
+      {/* Title + year below poster — fixed height so cards align */}
+      <div className="mt-2 px-0.5">
+        <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-tight text-foreground">
+          {title}
+        </p>
+        {year && (
+          <p className="mt-0.5 text-xs text-muted-foreground/60">{year}</p>
+        )}
+      </div>
     </Link>
   );
 }
@@ -90,10 +115,13 @@ export function MediaCardSkeleton({
   className?: string;
 }): React.JSX.Element {
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn("flex flex-col", className)}>
       <Skeleton className="aspect-[2/3] w-full rounded-xl" />
-      <Skeleton className="h-4 w-3/4" />
-      <Skeleton className="h-3 w-1/2" />
+      <div className="mt-2 min-h-[2.5rem] space-y-1 px-0.5">
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-4 w-1/2" />
+      </div>
+      <Skeleton className="mt-0.5 h-3 w-1/3 px-0.5" />
     </div>
   );
 }

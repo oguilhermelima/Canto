@@ -1,3 +1,4 @@
+import { AniListProvider } from "./anilist";
 import { TmdbProvider } from "./tmdb";
 import type { MetadataProvider, ProviderName } from "./types";
 
@@ -10,6 +11,9 @@ export function getProvider(name: ProviderName): MetadataProvider {
       case "tmdb":
         provider = new TmdbProvider();
         break;
+      case "anilist":
+        provider = new AniListProvider();
+        break;
       default:
         throw new Error(`Provider "${name}" not implemented`);
     }
@@ -19,4 +23,5 @@ export function getProvider(name: ProviderName): MetadataProvider {
 }
 
 export * from "./types";
+export { AniListProvider } from "./anilist";
 export { TmdbProvider } from "./tmdb";

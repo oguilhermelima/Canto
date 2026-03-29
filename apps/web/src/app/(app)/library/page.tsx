@@ -1,26 +1,16 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { cn } from "@canto/ui/cn";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@canto/ui/select";
-import { Search, Library } from "lucide-react";
+import { Search, Library, SlidersHorizontal } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { MediaGrid } from "~/components/media/media-grid";
-
-const SORT_OPTIONS = [
-  { value: "addedAt", label: "Date Added" },
-  { value: "title", label: "Title" },
-  { value: "year", label: "Year" },
-  { value: "voteAverage", label: "Rating" },
-] as const;
+import {
+  MediaFilterSidebar,
+  type FilterState,
+} from "~/components/media/media-filter-sidebar";
 
 const TYPE_TABS = [
   { value: "all", label: "All" },
@@ -28,23 +18,56 @@ const TYPE_TABS = [
   { value: "movie", label: "Movies" },
 ] as const;
 
+const DEFAULT_FILTERS: FilterState = {
+  sortBy: "addedAt",
+  sortOrder: "desc",
+  genres: new Set(),
+  yearMin: "",
+  yearMax: "",
+  status: "",
+  runtimeMax: "",
+  contentRating: "",
+  scoreMin: [0],
+  language: "",
+  provider: "",
+};
+
 export default function LibraryPage(): React.JSX.Element {
-  const [typeFilter, setTypeFilter] = useState<"all" | "movie" | "show">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "movie" | "show">(
+    "all",
+  );
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<
-    "title" | "year" | "addedAt" | "voteAverage" | "popularity" | "releaseDate"
-  >("addedAt");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const [showFilters, setShowFilters] = useState(true);
   const pageSize = 24;
+
+  useEffect(() => {
+    document.title = "Library — Canto";
+  }, []);
 
   const { data, isLoading } = trpc.library.list.useQuery({
     type: typeFilter === "all" ? undefined : typeFilter,
     search: searchQuery.length >= 2 ? searchQuery : undefined,
+    genre: filters.genres.size > 0 ? [...filters.genres].join(",") : undefined,
+    yearMin: filters.yearMin ? Number(filters.yearMin) : undefined,
+    yearMax: filters.yearMax ? Number(filters.yearMax) : undefined,
+    status: filters.status || undefined,
+    runtimeMax: filters.runtimeMax ? Number(filters.runtimeMax) : undefined,
+    contentRating: filters.contentRating || undefined,
+    scoreMin: (filters.scoreMin[0] ?? 0) > 0 ? filters.scoreMin[0] : undefined,
+    language: filters.language || undefined,
+    provider: (filters.provider || undefined) as "tmdb" | "anilist" | "tvdb" | undefined,
     page,
     pageSize,
-    sortBy,
-    sortOrder,
+    sortBy: filters.sortBy as
+      | "title"
+      | "year"
+      | "addedAt"
+      | "voteAverage"
+      | "popularity"
+      | "releaseDate",
+    sortOrder: filters.sortOrder,
   });
 
   const items = (data?.items ?? []).map((item) => ({
@@ -54,140 +77,171 @@ export default function LibraryPage(): React.JSX.Element {
     posterPath: item.posterPath,
     year: item.year,
     voteAverage: item.voteAverage,
+    inLibrary: true,
   }));
 
   const totalPages = data ? Math.ceil(data.total / pageSize) : 0;
 
-  const handleTypeChange = useCallback((type: "all" | "movie" | "show") => {
-    setTypeFilter(type);
+  const handleTypeChange = useCallback(
+    (type: "all" | "movie" | "show") => {
+      setTypeFilter(type);
+      setPage(1);
+    },
+    [],
+  );
+
+  const handleFilterChange = useCallback((newFilters: FilterState) => {
+    setFilters(newFilters);
+    setPage(1);
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setFilters(DEFAULT_FILTERS);
     setPage(1);
   }, []);
 
   return (
-    <div className="mx-auto max-w-screen-2xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Header */}
-      <h1 className="mb-6 text-3xl font-bold text-black">Library</h1>
-
-      {/* Toolbar: type tabs + search + count */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        {/* Left: type tabs */}
-        <div className="flex items-center gap-1">
-          {TYPE_TABS.map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => handleTypeChange(value as "all" | "movie" | "show")}
-              className={cn(
-                "rounded-lg px-4 py-1.5 text-sm font-medium transition-colors",
-                typeFilter === value
-                  ? "bg-neutral-100 text-black"
-                  : "text-neutral-500 hover:text-black",
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Right: search + sort + count */}
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
-            <Input
-              placeholder="Filter library..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setPage(1);
-              }}
-              className="h-9 w-[200px] border-neutral-200 bg-white pl-9 text-sm"
-            />
-          </div>
-
-          <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-            <SelectTrigger className="h-9 w-[140px] border-neutral-200 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SORT_OPTIONS.map(({ value, label }) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 border-neutral-200 text-sm"
-            onClick={() =>
-              setSortOrder((o) => (o === "asc" ? "desc" : "asc"))
-            }
-          >
-            {sortOrder === "asc" ? "Asc" : "Desc"}
-          </Button>
-
-          <span className="hidden text-sm text-neutral-400 sm:inline">
-            {data
-              ? `${data.total} item${data.total !== 1 ? "s" : ""}`
-              : ""}
-          </span>
-        </div>
+    <div className="w-full px-4 py-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+      {/* Fixed Sidebar */}
+      <div
+        className={cn(
+          "fixed top-16 z-[35] hidden transition-[left,opacity] duration-300 ease-in-out md:block",
+          showFilters
+            ? "left-4 opacity-100 md:left-8 lg:left-12 xl:left-16 2xl:left-24"
+            : "-left-72 opacity-0",
+        )}
+        style={{ width: "16rem", height: "calc(100vh - 5rem)", top: "5rem" }}
+      >
+        <MediaFilterSidebar
+          mediaType={typeFilter}
+          filters={filters}
+          onChange={handleFilterChange}
+          onReset={handleReset}
+        />
       </div>
 
-      {/* Content */}
-      {!isLoading && items.length === 0 ? (
-        <div className="flex min-h-[400px] items-center justify-center">
-          <div className="text-center">
-            <Library className="mx-auto mb-4 h-16 w-16 text-neutral-200" />
-            <h2 className="mb-2 text-lg font-medium text-black">
-              Your library is empty
-            </h2>
-            <p className="max-w-sm text-sm text-neutral-500">
-              Start by discovering movies and TV shows, then add them to
-              your library.
-            </p>
-            <Button className="mt-4 bg-black text-white hover:bg-neutral-800" asChild>
-              <a href="/">Discover Media</a>
+      {/* Content — shifts right when sidebar is open */}
+      <div
+        className={cn(
+          "transition-[margin] duration-300 ease-in-out",
+          showFilters && "md:ml-[17rem] lg:ml-[19rem]",
+        )}
+      >
+        {/* Header */}
+        <h1 className="mb-6 text-3xl font-bold tracking-tight">Library</h1>
+
+        {/* Toolbar: filter toggle + type tabs + search + count */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          {/* Left: filter toggle + type tabs */}
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "hidden gap-1.5 md:inline-flex",
+                showFilters && "bg-accent",
+              )}
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filters
             </Button>
+            <div className="flex items-center gap-1">
+              {TYPE_TABS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() =>
+                    handleTypeChange(value as "all" | "movie" | "show")
+                  }
+                  className={cn(
+                    "rounded-lg px-4 py-1.5 text-sm font-medium transition-colors",
+                    typeFilter === value
+                      ? "bg-foreground/10 text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Right: search + count */}
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Filter library..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setPage(1);
+                }}
+                className="h-9 w-[200px] pl-9 text-sm"
+              />
+            </div>
+
+            <span className="hidden text-sm text-muted-foreground sm:inline">
+              {data
+                ? `${data.total} item${data.total !== 1 ? "s" : ""}`
+                : ""}
+            </span>
           </div>
         </div>
-      ) : (
-        <>
-          <MediaGrid
-            items={items}
-            isLoading={isLoading}
-            skeletonCount={pageSize}
-          />
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-8 flex items-center justify-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-neutral-200"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                Previous
-              </Button>
-              <span className="text-sm text-neutral-500">
-                Page {page} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-neutral-200"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Next
+        {/* Content */}
+        {!isLoading && items.length === 0 ? (
+          <div className="flex min-h-[400px] items-center justify-center">
+            <div className="text-center">
+              <Library className="mx-auto mb-4 h-16 w-16 text-muted-foreground/30" />
+              <h2 className="mb-2 text-lg font-medium">
+                Your library is empty
+              </h2>
+              <p className="max-w-sm text-sm text-muted-foreground">
+                Start by discovering movies and TV shows, then add them to
+                your library.
+              </p>
+              <Button className="mt-4" asChild>
+                <a href="/">Discover Media</a>
               </Button>
             </div>
-          )}
-        </>
-      )}
+          </div>
+        ) : (
+          <>
+            <MediaGrid
+              items={items}
+              isLoading={isLoading}
+              skeletonCount={pageSize}
+              compact={showFilters}
+            />
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-8 flex items-center justify-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Page {page} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { Button } from "@canto/ui/button";
+import { Badge } from "@canto/ui/badge";
 import { Skeleton } from "@canto/ui/skeleton";
 import {
   Star,
@@ -11,11 +12,13 @@ import {
   Calendar,
   Film,
   Tv,
-  Download,
-  Play,
   Settings,
+  X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
+
+const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
 interface MediaDetailHeroProps {
   id: string;
@@ -28,11 +31,28 @@ interface MediaDetailHeroProps {
   year?: number | null;
   releaseDate?: string | null;
   voteAverage?: number | null;
+  voteCount?: number | null;
   genres?: string[];
   runtime?: number | null;
   status?: string | null;
+  logoPath?: string | null;
+  externalId?: number | null;
+  provider?: string | null;
   inLibrary?: boolean;
+  trailerUrl?: string | null;
+  watchProviders?: Array<{
+    providerId: number;
+    providerName: string;
+    logoPath: string | null;
+  }>;
+  rentBuyProviders?: Array<{
+    providerId: number;
+    providerName: string;
+    logoPath: string | null;
+  }>;
+  onSettingsClick?: () => void;
   onDownloadClick?: () => void;
+  onRemoveClick?: () => void;
 }
 
 export function MediaDetailHero({
@@ -44,17 +64,26 @@ export function MediaDetailHero({
   backdropPath,
   posterPath,
   year,
-  releaseDate,
   voteAverage,
+  voteCount,
   genres,
   runtime,
   status,
+  logoPath,
+  provider,
   inLibrary = false,
-  onDownloadClick,
+  onSettingsClick,
+  onRemoveClick,
 }: MediaDetailHeroProps): React.JSX.Element {
   const addToLibrary = trpc.media.addToLibrary.useMutation();
   const removeFromLibrary = trpc.media.removeFromLibrary.useMutation();
   const utils = trpc.useUtils();
+
+  const resolveImage = (path: string, size: string): string =>
+    path.startsWith("http") ? path : `${TMDB_IMAGE_BASE}/${size}${path}`;
+
+  // Use logoPath from DB (already persisted by provider on first visit)
+  const logoUrl = logoPath ? resolveImage(logoPath, "w500") : null;
 
   const handleLibraryToggle = (): void => {
     const mutation = inLibrary ? removeFromLibrary : addToLibrary;
@@ -63,214 +92,224 @@ export function MediaDetailHero({
       {
         onSuccess: () => {
           void utils.media.getById.invalidate({ id });
+          void utils.media.getByExternal.invalidate();
           void utils.library.list.invalidate();
           void utils.library.stats.invalidate();
+          toast.success(
+            inLibrary
+              ? `Removed "${title}" from library`
+              : `Added "${title}" to library`,
+          );
         },
       },
     );
   };
 
-  const formatRuntime = (minutes: number): string => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours === 0) return `${mins}m`;
-    return `${hours}h ${mins}m`;
+  const formatRuntime = (mins: number): string => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
   };
 
   const isPending = addToLibrary.isPending || removeFromLibrary.isPending;
 
   return (
-    <section className="relative w-full">
-      {/* Backdrop image area */}
-      <div className="relative h-[400px] w-full overflow-hidden">
+    <>
+      {/* Hero Backdrop — extends behind topbar */}
+      <div className="hero-backdrop relative -mt-16 min-h-[420px] w-full">
         {backdropPath ? (
-          <Image
-            src={`https://image.tmdb.org/t/p/original${backdropPath}`}
-            alt={title}
-            fill
-            className="object-cover"
-            priority
-            sizes="100vw"
-          />
+          <div className="absolute inset-0 overflow-hidden">
+            <Image
+              src={resolveImage(backdropPath, "original")}
+              alt=""
+              fill
+              className="object-cover object-top"
+              priority
+              sizes="100vw"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-background from-5% via-background/50 via-35% to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-r from-background/70 via-background/25 to-transparent" />
+          </div>
         ) : (
-          <div className="h-full w-full bg-neutral-100" />
+          <div className="absolute inset-0 bg-gradient-to-b from-muted/30 to-background" />
         )}
 
-        {/* Bottom gradient fading to white */}
-        <div className="absolute inset-0 bg-gradient-to-t from-white via-white/40 to-transparent" />
-      </div>
-
-      {/* Content area overlapping the backdrop */}
-      <div className="relative mx-auto -mt-32 max-w-screen-2xl px-4 pb-8 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-8 md:flex-row md:items-start">
-          {/* Poster */}
-          <div className="relative mx-auto h-[300px] w-[200px] shrink-0 overflow-hidden rounded-xl shadow-2xl md:mx-0 md:h-[360px] md:w-[240px]">
-            {posterPath ? (
-              <Image
-                src={`https://image.tmdb.org/t/p/w500${posterPath}`}
-                alt={title}
-                fill
-                className="object-cover"
-                sizes="240px"
-                priority
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-neutral-100">
-                {type === "movie" ? (
-                  <Film className="h-16 w-16 text-neutral-300" />
-                ) : (
-                  <Tv className="h-16 w-16 text-neutral-300" />
+        <div className="relative mx-auto flex min-h-[600px] w-full flex-col justify-end px-4 pb-10 pt-28 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+          <div className="flex max-w-5xl flex-col gap-8 md:flex-row md:items-end">
+            {/* Poster */}
+            <div className="relative aspect-[2/3] w-[220px] shrink-0 self-center overflow-hidden rounded-lg shadow-2xl ring-1 ring-white/10 md:w-[330px] md:self-auto lg:w-[380px]">
+              {posterPath ? (
+                <Image
+                  src={resolveImage(posterPath, "w500")}
+                  alt={title}
+                  fill
+                  className="object-cover"
+                  sizes="380px"
+                  priority
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-muted/50">
+                  {type === "movie" ? (
+                    <Film className="h-12 w-12 text-muted-foreground/40" />
+                  ) : (
+                    <Tv className="h-12 w-12 text-muted-foreground/40" />
+                  )}
+                </div>
+              )}
+              {/* Badges on poster */}
+              <div className="absolute left-2 top-2 flex items-center gap-1.5">
+                {status && (
+                  <Badge
+                    variant="secondary"
+                    className="border-none bg-black/60 text-[10px] text-white backdrop-blur-sm"
+                  >
+                    {status}
+                  </Badge>
+                )}
+                {provider && (
+                  <Badge
+                    variant="outline"
+                    className="border-none bg-black/60 text-[10px] uppercase text-white backdrop-blur-sm"
+                  >
+                    {provider}
+                  </Badge>
                 )}
               </div>
-            )}
-          </div>
-
-          {/* Info */}
-          <div className="flex-1 pt-4 text-center md:text-left">
-            {/* Title */}
-            <h1 className="mb-2 text-3xl font-bold text-black sm:text-4xl lg:text-5xl">
-              {title}
-            </h1>
-
-            {/* Tagline */}
-            {tagline && (
-              <p className="mb-3 text-base italic text-neutral-500">{tagline}</p>
-            )}
-
-            {/* Meta info row */}
-            <div className="mb-4 flex flex-wrap items-center justify-center gap-3 md:justify-start">
-              {year && (
-                <span className="text-sm font-medium text-neutral-600">
-                  {year}
-                </span>
-              )}
-
-              {voteAverage != null && voteAverage > 0 && (
-                <span className="flex items-center gap-1 text-sm font-medium text-neutral-600">
-                  <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
-                  {voteAverage.toFixed(1)}
-                </span>
-              )}
-
-              {runtime != null && runtime > 0 && (
-                <span className="flex items-center gap-1 text-sm text-neutral-500">
-                  <Clock className="h-3.5 w-3.5" />
-                  {formatRuntime(runtime)}
-                </span>
-              )}
-
-              {status && type === "show" && (
-                <span className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600">
-                  {status}
-                </span>
-              )}
-
-              {releaseDate && (
-                <span className="flex items-center gap-1 text-sm text-neutral-500">
-                  <Calendar className="h-3.5 w-3.5" />
-                  {releaseDate}
-                </span>
-              )}
             </div>
 
-            {/* Genres */}
-            {genres && genres.length > 0 && (
-              <div className="mb-5 flex flex-wrap justify-center gap-2 md:justify-start">
-                {genres.map((genre) => (
-                  <span
-                    key={genre}
-                    className="rounded-full border border-neutral-300 px-3 py-1 text-sm text-neutral-700"
-                  >
-                    {genre}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Overview */}
-            {overview && (
-              <p className="mb-6 max-w-2xl text-sm leading-relaxed text-neutral-600 sm:text-base">
-                {overview}
-              </p>
-            )}
-
-            {/* Actions */}
-            <div className="flex flex-wrap items-center justify-center gap-3 md:justify-start">
-              <Button
-                size="lg"
-                className={
-                  inLibrary
-                    ? "gap-2 rounded-lg border border-neutral-200 bg-white text-black hover:bg-neutral-50"
-                    : "gap-2 rounded-lg bg-black text-white hover:bg-neutral-800"
-                }
-                onClick={handleLibraryToggle}
-                disabled={isPending}
-              >
-                {inLibrary ? (
-                  <>
-                    <Check className="h-5 w-5" />
-                    In Library
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-5 w-5" />
-                    Add to Library
-                  </>
-                )}
-              </Button>
-
-              {onDownloadClick && (
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="gap-2 rounded-lg border-neutral-300 text-black hover:bg-neutral-50"
-                  onClick={onDownloadClick}
-                >
-                  <Download className="h-5 w-5" />
-                  Download
-                </Button>
+            {/* Info */}
+            <div className="flex flex-1 flex-col gap-4 pb-1">
+              {tagline && (
+                <p className="text-sm italic text-foreground/60">{tagline}</p>
               )}
+
+              {/* Logo or Title */}
+              {logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoUrl}
+                  alt={title}
+                  className="h-auto max-h-24 w-auto max-w-sm object-contain object-left md:max-h-36 md:max-w-md lg:max-h-44 lg:max-w-lg"
+                  style={{
+                    filter:
+                      "drop-shadow(0 2px 8px rgba(0,0,0,0.5)) drop-shadow(0 0 20px rgba(0,0,0,0.3))",
+                  }}
+                />
+              ) : (
+                <h1 className="text-3xl font-extrabold tracking-tight text-foreground drop-shadow-sm lg:text-4xl xl:text-5xl">
+                  {title}
+                </h1>
+              )}
+
+              {/* Meta row */}
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                {year && (
+                  <div className="flex items-center gap-1 text-foreground/70">
+                    <Calendar size={14} />
+                    {year}
+                  </div>
+                )}
+                {runtime != null && runtime > 0 && (
+                  <div className="flex items-center gap-1 text-foreground/70">
+                    <Clock size={14} />
+                    {formatRuntime(runtime)}
+                  </div>
+                )}
+                {voteAverage != null && voteAverage > 0 && (
+                  <div className="flex items-center gap-1 font-medium text-yellow-500">
+                    <Star size={14} fill="currentColor" />
+                    {Math.round(voteAverage * 10) / 10}
+                    {voteCount != null && (
+                      <span className="font-normal text-foreground/50">
+                        ({voteCount.toLocaleString()})
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Genres */}
+              {genres && genres.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {genres.map((genre) => (
+                    <Badge key={genre} variant="secondary" className="text-xs">
+                      {genre}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div className="mt-2 flex flex-wrap gap-2.5">
+                {inLibrary ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="group/lib border-green-500/30 bg-green-500/10 text-green-500 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-500"
+                    onClick={onRemoveClick ?? handleLibraryToggle}
+                    disabled={isPending}
+                  >
+                    <Check size={14} className="mr-1.5 group-hover/lib:hidden" />
+                    <X size={14} className="mr-1.5 hidden group-hover/lib:block" />
+                    <span className="group-hover/lib:hidden">In Library</span>
+                    <span className="hidden group-hover/lib:block">Remove</span>
+                  </Button>
+                ) : (
+                  <Button size="sm" onClick={handleLibraryToggle} disabled={isPending}>
+                    <Plus size={14} className="mr-1.5" />
+                    Add to Library
+                  </Button>
+                )}
+                {inLibrary && onSettingsClick && (
+                  <Button variant="outline" size="sm" onClick={onSettingsClick}>
+                    <Settings size={14} className="mr-1.5" />
+                    Settings
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </section>
+
+      {/* Overview — below hero */}
+      {overview && (
+        <div className="px-4 pt-1 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+          <p className="max-w-4xl text-sm leading-relaxed text-foreground/70">
+            {overview}
+          </p>
+        </div>
+      )}
+    </>
   );
 }
 
 export function MediaDetailHeroSkeleton(): React.JSX.Element {
   return (
-    <section className="relative w-full">
-      {/* Backdrop skeleton */}
-      <div className="relative h-[400px] w-full overflow-hidden bg-neutral-100">
-        <div className="absolute inset-0 bg-gradient-to-t from-white via-white/40 to-transparent" />
-      </div>
-
-      {/* Content skeleton */}
-      <div className="relative mx-auto -mt-32 max-w-screen-2xl px-4 pb-8 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-8 md:flex-row md:items-start">
-          <Skeleton className="mx-auto h-[300px] w-[200px] rounded-xl md:mx-0 md:h-[360px] md:w-[240px]" />
-          <div className="flex-1 space-y-4 pt-4">
-            <Skeleton className="mx-auto h-12 w-80 md:mx-0" />
-            <Skeleton className="mx-auto h-5 w-48 md:mx-0" />
-            <div className="flex justify-center gap-2 md:justify-start">
-              <Skeleton className="h-6 w-20" />
-              <Skeleton className="h-6 w-16" />
-              <Skeleton className="h-6 w-24" />
+    <div className="relative -mt-16 min-h-[420px] w-full">
+      <div className="absolute inset-0 bg-gradient-to-b from-muted/30 to-background" />
+      <div className="relative mx-auto flex min-h-[600px] w-full flex-col justify-end px-4 pb-10 pt-28 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+        <div className="flex max-w-5xl flex-col gap-8 md:flex-row md:items-end">
+          <Skeleton className="aspect-[2/3] w-[220px] shrink-0 self-center rounded-lg md:w-[330px] md:self-auto lg:w-[380px]" />
+          <div className="flex flex-1 flex-col gap-4 pb-1">
+            <Skeleton className="h-10 w-96 max-w-full" />
+            <div className="flex gap-2">
+              <Skeleton className="h-5 w-16" />
+              <Skeleton className="h-5 w-16" />
+              <Skeleton className="h-5 w-20" />
             </div>
-            <div className="flex justify-center gap-2 md:justify-start">
-              <Skeleton className="h-8 w-20 rounded-full" />
-              <Skeleton className="h-8 w-24 rounded-full" />
-              <Skeleton className="h-8 w-16 rounded-full" />
+            <div className="flex gap-1.5">
+              <Skeleton className="h-6 w-20 rounded-full" />
+              <Skeleton className="h-6 w-16 rounded-full" />
+              <Skeleton className="h-6 w-24 rounded-full" />
             </div>
-            <Skeleton className="mx-auto h-20 w-full max-w-2xl md:mx-0" />
-            <div className="flex justify-center gap-3 md:justify-start">
-              <Skeleton className="h-11 w-40 rounded-lg" />
-              <Skeleton className="h-11 w-36 rounded-lg" />
+            <div className="flex gap-2.5">
+              <Skeleton className="h-9 w-32 rounded-md" />
+              <Skeleton className="h-9 w-24 rounded-md" />
             </div>
           </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 }

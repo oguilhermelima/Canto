@@ -7,6 +7,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   real,
   text,
   timestamp,
@@ -23,6 +24,7 @@ export const user = pgTable("user", {
   email: varchar("email", { length: 255 }).notNull().unique(),
   emailVerified: boolean("email_verified").notNull().default(false),
   image: varchar("image", { length: 255 }),
+  role: varchar("role", { length: 20 }).notNull().default("user"), // 'admin' | 'user'
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -67,6 +69,42 @@ export const verification = pgTable("verification", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// ─── User Preferences ───
+
+export const userPreference = pgTable("user_preference", {
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  key: varchar("key", { length: 100 }).notNull(),
+  value: jsonb("value").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.userId, table.key] }),
+]);
+
+// ─── Library tables ───
+
+export const library = pgTable("library", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 100 }).notNull(),
+  /** "movies" | "shows" | "animes" */
+  type: varchar("type", { length: 20 }).notNull(),
+  /** Path inside Jellyfin container, e.g. "/media/Movies" */
+  jellyfinPath: varchar("jellyfin_path", { length: 500 }),
+  /** qBittorrent category name, e.g. "movies" */
+  qbitCategory: varchar("qbit_category", { length: 100 }),
+  /** Jellyfin library ID for triggering targeted scans */
+  jellyfinLibraryId: varchar("jellyfin_library_id", { length: 100 }),
+  /** Whether this is the default library for its type */
+  isDefault: boolean("is_default").notNull().default(false),
+
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 // ─── Media tables ───
 
 export const media = pgTable(
@@ -109,6 +147,8 @@ export const media = pgTable(
 
     // External IDs
     imdbId: varchar("imdb_id", { length: 20 }),
+    anilistId: integer("anilist_id"),
+    anilistScore: real("anilist_score"),
 
     // TV-specific
     numberOfSeasons: integer("number_of_seasons"),
@@ -133,6 +173,9 @@ export const media = pgTable(
     productionCountries: jsonb("production_countries").$type<string[]>(),
 
     // Library state
+    libraryId: uuid("library_id").references(() => library.id, {
+      onDelete: "set null",
+    }),
     inLibrary: boolean("in_library").notNull().default(false),
     libraryPath: varchar("library_path", { length: 500 }),
     addedAt: timestamp("added_at", { withTimezone: true }),
@@ -214,11 +257,23 @@ export const episode = pgTable(
 
 export const torrent = pgTable("torrent", {
   id: uuid("id").primaryKey().defaultRandom(),
+  mediaId: uuid("media_id").references(() => media.id, { onDelete: "set null" }),
   hash: varchar("hash", { length: 100 }).unique(),
   title: varchar("title", { length: 500 }).notNull(),
+  /** "movie" | "season" | "episode" */
+  downloadType: varchar("download_type", { length: 20 }).notNull().default("movie"),
+  seasonNumber: integer("season_number"),
+  episodeNumbers: jsonb("episode_numbers").$type<number[]>(),
   status: varchar("status", { length: 20 }).notNull().default("unknown"),
   quality: varchar("quality", { length: 20 }).notNull().default("unknown"),
+  source: varchar("source", { length: 20 }).notNull().default("unknown"),
+  progress: real("progress").notNull().default(0),
+  contentPath: varchar("content_path", { length: 1000 }),
+  fileSize: bigint("file_size", { mode: "number" }),
+  magnetUrl: text("magnet_url"),
+  downloadUrl: text("download_url"),
   imported: boolean("imported").notNull().default(false),
+  importing: boolean("importing").notNull().default(false),
   usenet: boolean("usenet").notNull().default(false),
 
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -244,6 +299,8 @@ export const mediaFile = pgTable(
     }),
     filePath: varchar("file_path", { length: 1000 }).notNull(),
     quality: varchar("quality", { length: 20 }).default("unknown"),
+    source: varchar("source", { length: 20 }).default("unknown"),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
     sizeBytes: bigint("size_bytes", { mode: "number" }),
 
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -280,6 +337,14 @@ export const extrasCache = pgTable("extras_cache", {
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
+  preferences: many(userPreference),
+}));
+
+export const userPreferenceRelations = relations(userPreference, ({ one }) => ({
+  user: one(user, {
+    fields: [userPreference.userId],
+    references: [user.id],
+  }),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -296,7 +361,15 @@ export const accountRelations = relations(account, ({ one }) => ({
   }),
 }));
 
+export const libraryRelations = relations(library, ({ many }) => ({
+  media: many(media),
+}));
+
 export const mediaRelations = relations(media, ({ many, one }) => ({
+  library: one(library, {
+    fields: [media.libraryId],
+    references: [library.id],
+  }),
   seasons: many(season),
   files: many(mediaFile),
   extrasCache: one(extrasCache, {

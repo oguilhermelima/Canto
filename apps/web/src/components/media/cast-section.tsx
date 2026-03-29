@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { Skeleton } from "@canto/ui/skeleton";
-import { User } from "lucide-react";
+import { User, ChevronDown } from "lucide-react";
 
 interface CastMember {
   id: string;
@@ -18,90 +20,103 @@ interface CastSectionProps {
   className?: string;
 }
 
+/** Height that fits exactly one row of cast cards (130px image + ~50px text) */
+const ONE_ROW_HEIGHT = 190;
+
 export function CastSection({
   credits,
   isLoading = false,
   className,
 }: CastSectionProps): React.JSX.Element {
+  const [showAll, setShowAll] = useState(false);
+
   if (!isLoading && credits.length === 0) {
     return <></>;
   }
 
+  const sorted = credits.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+  // Show all items but clip to one row via maxHeight when collapsed
+  const hasMore = sorted.length > 6;
+
   return (
     <section className={className}>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-black">Cast & Crew</h2>
-        {credits.length > 20 && (
-          <span className="text-sm font-medium text-neutral-500 hover:text-black">
-            View all &gt;
-          </span>
+        <h2 className="text-lg font-semibold text-foreground">Cast</h2>
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => setShowAll((p) => !p)}
+            className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {showAll ? "Show less" : "See all"}
+            <ChevronDown
+              size={14}
+              className={showAll ? "rotate-180 transition-transform" : "transition-transform"}
+            />
+          </button>
         )}
       </div>
 
       <div
-        className="flex gap-4 overflow-x-auto pb-4"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        className="flex flex-wrap gap-6"
+        style={!showAll ? { overflow: "hidden", maxHeight: `${ONE_ROW_HEIGHT}px` } : undefined}
       >
         {isLoading
           ? Array.from({ length: 8 }).map((_, i) => (
               <CastCardSkeleton key={i} />
             ))
-          : credits
-              .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
-              .slice(0, 20)
-              .map((member) => (
-                <CastCard key={member.id} {...member} />
-              ))}
+          : sorted.map((member) => (
+              <CastCard key={member.id} {...member} />
+            ))}
       </div>
     </section>
   );
 }
 
 function CastCard({
+  id,
   name,
   character,
   profilePath,
 }: CastMember): React.JSX.Element {
   return (
-    <div className="w-[120px] shrink-0">
-      {/* Profile photo */}
-      <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-full bg-neutral-100">
+    <Link
+      href={`/person/${id}`}
+      className="w-[110px] shrink-0 sm:w-[130px]"
+    >
+      <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-full bg-muted ring-2 ring-border/20">
         {profilePath ? (
           <Image
             src={`https://image.tmdb.org/t/p/w185${profilePath}`}
             alt={name}
             fill
             className="object-cover"
-            sizes="120px"
+            sizes="130px"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
-            <User className="h-8 w-8 text-neutral-300" />
+            <User className="h-8 w-8 text-muted-foreground/15" />
           </div>
         )}
       </div>
-
-      {/* Name */}
-      <p className="line-clamp-1 text-center text-sm font-medium text-black">
+      <p className="line-clamp-1 text-center text-sm font-medium text-foreground">
         {name}
       </p>
-
-      {/* Character */}
       {character && (
-        <p className="line-clamp-1 text-center text-xs text-neutral-500">
+        <p className="line-clamp-1 text-center text-xs text-muted-foreground/60">
           {character}
         </p>
       )}
-    </div>
+    </Link>
   );
 }
 
 function CastCardSkeleton(): React.JSX.Element {
   return (
-    <div className="w-[120px] shrink-0">
+    <div className="w-[110px] shrink-0 sm:w-[130px]">
       <Skeleton className="mb-2 aspect-square w-full rounded-full" />
-      <Skeleton className="mx-auto h-4 w-20" />
-      <Skeleton className="mx-auto mt-1 h-3 w-16" />
+      <Skeleton className="mx-auto h-4 w-16" />
+      <Skeleton className="mx-auto mt-1 h-3 w-12" />
     </div>
   );
 }

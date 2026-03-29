@@ -120,13 +120,13 @@ export function FilterSidebar({
       <Button
         variant="outline"
         size="sm"
-        className="mb-4 gap-2 border-neutral-200 text-neutral-700"
+        className="mb-4 gap-2 border-border text-foreground"
         onClick={onToggle}
       >
         <SlidersHorizontal className="h-4 w-4" />
         Filters
         {activeFilterCount > 0 && (
-          <Badge className="ml-1 h-5 w-5 rounded-full bg-black p-0 text-[10px] text-white">
+          <Badge className="ml-1 h-5 w-5 rounded-full bg-primary p-0 text-[10px] text-primary-foreground">
             {activeFilterCount}
           </Badge>
         )}
@@ -173,7 +173,7 @@ export function FilterSidebar({
 
       {/* Sidebar content */}
       {isOpen && (
-        <div className="w-full rounded-xl border border-neutral-200 bg-white p-4 lg:w-64">
+        <div className="w-full rounded-xl border border-border bg-card p-4 lg:w-64">
           {/* Type filter */}
           <FilterSection
             title="Type"
@@ -189,8 +189,8 @@ export function FilterSidebar({
                   className={cn(
                     "flex-1 gap-1",
                     filters.type === t
-                      ? "border-black bg-black text-white hover:bg-neutral-800"
-                      : "border-neutral-200 text-neutral-600 hover:bg-neutral-50",
+                      ? "border-black bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "border-border text-muted-foreground hover:bg-accent",
                   )}
                   onClick={() => onFiltersChange({ ...filters, type: t })}
                 >
@@ -202,7 +202,7 @@ export function FilterSidebar({
             </div>
           </FilterSection>
 
-          <Separator className="my-3 bg-neutral-200" />
+          <Separator className="my-3 bg-border" />
 
           {/* Genre filter */}
           <FilterSection
@@ -219,8 +219,8 @@ export function FilterSidebar({
                     className={cn(
                       "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors",
                       isActive
-                        ? "bg-black text-white"
-                        : "border border-neutral-200 text-neutral-500 hover:border-neutral-400 hover:text-black",
+                        ? "bg-primary text-primary-foreground"
+                        : "border border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
                     )}
                     onClick={() =>
                       onFiltersChange({
@@ -238,7 +238,7 @@ export function FilterSidebar({
             </div>
           </FilterSection>
 
-          <Separator className="my-3 bg-neutral-200" />
+          <Separator className="my-3 bg-border" />
 
           {/* Year range */}
           <FilterSection
@@ -259,14 +259,14 @@ export function FilterSidebar({
                 max={new Date().getFullYear()}
                 step={1}
               />
-              <div className="mt-2 flex justify-between text-xs text-neutral-500">
+              <div className="mt-2 flex justify-between text-xs text-muted-foreground">
                 <span>{filters.yearRange[0]}</span>
                 <span>{filters.yearRange[1]}</span>
               </div>
             </div>
           </FilterSection>
 
-          <Separator className="my-3 bg-neutral-200" />
+          <Separator className="my-3 bg-border" />
 
           {/* Rating range */}
           <FilterSection
@@ -287,14 +287,14 @@ export function FilterSidebar({
                 max={10}
                 step={0.5}
               />
-              <div className="mt-2 flex justify-between text-xs text-neutral-500">
+              <div className="mt-2 flex justify-between text-xs text-muted-foreground">
                 <span>{filters.ratingRange[0]}</span>
                 <span>{filters.ratingRange[1]}</span>
               </div>
             </div>
           </FilterSection>
 
-          <Separator className="my-3 bg-neutral-200" />
+          <Separator className="my-3 bg-border" />
 
           {/* Status filter */}
           <FilterSection
@@ -311,8 +311,8 @@ export function FilterSidebar({
                     className={cn(
                       "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors",
                       isActive
-                        ? "bg-black text-white"
-                        : "border border-neutral-200 text-neutral-500 hover:border-neutral-400 hover:text-black",
+                        ? "bg-primary text-primary-foreground"
+                        : "border border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
                     )}
                     onClick={() =>
                       onFiltersChange({
@@ -328,14 +328,14 @@ export function FilterSidebar({
             </div>
           </FilterSection>
 
-          <Separator className="my-3 bg-neutral-200" />
+          <Separator className="my-3 bg-border" />
 
           {/* Reset button */}
           {activeFilterCount > 0 && (
             <Button
               variant="ghost"
               size="sm"
-              className="w-full gap-2 text-neutral-500 hover:text-black"
+              className="w-full gap-2 text-muted-foreground hover:text-foreground"
               onClick={handleReset}
             >
               <RotateCcw className="h-3.5 w-3.5" />
@@ -362,14 +362,14 @@ function FilterSection({
   return (
     <div>
       <button
-        className="flex w-full items-center justify-between py-1 text-sm font-medium text-black"
+        className="flex w-full items-center justify-between py-1 text-sm font-medium text-foreground"
         onClick={onToggle}
       >
         {title}
         {expanded ? (
-          <ChevronUp className="h-4 w-4 text-neutral-400" />
+          <ChevronUp className="h-4 w-4 text-muted-foreground" />
         ) : (
-          <ChevronDown className="h-4 w-4 text-neutral-400" />
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
         )}
       </button>
       {expanded && <div className="mt-2">{children}</div>}
@@ -385,11 +385,11 @@ function FilterPill({
   onRemove: () => void;
 }): React.JSX.Element {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2.5 py-1 pr-1 text-xs font-medium text-neutral-700">
+    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 pr-1 text-xs font-medium text-foreground">
       {label}
       <button
         onClick={onRemove}
-        className="ml-0.5 rounded-full p-0.5 hover:bg-neutral-200"
+        className="ml-0.5 rounded-full p-0.5 hover:bg-border"
       >
         <X className="h-3 w-3" />
       </button>
