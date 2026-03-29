@@ -1,22 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { Button } from "@canto/ui/button";
 import { Badge } from "@canto/ui/badge";
 import { Skeleton } from "@canto/ui/skeleton";
 import {
   Star,
-  Plus,
-  Check,
   Clock,
   Calendar,
   Film,
   Tv,
-  Settings,
-  X,
 } from "lucide-react";
-import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
+import { LibraryButton } from "~/components/media/library-button";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -50,8 +45,6 @@ interface MediaDetailHeroProps {
     providerName: string;
     logoPath: string | null;
   }>;
-  onSettingsClick?: () => void;
-  onDownloadClick?: () => void;
   onRemoveClick?: () => void;
 }
 
@@ -72,46 +65,18 @@ export function MediaDetailHero({
   logoPath,
   provider,
   inLibrary = false,
-  onSettingsClick,
   onRemoveClick,
 }: MediaDetailHeroProps): React.JSX.Element {
-  const addToLibrary = trpc.media.addToLibrary.useMutation();
-  const removeFromLibrary = trpc.media.removeFromLibrary.useMutation();
-  const utils = trpc.useUtils();
-
   const resolveImage = (path: string, size: string): string =>
     path.startsWith("http") ? path : `${TMDB_IMAGE_BASE}/${size}${path}`;
 
-  // Use logoPath from DB (already persisted by provider on first visit)
   const logoUrl = logoPath ? resolveImage(logoPath, "w500") : null;
-
-  const handleLibraryToggle = (): void => {
-    const mutation = inLibrary ? removeFromLibrary : addToLibrary;
-    mutation.mutate(
-      { id },
-      {
-        onSuccess: () => {
-          void utils.media.getById.invalidate({ id });
-          void utils.media.getByExternal.invalidate();
-          void utils.library.list.invalidate();
-          void utils.library.stats.invalidate();
-          toast.success(
-            inLibrary
-              ? `Removed "${title}" from library`
-              : `Added "${title}" to library`,
-          );
-        },
-      },
-    );
-  };
 
   const formatRuntime = (mins: number): string => {
     const h = Math.floor(mins / 60);
     const m = mins % 60;
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
   };
-
-  const isPending = addToLibrary.isPending || removeFromLibrary.isPending;
 
   return (
     <>
@@ -241,31 +206,12 @@ export function MediaDetailHero({
 
               {/* Buttons */}
               <div className="mt-2 flex flex-wrap gap-2.5">
-                {inLibrary ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="group/lib border-green-500/30 bg-green-500/10 text-green-500 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-500"
-                    onClick={onRemoveClick ?? handleLibraryToggle}
-                    disabled={isPending}
-                  >
-                    <Check size={14} className="mr-1.5 group-hover/lib:hidden" />
-                    <X size={14} className="mr-1.5 hidden group-hover/lib:block" />
-                    <span className="group-hover/lib:hidden">In Library</span>
-                    <span className="hidden group-hover/lib:block">Remove</span>
-                  </Button>
-                ) : (
-                  <Button size="sm" onClick={handleLibraryToggle} disabled={isPending}>
-                    <Plus size={14} className="mr-1.5" />
-                    Add to Library
-                  </Button>
-                )}
-                {inLibrary && onSettingsClick && (
-                  <Button variant="outline" size="sm" onClick={onSettingsClick}>
-                    <Settings size={14} className="mr-1.5" />
-                    Settings
-                  </Button>
-                )}
+                <LibraryButton
+                  mediaId={id}
+                  title={title}
+                  inLibrary={inLibrary}
+                  onRemoveClick={onRemoveClick}
+                />
               </div>
             </div>
           </div>

@@ -4,10 +4,9 @@ import { useRef, useState, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
-import { ChevronLeft, ChevronRight, Star, Film, Tv, Plus, Loader2, Volume2, VolumeOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, Star, Film, Tv, Volume2, VolumeOff } from "lucide-react";
+import { LibraryButton } from "~/components/media/library-button";
 import { Skeleton } from "@canto/ui/skeleton";
-import { trpc } from "~/lib/trpc/client";
-import { toast } from "sonner";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -27,19 +26,25 @@ interface FeaturedItem {
 
 interface FeaturedCarouselProps {
   title: string;
+  seeAllHref?: string;
   items: FeaturedItem[];
   isLoading?: boolean;
+  isFetchingMore?: boolean;
+  onLoadMore?: () => void;
   className?: string;
 }
 
-const CARD_HEIGHT = 420;
+const CARD_HEIGHT = 500;
 const CARD_WIDTH_OPEN = 750;
 const TRAILER_DELAY_MS = 800;
 
 export function FeaturedCarousel({
   title,
   items,
+  seeAllHref,
   isLoading = false,
+  isFetchingMore = false,
+  onLoadMore,
   className,
 }: FeaturedCarouselProps): React.JSX.Element | null {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -64,7 +69,13 @@ export function FeaturedCarousel({
     if (!el) return;
     setCanScrollLeft(el.scrollLeft > 0);
     setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10);
-  }, []);
+
+    // Load more when near the end
+    const nearEnd = el.scrollLeft >= el.scrollWidth - el.clientWidth - 400;
+    if (nearEnd && onLoadMore && !isFetchingMore) {
+      onLoadMore();
+    }
+  }, [onLoadMore, isFetchingMore]);
 
   const scroll = useCallback(
     (direction: "left" | "right") => {
@@ -83,8 +94,17 @@ export function FeaturedCarousel({
 
   return (
     <section className={cn("relative", className)}>
-      <div className="mb-4 pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24">
+      <div className="mb-4 flex items-center justify-between pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24">
         <h2 className="text-xl font-semibold text-foreground">{title}</h2>
+        {seeAllHref && (
+          <Link
+            href={seeAllHref}
+            className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            See more
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        )}
       </div>
 
       <div className="group/carousel relative">
@@ -113,10 +133,10 @@ export function FeaturedCarousel({
           onMouseLeave={handleMouseLeave}
         >
           {isLoading
-            ? Array.from({ length: 8 }).map((_, i) => (
+            ? Array.from({ length: 12 }).map((_, i) => (
                 <Skeleton
                   key={i}
-                  className="shrink-0 rounded-xl w-[200px] sm:w-[220px] lg:w-[240px] 2xl:w-[260px]"
+                  className="shrink-0 rounded-xl w-[240px] sm:w-[260px] lg:w-[280px] 2xl:w-[320px]"
                   style={{ height: CARD_HEIGHT }}
                 />
               ))
@@ -128,6 +148,14 @@ export function FeaturedCarousel({
                   onHover={() => handleCardHover(i)}
                 />
               ))}
+          {isFetchingMore &&
+            Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton
+                key={`loading-${i}`}
+                className="shrink-0 rounded-xl w-[240px] sm:w-[260px] lg:w-[280px] 2xl:w-[320px]"
+                style={{ height: CARD_HEIGHT }}
+              />
+            ))}
           <div className="w-4 shrink-0 md:w-8 lg:w-12 xl:w-16 2xl:w-24" />
         </div>
       </div>
@@ -148,9 +176,7 @@ function FeaturedCard({
   const [muted, setMuted] = useState(true);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const trailerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const utils = trpc.useUtils();
 
-  // Start/stop trailer timer based on open state
   const handleMouseEnter = useCallback(() => {
     onHover();
     if (item.trailerKey) {
@@ -176,36 +202,6 @@ function FeaturedCard({
     );
   }, [muted]);
 
-  const [adding, setAdding] = useState(false);
-  const addToLibrary = trpc.media.addToLibrary.useMutation({
-    onSuccess: () => {
-      toast.success(`${item.title} added to library`);
-      setAdding(false);
-      void utils.library.list.invalidate();
-      void utils.media.recommendations.invalidate();
-    },
-    onError: (err) => { toast.error(err.message); setAdding(false); },
-  });
-
-  const isPending = adding;
-
-  const handleAdd = async (e: React.MouseEvent): Promise<void> => {
-    e.preventDefault();
-    e.stopPropagation();
-    setAdding(true);
-    try {
-      const media = await utils.client.media.getByExternal.query({
-        provider: item.provider as "tmdb" | "anilist" | "tvdb",
-        externalId: Number(item.externalId),
-        type: item.type,
-      });
-      addToLibrary.mutate({ id: media.id });
-    } catch {
-      toast.error("Failed to add to library");
-      setAdding(false);
-    }
-  };
-
   const href = `/media/ext?provider=${item.provider}&externalId=${item.externalId}&type=${item.type}`;
   const posterSrc = item.posterPath ? `${TMDB_IMAGE_BASE}/w500${item.posterPath}` : null;
   const backdropSrc = item.backdropPath ? `${TMDB_IMAGE_BASE}/w780${item.backdropPath}` : null;
@@ -214,7 +210,7 @@ function FeaturedCard({
     <div
       className={cn(
         "relative shrink-0 overflow-hidden rounded-xl transition-[width] duration-300 ease-in-out",
-        isOpen ? "border border-border/40" : "w-[280px] sm:w-[220px] lg:w-[240px] 2xl:w-[260px]",
+        isOpen ? "border border-border/40" : "w-[280px] sm:w-[260px] lg:w-[280px] 2xl:w-[320px]",
       )}
       style={{
         ...(isOpen ? { width: CARD_WIDTH_OPEN } : {}),
@@ -348,20 +344,15 @@ function FeaturedCard({
             </span>
           </div>
 
-          <div className="flex items-center gap-2 pt-0.5">
-            <button
-              type="button"
-              onClick={handleAdd}
-              disabled={isPending}
-              className="flex h-9 items-center gap-2 rounded-full border border-white/30 px-4 text-sm font-medium text-white transition-all hover:scale-105 hover:border-white hover:bg-white/10 disabled:opacity-50"
-            >
-              {isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4" strokeWidth={2.5} />
-              )}
-              Add to Library
-            </button>
+          <div className="flex items-center gap-2 pt-0.5" onClick={(e) => e.preventDefault()}>
+            <LibraryButton
+              externalId={item.externalId}
+              provider={item.provider}
+              type={item.type}
+              title={item.title}
+              redirectOnAdd
+              variant="dark"
+            />
           </div>
         </div>
       </Link>

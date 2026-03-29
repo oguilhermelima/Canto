@@ -6,11 +6,12 @@ import Link from "next/link";
 import { Button } from "@canto/ui/button";
 import { Badge } from "@canto/ui/badge";
 import { Skeleton } from "@canto/ui/skeleton";
-import { Star, ChevronLeft, ChevronRight, Info, Plus, Check, Loader2 } from "lucide-react";
+import { Star, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { MediaCarousel } from "~/components/media/media-carousel";
 import { FeaturedCarousel } from "~/components/media/featured-carousel";
+import { LibraryButton } from "~/components/media/library-button";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -46,9 +47,14 @@ export default function DiscoverPage(): React.JSX.Element {
   const trendingShows = trpc.media.discover.useInfiniteQuery({ type: "show" }, infiniteOpts);
   const trendingAnime = trpc.media.discover.useInfiniteQuery({ type: "show", genres: "16", language: "ja" }, infiniteOpts);
   const animeMovies = trpc.media.discover.useInfiniteQuery({ type: "movie", mode: "discover", genres: "16", language: "ja" }, infiniteOpts);
-  const recommendations = trpc.media.recommendations.useQuery(undefined, {
-    staleTime: 10 * 60 * 1000,
-  });
+  const recommendations = trpc.media.recommendations.useInfiniteQuery(
+    { pageSize: 10 },
+    {
+      staleTime: 10 * 60 * 1000,
+      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+      initialCursor: 0,
+    },
+  );
 
   const library = trpc.library.list.useQuery({
     page: 1,
@@ -57,38 +63,7 @@ export default function DiscoverPage(): React.JSX.Element {
     sortOrder: "desc",
   });
 
-  // Add to library
   const utils = trpc.useUtils();
-  const addToLibrary = trpc.media.addToLibrary.useMutation({
-    onSuccess: () => {
-      void utils.library.list.invalidate();
-      toast.success("Added to library");
-    },
-    onError: (err) => {
-      toast.error(err.message);
-    },
-  });
-
-  // We need getByExternal to persist the media first, then add to library
-  // For spotlight items, we call getByExternal which persists, then addToLibrary
-  const handleAddToLibrary = useCallback(
-    async (item: SpotlightItem) => {
-      try {
-        // First persist via getByExternal
-        const media = await utils.client.media.getByExternal.query({
-          provider: item.provider as "tmdb" | "anilist" | "tvdb",
-          externalId: item.externalId,
-          type: item.type,
-        });
-        if (media?.id) {
-          addToLibrary.mutate({ id: media.id });
-        }
-      } catch {
-        toast.error("Failed to add to library");
-      }
-    },
-    [utils.client.media.getByExternal, addToLibrary],
-  );
 
   // Check if current spotlight item is in library
   const libraryIds = useMemo(() => {
@@ -168,6 +143,7 @@ export default function DiscoverPage(): React.JSX.Element {
     posterPath: item.posterPath,
     year: item.year,
     voteAverage: item.voteAverage,
+    href: `/media/${item.id}`,
   }));
 
   const getPreviewUrl = (item: SpotlightItem): string => {
@@ -237,6 +213,7 @@ export default function DiscoverPage(): React.JSX.Element {
               key={currentSpotlight}
               className="flex max-w-2xl flex-col gap-5 animate-[contentSlideIn_0.7s_cubic-bezier(0.16,1,0.3,1)_both_0.2s]"
             >
+              <Link href={getPreviewUrl(currentItem)} className="flex flex-col gap-5">
               {/* Logo or Title */}
               {currentItem.logoPath ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -283,43 +260,19 @@ export default function DiscoverPage(): React.JSX.Element {
                 </p>
               )}
 
+              </Link>
+
               <div className="flex items-center gap-3 pt-1">
-                <Button
+                <LibraryButton
+                  externalId={currentItem.externalId}
+                  provider={currentItem.provider}
+                  type={currentItem.type}
+                  title={currentItem.title}
+                  inLibrary={isInLibrary}
+                  redirectOnAdd
                   size="lg"
-                  className="rounded-full px-6 font-semibold"
-                  asChild
-                >
-                  <Link href={getPreviewUrl(currentItem)}>
-                    <Info size={16} className="mr-2" />
-                    More Info
-                  </Link>
-                </Button>
-                {isInLibrary ? (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-10 w-10 rounded-full border-green-500/50 text-green-500"
-                    title="In Library"
-                    disabled
-                  >
-                    <Check size={18} />
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-10 w-10 rounded-full border-foreground/30"
-                    title="Add to Library"
-                    disabled={addToLibrary.isPending}
-                    onClick={() => currentItem && void handleAddToLibrary(currentItem)}
-                  >
-                    {addToLibrary.isPending ? (
-                      <Loader2 size={18} className="animate-spin" />
-                    ) : (
-                      <Plus size={18} />
-                    )}
-                  </Button>
-                )}
+                  variant="dark"
+                />
               </div>
             </div>
           ) : null}
@@ -374,11 +327,18 @@ export default function DiscoverPage(): React.JSX.Element {
 
         <FeaturedCarousel
           title="Recommended for you"
-          items={(recommendations.data ?? []).map((r) => ({
-            ...r,
-            externalId: r.externalId,
-          }))}
+          seeAllHref="/discover?preset=recommended"
+          items={(() => {
+            const seen = new Set<number>();
+            return (recommendations.data?.pages ?? []).flatMap((p) => p.items).filter((r) => {
+              if (seen.has(r.externalId)) return false;
+              seen.add(r.externalId);
+              return true;
+            });
+          })()}
           isLoading={recommendations.isLoading}
+          isFetchingMore={recommendations.isFetchingNextPage}
+          onLoadMore={recommendations.hasNextPage ? () => void recommendations.fetchNextPage() : undefined}
         />
 
         <MediaCarousel
