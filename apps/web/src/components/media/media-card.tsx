@@ -46,7 +46,7 @@ export function MediaCard({
     <Link
       href={linkHref}
       className={cn(
-        "group relative flex flex-col rounded-xl transition-all hover:z-10 hover:scale-[1.03]",
+        "group relative flex flex-col rounded-xl transition-transform duration-300 ease-out hover:z-10 hover:scale-110",
         className,
       )}
     >
@@ -96,13 +96,13 @@ export function MediaCard({
         )}
       </div>
 
-      {/* Title + year below poster — fixed height so cards align */}
+      {/* Title + year below poster */}
       <div className="mt-2 px-0.5">
-        <p className="line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-tight text-foreground">
+        <p className="line-clamp-2 text-sm font-medium leading-tight text-foreground">
           {title}
         </p>
         {year && (
-          <p className="mt-0.5 text-xs text-muted-foreground/60">{year}</p>
+          <p className="mt-1 text-sm text-muted-foreground/60">{year}</p>
         )}
       </div>
     </Link>
@@ -117,11 +117,10 @@ export function MediaCardSkeleton({
   return (
     <div className={cn("flex flex-col", className)}>
       <Skeleton className="aspect-[2/3] w-full rounded-xl" />
-      <div className="mt-2 min-h-[2.5rem] space-y-1 px-0.5">
+      <div className="mt-2 space-y-1.5 px-0.5">
         <Skeleton className="h-4 w-3/4" />
-        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-4 w-12" />
       </div>
-      <Skeleton className="mt-0.5 h-3 w-1/3 px-0.5" />
     </div>
   );
 }

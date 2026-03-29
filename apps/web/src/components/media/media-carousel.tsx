@@ -88,28 +88,27 @@ export function MediaCarousel({
         {/* Left arrow with gradient */}
         {canScrollLeft && (
           <button
-            className="absolute left-0 top-0 z-10 hidden h-full w-12 items-center justify-center bg-gradient-to-r from-background/90 to-transparent opacity-0 transition-opacity group-hover/carousel:opacity-100 md:flex lg:w-16"
+            className="absolute left-0 top-0 z-20 hidden h-full w-14 items-center justify-center bg-gradient-to-r from-background/80 to-transparent text-foreground/60 opacity-0 transition-opacity hover:text-foreground group-hover/carousel:opacity-100 md:flex lg:w-20"
             onClick={() => scroll("left")}
           >
-            <ChevronLeft size={28} />
+            <ChevronLeft size={24} />
           </button>
         )}
 
         {/* Right arrow with gradient */}
         {canScrollRight && (
           <button
-            className="absolute right-0 top-0 z-10 hidden h-full w-12 items-center justify-center bg-gradient-to-l from-background/90 to-transparent opacity-0 transition-opacity group-hover/carousel:opacity-100 md:flex lg:w-16"
+            className="absolute right-0 top-0 z-20 hidden h-full w-14 items-center justify-center bg-gradient-to-l from-background/80 to-transparent text-foreground/60 opacity-0 transition-opacity hover:text-foreground group-hover/carousel:opacity-100 md:flex lg:w-20"
             onClick={() => scroll("right")}
           >
-            <ChevronRight size={28} />
+            <ChevronRight size={24} />
           </button>
         )}
 
         <div
           ref={scrollRef}
           onScroll={updateScrollButtons}
-          className="flex gap-6 overflow-x-auto overflow-y-visible py-2 pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
-          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          className="flex gap-6 overflow-x-auto overflow-y-visible py-6 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
         >
           {isLoading
             ? Array.from({ length: 8 }).map((_, i) => (
@@ -122,7 +121,7 @@ export function MediaCarousel({
                 <MediaCard
                   key={item.id ?? `${item.provider}-${item.externalId}-${i}`}
                   {...item}
-                  showTypeBadge={false}
+                  showTypeBadge
                   className="w-[160px] shrink-0 sm:w-[185px] lg:w-[200px] 2xl:w-[220px]"
                 />
               ))}

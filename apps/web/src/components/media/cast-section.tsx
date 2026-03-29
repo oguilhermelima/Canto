@@ -57,17 +57,22 @@ export function CastSection({
         )}
       </div>
 
-      <div
-        className="flex flex-wrap gap-6"
-        style={!showAll ? { overflow: "hidden", maxHeight: `${ONE_ROW_HEIGHT}px` } : undefined}
-      >
-        {isLoading
-          ? Array.from({ length: 8 }).map((_, i) => (
-              <CastCardSkeleton key={i} />
-            ))
-          : sorted.map((member) => (
-              <CastCard key={member.id} {...member} />
-            ))}
+      <div className="relative">
+        <div
+          className="flex flex-wrap gap-6 overflow-hidden transition-[max-height] duration-500 ease-in-out"
+          style={{ maxHeight: showAll ? `${sorted.length * ONE_ROW_HEIGHT}px` : `${ONE_ROW_HEIGHT}px` }}
+        >
+          {isLoading
+            ? Array.from({ length: 8 }).map((_, i) => (
+                <CastCardSkeleton key={i} />
+              ))
+            : sorted.map((member) => (
+                <CastCard key={member.id} {...member} />
+              ))}
+        </div>
+        {hasMore && !showAll && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background to-transparent" />
+        )}
       </div>
     </section>
   );
@@ -82,9 +87,9 @@ function CastCard({
   return (
     <Link
       href={`/person/${id}`}
-      className="w-[110px] shrink-0 sm:w-[130px]"
+      className="group w-[110px] shrink-0 transition-transform duration-200 hover:scale-105 sm:w-[130px]"
     >
-      <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-full bg-muted ring-2 ring-border/20">
+      <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-full bg-muted ring-2 ring-border/20 transition-[filter] duration-200 group-hover:brightness-110">
         {profilePath ? (
           <Image
             src={`https://image.tmdb.org/t/p/w185${profilePath}`}

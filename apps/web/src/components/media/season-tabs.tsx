@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import Image from "next/image";
 import { cn } from "@canto/ui/cn";
 import { Button } from "@canto/ui/button";
@@ -82,6 +82,16 @@ export function SeasonTabs({
     new Set(),
   );
 
+  const [dismissed, setDismissed] = useState(false);
+  const prevHideFloatingBar = useRef(hideFloatingBar);
+
+  useEffect(() => {
+    if (hideFloatingBar && !prevHideFloatingBar.current) {
+      setDismissed(true);
+    }
+    prevHideFloatingBar.current = hideFloatingBar;
+  }, [hideFloatingBar]);
+
   const toggleExpand = useCallback((seasonId: string) => {
     setExpandedSeasons((prev) => {
       const next = new Set(prev);
@@ -161,23 +171,7 @@ export function SeasonTabs({
   return (
     <section className={cn("relative", className)}>
       <div className="mb-5 flex items-center justify-between">
-        <h2
-          className="text-xl font-semibold tracking-tight"
-          role={selectable ? "button" : undefined}
-          tabIndex={selectable ? 0 : undefined}
-          onClick={selectable ? selectAllSeasons : undefined}
-          onKeyDown={
-            selectable
-              ? (e) => {
-                  if (e.key === " " || e.key === "Enter") {
-                    e.preventDefault();
-                    selectAllSeasons();
-                  }
-                }
-              : undefined
-          }
-          style={selectable ? { cursor: "pointer" } : undefined}
-        >
+        <h2 className="text-xl font-semibold tracking-tight">
           Seasons
         </h2>
         {selectable && filteredSeasons.length > 1 && (
@@ -220,13 +214,14 @@ export function SeasonTabs({
             onToggleExpand={() => toggleExpand(season.id)}
             onToggleSeasonSelect={() => toggleSeasonSelect(season)}
             onToggleEpisode={toggleEpisode}
+            onDownload={onDownloadSeasons ? () => onDownloadSeasons([season.seasonNumber]) : undefined}
           />
         ))}
       </div>
 
       {/* Floating search torrent bar */}
-      {hasSelection && !hideFloatingBar && (onDownloadSeasons || onDownloadEpisodes) && (
-        <div className="fixed bottom-6 left-0 right-0 z-50 flex justify-center">
+      {hasSelection && !hideFloatingBar && !dismissed && (onDownloadSeasons || onDownloadEpisodes) && (
+        <div className="fixed bottom-20 left-0 right-0 z-50 flex justify-center md:bottom-6">
           <div className="flex items-center gap-4 rounded-full border border-border/50 bg-foreground px-2.5 py-2 text-background shadow-2xl">
             <button
               type="button"
@@ -284,6 +279,7 @@ function SeasonBlock({
   onToggleExpand,
   onToggleSeasonSelect,
   onToggleEpisode,
+  onDownload,
 }: {
   season: Season;
   isExpanded: boolean;
@@ -294,6 +290,7 @@ function SeasonBlock({
   onToggleExpand: () => void;
   onToggleSeasonSelect: () => void;
   onToggleEpisode: (id: string) => void;
+  onDownload?: () => void;
 }): React.JSX.Element {
   const episodes = useMemo(
     () =>
@@ -325,31 +322,9 @@ function SeasonBlock({
 
   return (
     <div className="rounded-2xl bg-card p-1">
-      {/* Header — line 1: checkbox + title, line 2: episode info */}
+      {/* Header — title on left, download + checkbox on right */}
       <div className="flex flex-col gap-1 px-3 py-3 sm:px-4">
         <div className="flex items-center gap-2 sm:gap-3">
-          {selectable && (
-            <button
-              type="button"
-              onClick={onToggleSeasonSelect}
-              className={cn(
-                "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 transition-all",
-                isSeasonSelected
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : allEpsSelected
-                    ? "border-primary bg-primary/80 text-primary-foreground"
-                    : selectedCount > 0
-                      ? "border-primary/50 bg-primary/20"
-                      : "border-muted-foreground/20 hover:border-muted-foreground/40",
-              )}
-            >
-              {isSeasonSelected || allEpsSelected ? (
-                <Check size={13} strokeWidth={3} />
-              ) : selectedCount > 0 ? (
-                <Minus size={13} strokeWidth={3} className="text-primary" />
-              ) : null}
-            </button>
-          )}
           <h3
             className="min-w-0 flex-1 truncate text-sm font-bold leading-tight sm:text-base"
             role={selectable ? "button" : undefined}
@@ -371,8 +346,42 @@ function SeasonBlock({
             <span className="mx-1.5 text-muted-foreground/20 sm:mx-2">—</span>
             <span>{seasonTitle}</span>
           </h3>
+          <div className="flex items-center gap-1.5">
+            {onDownload && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onDownload(); }}
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground"
+                title={`Download ${seasonTitle}`}
+              >
+                <Download size={14} />
+              </button>
+            )}
+            {selectable && (
+              <button
+                type="button"
+                onClick={onToggleSeasonSelect}
+                className={cn(
+                  "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 transition-all",
+                  isSeasonSelected
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : allEpsSelected
+                      ? "border-primary bg-primary/80 text-primary-foreground"
+                      : selectedCount > 0
+                        ? "border-primary/50 bg-primary/20"
+                        : "border-muted-foreground/20 hover:border-muted-foreground/40",
+                )}
+              >
+                {isSeasonSelected || allEpsSelected ? (
+                  <Check size={13} strokeWidth={3} />
+                ) : selectedCount > 0 ? (
+                  <Minus size={13} strokeWidth={3} className="text-primary" />
+                ) : null}
+              </button>
+            )}
+          </div>
         </div>
-        <div className={cn("flex items-center gap-2 text-xs text-muted-foreground sm:text-sm", selectable && "pl-8 sm:pl-9")}>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground sm:text-sm">
           <span>{epCount} episodes</span>
           {year && (
             <>
