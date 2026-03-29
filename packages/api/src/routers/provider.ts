@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { getSetting } from "@canto/db/settings";
+
 import { createTRPCRouter, publicProcedure } from "../trpc";
 
 /* -------------------------------------------------------------------------- */
@@ -12,7 +14,7 @@ async function tmdbFetch<T>(
   path: string,
   params?: Record<string, string>,
 ): Promise<T> {
-  const apiKey = process.env.TMDB_API_KEY ?? "";
+  const apiKey = (await getSetting("tmdb.apiKey")) ?? "";
   const url = new URL(`${TMDB_BASE}${path}`);
   url.searchParams.set("api_key", apiKey);
   if (params) {

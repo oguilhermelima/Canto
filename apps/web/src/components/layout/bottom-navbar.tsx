@@ -123,16 +123,6 @@ export function BottomNavbar(): React.JSX.Element {
               <span className="hidden dark:inline">Light mode</span>
             </button>
             <Separator className="my-1" />
-            <button
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-accent"
-              onClick={() => {
-                setSheetOpen(false);
-                router.push("/settings#me");
-              }}
-            >
-              <UserRound className="h-4 w-4" />
-              My Account
-            </button>
             <button className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-destructive transition-colors hover:bg-destructive/10">
               <LogOut className="h-4 w-4" />
               Log out

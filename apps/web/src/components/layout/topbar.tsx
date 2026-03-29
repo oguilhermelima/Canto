@@ -349,12 +349,6 @@ export function Topbar(): React.JSX.Element {
                   <span className="hidden dark:inline">Light mode</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <a href="/settings#me">
-                    <User className="mr-2 h-4 w-4" />
-                    My Account
-                  </a>
-                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={async () => {
                     await authClient.signOut();
