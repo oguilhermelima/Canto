@@ -2,9 +2,9 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { cn } from "@canto/ui/cn";
-import { Button } from "@canto/ui/button";
-import { Loader2, SlidersHorizontal } from "lucide-react";
+import { Loader2, Settings2 } from "lucide-react";
 import { MediaGrid } from "~/components/media/media-grid";
+import { PageHeader } from "~/components/layout/page-header";
 import {
   MediaFilterSidebar,
   type FilterState,
@@ -137,7 +137,18 @@ export function BrowseLayout({
   }, [hasNextPage, isFetchingNextPage, onFetchNextPage]);
 
   return (
-    <div className="w-full px-4 py-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+    <div className="w-full">
+      {!hideTitle && (
+        <PageHeader
+          title={title}
+          className={cn(
+            "transition-[margin] duration-300 ease-in-out",
+            showFilters && "md:ml-[17rem] lg:ml-[19rem]",
+          )}
+        />
+      )}
+
+      <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
       {/* Fixed Sidebar — uses fixed positioning so it never scrolls */}
       <div
         className={cn(
@@ -163,24 +174,21 @@ export function BrowseLayout({
           showFilters && "md:ml-[17rem] lg:ml-[19rem]",
         )}
       >
-        {/* Toolbar — sticky, full-width background matching topbar */}
-        <div className="sticky z-20 mb-6 flex items-center justify-between bg-background/80 py-3 backdrop-blur-md" style={{ top: "calc(4rem - 1px)", marginLeft: "calc(-50vw + 50%)", marginRight: "calc(-50vw + 50%)", paddingLeft: "calc(50vw - 50%)", paddingRight: "calc(50vw - 50%)" }}>
+        {/* Toolbar — sticky below topbar */}
+        <div className="sticky top-16 z-20 -mx-4 mb-6 flex items-center justify-between border-b border-border/40 bg-background/80 px-4 py-3 backdrop-blur-md md:-mx-8 md:px-8 lg:-mx-12 lg:px-12 xl:-mx-16 xl:px-16 2xl:-mx-24 2xl:px-24">
           <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
+            <button
+              type="button"
               className={cn(
-                "hidden gap-1.5 md:inline-flex",
-                showFilters && "bg-accent",
+                "hidden h-8 w-8 items-center justify-center rounded-xl bg-muted transition-all md:inline-flex",
+                showFilters
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
               onClick={() => setShowFilters(!showFilters)}
             >
-              <SlidersHorizontal className="h-4 w-4" />
-              Filters
-            </Button>
-            {!hideTitle && (
-              <h1 className="text-xl font-semibold text-foreground">{title}</h1>
-            )}
+              <Settings2 className={cn("h-4 w-4 transition-transform duration-300", showFilters && "rotate-90")} />
+            </button>
             {toolbar}
           </div>
           {totalResults > 0 && !isLoading && (
@@ -217,6 +225,7 @@ export function BrowseLayout({
             )}
           </>
         )}
+      </div>
       </div>
     </div>
   );

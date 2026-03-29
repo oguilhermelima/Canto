@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
+import { PageHeader } from "~/components/layout/page-header";
+import { TabBar } from "~/components/layout/tab-bar";
 import { Button } from "@canto/ui/button";
 import { Skeleton } from "@canto/ui/skeleton";
 import {
@@ -262,10 +264,12 @@ export default function DownloadsPage(): React.JSX.Element {
   };
 
   return (
-    <div className="mx-auto w-full px-4 py-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-      {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-foreground">Downloads</h1>
+    <div className="w-full">
+      <PageHeader title="Downloads" />
+
+      <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+      {/* Header actions */}
+      <div className="mb-6 flex justify-end">
         <Button
           variant="outline"
           size="sm"
@@ -277,26 +281,16 @@ export default function DownloadsPage(): React.JSX.Element {
       </div>
 
       {/* Status tabs */}
-      <div className="mb-6 flex items-center gap-1">
-        {STATUS_TABS.map(({ value, label }) => (
-          <button
-            key={value}
-            onClick={() => setStatusFilter(value)}
-            className={cn(
-              "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-              statusFilter === value
-                ? "bg-muted text-foreground"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {label}
-            {counts[value as keyof typeof counts] > 0 && (
-              <span className="ml-1.5 text-xs text-muted-foreground">
-                {counts[value as keyof typeof counts]}
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="mb-6">
+        <TabBar
+          tabs={STATUS_TABS.map(({ value, label }) => ({
+            value,
+            label,
+            count: counts[value as keyof typeof counts],
+          }))}
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
       </div>
 
       {/* Content */}
@@ -367,9 +361,9 @@ export default function DownloadsPage(): React.JSX.Element {
                 </div>
 
                 {/* ── Row 2: Poster + Info + Actions ── */}
-                <div className="flex gap-6 px-5 py-4">
+                <div className="flex gap-4 px-4 py-4 sm:gap-6 sm:px-5">
                   {/* Poster — 2:3 ratio */}
-                  <div className="relative aspect-[2/3] w-28 shrink-0 overflow-hidden rounded-xl bg-muted">
+                  <div className="relative aspect-[2/3] w-20 shrink-0 overflow-hidden rounded-xl bg-muted sm:w-28">
                     {t.media?.posterPath ? (
                       <Image
                         src={`https://image.tmdb.org/t/p/w185${t.media.posterPath}`}
@@ -388,15 +382,15 @@ export default function DownloadsPage(): React.JSX.Element {
                   {/* Info block */}
                   <div className="min-w-0 flex-1 space-y-2.5">
                     {/* Title + badges */}
-                    <div className="flex items-center gap-2.5">
-                      <h3 className="min-w-0 truncate text-base font-semibold text-foreground">
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5">
+                      <h3 className="min-w-0 text-sm font-semibold text-foreground sm:truncate sm:text-base">
                         {composedTitle || t.title}
                       </h3>
-                      <span className={cn("shrink-0 rounded-lg px-2.5 py-0.5 text-xs font-semibold", resolved.color)}>
+                      <span className={cn("shrink-0 rounded-lg px-2 py-0.5 text-[10px] font-semibold sm:px-2.5 sm:text-xs", resolved.color)}>
                         {resolved.label}
                       </span>
                       {resolved.seedingLabel && (
-                        <span className={cn("shrink-0 rounded-lg px-2.5 py-0.5 text-xs font-semibold", resolved.seedingColor)}>
+                        <span className={cn("shrink-0 rounded-lg px-2 py-0.5 text-[10px] font-semibold sm:px-2.5 sm:text-xs", resolved.seedingColor)}>
                           {resolved.seedingLabel}
                         </span>
                       )}
@@ -418,7 +412,7 @@ export default function DownloadsPage(): React.JSX.Element {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex shrink-0 items-start gap-2">
+                  <div className="hidden shrink-0 items-start gap-2 sm:flex">
                     {resolved.canRetry && (
                       <button onClick={() => retryMutation.mutate({ id: t.id })} disabled={retryMutation.isPending} className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-blue-500/15 hover:text-blue-500 disabled:opacity-40" title="Retry"><RotateCcw size={16} /></button>
                     )}
@@ -430,6 +424,20 @@ export default function DownloadsPage(): React.JSX.Element {
                     )}
                     <button onClick={() => setDeleteTarget({ id: t.id, title: t.media?.title ?? t.title })} className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-500" title="Delete"><Trash2 size={16} /></button>
                   </div>
+                </div>
+
+                {/* ── Mobile actions ── */}
+                <div className="flex items-center justify-end gap-2 px-4 pb-3 sm:hidden">
+                  {resolved.canRetry && (
+                    <button onClick={() => retryMutation.mutate({ id: t.id })} disabled={retryMutation.isPending} className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-blue-500/15 hover:text-blue-500 disabled:opacity-40" title="Retry"><RotateCcw size={14} /></button>
+                  )}
+                  {resolved.canResume && (
+                    <button onClick={() => resumeMutation.mutate({ id: t.id })} disabled={resumeMutation.isPending} className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-green-500/15 hover:text-green-500 disabled:opacity-40" title="Resume"><Play size={14} /></button>
+                  )}
+                  {resolved.canPause && (
+                    <button onClick={() => pauseMutation.mutate({ id: t.id })} disabled={pauseMutation.isPending} className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-yellow-500/15 hover:text-yellow-500 disabled:opacity-40" title="Pause"><Pause size={14} /></button>
+                  )}
+                  <button onClick={() => setDeleteTarget({ id: t.id, title: t.media?.title ?? t.title })} className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-500" title="Delete"><Trash2 size={14} /></button>
                 </div>
 
                 {/* ── Row 3: Stats bar ── */}
@@ -556,6 +564,7 @@ export default function DownloadsPage(): React.JSX.Element {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

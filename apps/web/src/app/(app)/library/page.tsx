@@ -4,8 +4,10 @@ import { useState, useCallback, useEffect } from "react";
 import { cn } from "@canto/ui/cn";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
-import { Search, Library, SlidersHorizontal } from "lucide-react";
+import { Search, Library, Settings2 } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
+import { TabBar } from "~/components/layout/tab-bar";
+import { PageHeader } from "~/components/layout/page-header";
 import { MediaGrid } from "~/components/media/media-grid";
 import {
   MediaFilterSidebar,
@@ -101,7 +103,16 @@ export default function LibraryPage(): React.JSX.Element {
   }, []);
 
   return (
-    <div className="w-full px-4 py-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+    <div className="w-full">
+      <PageHeader
+        title="Library"
+        className={cn(
+          "transition-[margin] duration-300 ease-in-out",
+          showFilters && "md:ml-[17rem] lg:ml-[19rem]",
+        )}
+      />
+
+      <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
       {/* Fixed Sidebar */}
       <div
         className={cn(
@@ -127,42 +138,29 @@ export default function LibraryPage(): React.JSX.Element {
           showFilters && "md:ml-[17rem] lg:ml-[19rem]",
         )}
       >
-        {/* Header */}
-        <h1 className="mb-6 text-3xl font-bold tracking-tight">Library</h1>
 
         {/* Toolbar: filter toggle + type tabs + search + count */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           {/* Left: filter toggle + type tabs */}
           <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
+            <button
+              type="button"
               className={cn(
-                "hidden gap-1.5 md:inline-flex",
-                showFilters && "bg-accent",
+                "hidden h-8 w-8 items-center justify-center rounded-xl bg-muted transition-all md:inline-flex",
+                showFilters
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
               onClick={() => setShowFilters(!showFilters)}
             >
-              <SlidersHorizontal className="h-4 w-4" />
-              Filters
-            </Button>
+              <Settings2 className={cn("h-4 w-4 transition-transform duration-300", showFilters && "rotate-90")} />
+            </button>
             <div className="flex items-center gap-1">
-              {TYPE_TABS.map(({ value, label }) => (
-                <button
-                  key={value}
-                  onClick={() =>
-                    handleTypeChange(value as "all" | "movie" | "show")
-                  }
-                  className={cn(
-                    "rounded-lg px-4 py-1.5 text-sm font-medium transition-colors",
-                    typeFilter === value
-                      ? "bg-foreground/10 text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
+              <TabBar
+                tabs={TYPE_TABS.map(({ value, label }) => ({ value, label }))}
+                value={typeFilter}
+                onChange={(v) => handleTypeChange(v as "all" | "movie" | "show")}
+              />
             </div>
           </div>
 
@@ -241,6 +239,7 @@ export default function LibraryPage(): React.JSX.Element {
             )}
           </>
         )}
+      </div>
       </div>
     </div>
   );

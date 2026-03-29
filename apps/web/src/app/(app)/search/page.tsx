@@ -3,9 +3,11 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { cn } from "@canto/ui/cn";
+import { Input } from "@canto/ui/input";
 import { Search } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { BrowseLayout } from "~/components/layout/browse-layout";
+import { TabBar } from "~/components/layout/tab-bar";
 
 const TYPE_OPTIONS = [
   { value: "multi", label: "All" },
@@ -143,6 +145,27 @@ export default function SearchPage(): React.JSX.Element {
         : "show";
 
   return (
+    <>
+      {/* Mobile search input */}
+      <div className="sticky top-0 z-30 border-b border-border/40 bg-background/80 px-4 py-2.5 backdrop-blur-md md:hidden">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              const params = new URLSearchParams();
+              if (e.target.value) params.set("q", e.target.value);
+              if (searchType !== "multi") params.set("type", searchType);
+              router.replace(`/search?${params.toString()}`, { scroll: false });
+            }}
+            placeholder="Search movies and shows..."
+            className="h-9 pl-9 text-sm"
+            autoFocus
+          />
+        </div>
+      </div>
+
     <BrowseLayout
       title="Search"
       hideTitle
@@ -154,24 +177,11 @@ export default function SearchPage(): React.JSX.Element {
       hasNextPage={hasNextPage}
       onFetchNextPage={fetchNextPage}
       toolbar={
-        <div className="flex items-center gap-1">
-          {TYPE_OPTIONS.map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() =>
-                handleTypeChange(value as "multi" | "movie" | "show")
-              }
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                searchType === value
-                  ? "bg-muted text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <TabBar
+          tabs={TYPE_OPTIONS.map(({ value, label }) => ({ value, label }))}
+          value={searchType}
+          onChange={(v) => handleTypeChange(v as "multi" | "movie" | "show")}
+        />
       }
       emptyState={
         query.length < 2 ? (
@@ -189,5 +199,6 @@ export default function SearchPage(): React.JSX.Element {
         ) : undefined
       }
     />
+    </>
   );
 }

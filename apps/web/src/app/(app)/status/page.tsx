@@ -17,6 +17,7 @@ import {
   Search,
 } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
+import { PageHeader } from "~/components/layout/page-header";
 
 function getStatusBadgeClass(status: string): string {
   if (status === "downloading") return "bg-blue-100 text-blue-700";
@@ -38,13 +39,10 @@ export default function StatusPage(): React.JSX.Element {
   const errorTorrents = torrents?.filter((t) => t.status === "error") ?? [];
 
   return (
-    <div className="mx-auto flex w-full flex-1 flex-col gap-8 px-4 py-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Status</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          System overview and administration.
-        </p>
-      </div>
+    <div className="w-full">
+      <PageHeader title="Status" subtitle="System overview and administration." />
+
+      <div className="flex flex-col gap-8 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pb-8">
 
       {/* System Status */}
       <section className="flex flex-col gap-4">
@@ -368,6 +366,7 @@ export default function StatusPage(): React.JSX.Element {
           </Link>
         </div>
       </section>
+      </div>
     </div>
   );
 }
