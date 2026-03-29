@@ -1,0 +1,300 @@
+import { z } from "zod";
+
+import {
+  getAllSettings,
+  getSetting,
+  setSetting,
+  deleteSetting,
+  invalidateSettingsCache,
+} from "@canto/db/settings";
+
+import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
+
+const serviceEnum = z.enum([
+  "jellyfin",
+  "plex",
+  "qbittorrent",
+  "prowlarr",
+]);
+
+export const settingsRouter = createTRPCRouter({
+  /** Get all settings as a key-value record */
+  getAll: publicProcedure.query(async () => {
+    return getAllSettings();
+  }),
+
+  /** Get a single setting by key */
+  get: publicProcedure
+    .input(z.object({ key: z.string() }))
+    .query(async ({ input }) => {
+      return getSetting(input.key);
+    }),
+
+  /** Upsert a setting (admin only) */
+  set: protectedProcedure
+    .input(z.object({ key: z.string(), value: z.unknown() }))
+    .mutation(async ({ input }) => {
+      await setSetting(input.key, input.value);
+      return { success: true };
+    }),
+
+  /** Delete a setting (admin only) */
+  delete: protectedProcedure
+    .input(z.object({ key: z.string() }))
+    .mutation(async ({ input }) => {
+      await deleteSetting(input.key);
+      return { success: true };
+    }),
+
+  /** Bulk upsert multiple settings at once */
+  setMany: protectedProcedure
+    .input(z.record(z.string(), z.unknown()))
+    .mutation(async ({ input }) => {
+      for (const [key, value] of Object.entries(input)) {
+        await setSetting(key, value);
+      }
+      return { success: true };
+    }),
+
+  /** Test connectivity using the provided values (not from DB) */
+  testService: publicProcedure
+    .input(
+      z.object({
+        service: serviceEnum,
+        values: z.record(z.string(), z.string()),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const v = input.values;
+
+      switch (input.service) {
+        case "jellyfin": {
+          const url = v["jellyfin.url"];
+          const apiKey = v["jellyfin.apiKey"];
+          if (!url || !apiKey) {
+            return { connected: false, error: "URL or API key not configured" };
+          }
+          try {
+            const res = await fetch(`${url}/System/Info`, {
+              headers: { "X-Emby-Token": apiKey },
+            });
+            if (!res.ok) return { connected: false, error: `HTTP ${res.status}` };
+            const info = (await res.json()) as { ServerName: string; Version: string };
+            return { connected: true, serverName: info.ServerName, version: info.Version };
+          } catch (err) {
+            return { connected: false, error: err instanceof Error ? err.message : "Connection failed" };
+          }
+        }
+
+        case "plex": {
+          const url = v["plex.url"];
+          const token = v["plex.token"];
+          if (!url || !token) {
+            return { connected: false, error: "URL or token not configured" };
+          }
+          try {
+            const res = await fetch(`${url}/?X-Plex-Token=${token}`, {
+              headers: { Accept: "application/json" },
+            });
+            if (!res.ok) return { connected: false, error: `HTTP ${res.status}` };
+            const data = (await res.json()) as {
+              MediaContainer: { friendlyName: string; version: string };
+            };
+            return {
+              connected: true,
+              serverName: data.MediaContainer.friendlyName,
+              version: data.MediaContainer.version,
+            };
+          } catch (err) {
+            return { connected: false, error: err instanceof Error ? err.message : "Connection failed" };
+          }
+        }
+
+        case "qbittorrent": {
+          const url = v["qbittorrent.url"];
+          const username = v["qbittorrent.username"] ?? "";
+          const password = v["qbittorrent.password"] ?? "";
+          if (!url) {
+            return { connected: false, error: "URL not configured" };
+          }
+          try {
+            const body = new URLSearchParams({ username, password });
+            const res = await fetch(`${url}/api/v2/auth/login`, {
+              method: "POST",
+              body,
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            });
+            if (!res.ok) return { connected: false, error: `HTTP ${res.status}` };
+            const text = await res.text();
+            if (text.includes("Fails")) {
+              return { connected: false, error: "Invalid credentials" };
+            }
+            return { connected: true };
+          } catch (err) {
+            return { connected: false, error: err instanceof Error ? err.message : "Connection failed" };
+          }
+        }
+
+        case "prowlarr": {
+          const url = v["prowlarr.url"];
+          const apiKey = v["prowlarr.apiKey"];
+          if (!url || !apiKey) {
+            return { connected: false, error: "URL or API key not configured" };
+          }
+          try {
+            const res = await fetch(`${url}/api/v1/health?apikey=${apiKey}`);
+            if (!res.ok) return { connected: false, error: `HTTP ${res.status}` };
+            return { connected: true };
+          } catch (err) {
+            return { connected: false, error: err instanceof Error ? err.message : "Connection failed" };
+          }
+        }
+      }
+    }),
+
+  /** Clear settings cache (useful after bulk changes) */
+  invalidateCache: protectedProcedure.mutation(async () => {
+    invalidateSettingsCache();
+    return { success: true };
+  }),
+
+  /**
+   * Authenticate with Jellyfin using username/password and obtain an API key.
+   * Saves the URL and key to settings on success.
+   */
+  authenticateJellyfin: publicProcedure
+    .input(
+      z.object({
+        url: z.string().url(),
+        username: z.string().min(1),
+        password: z.string(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        // Authenticate
+        const authRes = await fetch(
+          `${input.url}/Users/AuthenticateByName`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization:
+                'MediaBrowser Client="Canto", Device="Canto", DeviceId="canto-setup", Version="0.1.0"',
+            },
+            body: JSON.stringify({
+              Username: input.username,
+              Pw: input.password,
+            }),
+          },
+        );
+
+        if (!authRes.ok) {
+          const status = authRes.status;
+          if (status === 401) return { success: false, error: "Invalid username or password" };
+          return { success: false, error: `Authentication failed: HTTP ${status}` };
+        }
+
+        const authData = (await authRes.json()) as {
+          AccessToken: string;
+          User: { Name: string; Policy: { IsAdministrator: boolean } };
+        };
+
+        if (!authData.User.Policy.IsAdministrator) {
+          return { success: false, error: "User must be an administrator" };
+        }
+
+        // Create a persistent API key
+        const keyRes = await fetch(
+          `${input.url}/Auth/Keys?App=Canto`,
+          {
+            method: "POST",
+            headers: { "X-Emby-Token": authData.AccessToken },
+          },
+        );
+
+        // Fetch the newly created key
+        let apiKey = authData.AccessToken;
+        if (keyRes.ok) {
+          const keysRes = await fetch(`${input.url}/Auth/Keys`, {
+            headers: { "X-Emby-Token": authData.AccessToken },
+          });
+          if (keysRes.ok) {
+            const keysData = (await keysRes.json()) as {
+              Items: Array<{ AccessToken: string; AppName: string }>;
+            };
+            const cantoKey = keysData.Items.find((k) => k.AppName === "Canto");
+            if (cantoKey) apiKey = cantoKey.AccessToken;
+          }
+        }
+
+        // Save to settings
+        await setSetting("jellyfin.url", input.url);
+        await setSetting("jellyfin.apiKey", apiKey);
+
+        // Get server info
+        const infoRes = await fetch(`${input.url}/System/Info`, {
+          headers: { "X-Emby-Token": apiKey },
+        });
+        let serverName = "";
+        if (infoRes.ok) {
+          const info = (await infoRes.json()) as { ServerName: string };
+          serverName = info.ServerName;
+        }
+
+        return {
+          success: true,
+          serverName,
+          user: authData.User.Name,
+        };
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : "Connection failed",
+        };
+      }
+    }),
+
+  /**
+   * Authenticate with Plex using a token (Plex doesn't support direct user/pass via API).
+   * Validates and saves the URL and token.
+   */
+  authenticatePlex: publicProcedure
+    .input(
+      z.object({
+        url: z.string().url(),
+        token: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        const res = await fetch(
+          `${input.url}/?X-Plex-Token=${input.token}`,
+          { headers: { Accept: "application/json" } },
+        );
+
+        if (!res.ok) {
+          if (res.status === 401) return { success: false, error: "Invalid token" };
+          return { success: false, error: `HTTP ${res.status}` };
+        }
+
+        const data = (await res.json()) as {
+          MediaContainer: { friendlyName: string; version: string };
+        };
+
+        // Save to settings
+        await setSetting("plex.url", input.url);
+        await setSetting("plex.token", input.token);
+
+        return {
+          success: true,
+          serverName: data.MediaContainer.friendlyName,
+        };
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : "Connection failed",
+        };
+      }
+    }),
+});

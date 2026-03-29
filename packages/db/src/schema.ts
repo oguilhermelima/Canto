@@ -81,6 +81,16 @@ export const userPreference = pgTable("user_preference", {
   primaryKey({ columns: [table.userId, table.key] }),
 ]);
 
+// ─── System Settings (key-value, global config) ───
+
+export const systemSetting = pgTable("system_setting", {
+  key: varchar("key", { length: 100 }).primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 // ─── Library tables ───
 
 export const library = pgTable("library", {
@@ -88,14 +98,22 @@ export const library = pgTable("library", {
   name: varchar("name", { length: 100 }).notNull(),
   /** "movies" | "shows" | "animes" */
   type: varchar("type", { length: 20 }).notNull(),
-  /** Path inside Jellyfin container, e.g. "/media/Movies" */
-  jellyfinPath: varchar("jellyfin_path", { length: 500 }),
+  /** Organized media destination on host, e.g. "/home/user/Medias/Movies" */
+  mediaPath: varchar("media_path", { length: 500 }),
+  /** Same path as seen from qBit container, e.g. "/medias/Movies" */
+  containerMediaPath: varchar("container_media_path", { length: 500 }),
   /** qBittorrent category name, e.g. "movies" */
   qbitCategory: varchar("qbit_category", { length: 100 }),
-  /** Jellyfin library ID for triggering targeted scans */
-  jellyfinLibraryId: varchar("jellyfin_library_id", { length: 100 }),
+  /** Jellyfin library ID (unique per server) */
+  jellyfinLibraryId: varchar("jellyfin_library_id", { length: 100 }).unique(),
+  /** Path inside Jellyfin container, e.g. "/media/Movies" */
+  jellyfinPath: varchar("jellyfin_path", { length: 500 }),
+  /** Plex library section ID */
+  plexLibraryId: varchar("plex_library_id", { length: 100 }),
   /** Whether this is the default library for its type */
   isDefault: boolean("is_default").notNull().default(false),
+  /** Whether this library is enabled for downloads */
+  enabled: boolean("enabled").notNull().default(true),
 
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
