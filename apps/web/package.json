@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev --turbopack --port 3000",
+    "dev": "dotenv -e ../../.env -- next dev --turbopack --port 3000",
     "build": "next build",
     "start": "next start",
     "clean": "rm -rf .cache .next dist node_modules",
@@ -31,6 +31,7 @@
     "superjson": "^2.2.2",
     "tailwindcss": "catalog:",
     "tailwindcss-animate": "^1.0.7",
+    "usehooks-ts": "^3.1.1",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -42,6 +43,7 @@
     "@types/node": "^22.13.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "dotenv-cli": "^11.0.0",
     "prettier": "catalog:",
     "typescript": "catalog:"
   }
