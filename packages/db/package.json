@@ -24,10 +24,10 @@
   "scripts": {
     "clean": "rm -rf .cache dist node_modules",
     "format": "prettier --check . --ignore-path ../../.gitignore",
-    "generate": "drizzle-kit generate",
-    "migrate": "drizzle-kit migrate",
-    "push": "drizzle-kit push",
-    "studio": "drizzle-kit studio",
+    "generate": "dotenv -e ../../.env -- drizzle-kit generate",
+    "migrate": "dotenv -e ../../.env -- drizzle-kit migrate",
+    "push": "dotenv -e ../../.env -- drizzle-kit push",
+    "studio": "dotenv -e ../../.env -- drizzle-kit studio",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -37,6 +37,7 @@
   "devDependencies": {
     "@canto/tsconfig": "workspace:*",
     "@types/node": "^22.13.0",
+    "dotenv-cli": "^11.0.0",
     "drizzle-kit": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:"

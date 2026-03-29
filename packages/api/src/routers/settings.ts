@@ -5,7 +5,6 @@ import {
   getSetting,
   setSetting,
   deleteSetting,
-  invalidateSettingsCache,
 } from "@canto/db/settings";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
@@ -15,7 +14,10 @@ const serviceEnum = z.enum([
   "plex",
   "qbittorrent",
   "prowlarr",
+  "jackett",
 ]);
+
+const ALL_SERVICES = serviceEnum.options;
 
 export const settingsRouter = createTRPCRouter({
   /** Get all settings as a key-value record */
@@ -149,13 +151,42 @@ export const settingsRouter = createTRPCRouter({
             return { connected: false, error: err instanceof Error ? err.message : "Connection failed" };
           }
         }
+
+        case "jackett": {
+          const url = v["jackett.url"];
+          const apiKey = v["jackett.apiKey"];
+          if (!url || !apiKey) {
+            return { connected: false, error: "URL or API key not configured" };
+          }
+          try {
+            const res = await fetch(
+              `${url}/api/v2.0/indexers/all/results/torznab/api?apikey=${apiKey}&t=caps`,
+            );
+            if (!res.ok) return { connected: false, error: `HTTP ${res.status}` };
+            return { connected: true };
+          } catch (err) {
+            return { connected: false, error: err instanceof Error ? err.message : "Connection failed" };
+          }
+        }
       }
     }),
 
-  /** Clear settings cache (useful after bulk changes) */
-  invalidateCache: protectedProcedure.mutation(async () => {
-    invalidateSettingsCache();
-    return { success: true };
+  /** Toggle a service on/off */
+  toggleService: protectedProcedure
+    .input(z.object({ service: serviceEnum, enabled: z.boolean() }))
+    .mutation(async ({ input }) => {
+      await setSetting(`${input.service}.enabled`, input.enabled);
+      return { success: true };
+    }),
+
+  /** Get enabled state for all services */
+  getEnabledServices: publicProcedure.query(async () => {
+    const result: Record<string, boolean> = {};
+    for (const s of ALL_SERVICES) {
+      const val = await getSetting<boolean>(`${s}.enabled`);
+      result[s] = val === true;
+    }
+    return result;
   }),
 
   /**
@@ -256,7 +287,7 @@ export const settingsRouter = createTRPCRouter({
     }),
 
   /**
-   * Authenticate with Plex using a token (Plex doesn't support direct user/pass via API).
+   * Authenticate with Plex using a token.
    * Validates and saves the URL and token.
    */
   authenticatePlex: publicProcedure
@@ -282,13 +313,82 @@ export const settingsRouter = createTRPCRouter({
           MediaContainer: { friendlyName: string; version: string };
         };
 
-        // Save to settings
         await setSetting("plex.url", input.url);
         await setSetting("plex.token", input.token);
 
         return {
           success: true,
           serverName: data.MediaContainer.friendlyName,
+        };
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : "Connection failed",
+        };
+      }
+    }),
+
+  /**
+   * Authenticate with Plex via plex.tv using email + password.
+   * Gets an auth token from plex.tv, validates against the server, and saves.
+   */
+  loginPlex: publicProcedure
+    .input(
+      z.object({
+        url: z.string().url(),
+        email: z.string().min(1),
+        password: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      try {
+        // Sign in via plex.tv
+        const signInRes = await fetch("https://plex.tv/users/sign_in.json", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "X-Plex-Client-Identifier": "canto-app",
+            "X-Plex-Product": "Canto",
+            "X-Plex-Version": "0.1.0",
+          },
+          body: JSON.stringify({
+            user: { login: input.email, password: input.password },
+          }),
+        });
+
+        if (!signInRes.ok) {
+          if (signInRes.status === 401) return { success: false, error: "Invalid email or password" };
+          return { success: false, error: `plex.tv returned HTTP ${signInRes.status}` };
+        }
+
+        const signInData = (await signInRes.json()) as {
+          user: { authToken: string; username: string };
+        };
+
+        const token = signInData.user.authToken;
+
+        // Validate token against the local server
+        const serverRes = await fetch(
+          `${input.url}/?X-Plex-Token=${token}`,
+          { headers: { Accept: "application/json" } },
+        );
+
+        if (!serverRes.ok) {
+          return { success: false, error: "Logged in to plex.tv but could not connect to your server. Check the server URL." };
+        }
+
+        const serverData = (await serverRes.json()) as {
+          MediaContainer: { friendlyName: string };
+        };
+
+        await setSetting("plex.url", input.url);
+        await setSetting("plex.token", token);
+
+        return {
+          success: true,
+          serverName: serverData.MediaContainer.friendlyName,
+          user: signInData.user.username,
         };
       } catch (err) {
         return {

@@ -123,8 +123,8 @@ export class TmdbProvider implements MetadataProvider {
   private apiKey: string;
   private baseUrl = "https://api.themoviedb.org/3";
 
-  constructor(apiKey?: string) {
-    this.apiKey = apiKey ?? process.env.TMDB_API_KEY ?? "";
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
   }
 
   /* ── Generic fetcher ────────────────────────────────────────────────── */
@@ -786,5 +786,22 @@ export class TmdbProvider implements MetadataProvider {
       genreIds: (data.genre_ids as number[]) ?? undefined,
       originalLanguage: (data.original_language as string) ?? undefined,
     };
+  }
+
+  async getImages(
+    id: number,
+    type: "movie" | "tv",
+  ): Promise<{ logos: Array<{ file_path: string; iso_639_1: string | null }> }> {
+    return this.fetch(`/${type}/${id}/images`, { include_image_language: "en,null" });
+  }
+
+  async getVideos(
+    id: number,
+    type: "movie" | "tv",
+  ): Promise<Array<{ key: string; site: string; type: string }>> {
+    const data = await this.fetch<{
+      results: Array<{ key: string; site: string; type: string }>;
+    }>(`/${type}/${id}/videos`);
+    return data.results ?? [];
   }
 }

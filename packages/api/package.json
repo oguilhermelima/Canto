@@ -20,6 +20,7 @@
     "@canto/validators": "workspace:*",
     "@trpc/server": "catalog:",
     "drizzle-orm": "catalog:",
+    "fast-xml-parser": "^5.5.9",
     "superjson": "^2.2.2",
     "zod": "catalog:"
   },

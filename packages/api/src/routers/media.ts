@@ -10,6 +10,7 @@ import {
 } from "@canto/db/schema";
 import { getProvider, TmdbProvider } from "@canto/providers";
 import type { NormalizedMedia } from "@canto/providers";
+import { getSetting } from "@canto/db/settings";
 import {
   addToLibraryInput,
   getByExternalInput,
@@ -213,12 +214,20 @@ async function updateMediaFromNormalized(
 // Cache staleness threshold: 7 days
 const EXTRAS_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+async function getProviderWithKey(name: "tmdb" | "anilist" | "tvdb"): ReturnType<typeof getProvider> {
+  if (name === "tmdb") {
+    const apiKey = (await getSetting("tmdb.apiKey")) ?? "";
+    return getProvider(name, apiKey);
+  }
+  return getProvider(name);
+}
+
 export const mediaRouter = createTRPCRouter({
   /**
    * Search for media via external provider (nothing saved to DB).
    */
   search: publicProcedure.input(searchInput).query(async ({ input }) => {
-    const provider = getProvider(input.provider);
+    const provider = await getProviderWithKey(input.provider);
     const page = input.cursor ?? input.page;
     return provider.search(input.query, input.type, {
       page,
@@ -279,7 +288,7 @@ export const mediaRouter = createTRPCRouter({
       if (existing) return existing;
 
       // 2. Fetch full metadata from provider
-      const provider = getProvider(input.provider);
+      const provider = await getProviderWithKey(input.provider);
       const normalized = await provider.getMetadata(
         input.externalId,
         input.type,
@@ -338,7 +347,7 @@ export const mediaRouter = createTRPCRouter({
       }
 
       // Fetch fresh extras from provider
-      const provider = getProvider(row.provider as "tmdb" | "anilist" | "tvdb");
+      const provider = await getProviderWithKey(row.provider as "tmdb" | "anilist" | "tvdb");
       const extras = await provider.getExtras(
         row.externalId,
         row.type as "movie" | "show",
@@ -429,7 +438,7 @@ export const mediaRouter = createTRPCRouter({
         });
       }
 
-      const provider = getProvider(
+      const provider = await getProviderWithKey(
         row.provider as "tmdb" | "anilist" | "tvdb",
       );
       const normalized = await provider.getMetadata(
@@ -481,7 +490,8 @@ export const mediaRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input }) => {
-      const provider = new TmdbProvider();
+      const apiKey = (await getSetting("tmdb.apiKey")) ?? "";
+      const provider = new TmdbProvider(apiKey);
       const page = input.cursor ?? input.page;
 
       if (input.mode === "trending") {
@@ -513,7 +523,118 @@ export const mediaRouter = createTRPCRouter({
   getPerson: publicProcedure
     .input(z.object({ personId: z.number() }))
     .query(async ({ input }) => {
-      const provider = new TmdbProvider();
+      const apiKey = (await getSetting("tmdb.apiKey")) ?? "";
+      const provider = new TmdbProvider(apiKey);
       return provider.getPerson(input.personId);
     }),
+
+  /**
+   * Get recommendations based on the user's library.
+   * Picks random items from library, fetches TMDB recommendations, deduplicates.
+   */
+  recommendations: publicProcedure.query(async ({ ctx }) => {
+    // Get up to 10 random library items
+    const libraryItems = await ctx.db.query.media.findMany({
+      where: eq(media.inLibrary, true),
+      columns: {
+        id: true,
+        externalId: true,
+        provider: true,
+        type: true,
+        title: true,
+      },
+      limit: 50,
+    });
+
+    if (libraryItems.length === 0) return [];
+
+    // Pick up to 5 random seeds
+    const shuffled = libraryItems.sort(() => Math.random() - 0.5).slice(0, 5);
+    const apiKey = (await getSetting("tmdb.apiKey")) ?? "";
+    if (!apiKey) return [];
+
+    const tmdb = new TmdbProvider(apiKey);
+    const libraryExternalIds = new Set(libraryItems.map((m) => `${m.provider}-${m.externalId}`));
+    const seen = new Set<string>();
+    const results: Array<{
+      externalId: number;
+      provider: string;
+      type: "movie" | "show";
+      title: string;
+      posterPath: string | null;
+      backdropPath: string | null;
+      year: number | undefined;
+      voteAverage: number | undefined;
+      overview: string | undefined;
+    }> = [];
+
+    await Promise.all(
+      shuffled.map(async (item) => {
+        try {
+          const extras = await tmdb.getExtras(
+            Number(item.externalId),
+            item.type as "movie" | "show",
+          );
+          for (const rec of extras.recommendations ?? []) {
+            const key = `${rec.provider ?? "tmdb"}-${rec.externalId}`;
+            // Skip if already in library or already seen
+            if (libraryExternalIds.has(key) || seen.has(key)) continue;
+            seen.add(key);
+            results.push({
+              externalId: rec.externalId,
+              provider: rec.provider ?? "tmdb",
+              type: (rec.type ?? item.type) as "movie" | "show",
+              title: rec.title,
+              posterPath: rec.posterPath ?? null,
+              backdropPath: rec.backdropPath ?? null,
+              year: rec.year,
+              voteAverage: rec.voteAverage,
+              overview: rec.overview,
+            });
+          }
+        } catch {
+          // Skip failed fetches
+        }
+      }),
+    );
+
+    // Sort by vote average, take top 20, then fetch logos
+    const top = results
+      .sort((a, b) => (b.voteAverage ?? 0) - (a.voteAverage ?? 0))
+      .slice(0, 20);
+
+    // Fetch logos + trailers in parallel
+    const enriched = await Promise.all(
+      top.map(async (item) => {
+        const tmdbType = item.type === "show" ? "tv" : "movie";
+        let logoPath: string | null = null;
+        let trailerKey: string | null = null;
+
+        try {
+          const [images, videos] = await Promise.all([
+            tmdb.getImages(Number(item.externalId), tmdbType),
+            tmdb.getVideos(Number(item.externalId), tmdbType),
+          ]);
+
+          const enLogos = (images.logos ?? []).filter(
+            (l: { iso_639_1: string | null }) => l.iso_639_1 === "en",
+          );
+          if (enLogos.length > 0) logoPath = enLogos[0]!.file_path;
+
+          // Prefer official trailer, then any trailer, then teaser
+          const trailer =
+            videos.find((v) => v.site === "YouTube" && v.type === "Trailer") ??
+            videos.find((v) => v.site === "YouTube" && v.type === "Teaser") ??
+            null;
+          if (trailer) trailerKey = trailer.key;
+        } catch {
+          // Skip
+        }
+
+        return { ...item, logoPath, trailerKey };
+      }),
+    );
+
+    return enriched;
+  }),
 });

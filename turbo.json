@@ -12,6 +12,7 @@
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "dev": {
+      "dependsOn": ["@canto/db#push"],
       "cache": false,
       "persistent": true
     },

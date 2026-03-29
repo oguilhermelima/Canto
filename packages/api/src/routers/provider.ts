@@ -142,4 +142,101 @@ export const providerRouter = createTRPCRouter({
         originCountry: c.origin_country,
       }));
     }),
+
+  /**
+   * Get spotlight items for the home page hero.
+   * Fetches trending movies + shows, then enriches with backdrops and logos.
+   */
+  spotlight: publicProcedure.query(async () => {
+    const [moviesData, showsData] = await Promise.all([
+      tmdbFetch<{
+        results: Array<{
+          id: number;
+          title?: string;
+          name?: string;
+          overview: string;
+          release_date?: string;
+          first_air_date?: string;
+          vote_average: number;
+          popularity: number;
+          backdrop_path: string | null;
+        }>;
+      }>("/trending/movie/week"),
+      tmdbFetch<{
+        results: Array<{
+          id: number;
+          title?: string;
+          name?: string;
+          overview: string;
+          release_date?: string;
+          first_air_date?: string;
+          vote_average: number;
+          popularity: number;
+          backdrop_path: string | null;
+        }>;
+      }>("/trending/tv/week"),
+    ]);
+
+    const movies = moviesData.results.slice(0, 5).map((m) => ({
+      externalId: m.id,
+      type: "movie" as const,
+      title: m.title ?? m.name ?? "",
+      overview: m.overview,
+      year: m.release_date ? new Date(m.release_date).getFullYear() : undefined,
+      voteAverage: m.vote_average,
+    }));
+
+    const shows = showsData.results.slice(0, 5).map((s) => ({
+      externalId: s.id,
+      type: "show" as const,
+      title: s.name ?? s.title ?? "",
+      overview: s.overview,
+      year: s.first_air_date ? new Date(s.first_air_date).getFullYear() : undefined,
+      voteAverage: s.vote_average,
+    }));
+
+    // Interleave for variety
+    const mixed: typeof movies = [];
+    for (let i = 0; i < 5; i++) {
+      if (shows[i]) mixed.push(shows[i]);
+      if (movies[i]) mixed.push(movies[i]);
+    }
+
+    // Fetch backdrops + logos in parallel
+    const results = await Promise.all(
+      mixed.slice(0, 10).map(async (item) => {
+        const tmdbType = item.type === "show" ? "tv" : "movie";
+        try {
+          const [detail, images] = await Promise.all([
+            tmdbFetch<{ backdrop_path: string | null }>(`/${tmdbType}/${item.externalId}`),
+            tmdbFetch<{
+              logos: Array<{ file_path: string; iso_639_1: string | null }>;
+            }>(`/${tmdbType}/${item.externalId}/images`, { include_image_language: "en,null" }),
+          ]);
+
+          const backdropPath = detail.backdrop_path;
+          if (!backdropPath) return null;
+
+          const enLogos = (images.logos ?? []).filter((l) => l.iso_639_1 === "en");
+          const logoPath = enLogos.length > 0 ? enLogos[0]!.file_path : null;
+
+          return {
+            externalId: item.externalId,
+            provider: "tmdb",
+            type: item.type,
+            title: item.title,
+            overview: item.overview,
+            year: item.year,
+            voteAverage: item.voteAverage,
+            backdropPath,
+            logoPath,
+          };
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    return results.filter((r): r is NonNullable<typeof r> => r !== null);
+  }),
 });
