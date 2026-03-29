@@ -10,6 +10,7 @@ import { Star, ChevronLeft, ChevronRight, Info, Plus, Check, Loader2 } from "luc
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { MediaCarousel } from "~/components/media/media-carousel";
+import { FeaturedCarousel } from "~/components/media/featured-carousel";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -45,6 +46,10 @@ export default function DiscoverPage(): React.JSX.Element {
   const trendingShows = trpc.media.discover.useInfiniteQuery({ type: "show" }, infiniteOpts);
   const trendingAnime = trpc.media.discover.useInfiniteQuery({ type: "show", genres: "16", language: "ja" }, infiniteOpts);
   const animeMovies = trpc.media.discover.useInfiniteQuery({ type: "movie", mode: "discover", genres: "16", language: "ja" }, infiniteOpts);
+  const recommendations = trpc.media.recommendations.useQuery(undefined, {
+    staleTime: 10 * 60 * 1000,
+  });
+
   const library = trpc.library.list.useQuery({
     page: 1,
     pageSize: 20,
@@ -91,10 +96,13 @@ export default function DiscoverPage(): React.JSX.Element {
     return new Set(items.map((i) => `${i.provider}-${i.externalId}`));
   }, [library.data]);
 
-  // Spotlight state
-  const [spotlightItems, setSpotlightItems] = useState<SpotlightItem[]>([]);
+  // Spotlight from backend
+  const spotlightQuery = trpc.provider.spotlight.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000,
+  });
+  const spotlightItems = (spotlightQuery.data ?? []) as SpotlightItem[];
+  const loadingSpotlight = spotlightQuery.isLoading;
   const [currentSpotlight, setCurrentSpotlight] = useState(0);
-  const [loadingSpotlight, setLoadingSpotlight] = useState(true);
 
   const currentItem = spotlightItems[currentSpotlight];
   const isInLibrary = currentItem
@@ -121,82 +129,6 @@ export default function DiscoverPage(): React.JSX.Element {
   const flatAnime = useMemo(() => trendingAnime.data?.pages.flatMap((p) => p.results) ?? [], [trendingAnime.data]);
   const flatAnimeMovies = useMemo(() => animeMovies.data?.pages.flatMap((p) => p.results) ?? [], [animeMovies.data]);
 
-  // Build spotlight candidates from trending data
-  useEffect(() => {
-    if (flatMovies.length === 0 || flatShows.length === 0) return;
-
-    const shows = flatShows.slice(0, 5).map((s) => ({
-      ...s,
-      externalId: s.externalId,
-      type: "show" as const,
-    }));
-    const movies = flatMovies.slice(0, 5).map((m) => ({
-      ...m,
-      externalId: m.externalId,
-      type: "movie" as const,
-    }));
-
-    // Interleave for variety
-    const mixed: Array<(typeof shows)[number] | (typeof movies)[number]> = [];
-    for (let i = 0; i < 5; i++) {
-      const show = shows[i];
-      const movie = movies[i];
-      if (show) mixed.push(show);
-      if (movie) mixed.push(movie);
-    }
-
-    const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY ?? "";
-
-    // Fetch backdrops + logos in parallel
-    Promise.all(
-      mixed.slice(0, 10).map(async (item) => {
-        const tmdbType = item.type === "show" ? "tv" : "movie";
-        try {
-          const [detailRes, imagesRes] = await Promise.all([
-            fetch(`https://api.themoviedb.org/3/${tmdbType}/${item.externalId}?api_key=${apiKey}`),
-            fetch(`https://api.themoviedb.org/3/${tmdbType}/${item.externalId}/images?api_key=${apiKey}&include_image_language=en,null`),
-          ]);
-
-          let backdropPath: string | null = null;
-          let logoPath: string | null = null;
-
-          if (detailRes.ok) {
-            const data = await detailRes.json();
-            backdropPath = data.backdrop_path ?? null;
-          }
-          if (imagesRes.ok) {
-            const images = await imagesRes.json();
-            const logos = (images.logos || []).filter(
-              (l: { iso_639_1: string | null }) => l.iso_639_1 === "en",
-            );
-            if (logos.length > 0) {
-              logoPath = logos[0].file_path;
-            }
-          }
-
-          if (!backdropPath) return null;
-
-          return {
-            externalId: item.externalId,
-            provider: item.provider,
-            type: item.type,
-            title: item.title,
-            overview: item.overview,
-            year: item.year,
-            voteAverage: item.voteAverage,
-            backdropPath,
-            logoPath,
-          } as SpotlightItem;
-        } catch {
-          return null;
-        }
-      }),
-    ).then((results) => {
-      const valid = results.filter((r): r is SpotlightItem => r !== null);
-      setSpotlightItems(valid);
-      setLoadingSpotlight(false);
-    });
-  }, [flatMovies, flatShows]);
 
   // Set page title
   useEffect(() => {
@@ -245,7 +177,7 @@ export default function DiscoverPage(): React.JSX.Element {
   return (
     <div className="min-h-screen">
       {/* Spotlight Hero — extends behind topbar */}
-      <div className="spotlight relative -mt-16 min-h-[70vh] w-full">
+      <div className="spotlight relative -mt-16 min-h-[90vh] w-full md:min-h-[80vh]">
         {/* Backdrop */}
         {currentItem?.backdropPath ? (
           <div
@@ -270,7 +202,22 @@ export default function DiscoverPage(): React.JSX.Element {
         )}
 
         {/* Content */}
-        <div className="relative mx-auto flex min-h-[70vh] w-full flex-col justify-end px-4 pb-16 pt-24 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+        <div
+          className="relative mx-auto flex min-h-[90vh] w-full flex-col justify-end px-4 pb-16 pt-24 md:min-h-[80vh] md:px-8 lg:px-12 xl:px-16 2xl:px-24"
+          onTouchStart={(e) => {
+            const touch = e.touches[0];
+            if (touch) (e.currentTarget as HTMLElement).dataset.touchX = String(touch.clientX);
+          }}
+          onTouchEnd={(e) => {
+            const startX = Number((e.currentTarget as HTMLElement).dataset.touchX ?? "0");
+            const endX = e.changedTouches[0]?.clientX ?? 0;
+            const diff = startX - endX;
+            if (Math.abs(diff) > 50 && spotlightItems.length > 1) {
+              if (diff > 0) setCurrentSpotlight((p) => (p + 1) % spotlightItems.length);
+              else setCurrentSpotlight((p) => (p - 1 + spotlightItems.length) % spotlightItems.length);
+            }
+          }}
+        >
           {loadingSpotlight ? (
             <div className="flex max-w-2xl flex-col gap-5">
               <Skeleton className="h-24 w-96 max-w-full bg-foreground/10" />
@@ -416,7 +363,7 @@ export default function DiscoverPage(): React.JSX.Element {
       </div>
 
       {/* Carousels */}
-      <div className="relative mt-4 flex w-full min-w-0 flex-1 flex-col gap-12 overflow-x-hidden pb-12">
+      <div className="relative -mt-4 flex w-full min-w-0 flex-1 flex-col gap-12 overflow-x-hidden pb-12">
         {recentLibrary.length > 0 && (
           <MediaCarousel
             title="Recently Added"
@@ -425,9 +372,18 @@ export default function DiscoverPage(): React.JSX.Element {
           />
         )}
 
+        <FeaturedCarousel
+          title="Recommended for you"
+          items={(recommendations.data ?? []).map((r) => ({
+            ...r,
+            externalId: r.externalId,
+          }))}
+          isLoading={recommendations.isLoading}
+        />
+
         <MediaCarousel
           title="Trending TV Shows"
-          seeAllHref="/series"
+          seeAllHref="/discover?preset=trending_shows"
           items={showItems}
           isLoading={trendingShows.isLoading}
           isFetchingMore={trendingShows.isFetchingNextPage}
@@ -436,7 +392,7 @@ export default function DiscoverPage(): React.JSX.Element {
 
         <MediaCarousel
           title="Trending Movies"
-          seeAllHref="/movies"
+          seeAllHref="/discover?preset=trending_movies"
           items={movieItems}
           isLoading={trendingMovies.isLoading}
           isFetchingMore={trendingMovies.isFetchingNextPage}
@@ -445,7 +401,7 @@ export default function DiscoverPage(): React.JSX.Element {
 
         <MediaCarousel
           title="Trending Anime"
-          seeAllHref="/animes"
+          seeAllHref="/discover?preset=trending_anime"
           items={animeItems}
           isLoading={trendingAnime.isLoading}
           isFetchingMore={trendingAnime.isFetchingNextPage}
@@ -454,7 +410,7 @@ export default function DiscoverPage(): React.JSX.Element {
 
         <MediaCarousel
           title="Trending Anime Movies"
-          seeAllHref="/anime-movies"
+          seeAllHref="/discover?preset=trending_anime_movies"
           items={animeMovieItems}
           isLoading={animeMovies.isLoading}
           isFetchingMore={animeMovies.isFetchingNextPage}
