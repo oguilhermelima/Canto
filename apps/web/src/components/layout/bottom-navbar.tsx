@@ -7,6 +7,7 @@ import {
   Sheet,
   SheetContent,
   SheetHeader,
+  SheetTitle,
   SheetTrigger,
 } from "@canto/ui/sheet";
 import { Separator } from "@canto/ui/separator";
@@ -68,6 +69,7 @@ export function BottomNavbar(): React.JSX.Element {
         </SheetTrigger>
         <SheetContent side="bottom" className="rounded-t-2xl">
           <SheetHeader className="text-left">
+            <SheetTitle className="sr-only">Menu</SheetTitle>
             <div className="flex items-center gap-3 px-1">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
                 <UserRound className="h-5 w-5" />

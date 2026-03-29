@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@canto/ui/dropdown-menu";
 import {
+  Armchair,
   Search,
   X,
   User,
@@ -40,12 +41,13 @@ export function Topbar(): React.JSX.Element {
   const { theme, setTheme } = useTheme();
   const { data: session } = authClient.useSession();
   const [mounted, setMounted] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const [currentHint, setCurrentHint] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const hintIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  const scrolledRef = useRef(false);
 
   const isDiscover = pathname === "/";
   const isSearchPage = pathname.startsWith("/search");
@@ -64,14 +66,36 @@ export function Topbar(): React.JSX.Element {
     }
   }, [isSearchPage, searchParams]);
 
-  // Scroll listener for backdrop blur
+  // Scroll listener — manipulates DOM directly, no re-render
   useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    let rafId = 0;
     const onScroll = (): void => {
-      setScrolled(window.scrollY > 10);
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const isScrolled = window.scrollY > 10;
+        if (isScrolled !== scrolledRef.current) {
+          scrolledRef.current = isScrolled;
+          if (isScrolled || searchFocused) {
+            header.dataset.scrolled = "true";
+          } else {
+            delete header.dataset.scrolled;
+          }
+        }
+      });
     };
+    // Set initial state
+    if (window.scrollY > 10) {
+      scrolledRef.current = true;
+      header.dataset.scrolled = "true";
+    }
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(rafId);
+    };
+  }, [searchFocused]);
 
   // Rotating search hints
   useEffect(() => {
@@ -155,24 +179,28 @@ export function Topbar(): React.JSX.Element {
     }, 200);
   }, [searchValue]);
 
-  const showBlur = scrolled || searchFocused;
+  // Sync searchFocused to data attribute
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    if (searchFocused || scrolledRef.current) {
+      header.dataset.scrolled = "true";
+    } else {
+      delete header.dataset.scrolled;
+    }
+  }, [searchFocused]);
 
   return (
     <header
-      className={cn(
-        "fixed top-0 left-0 right-0 z-40 hidden h-16 items-center transition-all duration-150 md:flex",
-        showBlur
-          ? "bg-background/80 shadow-sm backdrop-blur-md"
-          : "bg-transparent",
-      )}
+      ref={headerRef}
+      className="group/topbar fixed top-0 left-0 right-0 z-40 hidden h-16 items-center bg-transparent data-[scrolled]:bg-background/80 data-[scrolled]:shadow-sm data-[scrolled]:backdrop-blur-md md:flex"
     >
       <div className="relative flex w-full items-center px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {/* Left: Logo + Nav Links */}
         <div className="flex shrink-0 items-center gap-6">
           <Link href="/" className="flex items-center gap-2.5">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" className="text-foreground">
-              <path d="M2 2h12a8 8 0 0 1 8 8v12H10a8 8 0 0 1-8-8V2Z" />
-            </svg>
+            <Armchair className="h-7 w-7 text-foreground" />
+            <span className="text-lg font-bold tracking-tight text-foreground">Canto</span>
           </Link>
           <nav className="flex items-center gap-1">
             {navLinks.map(({ href, label }) => {
@@ -202,25 +230,25 @@ export function Topbar(): React.JSX.Element {
         {/* Center: Search (truly centered via absolute) */}
         <div
           className={cn(
-            "absolute left-1/2 -translate-x-1/2 transition-all duration-200",
+            "absolute left-1/2 -translate-x-1/2 transition-[width] duration-200",
             searchFocused || searchValue ? "w-[32rem]" : "w-[24rem]",
           )}
         >
           <div
             className={cn(
-              "flex w-full items-center gap-2 rounded-full py-1.5 pl-4 pr-1.5 transition-all duration-200",
-              searchFocused || scrolled
-                ? "border border-foreground/30 bg-background shadow-sm focus-within:border-primary/50"
-                : "border border-foreground/30 bg-background/50 shadow-sm backdrop-blur-xl",
+              "flex w-full items-center gap-2 rounded-full border border-foreground/30 py-1.5 pl-4 pr-1.5 shadow-sm",
+              searchFocused
+                ? "bg-background focus-within:border-primary/50"
+                : "bg-background/50 backdrop-blur-xl group-data-[scrolled]/topbar:bg-background group-data-[scrolled]/topbar:focus-within:border-primary/50 group-data-[scrolled]/topbar:backdrop-blur-none",
             )}
           >
             <Search
               size={15}
               className={cn(
                 "shrink-0",
-                searchFocused || scrolled
+                searchFocused
                   ? "text-muted-foreground"
-                  : "text-foreground/60",
+                  : "text-foreground/60 group-data-[scrolled]/topbar:text-muted-foreground",
               )}
             />
             <div className="relative flex flex-1">
@@ -241,9 +269,9 @@ export function Topbar(): React.JSX.Element {
                 <span
                   className={cn(
                     "pointer-events-none absolute inset-0 flex items-center text-sm leading-5",
-                    searchFocused || scrolled
+                    searchFocused
                       ? "text-muted-foreground"
-                      : "text-foreground/60",
+                      : "text-foreground/60 group-data-[scrolled]/topbar:text-muted-foreground",
                   )}
                 >
                   Find&nbsp;
@@ -251,9 +279,9 @@ export function Topbar(): React.JSX.Element {
                     key={currentHint}
                     className={cn(
                       "inline-block animate-[hintRotate_0.4s_cubic-bezier(0.16,1,0.3,1)_both]",
-                      searchFocused || scrolled
+                      searchFocused
                         ? "text-foreground/50"
-                        : "text-foreground/80",
+                        : "text-foreground/80 group-data-[scrolled]/topbar:text-foreground/50",
                     )}
                   >
                     {searchHints[currentHint]}
@@ -295,7 +323,7 @@ export function Topbar(): React.JSX.Element {
         {/* Right: User Dropdown */}
         <div className="ml-auto flex shrink-0 items-center">
           {mounted ? (
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <button className="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-accent focus:outline-none">
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">

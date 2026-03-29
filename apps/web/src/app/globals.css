@@ -63,6 +63,31 @@
 @utility slide-out-to-left { --tw-exit-translate-x: -100%; }
 @utility slide-out-to-right { --tw-exit-translate-x: 100%; }
 
+/* Lava lamp gradient animation for active tabs */
+@keyframes lavaFlow {
+  0% { background-position: 0% 50%; }
+  25% { background-position: 50% 100%; }
+  50% { background-position: 100% 50%; }
+  75% { background-position: 50% 0%; }
+  100% { background-position: 0% 50%; }
+}
+
+@utility tab-gradient-active {
+  background-image: radial-gradient(ellipse at 20% 50%, #991b1b, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, #1e3a8a, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, #7f1d1d, transparent 50%),
+    linear-gradient(135deg, #1e3a8a, #7f1d1d, #1e40af, #991b1b, #1e3a8a);
+  background-size: 400% 400%;
+  animation: lavaFlow 6s ease-in-out infinite;
+  color: white;
+}
+
+@utility scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
 /* Search hint rotation animation */
 @keyframes hintRotate {
   from { opacity: 0; transform: translateY(8px); }
@@ -153,6 +178,9 @@
 @layer base {
   * {
     @apply border-border;
+  }
+  html {
+    overflow-y: scroll;
   }
   body {
     @apply bg-background text-foreground antialiased;
