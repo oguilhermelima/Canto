@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useState, useEffect, useRef, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@canto/ui/button";
 import { Badge } from "@canto/ui/badge";
 import { Input } from "@canto/ui/input";
@@ -152,8 +152,8 @@ export default function MediaDetailPage({
 }: MediaDetailPageProps): React.JSX.Element {
   const { id } = use(params);
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [torrentDialogOpen, setTorrentDialogOpen] = useState(false);
-  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [removeDeleteFiles, setRemoveDeleteFiles] = useState(false);
   const [removeDeleteTorrent, setRemoveDeleteTorrent] = useState(true);
@@ -208,7 +208,7 @@ export default function MediaDetailPage({
   const isMovieInLibrary = media?.type === "movie" && media?.inLibrary === true;
   const mediaTorrentsQuery = trpc.torrent.listByMedia.useQuery(
     { mediaId: media?.id ?? "" },
-    { enabled: !!media?.id && (settingsDialogOpen || isMovieInLibrary) },
+    { enabled: !!media?.id && isMovieInLibrary },
   );
   const mediaTorrents = mediaTorrentsQuery.data;
 
@@ -277,10 +277,13 @@ export default function MediaDetailPage({
   const utils = trpc.useUtils();
 
   // Library config queries
-  const { data: allLibraries } = trpc.library.listLibraries.useQuery(
-    undefined,
-    { enabled: settingsDialogOpen },
-  );
+  const { data: allLibraries } = trpc.library.listLibraries.useQuery();
+  const setContinuousDownload = trpc.library.setContinuousDownload.useMutation({
+    onSuccess: () => {
+      void utils.media.getById.invalidate({ id: media?.id });
+      void utils.media.getByExternal.invalidate();
+    },
+  });
   const setMediaLibrary = trpc.library.setMediaLibrary.useMutation({
     onSuccess: () => {
       void utils.media.getById.invalidate({ id });
@@ -294,7 +297,8 @@ export default function MediaDetailPage({
 
   const handleLibraryToggle = (): void => {
     if (!media) return;
-    const mutation = media.inLibrary ? removeFromLibrary : addToLibrary;
+    const wasInLibrary = media.inLibrary;
+    const mutation = wasInLibrary ? removeFromLibrary : addToLibrary;
     mutation.mutate(
       { id: media.id },
       {
@@ -304,10 +308,14 @@ export default function MediaDetailPage({
           void utils.library.list.invalidate();
           void utils.library.stats.invalidate();
           toast.success(
-            media.inLibrary
+            wasInLibrary
               ? `Removed "${media.title}" from library`
               : `Added "${media.title}" to library`,
           );
+          // Redirect to canonical URL when adding from /media/ext
+          if (!wasInLibrary && isExternal) {
+            router.replace(`/media/${media.id}`);
+          }
         },
       },
     );
@@ -498,7 +506,6 @@ export default function MediaDetailPage({
         externalId={media.externalId}
         provider={media.provider}
         inLibrary={media.inLibrary}
-        onSettingsClick={media.inLibrary ? () => setSettingsDialogOpen(true) : undefined}
         onRemoveClick={media.inLibrary ? () => setRemoveDialogOpen(true) : undefined}
       />
 
@@ -610,6 +617,24 @@ export default function MediaDetailPage({
               openTorrentDialog({ seasonNumber, episodeNumbers });
             } : undefined}
             hideFloatingBar={torrentDialogOpen}
+            mediaConfig={media.inLibrary ? {
+              libraryId: media.libraryId ?? null,
+              libraryPath: media.libraryPath ?? null,
+              continuousDownload: media.continuousDownload ?? false,
+              libraries: (allLibraries ?? []).map((l) => ({ id: l.id, name: l.name })),
+              onLibraryChange: (libraryId) => {
+                setMediaLibrary.mutate({ mediaId: media.id, libraryId });
+              },
+              onContinuousDownloadChange: (enabled) => {
+                setContinuousDownload.mutate({ mediaId: media.id, enabled });
+              },
+              onCustomSearch: (query: string) => {
+                setTorrentSearchQuery(query);
+                setTorrentSearchContext(null);
+                setTorrentPage(0);
+                setTorrentDialogOpen(true);
+              },
+            } : undefined}
           />
         )}
 
@@ -702,109 +727,6 @@ export default function MediaDetailPage({
         />
       </div>
 
-      {/* Settings dialog */}
-      <Dialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen}>
-        <DialogContent className="max-w-lg gap-0 overflow-hidden rounded-2xl border-border bg-background p-0 [&>button:last-child]:hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <div>
-              <DialogTitle className="text-lg font-semibold">Settings</DialogTitle>
-              <DialogDescription className="mt-0.5 text-sm text-muted-foreground">
-                {media.title}
-              </DialogDescription>
-            </div>
-            <button
-              onClick={() => setSettingsDialogOpen(false)}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-muted transition-colors hover:bg-muted/80"
-            >
-              <span className="text-lg leading-none text-foreground">×</span>
-            </button>
-          </div>
-
-          <div className="flex flex-col divide-y divide-border">
-            {/* Library Folder */}
-            {allLibraries && allLibraries.length > 0 && (
-              <div className="flex items-center justify-between px-5 py-4">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Library Folder</p>
-                  <p className="text-xs text-muted-foreground">
-                    Where downloads are saved
-                  </p>
-                </div>
-                <Select
-                  value={media.libraryId ?? "default"}
-                  onValueChange={(value) => {
-                    setMediaLibrary.mutate({
-                      mediaId: media.id,
-                      libraryId: value === "default" ? null : value,
-                    });
-                  }}
-                >
-                  <SelectTrigger className="h-9 w-[180px] border-border text-sm">
-                    <SelectValue placeholder="Select library..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="default">Default</SelectItem>
-                    {allLibraries.map((lib) => (
-                      <SelectItem key={lib.id} value={lib.id}>
-                        {lib.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Downloads */}
-            <div className="px-5 py-4">
-              <p className="mb-3 text-sm font-medium text-foreground">Downloads</p>
-              {mediaTorrents && mediaTorrents.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  {mediaTorrents.map((t) => (
-                    <div
-                      key={t.id}
-                      className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm text-foreground">{t.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {t.quality !== "unknown" ? t.quality.toUpperCase() : ""}{" "}
-                          · {Math.round((t.progress ?? 0) * 100)}%
-                          {t.status === "completed" && " · Downloaded"}
-                          {t.status === "downloading" && " · Downloading"}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground/50">No downloads yet</p>
-              )}
-            </div>
-
-            {/* Remove from library */}
-            <div className="flex items-center justify-between px-5 py-4">
-              <div>
-                <p className="text-sm font-medium text-foreground">Remove from Library</p>
-                <p className="text-xs text-muted-foreground">
-                  Remove this title and optionally delete files
-                </p>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-                onClick={() => {
-                  setSettingsDialogOpen(false);
-                  setRemoveDialogOpen(true);
-                }}
-              >
-                Remove
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Remove from library dialog */}
       <Dialog

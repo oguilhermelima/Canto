@@ -295,6 +295,20 @@ export const libraryRouter = createTRPCRouter({
       return updated;
     }),
 
+  setContinuousDownload: publicProcedure
+    .input(z.object({
+      mediaId: z.string().uuid(),
+      enabled: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const [updated] = await ctx.db
+        .update(media)
+        .set({ continuousDownload: input.enabled, updatedAt: new Date() })
+        .where(eq(media.id, input.mediaId))
+        .returning();
+      return updated;
+    }),
+
   /* ────────────────────────────────────────────────────────────────────────── */
   /*  User Preferences                                                         */
   /* ────────────────────────────────────────────────────────────────────────── */

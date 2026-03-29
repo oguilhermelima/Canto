@@ -4,15 +4,28 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import Image from "next/image";
 import { cn } from "@canto/ui/cn";
 import { Button } from "@canto/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@canto/ui/dialog";
+import { Input } from "@canto/ui/input";
+import { Switch } from "@canto/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@canto/ui/select";
 import {
   Search,
   Check,
   Star,
   X,
   Minus,
-  ChevronDown,
+  ChevronRight,
   CheckCircle2,
   Download,
+  Folder,
+  Settings2,
+  Search as SearchIcon,
 } from "lucide-react";
 
 interface Episode {
@@ -43,6 +56,21 @@ interface EpisodeDownloadInfo {
   status: string;
 }
 
+interface Library {
+  id: string;
+  name: string;
+}
+
+interface MediaConfig {
+  libraryId: string | null;
+  libraryPath: string | null;
+  continuousDownload: boolean;
+  libraries: Library[];
+  onLibraryChange: (libraryId: string | null) => void;
+  onContinuousDownloadChange: (enabled: boolean) => void;
+  onCustomSearch?: (query: string) => void;
+}
+
 interface SeasonTabsProps {
   seasons: Season[];
   onDownloadSeasons?: (seasonNumbers: number[]) => void;
@@ -53,6 +81,8 @@ interface SeasonTabsProps {
   hideFloatingBar?: boolean;
   /** Map of episode ID -> download info for showing status indicators */
   downloadedEpisodes?: Map<string, EpisodeDownloadInfo>;
+  /** Media config panel above seasons */
+  mediaConfig?: MediaConfig;
   className?: string;
 }
 
@@ -62,6 +92,7 @@ export function SeasonTabs({
   onDownloadEpisodes,
   hideFloatingBar = false,
   downloadedEpisodes,
+  mediaConfig,
   className,
 }: SeasonTabsProps): React.JSX.Element {
   const filteredSeasons = useMemo(
@@ -82,15 +113,8 @@ export function SeasonTabs({
     new Set(),
   );
 
-  const [dismissed, setDismissed] = useState(false);
-  const prevHideFloatingBar = useRef(hideFloatingBar);
-
-  useEffect(() => {
-    if (hideFloatingBar && !prevHideFloatingBar.current) {
-      setDismissed(true);
-    }
-    prevHideFloatingBar.current = hideFloatingBar;
-  }, [hideFloatingBar]);
+  const [customSearchOpen, setCustomSearchOpen] = useState(false);
+  const [customSearchQuery, setCustomSearchQuery] = useState("");
 
   const toggleExpand = useCallback((seasonId: string) => {
     setExpandedSeasons((prev) => {
@@ -168,38 +192,125 @@ export function SeasonTabs({
     }
   }, [allSeasonsSelected, filteredSeasons]);
 
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   return (
     <section className={cn("relative", className)}>
-      <div className="mb-5 flex items-center justify-between">
-        <h2 className="text-xl font-semibold tracking-tight">
-          Seasons
-        </h2>
-        {selectable && filteredSeasons.length > 1 && (
-          <button
-            type="button"
-            onClick={selectAllSeasons}
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <div
-              className={cn(
-                "flex h-4 w-4 items-center justify-center rounded border transition-all",
-                allSeasonsSelected
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : hasSelection
-                    ? "border-primary/50 bg-primary/20"
-                    : "border-muted-foreground/25",
-              )}
+      {/* Row 1: Seasons title + Custom Search + Preferences */}
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-xl font-semibold tracking-tight">Seasons</h2>
+        <div className="flex items-center gap-2">
+          {/* Custom Torrent Search */}
+          {mediaConfig?.onCustomSearch && (
+            <button
+              type="button"
+              onClick={() => setCustomSearchOpen(true)}
+              className="flex h-8 items-center gap-1.5 rounded-lg bg-muted/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              {allSeasonsSelected ? (
-                <Check size={10} strokeWidth={3} />
-              ) : hasSelection ? (
-                <Minus size={10} strokeWidth={3} className="text-primary" />
-              ) : null}
+              <SearchIcon className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Custom Search</span>
+            </button>
+          )}
+
+          {/* Preferences popover */}
+          {mediaConfig && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setSettingsOpen((p) => !p)}
+                className={cn(
+                  "flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs transition-all",
+                  settingsOpen
+                    ? "bg-foreground text-background"
+                    : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <Settings2 className={cn("h-3.5 w-3.5 transition-transform duration-300", settingsOpen && "rotate-90")} />
+                <span className="hidden sm:inline">Preferences</span>
+              </button>
+
+              {settingsOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setSettingsOpen(false)} />
+                  <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-border/60 bg-card p-1 shadow-xl">
+                    <div className="flex items-center justify-between px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <Folder className="h-3.5 w-3.5 text-muted-foreground/60" />
+                        <span className="text-xs text-muted-foreground">Library</span>
+                      </div>
+                      <Select
+                        value={mediaConfig.libraryId ?? "default"}
+                        onValueChange={(v) => mediaConfig.onLibraryChange(v === "default" ? null : v)}
+                      >
+                        <SelectTrigger className="h-7 w-[130px] border-border/40 text-xs">
+                          <SelectValue placeholder="Default" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="default">Default</SelectItem>
+                          {mediaConfig.libraries.map((lib) => (
+                            <SelectItem key={lib.id} value={lib.id}>{lib.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="border-t border-border/40" />
+                    <div className="flex items-center justify-between px-3 py-3">
+                      <span className="text-xs text-muted-foreground">Auto-download new episodes</span>
+                      <Switch
+                        checked={mediaConfig.continuousDownload}
+                        onCheckedChange={mediaConfig.onContinuousDownloadChange}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
-            {allSeasonsSelected ? "Deselect all" : "Select all"}
-          </button>
-        )}
+          )}
+        </div>
       </div>
+
+
+      {/* Custom Search Dialog */}
+      <Dialog open={customSearchOpen} onOpenChange={setCustomSearchOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Custom Torrent Search</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <Input
+              value={customSearchQuery}
+              onChange={(e) => setCustomSearchQuery(e.target.value)}
+              placeholder="e.g. Breaking Bad Season 1 1080p"
+              className="h-10"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && customSearchQuery.trim()) {
+                  setCustomSearchOpen(false);
+                  mediaConfig?.onCustomSearch?.(customSearchQuery.trim());
+                  setCustomSearchQuery("");
+                }
+              }}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setCustomSearchOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                disabled={!customSearchQuery.trim()}
+                onClick={() => {
+                  setCustomSearchOpen(false);
+                  mediaConfig?.onCustomSearch?.(customSearchQuery.trim());
+                  setCustomSearchQuery("");
+                }}
+              >
+                <SearchIcon className="mr-1.5 h-4 w-4" />
+                Search
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex flex-col gap-4">
         {filteredSeasons.map((season) => (
@@ -220,7 +331,7 @@ export function SeasonTabs({
       </div>
 
       {/* Floating search torrent bar */}
-      {hasSelection && !hideFloatingBar && !dismissed && (onDownloadSeasons || onDownloadEpisodes) && (
+      {hasSelection && !hideFloatingBar && (onDownloadSeasons || onDownloadEpisodes) && (
         <div className="fixed bottom-20 left-0 right-0 z-50 flex justify-center md:bottom-6">
           <div className="flex items-center gap-4 rounded-full border border-border/50 bg-foreground px-2.5 py-2 text-background shadow-2xl">
             <button
@@ -314,97 +425,88 @@ function SeasonBlock({
     : null;
   const seasonTitle = season.name || `Season ${season.seasonNumber}`;
 
-  // Collapsed: show enough for 1 row at the largest breakpoint (xl=4)
-  // CSS hides extras per breakpoint to keep exactly 1 row
-  const collapsedCount = 4;
-  const visibleEpisodes = isExpanded ? episodes : episodes.slice(0, collapsedCount);
-  const hasMore = episodes.length > 2; // 2 is the smallest row (mobile)
-
   return (
     <div className="rounded-2xl bg-card p-1">
-      {/* Header — title on left, download + checkbox on right */}
-      <div className="flex flex-col gap-1 px-3 py-3 sm:px-4">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <h3
-            className="min-w-0 flex-1 truncate text-sm font-bold leading-tight sm:text-base"
-            role={selectable ? "button" : undefined}
-            tabIndex={selectable ? 0 : undefined}
-            onClick={selectable ? onToggleSeasonSelect : undefined}
-            onKeyDown={
-              selectable
-                ? (e) => {
-                    if (e.key === " " || e.key === "Enter") {
-                      e.preventDefault();
-                      onToggleSeasonSelect();
-                    }
-                  }
-                : undefined
-            }
-            style={selectable ? { cursor: "pointer" } : undefined}
-          >
+      {/* Header — clickable to expand, with download + checkbox on right */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onToggleExpand}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggleExpand(); } }}
+        className="flex cursor-pointer items-center gap-2 px-3 py-3 sm:gap-3 sm:px-4"
+      >
+        <ChevronRight
+          size={20}
+          className={cn(
+            "shrink-0 text-muted-foreground/50 transition-transform duration-200",
+            isExpanded && "rotate-90",
+          )}
+        />
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-bold leading-tight sm:text-base">
             <span className="text-muted-foreground">S{sNum}</span>
-            <span className="mx-1.5 text-muted-foreground/20 sm:mx-2">—</span>
+            <span className="mx-1.5 text-muted-foreground/20 sm:mx-2">|</span>
             <span>{seasonTitle}</span>
           </h3>
-          <div className="flex items-center gap-1.5">
-            {onDownload && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onDownload(); }}
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground"
-                title={`Download ${seasonTitle}`}
-              >
-                <Download size={14} />
-              </button>
-            )}
-            {selectable && (
-              <button
-                type="button"
-                onClick={onToggleSeasonSelect}
-                className={cn(
-                  "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 transition-all",
-                  isSeasonSelected
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : allEpsSelected
-                      ? "border-primary bg-primary/80 text-primary-foreground"
-                      : selectedCount > 0
-                        ? "border-primary/50 bg-primary/20"
-                        : "border-muted-foreground/20 hover:border-muted-foreground/40",
-                )}
-              >
-                {isSeasonSelected || allEpsSelected ? (
-                  <Check size={13} strokeWidth={3} />
-                ) : selectedCount > 0 ? (
-                  <Minus size={13} strokeWidth={3} className="text-primary" />
-                ) : null}
-              </button>
+          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground sm:text-sm">
+            <span>{epCount} episodes</span>
+            {year && (
+              <>
+                <span className="text-muted-foreground/30">·</span>
+                <span>{year}</span>
+              </>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground sm:text-sm">
-          <span>{epCount} episodes</span>
-          {year && (
-            <>
-              <span className="text-muted-foreground/30">·</span>
-              <span>{year}</span>
-            </>
+        <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+          {onDownload && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onDownload(); }}
+              className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground/50 transition-colors hover:text-foreground"
+              title={`Download ${seasonTitle}`}
+            >
+              <Download size={24} />
+            </button>
+          )}
+          {selectable && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onToggleSeasonSelect(); }}
+              className={cn(
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 transition-all",
+                isSeasonSelected
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : allEpsSelected
+                    ? "border-primary bg-primary/80 text-primary-foreground"
+                    : selectedCount > 0
+                      ? "border-primary/50 bg-primary/20"
+                      : "border-muted-foreground/30 hover:border-muted-foreground/50",
+              )}
+            >
+              {isSeasonSelected || allEpsSelected ? (
+                <Check size={13} strokeWidth={3} />
+              ) : selectedCount > 0 ? (
+                <Minus size={13} strokeWidth={3} className="text-primary" />
+              ) : null}
+            </button>
           )}
         </div>
       </div>
 
-      {/* Episode grid */}
-      {episodes.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 px-3 pb-3 sm:px-4 md:grid-cols-3 xl:grid-cols-4">
-          {visibleEpisodes.map((ep, idx) => (
-            <div
-              key={ep.id}
-              className={cn(
-                // Collapsed: 1 row per breakpoint — sm:2, md:3, xl:4
-                !isExpanded && idx >= 2 && "hidden md:block",
-                !isExpanded && idx >= 3 && "md:hidden xl:block",
-              )}
-            >
+      {/* Collapsible episodes */}
+      <div
+        className={cn(
+          "overflow-hidden transition-all duration-300 ease-in-out",
+          isExpanded ? "max-h-[5000px] opacity-100" : "max-h-0 opacity-0",
+        )}
+      >
+        {/* Episode grid */}
+        {episodes.length > 0 && (
+          <div className="grid grid-cols-2 gap-3 px-3 pb-3 sm:px-4 md:grid-cols-4 xl:grid-cols-5">
+            {episodes.map((ep) => (
               <EpisodeCard
+                key={ep.id}
                 episode={ep}
                 isSelected={
                   selectedEpisodes.has(ep.id) || isSeasonSelected
@@ -416,39 +518,19 @@ function SeasonBlock({
                 selectable={selectable && !isSeasonSelected}
                 downloadInfo={downloadedEpisodes?.get(ep.id)}
               />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Empty state */}
-      {episodes.length === 0 && (
-        <div className="px-4 pb-4">
-          <div className="flex items-center justify-center rounded-xl border border-dashed border-border/30 py-10 text-xs text-muted-foreground/30">
-            No episodes available
+            ))}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* See all / Show less */}
-      {hasMore && (
-        <button
-          type="button"
-          onClick={onToggleExpand}
-          className="flex w-full items-center justify-center gap-2 border-t border-border/20 py-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground"
-        >
-          <ChevronDown
-            size={14}
-            className={cn(
-              "transition-transform",
-              isExpanded && "rotate-180",
-            )}
-          />
-          {isExpanded
-            ? "Show less"
-            : `See all ${episodes.length} episodes`}
-        </button>
-      )}
+        {/* Empty state */}
+        {episodes.length === 0 && (
+          <div className="px-4 pb-4">
+            <div className="flex items-center justify-center rounded-xl border border-dashed border-border/30 py-10 text-xs text-muted-foreground/30">
+              No episodes available
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -561,11 +643,11 @@ function EpisodeCard({
         )}
       </div>
 
-      <div className="flex flex-col gap-0.5 px-3 py-2">
-        <p className="line-clamp-1 text-[13px] font-semibold leading-snug">
+      <div className="flex flex-col gap-0.5 px-3 py-2.5">
+        <p className="line-clamp-1 text-sm font-semibold leading-snug">
           {episode.title || `Episode ${episode.episodeNumber}`}
         </p>
-        <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
           {episode.voteAverage != null && episode.voteAverage > 0 && (
             <span className="flex items-center gap-0.5 text-yellow-500">
               <Star size={10} className="fill-current" />
@@ -583,7 +665,7 @@ function EpisodeCard({
           )}
         </div>
         {episode.overview && (
-          <p className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground/50">
+          <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground/60">
             {episode.overview}
           </p>
         )}
