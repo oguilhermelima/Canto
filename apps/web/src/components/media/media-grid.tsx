@@ -38,7 +38,7 @@ export function MediaGrid({
 
   if (isLoading) {
     return (
-      <div className={cn("grid gap-4", cols, className)}>
+      <div className={cn("grid gap-6", cols, className)}>
         {Array.from({ length: skeletonCount }).map((_, i) => (
           <MediaCardSkeleton key={i} />
         ))}
@@ -55,7 +55,7 @@ export function MediaGrid({
   }
 
   return (
-    <div className={cn("grid gap-4", cols, className)}>
+    <div className={cn("grid gap-6", cols, className)}>
       {items.map((item, i) => (
         <MediaCard
           key={item.id ?? `${item.provider}-${item.externalId}-${i}`}

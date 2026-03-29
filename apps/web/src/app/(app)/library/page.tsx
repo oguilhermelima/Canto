@@ -80,6 +80,7 @@ export default function LibraryPage(): React.JSX.Element {
     year: item.year,
     voteAverage: item.voteAverage,
     inLibrary: true,
+    href: `/media/${item.id}`,
   }));
 
   const totalPages = data ? Math.ceil(data.total / pageSize) : 0;
@@ -140,13 +141,13 @@ export default function LibraryPage(): React.JSX.Element {
       >
 
         {/* Toolbar: filter toggle + type tabs + search + count */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="sticky top-16 z-20 -mx-4 mb-6 flex flex-col gap-4 border-b border-border/40 bg-background/80 px-4 py-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between md:-mx-8 md:px-8 lg:-mx-12 lg:px-12 xl:-mx-16 xl:px-16 2xl:-mx-24 2xl:px-24">
           {/* Left: filter toggle + type tabs */}
           <div className="flex items-center gap-3">
             <button
               type="button"
               className={cn(
-                "hidden h-8 w-8 items-center justify-center rounded-xl bg-muted transition-all md:inline-flex",
+                "hidden h-8 items-center gap-1.5 rounded-xl bg-muted px-4 text-sm font-medium transition-all md:inline-flex",
                 showFilters
                   ? "bg-foreground text-background"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -154,6 +155,7 @@ export default function LibraryPage(): React.JSX.Element {
               onClick={() => setShowFilters(!showFilters)}
             >
               <Settings2 className={cn("h-4 w-4 transition-transform duration-300", showFilters && "rotate-90")} />
+              Filters
             </button>
             <div className="flex items-center gap-1">
               <TabBar

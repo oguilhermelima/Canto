@@ -180,7 +180,7 @@ export function BrowseLayout({
             <button
               type="button"
               className={cn(
-                "hidden h-8 w-8 items-center justify-center rounded-xl bg-muted transition-all md:inline-flex",
+                "hidden h-8 items-center gap-1.5 rounded-xl bg-muted px-4 text-sm font-medium transition-all md:inline-flex",
                 showFilters
                   ? "bg-foreground text-background"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -188,6 +188,7 @@ export function BrowseLayout({
               onClick={() => setShowFilters(!showFilters)}
             >
               <Settings2 className={cn("h-4 w-4 transition-transform duration-300", showFilters && "rotate-90")} />
+              Filters
             </button>
             {toolbar}
           </div>
