@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import type { Database } from "@canto/db/client";
 import { library, media, mediaFile, torrent } from "@canto/db/schema";
+import { getSetting } from "@canto/db/settings";
 import {
   torrentDownloadInput,
   torrentSearchInput,
@@ -21,19 +22,22 @@ import {
 
 class QBittorrentClient {
   private baseUrl: string;
+  private username: string;
+  private password: string;
   private cookie: string | null = null;
 
-  constructor() {
-    this.baseUrl =
-      process.env.QBITTORRENT_URL ?? "";
+  constructor(baseUrl: string, username: string, password: string) {
+    this.baseUrl = baseUrl;
+    this.username = username;
+    this.password = password;
   }
 
   /** Authenticate with qBittorrent and store the session cookie. */
   private async login(): Promise<void> {
-    const username = process.env.QBITTORRENT_USERNAME ?? "";
-    const password = process.env.QBITTORRENT_PASSWORD ?? "";
-
-    const body = new URLSearchParams({ username, password });
+    const body = new URLSearchParams({
+      username: this.username,
+      password: this.password,
+    });
     const response = await fetch(`${this.baseUrl}/api/v2/auth/login`, {
       method: "POST",
       body,
@@ -246,9 +250,6 @@ class QBittorrentClient {
 /*  Auto-import: organize files on media server via SSH after download         */
 /* -------------------------------------------------------------------------- */
 
-const JELLYFIN_URL_ENV = process.env.JELLYFIN_URL ?? "";
-const JELLYFIN_API_KEY_ENV = process.env.JELLYFIN_API_KEY ?? "";
-
 const VIDEO_EXTENSIONS = new Set([".mkv", ".mp4", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v"]);
 const EP_PATTERN = /[Ss](\d{1,2})[Ee](\d{1,3})/;
 
@@ -261,12 +262,30 @@ function sanitizeName(name: string): string {
   return name.replace(/[<>:"/\\|?*]+/g, "").replace(/\.+$/, "").trim();
 }
 
-async function triggerJellyfinScan(): Promise<void> {
-  if (!JELLYFIN_URL_ENV || !JELLYFIN_API_KEY_ENV) return;
-  void fetch(`${JELLYFIN_URL_ENV}/Library/Refresh`, {
-    method: "POST",
-    headers: { "X-Emby-Token": JELLYFIN_API_KEY_ENV },
-  }).catch(() => {});
+async function triggerMediaServerScans(db: Database, libraryId?: string): Promise<void> {
+  // Jellyfin: full library refresh
+  const jellyfinUrl = await getSetting("jellyfin.url");
+  const jellyfinKey = await getSetting("jellyfin.apiKey");
+  if (jellyfinUrl && jellyfinKey) {
+    void fetch(`${jellyfinUrl}/Library/Refresh`, {
+      method: "POST",
+      headers: { "X-Emby-Token": jellyfinKey },
+    }).catch(() => {});
+  }
+
+  // Plex: targeted section refresh if library is linked
+  const plexUrl = await getSetting("plex.url");
+  const plexToken = await getSetting("plex.token");
+  if (plexUrl && plexToken && libraryId) {
+    const lib = await db.query.library.findFirst({
+      where: eq(library.id, libraryId),
+    });
+    if (lib?.plexLibraryId) {
+      void fetch(
+        `${plexUrl}/library/sections/${lib.plexLibraryId}/refresh?X-Plex-Token=${plexToken}`,
+      ).catch(() => {});
+    }
+  }
 }
 
 /**
@@ -343,18 +362,12 @@ async function autoImportTorrent(
     where: and(eq(mediaFile.torrentId, torrentRow.id), eq(mediaFile.status, "pending")),
   });
 
-  // Determine container base path from library/category
-  // qBit container paths: /medias/Movies, /medias/Shows, /medias/Animes
+  // Determine container base path from library
   const libRow = mediaRow.libraryId
     ? await db.query.library.findFirst({ where: eq(library.id, mediaRow.libraryId) })
     : null;
-  const containerCatMap: Record<string, string> = {
-    movies: "/medias/Movies",
-    shows: "/medias/Shows",
-    animes: "/medias/Animes",
-  };
-  const qbCat = libRow?.qbitCategory ?? (mediaRow.type === "show" ? "shows" : "movies");
-  const containerBasePath = containerCatMap[qbCat] ?? "/medias/Shows";
+  const containerBasePath = libRow?.containerMediaPath
+    ?? (mediaRow.type === "show" ? "/medias/Shows" : "/medias/Movies");
 
   // Get torrent file list
   const files = await qbClient.getTorrentFiles(torrentRow.hash);
@@ -464,8 +477,10 @@ async function autoImportTorrent(
         }
       }
 
-      // Build host path for DB
-      const hostTargetLocation = targetLocation.replace("/medias/", "/home/user/Medias/");
+      // Build host path for DB using library paths
+      const hostTargetLocation = (libRow?.mediaPath && libRow?.containerMediaPath)
+        ? targetLocation.replace(libRow.containerMediaPath, libRow.mediaPath)
+        : targetLocation.replace("/medias/", "/home/user/Medias/");
       const finalPath = `${hostTargetLocation}/${targetFilename}`;
 
       // UPDATE existing placeholder media_file (if we have one for this episode)
@@ -506,7 +521,9 @@ async function autoImportTorrent(
   }
 
   // Build host content path for DB
-  const hostContentPath = targetLocation.replace("/medias/", "/home/user/Medias/");
+  const hostContentPath = (libRow?.mediaPath && libRow?.containerMediaPath)
+    ? targetLocation.replace(libRow.containerMediaPath, libRow.mediaPath)
+    : targetLocation.replace("/medias/", "/home/user/Medias/");
 
   // Mark torrent as imported
   await db.update(torrent).set({
@@ -518,7 +535,7 @@ async function autoImportTorrent(
 
   if (importedCount > 0) {
     console.log(`[auto-import] Imported ${importedCount} file(s) for "${mediaRow.title}"`);
-    await triggerJellyfinScan();
+    await triggerMediaServerScans(db, mediaRow.libraryId ?? undefined);
 
     // Auto-merge versions if enabled
     await autoMergeIfEnabled(db, mediaRow, torrentRow);
@@ -549,10 +566,9 @@ class ProwlarrClient {
   private baseUrl: string;
   private apiKey: string;
 
-  constructor() {
-    this.baseUrl =
-      process.env.PROWLARR_URL ?? "";
-    this.apiKey = process.env.PROWLARR_API_KEY ?? "";
+  constructor(baseUrl: string, apiKey: string) {
+    this.baseUrl = baseUrl;
+    this.apiKey = apiKey;
   }
 
   isConfigured(): boolean {
@@ -585,15 +601,33 @@ class ProwlarrClient {
 /* -------------------------------------------------------------------------- */
 
 let qbClient: QBittorrentClient | null = null;
-function getQBClient(): QBittorrentClient {
-  if (!qbClient) qbClient = new QBittorrentClient();
+async function getQBClient(): Promise<QBittorrentClient> {
+  if (!qbClient) {
+    const url = (await getSetting("qbittorrent.url")) ?? "";
+    const user = (await getSetting("qbittorrent.username")) ?? "";
+    const pass = (await getSetting("qbittorrent.password")) ?? "";
+    qbClient = new QBittorrentClient(url, user, pass);
+  }
   return qbClient;
 }
 
+/** Reset the cached client (e.g. after settings change) */
+export function resetQBClient(): void {
+  qbClient = null;
+}
+
 let prowlarrClient: ProwlarrClient | null = null;
-function getProwlarrClient(): ProwlarrClient {
-  if (!prowlarrClient) prowlarrClient = new ProwlarrClient();
+async function getProwlarrClient(): Promise<ProwlarrClient> {
+  if (!prowlarrClient) {
+    const url = (await getSetting("prowlarr.url")) ?? "";
+    const apiKey = (await getSetting("prowlarr.apiKey")) ?? "";
+    prowlarrClient = new ProwlarrClient(url, apiKey);
+  }
   return prowlarrClient;
+}
+
+export function resetProwlarrClient(): void {
+  prowlarrClient = null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -844,7 +878,7 @@ export const torrentRouter = createTRPCRouter({
         }
       }
 
-      const prowlarr = getProwlarrClient();
+      const prowlarr = await getProwlarrClient();
 
       // Check if Prowlarr is configured
       if (!prowlarr.isConfigured()) {
@@ -958,7 +992,7 @@ export const torrentRouter = createTRPCRouter({
       });
 
       if (existingByTitle) {
-        const qb = getQBClient();
+        const qb = await getQBClient();
 
         if (existingByTitle.hash) {
           try {
@@ -1177,7 +1211,7 @@ export const torrentRouter = createTRPCRouter({
 
       // ── Add to qBittorrent ──
 
-      const qb = getQBClient();
+      const qb = await getQBClient();
 
       try {
         // Snapshot existing hashes before adding
@@ -1376,7 +1410,7 @@ export const torrentRouter = createTRPCRouter({
 
       // ── Add to qBittorrent ──
 
-      const qb = getQBClient();
+      const qb = await getQBClient();
 
       try {
         await qb.addTorrent(magnetOrUrl, qbCategory);
@@ -1457,7 +1491,7 @@ export const torrentRouter = createTRPCRouter({
         retryCategory = defaultLib?.qbitCategory ?? mediaType;
       }
 
-      const qb = getQBClient();
+      const qb = await getQBClient();
       await qb.addTorrent(url, retryCategory);
 
       // Try to get the new hash
@@ -1537,7 +1571,7 @@ export const torrentRouter = createTRPCRouter({
       save_path: string;
     }> = [];
     let qbReachable = false;
-    const qbImportClient = getQBClient();
+    const qbImportClient = await getQBClient();
 
     try {
       liveTorrents = await qbImportClient.listTorrents();
@@ -1701,7 +1735,7 @@ export const torrentRouter = createTRPCRouter({
       }
 
       if (row.hash) {
-        const qb = getQBClient();
+        const qb = await getQBClient();
         await qb.pauseTorrent(row.hash);
       }
 
@@ -1729,7 +1763,7 @@ export const torrentRouter = createTRPCRouter({
       }
 
       if (row.hash) {
-        const qb = getQBClient();
+        const qb = await getQBClient();
         await qb.resumeTorrent(row.hash);
       }
 
@@ -1757,7 +1791,7 @@ export const torrentRouter = createTRPCRouter({
       }
 
       if (row.hash) {
-        const qb = getQBClient();
+        const qb = await getQBClient();
         await qb.pauseTorrent(row.hash);
       }
 
@@ -1811,7 +1845,7 @@ export const torrentRouter = createTRPCRouter({
       }
 
       try {
-        const qb = getQBClient();
+        const qb = await getQBClient();
         await autoImportTorrent(ctx.db, claimed, qb);
         return { success: true };
       } catch (err) {
@@ -1850,7 +1884,7 @@ export const torrentRouter = createTRPCRouter({
       // Remove from qBittorrent if requested and hash is known
       if (input.removeTorrent && row.hash) {
         try {
-          const qb = getQBClient();
+          const qb = await getQBClient();
           await qb.deleteTorrent(row.hash, input.deleteFiles);
         } catch {
           // qBittorrent may not have this torrent anymore — that is okay
