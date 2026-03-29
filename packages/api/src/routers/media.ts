@@ -532,8 +532,15 @@ export const mediaRouter = createTRPCRouter({
    * Get recommendations based on the user's library.
    * Picks random items from library, fetches TMDB recommendations, deduplicates.
    */
-  recommendations: publicProcedure.query(async ({ ctx }) => {
-    // Get up to 10 random library items
+  recommendations: publicProcedure
+    .input(z.object({
+      cursor: z.number().int().min(0).default(0),
+      pageSize: z.number().int().min(1).max(20).default(10),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+    const page = input?.cursor ?? 0;
+    const pageSize = input?.pageSize ?? 10;
+
     const libraryItems = await ctx.db.query.media.findMany({
       where: eq(media.inLibrary, true),
       columns: {
@@ -543,15 +550,20 @@ export const mediaRouter = createTRPCRouter({
         type: true,
         title: true,
       },
-      limit: 50,
+      limit: 100,
     });
 
-    if (libraryItems.length === 0) return [];
+    if (libraryItems.length === 0) return { items: [], nextCursor: null };
 
-    // Pick up to 5 random seeds
-    const shuffled = libraryItems.sort(() => Math.random() - 0.5).slice(0, 5);
+    // Use page as seed offset — pick different items per page
+    const seedStart = (page * 3) % libraryItems.length;
+    const seeds: typeof libraryItems = [];
+    for (let i = 0; i < 3 && i < libraryItems.length; i++) {
+      seeds.push(libraryItems[(seedStart + i) % libraryItems.length]!);
+    }
+
     const apiKey = (await getSetting("tmdb.apiKey")) ?? "";
-    if (!apiKey) return [];
+    if (!apiKey) return { items: [], nextCursor: null };
 
     const tmdb = new TmdbProvider(apiKey);
     const libraryExternalIds = new Set(libraryItems.map((m) => `${m.provider}-${m.externalId}`));
@@ -569,7 +581,7 @@ export const mediaRouter = createTRPCRouter({
     }> = [];
 
     await Promise.all(
-      shuffled.map(async (item) => {
+      seeds.map(async (item) => {
         try {
           const extras = await tmdb.getExtras(
             Number(item.externalId),
@@ -577,7 +589,6 @@ export const mediaRouter = createTRPCRouter({
           );
           for (const rec of extras.recommendations ?? []) {
             const key = `${rec.provider ?? "tmdb"}-${rec.externalId}`;
-            // Skip if already in library or already seen
             if (libraryExternalIds.has(key) || seen.has(key)) continue;
             seen.add(key);
             results.push({
@@ -593,19 +604,19 @@ export const mediaRouter = createTRPCRouter({
             });
           }
         } catch {
-          // Skip failed fetches
+          // Skip
         }
       }),
     );
 
-    // Sort by vote average, take top 20, then fetch logos
-    const top = results
-      .sort((a, b) => (b.voteAverage ?? 0) - (a.voteAverage ?? 0))
-      .slice(0, 20);
+    // Sort by vote average, paginate
+    const sorted = results.sort((a, b) => (b.voteAverage ?? 0) - (a.voteAverage ?? 0));
+    const pageItems = sorted.slice(0, pageSize);
+    const hasMore = sorted.length > pageSize || libraryItems.length > (page + 1) * 3;
 
     // Fetch logos + trailers in parallel
     const enriched = await Promise.all(
-      top.map(async (item) => {
+      pageItems.map(async (item) => {
         const tmdbType = item.type === "show" ? "tv" : "movie";
         let logoPath: string | null = null;
         let trailerKey: string | null = null;
@@ -621,7 +632,6 @@ export const mediaRouter = createTRPCRouter({
           );
           if (enLogos.length > 0) logoPath = enLogos[0]!.file_path;
 
-          // Prefer official trailer, then any trailer, then teaser
           const trailer =
             videos.find((v) => v.site === "YouTube" && v.type === "Trailer") ??
             videos.find((v) => v.site === "YouTube" && v.type === "Teaser") ??
@@ -635,6 +645,9 @@ export const mediaRouter = createTRPCRouter({
       }),
     );
 
-    return enriched;
+    return {
+      items: enriched,
+      nextCursor: hasMore ? page + 1 : null,
+    };
   }),
 });

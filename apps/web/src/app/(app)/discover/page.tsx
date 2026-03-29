@@ -44,9 +44,63 @@ const PRESETS: Record<string, Preset> = {
 
 const DEFAULT_PRESET = "trending_shows";
 
-export default function DiscoverBrowsePage(): React.JSX.Element {
-  const searchParams = useSearchParams();
-  const presetKey = searchParams.get("preset") ?? DEFAULT_PRESET;
+function RecommendedPage(): React.JSX.Element {
+  useEffect(() => {
+    document.title = "Recommended for you — Canto";
+  }, []);
+
+  const query = trpc.media.recommendations.useInfiniteQuery(
+    { pageSize: 20 },
+    {
+      staleTime: 10 * 60 * 1000,
+      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+      initialCursor: 0,
+    },
+  );
+
+  const { items, totalResults } = useMemo(() => {
+    const allItems = (query.data?.pages ?? []).flatMap((p) => p.items);
+    // Deduplicate
+    const seen = new Set<number>();
+    const deduped = allItems.filter((r) => {
+      if (seen.has(r.externalId)) return false;
+      seen.add(r.externalId);
+      return true;
+    });
+    return {
+      items: deduped.map((r) => ({
+        externalId: r.externalId,
+        provider: r.provider,
+        type: r.type,
+        title: r.title,
+        posterPath: r.posterPath ?? null,
+        year: r.year,
+        voteAverage: r.voteAverage,
+      })),
+      totalResults: deduped.length,
+    };
+  }, [query.data]);
+
+  const fetchNextPage = useCallback(() => {
+    if (query.hasNextPage && !query.isFetchingNextPage)
+      void query.fetchNextPage();
+  }, [query]);
+
+  return (
+    <BrowseLayout
+      title="Recommended for you"
+      mediaType="all"
+      items={items}
+      totalResults={totalResults}
+      isLoading={query.isLoading}
+      isFetchingNextPage={query.isFetchingNextPage}
+      hasNextPage={query.hasNextPage ?? false}
+      onFetchNextPage={fetchNextPage}
+    />
+  );
+}
+
+function DiscoverPresetPage({ presetKey }: { presetKey: string }): React.JSX.Element {
   const preset = PRESETS[presetKey] ?? PRESETS[DEFAULT_PRESET]!;
 
   useEffect(() => {
@@ -106,4 +160,15 @@ export default function DiscoverBrowsePage(): React.JSX.Element {
       onFetchNextPage={fetchNextPage}
     />
   );
+}
+
+export default function DiscoverBrowsePage(): React.JSX.Element {
+  const searchParams = useSearchParams();
+  const presetKey = searchParams.get("preset") ?? DEFAULT_PRESET;
+
+  if (presetKey === "recommended") {
+    return <RecommendedPage />;
+  }
+
+  return <DiscoverPresetPage presetKey={presetKey} />;
 }
