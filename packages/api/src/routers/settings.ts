@@ -524,17 +524,31 @@ export const settingsRouter = createTRPCRouter({
             const resources = (await resourcesRes.json()) as Array<{
               name: string;
               provides: string;
-              connections: Array<{ uri: string; local: boolean }>;
+              connections: Array<{ uri: string; local: boolean; protocol: string }>;
             }>;
             const server = resources.find((r) => r.provides.includes("server"));
             if (server) {
-              // Prefer local connection
-              const localConn = server.connections.find((c) => c.local);
-              const conn = localConn ?? server.connections[0];
-              if (conn) {
-                await setSetting("plex.url", conn.uri);
-                serverName = server.name;
+              // Find local plex.direct connection and derive the plain HTTP URL
+              const localHttps = server.connections.find(
+                (c) => c.local && c.uri.includes("plex.direct"),
+              );
+              if (localHttps) {
+                // Extract IP from "https://192-168-0-204.xxx.plex.direct:32400"
+                const match = /https:\/\/(\d+-\d+-\d+-\d+)\./.exec(localHttps.uri);
+                if (match) {
+                  const ip = match[1]!.replace(/-/g, ".");
+                  await setSetting("plex.url", `http://${ip}:32400`);
+                } else {
+                  await setSetting("plex.url", localHttps.uri);
+                }
+                // Save the plex.direct URL for API calls that need HTTPS
+                await setSetting("plex.externalUrl", localHttps.uri);
+              } else {
+                const fallback = server.connections[0];
+                if (fallback) await setSetting("plex.url", fallback.uri);
               }
+
+              serverName = server.name;
             }
           }
         } catch {
