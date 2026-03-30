@@ -142,12 +142,12 @@ const BRAND_LOGO: Record<string, { type: "img"; src: string } | { type: "mask"; 
   tmdb: { type: "img", src: "/tmdb.svg" },
 };
 
-const SERVICE_INFO: Record<string, { subtitle?: string; link?: { label: string; href: string } }> = {
+const SERVICE_INFO: Record<string, { subtitle?: string; link?: { label: string; href: string }; apiKeyHint?: string; apiKeyLink?: { label: string; href: string } }> = {
   jellyfin: { subtitle: "Free software media system. Sync libraries and trigger scans after downloads.", link: { label: "jellyfin.org", href: "https://jellyfin.org" } },
   plex: { subtitle: "Popular media server. Sync libraries and trigger scans after downloads.", link: { label: "plex.tv", href: "https://plex.tv" } },
   qbittorrent: { subtitle: "Torrent client for downloading media files.", link: { label: "qbittorrent.org", href: "https://www.qbittorrent.org" } },
-  prowlarr: { subtitle: "Indexer manager for searching across torrent trackers.", link: { label: "prowlarr.com", href: "https://prowlarr.com" } },
-  jackett: { subtitle: "Torznab-compatible indexer proxy. Alternative to Prowlarr.", link: { label: "GitHub", href: "https://github.com/Jackett/Jackett" } },
+  prowlarr: { subtitle: "Indexer manager for searching across torrent trackers.", link: { label: "prowlarr.com", href: "https://prowlarr.com" }, apiKeyHint: "Found in Prowlarr under Settings → General → API Key.", apiKeyLink: { label: "How to find your API key", href: "https://wiki.servarr.com/prowlarr/settings#security" } },
+  jackett: { subtitle: "Torznab-compatible indexer proxy. Alternative to Prowlarr.", link: { label: "GitHub", href: "https://github.com/Jackett/Jackett" }, apiKeyHint: "Found in the Jackett dashboard at the top right corner.", apiKeyLink: { label: "How to find your API key", href: "https://github.com/Jackett/Jackett#api-key" } },
 };
 
 function BrandLogo({ serviceKey }: { serviceKey: string }): React.JSX.Element | null {
@@ -293,6 +293,19 @@ function ServiceRow({
               showSecrets={showSecrets}
               onToggleSecret={(key) => setShowSecrets((p) => ({ ...p, [key]: !p[key] }))}
             />
+          )}
+          {info?.apiKeyHint && (
+            <p className="text-sm text-muted-foreground">
+              {info.apiKeyHint}
+              {info.apiKeyLink && (
+                <>
+                  {" "}
+                  <a href={info.apiKeyLink.href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    {info.apiKeyLink.label}
+                  </a>
+                </>
+              )}
+            </p>
           )}
         </div>
       </AnimatedCollapse>
@@ -466,47 +479,79 @@ function MediaServerRow({
           <div className="space-y-3">
             <p className="text-sm font-medium text-muted-foreground">Authentication</p>
 
-            {/* Option 1: API Key / Token */}
-            <div className={cn("rounded-xl border p-4 transition-all", activeSection === "login" ? "border-border/20 opacity-40" : activeSection === "token" ? "border-border/60 bg-muted/30" : "border-border/40 hover:border-border/60")}>
-              <p className="text-sm font-medium text-foreground mb-3">{apiKeyField.label}</p>
-              <div className="relative">
-                <Input
-                  type={apiKeyField.secret && !showSecrets[apiKeyField.key] ? "password" : "text"}
-                  value={apiKey}
-                  placeholder={apiKeyField.placeholder}
-                  onChange={(e) => { setApiKey(e.target.value); setDirty(true); setActiveSection(e.target.value ? "token" : null); }}
-                  className="h-10 rounded-lg border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
-                  disabled={activeSection === "login"}
-                />
-                {apiKeyField.secret && activeSection !== "login" && (
-                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors" onClick={() => setShowSecrets((p) => ({ ...p, [apiKeyField.key]: !p[apiKeyField.key] }))}>
-                    {showSecrets[apiKeyField.key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                )}
-              </div>
-            </div>
+            {/* Jellyfin: Token first, then credentials */}
+            {isJellyfin && (
+              <>
+                <div className={cn("rounded-xl border p-4 transition-all", activeSection === "login" ? "border-border/20 opacity-40" : activeSection === "token" ? "border-border/60 bg-muted/30" : "border-border/40 hover:border-border/60")}>
+                  <p className="text-sm font-medium text-foreground mb-3">{apiKeyField.label}</p>
+                  <div className="relative">
+                    <Input
+                      type={apiKeyField.secret && !showSecrets[apiKeyField.key] ? "password" : "text"}
+                      value={apiKey}
+                      placeholder={apiKeyField.placeholder}
+                      onChange={(e) => { setApiKey(e.target.value); setDirty(true); setActiveSection(e.target.value ? "token" : null); }}
+                      className="h-10 rounded-lg border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+                      disabled={activeSection === "login"}
+                    />
+                    {apiKeyField.secret && activeSection !== "login" && (
+                      <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors" onClick={() => setShowSecrets((p) => ({ ...p, [apiKeyField.key]: !p[apiKeyField.key] }))}>
+                        {showSecrets[apiKeyField.key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    )}
+                  </div>
+                </div>
 
-            <OrDivider />
+                <OrDivider />
 
-            {/* Option 2: Login */}
-            {serviceKey === "jellyfin" ? (
-              <div className={cn("rounded-xl border p-4 transition-all", activeSection === "token" ? "border-border/20 opacity-40" : activeSection === "login" ? "border-border/60 bg-muted/30" : "border-border/40 hover:border-border/60")}>
-                <p className="text-sm font-medium text-foreground mb-3">Login with credentials</p>
-                <SettingsFields
-                  fields={loginFields}
-                  values={loginValues}
-                  onChange={(key, value) => { const next = { ...loginValues, [key]: value }; setLoginValues(next); setDirty(true); setActiveSection(Object.values(next).some((v) => v) ? "login" : null); }}
-                  showSecrets={showSecrets}
-                  onToggleSecret={(key) => setShowSecrets((p) => ({ ...p, [key]: !p[key] }))}
+                <div className={cn("rounded-xl border p-4 transition-all", activeSection === "token" ? "border-border/20 opacity-40" : activeSection === "login" ? "border-border/60 bg-muted/30" : "border-border/40 hover:border-border/60")}>
+                  <p className="text-sm font-medium text-foreground mb-3">Login with credentials</p>
+                  <SettingsFields
+                    fields={loginFields}
+                    values={loginValues}
+                    onChange={(key, value) => { const next = { ...loginValues, [key]: value }; setLoginValues(next); setDirty(true); setActiveSection(Object.values(next).some((v) => v) ? "login" : null); }}
+                    showSecrets={showSecrets}
+                    onToggleSecret={(key) => setShowSecrets((p) => ({ ...p, [key]: !p[key] }))}
+                    disabled={activeSection === "token"}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Plex: Sign in first, then token */}
+            {!isJellyfin && (
+              <>
+                <PlexOAuthSection
+                  serverUrl={url}
                   disabled={activeSection === "token"}
+                  onSuccess={() => { void utils.settings.getAll.invalidate(); setDirty(false); setActiveSection(null); }}
                 />
-              </div>
-            ) : (
-              <PlexOAuthSection
-                serverUrl={url}
-                disabled={activeSection === "token"}
-                onSuccess={() => { void utils.settings.getAll.invalidate(); setDirty(false); setActiveSection(null); }}
-              />
+
+                <OrDivider />
+
+                <div className={cn("rounded-xl border p-4 transition-all", activeSection === "login" ? "border-border/20 opacity-40" : activeSection === "token" ? "border-border/60 bg-muted/30" : "border-border/40 hover:border-border/60")}>
+                  <p className="text-sm font-medium text-foreground mb-2">{apiKeyField.label}</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Filled automatically when you sign in above. To find it manually, visit{" "}
+                    <a href="https://plex.tv/devices.xml" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">plex.tv/devices.xml</a>
+                    {" "}while logged in.
+                  </p>
+                  <div className="relative">
+                    <Input
+                      type={apiKeyField.secret && !showSecrets[apiKeyField.key] ? "password" : "text"}
+                      value={apiKey}
+                      placeholder={apiKeyField.placeholder}
+                      onChange={(e) => { setApiKey(e.target.value); setDirty(true); setActiveSection(e.target.value ? "token" : null); }}
+                      className="h-10 rounded-lg border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+                      disabled={activeSection === "login"}
+                    />
+                    {apiKeyField.secret && activeSection !== "login" && (
+                      <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors" onClick={() => setShowSecrets((p) => ({ ...p, [apiKeyField.key]: !p[apiKeyField.key] }))}>
+                        {showSecrets[apiKeyField.key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>
