@@ -143,6 +143,15 @@ const BRAND_GRADIENT: Record<string, string> = {
   jackett: "from-[#c23c2a]/15 via-[#c23c2a]/5 to-transparent",
 };
 
+const BRAND_LOGO: Record<string, string | null> = {
+  jellyfin: null,
+  plex: null,
+  qbittorrent: "/qbitorrent.svg",
+  prowlarr: "/prowlarr.svg",
+  jackett: null,
+  tmdb: "/tmdb.svg",
+};
+
 /* -------------------------------------------------------------------------- */
 /*  ServiceRow                                                                 */
 /* -------------------------------------------------------------------------- */
@@ -206,7 +215,11 @@ function ServiceRow({
         className={cn("flex w-full items-center justify-between px-5 py-5 text-left cursor-pointer bg-gradient-to-r", BRAND_GRADIENT[serviceKey] ?? "")}
       >
         <div className="min-w-0 pr-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            {BRAND_LOGO[serviceKey] && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={BRAND_LOGO[serviceKey]!} alt="" className="h-5 w-5 shrink-0" />
+            )}
             <p className="text-sm font-medium text-foreground">{title}</p>
             {testService.data && (
               testService.data.connected ? (
@@ -674,7 +687,9 @@ function TmdbSection(): React.JSX.Element {
 
   return (
     <div className={cn("px-5 py-5 bg-gradient-to-r", BRAND_GRADIENT.tmdb)}>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/tmdb.svg" alt="" className="h-5 w-5 shrink-0" />
         <p className="text-sm font-medium text-foreground">TMDB API Key</p>
         <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Required</Badge>
       </div>
