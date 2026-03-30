@@ -957,7 +957,7 @@ export const torrentRouter = createTRPCRouter({
    * Search for torrents via Prowlarr, building a search query from the
    * media item's title (+ season number if provided).
    */
-  search: publicProcedure // TODO: protectedProcedure when auth ready
+  search: protectedProcedure
     .input(torrentSearchInput)
     .query(async ({ ctx, input }) => {
       const row = await ctx.db.query.media.findFirst({

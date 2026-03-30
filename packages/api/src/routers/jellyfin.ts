@@ -4,23 +4,9 @@ import { z } from "zod";
 
 import type { Database } from "@canto/db/client";
 import { library } from "@canto/db/schema";
-import { getSetting } from "@canto/db/settings";
 
+import { getJellyfinCredentials } from "../lib/server-credentials";
 import { createTRPCRouter, publicProcedure } from "../trpc";
-
-/* -------------------------------------------------------------------------- */
-/*  Helpers                                                                   */
-/* -------------------------------------------------------------------------- */
-
-async function getJellyfinCredentials(): Promise<{
-  url: string;
-  apiKey: string;
-} | null> {
-  const url = await getSetting("jellyfin.url");
-  const apiKey = await getSetting("jellyfin.apiKey");
-  if (!url || !apiKey) return null;
-  return { url, apiKey };
-}
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                    */

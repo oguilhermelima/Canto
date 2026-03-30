@@ -1,6 +1,9 @@
 import { z } from "zod";
+import { isNotNull } from "drizzle-orm";
 
-import { getSetting } from "@canto/db/settings";
+import { db } from "@canto/db/client";
+import { watchProviderLink } from "@canto/db/schema";
+import { getSetting, setSetting } from "@canto/db/settings";
 
 import { createTRPCRouter, publicProcedure } from "../trpc";
 
@@ -148,6 +151,24 @@ export const providerRouter = createTRPCRouter({
    * Fetches trending movies + shows, then enriches with backdrops and logos.
    */
   spotlight: publicProcedure.query(async () => {
+    const CACHE_KEY = "cache.spotlight";
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+
+    const cached = await getSetting<{ data: unknown[]; updatedAt: string }>(CACHE_KEY);
+    if (cached && Date.now() - new Date(cached.updatedAt).getTime() < ONE_HOUR_MS) {
+      return cached.data as Array<{
+        externalId: number;
+        provider: string;
+        type: "movie" | "show";
+        title: string;
+        overview: string;
+        year: number | undefined;
+        voteAverage: number;
+        backdropPath: string;
+        logoPath: string | null;
+      }>;
+    }
+
     const [moviesData, showsData] = await Promise.all([
       tmdbFetch<{
         results: Array<{
@@ -237,6 +258,33 @@ export const providerRouter = createTRPCRouter({
       }),
     );
 
-    return results.filter((r): r is NonNullable<typeof r> => r !== null);
+    const spotlightResults = results.filter((r): r is NonNullable<typeof r> => r !== null);
+
+    await setSetting(CACHE_KEY, {
+      data: spotlightResults,
+      updatedAt: new Date().toISOString(),
+    });
+
+    return spotlightResults;
+  }),
+
+  /**
+   * Get watch provider search URL templates.
+   * Returns Record<providerId, searchUrlTemplate> for providers with known search URLs.
+   */
+  watchProviderLinks: publicProcedure.query(async () => {
+    const rows = await db
+      .select({
+        providerId: watchProviderLink.providerId,
+        searchUrlTemplate: watchProviderLink.searchUrlTemplate,
+      })
+      .from(watchProviderLink)
+      .where(isNotNull(watchProviderLink.searchUrlTemplate));
+
+    const mapping: Record<number, string> = {};
+    for (const row of rows) {
+      mapping[row.providerId] = row.searchUrlTemplate!;
+    }
+    return mapping;
   }),
 });

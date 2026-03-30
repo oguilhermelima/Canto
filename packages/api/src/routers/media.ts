@@ -3,14 +3,13 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import {
-  episode,
   extrasCache,
   media,
   season,
 } from "@canto/db/schema";
-import { getProvider, TmdbProvider } from "@canto/providers";
+import { getProvider } from "@canto/providers";
 import type { NormalizedMedia } from "@canto/providers";
-import { getSetting } from "@canto/db/settings";
+import { persistMedia, updateMediaFromNormalized } from "@canto/db/persist-media";
 import {
   addToLibraryInput,
   getByExternalInput,
@@ -19,193 +18,11 @@ import {
 } from "@canto/validators";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
+import { getTmdbProvider } from "../lib/tmdb-client";
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                   */
 /* -------------------------------------------------------------------------- */
-
-/** Persist normalized media + seasons + episodes into the database. */
-async function persistMedia(
-  db: import("@canto/db/client").Database,
-  normalized: NormalizedMedia,
-): Promise<typeof media.$inferSelect> {
-  const [inserted] = await db
-    .insert(media)
-    .values({
-      type: normalized.type,
-      externalId: normalized.externalId,
-      provider: normalized.provider,
-      title: normalized.title,
-      originalTitle: normalized.originalTitle,
-      overview: normalized.overview,
-      tagline: normalized.tagline,
-      releaseDate: normalized.releaseDate,
-      year: normalized.year,
-      lastAirDate: normalized.lastAirDate,
-      status: normalized.status,
-      genres: normalized.genres,
-      contentRating: normalized.contentRating,
-      originalLanguage: normalized.originalLanguage,
-      spokenLanguages: normalized.spokenLanguages,
-      originCountry: normalized.originCountry,
-      voteAverage: normalized.voteAverage,
-      voteCount: normalized.voteCount,
-      popularity: normalized.popularity,
-      runtime: normalized.runtime,
-      posterPath: normalized.posterPath,
-      backdropPath: normalized.backdropPath,
-      logoPath: normalized.logoPath,
-      imdbId: normalized.imdbId,
-      numberOfSeasons: normalized.numberOfSeasons,
-      numberOfEpisodes: normalized.numberOfEpisodes,
-      inProduction: normalized.inProduction,
-      networks: normalized.networks,
-      budget: normalized.budget,
-      revenue: normalized.revenue,
-      collection: normalized.collection,
-      productionCompanies: normalized.productionCompanies,
-      productionCountries: normalized.productionCountries,
-      metadataUpdatedAt: new Date(),
-    })
-    .returning();
-
-  if (!inserted) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "Failed to insert media",
-    });
-  }
-
-  // Insert seasons + episodes for TV shows
-  if (normalized.type === "show" && normalized.seasons) {
-    for (const s of normalized.seasons) {
-      const [insertedSeason] = await db
-        .insert(season)
-        .values({
-          mediaId: inserted.id,
-          number: s.number,
-          externalId: s.externalId,
-          name: s.name,
-          overview: s.overview,
-          airDate: s.airDate,
-          posterPath: s.posterPath,
-          episodeCount: s.episodeCount,
-        })
-        .returning();
-
-      if (insertedSeason && s.episodes && s.episodes.length > 0) {
-        await db.insert(episode).values(
-          s.episodes.map((ep) => ({
-            seasonId: insertedSeason.id,
-            number: ep.number,
-            externalId: ep.externalId,
-            title: ep.title,
-            overview: ep.overview,
-            airDate: ep.airDate,
-            runtime: ep.runtime,
-            stillPath: ep.stillPath,
-            voteAverage: ep.voteAverage,
-          })),
-        );
-      }
-    }
-  }
-
-  return inserted;
-}
-
-/** Update an existing media record with fresh normalized data. */
-async function updateMediaFromNormalized(
-  db: import("@canto/db/client").Database,
-  mediaId: string,
-  normalized: NormalizedMedia,
-): Promise<typeof media.$inferSelect> {
-  const [updated] = await db
-    .update(media)
-    .set({
-      title: normalized.title,
-      originalTitle: normalized.originalTitle,
-      overview: normalized.overview,
-      tagline: normalized.tagline,
-      releaseDate: normalized.releaseDate,
-      year: normalized.year,
-      lastAirDate: normalized.lastAirDate,
-      status: normalized.status,
-      genres: normalized.genres,
-      contentRating: normalized.contentRating,
-      originalLanguage: normalized.originalLanguage,
-      spokenLanguages: normalized.spokenLanguages,
-      originCountry: normalized.originCountry,
-      voteAverage: normalized.voteAverage,
-      voteCount: normalized.voteCount,
-      popularity: normalized.popularity,
-      runtime: normalized.runtime,
-      posterPath: normalized.posterPath,
-      backdropPath: normalized.backdropPath,
-      logoPath: normalized.logoPath,
-      imdbId: normalized.imdbId,
-      numberOfSeasons: normalized.numberOfSeasons,
-      numberOfEpisodes: normalized.numberOfEpisodes,
-      inProduction: normalized.inProduction,
-      networks: normalized.networks,
-      budget: normalized.budget,
-      revenue: normalized.revenue,
-      collection: normalized.collection,
-      productionCompanies: normalized.productionCompanies,
-      productionCountries: normalized.productionCountries,
-      metadataUpdatedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(eq(media.id, mediaId))
-    .returning();
-
-  if (!updated) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "Failed to update media",
-    });
-  }
-
-  // For shows, update seasons + episodes
-  if (normalized.type === "show" && normalized.seasons) {
-    // Delete existing seasons (cascades to episodes)
-    await db.delete(season).where(eq(season.mediaId, mediaId));
-
-    for (const s of normalized.seasons) {
-      const [insertedSeason] = await db
-        .insert(season)
-        .values({
-          mediaId,
-          number: s.number,
-          externalId: s.externalId,
-          name: s.name,
-          overview: s.overview,
-          airDate: s.airDate,
-          posterPath: s.posterPath,
-          episodeCount: s.episodeCount,
-        })
-        .returning();
-
-      if (insertedSeason && s.episodes && s.episodes.length > 0) {
-        await db.insert(episode).values(
-          s.episodes.map((ep) => ({
-            seasonId: insertedSeason.id,
-            number: ep.number,
-            externalId: ep.externalId,
-            title: ep.title,
-            overview: ep.overview,
-            airDate: ep.airDate,
-            runtime: ep.runtime,
-            stillPath: ep.stillPath,
-            voteAverage: ep.voteAverage,
-          })),
-        );
-      }
-    }
-  }
-
-  return updated;
-}
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                    */
@@ -216,8 +33,7 @@ const EXTRAS_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 async function getProviderWithKey(name: "tmdb" | "anilist" | "tvdb"): ReturnType<typeof getProvider> {
   if (name === "tmdb") {
-    const apiKey = (await getSetting("tmdb.apiKey")) ?? "";
-    return getProvider(name, apiKey);
+    return getTmdbProvider();
   }
   return getProvider(name);
 }
@@ -372,7 +188,7 @@ export const mediaRouter = createTRPCRouter({
   /**
    * Add media to the user's library.
    */
-  addToLibrary: publicProcedure // TODO: switch to protectedProcedure when auth is implemented
+  addToLibrary: protectedProcedure
     .input(addToLibraryInput)
     .mutation(async ({ ctx, input }) => {
       const [updated] = await ctx.db
@@ -398,7 +214,7 @@ export const mediaRouter = createTRPCRouter({
   /**
    * Remove media from the user's library.
    */
-  removeFromLibrary: publicProcedure // TODO: switch to protectedProcedure when auth is implemented
+  removeFromLibrary: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [updated] = await ctx.db
@@ -424,7 +240,7 @@ export const mediaRouter = createTRPCRouter({
   /**
    * Re-fetch metadata from the original provider and update the DB record.
    */
-  updateMetadata: publicProcedure // TODO: protectedProcedure when auth ready
+  updateMetadata: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const row = await ctx.db.query.media.findFirst({
@@ -452,7 +268,7 @@ export const mediaRouter = createTRPCRouter({
   /**
    * Hard delete a media record (cascades to seasons, episodes, files, cache).
    */
-  delete: publicProcedure // TODO: protectedProcedure when auth ready
+  delete: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const [deleted] = await ctx.db
@@ -490,8 +306,7 @@ export const mediaRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input }) => {
-      const apiKey = (await getSetting("tmdb.apiKey")) ?? "";
-      const provider = new TmdbProvider(apiKey);
+      const provider = await getTmdbProvider();
       const page = input.cursor ?? input.page;
 
       if (input.mode === "trending") {
@@ -523,8 +338,7 @@ export const mediaRouter = createTRPCRouter({
   getPerson: publicProcedure
     .input(z.object({ personId: z.number() }))
     .query(async ({ input }) => {
-      const apiKey = (await getSetting("tmdb.apiKey")) ?? "";
-      const provider = new TmdbProvider(apiKey);
+      const provider = await getTmdbProvider();
       return provider.getPerson(input.personId);
     }),
 
@@ -562,10 +376,7 @@ export const mediaRouter = createTRPCRouter({
       seeds.push(libraryItems[(seedStart + i) % libraryItems.length]!);
     }
 
-    const apiKey = (await getSetting("tmdb.apiKey")) ?? "";
-    if (!apiKey) return { items: [], nextCursor: null };
-
-    const tmdb = new TmdbProvider(apiKey);
+    const tmdb = await getTmdbProvider();
     const libraryExternalIds = new Set(libraryItems.map((m) => `${m.provider}-${m.externalId}`));
     const seen = new Set<string>();
     const results: Array<{

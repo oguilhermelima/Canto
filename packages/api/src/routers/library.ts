@@ -261,6 +261,20 @@ export const libraryRouter = createTRPCRouter({
     }),
 
   /**
+   * Toggle sync (media import) for a library.
+   */
+  toggleSync: publicProcedure
+    .input(z.object({ id: z.string().uuid(), syncEnabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const [updated] = await ctx.db
+        .update(library)
+        .set({ syncEnabled: input.syncEnabled, updatedAt: new Date() })
+        .where(eq(library.id, input.id))
+        .returning();
+      return updated;
+    }),
+
+  /**
    * Get the default library for each type.
    */
   getDefaults: publicProcedure.query(async ({ ctx }) => {

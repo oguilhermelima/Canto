@@ -4,23 +4,9 @@ import { z } from "zod";
 
 import type { Database } from "@canto/db/client";
 import { library } from "@canto/db/schema";
-import { getSetting } from "@canto/db/settings";
 
+import { getPlexCredentials } from "../lib/server-credentials";
 import { createTRPCRouter, publicProcedure } from "../trpc";
-
-/* -------------------------------------------------------------------------- */
-/*  Helpers                                                                   */
-/* -------------------------------------------------------------------------- */
-
-async function getPlexCredentials(): Promise<{
-  url: string;
-  token: string;
-} | null> {
-  const url = await getSetting("plex.url");
-  const token = await getSetting("plex.token");
-  if (!url || !token) return null;
-  return { url, token };
-}
 
 async function plexFetch<T>(
   url: string,

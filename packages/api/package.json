@@ -19,6 +19,7 @@
     "@canto/providers": "workspace:*",
     "@canto/validators": "workspace:*",
     "@trpc/server": "catalog:",
+    "bullmq": "^5.34.8",
     "drizzle-orm": "catalog:",
     "fast-xml-parser": "^5.5.9",
     "superjson": "^2.2.2",
