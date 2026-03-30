@@ -523,6 +523,7 @@ function MediaServerRow({
                 <PlexOAuthSection
                   serverUrl={url}
                   disabled={activeSection === "token"}
+                  isConnected={!!isConnected}
                   onSuccess={() => { void utils.settings.getAll.invalidate(); setDirty(false); setActiveSection(null); }}
                 />
 
@@ -564,7 +565,7 @@ function MediaServerRow({
 /*  Plex OAuth                                                                 */
 /* -------------------------------------------------------------------------- */
 
-function PlexOAuthSection({ serverUrl, disabled, onSuccess }: { serverUrl: string; disabled: boolean; onSuccess: () => void }): React.JSX.Element {
+function PlexOAuthSection({ serverUrl, disabled, onSuccess, isConnected }: { serverUrl: string; disabled: boolean; onSuccess: () => void; isConnected: boolean }): React.JSX.Element {
   const [polling, setPolling] = useState(false);
   const [pinData, setPinData] = useState<{ pinId: number; clientId: string } | null>(null);
   const createPin = trpc.settings.plexPinCreate.useMutation();
@@ -599,11 +600,15 @@ function PlexOAuthSection({ serverUrl, disabled, onSuccess }: { serverUrl: strin
 
   return (
     <div className={cn("rounded-xl border p-4 transition-all", disabled ? "border-border/20 opacity-40" : "border-border/40 hover:border-border/60")}>
-      <p className="text-sm font-medium text-foreground mb-2">Sign in with Plex</p>
-      <p className="text-sm text-muted-foreground mb-3">Opens a popup where you sign in with your Plex account. Works with Google, Apple, and email.</p>
+      <p className="text-sm font-medium text-foreground mb-2">{isConnected ? "Plex account" : "Sign in with Plex"}</p>
+      <p className="text-sm text-muted-foreground mb-3">
+        {isConnected
+          ? "Your Plex account is connected. Re-authenticate if your token has expired."
+          : "Opens a popup where you sign in with your Plex account. Works with Google, Apple, and email."}
+      </p>
       <Button size="sm" variant="outline" className="gap-2" onClick={handleSignIn} disabled={disabled || polling || createPin.isPending}>
         {polling ? (<><Loader2 className="h-4 w-4 animate-spin" />Waiting for Plex...</>) : createPin.isPending ? (<><Loader2 className="h-4 w-4 animate-spin" />Creating PIN...</>) : (
-          <><span className="inline-block h-4 w-4 shrink-0 bg-[#e5a00d]" style={{ mask: "url(/plex-logo.svg) center/contain no-repeat", WebkitMask: "url(/plex-logo.svg) center/contain no-repeat" }} />Sign in with Plex</>
+          <><span className="inline-block h-4 w-4 shrink-0 bg-[#e5a00d]" style={{ mask: "url(/plex-logo.svg) center/contain no-repeat", WebkitMask: "url(/plex-logo.svg) center/contain no-repeat" }} />{isConnected ? "Re-authenticate" : "Sign in with Plex"}</>
         )}
       </Button>
     </div>
