@@ -275,7 +275,10 @@ class QBittorrentClient {
 /* -------------------------------------------------------------------------- */
 
 const VIDEO_EXTENSIONS = new Set([".mkv", ".mp4", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v"]);
+/** Matches S01E01, s1e5, etc. */
 const EP_PATTERN = /[Ss](\d{1,2})[Ee](\d{1,3})/;
+/** Matches bare episode numbers like "- 01", "- 12" (common in anime fansubs) */
+const BARE_EP_PATTERN = /\s-\s(\d{2,3})(?:\s|\[|\.)/;
 
 function isVideoFile(name: string): boolean {
   const ext = name.substring(name.lastIndexOf(".")).toLowerCase();
@@ -436,7 +439,12 @@ async function autoImportTorrent(
   if (!primarySeasonNumber && mediaRow.type === "show") {
     // Try to extract from the first video file name
     const match = EP_PATTERN.exec(videoFiles[0]?.name ?? "");
-    if (match) primarySeasonNumber = parseInt(match[1]!, 10);
+    if (match) {
+      primarySeasonNumber = parseInt(match[1]!, 10);
+    } else {
+      // Default to season 1 for bare episode numbers (anime fansubs)
+      primarySeasonNumber = 1;
+    }
   }
 
   // Build target location (container path for qBit)
@@ -473,11 +481,20 @@ async function autoImportTorrent(
       let episodeId: string | undefined;
       const ext = vf.name.substring(vf.name.lastIndexOf("."));
 
+      let epNum: number | undefined;
       if (mediaRow.type === "show") {
         const match = EP_PATTERN.exec(vf.name);
         if (match) {
           seasonNumber = parseInt(match[1]!, 10);
-          const epNum = parseInt(match[2]!, 10);
+          epNum = parseInt(match[2]!, 10);
+        } else {
+          // Fallback: bare episode number "- 01" (common in anime fansubs)
+          const bareMatch = BARE_EP_PATTERN.exec(vf.name);
+          if (bareMatch) {
+            epNum = parseInt(bareMatch[1]!, 10);
+          }
+        }
+        if (epNum !== undefined && seasonNumber !== undefined) {
           const matchedSeason = mediaRow.seasons?.find((s) => s.number === seasonNumber);
           const matchedEp = matchedSeason?.episodes?.find((e) => e.number === epNum);
           if (matchedEp) episodeId = matchedEp.id;
@@ -486,17 +503,14 @@ async function autoImportTorrent(
 
       // Build new filename with version tag (flat, no subfolder)
       let targetFilename: string;
-      if (mediaRow.type === "show" && seasonNumber !== undefined) {
-        const match = EP_PATTERN.exec(vf.name);
-        if (match) {
-          const sn = String(parseInt(match[1]!, 10)).padStart(2, "0");
-          const en = String(parseInt(match[2]!, 10)).padStart(2, "0");
-          targetFilename = `S${sn}E${en}${versionSuffix}${ext}`;
-        } else {
-          targetFilename = sanitizeName(vf.name.substring(vf.name.lastIndexOf("/") + 1));
-        }
-      } else {
+      if (mediaRow.type === "show" && seasonNumber !== undefined && epNum !== undefined) {
+        const sn = String(seasonNumber).padStart(2, "0");
+        const en = String(epNum).padStart(2, "0");
+        targetFilename = `S${sn}E${en}${versionSuffix}${ext}`;
+      } else if (mediaRow.type === "movie") {
         targetFilename = `${safeTitle}${yearSuffix}${versionSuffix}${ext}`;
+      } else {
+        targetFilename = sanitizeName(vf.name.substring(vf.name.lastIndexOf("/") + 1));
       }
 
       // Rename file via qBittorrent API
