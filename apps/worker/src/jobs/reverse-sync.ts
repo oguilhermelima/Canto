@@ -151,7 +151,7 @@ async function scanPlex(
     const mediaType = lib.type === "movies" ? "movie" : "show";
 
     const res = await fetch(
-      `${url}/library/sections/${lib.plexLibraryId}/all?X-Plex-Token=${token}`,
+      `${url}/library/sections/${lib.plexLibraryId}/all?X-Plex-Token=${token}&includeGuids=1`,
       { headers: { Accept: "application/json" } },
     );
     if (!res.ok) continue;
