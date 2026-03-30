@@ -1,30 +1,11 @@
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
-
-import type { Database } from "@canto/db/client";
-import { library } from "@canto/db/schema";
 
 import { getPlexCredentials } from "../lib/server-credentials";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { syncPlexLibraries } from "../domain/use-cases/sync-plex-libraries";
-
-async function plexFetch<T>(
-  url: string,
-  token: string,
-  endpoint: string,
-): Promise<T> {
-  const res = await fetch(`${url}${endpoint}?X-Plex-Token=${token}`, {
-    headers: { Accept: "application/json" },
-  });
-  if (!res.ok) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: `Plex API error: ${res.status}`,
-    });
-  }
-  return res.json() as Promise<T>;
-}
+import { testPlexConnection, scanPlexLibrary } from "../infrastructure/adapters/plex";
+import { findAllLibraries, updateLibrary } from "../infrastructure/repositories/library-repository";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                    */
@@ -34,28 +15,14 @@ export const plexRouter = createTRPCRouter({
   /** Test connection and auto-sync libraries */
   testConnection: publicProcedure.query(async ({ ctx }) => {
     const creds = await getPlexCredentials();
-    if (!creds) {
-      return { connected: false, error: "Plex URL or token not configured" };
-    }
+    if (!creds) return { connected: false, error: "Plex URL or token not configured" };
 
     try {
-      const data = await plexFetch<{
-        MediaContainer: { friendlyName: string; version: string };
-      }>(creds.url, creds.token, "/");
-
-      // Auto-sync libraries on successful connection
+      const info = await testPlexConnection(creds.url, creds.token);
       await syncPlexLibraries(ctx.db, creds.url, creds.token);
-
-      return {
-        connected: true,
-        serverName: data.MediaContainer.friendlyName,
-        version: data.MediaContainer.version,
-      };
+      return { connected: true, serverName: info.serverName, version: info.version };
     } catch (err) {
-      return {
-        connected: false,
-        error: err instanceof Error ? err.message : "Unknown error",
-      };
+      return { connected: false, error: err instanceof Error ? err.message : "Unknown error" };
     }
   }),
 
@@ -71,51 +38,17 @@ export const plexRouter = createTRPCRouter({
     return syncPlexLibraries(ctx.db, creds.url, creds.token);
   }),
 
-  /** Trigger library scan for all linked Plex libraries */
   scan: publicProcedure.mutation(async ({ ctx }) => {
     const creds = await getPlexCredentials();
-    if (!creds) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Plex not configured",
-      });
-    }
+    if (!creds) throw new TRPCError({ code: "BAD_REQUEST", message: "Plex not configured" });
 
-    // Scan each linked library individually for targeted refresh
-    const linkedLibs = await ctx.db.query.library.findMany();
-    const linked = linkedLibs.filter((l) => l.plexLibraryId);
-
-    if (linked.length === 0) {
-      // No linked libraries, scan all
-      await fetch(
-        `${creds.url}/library/sections/all/refresh?X-Plex-Token=${creds.token}`,
-      );
-    } else {
-      await Promise.all(
-        linked.map((lib) =>
-          fetch(
-            `${creds.url}/library/sections/${lib.plexLibraryId}/refresh?X-Plex-Token=${creds.token}`,
-          ).catch(() => {}),
-        ),
-      );
-    }
-
+    const libs = await findAllLibraries(ctx.db);
+    const sectionIds = libs.filter((l) => l.plexLibraryId).map((l) => l.plexLibraryId!);
+    await scanPlexLibrary(creds.url, creds.token, sectionIds.length > 0 ? sectionIds : undefined);
     return { success: true };
   }),
 
-  /** Toggle a library's Plex link */
   toggleLibrary: publicProcedure
     .input(z.object({ id: z.string().uuid(), enabled: z.boolean() }))
-    .mutation(async ({ ctx, input }) => {
-      const [updated] = await ctx.db
-        .update(library)
-        .set({ enabled: input.enabled, updatedAt: new Date() })
-        .where(eq(library.id, input.id))
-        .returning();
-      return updated;
-    }),
+    .mutation(({ ctx, input }) => updateLibrary(ctx.db, input.id, { enabled: input.enabled })),
 });
-
-/* -------------------------------------------------------------------------- */
-/*  Shared sync logic                                                         */
-/* syncPlexLibraries moved to domain/use-cases/sync-plex-libraries.ts */

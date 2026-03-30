@@ -1,14 +1,22 @@
 import { Queue } from "bullmq";
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@canto/db/client";
-import { library, media, syncItem, syncEpisode } from "@canto/db/schema";
+import { media, syncItem } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
 import { persistMedia } from "@canto/db/persist-media";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getTmdbProvider } from "../lib/tmdb-client";
+import {
+  findSyncItemById,
+  findSyncItemsByMediaId,
+  findSyncItemsWithEpisodes,
+  listSyncItems,
+  updateSyncItem,
+} from "../infrastructure/repositories/sync-repository";
+import { updateMedia } from "../infrastructure/repositories/media-repository";
 
 /* -------------------------------------------------------------------------- */
 /*  Queue (lazy singleton)                                                     */
@@ -86,31 +94,12 @@ export const syncRouter = createTRPCRouter({
       if (input.libraryId) conditions.push(eq(syncItem.libraryId, input.libraryId));
       if (input.source) conditions.push(eq(syncItem.source, input.source));
       if (input.result) conditions.push(eq(syncItem.result, input.result));
-
       const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-      const [items, [total]] = await Promise.all([
-        db
-          .select()
-          .from(syncItem)
-          .where(where)
-          .orderBy(
-            // Failed first, then imported, then skipped
-            desc(eq(syncItem.result, "failed")),
-            desc(eq(syncItem.result, "imported")),
-            syncItem.serverItemTitle,
-          )
-          .limit(input.pageSize)
-          .offset((input.page - 1) * input.pageSize),
-        db.select({ count: count() }).from(syncItem).where(where),
-      ]);
-
-      return {
-        items,
-        total: total?.count ?? 0,
-        page: input.page,
-        pageSize: input.pageSize,
-      };
+      const { items, total } = await listSyncItems(
+        db, where, input.pageSize, (input.page - 1) * input.pageSize,
+      );
+      return { items, total, page: input.page, pageSize: input.pageSize };
     }),
 
   /**
@@ -136,50 +125,39 @@ export const syncRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input }) => {
-      const item = await db.query.syncItem.findFirst({
-        where: eq(syncItem.id, input.syncItemId),
-      });
+      const item = await findSyncItemById(db, input.syncItemId);
       if (!item) throw new Error("Sync item not found");
 
       const tmdb = await getTmdbProvider();
       const normalized = await tmdb.getMetadata(input.tmdbId, input.type);
 
-      // Check if media already exists
-      let existingMedia = await db.query.media.findFirst({
+      // Check if media already exists by external ID
+      const existing = await db.query.media.findFirst({
         where: and(eq(media.externalId, input.tmdbId), eq(media.provider, "tmdb")),
       });
 
-      if (existingMedia) {
-        if (!existingMedia.inLibrary) {
-          await db
-            .update(media)
-            .set({ inLibrary: true, libraryId: item.libraryId, libraryPath: item.serverItemPath, addedAt: new Date() })
-            .where(eq(media.id, existingMedia.id));
+      let mediaId: string;
+      if (existing) {
+        mediaId = existing.id;
+        if (!existing.inLibrary) {
+          await updateMedia(db, existing.id, {
+            inLibrary: true, libraryId: item.libraryId, libraryPath: item.serverItemPath, addedAt: new Date(),
+          });
         }
       } else {
         const inserted = await persistMedia(db, normalized);
-        await db
-          .update(media)
-          .set({ inLibrary: true, libraryId: item.libraryId, libraryPath: item.serverItemPath, addedAt: new Date() })
-          .where(eq(media.id, inserted.id));
-        existingMedia = inserted;
+        await updateMedia(db, inserted.id, {
+          inLibrary: true, libraryId: item.libraryId, libraryPath: item.serverItemPath, addedAt: new Date(),
+        });
+        mediaId = inserted.id;
       }
 
-      // Update sync item
-      await db
-        .update(syncItem)
-        .set({
-          tmdbId: input.tmdbId,
-          mediaId: existingMedia.id,
-          result: "imported",
-          reason: null,
-        })
-        .where(eq(syncItem.id, input.syncItemId));
+      await updateSyncItem(db, input.syncItemId, {
+        tmdbId: input.tmdbId, mediaId, result: "imported", reason: null,
+      });
 
-      // Suggest a rename path
       const suggestedName = `${normalized.title} (${normalized.year ?? "Unknown"}) [tmdb-${input.tmdbId}]`;
-
-      return { mediaId: existingMedia.id, suggestedName };
+      return { mediaId, suggestedName };
     }),
 
   /**
@@ -188,14 +166,7 @@ export const syncRouter = createTRPCRouter({
   mediaServers: publicProcedure
     .input(z.object({ mediaId: z.string().uuid() }))
     .query(async ({ input }) => {
-      const items = await db
-        .select({
-          source: syncItem.source,
-          jellyfinItemId: syncItem.jellyfinItemId,
-          plexRatingKey: syncItem.plexRatingKey,
-        })
-        .from(syncItem)
-        .where(eq(syncItem.mediaId, input.mediaId));
+      const items = await findSyncItemsByMediaId(db, input.mediaId);
 
       const result: {
         jellyfin?: { url: string };
@@ -233,11 +204,7 @@ export const syncRouter = createTRPCRouter({
   mediaAvailability: publicProcedure
     .input(z.object({ mediaId: z.string().uuid() }))
     .query(async ({ input }) => {
-      // Get sync items with their episodes for this media
-      const items = await db.query.syncItem.findMany({
-        where: eq(syncItem.mediaId, input.mediaId),
-        with: { episodes: true },
-      });
+      const items = await findSyncItemsWithEpisodes(db, input.mediaId);
 
       const sources: Array<{
         type: "jellyfin" | "plex";

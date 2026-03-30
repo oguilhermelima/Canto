@@ -1,19 +1,25 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { library, media, mediaFile, torrent } from "@canto/db/schema";
-import { getSetting } from "@canto/db/settings";
+import { torrent } from "@canto/db/schema";
 import { torrentDownloadInput, torrentSearchInput } from "@canto/validators";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
-import { detectQuality, detectSource } from "../domain/rules/quality";
-import { parseSeasons, parseEpisodes } from "../domain/rules/parsing";
 import { getQBClient } from "../infrastructure/adapters/qbittorrent";
 import { autoImportTorrent } from "../domain/use-cases/import-torrent";
 import { mergeLiveData } from "../domain/use-cases/merge-live-data";
 import { searchTorrents } from "../domain/use-cases/search-torrents";
 import { downloadTorrent, replaceTorrent } from "../domain/use-cases/download-torrent";
+import {
+  findTorrentById,
+  findAllTorrents,
+  findTorrentsByMediaId,
+  updateTorrent,
+  deleteTorrent as deleteTorrentRecord,
+} from "../infrastructure/repositories/torrent-repository";
+import { findMediaById } from "../infrastructure/repositories/media-repository";
+import { findDefaultLibrary, findLibraryById } from "../infrastructure/repositories/library-repository";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                    */
@@ -61,126 +67,66 @@ export const torrentRouter = createTRPCRouter({
   retry: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const row = await ctx.db.query.torrent.findFirst({
-        where: eq(torrent.id, input.id),
-      });
-
-      if (!row) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
-      }
+      const row = await findTorrentById(ctx.db, input.id);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
 
       const url = row.magnetUrl ?? row.downloadUrl;
       if (!url) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "No download URL saved for this torrent. Please search and download again.",
-        });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No download URL saved for this torrent." });
       }
 
-      // Resolve category from linked media's library assignment
-      const linkedMedia = row.mediaId
-        ? await ctx.db.query.media.findFirst({
-            where: eq(media.id, row.mediaId),
-            columns: { type: true, libraryId: true },
-          })
-        : null;
-
+      const linkedMedia = row.mediaId ? await findMediaById(ctx.db, row.mediaId) : null;
       let retryCategory: string;
       if (linkedMedia?.libraryId) {
-        const assignedLib = await ctx.db.query.library.findFirst({
-          where: eq(library.id, linkedMedia.libraryId),
-          columns: { qbitCategory: true },
-        });
-        retryCategory = assignedLib?.qbitCategory ?? (linkedMedia.type === "show" ? "shows" : "movies");
+        const lib = await findLibraryById(ctx.db, linkedMedia.libraryId);
+        retryCategory = lib?.qbitCategory ?? (linkedMedia.type === "show" ? "shows" : "movies");
       } else {
         const mediaType = linkedMedia?.type === "show" ? "shows" : "movies";
-        const defaultLib = await ctx.db.query.library.findFirst({
-          where: and(eq(library.type, mediaType), eq(library.isDefault, true)),
-          columns: { qbitCategory: true },
-        });
-        retryCategory = defaultLib?.qbitCategory ?? mediaType;
+        const lib = await findDefaultLibrary(ctx.db, mediaType);
+        retryCategory = lib?.qbitCategory ?? mediaType;
       }
 
       const qb = await getQBClient();
       await qb.addTorrent(url, retryCategory);
 
-      // Try to get the new hash
       let newHash = row.hash;
       if (!newHash && url.startsWith("magnet:")) {
         const match = /xt=urn:btih:([a-fA-F0-9]+)/i.exec(url);
         if (match?.[1]) newHash = match[1].toLowerCase();
       }
 
-      const [updated] = await ctx.db
-        .update(torrent)
-        .set({
-          hash: newHash,
-          status: "downloading",
-          progress: 0,
-          updatedAt: new Date(),
-        })
-        .where(eq(torrent.id, input.id))
-        .returning();
-
-      return updated;
+      return updateTorrent(ctx.db, input.id, { hash: newHash, status: "downloading", progress: 0 });
     }),
 
   /**
    * List all torrent records from the database.
    */
-  list: publicProcedure.query(async ({ ctx }) => {
-    return ctx.db.query.torrent.findMany({
-      orderBy: (t, { desc: d }) => [d(t.createdAt)],
-    });
-  }),
+  list: publicProcedure.query(({ ctx }) => findAllTorrents(ctx.db)),
 
-  /**
-   * List torrents for a specific media item.
-   */
   listByMedia: publicProcedure
     .input(z.object({ mediaId: z.string().uuid() }))
-    .query(async ({ ctx, input }) => {
-      return ctx.db.query.torrent.findMany({
-        where: eq(torrent.mediaId, input.mediaId),
-        orderBy: (t, { desc: d }) => [d(t.createdAt)],
-      });
-    }),
+    .query(({ ctx, input }) => findTorrentsByMediaId(ctx.db, input.mediaId)),
 
   /**
    * List live torrent data from qBittorrent merged with DB records + media info.
    */
   listLive: publicProcedure.query(async ({ ctx }) => {
-    const dbRows = await ctx.db.query.torrent.findMany({
-      orderBy: (t, { desc: d }) => [d(t.createdAt)],
-    });
-
-    // Fetch media info for all linked torrents
-    const mediaIds = [...new Set(dbRows.map((r) => r.mediaId).filter(Boolean))] as string[];
-    const mediaRows = mediaIds.length > 0
-      ? await ctx.db.query.media.findMany({
-          columns: { id: true, title: true, posterPath: true, type: true, year: true },
-        })
-      : [];
-    const mediaMap = new Map(mediaRows.map((m) => [m.id, m]));
-
+    const dbRows = await findAllTorrents(ctx.db);
     const merged = await mergeLiveData(ctx.db, dbRows);
 
-    return merged.map((item) => {
-      const linkedMedia = item.row.mediaId ? mediaMap.get(item.row.mediaId) : undefined;
-      return {
-        ...item.row,
-        media: linkedMedia
-          ? {
-              id: linkedMedia.id,
-              title: linkedMedia.title,
-              posterPath: linkedMedia.posterPath,
-              type: linkedMedia.type,
-              year: linkedMedia.year,
-            }
-          : null,
-        live: item.live,
-      };
-    });
+    // Batch-fetch linked media info
+    const mediaIds = [...new Set(dbRows.map((r) => r.mediaId).filter(Boolean))] as string[];
+    const mediaMap = new Map<string, { id: string; title: string; posterPath: string | null; type: string; year: number | null }>();
+    for (const id of mediaIds) {
+      const m = await findMediaById(ctx.db, id);
+      if (m) mediaMap.set(m.id, { id: m.id, title: m.title, posterPath: m.posterPath, type: m.type, year: m.year });
+    }
+
+    return merged.map((item) => ({
+      ...item.row,
+      media: item.row.mediaId ? mediaMap.get(item.row.mediaId) ?? null : null,
+      live: item.live,
+    }));
   }),
 
   /**
@@ -189,19 +135,10 @@ export const torrentRouter = createTRPCRouter({
   listLiveByMedia: publicProcedure
     .input(z.object({ mediaId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const dbRows = await ctx.db.query.torrent.findMany({
-        where: eq(torrent.mediaId, input.mediaId),
-        orderBy: (t, { desc: d }) => [d(t.createdAt)],
-      });
-
+      const dbRows = await findTorrentsByMediaId(ctx.db, input.mediaId);
       if (dbRows.length === 0) return [];
-
       const merged = await mergeLiveData(ctx.db, dbRows);
-
-      return merged.map((item) => ({
-        ...item.row,
-        live: item.live,
-      }));
+      return merged.map((item) => ({ ...item.row, live: item.live }));
     }),
 
   /**
@@ -210,82 +147,28 @@ export const torrentRouter = createTRPCRouter({
   pause: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const row = await ctx.db.query.torrent.findFirst({
-        where: eq(torrent.id, input.id),
-      });
-
-      if (!row) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
-      }
-
-      if (row.hash) {
-        const qb = await getQBClient();
-        await qb.pauseTorrent(row.hash);
-      }
-
-      const [updated] = await ctx.db
-        .update(torrent)
-        .set({ status: "paused", updatedAt: new Date() })
-        .where(eq(torrent.id, input.id))
-        .returning();
-
-      return updated;
+      const row = await findTorrentById(ctx.db, input.id);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
+      if (row.hash) { const qb = await getQBClient(); await qb.pauseTorrent(row.hash); }
+      return updateTorrent(ctx.db, input.id, { status: "paused" });
     }),
 
-  /**
-   * Resume a paused torrent in qBittorrent.
-   */
   resume: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const row = await ctx.db.query.torrent.findFirst({
-        where: eq(torrent.id, input.id),
-      });
-
-      if (!row) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
-      }
-
-      if (row.hash) {
-        const qb = await getQBClient();
-        await qb.resumeTorrent(row.hash);
-      }
-
-      const [updated] = await ctx.db
-        .update(torrent)
-        .set({ status: "downloading", updatedAt: new Date() })
-        .where(eq(torrent.id, input.id))
-        .returning();
-
-      return updated;
+      const row = await findTorrentById(ctx.db, input.id);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
+      if (row.hash) { const qb = await getQBClient(); await qb.resumeTorrent(row.hash); }
+      return updateTorrent(ctx.db, input.id, { status: "downloading" });
     }),
 
-  /**
-   * Cancel (pause) a torrent in qBittorrent (legacy).
-   */
   cancel: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const row = await ctx.db.query.torrent.findFirst({
-        where: eq(torrent.id, input.id),
-      });
-
-      if (!row) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
-      }
-
-      if (row.hash) {
-        const qb = await getQBClient();
-        await qb.pauseTorrent(row.hash);
-      }
-
-      const [updated] = await ctx.db
-        .update(torrent)
-        .set({ status: "paused", updatedAt: new Date() })
-        .where(eq(torrent.id, input.id))
-        .returning();
-
-      return updated;
+      const row = await findTorrentById(ctx.db, input.id);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
+      if (row.hash) { const qb = await getQBClient(); await qb.pauseTorrent(row.hash); }
+      return updateTorrent(ctx.db, input.id, { status: "paused" });
     }),
 
   /**
@@ -294,27 +177,12 @@ export const torrentRouter = createTRPCRouter({
   import: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const row = await ctx.db.query.torrent.findFirst({
-        where: eq(torrent.id, input.id),
-      });
-
-      if (!row) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
-      }
-
-      if (row.imported) {
-        return { success: true, message: "Already imported" };
-      }
-
-      if (row.importing) {
-        return { success: true, message: "Import already in progress" };
-      }
-
+      const row = await findTorrentById(ctx.db, input.id);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
+      if (row.imported) return { success: true, message: "Already imported" };
+      if (row.importing) return { success: true, message: "Import already in progress" };
       if (row.status !== "completed" || !row.hash || !row.mediaId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Torrent must be completed and linked to a media item to import",
-        });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Torrent must be completed and linked to a media item to import" });
       }
 
       // Atomically set importing = true
@@ -323,18 +191,14 @@ export const torrentRouter = createTRPCRouter({
         .set({ importing: true })
         .where(and(eq(torrent.id, row.id), eq(torrent.importing, false)))
         .returning();
-
-      if (!claimed) {
-        return { success: true, message: "Import already in progress" };
-      }
+      if (!claimed) return { success: true, message: "Import already in progress" };
 
       try {
         const qb = await getQBClient();
         await autoImportTorrent(ctx.db, claimed, qb);
         return { success: true };
       } catch (err) {
-        // Reset importing flag so it can retry
-        await ctx.db.update(torrent).set({ importing: false }).where(eq(torrent.id, row.id));
+        await updateTorrent(ctx.db, row.id, { importing: false });
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: `Import failed: ${err instanceof Error ? err.message : "Unknown error"}`,
@@ -346,37 +210,21 @@ export const torrentRouter = createTRPCRouter({
    * Delete a torrent record from DB and optionally from qBittorrent.
    */
   delete: publicProcedure
-    .input(
-      z.object({
-        id: z.string().uuid(),
-        deleteFiles: z.boolean().default(false),
-        removeTorrent: z.boolean().default(true),
-      }),
-    )
+    .input(z.object({
+      id: z.string().uuid(),
+      deleteFiles: z.boolean().default(false),
+      removeTorrent: z.boolean().default(true),
+    }))
     .mutation(async ({ ctx, input }) => {
-      const row = await ctx.db.query.torrent.findFirst({
-        where: eq(torrent.id, input.id),
-      });
+      const row = await findTorrentById(ctx.db, input.id);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
 
-      if (!row) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Torrent not found",
-        });
-      }
-
-      // Remove from qBittorrent if requested and hash is known
       if (input.removeTorrent && row.hash) {
-        try {
-          const qb = await getQBClient();
-          await qb.deleteTorrent(row.hash, input.deleteFiles);
-        } catch {
-          // qBittorrent may not have this torrent anymore — that is okay
-        }
+        try { const qb = await getQBClient(); await qb.deleteTorrent(row.hash, input.deleteFiles); }
+        catch { /* qBit may not have it */ }
       }
 
-      await ctx.db.delete(torrent).where(eq(torrent.id, input.id));
-
+      await deleteTorrentRecord(ctx.db, input.id);
       return { success: true };
     }),
 
@@ -384,16 +232,9 @@ export const torrentRouter = createTRPCRouter({
    * Rename a torrent's file in qBittorrent.
    */
   rename: protectedProcedure
-    .input(
-      z.object({
-        id: z.string().uuid(),
-        newName: z.string().min(1),
-      }),
-    )
+    .input(z.object({ id: z.string().uuid(), newName: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
-      const row = await ctx.db.query.torrent.findFirst({
-        where: eq(torrent.id, input.id),
-      });
+      const row = await findTorrentById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
       if (!row.hash) throw new TRPCError({ code: "BAD_REQUEST", message: "Torrent has no hash" });
 
@@ -401,7 +242,6 @@ export const torrentRouter = createTRPCRouter({
       const files = await qb.listTorrentFiles(row.hash);
       if (files.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No files in torrent" });
 
-      // Rename the main video file (largest file)
       const mainFile = files.reduce((a, b) => (a.size > b.size ? a : b));
       const ext = mainFile.name.includes(".") ? mainFile.name.slice(mainFile.name.lastIndexOf(".")) : "";
       const newPath = mainFile.name.includes("/")
@@ -409,42 +249,20 @@ export const torrentRouter = createTRPCRouter({
         : input.newName + ext;
 
       await qb.renameFile(row.hash, mainFile.name, newPath);
-
-      // Update DB title
-      await ctx.db
-        .update(torrent)
-        .set({ title: input.newName, updatedAt: new Date() })
-        .where(eq(torrent.id, input.id));
-
+      await updateTorrent(ctx.db, input.id, { title: input.newName });
       return { success: true };
     }),
 
-  /**
-   * Move a torrent's files to a new location in qBittorrent.
-   */
   move: protectedProcedure
-    .input(
-      z.object({
-        id: z.string().uuid(),
-        newPath: z.string().min(1),
-      }),
-    )
+    .input(z.object({ id: z.string().uuid(), newPath: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
-      const row = await ctx.db.query.torrent.findFirst({
-        where: eq(torrent.id, input.id),
-      });
+      const row = await findTorrentById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
       if (!row.hash) throw new TRPCError({ code: "BAD_REQUEST", message: "Torrent has no hash" });
 
       const qb = await getQBClient();
       await qb.setLocation(row.hash, input.newPath);
-
-      // Update DB content path
-      await ctx.db
-        .update(torrent)
-        .set({ contentPath: input.newPath, updatedAt: new Date() })
-        .where(eq(torrent.id, input.id));
-
+      await updateTorrent(ctx.db, input.id, { contentPath: input.newPath });
       return { success: true };
     }),
 });
