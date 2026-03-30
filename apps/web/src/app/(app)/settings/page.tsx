@@ -371,11 +371,11 @@ function ServerLibraryGroup({
           <Button
             size="sm"
             variant="ghost"
-            onClick={hasSyncable ? onImport : () => onSyncLibraries()}
-            disabled={isBusy || (!hasSyncable && libraries.length > 0)}
+            onClick={onImport}
+            disabled={isBusy || !hasSyncable}
           >
             {isBusy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
-            {isSyncingLibraries ? "Syncing..." : isBusy ? "Importing..." : "Sync media"}
+            {isSyncingLibraries ? "Discovering..." : isBusy ? "Importing..." : "Sync media"}
           </Button>
         </div>
       </div>
@@ -426,7 +426,9 @@ function ServerLibraryGroup({
         </div>
       ) : (
         <div className="px-5 py-8 text-center">
-          <p className="text-sm text-muted-foreground">No libraries. Click &quot;Sync media&quot; to discover libraries from {server}.</p>
+          <p className="text-sm text-muted-foreground">
+            {isSyncingLibraries ? "Discovering libraries..." : `No libraries found on ${server}. Check your server connection.`}
+          </p>
         </div>
       )}
 
@@ -522,6 +524,20 @@ function LibrariesSection(): React.JSX.Element {
 
   const jellyfinLibs = (libraries ?? []).filter((l) => l.jellyfinLibraryId);
   const plexLibs = (libraries ?? []).filter((l) => l.plexLibraryId);
+
+  // Auto-discover libraries when a server is enabled but has no libraries yet
+  const autoDiscoveredRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (isLoading || !libraries) return;
+    if (jellyfinEnabled && jellyfinLibs.length === 0 && !syncJellyfin.isPending && !autoDiscoveredRef.current.has("jellyfin")) {
+      autoDiscoveredRef.current.add("jellyfin");
+      syncJellyfin.mutate();
+    }
+    if (plexEnabled && plexLibs.length === 0 && !syncPlex.isPending && !autoDiscoveredRef.current.has("plex")) {
+      autoDiscoveredRef.current.add("plex");
+      syncPlex.mutate();
+    }
+  }, [isLoading, libraries, jellyfinEnabled, plexEnabled, jellyfinLibs.length, plexLibs.length, syncJellyfin, syncPlex]);
 
   const triggerImport = (syncLibraryPromise?: Promise<unknown>): void => {
     setBusy(true);
