@@ -3,6 +3,7 @@ import { Queue, Worker } from "bullmq";
 import { handleCleanupCache } from "./jobs/cleanup-cache";
 import { handleImportTorrents } from "./jobs/import-torrents";
 import { handleRefreshMetadata } from "./jobs/refresh-metadata";
+import { handleReverseSync } from "./jobs/reverse-sync";
 
 /* -------------------------------------------------------------------------- */
 /*  Redis connection                                                          */
@@ -30,6 +31,10 @@ const cleanupCacheQueue = new Queue("cleanup-cache", {
   connection: redisConnection,
 });
 
+const reverseSyncQueue = new Queue("reverse-sync", {
+  connection: redisConnection,
+});
+
 /* -------------------------------------------------------------------------- */
 /*  Repeatable jobs (cron-like schedules)                                     */
 /* -------------------------------------------------------------------------- */
@@ -47,6 +52,13 @@ async function setupRepeatableJobs(): Promise<void> {
     "refresh-metadata-scheduler",
     { pattern: "0 3 * * 0" },
     { name: "refresh-metadata" },
+  );
+
+  // Reverse sync (import from Jellyfin/Plex): every 5 minutes
+  await reverseSyncQueue.upsertJobScheduler(
+    "reverse-sync-scheduler",
+    { every: 5 * 60 * 1000 },
+    { name: "reverse-sync" },
   );
 
   // Cleanup cache: every day at 04:00
@@ -91,6 +103,16 @@ const cleanupCacheWorker = new Worker(
   { connection: redisConnection, concurrency: 1 },
 );
 
+const reverseSyncWorker = new Worker(
+  "reverse-sync",
+  async (job) => {
+    console.log(`[reverse-sync] Running job ${job.id}`);
+    await handleReverseSync();
+    console.log(`[reverse-sync] Completed job ${job.id}`);
+  },
+  { connection: redisConnection, concurrency: 1 },
+);
+
 /* -------------------------------------------------------------------------- */
 /*  Error handling                                                            */
 /* -------------------------------------------------------------------------- */
@@ -99,6 +121,7 @@ for (const worker of [
   importTorrentsWorker,
   refreshMetadataWorker,
   cleanupCacheWorker,
+  reverseSyncWorker,
 ]) {
   worker.on("failed", (job, err) => {
     console.error(`[${worker.name}] Job ${job?.id} failed:`, err);
@@ -119,9 +142,11 @@ async function shutdown(): Promise<void> {
     importTorrentsWorker.close(),
     refreshMetadataWorker.close(),
     cleanupCacheWorker.close(),
+    reverseSyncWorker.close(),
     importTorrentsQueue.close(),
     refreshMetadataQueue.close(),
     cleanupCacheQueue.close(),
+    reverseSyncQueue.close(),
   ]);
   console.log("All workers shut down.");
   process.exit(0);
