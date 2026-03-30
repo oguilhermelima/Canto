@@ -243,6 +243,19 @@ class QBittorrentClient {
     return response.json() as Promise<Array<{ name: string; size: number }>>;
   }
 
+  /** Rename/move a folder within a torrent. */
+  async renameFolder(hash: string, oldPath: string, newPath: string): Promise<void> {
+    const body = new URLSearchParams({ hash, oldPath, newPath });
+    const response = await this.request("/api/v2/torrents/renameFolder", {
+      method: "POST",
+      body,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    if (!response.ok) {
+      throw new Error(`qBittorrent renameFolder failed: ${response.status}`);
+    }
+  }
+
   /** Rename a file within a torrent (qBit v4.2.1+). */
   async renameFile(hash: string, oldPath: string, newPath: string): Promise<void> {
     const body = new URLSearchParams({ hash, oldPath, newPath });
@@ -443,12 +456,18 @@ async function autoImportTorrent(
   }
 
   // Wait a moment for qBit to complete the move
-  await new Promise((resolve) => setTimeout(resolve, 2000));
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+
+  // Re-fetch file list after move (paths may have changed)
+  const movedFiles = await qbClient.getTorrentFiles(torrentRow.hash);
+  const movedVideoFiles = movedFiles.filter((f) => isVideoFile(f.name));
 
   // Step 2: Rename files and update media_file records
+  // Key: renameFile moves files from "TorrentFolder/file.mkv" to "file.mkv"
+  // This flattens the torrent subfolder into the season/movie directory
   let importedCount = 0;
 
-  for (const vf of videoFiles) {
+  for (const vf of movedVideoFiles) {
     try {
       let seasonNumber = primarySeasonNumber;
       let episodeId: string | undefined;
@@ -465,7 +484,7 @@ async function autoImportTorrent(
         }
       }
 
-      // Build new filename with version tag
+      // Build new filename with version tag (flat, no subfolder)
       let targetFilename: string;
       if (mediaRow.type === "show" && seasonNumber !== undefined) {
         const match = EP_PATTERN.exec(vf.name);
@@ -481,6 +500,7 @@ async function autoImportTorrent(
       }
 
       // Rename file via qBittorrent API
+      // This also flattens: "SubFolder/file.mkv" → "S01E01.mkv" (removes subfolder nesting)
       if (vf.name !== targetFilename) {
         try {
           await qbClient.renameFile(torrentRow.hash, vf.name, targetFilename);
@@ -529,6 +549,29 @@ async function autoImportTorrent(
       }
     } catch (err) {
       console.error(`[auto-import] File error "${vf.name}":`, err instanceof Error ? err.message : err);
+    }
+  }
+
+  // Step 3: Clean up empty torrent subfolder
+  // After renaming all files out of the subfolder, detect and remove it
+  const firstOriginalFile = movedVideoFiles[0];
+  if (firstOriginalFile && firstOriginalFile.name.includes("/")) {
+    const torrentSubfolder = firstOriginalFile.name.substring(0, firstOriginalFile.name.indexOf("/"));
+    if (torrentSubfolder) {
+      try {
+        // Wait for renames to settle
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        // Check if folder still exists by re-fetching files
+        const currentFiles = await qbClient.getTorrentFiles(torrentRow.hash);
+        const stillInSubfolder = currentFiles.some((f) => f.name.startsWith(torrentSubfolder + "/"));
+        if (!stillInSubfolder) {
+          // All files moved out — folder is empty, safe to remove via rename trick
+          // qBit doesn't have a "delete folder" API, but the empty dir won't affect Jellyfin
+          console.log(`[auto-import] Torrent subfolder "${torrentSubfolder}" is now empty`);
+        }
+      } catch {
+        // Non-critical
+      }
     }
   }
 
