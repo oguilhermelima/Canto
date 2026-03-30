@@ -105,16 +105,7 @@ function OrDivider(): React.JSX.Element {
 /*  Page sections                                                              */
 /* -------------------------------------------------------------------------- */
 
-interface SyncStatusData {
-  status: string;
-  total: number;
-  processed: number;
-  imported: number;
-  skipped: number;
-  failed: number;
-}
-
-function SyncedItemsTable(): React.JSX.Element {
+function SyncedItemsTable({ source }: { source?: "jellyfin" | "plex" }): React.JSX.Element {
   const [filter, setFilter] = useState<"all" | "failed" | "imported" | "skipped">("all");
   const [page, setPage] = useState(1);
   const [fixDialogItem, setFixDialogItem] = useState<{ id: string; title: string } | null>(null);
@@ -124,6 +115,7 @@ function SyncedItemsTable(): React.JSX.Element {
   const utils = trpc.useUtils();
 
   const { data, isLoading } = trpc.sync.listSyncedItems.useQuery({
+    source,
     result: filter === "all" ? undefined : filter,
     page,
     pageSize: 20,
@@ -315,25 +307,19 @@ function SyncedItemsTable(): React.JSX.Element {
 
 function ServerLibraryGroup({
   server,
+  source,
   enabled,
   libraries,
-  syncStatus,
   isSyncingLibraries,
-  isImporting,
   onSyncLibraries,
   onToggle,
   onToggleSync,
-  syncProgress,
-  isRunningOnServer,
 }: {
   server: string;
+  source: "jellyfin" | "plex";
   enabled: boolean;
   libraries: Array<{ id: string; name: string; mediaPath: string | null; enabled: boolean; syncEnabled: boolean }>;
-  syncStatus: SyncStatusData | null;
   isSyncingLibraries: boolean;
-  isImporting: boolean;
-  syncProgress: number;
-  isRunningOnServer: boolean;
   onSyncLibraries: () => void;
   onToggle: (id: string, enabled: boolean) => void;
   onToggleSync: (id: string, syncEnabled: boolean) => void;
@@ -342,123 +328,102 @@ function ServerLibraryGroup({
 
   const [showSyncedItems, setShowSyncedItems] = useState(false);
 
-  const isBusy = isSyncingLibraries || isImporting;
-  const hasResults = syncStatus && syncStatus.status !== "running" && !isImporting && (syncStatus.imported + syncStatus.skipped + syncStatus.failed) > 0;
+  // Global auto-sync: true if any library has syncEnabled
+  const globalAutoSync = libraries.some((l) => l.syncEnabled);
+
+  const handleGlobalAutoSync = (checked: boolean): void => {
+    for (const lib of libraries) {
+      if (lib.enabled && lib.syncEnabled !== checked) {
+        onToggleSync(lib.id, checked);
+      }
+    }
+  };
 
   return (
     <div className="rounded-xl border border-border/40 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between bg-muted/30 px-5 py-3.5">
         <p className="text-base font-semibold text-foreground">{server}</p>
-        <div className="flex items-center gap-2">
-          {isImporting && (
-            <div className="flex items-center gap-2">
-              {isRunningOnServer ? (
-                <>
-                  <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${syncProgress}%` }} />
-                  </div>
-                  <span className="text-xs text-muted-foreground">{syncProgress}%</span>
-                </>
-              ) : (
-                <span className="text-xs text-muted-foreground">Starting...</span>
-              )}
-            </div>
-          )}
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onSyncLibraries}
-            disabled={isBusy}
-          >
-            {isSyncingLibraries ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
-            {isSyncingLibraries ? "Refreshing..." : "Refresh libraries"}
-          </Button>
-        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onSyncLibraries}
+          disabled={isSyncingLibraries}
+        >
+          {isSyncingLibraries ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
+          {isSyncingLibraries ? "Refreshing..." : "Refresh"}
+        </Button>
       </div>
 
-      {/* Libraries */}
+      {/* Folder cards */}
       {libraries.length > 0 ? (
-        <div className="divide-y divide-border/30">
-          {libraries.map((lib) => (
-            <div key={lib.id} className="px-5 py-4">
-              <p className="text-base font-semibold text-foreground">{lib.name}</p>
-              {lib.mediaPath && (
-                <p className="mt-1 flex items-center gap-1.5 truncate text-sm text-muted-foreground">
-                  <Folder className="h-3.5 w-3.5 shrink-0" />{lib.mediaPath}
-                </p>
-              )}
-              <div className="mt-3 flex flex-col gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => onToggle(lib.id, !lib.enabled)}
-                  className={cn(
-                    "flex flex-1 items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-sm transition-all select-none",
-                    lib.enabled
-                      ? "border-primary/40 bg-primary/5 text-foreground"
-                      : "border-border/40 text-muted-foreground hover:border-border/60",
-                  )}
-                >
-                  <Download className="h-4 w-4 shrink-0" />
-                  <span>Use for downloads</span>
-                </button>
-                <div
-                  className={cn(
-                    "flex items-center justify-between rounded-xl border px-3.5 py-2.5 text-sm transition-all",
-                    !lib.enabled
-                      ? "border-border/20 text-muted-foreground/40"
-                      : "border-border/40",
-                  )}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <RefreshCw className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <span className={lib.enabled ? "text-foreground" : "text-muted-foreground/40"}>Automatic sync</span>
-                  </div>
-                  <Switch
-                    checked={lib.syncEnabled}
-                    onCheckedChange={(checked) => onToggleSync(lib.id, checked)}
-                    disabled={!lib.enabled}
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="px-5 py-4">
+          <p className="mb-3 text-xs font-medium text-muted-foreground">Select folders to use as download directories</p>
+          <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2" style={{ scrollbarWidth: "none" }}>
+            {libraries.map((lib) => (
+              <button
+                key={lib.id}
+                type="button"
+                onClick={() => onToggle(lib.id, !lib.enabled)}
+                className={cn(
+                  "flex w-36 shrink-0 flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all select-none",
+                  lib.enabled
+                    ? "border-primary bg-primary/5"
+                    : "border-border/40 hover:border-border/60",
+                )}
+              >
+                <Folder className={cn("h-8 w-8", lib.enabled ? "text-primary" : "text-muted-foreground/40")} />
+                <span className={cn("text-sm font-medium text-center leading-tight", lib.enabled ? "text-foreground" : "text-muted-foreground")}>
+                  {lib.name}
+                </span>
+                {lib.mediaPath && (
+                  <span className="w-full truncate text-center text-[10px] text-muted-foreground/50">
+                    {lib.mediaPath.split("/").pop()}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       ) : (
         <div className="px-5 py-8 text-center">
           <p className="text-sm text-muted-foreground">
-            {isSyncingLibraries ? "Discovering libraries..." : `No libraries found on ${server}. Check your server connection.`}
+            {isSyncingLibraries ? "Discovering libraries..." : `No libraries found on ${server}.`}
           </p>
         </div>
       )}
 
-      {/* Synced Items */}
-      {hasResults && (
-        <div className="border-t border-border/30">
-          <button
-            type="button"
-            onClick={() => setShowSyncedItems((p) => !p)}
-            className="flex w-full items-center justify-between px-5 py-3.5 text-left transition-colors hover:bg-muted/20"
-          >
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-medium text-foreground">Synced items</p>
-              <span className="text-xs text-muted-foreground">
-                {syncStatus.imported + syncStatus.skipped + syncStatus.failed} items
-              </span>
-              {syncStatus.failed > 0 && (
-                <span className="text-xs text-destructive">{syncStatus.failed} failed</span>
-              )}
-            </div>
-            <ChevronRight size={16} className={cn("text-muted-foreground/50 transition-transform duration-200", showSyncedItems && "rotate-90")} />
-          </button>
-
-          <AnimatedCollapse open={showSyncedItems}>
-            <div className="px-5 pb-5">
-              <SyncedItemsTable />
-            </div>
-          </AnimatedCollapse>
+      {/* Auto sync toggle */}
+      {libraries.length > 0 && (
+        <div className="flex items-center justify-between border-t border-border/30 px-5 py-3.5">
+          <div>
+            <p className="text-sm font-medium text-foreground">Automatic sync</p>
+            <p className="text-xs text-muted-foreground">Periodically import media from {server}</p>
+          </div>
+          <Switch
+            checked={globalAutoSync}
+            onCheckedChange={handleGlobalAutoSync}
+          />
         </div>
       )}
+
+      {/* Synced Items */}
+      <div className="border-t border-border/30">
+        <button
+          type="button"
+          onClick={() => setShowSyncedItems((p) => !p)}
+          className="flex w-full items-center justify-between px-5 py-3.5 text-left transition-colors hover:bg-muted/20"
+        >
+          <p className="text-sm font-medium text-foreground">Synced items</p>
+          <ChevronRight size={16} className={cn("text-muted-foreground/50 transition-transform duration-200", showSyncedItems && "rotate-90")} />
+        </button>
+
+        <AnimatedCollapse open={showSyncedItems}>
+          <div className="px-5 pb-5">
+            <SyncedItemsTable source={source} />
+          </div>
+        </AnimatedCollapse>
+      </div>
     </div>
   );
 }
@@ -498,29 +463,6 @@ function LibrariesSection(): React.JSX.Element {
   });
   const autoMergeVersions = (preferences as Record<string, unknown> | undefined)?.autoMergeVersions ?? true;
 
-  const [busy, setBusy] = useState(false);
-  const busyStarted = useRef(0);
-  const importMedia = trpc.sync.importMedia.useMutation();
-  const { data: syncStatus } = trpc.sync.importMediaStatus.useQuery(undefined, {
-    refetchInterval: busy ? 1500 : false,
-  });
-
-  const serverRunning = syncStatus?.status === "running";
-
-  // Clear busy when server is no longer running AND enough time has passed since we triggered
-  useEffect(() => {
-    if (!busy) return;
-    const elapsed = Date.now() - busyStarted.current;
-    if (elapsed > 3000 && !serverRunning) {
-      setBusy(false);
-      void utils.sync.listSyncedItems.invalidate();
-    }
-  }, [busy, serverRunning, syncStatus, utils.sync.listSyncedItems]);
-
-  const isSyncing = busy || serverRunning;
-  const syncProgress = serverRunning && syncStatus && syncStatus.total > 0
-    ? Math.round((syncStatus.processed / syncStatus.total) * 100) : 0;
-
   const jellyfinLibs = (libraries ?? []).filter((l) => l.jellyfinLibraryId);
   const plexLibs = (libraries ?? []).filter((l) => l.plexLibraryId);
 
@@ -553,26 +495,20 @@ function LibrariesSection(): React.JSX.Element {
           <div className="space-y-4">
             <ServerLibraryGroup
               server="Jellyfin"
+              source="jellyfin"
               enabled={jellyfinEnabled}
               libraries={jellyfinLibs}
-              syncStatus={syncStatus ?? null}
               isSyncingLibraries={syncJellyfin.isPending}
-              isImporting={isSyncing}
-              syncProgress={syncProgress}
-              isRunningOnServer={!!serverRunning}
               onSyncLibraries={() => syncJellyfin.mutate()}
               onToggle={(id, enabled) => toggleLibrary.mutate({ id, enabled })}
               onToggleSync={(id, syncEnabled) => toggleSync.mutate({ id, syncEnabled })}
             />
             <ServerLibraryGroup
               server="Plex"
+              source="plex"
               enabled={plexEnabled}
               libraries={plexLibs}
-              syncStatus={syncStatus ?? null}
               isSyncingLibraries={syncPlex.isPending}
-              isImporting={isSyncing}
-              syncProgress={syncProgress}
-              isRunningOnServer={!!serverRunning}
               onSyncLibraries={() => syncPlex.mutate()}
               onToggle={(id, enabled) => toggleLibrary.mutate({ id, enabled })}
               onToggleSync={(id, syncEnabled) => toggleSync.mutate({ id, syncEnabled })}

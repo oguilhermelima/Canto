@@ -75,6 +75,7 @@ export const syncRouter = createTRPCRouter({
     .input(
       z.object({
         libraryId: z.string().uuid().optional(),
+        source: z.enum(["jellyfin", "plex"]).optional(),
         result: z.enum(["imported", "skipped", "failed"]).optional(),
         page: z.number().int().min(1).default(1),
         pageSize: z.number().int().min(1).max(100).default(50),
@@ -83,6 +84,7 @@ export const syncRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const conditions = [];
       if (input.libraryId) conditions.push(eq(syncItem.libraryId, input.libraryId));
+      if (input.source) conditions.push(eq(syncItem.source, input.source));
       if (input.result) conditions.push(eq(syncItem.result, input.result));
 
       const where = conditions.length > 0 ? and(...conditions) : undefined;
