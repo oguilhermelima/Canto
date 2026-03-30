@@ -19,6 +19,10 @@
     "./settings": {
       "types": "./src/settings.ts",
       "default": "./src/settings.ts"
+    },
+    "./persist-media": {
+      "types": "./src/persist-media.ts",
+      "default": "./src/persist-media.ts"
     }
   },
   "scripts": {
@@ -27,10 +31,12 @@
     "generate": "dotenv -e ../../.env -- drizzle-kit generate",
     "migrate": "dotenv -e ../../.env -- drizzle-kit migrate",
     "push": "dotenv -e ../../.env -- drizzle-kit push",
+    "seed:watch-providers": "dotenv -e ../../.env -- tsx src/seed-watch-providers.ts",
     "studio": "dotenv -e ../../.env -- drizzle-kit studio",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@canto/providers": "workspace:*",
     "drizzle-orm": "catalog:",
     "postgres": "^3.4.5"
   },
@@ -40,6 +46,7 @@
     "dotenv-cli": "^11.0.0",
     "drizzle-kit": "catalog:",
     "prettier": "catalog:",
+    "tsx": "^4.19.3",
     "typescript": "catalog:"
   }
 }

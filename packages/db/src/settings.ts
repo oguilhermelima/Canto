@@ -56,6 +56,8 @@ const PLAINTEXT_KEYS = new Set([
   "jackett.enabled",
   "tmdb.enabled",
   "autoMergeVersions",
+  "sync.mediaImport.status",
+  "cache.spotlight",
 ]);
 
 function isSensitive(key: string): boolean {

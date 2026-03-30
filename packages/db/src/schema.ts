@@ -114,6 +114,8 @@ export const library = pgTable("library", {
   isDefault: boolean("is_default").notNull().default(false),
   /** Whether this library is enabled for downloads */
   enabled: boolean("enabled").notNull().default(true),
+  /** Whether to import media from this library during sync */
+  syncEnabled: boolean("sync_enabled").notNull().default(false),
 
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -350,6 +352,68 @@ export const extrasCache = pgTable("extras_cache", {
     .defaultNow(),
 });
 
+// ─── Sync items (reverse sync from Jellyfin/Plex) ───
+
+export const syncItem = pgTable(
+  "sync_item",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    libraryId: uuid("library_id")
+      .notNull()
+      .references(() => library.id, { onDelete: "cascade" }),
+    serverItemTitle: varchar("server_item_title", { length: 500 }).notNull(),
+    serverItemPath: varchar("server_item_path", { length: 1000 }),
+    serverItemYear: integer("server_item_year"),
+    tmdbId: integer("tmdb_id"),
+    mediaId: uuid("media_id").references(() => media.id, { onDelete: "set null" }),
+    result: varchar("result", { length: 20 }).notNull(), // imported | skipped | failed
+    reason: varchar("reason", { length: 500 }),
+    /** Which server this item came from */
+    source: varchar("source", { length: 20 }), // jellyfin | plex
+    /** Jellyfin internal item ID for deep linking */
+    jellyfinItemId: varchar("jellyfin_item_id", { length: 100 }),
+    /** Plex rating key for deep linking */
+    plexRatingKey: varchar("plex_rating_key", { length: 100 }),
+    syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_sync_item_library").on(table.libraryId),
+    index("idx_sync_item_result").on(table.result),
+  ],
+);
+
+// ─── Sync episode details (media files from Jellyfin/Plex) ───
+
+export const syncEpisode = pgTable(
+  "sync_episode",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    syncItemId: uuid("sync_item_id")
+      .notNull()
+      .references(() => syncItem.id, { onDelete: "cascade" }),
+    seasonNumber: integer("season_number"),
+    episodeNumber: integer("episode_number"),
+    serverEpisodeId: varchar("server_episode_id", { length: 100 }),
+    resolution: varchar("resolution", { length: 10 }), // 4K, 1080p, 720p, SD
+    videoCodec: varchar("video_codec", { length: 20 }),
+    audioCodec: varchar("audio_codec", { length: 20 }),
+    container: varchar("container", { length: 10 }),
+    fileSize: bigint("file_size", { mode: "number" }),
+    filePath: varchar("file_path", { length: 1000 }),
+  },
+  (table) => [
+    index("idx_sync_episode_item").on(table.syncItemId),
+  ],
+);
+
+// ─── Watch provider search links ───
+
+export const watchProviderLink = pgTable("watch_provider_link", {
+  providerId: integer("provider_id").primaryKey(),
+  providerName: varchar("provider_name", { length: 200 }).notNull(),
+  searchUrlTemplate: text("search_url_template"),
+});
+
 // ─── Relations ───
 
 export const userRelations = relations(user, ({ many }) => ({
@@ -435,5 +499,24 @@ export const extrasCacheRelations = relations(extrasCache, ({ one }) => ({
   media: one(media, {
     fields: [extrasCache.mediaId],
     references: [media.id],
+  }),
+}));
+
+export const syncItemRelations = relations(syncItem, ({ one, many }) => ({
+  library: one(library, {
+    fields: [syncItem.libraryId],
+    references: [library.id],
+  }),
+  media: one(media, {
+    fields: [syncItem.mediaId],
+    references: [media.id],
+  }),
+  episodes: many(syncEpisode),
+}));
+
+export const syncEpisodeRelations = relations(syncEpisode, ({ one }) => ({
+  syncItem: one(syncItem, {
+    fields: [syncEpisode.syncItemId],
+    references: [syncItem.id],
   }),
 }));
