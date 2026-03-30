@@ -234,6 +234,15 @@ class QBittorrentClient {
     }
   }
 
+  /** List files within a torrent. */
+  async listTorrentFiles(hash: string): Promise<Array<{ name: string; size: number }>> {
+    const response = await this.request(`/api/v2/torrents/files?hash=${hash}`);
+    if (!response.ok) {
+      throw new Error(`qBittorrent listFiles failed: ${response.status}`);
+    }
+    return response.json() as Promise<Array<{ name: string; size: number }>>;
+  }
+
   /** Rename a file within a torrent (qBit v4.2.1+). */
   async renameFile(hash: string, oldPath: string, newPath: string): Promise<void> {
     const body = new URLSearchParams({ hash, oldPath, newPath });
@@ -948,6 +957,182 @@ function parseEpisodes(title: string): number[] {
 
   // No episode pattern = season pack
   return [];
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Shared live-merge logic                                                   */
+/* -------------------------------------------------------------------------- */
+
+export interface LiveData {
+  state: string;
+  progress: number;
+  size: number;
+  dlspeed: number;
+  upspeed: number;
+  eta: number;
+  seeds: number;
+  peers: number;
+  addedOn: number;
+  completedOn: number;
+  ratio: number;
+}
+
+type TorrentRow = Awaited<ReturnType<Database["query"]["torrent"]["findMany"]>>[number];
+
+/**
+ * Merge DB torrent rows with live qBittorrent data.
+ * Handles: progress sync, status transitions, auto-import.
+ * Used by both `listLive` (global) and `listLiveByMedia` (scoped).
+ */
+async function mergeLiveData(
+  db: Database,
+  dbRows: TorrentRow[],
+): Promise<Array<{ row: TorrentRow; live: LiveData | null }>> {
+  let liveTorrents: Array<{
+    hash: string;
+    name: string;
+    state: string;
+    progress: number;
+    size: number;
+    dlspeed: number;
+    upspeed: number;
+    eta: number;
+    num_seeds: number;
+    num_leechs: number;
+    added_on: number;
+    completion_on: number;
+    ratio: number;
+    content_path: string;
+    save_path: string;
+  }> = [];
+  let qbReachable = false;
+  const qbImportClient = await getQBClient();
+
+  try {
+    liveTorrents = await qbImportClient.listTorrents();
+    qbReachable = true;
+  } catch {
+    // qBittorrent may be unreachable — return DB data only
+  }
+
+  const liveMap = new Map(liveTorrents.map((t) => [t.hash, t]));
+
+  // 1. Persist contentPath, fileSize, and progress from live data
+  for (const row of dbRows) {
+    const live = row.hash ? liveMap.get(row.hash) : undefined;
+    if (live) {
+      const updates: Record<string, unknown> = {
+        progress: live.progress,
+        updatedAt: new Date(),
+      };
+      if (live.content_path && !row.contentPath) {
+        updates.contentPath = live.content_path;
+        (row as { contentPath: string | null }).contentPath = live.content_path;
+      }
+      if (live.size && !row.fileSize) {
+        updates.fileSize = live.size;
+        (row as { fileSize: number | null }).fileSize = live.size;
+      }
+      (row as { progress: number }).progress = live.progress;
+      void db
+        .update(torrent)
+        .set(updates)
+        .where(eq(torrent.id, row.id))
+        .execute()
+        .catch(() => {});
+    }
+  }
+
+  // 2. Status transitions based on live data
+  const statusUpdates = new Map<string, string>();
+
+  for (const row of dbRows) {
+    const live = row.hash ? liveMap.get(row.hash) : undefined;
+    if (live && live.progress >= 1 && row.status !== "completed") {
+      statusUpdates.set(row.id, "completed");
+    } else if (
+      !live &&
+      row.hash &&
+      qbReachable &&
+      (row.status === "downloading" || row.status === "paused")
+    ) {
+      if (row.progress >= 1) {
+        statusUpdates.set(row.id, "completed");
+      } else {
+        statusUpdates.set(row.id, "incomplete");
+      }
+    }
+  }
+
+  // Batch DB updates by target status
+  const byStatus = new Map<string, string[]>();
+  for (const [id, status] of statusUpdates) {
+    if (!byStatus.has(status)) byStatus.set(status, []);
+    byStatus.get(status)!.push(id);
+  }
+  for (const [status, ids] of byStatus) {
+    void db
+      .update(torrent)
+      .set({ status, updatedAt: new Date() })
+      .where(inArray(torrent.id, ids))
+      .execute()
+      .catch(() => {});
+  }
+
+  // Auto-import: trigger for newly completed, non-imported torrents
+  const newlyCompleted = [...statusUpdates.entries()]
+    .filter(([, s]) => s === "completed")
+    .map(([id]) => id);
+
+  if (newlyCompleted.length > 0) {
+    const toImport = dbRows.filter(
+      (r) => newlyCompleted.includes(r.id) && !r.imported && !r.importing && r.hash && r.mediaId,
+    );
+    for (const row of toImport) {
+      void (async () => {
+        try {
+          const [claimed] = await db
+            .update(torrent)
+            .set({ importing: true })
+            .where(and(eq(torrent.id, row.id), eq(torrent.importing, false)))
+            .returning();
+          if (!claimed) return;
+          await autoImportTorrent(db, claimed, qbImportClient);
+        } catch (err) {
+          console.error(`[auto-import] Failed for "${row.title}":`, err instanceof Error ? err.message : err);
+          await db.update(torrent).set({ importing: false }).where(eq(torrent.id, row.id)).catch(() => {});
+        }
+      })();
+    }
+  }
+
+  // Update in-memory statuses
+  for (const row of dbRows) {
+    const newStatus = statusUpdates.get(row.id);
+    if (newStatus) (row as { status: string }).status = newStatus;
+  }
+
+  return dbRows.map((row) => {
+    const live = row.hash ? liveMap.get(row.hash) : undefined;
+    return {
+      row,
+      live: live
+        ? {
+            state: live.state,
+            progress: live.progress,
+            size: live.size,
+            dlspeed: live.dlspeed,
+            upspeed: live.upspeed,
+            eta: live.eta,
+            seeds: live.num_seeds,
+            peers: live.num_leechs,
+            addedOn: live.added_on,
+            completedOn: live.completion_on,
+            ratio: live.ratio,
+          }
+        : null,
+    };
+  });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1690,145 +1875,12 @@ export const torrentRouter = createTRPCRouter({
       : [];
     const mediaMap = new Map(mediaRows.map((m) => [m.id, m]));
 
-    let liveTorrents: Array<{
-      hash: string;
-      name: string;
-      state: string;
-      progress: number;
-      size: number;
-      dlspeed: number;
-      upspeed: number;
-      eta: number;
-      num_seeds: number;
-      num_leechs: number;
-      added_on: number;
-      completion_on: number;
-      ratio: number;
-      content_path: string;
-      save_path: string;
-    }> = [];
-    let qbReachable = false;
-    const qbImportClient = await getQBClient();
+    const merged = await mergeLiveData(ctx.db, dbRows);
 
-    try {
-      liveTorrents = await qbImportClient.listTorrents();
-      qbReachable = true;
-    } catch {
-      // qBittorrent may be unreachable — return DB data only
-    }
-
-    const liveMap = new Map(liveTorrents.map((t) => [t.hash, t]));
-
-    // ── Sync state from qBittorrent → DB ──
-
-    // 1. Persist contentPath, fileSize, and progress from live data
-    for (const row of dbRows) {
-      const live = row.hash ? liveMap.get(row.hash) : undefined;
-      if (live) {
-        const updates: Record<string, unknown> = {
-          progress: live.progress,
-          updatedAt: new Date(),
-        };
-        if (live.content_path && !row.contentPath) {
-          updates.contentPath = live.content_path;
-          (row as { contentPath: string | null }).contentPath = live.content_path;
-        }
-        if (live.size && !row.fileSize) {
-          updates.fileSize = live.size;
-          (row as { fileSize: number | null }).fileSize = live.size;
-        }
-        (row as { progress: number }).progress = live.progress;
-        void ctx.db
-          .update(torrent)
-          .set(updates)
-          .where(eq(torrent.id, row.id))
-          .execute()
-          .catch(() => {});
-      }
-    }
-
-    // 2. Status transitions based on live data
-    const statusUpdates = new Map<string, string>(); // id → new status
-
-    for (const row of dbRows) {
-      const live = row.hash ? liveMap.get(row.hash) : undefined;
-
-      if (live && live.progress >= 1 && row.status !== "completed") {
-        statusUpdates.set(row.id, "completed");
-      } else if (
-        !live &&
-        row.hash &&
-        qbReachable &&
-        (row.status === "downloading" || row.status === "paused")
-      ) {
-        // Disappeared from qBittorrent
-        if (row.progress >= 1) {
-          statusUpdates.set(row.id, "completed");
-        } else {
-          statusUpdates.set(row.id, "incomplete");
-        }
-      }
-    }
-
-    // Batch by target status
-    const byStatus = new Map<string, string[]>();
-    for (const [id, status] of statusUpdates) {
-      if (!byStatus.has(status)) byStatus.set(status, []);
-      byStatus.get(status)!.push(id);
-    }
-    for (const [status, ids] of byStatus) {
-      void ctx.db
-        .update(torrent)
-        .set({ status, updatedAt: new Date() })
-        .where(inArray(torrent.id, ids))
-        .execute()
-        .catch(() => {});
-    }
-    // Auto-import: trigger for newly completed, non-imported torrents
-    const newlyCompleted = [...statusUpdates.entries()]
-      .filter(([, s]) => s === "completed")
-      .map(([id]) => id);
-
-    if (newlyCompleted.length > 0) {
-      const toImport = dbRows.filter(
-        (r) => newlyCompleted.includes(r.id) && !r.imported && !r.importing && r.hash && r.mediaId,
-      );
-      if (toImport.length > 0) {
-        // Atomically claim: UPDATE ... WHERE importing = false RETURNING *
-        for (const row of toImport) {
-          void (async () => {
-            try {
-              // Atomically set importing = true (prevents double-import from concurrent listLive calls)
-              const [claimed] = await ctx.db
-                .update(torrent)
-                .set({ importing: true })
-                .where(and(eq(torrent.id, row.id), eq(torrent.importing, false)))
-                .returning();
-
-              if (!claimed) return; // Another process already claimed it
-
-              await autoImportTorrent(ctx.db, claimed, qbImportClient);
-            } catch (err) {
-              console.error(`[auto-import] Failed for "${row.title}":`, err instanceof Error ? err.message : err);
-              // Reset importing flag so it can retry
-              await ctx.db.update(torrent).set({ importing: false }).where(eq(torrent.id, row.id)).catch(() => {});
-            }
-          })();
-        }
-      }
-    }
-
-    // Update in-memory
-    for (const row of dbRows) {
-      const newStatus = statusUpdates.get(row.id);
-      if (newStatus) (row as { status: string }).status = newStatus;
-    }
-
-    return dbRows.map((row) => {
-      const live = row.hash ? liveMap.get(row.hash) : undefined;
-      const linkedMedia = row.mediaId ? mediaMap.get(row.mediaId) : undefined;
+    return merged.map((item) => {
+      const linkedMedia = item.row.mediaId ? mediaMap.get(item.row.mediaId) : undefined;
       return {
-        ...row,
+        ...item.row,
         media: linkedMedia
           ? {
               id: linkedMedia.id,
@@ -1838,24 +1890,31 @@ export const torrentRouter = createTRPCRouter({
               year: linkedMedia.year,
             }
           : null,
-        live: live
-          ? {
-              state: live.state,
-              progress: live.progress,
-              size: live.size,
-              dlspeed: live.dlspeed,
-              upspeed: live.upspeed,
-              eta: live.eta,
-              seeds: live.num_seeds,
-              peers: live.num_leechs,
-              addedOn: live.added_on,
-              completedOn: live.completion_on,
-              ratio: live.ratio,
-            }
-          : null,
+        live: item.live,
       };
     });
   }),
+
+  /**
+   * List live torrent data for a specific media, merged with qBittorrent.
+   */
+  listLiveByMedia: publicProcedure
+    .input(z.object({ mediaId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const dbRows = await ctx.db.query.torrent.findMany({
+        where: eq(torrent.mediaId, input.mediaId),
+        orderBy: (t, { desc: d }) => [d(t.createdAt)],
+      });
+
+      if (dbRows.length === 0) return [];
+
+      const merged = await mergeLiveData(ctx.db, dbRows);
+
+      return merged.map((item) => ({
+        ...item.row,
+        live: item.live,
+      }));
+    }),
 
   /**
    * Pause a torrent in qBittorrent.
@@ -2029,6 +2088,74 @@ export const torrentRouter = createTRPCRouter({
       }
 
       await ctx.db.delete(torrent).where(eq(torrent.id, input.id));
+
+      return { success: true };
+    }),
+
+  /**
+   * Rename a torrent's file in qBittorrent.
+   */
+  rename: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        newName: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const row = await ctx.db.query.torrent.findFirst({
+        where: eq(torrent.id, input.id),
+      });
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
+      if (!row.hash) throw new TRPCError({ code: "BAD_REQUEST", message: "Torrent has no hash" });
+
+      const qb = await getQBClient();
+      const files = await qb.listTorrentFiles(row.hash);
+      if (files.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No files in torrent" });
+
+      // Rename the main video file (largest file)
+      const mainFile = files.reduce((a, b) => (a.size > b.size ? a : b));
+      const ext = mainFile.name.includes(".") ? mainFile.name.slice(mainFile.name.lastIndexOf(".")) : "";
+      const newPath = mainFile.name.includes("/")
+        ? mainFile.name.slice(0, mainFile.name.lastIndexOf("/") + 1) + input.newName + ext
+        : input.newName + ext;
+
+      await qb.renameFile(row.hash, mainFile.name, newPath);
+
+      // Update DB title
+      await ctx.db
+        .update(torrent)
+        .set({ title: input.newName, updatedAt: new Date() })
+        .where(eq(torrent.id, input.id));
+
+      return { success: true };
+    }),
+
+  /**
+   * Move a torrent's files to a new location in qBittorrent.
+   */
+  move: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        newPath: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const row = await ctx.db.query.torrent.findFirst({
+        where: eq(torrent.id, input.id),
+      });
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
+      if (!row.hash) throw new TRPCError({ code: "BAD_REQUEST", message: "Torrent has no hash" });
+
+      const qb = await getQBClient();
+      await qb.setLocation(row.hash, input.newPath);
+
+      // Update DB content path
+      await ctx.db
+        .update(torrent)
+        .set({ contentPath: input.newPath, updatedAt: new Date() })
+        .where(eq(torrent.id, input.id));
 
       return { success: true };
     }),

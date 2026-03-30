@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   extrasCache,
   media,
+  mediaFile,
   season,
 } from "@canto/db/schema";
 import { getProvider } from "@canto/providers";
@@ -284,6 +285,29 @@ export const mediaRouter = createTRPCRouter({
       }
 
       return { success: true };
+    }),
+
+  /**
+   * List media files (on disk) for a given media, with episode and torrent info.
+   */
+  listFiles: publicProcedure
+    .input(z.object({ mediaId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      return ctx.db.query.mediaFile.findMany({
+        where: eq(mediaFile.mediaId, input.mediaId),
+        with: {
+          episode: {
+            columns: { id: true, number: true, title: true, seasonId: true },
+            with: {
+              season: { columns: { id: true, number: true } },
+            },
+          },
+          torrent: {
+            columns: { id: true, quality: true, source: true, title: true },
+          },
+        },
+        orderBy: (f, { asc }) => [asc(f.createdAt)],
+      });
     }),
 
   /**
