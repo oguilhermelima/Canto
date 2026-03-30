@@ -214,24 +214,9 @@ export const syncRouter = createTRPCRouter({
       if (plexItem) {
         const plexUrl = await getSetting<string>("plex.url");
         if (plexUrl) {
-          // Try to get machine ID for app.plex.tv deep link
-          try {
-            const identityRes = await fetch(`${plexUrl}/identity`, {
-              headers: { Accept: "application/json", "X-Plex-Token": (await getSetting<string>("plex.token")) ?? "" },
-            });
-            if (identityRes.ok) {
-              const identity = await identityRes.json() as { MediaContainer: { machineIdentifier: string } };
-              const machineId = identity.MediaContainer.machineIdentifier;
-              result.plex = {
-                url: `https://app.plex.tv/desktop#!/server/${machineId}/details?key=%2Flibrary%2Fmetadata%2F${plexItem.plexRatingKey}&context%5Bdevice%5D%5Bproduct%5D=Canto`,
-              };
-            }
-          } catch {
-            // Fallback to local URL
-            result.plex = {
-              url: `${plexUrl}/web/index.html#!/details?key=%2Flibrary%2Fmetadata%2F${plexItem.plexRatingKey}`,
-            };
-          }
+          result.plex = {
+            url: `${plexUrl}/web/index.html#!/details?key=%2Flibrary%2Fmetadata%2F${plexItem.plexRatingKey}`,
+          };
         }
       }
 
