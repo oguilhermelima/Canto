@@ -1,10 +1,9 @@
 import { Queue } from "bullmq";
-import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@canto/db/client";
-import { media, syncItem } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
+import { SETTINGS } from "../lib/settings-keys";
 import { persistMedia } from "@canto/db/persist-media";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
@@ -13,10 +12,10 @@ import {
   findSyncItemById,
   findSyncItemsByMediaId,
   findSyncItemsWithEpisodes,
-  listSyncItems,
+  findSyncItemsPaginated,
   updateSyncItem,
 } from "../infrastructure/repositories/sync-repository";
-import { updateMedia } from "../infrastructure/repositories/media-repository";
+import { findMediaByExternalId, updateMedia } from "../infrastructure/repositories/media-repository";
 
 /* -------------------------------------------------------------------------- */
 /*  Queue (lazy singleton)                                                     */
@@ -72,7 +71,7 @@ export const syncRouter = createTRPCRouter({
       failed: number;
       startedAt: string;
       completedAt?: string;
-    }>("sync.mediaImport.status");
+    }>(SETTINGS.SYNC_MEDIA_IMPORT_STATUS);
     return status ?? null;
   }),
 
@@ -90,14 +89,11 @@ export const syncRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input }) => {
-      const conditions = [];
-      if (input.libraryId) conditions.push(eq(syncItem.libraryId, input.libraryId));
-      if (input.source) conditions.push(eq(syncItem.source, input.source));
-      if (input.result) conditions.push(eq(syncItem.result, input.result));
-      const where = conditions.length > 0 ? and(...conditions) : undefined;
-
-      const { items, total } = await listSyncItems(
-        db, where, input.pageSize, (input.page - 1) * input.pageSize,
+      const { items, total } = await findSyncItemsPaginated(
+        db,
+        { libraryId: input.libraryId, source: input.source, result: input.result },
+        input.pageSize,
+        (input.page - 1) * input.pageSize,
       );
       return { items, total, page: input.page, pageSize: input.pageSize };
     }),
@@ -132,9 +128,7 @@ export const syncRouter = createTRPCRouter({
       const normalized = await tmdb.getMetadata(input.tmdbId, input.type);
 
       // Check if media already exists by external ID
-      const existing = await db.query.media.findFirst({
-        where: and(eq(media.externalId, input.tmdbId), eq(media.provider, "tmdb")),
-      });
+      const existing = await findMediaByExternalId(db, input.tmdbId, "tmdb");
 
       let mediaId: string;
       if (existing) {
@@ -175,7 +169,7 @@ export const syncRouter = createTRPCRouter({
 
       const jellyfinItem = items.find((i) => i.source === "jellyfin" && i.jellyfinItemId);
       if (jellyfinItem) {
-        const jellyfinUrl = await getSetting<string>("jellyfin.url");
+        const jellyfinUrl = await getSetting<string>(SETTINGS.JELLYFIN_URL);
         if (jellyfinUrl) {
           result.jellyfin = {
             url: `${jellyfinUrl}/web/index.html#!/details?id=${jellyfinItem.jellyfinItemId}`,
@@ -185,8 +179,8 @@ export const syncRouter = createTRPCRouter({
 
       const plexItem = items.find((i) => i.source === "plex" && i.plexRatingKey);
       if (plexItem) {
-        const plexUrl = await getSetting<string>("plex.url");
-        const machineId = await getSetting<string>("plex.machineId");
+        const plexUrl = await getSetting<string>(SETTINGS.PLEX_URL);
+        const machineId = await getSetting<string>(SETTINGS.PLEX_MACHINE_ID);
         if (plexUrl && machineId) {
           result.plex = {
             url: `${plexUrl}/web/index.html#!/server/${machineId}/details?key=%2Flibrary%2Fmetadata%2F${plexItem.plexRatingKey}`,

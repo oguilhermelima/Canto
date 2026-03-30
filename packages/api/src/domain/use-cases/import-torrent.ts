@@ -1,17 +1,24 @@
-import { and, eq } from "drizzle-orm";
-
 import type { Database } from "@canto/db/client";
-import { library, media, mediaFile, torrent } from "@canto/db/schema";
+import type { torrent as torrentSchema } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
+import { SETTINGS } from "../../lib/settings-keys";
 import { getJellyfinCredentials } from "../../lib/server-credentials";
 import type { QBittorrentClient } from "../../infrastructure/adapters/qbittorrent";
 import { isVideoFile, sanitizeName, buildMediaDir, buildFileName } from "../rules/naming";
 import { EP_PATTERN, BARE_EP_PATTERN, isSubtitleFile, parseSubtitleLanguage } from "../rules/parsing";
 import { createNotification } from "./create-notification";
+import {
+  findMediaByIdWithSeasons,
+  findLibraryById,
+  findMediaFilesByTorrentId,
+  updateMediaFile,
+  createMediaFileNoConflict,
+  updateTorrent,
+} from "../../infrastructure/repositories";
 
 async function triggerMediaServerScans(db: Database, libraryId?: string): Promise<void> {
-  const jellyfinUrl = await getSetting("jellyfin.url");
-  const jellyfinKey = await getSetting("jellyfin.apiKey");
+  const jellyfinUrl = await getSetting(SETTINGS.JELLYFIN_URL);
+  const jellyfinKey = await getSetting(SETTINGS.JELLYFIN_API_KEY);
   if (jellyfinUrl && jellyfinKey) {
     void fetch(`${jellyfinUrl}/Library/Refresh`, {
       method: "POST",
@@ -19,12 +26,10 @@ async function triggerMediaServerScans(db: Database, libraryId?: string): Promis
     }).catch(() => {});
   }
 
-  const plexUrl = await getSetting("plex.url");
-  const plexToken = await getSetting("plex.token");
+  const plexUrl = await getSetting(SETTINGS.PLEX_URL);
+  const plexToken = await getSetting(SETTINGS.PLEX_TOKEN);
   if (plexUrl && plexToken && libraryId) {
-    const lib = await db.query.library.findFirst({
-      where: eq(library.id, libraryId),
-    });
+    const lib = await findLibraryById(db, libraryId);
     if (lib?.plexLibraryId) {
       void fetch(
         `${plexUrl}/library/sections/${lib.plexLibraryId}/refresh?X-Plex-Token=${plexToken}`,
@@ -73,23 +78,18 @@ async function autoMergeIfEnabled(
 
 export async function autoImportTorrent(
   db: Database,
-  torrentRow: typeof torrent.$inferSelect,
+  torrentRow: typeof torrentSchema.$inferSelect,
   qbClient: QBittorrentClient,
 ): Promise<void> {
   if (!torrentRow.hash || !torrentRow.mediaId) return;
 
-  const mediaRow = await db.query.media.findFirst({
-    where: eq(media.id, torrentRow.mediaId),
-    with: { seasons: { with: { episodes: true } } },
-  });
+  const mediaRow = await findMediaByIdWithSeasons(db, torrentRow.mediaId);
   if (!mediaRow) return;
 
-  const placeholders = await db.query.mediaFile.findMany({
-    where: and(eq(mediaFile.torrentId, torrentRow.id), eq(mediaFile.status, "pending")),
-  });
+  const placeholders = await findMediaFilesByTorrentId(db, torrentRow.id, "pending");
 
   const libRow = mediaRow.libraryId
-    ? await db.query.library.findFirst({ where: eq(library.id, mediaRow.libraryId) })
+    ? await findLibraryById(db, mediaRow.libraryId)
     : null;
   const containerBasePath = libRow?.containerMediaPath
     ?? (mediaRow.type === "show" ? "/medias/Shows" : "/medias/Movies");
@@ -111,7 +111,7 @@ export async function autoImportTorrent(
       type: "movie_multi_file",
       mediaId: mediaRow.id,
     });
-    await db.update(torrent).set({ importing: false }).where(eq(torrent.id, torrentRow.id));
+    await updateTorrent(db, torrentRow.id, { importing: false });
     return;
   }
 
@@ -141,7 +141,7 @@ export async function autoImportTorrent(
     console.log(`[auto-import] Moved "${torrentRow.title}" → ${targetLocation}`);
   } catch (err) {
     console.error(`[auto-import] setLocation failed:`, err instanceof Error ? err.message : err);
-    await db.update(torrent).set({ importing: false }).where(eq(torrent.id, torrentRow.id));
+    await updateTorrent(db, torrentRow.id, { importing: false });
     return;
   }
 
@@ -206,12 +206,14 @@ export async function autoImportTorrent(
       if (episodeId) {
         const placeholder = placeholders.find((p) => p.episodeId === episodeId);
         if (placeholder) {
-          await db.update(mediaFile)
-            .set({ filePath: finalPath, sizeBytes: vf.size, status: "imported" })
-            .where(eq(mediaFile.id, placeholder.id));
+          await updateMediaFile(db, placeholder.id, {
+            filePath: finalPath,
+            sizeBytes: vf.size,
+            status: "imported",
+          });
           importedCount++;
         } else {
-          await db.insert(mediaFile).values({
+          await createMediaFileNoConflict(db, {
             mediaId: mediaRow.id,
             episodeId,
             torrentId: torrentRow.id,
@@ -220,15 +222,17 @@ export async function autoImportTorrent(
             source: torrentRow.source,
             sizeBytes: vf.size,
             status: "imported",
-          }).onConflictDoNothing();
+          });
           importedCount++;
         }
       } else if (mediaRow.type === "movie") {
         const placeholder = placeholders.find((p) => !p.episodeId);
         if (placeholder) {
-          await db.update(mediaFile)
-            .set({ filePath: finalPath, sizeBytes: vf.size, status: "imported" })
-            .where(eq(mediaFile.id, placeholder.id));
+          await updateMediaFile(db, placeholder.id, {
+            filePath: finalPath,
+            sizeBytes: vf.size,
+            status: "imported",
+          });
           importedCount++;
         }
       }
@@ -305,12 +309,11 @@ export async function autoImportTorrent(
     ? targetLocation.replace(libRow.containerMediaPath, libRow.mediaPath)
     : targetLocation.replace("/medias/", "/home/user/Medias/");
 
-  await db.update(torrent).set({
+  await updateTorrent(db, torrentRow.id, {
     imported: true,
     importing: false,
     contentPath: hostContentPath,
-    updatedAt: new Date(),
-  }).where(eq(torrent.id, torrentRow.id));
+  });
 
   if (importedCount > 0) {
     console.log(`[auto-import] Imported ${importedCount} file(s) for "${mediaRow.title}"`);

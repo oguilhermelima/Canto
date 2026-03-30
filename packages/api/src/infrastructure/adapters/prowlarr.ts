@@ -1,4 +1,5 @@
 import { getSetting } from "@canto/db/settings";
+import { SETTINGS } from "../../lib/settings-keys";
 import type { IndexerResult } from "../../domain/types/torrent";
 
 export class ProwlarrClient {
@@ -37,8 +38,8 @@ let prowlarrClient: ProwlarrClient | null = null;
 
 export async function getProwlarrClient(): Promise<ProwlarrClient> {
   if (!prowlarrClient) {
-    const url = (await getSetting("prowlarr.url")) ?? "";
-    const apiKey = (await getSetting("prowlarr.apiKey")) ?? "";
+    const url = (await getSetting(SETTINGS.PROWLARR_URL)) ?? "";
+    const apiKey = (await getSetting(SETTINGS.PROWLARR_API_KEY)) ?? "";
     prowlarrClient = new ProwlarrClient(url, apiKey);
   }
   return prowlarrClient;

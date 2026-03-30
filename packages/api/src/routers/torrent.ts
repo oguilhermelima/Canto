@@ -1,8 +1,6 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { torrent } from "@canto/db/schema";
 import { torrentDownloadInput, torrentSearchInput } from "@canto/validators";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
@@ -17,6 +15,7 @@ import {
   findTorrentsByMediaId,
   updateTorrent,
   deleteTorrent as deleteTorrentRecord,
+  claimTorrentForImport,
 } from "../infrastructure/repositories/torrent-repository";
 import { findMediaById } from "../infrastructure/repositories/media-repository";
 import { findDefaultLibrary, findLibraryById } from "../infrastructure/repositories/library-repository";
@@ -186,11 +185,7 @@ export const torrentRouter = createTRPCRouter({
       }
 
       // Atomically set importing = true
-      const [claimed] = await ctx.db
-        .update(torrent)
-        .set({ importing: true })
-        .where(and(eq(torrent.id, row.id), eq(torrent.importing, false)))
-        .returning();
+      const claimed = await claimTorrentForImport(ctx.db, row.id);
       if (!claimed) return { success: true, message: "Import already in progress" };
 
       try {

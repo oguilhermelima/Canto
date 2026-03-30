@@ -1,4 +1,4 @@
-import { and, desc, eq, not, isNull, notInArray } from "drizzle-orm";
+import { and, desc, eq, not, isNull, isNotNull, notInArray } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
   blocklist,
@@ -6,6 +6,7 @@ import {
   mediaVideo,
   mediaWatchProvider,
   recommendationPool,
+  watchProviderLink,
 } from "@canto/db/schema";
 
 // ── Credits ──
@@ -96,10 +97,22 @@ export async function findBlocklistEntry(
   });
 }
 
-export async function addToBlocklist(
+export async function createBlocklistEntry(
   db: Database,
   data: typeof blocklist.$inferInsert,
 ) {
   const [row] = await db.insert(blocklist).values(data).returning();
   return row;
+}
+
+// ── Watch Provider Links ──
+
+export async function findWatchProviderLinks(db: Database) {
+  return db
+    .select({
+      providerId: watchProviderLink.providerId,
+      searchUrlTemplate: watchProviderLink.searchUrlTemplate,
+    })
+    .from(watchProviderLink)
+    .where(isNotNull(watchProviderLink.searchUrlTemplate));
 }

@@ -1,9 +1,8 @@
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
 
 import type { Database } from "@canto/db/client";
-import { blocklist, media } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
+import { SETTINGS } from "../../lib/settings-keys";
 
 import { getJackettClient } from "../../infrastructure/adapters/jackett";
 import { getProwlarrClient } from "../../infrastructure/adapters/prowlarr";
@@ -11,6 +10,10 @@ import { detectQuality, detectSource } from "../rules/quality";
 import { calculateConfidence } from "../rules/scoring";
 import type { ConfidenceContext } from "../types/common";
 import type { IndexerResult } from "../types/torrent";
+import {
+  findMediaById,
+  findBlocklistByMediaId,
+} from "../../infrastructure/repositories";
 
 export interface SearchResult {
   guid: string;
@@ -35,9 +38,7 @@ export async function searchTorrents(
   db: Database,
   input: { mediaId: string; seasonNumber?: number; episodeNumbers?: number[] | null },
 ): Promise<SearchResult[]> {
-  const row = await db.query.media.findFirst({
-    where: eq(media.id, input.mediaId),
-  });
+  const row = await findMediaById(db, input.mediaId);
 
   if (!row) {
     throw new TRPCError({
@@ -65,9 +66,9 @@ export async function searchTorrents(
   }
 
   const prowlarrEnabled =
-    (await getSetting<boolean>("prowlarr.enabled")) === true;
+    (await getSetting<boolean>(SETTINGS.PROWLARR_ENABLED)) === true;
   const jackettEnabled =
-    (await getSetting<boolean>("jackett.enabled")) === true;
+    (await getSetting<boolean>(SETTINGS.JACKETT_ENABLED)) === true;
 
   if (!prowlarrEnabled && !jackettEnabled) {
     return [];
@@ -108,10 +109,7 @@ export async function searchTorrents(
   }
 
   // Filter out blocklisted titles
-  const blockedRows = await db.query.blocklist.findMany({
-    where: eq(blocklist.mediaId, input.mediaId),
-    columns: { title: true },
-  });
+  const blockedRows = await findBlocklistByMediaId(db, input.mediaId);
   if (blockedRows.length > 0) {
     const blockedTitles = new Set(blockedRows.map((b) => b.title.toLowerCase()));
     results = results.filter((r) => !blockedTitles.has(r.title.toLowerCase()));

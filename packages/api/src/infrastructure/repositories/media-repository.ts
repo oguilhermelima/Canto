@@ -72,7 +72,7 @@ export async function findLibraryMediaBrief(db: Database, limit = 100) {
   });
 }
 
-export async function getLibraryStats(db: Database) {
+export async function findLibraryStats(db: Database) {
   const [totalRow] = await db
     .select({ total: count() })
     .from(media)

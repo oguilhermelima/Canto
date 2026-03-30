@@ -1,10 +1,12 @@
-import { and, eq, inArray } from "drizzle-orm";
-
 import type { Database } from "@canto/db/client";
-import { torrent } from "@canto/db/schema";
 import { getQBClient } from "../../infrastructure/adapters/qbittorrent";
 import type { LiveData } from "../types/torrent";
 import { autoImportTorrent } from "./import-torrent";
+import {
+  updateTorrent,
+  updateTorrentBatch,
+  claimTorrentForImport,
+} from "../../infrastructure/repositories";
 
 type TorrentRow = Awaited<ReturnType<Database["query"]["torrent"]["findMany"]>>[number];
 
@@ -47,7 +49,6 @@ export async function mergeLiveData(
     if (live) {
       const updates: Record<string, unknown> = {
         progress: live.progress,
-        updatedAt: new Date(),
       };
       if (live.content_path && !row.contentPath) {
         updates.contentPath = live.content_path;
@@ -58,12 +59,7 @@ export async function mergeLiveData(
         (row as { fileSize: number | null }).fileSize = live.size;
       }
       (row as { progress: number }).progress = live.progress;
-      void db
-        .update(torrent)
-        .set(updates)
-        .where(eq(torrent.id, row.id))
-        .execute()
-        .catch(() => {});
+      void updateTorrent(db, row.id, updates).catch(() => {});
     }
   }
 
@@ -94,12 +90,7 @@ export async function mergeLiveData(
     byStatus.get(status)!.push(id);
   }
   for (const [status, ids] of byStatus) {
-    void db
-      .update(torrent)
-      .set({ status, updatedAt: new Date() })
-      .where(inArray(torrent.id, ids))
-      .execute()
-      .catch(() => {});
+    void updateTorrentBatch(db, ids, { status }).catch(() => {});
   }
 
   // 3. Auto-import newly completed torrents
@@ -114,16 +105,12 @@ export async function mergeLiveData(
     for (const row of toImport) {
       void (async () => {
         try {
-          const [claimed] = await db
-            .update(torrent)
-            .set({ importing: true })
-            .where(and(eq(torrent.id, row.id), eq(torrent.importing, false)))
-            .returning();
+          const claimed = await claimTorrentForImport(db, row.id);
           if (!claimed) return;
           await autoImportTorrent(db, claimed, qbImportClient);
         } catch (err) {
           console.error(`[auto-import] Failed for "${row.title}":`, err instanceof Error ? err.message : err);
-          await db.update(torrent).set({ importing: false }).where(eq(torrent.id, row.id)).catch(() => {});
+          await updateTorrent(db, row.id, { importing: false }).catch(() => {});
         }
       })();
     }

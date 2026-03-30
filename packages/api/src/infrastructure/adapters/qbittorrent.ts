@@ -1,4 +1,5 @@
 import { getSetting } from "@canto/db/settings";
+import { SETTINGS } from "../../lib/settings-keys";
 
 export class QBittorrentClient {
   private baseUrl: string;
@@ -239,9 +240,9 @@ let qbClient: QBittorrentClient | null = null;
 
 export async function getQBClient(): Promise<QBittorrentClient> {
   if (!qbClient) {
-    const url = (await getSetting("qbittorrent.url")) ?? "";
-    const user = (await getSetting("qbittorrent.username")) ?? "";
-    const pass = (await getSetting("qbittorrent.password")) ?? "";
+    const url = (await getSetting(SETTINGS.QBITTORRENT_URL)) ?? "";
+    const user = (await getSetting(SETTINGS.QBITTORRENT_USERNAME)) ?? "";
+    const pass = (await getSetting(SETTINGS.QBITTORRENT_PASSWORD)) ?? "";
     qbClient = new QBittorrentClient(url, user, pass);
   }
   return qbClient;

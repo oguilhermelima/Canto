@@ -1,13 +1,12 @@
 import { z } from "zod";
-import { isNotNull } from "drizzle-orm";
 
 import { db } from "@canto/db/client";
-import { watchProviderLink } from "@canto/db/schema";
 import { getSetting, setSetting } from "@canto/db/settings";
+import { SETTINGS } from "../lib/settings-keys";
 
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { cached } from "../infrastructure/cache/redis";
-import { findPoolItemsWithBackdrops } from "../infrastructure/repositories/extras-repository";
+import { findPoolItemsWithBackdrops, findWatchProviderLinks } from "../infrastructure/repositories/extras-repository";
 
 /* -------------------------------------------------------------------------- */
 /*  TMDB direct API helper                                                    */
@@ -19,7 +18,7 @@ async function tmdbFetch<T>(
   path: string,
   params?: Record<string, string>,
 ): Promise<T> {
-  const apiKey = (await getSetting("tmdb.apiKey")) ?? "";
+  const apiKey = (await getSetting(SETTINGS.TMDB_API_KEY)) ?? "";
   const url = new URL(`${TMDB_BASE}${path}`);
   url.searchParams.set("api_key", apiKey);
   if (params) {
@@ -140,7 +139,7 @@ export const providerRouter = createTRPCRouter({
     }
 
     // Fallback: TMDB trending (fresh install, pool empty)
-    const CACHE_KEY = "cache.spotlight";
+    const CACHE_KEY = SETTINGS.CACHE_SPOTLIGHT;
     const ONE_HOUR_MS = 60 * 60 * 1000;
 
     const cached = await getSetting<{ data: unknown[]; updatedAt: string }>(CACHE_KEY);
@@ -260,13 +259,7 @@ export const providerRouter = createTRPCRouter({
    * Returns Record<providerId, searchUrlTemplate> for providers with known search URLs.
    */
   watchProviderLinks: publicProcedure.query(async () => {
-    const rows = await db
-      .select({
-        providerId: watchProviderLink.providerId,
-        searchUrlTemplate: watchProviderLink.searchUrlTemplate,
-      })
-      .from(watchProviderLink)
-      .where(isNotNull(watchProviderLink.searchUrlTemplate));
+    const rows = await findWatchProviderLinks(db);
 
     const mapping: Record<number, string> = {};
     for (const row of rows) {

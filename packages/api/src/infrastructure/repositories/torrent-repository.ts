@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { torrent } from "@canto/db/schema";
 
@@ -64,4 +64,25 @@ export async function updateTorrent(
 
 export async function deleteTorrent(db: Database, id: string) {
   await db.delete(torrent).where(eq(torrent.id, id));
+}
+
+export async function updateTorrentBatch(
+  db: Database,
+  ids: string[],
+  data: Partial<typeof torrent.$inferInsert>,
+) {
+  if (ids.length === 0) return;
+  await db
+    .update(torrent)
+    .set({ ...data, updatedAt: new Date() })
+    .where(inArray(torrent.id, ids));
+}
+
+export async function claimTorrentForImport(db: Database, id: string) {
+  const [claimed] = await db
+    .update(torrent)
+    .set({ importing: true })
+    .where(and(eq(torrent.id, id), eq(torrent.importing, false)))
+    .returning();
+  return claimed;
 }

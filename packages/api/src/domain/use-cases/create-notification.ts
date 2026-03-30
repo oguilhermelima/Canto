@@ -1,5 +1,5 @@
 import type { Database } from "@canto/db/client";
-import { notification } from "@canto/db/schema";
+import { insertNotification } from "../../infrastructure/repositories";
 
 type NotificationType =
   | "import_success"
@@ -17,7 +17,7 @@ export async function createNotification(
     mediaId?: string;
   },
 ): Promise<void> {
-  await db.insert(notification).values({
+  await insertNotification(db, {
     title: input.title,
     message: input.message,
     type: input.type,

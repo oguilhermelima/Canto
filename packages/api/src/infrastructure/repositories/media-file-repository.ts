@@ -90,3 +90,10 @@ export async function deleteMediaFile(db: Database, id: string) {
 export async function deleteMediaFilesByTorrentId(db: Database, torrentId: string) {
   await db.delete(mediaFile).where(eq(mediaFile.torrentId, torrentId));
 }
+
+export async function createMediaFileNoConflict(
+  db: Database,
+  data: typeof mediaFile.$inferInsert,
+) {
+  await db.insert(mediaFile).values(data).onConflictDoNothing();
+}

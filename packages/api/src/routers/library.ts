@@ -12,10 +12,10 @@ import {
   seedDefaultLibraries,
   setDefaultLibrary,
   updateLibrary,
-  getUserPreferences,
-  setUserPreference,
+  findUserPreferences,
+  upsertUserPreference,
 } from "../infrastructure/repositories/library-repository";
-import { getLibraryStats, updateMedia } from "../infrastructure/repositories/media-repository";
+import { findLibraryStats, updateMedia } from "../infrastructure/repositories/media-repository";
 
 /* -------------------------------------------------------------------------- */
 /*  Library Router                                                            */
@@ -33,7 +33,7 @@ export const libraryRouter = createTRPCRouter({
   /**
    * Library statistics: counts of movies, shows, total, and storage usage.
    */
-  stats: publicProcedure.query(({ ctx }) => getLibraryStats(ctx.db)),
+  stats: publicProcedure.query(({ ctx }) => findLibraryStats(ctx.db)),
 
   /* ────────────────────────────────────────────────────────────────────────── */
   /*  Library config (the `library` table)                                     */
@@ -107,13 +107,13 @@ export const libraryRouter = createTRPCRouter({
   /* ────────────────────────────────────────────────────────────────────────── */
 
   getPreferences: protectedProcedure.query(({ ctx }) =>
-    getUserPreferences(ctx.db, ctx.session.user.id),
+    findUserPreferences(ctx.db, ctx.session.user.id),
   ),
 
   setPreference: protectedProcedure
     .input(z.object({ key: z.string(), value: z.unknown() }))
     .mutation(async ({ ctx, input }) => {
-      await setUserPreference(ctx.db, ctx.session.user.id, input.key, input.value);
+      await upsertUserPreference(ctx.db, ctx.session.user.id, input.key, input.value);
       return { success: true };
     }),
 });

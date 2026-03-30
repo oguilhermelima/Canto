@@ -10,6 +10,7 @@ import {
 } from "@canto/db/schema";
 import type { MediaType, SearchResult } from "@canto/providers";
 import { getTmdbProvider } from "../../lib/tmdb-client";
+import { findMediaById } from "../../infrastructure/repositories";
 
 function calculatePoolScore(
   voteAverage: number | undefined,
@@ -64,15 +65,7 @@ export async function refreshExtras(
   db: Database,
   mediaId: string,
 ): Promise<void> {
-  const row = await db.query.media.findFirst({
-    where: eq(media.id, mediaId),
-    columns: {
-      id: true,
-      externalId: true,
-      provider: true,
-      type: true,
-    },
-  });
+  const row = await findMediaById(db, mediaId);
   if (!row) return;
 
   const provider = await getTmdbProvider();

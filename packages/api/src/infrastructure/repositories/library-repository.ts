@@ -2,6 +2,8 @@ import { and, eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { library, userPreference } from "@canto/db/schema";
 
+type LibraryInsert = typeof library.$inferInsert;
+
 export async function findLibraryById(db: Database, id: string) {
   return db.query.library.findFirst({
     where: eq(library.id, id),
@@ -67,7 +69,7 @@ export async function setDefaultLibrary(db: Database, id: string, type: string) 
   return updated;
 }
 
-export async function getUserPreferences(db: Database, userId: string) {
+export async function findUserPreferences(db: Database, userId: string) {
   const rows = await db.query.userPreference.findMany({
     where: eq(userPreference.userId, userId),
   });
@@ -76,7 +78,7 @@ export async function getUserPreferences(db: Database, userId: string) {
   return { autoMergeVersions: true, defaultQuality: "fullhd", ...prefs };
 }
 
-export async function setUserPreference(
+export async function upsertUserPreference(
   db: Database,
   userId: string,
   key: string,
@@ -89,4 +91,27 @@ export async function setUserPreference(
       target: [userPreference.userId, userPreference.key],
       set: { value },
     });
+}
+
+export async function findLibraryByJellyfinId(db: Database, jellyfinId: string) {
+  return db.query.library.findFirst({
+    where: eq(library.jellyfinLibraryId, jellyfinId),
+  });
+}
+
+export async function findLibraryByPlexId(db: Database, plexId: string) {
+  return db.query.library.findFirst({
+    where: eq(library.plexLibraryId, plexId),
+  });
+}
+
+export async function findLibrariesByType(db: Database, type: string) {
+  return db.query.library.findMany({
+    where: eq(library.type, type),
+  });
+}
+
+export async function createLibrary(db: Database, data: LibraryInsert) {
+  const [row] = await db.insert(library).values(data).returning();
+  return row;
 }

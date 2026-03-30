@@ -31,6 +31,14 @@
     "./domain/use-cases/download-torrent": {
       "types": "./src/domain/use-cases/download-torrent.ts",
       "default": "./src/domain/use-cases/download-torrent.ts"
+    },
+    "./domain/use-cases/import-torrent": {
+      "types": "./src/domain/use-cases/import-torrent.ts",
+      "default": "./src/domain/use-cases/import-torrent.ts"
+    },
+    "./infrastructure/adapters/qbittorrent": {
+      "types": "./src/infrastructure/adapters/qbittorrent.ts",
+      "default": "./src/infrastructure/adapters/qbittorrent.ts"
     }
   },
   "scripts": {

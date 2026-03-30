@@ -8,14 +8,15 @@ import {
 } from "@canto/db/settings";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
+import { SETTINGS } from "../lib/settings-keys";
 import { randomUUID } from "crypto";
 
 /** Get or create a stable Plex client identifier (persisted in settings). */
 async function getOrCreatePlexClientId(): Promise<string> {
-  const existing = await getSetting<string>("plex.clientId");
+  const existing = await getSetting<string>(SETTINGS.PLEX_CLIENT_ID);
   if (existing) return existing;
   const id = randomUUID();
-  await setSetting("plex.clientId", id);
+  await setSetting(SETTINGS.PLEX_CLIENT_ID, id);
   return id;
 }
 
@@ -270,8 +271,8 @@ export const settingsRouter = createTRPCRouter({
         }
 
         // Save to settings
-        await setSetting("jellyfin.url", input.url);
-        await setSetting("jellyfin.apiKey", apiKey);
+        await setSetting(SETTINGS.JELLYFIN_URL, input.url);
+        await setSetting(SETTINGS.JELLYFIN_API_KEY, apiKey);
 
         // Get server info
         const infoRes = await fetch(`${input.url}/System/Info`, {
@@ -323,9 +324,9 @@ export const settingsRouter = createTRPCRouter({
           MediaContainer: { friendlyName: string; machineIdentifier: string };
         };
 
-        await setSetting("plex.url", input.url);
-        await setSetting("plex.token", input.token);
-        await setSetting("plex.machineId", data.MediaContainer.machineIdentifier);
+        await setSetting(SETTINGS.PLEX_URL, input.url);
+        await setSetting(SETTINGS.PLEX_TOKEN, input.token);
+        await setSetting(SETTINGS.PLEX_MACHINE_ID, data.MediaContainer.machineIdentifier);
 
         return {
           success: true,
@@ -393,9 +394,9 @@ export const settingsRouter = createTRPCRouter({
           MediaContainer: { friendlyName: string; machineIdentifier: string };
         };
 
-        await setSetting("plex.url", input.url);
-        await setSetting("plex.token", token);
-        await setSetting("plex.machineId", serverData.MediaContainer.machineIdentifier);
+        await setSetting(SETTINGS.PLEX_URL, input.url);
+        await setSetting(SETTINGS.PLEX_TOKEN, token);
+        await setSetting(SETTINGS.PLEX_MACHINE_ID, serverData.MediaContainer.machineIdentifier);
 
         return {
           success: true,
@@ -469,7 +470,7 @@ export const settingsRouter = createTRPCRouter({
 
       // Got a token — save it
       const token = data.authToken;
-      await setSetting("plex.token", token);
+      await setSetting(SETTINGS.PLEX_TOKEN, token);
 
       // Try to get user info
       let username: string | undefined;
@@ -502,7 +503,7 @@ export const settingsRouter = createTRPCRouter({
               MediaContainer: { friendlyName: string };
             };
             serverName = serverData.MediaContainer.friendlyName;
-            await setSetting("plex.url", input.serverUrl);
+            await setSetting(SETTINGS.PLEX_URL, input.serverUrl);
           }
         } catch {
           // Server not reachable, still save token
@@ -532,13 +533,13 @@ export const settingsRouter = createTRPCRouter({
             const server = resources.find((r) => r.provides.includes("server"));
             if (server) {
               // Save machineIdentifier (needed for deep links)
-              await setSetting("plex.machineId", server.clientIdentifier);
+              await setSetting(SETTINGS.PLEX_MACHINE_ID, server.clientIdentifier);
 
               // Pick the best local connection
               const localConn = server.connections.find((c) => c.local);
               const conn = localConn ?? server.connections[0];
               if (conn) {
-                await setSetting("plex.url", conn.uri);
+                await setSetting(SETTINGS.PLEX_URL, conn.uri);
               }
 
               serverName = server.name;

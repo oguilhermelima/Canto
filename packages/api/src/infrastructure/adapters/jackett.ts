@@ -1,5 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import { getSetting } from "@canto/db/settings";
+import { SETTINGS } from "../../lib/settings-keys";
 import type { IndexerResult } from "../../domain/types/torrent";
 
 const xmlParser = new XMLParser({
@@ -104,8 +105,8 @@ let jackettClient: JackettClient | null = null;
 
 export async function getJackettClient(): Promise<JackettClient> {
   if (!jackettClient) {
-    const url = (await getSetting("jackett.url")) ?? "";
-    const apiKey = (await getSetting("jackett.apiKey")) ?? "";
+    const url = (await getSetting(SETTINGS.JACKETT_URL)) ?? "";
+    const apiKey = (await getSetting(SETTINGS.JACKETT_API_KEY)) ?? "";
     jackettClient = new JackettClient(url, apiKey);
   }
   return jackettClient;

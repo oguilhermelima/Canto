@@ -1,8 +1,11 @@
-import { eq } from "drizzle-orm";
-
 import type { Database } from "@canto/db/client";
-import { library } from "@canto/db/schema";
 
+import {
+  findLibraryByJellyfinId,
+  findLibrariesByType,
+  updateLibrary,
+  createLibrary,
+} from "../../infrastructure/repositories";
 import { autoElectDefaults } from "./sync-library-helpers";
 
 export async function syncJellyfinLibraries(
@@ -35,41 +38,30 @@ export async function syncJellyfinLibraries(
     const defaultCategory =
       type === "movies" ? "movies" : type === "animes" ? "animes" : "shows";
 
-    let existing = await db.query.library.findFirst({
-      where: eq(library.jellyfinLibraryId, folder.ItemId),
-    });
+    let existing = await findLibraryByJellyfinId(db, folder.ItemId);
 
     if (!existing) {
-      const allOfType = await db.query.library.findMany({
-        where: eq(library.type, type),
-      });
+      const allOfType = await findLibrariesByType(db, type);
       existing = allOfType.find((l) => !l.jellyfinLibraryId) ?? undefined;
     }
 
     if (existing) {
-      await db
-        .update(library)
-        .set({
-          name: folder.Name,
-          jellyfinPath: folder.Locations[0] ?? null,
-          jellyfinLibraryId: folder.ItemId,
-          updatedAt: new Date(),
-        })
-        .where(eq(library.id, existing.id));
+      await updateLibrary(db, existing.id, {
+        name: folder.Name,
+        jellyfinPath: folder.Locations[0] ?? null,
+        jellyfinLibraryId: folder.ItemId,
+      });
       synced.push({ id: existing.id, name: folder.Name, action: "updated" });
     } else {
-      const [row] = await db
-        .insert(library)
-        .values({
-          name: folder.Name,
-          type,
-          jellyfinPath: folder.Locations[0] ?? null,
-          jellyfinLibraryId: folder.ItemId,
-          qbitCategory: defaultCategory,
-          isDefault: false,
-          enabled: true,
-        })
-        .returning();
+      const row = await createLibrary(db, {
+        name: folder.Name,
+        type,
+        jellyfinPath: folder.Locations[0] ?? null,
+        jellyfinLibraryId: folder.ItemId,
+        qbitCategory: defaultCategory,
+        isDefault: false,
+        enabled: true,
+      });
       if (row) {
         synced.push({ id: row.id, name: folder.Name, action: "created" });
       }

@@ -1,18 +1,32 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq, isNull } from "drizzle-orm";
 
 import type { Database } from "@canto/db/client";
-import { blocklist, library, media, mediaFile, torrent } from "@canto/db/schema";
 import type { TorrentDownloadInput } from "@canto/validators";
 
 import { detectQuality, detectSource } from "../rules/quality";
 import { parseSeasons, parseEpisodes } from "../rules/parsing";
 import { getQBClient } from "../../infrastructure/adapters/qbittorrent";
+import {
+  findMediaByIdWithSeasons,
+  findLibraryById,
+  findDefaultLibrary,
+  findTorrentByTitle,
+  findTorrentByHash,
+  createTorrent,
+  updateTorrent,
+  deleteTorrent,
+  createMediaFile,
+  deleteMediaFile,
+  deleteMediaFilesByTorrentId,
+  findDuplicateMovieFile,
+  findDuplicateEpisodeFile,
+  findBlocklistEntry,
+} from "../../infrastructure/repositories";
 import { createNotification } from "./create-notification";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-type TorrentRow = typeof torrent.$inferSelect;
+type TorrentRow = NonNullable<Awaited<ReturnType<typeof findTorrentByTitle>>>;
 
 interface DownloadInput extends TorrentDownloadInput {
   magnetUrl?: string;
@@ -32,18 +46,12 @@ async function resolveQBCategory(
   mediaRow: { type: string; libraryId: string | null },
 ): Promise<string> {
   if (mediaRow.libraryId) {
-    const assignedLib = await db.query.library.findFirst({
-      where: eq(library.id, mediaRow.libraryId),
-      columns: { qbitCategory: true },
-    });
+    const assignedLib = await findLibraryById(db, mediaRow.libraryId);
     return assignedLib?.qbitCategory ?? (mediaRow.type === "show" ? "shows" : "movies");
   }
 
   const mediaType = mediaRow.type === "show" ? "shows" : "movies";
-  const defaultLib = await db.query.library.findFirst({
-    where: and(eq(library.type, mediaType), eq(library.isDefault, true)),
-    columns: { qbitCategory: true },
-  });
+  const defaultLib = await findDefaultLibrary(db, mediaType);
   return defaultLib?.qbitCategory ?? mediaType;
 }
 
@@ -133,10 +141,7 @@ async function coreDownload(
 
   // ── Fetch media with seasons/episodes for association ──
 
-  const mediaRow = await db.query.media.findFirst({
-    where: eq(media.id, input.mediaId),
-    with: { seasons: { with: { episodes: true } } },
-  });
+  const mediaRow = await findMediaByIdWithSeasons(db, input.mediaId);
 
   if (!mediaRow) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
@@ -149,12 +154,7 @@ async function coreDownload(
   // ── Blocklist check: reject previously failed downloads ──
 
   if (!opts.skipDedup) {
-    const blocked = await db.query.blocklist.findFirst({
-      where: and(
-        eq(blocklist.mediaId, input.mediaId),
-        eq(blocklist.title, input.title),
-      ),
-    });
+    const blocked = await findBlocklistEntry(db, input.mediaId, input.title);
     if (blocked) {
       throw new TRPCError({
         code: "CONFLICT",
@@ -166,9 +166,7 @@ async function coreDownload(
   // ── Deduplication: check if we already have this torrent (by title) ──
 
   if (!opts.skipDedup) {
-    const existingByTitle = await db.query.torrent.findFirst({
-      where: eq(torrent.title, input.title),
-    });
+    const existingByTitle = await findTorrentByTitle(db, input.title);
 
     if (existingByTitle) {
       const qb = await getQBClient();
@@ -187,11 +185,7 @@ async function coreDownload(
 
       if (existingByTitle.status === "paused" && existingByTitle.hash) {
         await qb.resumeTorrent(existingByTitle.hash);
-        const [updated] = await db
-          .update(torrent)
-          .set({ status: "downloading", updatedAt: new Date() })
-          .where(eq(torrent.id, existingByTitle.id))
-          .returning();
+        const updated = await updateTorrent(db, existingByTitle.id, { status: "downloading" });
         return updated!;
       }
 
@@ -204,18 +198,13 @@ async function coreDownload(
           if (match?.[1]) hash = match[1].toLowerCase();
         }
 
-        const [updated] = await db
-          .update(torrent)
-          .set({
-            hash: hash ?? existingByTitle.hash,
-            status: "downloading",
-            progress: 0,
-            magnetUrl: input.magnetUrl ?? existingByTitle.magnetUrl,
-            downloadUrl: input.torrentUrl ?? existingByTitle.downloadUrl,
-            updatedAt: new Date(),
-          })
-          .where(eq(torrent.id, existingByTitle.id))
-          .returning();
+        const updated = await updateTorrent(db, existingByTitle.id, {
+          hash: hash ?? existingByTitle.hash,
+          status: "downloading",
+          progress: 0,
+          magnetUrl: input.magnetUrl ?? existingByTitle.magnetUrl,
+          downloadUrl: input.torrentUrl ?? existingByTitle.downloadUrl,
+        });
         return updated!;
       }
 
@@ -247,24 +236,11 @@ async function coreDownload(
     const duplicates: string[] = [];
 
     if (mediaRow.type === "movie") {
-      const existingFile = await db.query.mediaFile.findFirst({
-        where: and(
-          eq(mediaFile.mediaId, input.mediaId),
-          eq(mediaFile.quality, quality),
-          eq(mediaFile.source, source),
-          isNull(mediaFile.episodeId),
-        ),
-      });
+      const existingFile = await findDuplicateMovieFile(db, input.mediaId, quality, source);
       if (existingFile) duplicates.push(`${mediaRow.title} (${quality} ${source})`);
     } else {
       for (const ep of episodeIds) {
-        const existingFile = await db.query.mediaFile.findFirst({
-          where: and(
-            eq(mediaFile.episodeId, ep.id),
-            eq(mediaFile.quality, quality),
-            eq(mediaFile.source, source),
-          ),
-        });
+        const existingFile = await findDuplicateEpisodeFile(db, ep.id, quality, source);
         if (existingFile) {
           duplicates.push(
             `S${String(ep.seasonNumber).padStart(2, "0")}E${String(ep.episodeNumber).padStart(2, "0")}`,
@@ -288,44 +264,34 @@ async function coreDownload(
   // ── Dedup by hash ──
 
   if (!opts.skipDedup && extractedHash) {
-    const byHash = await db.query.torrent.findFirst({
-      where: eq(torrent.hash, extractedHash),
-    });
+    const byHash = await findTorrentByHash(db, extractedHash);
     if (byHash) {
-      const [updated] = await db
-        .update(torrent)
-        .set({
-          status: "downloading",
-          progress: 0,
-          mediaId: input.mediaId,
-          magnetUrl: input.magnetUrl ?? byHash.magnetUrl,
-          downloadUrl: input.torrentUrl ?? byHash.downloadUrl,
-          updatedAt: new Date(),
-        })
-        .where(eq(torrent.id, byHash.id))
-        .returning();
+      const updated = await updateTorrent(db, byHash.id, {
+        status: "downloading",
+        progress: 0,
+        mediaId: input.mediaId,
+        magnetUrl: input.magnetUrl ?? byHash.magnetUrl,
+        downloadUrl: input.torrentUrl ?? byHash.downloadUrl,
+      });
       return updated!;
     }
   }
 
   // ── Create torrent record ──
 
-  const [torrentRow] = await db
-    .insert(torrent)
-    .values({
-      mediaId: input.mediaId,
-      title: input.title,
-      hash: extractedHash ?? null,
-      magnetUrl: input.magnetUrl ?? null,
-      downloadUrl: input.torrentUrl ?? null,
-      quality,
-      source,
-      downloadType: torrentType,
-      seasonNumber: input.seasonNumber ?? parsedSeasons[0] ?? null,
-      episodeNumbers: input.episodeNumbers ?? (parsedEpisodes.length > 0 ? parsedEpisodes : null),
-      status: "downloading",
-    })
-    .returning();
+  const torrentRow = await createTorrent(db, {
+    mediaId: input.mediaId,
+    title: input.title,
+    hash: extractedHash ?? null,
+    magnetUrl: input.magnetUrl ?? null,
+    downloadUrl: input.torrentUrl ?? null,
+    quality,
+    source,
+    downloadType: torrentType,
+    seasonNumber: input.seasonNumber ?? parsedSeasons[0] ?? null,
+    episodeNumbers: input.episodeNumbers ?? (parsedEpisodes.length > 0 ? parsedEpisodes : null),
+    status: "downloading",
+  });
 
   if (!torrentRow) {
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create torrent" });
@@ -335,7 +301,7 @@ async function coreDownload(
 
   try {
     if (mediaRow.type === "movie") {
-      await db.insert(mediaFile).values({
+      await createMediaFile(db, {
         mediaId: input.mediaId,
         episodeId: null,
         torrentId: torrentRow.id,
@@ -346,7 +312,7 @@ async function coreDownload(
       });
     } else {
       for (const ep of episodeIds) {
-        await db.insert(mediaFile).values({
+        await createMediaFile(db, {
           mediaId: input.mediaId,
           episodeId: ep.id,
           torrentId: torrentRow.id,
@@ -359,8 +325,8 @@ async function coreDownload(
     }
   } catch {
     // Rollback on constraint violation
-    await db.delete(mediaFile).where(eq(mediaFile.torrentId, torrentRow.id));
-    await db.delete(torrent).where(eq(torrent.id, torrentRow.id));
+    await deleteMediaFilesByTorrentId(db, torrentRow.id);
+    await deleteTorrent(db, torrentRow.id);
     throw new TRPCError({
       code: "CONFLICT",
       message: "Duplicate file version detected",
@@ -392,10 +358,7 @@ async function coreDownload(
           const newTorrent = current.find((t) => !existingHashes.has(t.hash));
           if (newTorrent) {
             extractedHash = newTorrent.hash;
-            await db
-              .update(torrent)
-              .set({ hash: extractedHash, updatedAt: new Date() })
-              .where(eq(torrent.id, torrentRow.id));
+            await updateTorrent(db, torrentRow.id, { hash: extractedHash });
             break;
           }
         } catch {
@@ -408,8 +371,8 @@ async function coreDownload(
     }
   } catch (qbErr) {
     // qBittorrent failed — rollback DB records
-    await db.delete(mediaFile).where(eq(mediaFile.torrentId, torrentRow.id));
-    await db.delete(torrent).where(eq(torrent.id, torrentRow.id));
+    await deleteMediaFilesByTorrentId(db, torrentRow.id);
+    await deleteTorrent(db, torrentRow.id);
 
     void createNotification(db, {
       title: "Download failed",
@@ -450,7 +413,7 @@ export async function replaceTorrent(
 ): Promise<TorrentRow> {
   // Delete old media_file records
   for (const fileId of input.replaceFileIds) {
-    await db.delete(mediaFile).where(eq(mediaFile.id, fileId));
+    await deleteMediaFile(db, fileId);
   }
 
   // Run download flow skipping dedup (we just deleted the files being replaced)
