@@ -213,34 +213,31 @@ function ServiceRow({
         tabIndex={0}
         onClick={handleToggle}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleToggle(); } }}
-        className={cn("flex w-full items-center justify-between px-5 py-5 text-left cursor-pointer bg-gradient-to-r", BRAND_GRADIENT[serviceKey] ?? "")}
+        className={cn("flex w-full items-center justify-between px-5 py-3.5 text-left cursor-pointer bg-gradient-to-r", BRAND_GRADIENT[serviceKey] ?? "")}
       >
-        <div className="min-w-0 pr-4">
-          <div className="flex items-center gap-2.5">
-            {BRAND_LOGO[serviceKey]?.type === "img" && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={BRAND_LOGO[serviceKey].src} alt="" className="h-5 w-5 shrink-0" />
-            )}
-            {BRAND_LOGO[serviceKey]?.type === "mask" && (
-              <span
-                className="inline-block h-5 w-5 shrink-0"
-                style={{
-                  background: BRAND_LOGO[serviceKey].color,
-                  mask: `url(${BRAND_LOGO[serviceKey].src}) center/contain no-repeat`,
-                  WebkitMask: `url(${BRAND_LOGO[serviceKey].src}) center/contain no-repeat`,
-                }}
-              />
-            )}
-            <p className="text-sm font-medium text-foreground">{title}</p>
-            {testService.data && (
-              testService.data.connected ? (
-                <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-              ) : (
-                <XCircle className="h-3.5 w-3.5 text-destructive" />
-              )
-            )}
-          </div>
-          <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">{description}</p>
+        <div className="flex items-center gap-2.5">
+          {BRAND_LOGO[serviceKey]?.type === "img" && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={BRAND_LOGO[serviceKey].src} alt="" className="h-5 w-5 shrink-0" />
+          )}
+          {BRAND_LOGO[serviceKey]?.type === "mask" && (
+            <span
+              className="inline-block h-5 w-5 shrink-0"
+              style={{
+                background: BRAND_LOGO[serviceKey].color,
+                mask: `url(${BRAND_LOGO[serviceKey].src}) center/contain no-repeat`,
+                WebkitMask: `url(${BRAND_LOGO[serviceKey].src}) center/contain no-repeat`,
+              }}
+            />
+          )}
+          <p className="text-base font-semibold text-foreground">{title}</p>
+          {testService.data && (
+            testService.data.connected ? (
+              <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+            ) : (
+              <XCircle className="h-3.5 w-3.5 text-destructive" />
+            )
+          )}
         </div>
         <Switch
           checked={isEnabled}
@@ -421,15 +418,12 @@ function MediaServerRow({
         tabIndex={0}
         onClick={handleToggle}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleToggle(); } }}
-        className={cn("flex w-full items-center justify-between px-5 py-5 text-left cursor-pointer bg-gradient-to-r", brandGradient)}
+        className={cn("flex w-full items-center justify-between px-5 py-3.5 text-left cursor-pointer bg-gradient-to-r", brandGradient)}
       >
-        <div className="min-w-0 pr-4">
-          <div className="flex items-center gap-2.5">
-            <span className="inline-block h-5 w-5 shrink-0" style={logoStyle} />
-            <p className="text-sm font-medium text-foreground">{title}</p>
-            {!!isConnected && <CheckCircle className="h-3.5 w-3.5 text-green-500" />}
-          </div>
-          <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">{description}</p>
+        <div className="flex items-center gap-2.5">
+          <span className="inline-block h-5 w-5 shrink-0" style={logoStyle} />
+          <p className="text-base font-semibold text-foreground">{title}</p>
+          {!!isConnected && <CheckCircle className="h-3.5 w-3.5 text-green-500" />}
         </div>
         <Switch
           checked={isEnabled}
@@ -697,11 +691,11 @@ function TmdbSection(): React.JSX.Element {
   }
 
   return (
-    <div className={cn("px-5 py-5 bg-gradient-to-r", BRAND_GRADIENT.tmdb)}>
+    <div className={cn("px-5 py-3.5 bg-gradient-to-r", BRAND_GRADIENT.tmdb)}>
       <div className="flex items-center gap-2.5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/tmdb.svg" alt="" className="h-5 w-5 shrink-0" />
-        <p className="text-sm font-medium text-foreground">TMDB API Key</p>
+        <p className="text-base font-semibold text-foreground">TMDB</p>
         <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Required</Badge>
       </div>
       <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">

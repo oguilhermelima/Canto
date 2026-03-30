@@ -6,7 +6,7 @@ export function SectionCard({
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+    <div className="rounded-xl border border-border/40 overflow-hidden">
       {children}
     </div>
   );
