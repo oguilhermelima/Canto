@@ -8,6 +8,16 @@ import {
 } from "@canto/db/settings";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
+import { randomUUID } from "crypto";
+
+/** Get or create a stable Plex client identifier (persisted in settings). */
+async function getOrCreatePlexClientId(): Promise<string> {
+  const existing = await getSetting<string>("plex.clientId");
+  if (existing) return existing;
+  const id = randomUUID();
+  await setSetting("plex.clientId", id);
+  return id;
+}
 
 const serviceEnum = z.enum([
   "jellyfin",
@@ -396,5 +406,142 @@ export const settingsRouter = createTRPCRouter({
           error: err instanceof Error ? err.message : "Connection failed",
         };
       }
+    }),
+
+  /**
+   * Create a Plex PIN for the OAuth flow.
+   * Returns the PIN id and code to redirect the user to app.plex.tv/auth.
+   */
+  plexPinCreate: publicProcedure.mutation(async () => {
+    const clientId = await getOrCreatePlexClientId();
+    const res = await fetch("https://plex.tv/api/v2/pins?strong=true", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Plex-Client-Identifier": clientId,
+        "X-Plex-Product": "Canto",
+        "X-Plex-Version": "0.1.0",
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Plex PIN creation failed: ${res.status}`);
+    }
+
+    const data = (await res.json()) as { id: number; code: string };
+    return { pinId: data.id, pinCode: data.code, clientId };
+  }),
+
+  /**
+   * Poll a Plex PIN to check if the user has authenticated.
+   * Once authToken is present, validate against the server and save.
+   */
+  plexPinCheck: publicProcedure
+    .input(
+      z.object({
+        pinId: z.number(),
+        clientId: z.string(),
+        serverUrl: z.string().url().optional(),
+      }),
+    )
+    .query(async ({ input }) => {
+      const res = await fetch(`https://plex.tv/api/v2/pins/${input.pinId}`, {
+        headers: {
+          Accept: "application/json",
+          "X-Plex-Client-Identifier": input.clientId,
+          "X-Plex-Product": "Canto",
+          "X-Plex-Version": "0.1.0",
+        },
+      });
+
+      if (!res.ok) {
+        return { authenticated: false, expired: true };
+      }
+
+      const data = (await res.json()) as { authToken: string | null; expiresAt: string };
+      if (!data.authToken) {
+        const expired = new Date(data.expiresAt) < new Date();
+        return { authenticated: false, expired };
+      }
+
+      // Got a token — save it
+      const token = data.authToken;
+      await setSetting("plex.token", token);
+
+      // Try to get user info
+      let username: string | undefined;
+      try {
+        const userRes = await fetch("https://plex.tv/api/v2/user", {
+          headers: {
+            Accept: "application/json",
+            "X-Plex-Client-Identifier": input.clientId,
+            "X-Plex-Token": token,
+          },
+        });
+        if (userRes.ok) {
+          const userData = (await userRes.json()) as { username: string };
+          username = userData.username;
+        }
+      } catch {
+        // Non-critical
+      }
+
+      // If server URL provided, validate and save
+      let serverName: string | undefined;
+      if (input.serverUrl) {
+        try {
+          const serverRes = await fetch(
+            `${input.serverUrl}/?X-Plex-Token=${token}`,
+            { headers: { Accept: "application/json" } },
+          );
+          if (serverRes.ok) {
+            const serverData = (await serverRes.json()) as {
+              MediaContainer: { friendlyName: string };
+            };
+            serverName = serverData.MediaContainer.friendlyName;
+            await setSetting("plex.url", input.serverUrl);
+          }
+        } catch {
+          // Server not reachable, still save token
+        }
+      }
+
+      // Auto-discover server if no URL provided
+      if (!input.serverUrl) {
+        try {
+          const resourcesRes = await fetch(
+            "https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=0",
+            {
+              headers: {
+                Accept: "application/json",
+                "X-Plex-Client-Identifier": input.clientId,
+                "X-Plex-Token": token,
+              },
+            },
+          );
+          if (resourcesRes.ok) {
+            const resources = (await resourcesRes.json()) as Array<{
+              name: string;
+              provides: string;
+              connections: Array<{ uri: string; local: boolean }>;
+            }>;
+            const server = resources.find((r) => r.provides.includes("server"));
+            if (server) {
+              // Prefer local connection
+              const localConn = server.connections.find((c) => c.local);
+              const conn = localConn ?? server.connections[0];
+              if (conn) {
+                await setSetting("plex.url", conn.uri);
+                serverName = server.name;
+              }
+            }
+          }
+        } catch {
+          // Non-critical
+        }
+      }
+
+      return { authenticated: true, username, serverName };
     }),
 });

@@ -445,33 +445,45 @@ function MediaServerRow({
             <OrDivider />
 
             {/* Option 2: Login */}
-            <div
-              className={cn(
-                "rounded-lg border p-4 transition-all",
-                activeSection === "token"
-                  ? "border-border/20 opacity-40"
-                  : activeSection === "login"
-                    ? "border-border/60 bg-muted/30"
-                    : "border-border/40 hover:border-border/60",
-              )}
-            >
-              <p className="text-xs font-semibold text-foreground mb-3">
-                {serviceKey === "jellyfin" ? "Login with credentials" : "Login with plex.tv"}
-              </p>
-              <SettingsFields
-                fields={loginFields}
-                values={loginValues}
-                onChange={(key, value) => {
-                  const next = { ...loginValues, [key]: value };
-                  setLoginValues(next);
-                  setDirty(true);
-                  setActiveSection(Object.values(next).some((v) => v) ? "login" : null);
-                }}
-                showSecrets={showSecrets}
-                onToggleSecret={(key) => setShowSecrets((p) => ({ ...p, [key]: !p[key] }))}
+            {serviceKey === "jellyfin" ? (
+              <div
+                className={cn(
+                  "rounded-lg border p-4 transition-all",
+                  activeSection === "token"
+                    ? "border-border/20 opacity-40"
+                    : activeSection === "login"
+                      ? "border-border/60 bg-muted/30"
+                      : "border-border/40 hover:border-border/60",
+                )}
+              >
+                <p className="text-xs font-semibold text-foreground mb-3">
+                  Login with credentials
+                </p>
+                <SettingsFields
+                  fields={loginFields}
+                  values={loginValues}
+                  onChange={(key, value) => {
+                    const next = { ...loginValues, [key]: value };
+                    setLoginValues(next);
+                    setDirty(true);
+                    setActiveSection(Object.values(next).some((v) => v) ? "login" : null);
+                  }}
+                  showSecrets={showSecrets}
+                  onToggleSecret={(key) => setShowSecrets((p) => ({ ...p, [key]: !p[key] }))}
+                  disabled={activeSection === "token"}
+                />
+              </div>
+            ) : (
+              <PlexOAuthSection
+                serverUrl={url}
                 disabled={activeSection === "token"}
+                onSuccess={() => {
+                  void utils.settings.getAll.invalidate();
+                  setDirty(false);
+                  setActiveSection(null);
+                }}
               />
-            </div>
+            )}
           </div>
 
           {/* Save / Test */}
@@ -495,6 +507,119 @@ function MediaServerRow({
           </div>
         </div>
       </AnimatedCollapse>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Plex OAuth Section                                                         */
+/* -------------------------------------------------------------------------- */
+
+function PlexOAuthSection({
+  serverUrl,
+  disabled,
+  onSuccess,
+}: {
+  serverUrl: string;
+  disabled: boolean;
+  onSuccess: () => void;
+}): React.JSX.Element {
+  const [polling, setPolling] = useState(false);
+  const [pinData, setPinData] = useState<{ pinId: number; clientId: string } | null>(null);
+  const createPin = trpc.settings.plexPinCreate.useMutation();
+
+  // Poll for the PIN result
+  const pinCheck = trpc.settings.plexPinCheck.useQuery(
+    {
+      pinId: pinData?.pinId ?? 0,
+      clientId: pinData?.clientId ?? "",
+      serverUrl: serverUrl || undefined,
+    },
+    {
+      enabled: polling && pinData !== null,
+      refetchInterval: 2000,
+    },
+  );
+
+  // Handle successful auth
+  useEffect(() => {
+    if (pinCheck.data?.authenticated) {
+      setPolling(false);
+      setPinData(null);
+      const msg = pinCheck.data.serverName
+        ? `Connected to ${pinCheck.data.serverName}${pinCheck.data.username ? ` as ${pinCheck.data.username}` : ""}`
+        : `Signed in${pinCheck.data.username ? ` as ${pinCheck.data.username}` : ""}`;
+      toast.success(msg);
+      onSuccess();
+    }
+    if (pinCheck.data?.expired) {
+      setPolling(false);
+      setPinData(null);
+      toast.error("Authentication expired. Please try again.");
+    }
+  }, [pinCheck.data, onSuccess]);
+
+  const handleSignIn = (): void => {
+    createPin.mutate(undefined, {
+      onSuccess: (data) => {
+        setPinData({ pinId: data.pinId, clientId: data.clientId });
+        setPolling(true);
+        // Open Plex auth in popup
+        const authUrl = `https://app.plex.tv/auth#?clientID=${data.clientId}&code=${data.pinCode}&context%5Bdevice%5D%5Bproduct%5D=Canto`;
+        const w = 600;
+        const h = 700;
+        const left = window.screenX + (window.outerWidth - w) / 2;
+        const top = window.screenY + (window.outerHeight - h) / 2;
+        window.open(authUrl, "plex-auth", `width=${w},height=${h},left=${left},top=${top}`);
+      },
+      onError: (err) => toast.error(err.message),
+    });
+  };
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border p-4 transition-all",
+        disabled
+          ? "border-border/20 opacity-40"
+          : "border-border/40 hover:border-border/60",
+      )}
+    >
+      <p className="text-xs font-semibold text-foreground mb-3">Sign in with Plex</p>
+      <p className="text-xs text-muted-foreground mb-3">
+        Opens a popup where you sign in with your Plex account (Google, Apple, or email).
+        Works with all login methods.
+      </p>
+      <Button
+        size="sm"
+        variant="outline"
+        className="gap-2"
+        onClick={handleSignIn}
+        disabled={disabled || polling || createPin.isPending}
+      >
+        {polling ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Waiting for Plex...
+          </>
+        ) : createPin.isPending ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Creating PIN...
+          </>
+        ) : (
+          <>
+            <span
+              className="inline-block h-4 w-4 shrink-0 bg-[#e5a00d]"
+              style={{
+                mask: "url(/plex-logo.svg) center/contain no-repeat",
+                WebkitMask: "url(/plex-logo.svg) center/contain no-repeat",
+              }}
+            />
+            Sign in with Plex
+          </>
+        )}
+      </Button>
     </div>
   );
 }
