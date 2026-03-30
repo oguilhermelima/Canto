@@ -45,7 +45,7 @@ export function BottomNavbar(): React.JSX.Element {
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border/50 bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border/50 bg-background pb-[env(safe-area-inset-bottom)] md:hidden">
       {navItems.map(({ title, href, icon: Icon }) => (
         <Link
           key={title}

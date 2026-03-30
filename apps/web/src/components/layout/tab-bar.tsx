@@ -17,24 +17,24 @@ export interface TabBarProps {
 
 export function TabBar({ tabs, value, onChange, className }: TabBarProps): React.JSX.Element {
   return (
-    <div className={cn("flex items-center gap-1.5 overflow-x-auto scrollbar-none", className)}>
+    <div className={cn("inline-flex max-w-full items-center gap-1 rounded-full bg-muted/60 p-1 overflow-x-auto scrollbar-none", className)}>
       {tabs.map((tab) => (
         <button
           key={tab.value}
           type="button"
           onClick={() => onChange(tab.value)}
           className={cn(
-            "shrink-0 rounded-xl px-4 py-1.5 text-sm font-medium transition-all",
+            "shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-all",
             value === tab.value
-              ? "tab-gradient-active shadow-sm"
-              : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+              ? "bg-foreground text-background shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
           {tab.label}
           {tab.count != null && tab.count > 0 && (
             <span className={cn(
               "ml-1.5 text-xs",
-              value === tab.value ? "text-white/70" : "text-muted-foreground",
+              value === tab.value ? "text-foreground/60" : "text-muted-foreground",
             )}>
               {tab.count}
             </span>

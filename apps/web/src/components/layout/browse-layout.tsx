@@ -175,7 +175,7 @@ export function BrowseLayout({
         )}
       >
         {/* Toolbar — sticky below topbar */}
-        <div className="sticky top-16 z-20 -mx-4 mb-6 flex items-center justify-between border-b border-border/40 bg-background/80 px-4 py-3 backdrop-blur-md md:-mx-8 md:px-8 lg:-mx-12 lg:px-12 xl:-mx-16 xl:px-16 2xl:-mx-24 2xl:px-24">
+        <div className="sticky top-14 z-20 -mx-4 mb-6 flex items-center justify-between border-b border-border/40 bg-background px-4 py-3 md:top-16 md:-mx-8 md:px-8 lg:-mx-12 lg:px-12 xl:-mx-16 xl:px-16 2xl:-mx-24 2xl:px-24">
           <div className="flex items-center gap-3">
             <button
               type="button"
