@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import Image from "next/image";
+import { useState, useCallback, useMemo } from "react";
 import { cn } from "@canto/ui/cn";
 import { Button } from "@canto/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@canto/ui/dialog";
@@ -17,27 +16,16 @@ import {
 import {
   Search,
   Check,
-  Star,
   X,
   Minus,
   ChevronRight,
-  CheckCircle2,
   Download,
   Folder,
   Settings2,
   Search as SearchIcon,
 } from "lucide-react";
-
-interface Episode {
-  id: string;
-  episodeNumber: number;
-  title: string;
-  overview?: string | null;
-  stillPath?: string | null;
-  airDate?: string | null;
-  runtime?: number | null;
-  voteAverage?: number | null;
-}
+import { EpisodeCard } from "./episode-card";
+import type { Episode, EpisodeDownloadInfo } from "./episode-card";
 
 interface Season {
   id: string;
@@ -48,12 +36,6 @@ interface Season {
   airDate?: string | null;
   posterPath?: string | null;
   episodes?: Episode[];
-}
-
-interface EpisodeDownloadInfo {
-  quality: string;
-  source: string;
-  status: string;
 }
 
 interface Library {
@@ -83,6 +65,10 @@ interface SeasonTabsProps {
   downloadedEpisodes?: Map<string, EpisodeDownloadInfo>;
   /** Media config panel above seasons */
   mediaConfig?: MediaConfig;
+  /** Episode availability from servers: key = "S01E05" -> [{ type, resolution }] */
+  episodeAvailability?: Record<string, Array<{ type: string; resolution?: string | null }>>;
+  /** Server links for "Watch on" buttons */
+  serverLinks?: { jellyfin?: { url: string }; plex?: { url: string } };
   className?: string;
 }
 
@@ -93,13 +79,12 @@ export function SeasonTabs({
   hideFloatingBar = false,
   downloadedEpisodes,
   mediaConfig,
+  episodeAvailability,
+  serverLinks,
   className,
 }: SeasonTabsProps): React.JSX.Element {
   const filteredSeasons = useMemo(
-    () =>
-      seasons
-        .filter((s) => s.seasonNumber > 0)
-        .sort((a, b) => a.seasonNumber - b.seasonNumber),
+    () => [...seasons].sort((a, b) => a.seasonNumber - b.seasonNumber),
     [seasons],
   );
 
@@ -322,6 +307,8 @@ export function SeasonTabs({
             selectedEpisodes={selectedEpisodes}
             selectable={selectable}
             downloadedEpisodes={downloadedEpisodes}
+            episodeAvailability={episodeAvailability}
+            serverLinks={serverLinks}
             onToggleExpand={() => toggleExpand(season.id)}
             onToggleSeasonSelect={() => toggleSeasonSelect(season)}
             onToggleEpisode={toggleEpisode}
@@ -387,6 +374,8 @@ function SeasonBlock({
   selectedEpisodes,
   selectable,
   downloadedEpisodes,
+  episodeAvailability,
+  serverLinks,
   onToggleExpand,
   onToggleSeasonSelect,
   onToggleEpisode,
@@ -398,6 +387,8 @@ function SeasonBlock({
   selectedEpisodes: Set<string>;
   selectable: boolean;
   downloadedEpisodes?: Map<string, EpisodeDownloadInfo>;
+  episodeAvailability?: Record<string, Array<{ type: string; resolution?: string | null }>>;
+  serverLinks?: { jellyfin?: { url: string }; plex?: { url: string } };
   onToggleExpand: () => void;
   onToggleSeasonSelect: () => void;
   onToggleEpisode: (id: string) => void;
@@ -418,12 +409,28 @@ function SeasonBlock({
     episodes.length > 0 &&
     episodes.every((e) => selectedEpisodes.has(e.id));
 
+  // Count available episodes from server sync
+  const availableEpCount = episodeAvailability
+    ? episodes.filter((ep) => {
+        const key = `S${String(season.seasonNumber).padStart(2, "0")}E${String(ep.episodeNumber).padStart(2, "0")}`;
+        return !!episodeAvailability[key];
+      }).length
+    : 0;
+
+  const isSpecials = season.seasonNumber === 0;
   const sNum = String(season.seasonNumber).padStart(2, "0");
   const epCount = episodes.length || season.episodeCount || 0;
   const year = season.airDate
     ? new Date(season.airDate).getFullYear()
     : null;
-  const seasonTitle = season.name || `Season ${season.seasonNumber}`;
+  const rawTitle = season.name || `Season ${season.seasonNumber}`;
+  // Strip redundant season prefix (e.g. "S1 • Kazakage Rescue" → "Kazakage Rescue")
+  const seasonTitle = isSpecials
+    ? "Specials"
+    : rawTitle.replace(
+        /^(?:s(?:eason)?\s*0*\d+)\s*[•·\-–—:|]\s*/i,
+        "",
+      ) || rawTitle;
 
   return (
     <div className="rounded-2xl bg-card p-1">
@@ -444,9 +451,15 @@ function SeasonBlock({
         />
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-sm font-bold leading-tight sm:text-base">
-            <span className="text-muted-foreground">S{sNum}</span>
-            <span className="mx-1.5 text-muted-foreground/20 sm:mx-2">|</span>
-            <span>{seasonTitle}</span>
+            {isSpecials ? (
+              <span>{seasonTitle}</span>
+            ) : (
+              <>
+                <span>S{sNum}</span>
+                <span className="mx-1.5 text-muted-foreground/20 sm:mx-2">|</span>
+                <span>{seasonTitle}</span>
+              </>
+            )}
           </h3>
           <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground sm:text-sm">
             <span>{epCount} episodes</span>
@@ -456,7 +469,38 @@ function SeasonBlock({
                 <span>{year}</span>
               </>
             )}
+            {availableEpCount > 0 && (
+              <>
+                <span className="text-muted-foreground/30">·</span>
+                <span className="text-green-500">{availableEpCount}/{epCount}</span>
+              </>
+            )}
           </div>
+          {/* Watch on server buttons */}
+          {availableEpCount > 0 && (serverLinks?.jellyfin || serverLinks?.plex) && (
+            <div className="mt-1 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+              {serverLinks.jellyfin && (
+                <a
+                  href={serverLinks.jellyfin.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 rounded-md bg-[#00a4dc]/15 px-2 py-0.5 text-[10px] font-medium text-[#00a4dc] transition-colors hover:bg-[#00a4dc]/25"
+                >
+                  Watch on Jellyfin
+                </a>
+              )}
+              {serverLinks.plex && (
+                <a
+                  href={serverLinks.plex.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 rounded-md bg-[#e5a00d]/15 px-2 py-0.5 text-[10px] font-medium text-[#e5a00d] transition-colors hover:bg-[#e5a00d]/25"
+                >
+                  Watch on Plex
+                </a>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
           {onDownload && (
@@ -508,6 +552,7 @@ function SeasonBlock({
               <EpisodeCard
                 key={ep.id}
                 episode={ep}
+                seasonNumber={season.seasonNumber}
                 isSelected={
                   selectedEpisodes.has(ep.id) || isSeasonSelected
                 }
@@ -517,6 +562,9 @@ function SeasonBlock({
                 }
                 selectable={selectable && !isSeasonSelected}
                 downloadInfo={downloadedEpisodes?.get(ep.id)}
+                serverAvailability={episodeAvailability?.[
+                  `S${String(season.seasonNumber).padStart(2, "0")}E${String(ep.episodeNumber).padStart(2, "0")}`
+                ]}
               />
             ))}
           </div>
@@ -535,141 +583,3 @@ function SeasonBlock({
   );
 }
 
-/* ─── Episode Card ─── */
-
-function EpisodeCard({
-  episode,
-  isSelected,
-  isMuted,
-  onToggle,
-  selectable,
-  downloadInfo,
-}: {
-  episode: Episode;
-  isSelected: boolean;
-  isMuted: boolean;
-  onToggle: () => void;
-  selectable: boolean;
-  downloadInfo?: EpisodeDownloadInfo;
-}): React.JSX.Element {
-  const num = String(episode.episodeNumber).padStart(2, "0");
-  const isFuture =
-    !!episode.airDate && new Date(episode.airDate) > new Date();
-  const isInteractive = selectable && !isFuture;
-
-  return (
-    <div
-      role={isInteractive ? "button" : undefined}
-      tabIndex={isInteractive ? 0 : undefined}
-      onClick={isInteractive ? onToggle : undefined}
-      onKeyDown={
-        isInteractive
-          ? (e) => {
-              if (e.key === " " || e.key === "Enter") {
-                e.preventDefault();
-                onToggle();
-              }
-            }
-          : undefined
-      }
-      className={cn(
-        "group relative flex flex-col overflow-hidden rounded-xl transition-all",
-        isFuture && "pointer-events-none opacity-40",
-        isInteractive && "cursor-pointer",
-        !isFuture && isSelected && !isMuted
-          ? "ring-2 ring-primary"
-          : !isFuture && !isMuted && "hover:ring-1 hover:ring-border",
-        !isFuture && isMuted && "opacity-40",
-      )}
-    >
-      <div className="relative aspect-video w-full overflow-hidden bg-muted">
-        {episode.stillPath ? (
-          <Image
-            src={`https://image.tmdb.org/t/p/w400${episode.stillPath}`}
-            alt={episode.title || `Episode ${episode.episodeNumber}`}
-            fill
-            className={cn(
-              "object-cover transition-transform duration-300",
-              !isMuted && "group-hover:scale-105",
-            )}
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-            loading="lazy"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-muted to-muted/50">
-            <span className="text-2xl font-black text-muted-foreground/8">
-              E{num}
-            </span>
-          </div>
-        )}
-
-        <div className="absolute left-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-bold tracking-wide text-white backdrop-blur-sm">
-          E{num}
-        </div>
-
-        {episode.runtime != null && episode.runtime > 0 && (
-          <div className="absolute bottom-2 right-2 rounded-md bg-black/60 px-2 py-0.5 text-[11px] text-white/70 backdrop-blur-sm">
-            {episode.runtime}m
-          </div>
-        )}
-
-        {/* Download status indicator */}
-        {downloadInfo && !isSelected && !isMuted && (
-          <div className="absolute right-2 top-2 z-10">
-            {downloadInfo.status === "imported" ? (
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500/90 text-white shadow-sm backdrop-blur-sm" title="Downloaded">
-                <CheckCircle2 size={14} />
-              </div>
-            ) : (downloadInfo.status === "pending" || downloadInfo.status === "downloading") ? (
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500/90 text-white shadow-sm backdrop-blur-sm" title={downloadInfo.status === "downloading" ? "Downloading" : "Pending"}>
-                <Download size={14} />
-              </div>
-            ) : null}
-          </div>
-        )}
-
-        {/* Hover selection indicator */}
-        {isInteractive && !isSelected && !isMuted && !downloadInfo && (
-          <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white/30 bg-black/30 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100" />
-        )}
-
-        {/* Selected overlay */}
-        {!isFuture && isSelected && !isMuted && (
-          <div className="absolute inset-0 flex items-center justify-center bg-primary/25">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
-              <Check size={18} strokeWidth={3} />
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-0.5 px-3 py-2.5">
-        <p className="line-clamp-1 text-sm font-semibold leading-snug">
-          {episode.title || `Episode ${episode.episodeNumber}`}
-        </p>
-        <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
-          {episode.voteAverage != null && episode.voteAverage > 0 && (
-            <span className="flex items-center gap-0.5 text-yellow-500">
-              <Star size={10} className="fill-current" />
-              {episode.voteAverage.toFixed(1)}
-            </span>
-          )}
-          {episode.airDate && (
-            <span>
-              {new Date(episode.airDate).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </span>
-          )}
-        </div>
-        {episode.overview && (
-          <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground/60">
-            {episode.overview}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
