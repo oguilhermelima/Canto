@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { db } from "@canto/db/client";
 import { library, media, syncItem, syncEpisode } from "@canto/db/schema";
-import { getSetting, setSetting } from "@canto/db/settings";
+import { getSetting } from "@canto/db/settings";
 import { persistMedia } from "@canto/db/persist-media";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
@@ -213,29 +213,10 @@ export const syncRouter = createTRPCRouter({
       const plexItem = items.find((i) => i.source === "plex" && i.plexRatingKey);
       if (plexItem) {
         const plexUrl = await getSetting<string>("plex.url");
-        const plexToken = await getSetting<string>("plex.token");
-        if (plexUrl && plexToken) {
-          // Get or cache machineIdentifier
-          let machineId = await getSetting<string>("plex.machineId");
-          if (!machineId) {
-            try {
-              const idRes = await fetch(`${plexUrl}/identity`, {
-                headers: { Accept: "application/json", "X-Plex-Token": plexToken },
-              });
-              if (idRes.ok) {
-                const idData = (await idRes.json()) as { MediaContainer: { machineIdentifier: string } };
-                machineId = idData.MediaContainer.machineIdentifier;
-                await setSetting("plex.machineId", machineId);
-              }
-            } catch {
-              // fallback without machineId
-            }
-          }
-          const serverPath = machineId
-            ? `/server/${machineId}/details`
-            : "/details";
+        const machineId = await getSetting<string>("plex.machineId");
+        if (plexUrl && machineId) {
           result.plex = {
-            url: `${plexUrl}/web/index.html#!${serverPath}?key=%2Flibrary%2Fmetadata%2F${plexItem.plexRatingKey}`,
+            url: `${plexUrl}/web/index.html#!/server/${machineId}/details?key=%2Flibrary%2Fmetadata%2F${plexItem.plexRatingKey}`,
           };
         }
       }
