@@ -143,13 +143,14 @@ const BRAND_GRADIENT: Record<string, string> = {
   jackett: "from-[#c23c2a]/15 via-[#c23c2a]/5 to-transparent",
 };
 
-const BRAND_LOGO: Record<string, string | null> = {
+/** Logo config: `img` = use as <img> (SVG has own colors), `mask` = use CSS mask with brand color */
+const BRAND_LOGO: Record<string, { type: "img"; src: string } | { type: "mask"; src: string; color: string } | null> = {
   jellyfin: null,
   plex: null,
-  qbittorrent: "/qbitorrent.svg",
-  prowlarr: "/prowlarr.svg",
-  jackett: null,
-  tmdb: "/tmdb.svg",
+  qbittorrent: { type: "mask", src: "/qbitorrent.svg", color: "#4488cc" },
+  prowlarr: { type: "img", src: "/prowlarr.svg" },
+  jackett: { type: "mask", src: "/jackett.svg", color: "#c23c2a" },
+  tmdb: { type: "img", src: "/tmdb.svg" },
 };
 
 /* -------------------------------------------------------------------------- */
@@ -216,9 +217,19 @@ function ServiceRow({
       >
         <div className="min-w-0 pr-4">
           <div className="flex items-center gap-2.5">
-            {BRAND_LOGO[serviceKey] && (
+            {BRAND_LOGO[serviceKey]?.type === "img" && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={BRAND_LOGO[serviceKey]!} alt="" className="h-5 w-5 shrink-0" />
+              <img src={BRAND_LOGO[serviceKey].src} alt="" className="h-5 w-5 shrink-0" />
+            )}
+            {BRAND_LOGO[serviceKey]?.type === "mask" && (
+              <span
+                className="inline-block h-5 w-5 shrink-0"
+                style={{
+                  background: BRAND_LOGO[serviceKey].color,
+                  mask: `url(${BRAND_LOGO[serviceKey].src}) center/contain no-repeat`,
+                  WebkitMask: `url(${BRAND_LOGO[serviceKey].src}) center/contain no-repeat`,
+                }}
+              />
             )}
             <p className="text-sm font-medium text-foreground">{title}</p>
             {testService.data && (
