@@ -44,10 +44,10 @@ export default function DiscoverPage(): React.JSX.Element {
     initialCursor: 1,
   };
 
-  const trendingMovies = trpc.media.discover.useInfiniteQuery({ type: "movie" }, infiniteOpts);
-  const trendingShows = trpc.media.discover.useInfiniteQuery({ type: "show" }, infiniteOpts);
-  const trendingAnime = trpc.media.discover.useInfiniteQuery({ type: "show", genres: "16", language: "ja" }, infiniteOpts);
-  const animeMovies = trpc.media.discover.useInfiniteQuery({ type: "movie", mode: "discover", genres: "16", language: "ja" }, infiniteOpts);
+  const trendingMovies = trpc.media.browse.useInfiniteQuery({ type: "movie" }, infiniteOpts);
+  const trendingShows = trpc.media.browse.useInfiniteQuery({ type: "show" }, infiniteOpts);
+  const trendingAnime = trpc.media.browse.useInfiniteQuery({ type: "show", genres: "16", language: "ja" }, infiniteOpts);
+  const animeMovies = trpc.media.browse.useInfiniteQuery({ type: "movie", mode: "discover", genres: "16", language: "ja" }, infiniteOpts);
   const recommendations = trpc.media.recommendations.useInfiniteQuery(
     { pageSize: 10 },
     {

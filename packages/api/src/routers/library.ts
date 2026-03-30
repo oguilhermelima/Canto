@@ -1,12 +1,21 @@
 import { TRPCError } from "@trpc/server";
-import { and, count, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { library, media, mediaFile, userPreference } from "@canto/db/schema";
 import { listInput } from "@canto/validators";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { listLibraryMedia } from "../domain/use-cases/list-library-media";
+import {
+  findAllLibraries,
+  findDefaultLibraries,
+  findLibraryById,
+  seedDefaultLibraries,
+  setDefaultLibrary,
+  updateLibrary,
+  getUserPreferences,
+  setUserPreference,
+} from "../infrastructure/repositories/library-repository";
+import { getLibraryStats, updateMedia } from "../infrastructure/repositories/media-repository";
 
 /* -------------------------------------------------------------------------- */
 /*  Library Router                                                            */
@@ -24,35 +33,7 @@ export const libraryRouter = createTRPCRouter({
   /**
    * Library statistics: counts of movies, shows, total, and storage usage.
    */
-  stats: publicProcedure.query(async ({ ctx }) => {
-    const [totalRow] = await ctx.db
-      .select({ total: count() })
-      .from(media)
-      .where(eq(media.inLibrary, true));
-
-    const [moviesRow] = await ctx.db
-      .select({ total: count() })
-      .from(media)
-      .where(and(eq(media.inLibrary, true), eq(media.type, "movie")));
-
-    const [showsRow] = await ctx.db
-      .select({ total: count() })
-      .from(media)
-      .where(and(eq(media.inLibrary, true), eq(media.type, "show")));
-
-    const [storageRow] = await ctx.db
-      .select({
-        totalBytes: sql<string>`COALESCE(SUM(${mediaFile.sizeBytes}), 0)`,
-      })
-      .from(mediaFile);
-
-    return {
-      total: totalRow?.total ?? 0,
-      movies: moviesRow?.total ?? 0,
-      shows: showsRow?.total ?? 0,
-      storageBytes: BigInt(storageRow?.totalBytes ?? "0"),
-    };
-  }),
+  stats: publicProcedure.query(({ ctx }) => getLibraryStats(ctx.db)),
 
   /* ────────────────────────────────────────────────────────────────────────── */
   /*  Library config (the `library` table)                                     */
@@ -61,52 +42,12 @@ export const libraryRouter = createTRPCRouter({
   /**
    * Seed default libraries if none exist.
    */
-  seed: publicProcedure.mutation(async ({ ctx }) => {
-    const existing = await ctx.db.query.library.findMany();
-    if (existing.length > 0) {
-      return existing;
-    }
-
-    const defaults = [
-      {
-        name: "Movies",
-        type: "movies",
-        jellyfinPath: "/media/Movies",
-        qbitCategory: "movies",
-        isDefault: true,
-      },
-      {
-        name: "Shows",
-        type: "shows",
-        jellyfinPath: "/media/Shows",
-        qbitCategory: "shows",
-        isDefault: true,
-      },
-      {
-        name: "Animes",
-        type: "animes",
-        jellyfinPath: "/media/Animes",
-        qbitCategory: "animes",
-        isDefault: true,
-      },
-    ] as const;
-
-    const inserted = await ctx.db
-      .insert(library)
-      .values([...defaults])
-      .returning();
-
-    return inserted;
-  }),
+  seed: publicProcedure.mutation(({ ctx }) => seedDefaultLibraries(ctx.db)),
 
   /**
    * List all library configs (the library table rows, not media items).
    */
-  listLibraries: publicProcedure.query(async ({ ctx }) => {
-    return ctx.db.query.library.findMany({
-      orderBy: (l, { asc: a }) => [a(l.type), a(l.name)],
-    });
-  }),
+  listLibraries: publicProcedure.query(({ ctx }) => findAllLibraries(ctx.db)),
 
   /**
    * Set a library as the default for its type (un-defaults the others of the same type).
@@ -114,28 +55,11 @@ export const libraryRouter = createTRPCRouter({
   setDefault: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const target = await ctx.db.query.library.findFirst({
-        where: eq(library.id, input.id),
-      });
-
+      const target = await findLibraryById(ctx.db, input.id);
       if (!target) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Library not found" });
       }
-
-      // Un-default all libraries of the same type
-      await ctx.db
-        .update(library)
-        .set({ isDefault: false, updatedAt: new Date() })
-        .where(eq(library.type, target.type));
-
-      // Set the target as default
-      const [updated] = await ctx.db
-        .update(library)
-        .set({ isDefault: true, updatedAt: new Date() })
-        .where(eq(library.id, input.id))
-        .returning();
-
-      return updated;
+      return setDefaultLibrary(ctx.db, input.id, target.type);
     }),
 
   /**
@@ -143,27 +67,17 @@ export const libraryRouter = createTRPCRouter({
    */
   toggleSync: publicProcedure
     .input(z.object({ id: z.string().uuid(), syncEnabled: z.boolean() }))
-    .mutation(async ({ ctx, input }) => {
-      const [updated] = await ctx.db
-        .update(library)
-        .set({ syncEnabled: input.syncEnabled, updatedAt: new Date() })
-        .where(eq(library.id, input.id))
-        .returning();
-      return updated;
-    }),
+    .mutation(({ ctx, input }) =>
+      updateLibrary(ctx.db, input.id, { syncEnabled: input.syncEnabled }),
+    ),
 
   /**
    * Get the default library for each type.
    */
   getDefaults: publicProcedure.query(async ({ ctx }) => {
-    const defaults = await ctx.db.query.library.findMany({
-      where: eq(library.isDefault, true),
-    });
-
+    const defaults = await findDefaultLibraries(ctx.db);
     const result: Record<string, typeof defaults[number]> = {};
-    for (const lib of defaults) {
-      result[lib.type] = lib;
-    }
+    for (const lib of defaults) result[lib.type] = lib;
     return result;
   }),
 
@@ -171,72 +85,35 @@ export const libraryRouter = createTRPCRouter({
    * Assign a specific library to a media item (override the default).
    */
   setMediaLibrary: publicProcedure
-    .input(
-      z.object({
-        mediaId: z.string().uuid(),
-        libraryId: z.string().uuid().nullable(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const [updated] = await ctx.db
-        .update(media)
-        .set({ libraryId: input.libraryId, updatedAt: new Date() })
-        .where(eq(media.id, input.mediaId))
-        .returning();
-
-      return updated;
-    }),
+    .input(z.object({
+      mediaId: z.string().uuid(),
+      libraryId: z.string().uuid().nullable(),
+    }))
+    .mutation(({ ctx, input }) =>
+      updateMedia(ctx.db, input.mediaId, { libraryId: input.libraryId }),
+    ),
 
   setContinuousDownload: publicProcedure
     .input(z.object({
       mediaId: z.string().uuid(),
       enabled: z.boolean(),
     }))
-    .mutation(async ({ ctx, input }) => {
-      const [updated] = await ctx.db
-        .update(media)
-        .set({ continuousDownload: input.enabled, updatedAt: new Date() })
-        .where(eq(media.id, input.mediaId))
-        .returning();
-      return updated;
-    }),
+    .mutation(({ ctx, input }) =>
+      updateMedia(ctx.db, input.mediaId, { continuousDownload: input.enabled }),
+    ),
 
   /* ────────────────────────────────────────────────────────────────────────── */
   /*  User Preferences                                                         */
   /* ────────────────────────────────────────────────────────────────────────── */
 
-  /** Get all user preferences */
-  getPreferences: protectedProcedure.query(async ({ ctx }) => {
-    const rows = await ctx.db.query.userPreference.findMany({
-      where: eq(userPreference.userId, ctx.session.user.id),
-    });
-    const prefs: Record<string, unknown> = {};
-    for (const row of rows) {
-      prefs[row.key] = row.value;
-    }
-    // Apply defaults
-    return {
-      autoMergeVersions: true,
-      defaultQuality: "fullhd",
-      ...prefs,
-    };
-  }),
+  getPreferences: protectedProcedure.query(({ ctx }) =>
+    getUserPreferences(ctx.db, ctx.session.user.id),
+  ),
 
-  /** Set a user preference */
   setPreference: protectedProcedure
     .input(z.object({ key: z.string(), value: z.unknown() }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.db
-        .insert(userPreference)
-        .values({
-          userId: ctx.session.user.id,
-          key: input.key,
-          value: input.value,
-        })
-        .onConflictDoUpdate({
-          target: [userPreference.userId, userPreference.key],
-          set: { value: input.value },
-        });
+      await setUserPreference(ctx.db, ctx.session.user.id, input.key, input.value);
       return { success: true };
     }),
 });

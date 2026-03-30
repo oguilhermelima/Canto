@@ -575,9 +575,11 @@ function TmdbSettingsSection(): React.JSX.Element {
   const [pendingRegion, setPendingRegion] = useState<string | null>(null);
   const displayRegion = pendingRegion ?? region;
 
-  const { data: regions, isLoading: regionsLoading } = trpc.provider.regions.useQuery();
-  const { data: watchProviders, isLoading: providersLoading } =
-    trpc.provider.watchProviders.useQuery({ type: "movie", region: displayRegion }, { enabled: !!displayRegion });
+  const { data: regionsRaw, isLoading: regionsLoading } = trpc.provider.filterOptions.useQuery({ type: "regions" });
+  const regions = regionsRaw as Array<{ code: string; englishName: string; nativeName: string }> | undefined;
+  const { data: wpRaw, isLoading: providersLoading } =
+    trpc.provider.filterOptions.useQuery({ type: "watchProviders", mediaType: "movie", region: displayRegion }, { enabled: !!displayRegion });
+  const watchProviders = wpRaw as Array<{ providerId: number; providerName: string; logoPath: string; displayPriority: number }> | undefined;
 
   const handleSaveRegion = (): void => {
     setRegion(pendingRegion ?? region);

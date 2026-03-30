@@ -26,16 +26,16 @@ export function SearchCommand({
   const router = useRouter();
   const [query, setQuery] = useState("");
 
-  const movieSearch = trpc.media.search.useQuery(
-    { query, type: "movie", provider: "tmdb" },
+  const movieSearch = trpc.media.browse.useQuery(
+    { mode: "search", query, type: "movie", provider: "tmdb" },
     {
       enabled: query.length >= 2,
       placeholderData: keepPreviousData,
     },
   );
 
-  const showSearch = trpc.media.search.useQuery(
-    { query, type: "show", provider: "tmdb" },
+  const showSearch = trpc.media.browse.useQuery(
+    { mode: "search", query, type: "show", provider: "tmdb" },
     {
       enabled: query.length >= 2,
       placeholderData: keepPreviousData,

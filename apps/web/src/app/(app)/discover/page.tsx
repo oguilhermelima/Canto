@@ -107,7 +107,7 @@ function DiscoverPresetPage({ presetKey }: { presetKey: string }): React.JSX.Ele
     document.title = `${preset.title} — Canto`;
   }, [preset.title]);
 
-  const query = trpc.media.discover.useInfiniteQuery(
+  const query = trpc.media.browse.useInfiniteQuery(
     {
       type: preset.type,
       mode: preset.mode,

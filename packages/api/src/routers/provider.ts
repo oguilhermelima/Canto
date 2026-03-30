@@ -1,12 +1,13 @@
 import { z } from "zod";
-import { desc, isNotNull, isNull, not } from "drizzle-orm";
+import { isNotNull } from "drizzle-orm";
 
 import { db } from "@canto/db/client";
-import { recommendationPool, watchProviderLink } from "@canto/db/schema";
+import { watchProviderLink } from "@canto/db/schema";
 import { getSetting, setSetting } from "@canto/db/settings";
 
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { cached } from "../infrastructure/cache/redis";
+import { findPoolItemsWithBackdrops } from "../infrastructure/repositories/extras-repository";
 
 /* -------------------------------------------------------------------------- */
 /*  TMDB direct API helper                                                    */
@@ -49,111 +50,71 @@ async function tmdbFetch<T>(
 
 export const providerRouter = createTRPCRouter({
   /**
-   * Get available watch provider regions from TMDB.
+   * Unified filter options endpoint.
+   * - type "regions": available watch provider regions
+   * - type "watchProviders": streaming providers for a media type + region
    */
-  regions: publicProcedure.query(() =>
-    cached("provider:regions", 86400, async () => {
-      const data = await tmdbFetch<{
-        results: Array<{
-          iso_3166_1: string;
-          english_name: string;
-          native_name: string;
-        }>;
-      }>("/watch/providers/regions");
+  filterOptions: publicProcedure
+    .input(z.object({
+      type: z.enum(["regions", "watchProviders"]),
+      mediaType: z.enum(["movie", "show"]).optional(),
+      region: z.string().length(2).optional(),
+    }))
+    .query(async ({ input }): Promise<
+      | Array<{ code: string; englishName: string; nativeName: string }>
+      | Array<{ providerId: number; providerName: string; logoPath: string; displayPriority: number }>
+    > => {
+      if (input.type === "regions") {
+        return cached("provider:regions", 86400, async () => {
+          const data = await tmdbFetch<{
+            results: Array<{ iso_3166_1: string; english_name: string; native_name: string }>;
+          }>("/watch/providers/regions");
+          return data.results.map((r) => ({
+            code: r.iso_3166_1,
+            englishName: r.english_name,
+            nativeName: r.native_name,
+          }));
+        });
+      }
 
-      return data.results.map((r) => ({
-        code: r.iso_3166_1,
-        englishName: r.english_name,
-        nativeName: r.native_name,
-      }));
-    }),
-  ),
-
-  /**
-   * Get watch (streaming) providers for a given media type and region.
-   */
-  watchProviders: publicProcedure
-    .input(
-      z.object({
-        type: z.enum(["movie", "show"]),
-        region: z.string().length(2),
-      }),
-    )
-    .query(({ input }) =>
-      cached(`provider:wp:${input.type}:${input.region}`, 86400, async () => {
-        const endpoint =
-          input.type === "movie"
-            ? "/watch/providers/movie"
-            : "/watch/providers/tv";
-
+      const mediaType = input.mediaType ?? "movie";
+      const region = input.region ?? "US";
+      return cached(`provider:wp:${mediaType}:${region}`, 86400, async () => {
+        const endpoint = mediaType === "movie" ? "/watch/providers/movie" : "/watch/providers/tv";
         const data = await tmdbFetch<{
           results: Array<{
-            provider_id: number;
-            provider_name: string;
-            logo_path: string;
-            display_priority: number;
-            display_priorities: Record<string, number>;
+            provider_id: number; provider_name: string; logo_path: string;
+            display_priority: number; display_priorities: Record<string, number>;
           }>;
-        }>(endpoint, { watch_region: input.region });
-
+        }>(endpoint, { watch_region: region });
         return data.results.map((p) => ({
-          providerId: p.provider_id,
-          providerName: p.provider_name,
-          logoPath: p.logo_path,
-          displayPriority: p.display_priority,
+          providerId: p.provider_id, providerName: p.provider_name,
+          logoPath: p.logo_path, displayPriority: p.display_priority,
         }));
-      }),
-    ),
+      });
+    }),
 
   /**
-   * Search TV networks on TMDB.
+   * Unified filter search endpoint.
+   * - type "networks": search TV networks on TMDB
+   * - type "companies": search production companies on TMDB
    */
-  networks: publicProcedure
-    .input(z.object({ query: z.string().min(1) }))
-    .query(({ input }) =>
-      cached(`provider:network:${input.query}`, 300, async () => {
+  filterSearch: publicProcedure
+    .input(z.object({
+      type: z.enum(["networks", "companies"]),
+      query: z.string().min(1),
+    }))
+    .query(({ input }) => {
+      const endpoint = input.type === "networks" ? "/search/network" : "/search/company";
+      return cached(`provider:${input.type}:${input.query}`, 300, async () => {
         const data = await tmdbFetch<{
-          results: Array<{
-            id: number;
-            name: string;
-            logo_path: string | null;
-            origin_country: string;
-          }>;
-        }>("/search/network", { query: input.query });
-
+          results: Array<{ id: number; name: string; logo_path: string | null; origin_country: string }>;
+        }>(endpoint, { query: input.query });
         return data.results.map((n) => ({
-          id: n.id,
-          name: n.name,
-          logoPath: n.logo_path,
-          originCountry: n.origin_country,
+          id: n.id, name: n.name, logoPath: n.logo_path, originCountry: n.origin_country,
         }));
-      }),
-    ),
-
-  /**
-   * Search production companies on TMDB.
-   */
-  companies: publicProcedure
-    .input(z.object({ query: z.string().min(1) }))
-    .query(({ input }) =>
-      cached(`provider:company:${input.query}`, 300, async () => {
-        const data = await tmdbFetch<{
-          results: Array<{
-            id: number;
-            name: string;
-            logo_path: string | null;
-            origin_country: string;
-          }>;
-        }>("/search/company", { query: input.query });
-
-        return data.results.map((c) => ({
-          id: c.id,
-          name: c.name,
-          logoPath: c.logo_path,
-          originCountry: c.origin_country,
-        }));
-      }),
-    ),
+      });
+    }),
 
   /**
    * Get spotlight items for the home page hero.
@@ -162,11 +123,7 @@ export const providerRouter = createTRPCRouter({
    */
   spotlight: publicProcedure.query(async () => {
     // Try recommendation pool first
-    const poolItems = await db.query.recommendationPool.findMany({
-      where: not(isNull(recommendationPool.backdropPath)),
-      orderBy: [desc(recommendationPool.releaseDate)],
-      limit: 10,
-    });
+    const poolItems = await findPoolItemsWithBackdrops(db, 10);
 
     if (poolItems.length > 0) {
       return poolItems.map((item) => ({

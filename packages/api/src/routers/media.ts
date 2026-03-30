@@ -1,30 +1,35 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, notInArray } from "drizzle-orm";
 import { z } from "zod";
 
-import {
-  media,
-  mediaCredit,
-  mediaFile,
-  mediaVideo,
-  mediaWatchProvider,
-  recommendationPool,
-  season,
-} from "@canto/db/schema";
 import { getProvider } from "@canto/providers";
-import type { NormalizedMedia } from "@canto/providers";
 import { persistMedia, updateMediaFromNormalized } from "@canto/db/persist-media";
 import {
   addToLibraryInput,
   getByExternalInput,
   getByIdInput,
-  searchInput,
 } from "@canto/validators";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getTmdbProvider } from "../lib/tmdb-client";
 import { dispatchRefreshExtras } from "../infrastructure/queue/bullmq-dispatcher";
 import { cached } from "../infrastructure/cache/redis";
+import {
+  findMediaById,
+  findMediaByIdWithSeasons,
+  findMediaByExternalId,
+  updateMedia,
+  deleteMedia,
+  findLibraryExternalIds,
+  findLibraryMediaBrief,
+} from "../infrastructure/repositories/media-repository";
+import { findMediaFilesByMediaId } from "../infrastructure/repositories/media-file-repository";
+import {
+  findCreditsByMediaId,
+  findVideosByMediaId,
+  findWatchProvidersByMediaId,
+  findPoolBySource,
+  findPoolRecommendations,
+} from "../infrastructure/repositories/extras-repository";
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                   */
@@ -43,43 +48,76 @@ async function getProviderWithKey(name: "tmdb" | "anilist" | "tvdb"): ReturnType
 
 export const mediaRouter = createTRPCRouter({
   /**
-   * Search for media via external provider (nothing saved to DB).
+   * Unified browse endpoint. Supports:
+   * - mode "search": free-text search via any provider
+   * - mode "trending": TMDB /trending endpoint (default)
+   * - mode "discover": TMDB /discover endpoint (genre, language, sort filters)
    */
-  search: publicProcedure.input(searchInput).query(({ input }) => {
-    const page = input.cursor ?? input.page;
-    return cached(
-      `search:${input.provider}:${input.type}:${input.query}:${page}`,
-      300,
-      async () => {
-        const provider = await getProviderWithKey(input.provider);
-        return provider.search(input.query, input.type, { page });
-      },
-    );
-  }),
+  browse: publicProcedure
+    .input(z.object({
+      mode: z.enum(["search", "trending", "discover"]).default("trending"),
+      type: z.enum(["movie", "show"]),
+      query: z.string().optional(), // required when mode = "search"
+      provider: z.enum(["tmdb", "anilist", "tvdb"]).default("tmdb"),
+      genres: z.string().optional(),
+      language: z.string().optional(),
+      sortBy: z.string().optional(),
+      dateFrom: z.string().optional(),
+      page: z.number().int().min(1).default(1),
+      cursor: z.number().int().positive().nullish(),
+    }))
+    .query(({ input }) => {
+      const page = input.cursor ?? input.page;
+
+      if (input.mode === "search") {
+        if (!input.query) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Query is required for search mode" });
+        }
+        return cached(
+          `browse:search:${input.provider}:${input.type}:${input.query}:${page}`,
+          300,
+          async () => {
+            const provider = await getProviderWithKey(input.provider);
+            return provider.search(input.query!, input.type, { page });
+          },
+        );
+      }
+
+      const cacheKey = `browse:${input.type}:${input.mode}:${input.genres ?? ""}:${input.language ?? ""}:${input.sortBy ?? ""}:${input.dateFrom ?? ""}:${page}`;
+
+      return cached(cacheKey, 300, async () => {
+        const provider = await getTmdbProvider();
+
+        if (input.mode === "trending") {
+          if (input.genres || input.language) {
+            return provider.getTrendingFiltered(input.type, {
+              page,
+              genreIds: input.genres ? input.genres.split(",").map(Number) : undefined,
+              language: input.language,
+            });
+          }
+          return provider.getTrending(input.type, { page });
+        }
+
+        // mode === "discover"
+        return provider.discover(input.type, {
+          page,
+          with_genres: input.genres,
+          with_original_language: input.language,
+          sort_by: input.sortBy ?? "popularity.desc",
+          first_air_date_gte: input.type === "show" ? input.dateFrom : undefined,
+          release_date_gte: input.type === "movie" ? input.dateFrom : undefined,
+        });
+      });
+    }),
 
   /**
    * Get media from DB by its internal UUID.
    * Returns the media row with seasons and episodes.
    */
   getById: publicProcedure.input(getByIdInput).query(async ({ ctx, input }) => {
-    const row = await ctx.db.query.media.findFirst({
-      where: eq(media.id, input.id),
-      with: {
-        seasons: {
-          orderBy: (s, { asc }) => [asc(s.number)],
-          with: {
-            episodes: {
-              orderBy: (e, { asc }) => [asc(e.number)],
-            },
-          },
-        },
-      },
-    });
-
-    if (!row) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
-    }
-
+    const row = await findMediaByIdWithSeasons(ctx.db, input.id);
+    if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
     return row;
   }),
 
@@ -90,63 +128,23 @@ export const mediaRouter = createTRPCRouter({
   getByExternal: publicProcedure
     .input(getByExternalInput)
     .query(async ({ ctx, input }) => {
-      // 1. Check if already in DB
-      const existing = await ctx.db.query.media.findFirst({
-        where: and(
-          eq(media.externalId, input.externalId),
-          eq(media.provider, input.provider),
-        ),
-        with: {
-          seasons: {
-            orderBy: (s, { asc }) => [asc(s.number)],
-            with: {
-              episodes: {
-                orderBy: (e, { asc }) => [asc(e.number)],
-              },
-            },
-          },
-        },
-      });
+      const existing = await findMediaByExternalId(ctx.db, input.externalId, input.provider);
 
       if (existing) {
-        // Stale-while-revalidate: dispatch background refresh if extras are old
         if (existing.inLibrary) {
-          const STALE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+          const STALE_MS = 30 * 24 * 60 * 60 * 1000;
           const isStale =
             !existing.extrasUpdatedAt ||
             Date.now() - existing.extrasUpdatedAt.getTime() > STALE_MS;
-          if (isStale) {
-            void dispatchRefreshExtras(existing.id).catch(() => {});
-          }
+          if (isStale) void dispatchRefreshExtras(existing.id).catch(() => {});
         }
         return existing;
       }
 
-      // 2. Fetch full metadata from provider
       const provider = await getProviderWithKey(input.provider);
-      const normalized = await provider.getMetadata(
-        input.externalId,
-        input.type,
-      );
-
-      // 3. Persist to DB
+      const normalized = await provider.getMetadata(input.externalId, input.type);
       const inserted = await persistMedia(ctx.db, normalized);
-
-      // 4. Re-fetch with relations
-      const result = await ctx.db.query.media.findFirst({
-        where: eq(media.id, inserted.id),
-        with: {
-          seasons: {
-            orderBy: (s, { asc }) => [asc(s.number)],
-            with: {
-              episodes: {
-                orderBy: (e, { asc }) => [asc(e.number)],
-              },
-            },
-          },
-        },
-      });
-
+      const result = await findMediaByIdWithSeasons(ctx.db, inserted.id);
       return result!;
     }),
 
@@ -158,41 +156,17 @@ export const mediaRouter = createTRPCRouter({
   getExtras: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const row = await ctx.db.query.media.findFirst({
-        where: eq(media.id, input.id),
-      });
-
+      const row = await findMediaById(ctx.db, input.id);
       if (!row) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Media not found",
-        });
+        throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
       }
 
-      // Try reading from new dedicated tables
       const [credits, videos, watchProviders, similar, recommendations] = await Promise.all([
-        ctx.db.query.mediaCredit.findMany({
-          where: eq(mediaCredit.mediaId, input.id),
-          orderBy: (c, { asc }) => [asc(c.order)],
-        }),
-        ctx.db.query.mediaVideo.findMany({
-          where: eq(mediaVideo.mediaId, input.id),
-        }),
-        ctx.db.query.mediaWatchProvider.findMany({
-          where: eq(mediaWatchProvider.mediaId, input.id),
-        }),
-        ctx.db.query.recommendationPool.findMany({
-          where: and(
-            eq(recommendationPool.sourceMediaId, input.id),
-            eq(recommendationPool.sourceType, "similar"),
-          ),
-        }),
-        ctx.db.query.recommendationPool.findMany({
-          where: and(
-            eq(recommendationPool.sourceMediaId, input.id),
-            eq(recommendationPool.sourceType, "recommendation"),
-          ),
-        }),
+        findCreditsByMediaId(ctx.db, input.id),
+        findVideosByMediaId(ctx.db, input.id),
+        findWatchProvidersByMediaId(ctx.db, input.id),
+        findPoolBySource(ctx.db, input.id, "similar"),
+        findPoolBySource(ctx.db, input.id, "recommendation"),
       ]);
 
       // If new tables have data, build response from them
@@ -288,26 +262,12 @@ export const mediaRouter = createTRPCRouter({
   addToLibrary: protectedProcedure
     .input(addToLibraryInput)
     .mutation(async ({ ctx, input }) => {
-      const [updated] = await ctx.db
-        .update(media)
-        .set({
-          inLibrary: true,
-          addedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(media.id, input.id))
-        .returning();
-
-      if (!updated) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Media not found",
-        });
-      }
-
-      // Populate recommendation pool + extras in background
+      const updated = await updateMedia(ctx.db, input.id, {
+        inLibrary: true,
+        addedAt: new Date(),
+      });
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
       void dispatchRefreshExtras(updated.id).catch(() => {});
-
       return updated;
     }),
 
@@ -317,23 +277,8 @@ export const mediaRouter = createTRPCRouter({
   removeFromLibrary: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const [updated] = await ctx.db
-        .update(media)
-        .set({
-          inLibrary: false,
-          addedAt: null,
-          updatedAt: new Date(),
-        })
-        .where(eq(media.id, input.id))
-        .returning();
-
-      if (!updated) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Media not found",
-        });
-      }
-
+      const updated = await updateMedia(ctx.db, input.id, { inLibrary: false, addedAt: null });
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
       return updated;
     }),
 
@@ -343,25 +288,10 @@ export const mediaRouter = createTRPCRouter({
   updateMetadata: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const row = await ctx.db.query.media.findFirst({
-        where: eq(media.id, input.id),
-      });
-
-      if (!row) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Media not found",
-        });
-      }
-
-      const provider = await getProviderWithKey(
-        row.provider as "tmdb" | "anilist" | "tvdb",
-      );
-      const normalized = await provider.getMetadata(
-        row.externalId,
-        row.type as "movie" | "show",
-      );
-
+      const row = await findMediaById(ctx.db, input.id);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
+      const provider = await getProviderWithKey(row.provider as "tmdb" | "anilist" | "tvdb");
+      const normalized = await provider.getMetadata(row.externalId, row.type as "movie" | "show");
       return updateMediaFromNormalized(ctx.db, input.id, normalized);
     }),
 
@@ -371,18 +301,8 @@ export const mediaRouter = createTRPCRouter({
   delete: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const [deleted] = await ctx.db
-        .delete(media)
-        .where(eq(media.id, input.id))
-        .returning();
-
-      if (!deleted) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Media not found",
-        });
-      }
-
+      const deleted = await deleteMedia(ctx.db, input.id);
+      if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
       return { success: true };
     }),
 
@@ -391,71 +311,7 @@ export const mediaRouter = createTRPCRouter({
    */
   listFiles: publicProcedure
     .input(z.object({ mediaId: z.string().uuid() }))
-    .query(async ({ ctx, input }) => {
-      return ctx.db.query.mediaFile.findMany({
-        where: eq(mediaFile.mediaId, input.mediaId),
-        with: {
-          episode: {
-            columns: { id: true, number: true, title: true, seasonId: true },
-            with: {
-              season: { columns: { id: true, number: true } },
-            },
-          },
-          torrent: {
-            columns: { id: true, quality: true, source: true, title: true },
-          },
-        },
-        orderBy: (f, { asc }) => [asc(f.createdAt)],
-      });
-    }),
-
-  /**
-   * Unified discover endpoint. Supports:
-   * - mode "trending": TMDB /trending endpoint (default)
-   * - mode "discover": TMDB /discover endpoint (genre, language, sort filters)
-   * - genre/language filters: applied server-side on trending, or as API params on discover
-   */
-  discover: publicProcedure
-    .input(
-      z.object({
-        type: z.enum(["movie", "show"]),
-        mode: z.enum(["trending", "discover"]).default("trending"),
-        genres: z.string().optional(),
-        language: z.string().optional(),
-        sortBy: z.string().optional(),
-        dateFrom: z.string().optional(),
-        page: z.number().int().min(1).default(1),
-        cursor: z.number().int().positive().nullish(),
-      }),
-    )
-    .query(({ input }) => {
-      const page = input.cursor ?? input.page;
-      const cacheKey = `discover:${input.type}:${input.mode}:${input.genres ?? ""}:${input.language ?? ""}:${input.sortBy ?? ""}:${input.dateFrom ?? ""}:${page}`;
-
-      return cached(cacheKey, 300, async () => {
-        const provider = await getTmdbProvider();
-
-        if (input.mode === "trending") {
-          if (input.genres || input.language) {
-            return provider.getTrendingFiltered(input.type, {
-              page,
-              genreIds: input.genres ? input.genres.split(",").map(Number) : undefined,
-              language: input.language,
-            });
-          }
-          return provider.getTrending(input.type, { page });
-        }
-
-        return provider.discover(input.type, {
-          page,
-          with_genres: input.genres,
-          with_original_language: input.language,
-          sort_by: input.sortBy ?? "popularity.desc",
-          first_air_date_gte: input.type === "show" ? input.dateFrom : undefined,
-          release_date_gte: input.type === "movie" ? input.dateFrom : undefined,
-        });
-      });
-    }),
+    .query(({ ctx, input }) => findMediaFilesByMediaId(ctx.db, input.mediaId)),
 
   /**
    * Get person detail from TMDB (biography, credits, images).
@@ -484,27 +340,9 @@ export const mediaRouter = createTRPCRouter({
       const pageSize = input?.pageSize ?? 10;
       const offset = page * pageSize;
 
-      // Get library external IDs to exclude items already in library
-      const libraryItems = await ctx.db.query.media.findMany({
-        where: eq(media.inLibrary, true),
-        columns: { externalId: true },
-      });
-
+      const libraryItems = await findLibraryExternalIds(ctx.db);
       const libraryTmdbIds = libraryItems.map((m) => m.externalId);
-
-      // Query pool, excluding library items, ordered by score
-      const poolItems = libraryTmdbIds.length > 0
-        ? await ctx.db.query.recommendationPool.findMany({
-            where: notInArray(recommendationPool.tmdbId, libraryTmdbIds),
-            orderBy: [desc(recommendationPool.score)],
-            limit: pageSize + 1,
-            offset,
-          })
-        : await ctx.db.query.recommendationPool.findMany({
-            orderBy: [desc(recommendationPool.score)],
-            limit: pageSize + 1,
-            offset,
-          });
+      const poolItems = await findPoolRecommendations(ctx.db, libraryTmdbIds, pageSize + 1, offset);
 
       if (poolItems.length > 0) {
         // Deduplicate by tmdbId (same media can be recommended by multiple sources)
@@ -536,11 +374,7 @@ export const mediaRouter = createTRPCRouter({
       // Fallback: TMDB (pool empty — no library items with refresh-extras yet)
       if (libraryItems.length === 0) return { items: [], nextCursor: null };
 
-      const allLibrary = await ctx.db.query.media.findMany({
-        where: eq(media.inLibrary, true),
-        columns: { id: true, externalId: true, provider: true, type: true },
-        limit: 100,
-      });
+      const allLibrary = await findLibraryMediaBrief(ctx.db);
 
       const seedStart = (page * 3) % allLibrary.length;
       const seeds: typeof allLibrary = [];

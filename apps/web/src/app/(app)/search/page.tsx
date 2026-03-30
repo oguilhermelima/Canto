@@ -54,18 +54,18 @@ export default function SearchPage(): React.JSX.Element {
     initialCursor: 1,
   };
 
-  const singleQuery = trpc.media.search.useInfiniteQuery(
-    { query, type: searchType === "multi" ? "movie" : searchType, provider: "tmdb" },
+  const singleQuery = trpc.media.browse.useInfiniteQuery(
+    { mode: "search", query, type: searchType === "multi" ? "movie" : searchType, provider: "tmdb" },
     { enabled: query.length >= 2 && searchType !== "multi", ...pageParam },
   );
 
-  const multiMovieQuery = trpc.media.search.useInfiniteQuery(
-    { query, type: "movie", provider: "tmdb" },
+  const multiMovieQuery = trpc.media.browse.useInfiniteQuery(
+    { mode: "search", query, type: "movie", provider: "tmdb" },
     { enabled: query.length >= 2 && searchType === "multi", ...pageParam },
   );
 
-  const multiShowQuery = trpc.media.search.useInfiniteQuery(
-    { query, type: "show", provider: "tmdb" },
+  const multiShowQuery = trpc.media.browse.useInfiniteQuery(
+    { mode: "search", query, type: "show", provider: "tmdb" },
     { enabled: query.length >= 2 && searchType === "multi", ...pageParam },
   );
 
