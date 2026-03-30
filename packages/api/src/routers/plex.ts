@@ -7,6 +7,7 @@ import { library } from "@canto/db/schema";
 
 import { getPlexCredentials } from "../lib/server-credentials";
 import { createTRPCRouter, publicProcedure } from "../trpc";
+import { syncPlexLibraries } from "../domain/use-cases/sync-plex-libraries";
 
 async function plexFetch<T>(
   url: string,
@@ -117,93 +118,4 @@ export const plexRouter = createTRPCRouter({
 
 /* -------------------------------------------------------------------------- */
 /*  Shared sync logic                                                         */
-/* -------------------------------------------------------------------------- */
-
-interface PlexSection {
-  key: string;
-  title: string;
-  type: string; // "movie" | "show" | "artist" | "photo"
-  Location: Array<{ path: string }>;
-}
-
-async function syncPlexLibraries(
-  db: Database,
-  url: string,
-  token: string,
-): Promise<Array<{ id: string; name: string; action: "created" | "updated" }>> {
-  const data = await plexFetch<{
-    MediaContainer: { Directory: PlexSection[] };
-  }>(url, token, "/library/sections");
-
-  const sections = data.MediaContainer.Directory ?? [];
-  const synced: Array<{ id: string; name: string; action: "created" | "updated" }> = [];
-
-  for (const section of sections) {
-    // Only sync movie and show libraries
-    if (!["movie", "show"].includes(section.type)) continue;
-
-    let type = "movies";
-    if (section.type === "show") {
-      type = /anime/i.test(section.title) ? "animes" : "shows";
-    }
-
-    // Try to find existing library by plexLibraryId
-    let existing = await db.query.library.findFirst({
-      where: eq(library.plexLibraryId, section.key),
-    });
-
-    // Fallback: match by type without any plex link
-    if (!existing) {
-      const allOfType = await db.query.library.findMany({
-        where: eq(library.type, type),
-      });
-      existing = allOfType.find((l) => !l.plexLibraryId) ?? undefined;
-    }
-
-    if (existing) {
-      await db
-        .update(library)
-        .set({
-          plexLibraryId: section.key,
-          updatedAt: new Date(),
-        })
-        .where(eq(library.id, existing.id));
-      synced.push({ id: existing.id, name: section.title, action: "updated" });
-    } else {
-      const [row] = await db
-        .insert(library)
-        .values({
-          name: section.title,
-          type,
-          mediaPath: section.Location[0]?.path ?? null,
-          containerMediaPath: section.Location[0]?.path ?? null,
-          qbitCategory: type === "movies" ? "movies" : type === "animes" ? "animes" : "shows",
-          plexLibraryId: section.key,
-          isDefault: false,
-          enabled: true,
-        })
-        .returning();
-      if (row) {
-        synced.push({ id: row.id, name: section.title, action: "created" });
-      }
-    }
-  }
-
-  // Auto-elect defaults
-  for (const t of ["movies", "shows", "animes"]) {
-    const ofType = await db.query.library.findMany({
-      where: eq(library.type, t),
-    });
-    if (ofType.length > 0 && !ofType.some((l) => l.isDefault)) {
-      const first = ofType.find((l) => l.enabled) ?? ofType[0];
-      if (first) {
-        await db
-          .update(library)
-          .set({ isDefault: true, updatedAt: new Date() })
-          .where(eq(library.id, first.id));
-      }
-    }
-  }
-
-  return synced;
-}
+/* syncPlexLibraries moved to domain/use-cases/sync-plex-libraries.ts */

@@ -201,6 +201,14 @@ export const media = pgTable(
     addedAt: timestamp("added_at", { withTimezone: true }),
     continuousDownload: boolean("continuous_download").notNull().default(false),
 
+    // Refresh strategy
+    nextAirDate: date("next_air_date"),
+    extrasUpdatedAt: timestamp("extras_updated_at", { withTimezone: true }),
+    qualityProfileId: uuid("quality_profile_id").references(
+      () => qualityProfile.id,
+      { onDelete: "set null" },
+    ),
+
     // Timestamps
     metadataUpdatedAt: timestamp("metadata_updated_at", {
       withTimezone: true,
@@ -414,6 +422,150 @@ export const watchProviderLink = pgTable("watch_provider_link", {
   searchUrlTemplate: text("search_url_template"),
 });
 
+// ─── Quality profiles ───
+
+export const qualityProfile = pgTable("quality_profile", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 100 }).notNull(),
+  qualities: jsonb("qualities").$type<string[]>().notNull(),
+  cutoff: varchar("cutoff", { length: 50 }).notNull(),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// ─── Recommendation pool ───
+
+export const recommendationPool = pgTable(
+  "recommendation_pool",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tmdbId: integer("tmdb_id").notNull(),
+    mediaType: varchar("media_type", { length: 10 }).notNull(),
+    sourceMediaId: uuid("source_media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 500 }).notNull(),
+    overview: text("overview"),
+    posterPath: varchar("poster_path", { length: 255 }),
+    backdropPath: varchar("backdrop_path", { length: 255 }),
+    logoPath: varchar("logo_path", { length: 255 }),
+    releaseDate: date("release_date"),
+    voteAverage: real("vote_average"),
+    score: real("score").notNull().default(0),
+    frequency: integer("frequency").notNull().default(1),
+    sourceType: varchar("source_type", { length: 20 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_rec_pool_source").on(table.sourceMediaId),
+    index("idx_rec_pool_tmdb").on(table.tmdbId, table.mediaType),
+    index("idx_rec_pool_score").on(table.score),
+  ],
+);
+
+// ─── Media credits (replaces extrasCache credits) ───
+
+export const mediaCredit = pgTable(
+  "media_credit",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    personId: integer("person_id").notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    character: varchar("character", { length: 500 }),
+    department: varchar("department", { length: 100 }),
+    job: varchar("job", { length: 100 }),
+    profilePath: varchar("profile_path", { length: 255 }),
+    type: varchar("type", { length: 10 }).notNull(),
+    order: integer("order").notNull().default(0),
+  },
+  (table) => [index("idx_credit_media").on(table.mediaId)],
+);
+
+// ─── Media videos (replaces extrasCache videos) ───
+
+export const mediaVideo = pgTable(
+  "media_video",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    externalKey: varchar("external_key", { length: 255 }).notNull(),
+    site: varchar("site", { length: 50 }).notNull(),
+    name: varchar("name", { length: 500 }).notNull(),
+    type: varchar("type", { length: 50 }).notNull(),
+    official: boolean("official").notNull().default(true),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+  },
+  (table) => [index("idx_video_media").on(table.mediaId)],
+);
+
+// ─── Media watch providers (replaces extrasCache watchProviders) ───
+
+export const mediaWatchProvider = pgTable(
+  "media_watch_provider",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    providerId: integer("provider_id").notNull(),
+    providerName: varchar("provider_name", { length: 255 }).notNull(),
+    logoPath: varchar("logo_path", { length: 255 }),
+    type: varchar("type", { length: 10 }).notNull(),
+    region: varchar("region", { length: 10 }).notNull(),
+  },
+  (table) => [
+    index("idx_wp_media").on(table.mediaId),
+    index("idx_wp_region").on(table.region),
+  ],
+);
+
+// ─── Notifications ───
+
+export const notification = pgTable("notification", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  type: varchar("type", { length: 30 }).notNull(),
+  read: boolean("read").notNull().default(false),
+  mediaId: uuid("media_id").references(() => media.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// ─── Blocklist (failed downloads) ───
+
+export const blocklist = pgTable(
+  "blocklist",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 500 }).notNull(),
+    indexer: varchar("indexer", { length: 100 }),
+    reason: varchar("reason", { length: 50 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("idx_blocklist_media").on(table.mediaId)],
+);
+
 // ─── Relations ───
 
 export const userRelations = relations(user, ({ many }) => ({
@@ -452,8 +604,16 @@ export const mediaRelations = relations(media, ({ many, one }) => ({
     fields: [media.libraryId],
     references: [library.id],
   }),
+  qualityProfile: one(qualityProfile, {
+    fields: [media.qualityProfileId],
+    references: [qualityProfile.id],
+  }),
   seasons: many(season),
   files: many(mediaFile),
+  credits: many(mediaCredit),
+  videos: many(mediaVideo),
+  watchProviders: many(mediaWatchProvider),
+  recommendations: many(recommendationPool),
   extrasCache: one(extrasCache, {
     fields: [media.id],
     references: [extrasCache.mediaId],
@@ -518,5 +678,57 @@ export const syncEpisodeRelations = relations(syncEpisode, ({ one }) => ({
   syncItem: one(syncItem, {
     fields: [syncEpisode.syncItemId],
     references: [syncItem.id],
+  }),
+}));
+
+export const qualityProfileRelations = relations(qualityProfile, ({ many }) => ({
+  media: many(media),
+}));
+
+export const recommendationPoolRelations = relations(
+  recommendationPool,
+  ({ one }) => ({
+    sourceMedia: one(media, {
+      fields: [recommendationPool.sourceMediaId],
+      references: [media.id],
+    }),
+  }),
+);
+
+export const mediaCreditRelations = relations(mediaCredit, ({ one }) => ({
+  media: one(media, {
+    fields: [mediaCredit.mediaId],
+    references: [media.id],
+  }),
+}));
+
+export const mediaVideoRelations = relations(mediaVideo, ({ one }) => ({
+  media: one(media, {
+    fields: [mediaVideo.mediaId],
+    references: [media.id],
+  }),
+}));
+
+export const mediaWatchProviderRelations = relations(
+  mediaWatchProvider,
+  ({ one }) => ({
+    media: one(media, {
+      fields: [mediaWatchProvider.mediaId],
+      references: [media.id],
+    }),
+  }),
+);
+
+export const notificationRelations = relations(notification, ({ one }) => ({
+  media: one(media, {
+    fields: [notification.mediaId],
+    references: [media.id],
+  }),
+}));
+
+export const blocklistRelations = relations(blocklist, ({ one }) => ({
+  media: one(media, {
+    fields: [blocklist.mediaId],
+    references: [media.id],
   }),
 }));

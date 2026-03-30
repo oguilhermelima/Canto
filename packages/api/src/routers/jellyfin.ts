@@ -7,6 +7,7 @@ import { library } from "@canto/db/schema";
 
 import { getJellyfinCredentials } from "../lib/server-credentials";
 import { createTRPCRouter, publicProcedure } from "../trpc";
+import { syncJellyfinLibraries } from "../domain/use-cases/sync-jellyfin-libraries";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                    */
@@ -118,98 +119,4 @@ export const jellyfinRouter = createTRPCRouter({
     }),
 });
 
-/* -------------------------------------------------------------------------- */
-/*  Shared sync logic                                                         */
-/* -------------------------------------------------------------------------- */
-
-async function syncJellyfinLibraries(
-  db: Database,
-  url: string,
-  apiKey: string,
-): Promise<Array<{ id: string; name: string; action: "created" | "updated" }>> {
-  const res = await fetch(`${url}/Library/VirtualFolders`, {
-    headers: { "X-Emby-Token": apiKey },
-  });
-  if (!res.ok) return [];
-
-  const folders = (await res.json()) as Array<{
-    ItemId: string;
-    Name: string;
-    CollectionType: string;
-    Locations: string[];
-  }>;
-
-  const synced: Array<{ id: string; name: string; action: "created" | "updated" }> = [];
-
-  for (const folder of folders) {
-    if (!["movies", "tvshows"].includes(folder.CollectionType)) continue;
-
-    let type = "movies";
-    if (folder.CollectionType === "tvshows") {
-      type = /anime/i.test(folder.Name) ? "animes" : "shows";
-    }
-
-    const defaultCategory =
-      type === "movies" ? "movies" : type === "animes" ? "animes" : "shows";
-
-    // Try by jellyfinLibraryId first
-    let existing = await db.query.library.findFirst({
-      where: eq(library.jellyfinLibraryId, folder.ItemId),
-    });
-
-    // Fallback: match unlinked library of same type
-    if (!existing) {
-      const allOfType = await db.query.library.findMany({
-        where: eq(library.type, type),
-      });
-      existing = allOfType.find((l) => !l.jellyfinLibraryId) ?? undefined;
-    }
-
-    if (existing) {
-      await db
-        .update(library)
-        .set({
-          name: folder.Name,
-          jellyfinPath: folder.Locations[0] ?? null,
-          jellyfinLibraryId: folder.ItemId,
-          updatedAt: new Date(),
-        })
-        .where(eq(library.id, existing.id));
-      synced.push({ id: existing.id, name: folder.Name, action: "updated" });
-    } else {
-      const [row] = await db
-        .insert(library)
-        .values({
-          name: folder.Name,
-          type,
-          jellyfinPath: folder.Locations[0] ?? null,
-          jellyfinLibraryId: folder.ItemId,
-          qbitCategory: defaultCategory,
-          isDefault: false,
-          enabled: true,
-        })
-        .returning();
-      if (row) {
-        synced.push({ id: row.id, name: folder.Name, action: "created" });
-      }
-    }
-  }
-
-  // Auto-elect defaults
-  for (const t of ["movies", "shows", "animes"]) {
-    const ofType = await db.query.library.findMany({
-      where: eq(library.type, t),
-    });
-    if (ofType.length > 0 && !ofType.some((l) => l.isDefault)) {
-      const first = ofType.find((l) => l.enabled) ?? ofType[0];
-      if (first) {
-        await db
-          .update(library)
-          .set({ isDefault: true, updatedAt: new Date() })
-          .where(eq(library.id, first.id));
-      }
-    }
-  }
-
-  return synced;
-}
+/* syncJellyfinLibraries moved to domain/use-cases/sync-jellyfin-libraries.ts */

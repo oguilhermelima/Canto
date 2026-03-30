@@ -1,9 +1,9 @@
 import { Queue, Worker } from "bullmq";
 
-import { handleCleanupCache } from "./jobs/cleanup-cache";
 import { handleImportTorrents } from "./jobs/import-torrents";
-import { handleRefreshMetadata } from "./jobs/refresh-metadata";
 import { handleReverseSync } from "./jobs/reverse-sync";
+import { refreshExtras } from "@canto/api/domain/use-cases/refresh-extras";
+import { db } from "@canto/db/client";
 
 /* -------------------------------------------------------------------------- */
 /*  Redis connection                                                          */
@@ -23,14 +23,6 @@ const importTorrentsQueue = new Queue("import-torrents", {
   connection: redisConnection,
 });
 
-const refreshMetadataQueue = new Queue("refresh-metadata", {
-  connection: redisConnection,
-});
-
-const cleanupCacheQueue = new Queue("cleanup-cache", {
-  connection: redisConnection,
-});
-
 const reverseSyncQueue = new Queue("reverse-sync", {
   connection: redisConnection,
 });
@@ -47,25 +39,11 @@ async function setupRepeatableJobs(): Promise<void> {
     { name: "import-torrents" },
   );
 
-  // Refresh metadata: every Sunday at 03:00
-  await refreshMetadataQueue.upsertJobScheduler(
-    "refresh-metadata-scheduler",
-    { pattern: "0 3 * * 0" },
-    { name: "refresh-metadata" },
-  );
-
   // Reverse sync (import from Jellyfin/Plex): every 5 minutes
   await reverseSyncQueue.upsertJobScheduler(
     "reverse-sync-scheduler",
     { every: 5 * 60 * 1000 },
     { name: "reverse-sync" },
-  );
-
-  // Cleanup cache: every day at 04:00
-  await cleanupCacheQueue.upsertJobScheduler(
-    "cleanup-cache-scheduler",
-    { pattern: "0 4 * * *" },
-    { name: "cleanup-cache" },
   );
 }
 
@@ -83,26 +61,6 @@ const importTorrentsWorker = new Worker(
   { connection: redisConnection, concurrency: 1 },
 );
 
-const refreshMetadataWorker = new Worker(
-  "refresh-metadata",
-  async (job) => {
-    console.log(`[refresh-metadata] Running job ${job.id}`);
-    await handleRefreshMetadata();
-    console.log(`[refresh-metadata] Completed job ${job.id}`);
-  },
-  { connection: redisConnection, concurrency: 1 },
-);
-
-const cleanupCacheWorker = new Worker(
-  "cleanup-cache",
-  async (job) => {
-    console.log(`[cleanup-cache] Running job ${job.id}`);
-    await handleCleanupCache();
-    console.log(`[cleanup-cache] Completed job ${job.id}`);
-  },
-  { connection: redisConnection, concurrency: 1 },
-);
-
 const reverseSyncWorker = new Worker(
   "reverse-sync",
   async (job) => {
@@ -113,15 +71,25 @@ const reverseSyncWorker = new Worker(
   { connection: redisConnection, concurrency: 1 },
 );
 
+const refreshExtrasWorker = new Worker(
+  "refresh-extras",
+  async (job) => {
+    const { mediaId } = job.data as { mediaId: string };
+    console.log(`[refresh-extras] Running for media ${mediaId}`);
+    await refreshExtras(db, mediaId);
+    console.log(`[refresh-extras] Completed for media ${mediaId}`);
+  },
+  { connection: redisConnection, concurrency: 2 },
+);
+
 /* -------------------------------------------------------------------------- */
 /*  Error handling                                                            */
 /* -------------------------------------------------------------------------- */
 
 for (const worker of [
   importTorrentsWorker,
-  refreshMetadataWorker,
-  cleanupCacheWorker,
   reverseSyncWorker,
+  refreshExtrasWorker,
 ]) {
   worker.on("failed", (job, err) => {
     console.error(`[${worker.name}] Job ${job?.id} failed:`, err);
@@ -140,12 +108,9 @@ async function shutdown(): Promise<void> {
   console.log("Shutting down workers...");
   await Promise.all([
     importTorrentsWorker.close(),
-    refreshMetadataWorker.close(),
-    cleanupCacheWorker.close(),
     reverseSyncWorker.close(),
+    refreshExtrasWorker.close(),
     importTorrentsQueue.close(),
-    refreshMetadataQueue.close(),
-    cleanupCacheQueue.close(),
     reverseSyncQueue.close(),
   ]);
   console.log("All workers shut down.");

@@ -15,6 +15,13 @@
       "when": 1774686458577,
       "tag": "0001_red_sumo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774900391823,
+      "tag": "0002_short_kat_farrell",
+      "breakpoints": true
     }
   ]
 }

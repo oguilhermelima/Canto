@@ -743,6 +743,8 @@ export class TmdbProvider implements MetadataProvider {
       numberOfSeasons: (data.number_of_seasons as number) ?? undefined,
       numberOfEpisodes: (data.number_of_episodes as number) ?? undefined,
       inProduction: (data.in_production as boolean) ?? undefined,
+      nextAirDate: (data.next_episode_to_air as Record<string, unknown> | null)
+        ?.air_date as string | undefined,
       productionCompanies,
       productionCountries,
     };

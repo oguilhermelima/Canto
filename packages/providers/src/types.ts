@@ -72,6 +72,7 @@ export interface NormalizedMedia {
   numberOfSeasons?: number;
   numberOfEpisodes?: number;
   inProduction?: boolean;
+  nextAirDate?: string;
   // Movie
   budget?: number;
   revenue?: number;

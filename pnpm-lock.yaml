@@ -165,6 +165,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@canto/api':
+        specifier: workspace:*
+        version: link:../../packages/api
       '@canto/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -220,6 +223,9 @@ importers:
       fast-xml-parser:
         specifier: ^5.5.9
         version: 5.5.9
+      ioredis:
+        specifier: ^5.6.1
+        version: 5.10.1
       superjson:
         specifier: ^2.2.2
         version: 2.2.6

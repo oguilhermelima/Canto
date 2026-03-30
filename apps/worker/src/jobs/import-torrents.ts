@@ -6,6 +6,14 @@ import { eq } from "drizzle-orm";
 import { db } from "@canto/db/client";
 import { library, media, mediaFile, torrent } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
+import {
+  isVideoFile,
+  sanitizeName,
+  buildMediaDir,
+  buildFileName,
+  EP_PATTERN,
+  detectQuality,
+} from "@canto/api/domain/rules";
 
 const execAsync = promisify(exec);
 
@@ -84,54 +92,7 @@ async function sshExec(command: string): Promise<string> {
   return stdout.trim();
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Naming helpers                                                             */
-/* -------------------------------------------------------------------------- */
-
-const VIDEO_EXTENSIONS = new Set([
-  ".mkv", ".mp4", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".ts",
-]);
-
-const EPISODE_PATTERN = /[Ss](\d{1,2})[Ee](\d{1,3})/;
-
-function isVideoFile(filename: string): boolean {
-  const ext = filename.substring(filename.lastIndexOf(".")).toLowerCase();
-  return VIDEO_EXTENSIONS.has(ext);
-}
-
-function sanitizeName(name: string): string {
-  return name
-    .replace(/[<>:"/\\|?*]+/g, "")
-    .replace(/\.+$/, "")
-    .trim();
-}
-
-function buildMediaDir(
-  mediaItem: { title: string; year: number | null; externalId: number; provider: string; type: string },
-  seasonNumber?: number,
-): string {
-  const safeTitle = sanitizeName(mediaItem.title);
-  const yearSuffix = mediaItem.year ? ` (${mediaItem.year})` : "";
-  const providerTag = mediaItem.provider === "tmdb" ? "tmdbid" : mediaItem.provider;
-  const idTag = `[${providerTag}-${mediaItem.externalId}]`;
-  const baseName = `${safeTitle}${yearSuffix} ${idTag}`;
-
-  if (mediaItem.type === "movie") {
-    return baseName;
-  }
-
-  const seasonPadded = String(seasonNumber ?? 1).padStart(2, "0");
-  return `${baseName}/Season ${seasonPadded}`;
-}
-
-function detectQuality(filename: string): string {
-  const lower = filename.toLowerCase();
-  if (lower.includes("2160p") || lower.includes("4k") || lower.includes("uhd")) return "uhd";
-  if (lower.includes("1080p") || lower.includes("fullhd")) return "fullhd";
-  if (lower.includes("720p")) return "hd";
-  if (lower.includes("480p") || lower.includes("360p")) return "sd";
-  return "unknown";
-}
+/* Naming helpers moved to @canto/api/domain/rules */
 
 /* -------------------------------------------------------------------------- */
 /*  Media server scan trigger                                                  */
@@ -294,7 +255,7 @@ async function importTorrent(
       const ext = vf.name.substring(vf.name.lastIndexOf("."));
 
       if (mediaRow.type === "show") {
-        const match = EPISODE_PATTERN.exec(vf.name);
+        const match = EP_PATTERN.exec(vf.name);
         if (match) {
           seasonNumber = parseInt(match[1]!, 10);
           const episodeNum = parseInt(match[2]!, 10);
@@ -308,19 +269,20 @@ async function importTorrent(
       const mediaDir = buildMediaDir(mediaRow, seasonNumber);
       const targetDir = `${basePath}/${mediaDir}`;
 
+      // Build filename with media title (Roadmap 1.1)
       let targetFilename: string;
-      if (mediaRow.type === "show" && seasonNumber !== undefined) {
-        const match = EPISODE_PATTERN.exec(vf.name);
-        if (match) {
-          const sn = String(parseInt(match[1]!, 10)).padStart(2, "0");
-          const en = String(parseInt(match[2]!, 10)).padStart(2, "0");
-          targetFilename = `S${sn}E${en}${ext}`;
-        } else {
-          targetFilename = sanitizeName(vf.name.substring(vf.name.lastIndexOf("/") + 1));
-        }
+      const epMatch = EP_PATTERN.exec(vf.name);
+      const epNum = epMatch ? parseInt(epMatch[2]!, 10) : undefined;
+      if (epNum !== undefined || mediaRow.type === "movie") {
+        targetFilename = buildFileName(mediaRow, {
+          seasonNumber,
+          episodeNumber: epNum,
+          quality: row.quality !== "unknown" ? row.quality : detectQuality(vf.name),
+          source: row.source ?? "unknown",
+          extension: ext,
+        });
       } else {
-        const yearSuffix = mediaRow.year ? ` (${mediaRow.year})` : "";
-        targetFilename = `${sanitizeName(mediaRow.title)}${yearSuffix}${ext}`;
+        targetFilename = sanitizeName(vf.name.substring(vf.name.lastIndexOf("/") + 1));
       }
 
       const sourcePath = containerToHost(`${qbt.save_path}/${vf.name}`);

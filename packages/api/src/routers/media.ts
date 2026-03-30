@@ -1,11 +1,14 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, notInArray } from "drizzle-orm";
 import { z } from "zod";
 
 import {
-  extrasCache,
   media,
+  mediaCredit,
   mediaFile,
+  mediaVideo,
+  mediaWatchProvider,
+  recommendationPool,
   season,
 } from "@canto/db/schema";
 import { getProvider } from "@canto/providers";
@@ -20,6 +23,8 @@ import {
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getTmdbProvider } from "../lib/tmdb-client";
+import { dispatchRefreshExtras } from "../infrastructure/queue/bullmq-dispatcher";
+import { cached } from "../infrastructure/cache/redis";
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                   */
@@ -28,9 +33,6 @@ import { getTmdbProvider } from "../lib/tmdb-client";
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                    */
 /* -------------------------------------------------------------------------- */
-
-// Cache staleness threshold: 7 days
-const EXTRAS_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 async function getProviderWithKey(name: "tmdb" | "anilist" | "tvdb"): ReturnType<typeof getProvider> {
   if (name === "tmdb") {
@@ -43,12 +45,16 @@ export const mediaRouter = createTRPCRouter({
   /**
    * Search for media via external provider (nothing saved to DB).
    */
-  search: publicProcedure.input(searchInput).query(async ({ input }) => {
-    const provider = await getProviderWithKey(input.provider);
+  search: publicProcedure.input(searchInput).query(({ input }) => {
     const page = input.cursor ?? input.page;
-    return provider.search(input.query, input.type, {
-      page,
-    });
+    return cached(
+      `search:${input.provider}:${input.type}:${input.query}:${page}`,
+      300,
+      async () => {
+        const provider = await getProviderWithKey(input.provider);
+        return provider.search(input.query, input.type, { page });
+      },
+    );
   }),
 
   /**
@@ -102,7 +108,19 @@ export const mediaRouter = createTRPCRouter({
         },
       });
 
-      if (existing) return existing;
+      if (existing) {
+        // Stale-while-revalidate: dispatch background refresh if extras are old
+        if (existing.inLibrary) {
+          const STALE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+          const isStale =
+            !existing.extrasUpdatedAt ||
+            Date.now() - existing.extrasUpdatedAt.getTime() > STALE_MS;
+          if (isStale) {
+            void dispatchRefreshExtras(existing.id).catch(() => {});
+          }
+        }
+        return existing;
+      }
 
       // 2. Fetch full metadata from provider
       const provider = await getProviderWithKey(input.provider);
@@ -134,12 +152,12 @@ export const mediaRouter = createTRPCRouter({
 
   /**
    * Get extras (credits, similar, recommendations, videos, watch providers).
-   * Cached in extras_cache table; re-fetches if stale (>7 days).
+   * Reads from dedicated tables (populated by refresh-extras job).
+   * Falls back to extrasCache or TMDB if new tables are empty.
    */
   getExtras: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      // Look up the media record to get external_id and provider
       const row = await ctx.db.query.media.findFirst({
         where: eq(media.id, input.id),
       });
@@ -151,39 +169,117 @@ export const mediaRouter = createTRPCRouter({
         });
       }
 
-      // Check extras cache
-      const cached = await ctx.db.query.extrasCache.findFirst({
-        where: eq(extrasCache.mediaId, input.id),
-      });
+      // Try reading from new dedicated tables
+      const [credits, videos, watchProviders, similar, recommendations] = await Promise.all([
+        ctx.db.query.mediaCredit.findMany({
+          where: eq(mediaCredit.mediaId, input.id),
+          orderBy: (c, { asc }) => [asc(c.order)],
+        }),
+        ctx.db.query.mediaVideo.findMany({
+          where: eq(mediaVideo.mediaId, input.id),
+        }),
+        ctx.db.query.mediaWatchProvider.findMany({
+          where: eq(mediaWatchProvider.mediaId, input.id),
+        }),
+        ctx.db.query.recommendationPool.findMany({
+          where: and(
+            eq(recommendationPool.sourceMediaId, input.id),
+            eq(recommendationPool.sourceType, "similar"),
+          ),
+        }),
+        ctx.db.query.recommendationPool.findMany({
+          where: and(
+            eq(recommendationPool.sourceMediaId, input.id),
+            eq(recommendationPool.sourceType, "recommendation"),
+          ),
+        }),
+      ]);
 
-      if (cached) {
-        const age = Date.now() - new Date(cached.updatedAt).getTime();
-        if (age < EXTRAS_CACHE_MAX_AGE_MS) {
-          return cached.data as import("@canto/providers").MediaExtras;
+      // If new tables have data, build response from them
+      if (credits.length > 0 || videos.length > 0) {
+        const cast = credits
+          .filter((c) => c.type === "cast")
+          .map((c) => ({
+            id: c.personId,
+            name: c.name,
+            character: c.character ?? "",
+            profilePath: c.profilePath ?? undefined,
+            order: c.order,
+          }));
+
+        const crew = credits
+          .filter((c) => c.type === "crew")
+          .map((c) => ({
+            id: c.personId,
+            name: c.name,
+            job: c.job ?? "",
+            department: c.department ?? "",
+            profilePath: c.profilePath ?? undefined,
+          }));
+
+        const mapPoolToSearchResult = (item: typeof similar[number]) => ({
+          externalId: item.tmdbId,
+          provider: "tmdb" as const,
+          type: item.mediaType as "movie" | "show",
+          title: item.title,
+          overview: item.overview ?? undefined,
+          posterPath: item.posterPath ?? undefined,
+          backdropPath: item.backdropPath ?? undefined,
+          releaseDate: item.releaseDate ?? undefined,
+          year: item.releaseDate ? new Date(item.releaseDate).getFullYear() : undefined,
+          voteAverage: item.voteAverage ?? undefined,
+        });
+
+        // Group watch providers by region
+        const wpByRegion: Record<string, {
+          link?: string;
+          flatrate?: Array<{ providerId: number; providerName: string; logoPath: string }>;
+          rent?: Array<{ providerId: number; providerName: string; logoPath: string }>;
+          buy?: Array<{ providerId: number; providerName: string; logoPath: string }>;
+        }> = {};
+
+        for (const wp of watchProviders) {
+          if (!wpByRegion[wp.region]) wpByRegion[wp.region] = {};
+          const region = wpByRegion[wp.region]!;
+          const entry = {
+            providerId: wp.providerId,
+            providerName: wp.providerName,
+            logoPath: wp.logoPath ?? "",
+          };
+          if (wp.type === "stream") {
+            (region.flatrate ??= []).push(entry);
+          } else if (wp.type === "rent") {
+            (region.rent ??= []).push(entry);
+          } else if (wp.type === "buy") {
+            (region.buy ??= []).push(entry);
+          }
         }
+
+        return {
+          credits: { cast, crew },
+          similar: similar.map(mapPoolToSearchResult),
+          recommendations: recommendations.map(mapPoolToSearchResult),
+          videos: videos.map((v) => ({
+            id: v.id,
+            key: v.externalKey,
+            name: v.name,
+            site: v.site,
+            type: v.type,
+            official: v.official,
+          })),
+          watchProviders: wpByRegion,
+        };
       }
 
-      // Fetch fresh extras from provider
+      // New tables empty — dispatch background refresh and return empty for now
+      void dispatchRefreshExtras(input.id).catch(() => {});
+
+      // Fetch from TMDB directly as one-time response (next call will have new tables populated)
       const provider = await getProviderWithKey(row.provider as "tmdb" | "anilist" | "tvdb");
-      const extras = await provider.getExtras(
+      return provider.getExtras(
         row.externalId,
         row.type as "movie" | "show",
       );
-
-      // Upsert cache
-      if (cached) {
-        await ctx.db
-          .update(extrasCache)
-          .set({ data: extras, updatedAt: new Date() })
-          .where(eq(extrasCache.id, cached.id));
-      } else {
-        await ctx.db.insert(extrasCache).values({
-          mediaId: input.id,
-          data: extras,
-        });
-      }
-
-      return extras;
     }),
 
   /**
@@ -208,6 +304,9 @@ export const mediaRouter = createTRPCRouter({
           message: "Media not found",
         });
       }
+
+      // Populate recommendation pool + extras in background
+      void dispatchRefreshExtras(updated.id).catch(() => {});
 
       return updated;
     }),
@@ -329,30 +428,32 @@ export const mediaRouter = createTRPCRouter({
         cursor: z.number().int().positive().nullish(),
       }),
     )
-    .query(async ({ input }) => {
-      const provider = await getTmdbProvider();
+    .query(({ input }) => {
       const page = input.cursor ?? input.page;
+      const cacheKey = `discover:${input.type}:${input.mode}:${input.genres ?? ""}:${input.language ?? ""}:${input.sortBy ?? ""}:${input.dateFrom ?? ""}:${page}`;
 
-      if (input.mode === "trending") {
-        // If genre/language filters are set, use filtered trending (fetches multiple pages)
-        if (input.genres || input.language) {
-          return provider.getTrendingFiltered(input.type, {
-            page,
-            genreIds: input.genres ? input.genres.split(",").map(Number) : undefined,
-            language: input.language,
-          });
+      return cached(cacheKey, 300, async () => {
+        const provider = await getTmdbProvider();
+
+        if (input.mode === "trending") {
+          if (input.genres || input.language) {
+            return provider.getTrendingFiltered(input.type, {
+              page,
+              genreIds: input.genres ? input.genres.split(",").map(Number) : undefined,
+              language: input.language,
+            });
+          }
+          return provider.getTrending(input.type, { page });
         }
-        return provider.getTrending(input.type, { page });
-      }
 
-      // Discover mode — pass all filters to TMDB Discover API
-      return provider.discover(input.type, {
-        page,
-        with_genres: input.genres,
-        with_original_language: input.language,
-        sort_by: input.sortBy ?? "popularity.desc",
-        first_air_date_gte: input.type === "show" ? input.dateFrom : undefined,
-        release_date_gte: input.type === "movie" ? input.dateFrom : undefined,
+        return provider.discover(input.type, {
+          page,
+          with_genres: input.genres,
+          with_original_language: input.language,
+          sort_by: input.sortBy ?? "popularity.desc",
+          first_air_date_gte: input.type === "show" ? input.dateFrom : undefined,
+          release_date_gte: input.type === "movie" ? input.dateFrom : undefined,
+        });
       });
     }),
 
@@ -361,14 +462,17 @@ export const mediaRouter = createTRPCRouter({
    */
   getPerson: publicProcedure
     .input(z.object({ personId: z.number() }))
-    .query(async ({ input }) => {
-      const provider = await getTmdbProvider();
-      return provider.getPerson(input.personId);
-    }),
+    .query(({ input }) =>
+      cached(`person:${input.personId}`, 86400, async () => {
+        const provider = await getTmdbProvider();
+        return provider.getPerson(input.personId);
+      }),
+    ),
 
   /**
    * Get recommendations based on the user's library.
-   * Picks random items from library, fetches TMDB recommendations, deduplicates.
+   * Reads from recommendation_pool (pre-computed).
+   * Falls back to TMDB if pool is empty (no library items with extras).
    */
   recommendations: publicProcedure
     .input(z.object({
@@ -376,113 +480,129 @@ export const mediaRouter = createTRPCRouter({
       pageSize: z.number().int().min(1).max(20).default(10),
     }).optional())
     .query(async ({ ctx, input }) => {
-    const page = input?.cursor ?? 0;
-    const pageSize = input?.pageSize ?? 10;
+      const page = input?.cursor ?? 0;
+      const pageSize = input?.pageSize ?? 10;
+      const offset = page * pageSize;
 
-    const libraryItems = await ctx.db.query.media.findMany({
-      where: eq(media.inLibrary, true),
-      columns: {
-        id: true,
-        externalId: true,
-        provider: true,
-        type: true,
-        title: true,
-      },
-      limit: 100,
-    });
+      // Get library external IDs to exclude items already in library
+      const libraryItems = await ctx.db.query.media.findMany({
+        where: eq(media.inLibrary, true),
+        columns: { externalId: true },
+      });
 
-    if (libraryItems.length === 0) return { items: [], nextCursor: null };
+      const libraryTmdbIds = libraryItems.map((m) => m.externalId);
 
-    // Use page as seed offset — pick different items per page
-    const seedStart = (page * 3) % libraryItems.length;
-    const seeds: typeof libraryItems = [];
-    for (let i = 0; i < 3 && i < libraryItems.length; i++) {
-      seeds.push(libraryItems[(seedStart + i) % libraryItems.length]!);
-    }
+      // Query pool, excluding library items, ordered by score
+      const poolItems = libraryTmdbIds.length > 0
+        ? await ctx.db.query.recommendationPool.findMany({
+            where: notInArray(recommendationPool.tmdbId, libraryTmdbIds),
+            orderBy: [desc(recommendationPool.score)],
+            limit: pageSize + 1,
+            offset,
+          })
+        : await ctx.db.query.recommendationPool.findMany({
+            orderBy: [desc(recommendationPool.score)],
+            limit: pageSize + 1,
+            offset,
+          });
 
-    const tmdb = await getTmdbProvider();
-    const libraryExternalIds = new Set(libraryItems.map((m) => `${m.provider}-${m.externalId}`));
-    const seen = new Set<string>();
-    const results: Array<{
-      externalId: number;
-      provider: string;
-      type: "movie" | "show";
-      title: string;
-      posterPath: string | null;
-      backdropPath: string | null;
-      year: number | undefined;
-      voteAverage: number | undefined;
-      overview: string | undefined;
-    }> = [];
+      if (poolItems.length > 0) {
+        // Deduplicate by tmdbId (same media can be recommended by multiple sources)
+        const seen = new Set<number>();
+        const unique = poolItems.filter((item) => {
+          if (seen.has(item.tmdbId)) return false;
+          seen.add(item.tmdbId);
+          return true;
+        });
 
-    await Promise.all(
-      seeds.map(async (item) => {
-        try {
-          const extras = await tmdb.getExtras(
-            Number(item.externalId),
-            item.type as "movie" | "show",
-          );
-          for (const rec of extras.recommendations ?? []) {
-            const key = `${rec.provider ?? "tmdb"}-${rec.externalId}`;
-            if (libraryExternalIds.has(key) || seen.has(key)) continue;
-            seen.add(key);
-            results.push({
-              externalId: rec.externalId,
-              provider: rec.provider ?? "tmdb",
-              type: (rec.type ?? item.type) as "movie" | "show",
-              title: rec.title,
-              posterPath: rec.posterPath ?? null,
-              backdropPath: rec.backdropPath ?? null,
-              year: rec.year,
-              voteAverage: rec.voteAverage,
-              overview: rec.overview,
-            });
+        const hasMore = unique.length > pageSize;
+        const items = unique.slice(0, pageSize).map((item) => ({
+          externalId: item.tmdbId,
+          provider: "tmdb",
+          type: item.mediaType as "movie" | "show",
+          title: item.title,
+          posterPath: item.posterPath ?? null,
+          backdropPath: item.backdropPath ?? null,
+          year: item.releaseDate ? new Date(item.releaseDate).getFullYear() : undefined,
+          voteAverage: item.voteAverage ?? undefined,
+          overview: item.overview ?? undefined,
+          logoPath: item.logoPath ?? null,
+          trailerKey: null as string | null,
+        }));
+
+        return { items, nextCursor: hasMore ? page + 1 : null };
+      }
+
+      // Fallback: TMDB (pool empty — no library items with refresh-extras yet)
+      if (libraryItems.length === 0) return { items: [], nextCursor: null };
+
+      const allLibrary = await ctx.db.query.media.findMany({
+        where: eq(media.inLibrary, true),
+        columns: { id: true, externalId: true, provider: true, type: true },
+        limit: 100,
+      });
+
+      const seedStart = (page * 3) % allLibrary.length;
+      const seeds: typeof allLibrary = [];
+      for (let i = 0; i < 3 && i < allLibrary.length; i++) {
+        seeds.push(allLibrary[(seedStart + i) % allLibrary.length]!);
+      }
+
+      const tmdb = await getTmdbProvider();
+      const libraryKeys = new Set(allLibrary.map((m) => `${m.provider}-${m.externalId}`));
+      const seenKeys = new Set<string>();
+      const results: Array<{
+        externalId: number;
+        provider: string;
+        type: "movie" | "show";
+        title: string;
+        posterPath: string | null;
+        backdropPath: string | null;
+        year: number | undefined;
+        voteAverage: number | undefined;
+        overview: string | undefined;
+        logoPath: string | null;
+        trailerKey: string | null;
+      }> = [];
+
+      await Promise.all(
+        seeds.map(async (item) => {
+          try {
+            const extras = await tmdb.getExtras(
+              Number(item.externalId),
+              item.type as "movie" | "show",
+            );
+            for (const rec of extras.recommendations ?? []) {
+              const key = `${rec.provider ?? "tmdb"}-${rec.externalId}`;
+              if (libraryKeys.has(key) || seenKeys.has(key)) continue;
+              seenKeys.add(key);
+              results.push({
+                externalId: rec.externalId,
+                provider: rec.provider ?? "tmdb",
+                type: (rec.type ?? item.type) as "movie" | "show",
+                title: rec.title,
+                posterPath: rec.posterPath ?? null,
+                backdropPath: rec.backdropPath ?? null,
+                year: rec.year,
+                voteAverage: rec.voteAverage,
+                overview: rec.overview,
+                logoPath: null,
+                trailerKey: null,
+              });
+            }
+          } catch {
+            // Skip failed seed
           }
-        } catch {
-          // Skip
-        }
-      }),
-    );
+        }),
+      );
 
-    // Sort by vote average, paginate
-    const sorted = results.sort((a, b) => (b.voteAverage ?? 0) - (a.voteAverage ?? 0));
-    const pageItems = sorted.slice(0, pageSize);
-    const hasMore = sorted.length > pageSize || libraryItems.length > (page + 1) * 3;
+      const sorted = results.sort((a, b) => (b.voteAverage ?? 0) - (a.voteAverage ?? 0));
+      const pageItems = sorted.slice(0, pageSize);
+      const hasMore = sorted.length > pageSize || allLibrary.length > (page + 1) * 3;
 
-    // Fetch logos + trailers in parallel
-    const enriched = await Promise.all(
-      pageItems.map(async (item) => {
-        const tmdbType = item.type === "show" ? "tv" : "movie";
-        let logoPath: string | null = null;
-        let trailerKey: string | null = null;
-
-        try {
-          const [images, videos] = await Promise.all([
-            tmdb.getImages(Number(item.externalId), tmdbType),
-            tmdb.getVideos(Number(item.externalId), tmdbType),
-          ]);
-
-          const enLogos = (images.logos ?? []).filter(
-            (l: { iso_639_1: string | null }) => l.iso_639_1 === "en",
-          );
-          if (enLogos.length > 0) logoPath = enLogos[0]!.file_path;
-
-          const trailer =
-            videos.find((v) => v.site === "YouTube" && v.type === "Trailer") ??
-            videos.find((v) => v.site === "YouTube" && v.type === "Teaser") ??
-            null;
-          if (trailer) trailerKey = trailer.key;
-        } catch {
-          // Skip
-        }
-
-        return { ...item, logoPath, trailerKey };
-      }),
-    );
-
-    return {
-      items: enriched,
-      nextCursor: hasMore ? page + 1 : null,
-    };
-  }),
+      return {
+        items: pageItems,
+        nextCursor: hasMore ? page + 1 : null,
+      };
+    }),
 });
