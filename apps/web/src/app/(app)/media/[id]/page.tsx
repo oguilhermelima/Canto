@@ -46,101 +46,14 @@ import { SimilarSection } from "~/components/media/similar-section";
 import { WhereToWatch } from "~/components/media/where-to-watch";
 import { useWatchRegion } from "~/hooks/use-watch-region";
 import { useDirectSearch } from "~/hooks/use-direct-search";
+import { PreferencesModal } from "~/components/media/manage/preferences-modal";
 
-/* ─── Helpers ─── */
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
-}
-
-function formatAge(days: number): string {
-  if (days <= 0) return "new";
-  if (days < 1) return `${Math.round(days * 24)}h`;
-  if (days < 30) return `${Math.round(days)}d`;
-  if (days < 365) return `${Math.round(days / 30)}mo`;
-  return `${(days / 365).toFixed(1)}y`;
-}
-
-function qualityBadge(
-  quality: string,
-): { label: string; className: string } | null {
-  switch (quality) {
-    case "uhd":
-      return {
-        label: "4K",
-        className: "bg-violet-500/20 text-violet-300 border-violet-500/30",
-      };
-    case "fullhd":
-      return {
-        label: "1080p",
-        className: "bg-blue-500/20 text-blue-300 border-blue-500/30",
-      };
-    case "hd":
-      return {
-        label: "720p",
-        className: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
-      };
-    case "sd":
-      return {
-        label: "SD",
-        className: "bg-slate-500/20 text-slate-300 border-slate-500/30",
-      };
-    default:
-      return null;
-  }
-}
-
-function sourceLabel(source: string): string {
-  const map: Record<string, string> = {
-    remux: "Remux",
-    bluray: "Blu-Ray",
-    webdl: "WEB-DL",
-    webrip: "WEBRip",
-    hdtv: "HDTV",
-    telesync: "TS",
-    cam: "CAM",
-    unknown: "",
-  };
-  return map[source] ?? source;
-}
-
-function sourceBadge(
-  source: string,
-): { label: string; className: string } | null {
-  const label = sourceLabel(source);
-  if (!label) return null;
-  switch (source) {
-    case "remux":
-    case "bluray":
-      return {
-        label,
-        className: "bg-purple-500/15 text-purple-400 border-purple-500/20",
-      };
-    case "webdl":
-    case "webrip":
-      return {
-        label,
-        className: "bg-blue-500/15 text-blue-400 border-blue-500/20",
-      };
-    case "hdtv":
-      return {
-        label,
-        className: "bg-teal-500/15 text-teal-400 border-teal-500/20",
-      };
-    case "telesync":
-    case "cam":
-      return {
-        label,
-        className: "bg-red-500/15 text-red-400 border-red-500/20",
-      };
-    default:
-      return null;
-  }
-}
+import {
+  formatBytes,
+  formatAge,
+  qualityBadge,
+  sourceBadge,
+} from "~/lib/torrent-utils";
 
 /* ─── Page ─── */
 
@@ -156,6 +69,7 @@ export default function MediaDetailPage({
   const router = useRouter();
   const [torrentDialogOpen, setTorrentDialogOpen] = useState(false);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [removeDeleteFiles, setRemoveDeleteFiles] = useState(false);
   const [removeDeleteTorrent, setRemoveDeleteTorrent] = useState(true);
   const [torrentSearchQuery, setTorrentSearchQuery] = useState("");
@@ -595,79 +509,10 @@ export default function MediaDetailPage({
                 setTorrentDialogOpen(true);
               },
             } : undefined}
+            onOpenPreferences={media.inLibrary ? () => setPreferencesOpen(true) : undefined}
             episodeAvailability={availability.data?.episodes}
             serverLinks={mediaServers.data}
           />
-        )}
-
-        {/* Download (Movies) */}
-        {media.type === "movie" && media.inLibrary === true && (
-          <section>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-semibold tracking-tight text-foreground">
-                Download
-              </h2>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => openTorrentDialog()}
-                className="gap-2"
-              >
-                <Search className="h-4 w-4" />
-                Search Torrent
-              </Button>
-            </div>
-            {mediaTorrents && mediaTorrents.length > 0 ? (
-              <div className="divide-y divide-border rounded-lg border border-border bg-card">
-                {mediaTorrents.map((t) => {
-                  const qb = qualityBadge(t.quality);
-                  const sb = sourceBadge(t.source);
-                  const statusMap: Record<string, { label: string; className: string }> = {
-                    downloading: { label: "Downloading", className: "bg-blue-500/15 text-blue-400 border-blue-500/20" },
-                    paused: { label: "Paused", className: "bg-yellow-500/15 text-yellow-400 border-yellow-500/20" },
-                    completed: { label: "Completed", className: "bg-green-500/15 text-green-400 border-green-500/20" },
-                    finished: { label: "Completed", className: "bg-green-500/15 text-green-400 border-green-500/20" },
-                    unknown: { label: "Unknown", className: "bg-muted text-muted-foreground border-border" },
-                    incomplete: { label: "Incomplete", className: "bg-orange-500/15 text-orange-400 border-orange-500/20" },
-                  };
-                  const resolvedStatus = t.imported
-                    ? { label: "Imported", className: "bg-green-500/15 text-green-400 border-green-500/20" }
-                    : t.progress >= 1
-                      ? { label: "Downloaded", className: "bg-green-500/15 text-green-400 border-green-500/20" }
-                      : (statusMap[t.status] ?? statusMap.unknown!);
-                  return (
-                    <div key={t.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3">
-                      <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-                        {t.title}
-                      </span>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {qb && (
-                          <Badge variant="outline" className={qb.className}>
-                            {qb.label}
-                          </Badge>
-                        )}
-                        {sb && (
-                          <Badge variant="outline" className={sb.className}>
-                            {sb.label}
-                          </Badge>
-                        )}
-                        <Badge variant="outline" className={resolvedStatus.className}>
-                          {resolvedStatus.label}
-                        </Badge>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="rounded-lg border border-border bg-card p-8 text-center">
-                <Download className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">
-                  No files downloaded yet. Use the search button to find torrents.
-                </p>
-              </div>
-            )}
-          </section>
         )}
 
         {/* Cast */}
@@ -689,6 +534,19 @@ export default function MediaDetailPage({
         />
       </div>
 
+
+      {/* Preferences modal */}
+      {media.inLibrary && (
+        <PreferencesModal
+          open={preferencesOpen}
+          onOpenChange={setPreferencesOpen}
+          mediaId={media.id}
+          mediaType={media.type as "movie" | "show"}
+          mediaTitle={media.title}
+          currentLibraryId={media.libraryId ?? null}
+          continuousDownload={media.continuousDownload ?? false}
+        />
+      )}
 
       {/* Remove from library dialog */}
       <Dialog
@@ -1216,6 +1074,7 @@ export default function MediaDetailPage({
           )}
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }
