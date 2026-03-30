@@ -321,7 +321,6 @@ function ServerLibraryGroup({
   isSyncingLibraries,
   isImporting,
   onSyncLibraries,
-  onImport,
   onToggle,
   onToggleSync,
   syncProgress,
@@ -336,7 +335,6 @@ function ServerLibraryGroup({
   syncProgress: number;
   isRunningOnServer: boolean;
   onSyncLibraries: () => void;
-  onImport: () => void;
   onToggle: (id: string, enabled: boolean) => void;
   onToggleSync: (id: string, syncEnabled: boolean) => void;
 }): React.JSX.Element | null {
@@ -344,7 +342,6 @@ function ServerLibraryGroup({
 
   const [showSyncedItems, setShowSyncedItems] = useState(false);
 
-  const hasSyncable = libraries.some((l) => l.enabled && l.syncEnabled);
   const isBusy = isSyncingLibraries || isImporting;
   const hasResults = syncStatus && syncStatus.status !== "running" && !isImporting && (syncStatus.imported + syncStatus.skipped + syncStatus.failed) > 0;
 
@@ -353,8 +350,8 @@ function ServerLibraryGroup({
       {/* Header */}
       <div className="flex items-center justify-between bg-muted/30 px-5 py-3.5">
         <p className="text-base font-semibold text-foreground">{server}</p>
-        <div className="flex items-center gap-3">
-          {isBusy && (
+        <div className="flex items-center gap-2">
+          {isImporting && (
             <div className="flex items-center gap-2">
               {isRunningOnServer ? (
                 <>
@@ -371,11 +368,11 @@ function ServerLibraryGroup({
           <Button
             size="sm"
             variant="ghost"
-            onClick={onImport}
-            disabled={isBusy || !hasSyncable}
+            onClick={onSyncLibraries}
+            disabled={isBusy}
           >
-            {isBusy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
-            {isSyncingLibraries ? "Discovering..." : isBusy ? "Importing..." : "Sync media"}
+            {isSyncingLibraries ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
+            {isSyncingLibraries ? "Refreshing..." : "Refresh libraries"}
           </Button>
         </div>
       </div>
@@ -405,21 +402,24 @@ function ServerLibraryGroup({
                   <Download className="h-4 w-4 shrink-0" />
                   <span>Use for downloads</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => lib.enabled && onToggleSync(lib.id, !lib.syncEnabled)}
+                <div
                   className={cn(
-                    "flex flex-1 items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-sm transition-all select-none",
+                    "flex items-center justify-between rounded-xl border px-3.5 py-2.5 text-sm transition-all",
                     !lib.enabled
-                      ? "pointer-events-none border-border/20 text-muted-foreground/40"
-                      : lib.syncEnabled
-                        ? "border-primary/40 bg-primary/5 text-foreground"
-                        : "border-border/40 text-muted-foreground hover:border-border/60",
+                      ? "border-border/20 text-muted-foreground/40"
+                      : "border-border/40",
                   )}
                 >
-                  <RefreshCw className="h-4 w-4 shrink-0" />
-                  <span>Import existing media</span>
-                </button>
+                  <div className="flex items-center gap-2.5">
+                    <RefreshCw className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className={lib.enabled ? "text-foreground" : "text-muted-foreground/40"}>Automatic sync</span>
+                  </div>
+                  <Switch
+                    checked={lib.syncEnabled}
+                    onCheckedChange={(checked) => onToggleSync(lib.id, checked)}
+                    disabled={!lib.enabled}
+                  />
+                </div>
               </div>
             </div>
           ))}
@@ -520,7 +520,6 @@ function LibrariesSection(): React.JSX.Element {
   const isSyncing = busy || serverRunning;
   const syncProgress = serverRunning && syncStatus && syncStatus.total > 0
     ? Math.round((syncStatus.processed / syncStatus.total) * 100) : 0;
-  const hasSyncableLibraries = (libraries ?? []).some((l) => l.enabled && l.syncEnabled);
 
   const jellyfinLibs = (libraries ?? []).filter((l) => l.jellyfinLibraryId);
   const plexLibs = (libraries ?? []).filter((l) => l.plexLibraryId);
@@ -538,27 +537,6 @@ function LibrariesSection(): React.JSX.Element {
       syncPlex.mutate();
     }
   }, [isLoading, libraries, jellyfinEnabled, plexEnabled, jellyfinLibs.length, plexLibs.length, syncJellyfin, syncPlex]);
-
-  const triggerImport = (syncLibraryPromise?: Promise<unknown>): void => {
-    setBusy(true);
-    busyStarted.current = Date.now();
-
-    const doImport = (): void => {
-      importMedia.mutate(undefined, {
-        onSuccess: (data) => {
-          if (!data.started) { toast.error("Import already running"); setBusy(false); }
-          // Don't setBusy(false) on success — wait for polling to see it complete
-        },
-        onError: () => { toast.error("Failed to start import"); setBusy(false); },
-      });
-    };
-
-    if (syncLibraryPromise) {
-      syncLibraryPromise.then(() => doImport()).catch(() => { toast.error("Failed to sync libraries"); setBusy(false); });
-    } else {
-      doImport();
-    }
-  };
 
   return (
     <div>
@@ -583,7 +561,6 @@ function LibrariesSection(): React.JSX.Element {
               syncProgress={syncProgress}
               isRunningOnServer={!!serverRunning}
               onSyncLibraries={() => syncJellyfin.mutate()}
-              onImport={() => triggerImport(syncJellyfin.mutateAsync())}
               onToggle={(id, enabled) => toggleLibrary.mutate({ id, enabled })}
               onToggleSync={(id, syncEnabled) => toggleSync.mutate({ id, syncEnabled })}
             />
@@ -597,7 +574,6 @@ function LibrariesSection(): React.JSX.Element {
               syncProgress={syncProgress}
               isRunningOnServer={!!serverRunning}
               onSyncLibraries={() => syncPlex.mutate()}
-              onImport={() => triggerImport(syncPlex.mutateAsync())}
               onToggle={(id, enabled) => toggleLibrary.mutate({ id, enabled })}
               onToggleSync={(id, syncEnabled) => toggleSync.mutate({ id, syncEnabled })}
             />
