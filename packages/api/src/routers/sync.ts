@@ -118,7 +118,7 @@ export const syncRouter = createTRPCRouter({
     .input(z.object({ query: z.string().min(1) }))
     .query(async ({ input }) => {
       const tmdb = await getTmdbProvider();
-      return tmdb.search(input.query, {});
+      return tmdb.search(input.query, "movie");
     }),
 
   /**

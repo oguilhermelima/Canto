@@ -38,3 +38,5 @@ drizzle/meta/
 
 # Legacy
 old/
+.pnpm-store/
+.superset/

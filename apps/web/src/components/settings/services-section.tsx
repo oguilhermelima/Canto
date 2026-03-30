@@ -381,7 +381,7 @@ function MediaServerRow({
         <div className="min-w-0 pr-4">
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium text-foreground">{title}</p>
-            {isConnected && <CheckCircle className="h-3.5 w-3.5 text-green-500" />}
+            {!!isConnected && <CheckCircle className="h-3.5 w-3.5 text-green-500" />}
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">{description}</p>
         </div>

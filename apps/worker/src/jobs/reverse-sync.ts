@@ -478,13 +478,11 @@ export async function handleReverseSync(): Promise<void> {
         }
 
         if (!tmdbId) {
-          const results = await tmdb.search(item.title, {
-            type: item.type,
-            year: item.year,
-          });
-          if (results.length === 1) {
-            tmdbId = results[0]!.externalId;
-            resolvedType = results[0]!.type as "movie" | "show";
+          const query = item.year ? `${item.title} ${item.year}` : item.title;
+          const searchResult = await tmdb.search(query, item.type);
+          if (searchResult.results.length === 1) {
+            tmdbId = searchResult.results[0]!.externalId;
+            resolvedType = searchResult.results[0]!.type as "movie" | "show";
           }
         }
 

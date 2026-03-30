@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { Database } from "@canto/db/client";
 import { library, media, mediaFile, torrent } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
+import { getJellyfinCredentials } from "../lib/server-credentials";
 import {
   torrentDownloadInput,
   torrentSearchInput,
@@ -301,15 +302,16 @@ async function autoMergeIfEnabled(
     // Check user preference (default: true)
     // For now, always merge. User preference check will come from Phase 4.
 
-    if (!JELLYFIN_URL_ENV || !JELLYFIN_API_KEY_ENV) return;
+    const jellyfinCreds = await getJellyfinCredentials();
+    if (!jellyfinCreds) return;
 
     // Wait for Jellyfin scan to process
     await new Promise((resolve) => setTimeout(resolve, 5000));
 
     // Search for items matching this media
     const searchRes = await fetch(
-      `${JELLYFIN_URL_ENV}/Items?searchTerm=${encodeURIComponent(mediaRow.title)}&Recursive=true&IncludeItemTypes=${mediaRow.type === "movie" ? "Movie" : "Series"}&Fields=Path,ProviderIds`,
-      { headers: { "X-Emby-Token": JELLYFIN_API_KEY_ENV } },
+      `${jellyfinCreds.url}/Items?searchTerm=${encodeURIComponent(mediaRow.title)}&Recursive=true&IncludeItemTypes=${mediaRow.type === "movie" ? "Movie" : "Series"}&Fields=Path,ProviderIds`,
+      { headers: { "X-Emby-Token": jellyfinCreds.apiKey } },
     );
     if (!searchRes.ok) return;
 
@@ -324,9 +326,9 @@ async function autoMergeIfEnabled(
 
     if (matchingItems.length >= 2) {
       const ids = matchingItems.map(i => i.Id).join(",");
-      await fetch(`${JELLYFIN_URL_ENV}/Videos/MergeVersions?Ids=${ids}`, {
+      await fetch(`${jellyfinCreds.url}/Videos/MergeVersions?Ids=${ids}`, {
         method: "POST",
-        headers: { "X-Emby-Token": JELLYFIN_API_KEY_ENV },
+        headers: { "X-Emby-Token": jellyfinCreds.apiKey },
       });
       console.log(`[auto-import] Merged ${matchingItems.length} Jellyfin versions for "${mediaRow.title}"`);
     }

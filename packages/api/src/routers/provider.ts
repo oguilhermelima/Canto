@@ -217,10 +217,12 @@ export const providerRouter = createTRPCRouter({
     }));
 
     // Interleave for variety
-    const mixed: typeof movies = [];
+    const mixed: Array<(typeof movies)[number] | (typeof shows)[number]> = [];
     for (let i = 0; i < 5; i++) {
-      if (shows[i]) mixed.push(shows[i]);
-      if (movies[i]) mixed.push(movies[i]);
+      const show = shows[i];
+      const movie = movies[i];
+      if (show) mixed.push(show);
+      if (movie) mixed.push(movie);
     }
 
     // Fetch backdrops + logos in parallel

@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@canto/db/client";
 import { episode, media, season } from "@canto/db/schema";
 import { getProvider } from "@canto/providers";
-import type { MediaType, ProviderName } from "@canto/providers";
+import type { MediaType, NormalizedEpisode, ProviderName } from "@canto/providers";
 
 /* -------------------------------------------------------------------------- */
 /*  Constants                                                                  */
@@ -101,7 +101,7 @@ async function refreshSingleItem(item: {
   externalId: number;
   type: string;
 }): Promise<void> {
-  const provider = getProvider(item.provider as ProviderName);
+  const provider = await getProvider(item.provider as ProviderName);
   const normalized = await provider.getMetadata(
     item.externalId,
     item.type as MediaType,
@@ -168,7 +168,7 @@ async function refreshSingleItem(item: {
 
       if (insertedSeason && s.episodes && s.episodes.length > 0) {
         await db.insert(episode).values(
-          s.episodes.map((ep) => ({
+          s.episodes.map((ep: NormalizedEpisode) => ({
             seasonId: insertedSeason.id,
             number: ep.number,
             externalId: ep.externalId,

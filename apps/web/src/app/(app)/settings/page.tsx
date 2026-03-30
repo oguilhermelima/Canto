@@ -276,9 +276,9 @@ function SyncedItemsTable(): React.JSX.Element {
             </div>
 
             {/* Search results */}
-            {searchResults.data && searchResults.data.length > 0 && (
+            {searchResults.data && searchResults.data.results.length > 0 && (
               <div className="max-h-60 overflow-y-auto rounded-lg border border-border/40">
-                {searchResults.data.slice(0, 10).map((result) => (
+                {searchResults.data.results.slice(0, 10).map((result) => (
                   <button
                     key={`${result.externalId}-${result.type}`}
                     type="button"
@@ -561,7 +561,7 @@ function LibrariesSection(): React.JSX.Element {
               server="Jellyfin"
               enabled={jellyfinEnabled}
               libraries={jellyfinLibs}
-              syncStatus={syncStatus}
+              syncStatus={syncStatus ?? null}
               isSyncingLibraries={syncJellyfin.isPending}
               isImporting={isSyncing}
               syncProgress={syncProgress}
@@ -575,7 +575,7 @@ function LibrariesSection(): React.JSX.Element {
               server="Plex"
               enabled={plexEnabled}
               libraries={plexLibs}
-              syncStatus={syncStatus}
+              syncStatus={syncStatus ?? null}
               isSyncingLibraries={syncPlex.isPending}
               isImporting={isSyncing}
               syncProgress={syncProgress}
