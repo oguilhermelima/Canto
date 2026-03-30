@@ -131,6 +131,19 @@ function showTestResult(data: { connected: boolean; error?: string; serverName?:
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Brand colors                                                               */
+/* -------------------------------------------------------------------------- */
+
+const BRAND_GRADIENT: Record<string, string> = {
+  jellyfin: "from-[#a95ce0]/15 via-[#4bb8e8]/10 to-transparent",
+  plex: "from-[#e5a00d]/15 via-[#e5a00d]/5 to-transparent",
+  tmdb: "from-[#01b4e4]/15 via-[#90cea1]/10 to-transparent",
+  qbittorrent: "from-[#4488cc]/15 via-[#4488cc]/5 to-transparent",
+  prowlarr: "from-[#e77220]/15 via-[#e77220]/5 to-transparent",
+  jackett: "from-[#c23c2a]/15 via-[#c23c2a]/5 to-transparent",
+};
+
+/* -------------------------------------------------------------------------- */
 /*  ServiceRow                                                                 */
 /* -------------------------------------------------------------------------- */
 
@@ -190,7 +203,7 @@ function ServiceRow({
         tabIndex={0}
         onClick={handleToggle}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleToggle(); } }}
-        className="flex w-full items-center justify-between px-5 py-5 text-left cursor-pointer"
+        className={cn("flex w-full items-center justify-between px-5 py-5 text-left cursor-pointer bg-gradient-to-r", BRAND_GRADIENT[serviceKey] ?? "")}
       >
         <div className="min-w-0 pr-4">
           <div className="flex items-center gap-2">
@@ -660,7 +673,7 @@ function TmdbSection(): React.JSX.Element {
   }
 
   return (
-    <div className="px-5 py-5">
+    <div className={cn("px-5 py-5 bg-gradient-to-r", BRAND_GRADIENT.tmdb)}>
       <div className="flex items-center gap-2">
         <p className="text-sm font-medium text-foreground">TMDB API Key</p>
         <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Required</Badge>
@@ -749,7 +762,7 @@ export function ServicesSection(): React.JSX.Element {
       </SettingsSection>
 
       <SettingsSection title="Download Client" description="Torrent client for downloading and managing media files.">
-        <SectionCard title="Download Client">
+        <SectionCard title="qBittorrent">
           <ServiceRow
             title="qBittorrent"
             description="Torrent client for downloading media. Manages torrents, organizes files, and triggers imports."
@@ -765,7 +778,7 @@ export function ServicesSection(): React.JSX.Element {
       </SettingsSection>
 
       <SettingsSection title="Indexers" description="Search aggregators for finding torrents across multiple trackers.">
-        <SectionCard title="Indexers">
+        <SectionCard title="Prowlarr">
           <ServiceRow
             title="Prowlarr"
             description="Indexer manager that aggregates torrent search across multiple trackers."
@@ -774,7 +787,10 @@ export function ServicesSection(): React.JSX.Element {
               { key: "prowlarr.url", label: "URL", placeholder: "http://localhost:9696" },
               { key: "prowlarr.apiKey", label: "API Key", placeholder: "Your Prowlarr API key", secret: true },
             ]}
+            isLast
           />
+        </SectionCard>
+        <SectionCard title="Jackett">
           <ServiceRow
             title="Jackett"
             description="Torznab-compatible indexer proxy. Alternative to Prowlarr for searching across torrent trackers."

@@ -29,7 +29,7 @@ export function SettingsSection({
           <p className="mt-1 text-sm text-muted-foreground leading-relaxed">{description}</p>
         )}
       </div>
-      <div className="min-w-0">{children}</div>
+      <div className="min-w-0 space-y-4">{children}</div>
     </div>
   );
 }
