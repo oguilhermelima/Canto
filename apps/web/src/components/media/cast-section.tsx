@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Skeleton } from "@canto/ui/skeleton";
@@ -20,8 +20,8 @@ interface CastSectionProps {
   className?: string;
 }
 
-/** Height that fits exactly one row of cast cards (130px image + ~50px text) */
-const ONE_ROW_HEIGHT = 190;
+/** Collapsed height — enough for one row including character names */
+const COLLAPSED_HEIGHT = 230;
 
 export function CastSection({
   credits,
@@ -29,14 +29,27 @@ export function CastSection({
   className,
 }: CastSectionProps): React.JSX.Element {
   const [showAll, setShowAll] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [fullHeight, setFullHeight] = useState<number>(0);
+
+  const measure = useCallback(() => {
+    if (contentRef.current) {
+      setFullHeight(contentRef.current.scrollHeight);
+    }
+  }, []);
+
+  useEffect(() => {
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [measure, credits]);
 
   if (!isLoading && credits.length === 0) {
     return <></>;
   }
 
   const sorted = credits.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
-  // Show all items but clip to one row via maxHeight when collapsed
-  const hasMore = sorted.length > 6;
+  const hasMore = fullHeight > COLLAPSED_HEIGHT;
 
   return (
     <section className={className}>
@@ -59,8 +72,12 @@ export function CastSection({
 
       <div className="relative">
         <div
-          className="flex flex-wrap gap-6 overflow-hidden transition-[max-height] duration-500 ease-in-out"
-          style={{ maxHeight: showAll ? `${sorted.length * ONE_ROW_HEIGHT}px` : `${ONE_ROW_HEIGHT}px` }}
+          ref={contentRef}
+          className="-m-2 grid grid-cols-4 justify-items-center gap-x-2 gap-y-4 overflow-hidden p-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8"
+          style={{
+            maxHeight: showAll ? fullHeight : COLLAPSED_HEIGHT,
+            transition: "max-height 400ms cubic-bezier(0.4, 0, 0.2, 1)",
+          }}
         >
           {isLoading
             ? Array.from({ length: 8 }).map((_, i) => (
@@ -71,7 +88,11 @@ export function CastSection({
               ))}
         </div>
         {hasMore && !showAll && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background to-transparent" />
+          <button
+            type="button"
+            onClick={() => setShowAll(true)}
+            className="absolute inset-x-0 bottom-0 h-16 cursor-pointer bg-gradient-to-t from-background to-transparent"
+          />
         )}
       </div>
     </section>
@@ -87,7 +108,7 @@ function CastCard({
   return (
     <Link
       href={`/person/${id}`}
-      className="group w-[110px] shrink-0 transition-transform duration-200 hover:scale-105 sm:w-[130px]"
+      className="group w-full max-w-[130px] transition-transform duration-200 hover:scale-105"
     >
       <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-full bg-muted ring-2 ring-border/20 transition-[filter] duration-200 group-hover:brightness-110">
         {profilePath ? (
@@ -108,7 +129,7 @@ function CastCard({
         {name}
       </p>
       {character && (
-        <p className="line-clamp-1 text-center text-xs text-muted-foreground/60">
+        <p className="text-center text-sm text-muted-foreground/60">
           {character}
         </p>
       )}
@@ -118,7 +139,7 @@ function CastCard({
 
 function CastCardSkeleton(): React.JSX.Element {
   return (
-    <div className="w-[110px] shrink-0 sm:w-[130px]">
+    <div className="w-full max-w-[130px]">
       <Skeleton className="mb-2 aspect-square w-full rounded-full" />
       <Skeleton className="mx-auto h-4 w-16" />
       <Skeleton className="mx-auto mt-1 h-3 w-12" />
