@@ -23,6 +23,14 @@
     "./domain/use-cases/refresh-extras": {
       "types": "./src/domain/use-cases/refresh-extras.ts",
       "default": "./src/domain/use-cases/refresh-extras.ts"
+    },
+    "./domain/use-cases/search-torrents": {
+      "types": "./src/domain/use-cases/search-torrents.ts",
+      "default": "./src/domain/use-cases/search-torrents.ts"
+    },
+    "./domain/use-cases/download-torrent": {
+      "types": "./src/domain/use-cases/download-torrent.ts",
+      "default": "./src/domain/use-cases/download-torrent.ts"
     }
   },
   "scripts": {

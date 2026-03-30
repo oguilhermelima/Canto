@@ -6,6 +6,8 @@ import { eq } from "drizzle-orm";
 import { db } from "@canto/db/client";
 import { library, media, mediaFile, torrent } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
+import { searchTorrents } from "@canto/api/domain/use-cases/search-torrents";
+import { downloadTorrent } from "@canto/api/domain/use-cases/download-torrent";
 import {
   isVideoFile,
   sanitizeName,
@@ -13,6 +15,8 @@ import {
   buildFileName,
   EP_PATTERN,
   detectQuality,
+  isSubtitleFile,
+  parseSubtitleLanguage,
 } from "@canto/api/domain/rules";
 
 const execAsync = promisify(exec);
@@ -162,6 +166,15 @@ export async function handleImportTorrents(): Promise<void> {
       if (result.success) {
         importedAny = true;
         lastLibraryId = result.libraryId;
+
+        // Continuous download: try to grab next episode
+        if (row.mediaId && result.mediaRow) {
+          void tryContinuousDownload(
+            result.mediaRow,
+            row.seasonNumber,
+            row.episodeNumbers,
+          ).catch(() => {});
+        }
       }
     } catch (err) {
       console.error(
@@ -178,7 +191,11 @@ export async function handleImportTorrents(): Promise<void> {
 
 async function importTorrent(
   row: typeof torrent.$inferSelect,
-): Promise<{ success: boolean; libraryId?: string }> {
+): Promise<{
+  success: boolean;
+  libraryId?: string;
+  mediaRow?: { id: string; type: string; continuousDownload: boolean; title: string };
+}> {
   if (!row.hash || !row.mediaId) return { success: false };
 
   const mediaRow = await db.query.media.findFirst({
@@ -215,12 +232,22 @@ async function importTorrent(
   );
 
   const videoFiles = files.filter((f) => isVideoFile(f.name));
+  const subtitleFiles = files.filter((f) => isSubtitleFile(f.name));
+
   if (videoFiles.length === 0) {
     console.warn(`[import-torrents] No video files in torrent "${row.title}"`);
     await db
       .update(torrent)
       .set({ imported: true, updatedAt: new Date() })
       .where(eq(torrent.id, row.id));
+    return { success: false };
+  }
+
+  // Movie validation: skip auto-import if multiple video files
+  if (mediaRow.type === "movie" && videoFiles.length > 1) {
+    console.warn(
+      `[import-torrents] Movie "${mediaRow.title}" has ${videoFiles.length} video files — skipping (expected single file)`,
+    );
     return { success: false };
   }
 
@@ -316,6 +343,50 @@ async function importTorrent(
     }
   }
 
+  // Copy subtitle files alongside video
+  for (const sf of subtitleFiles) {
+    try {
+      const lang = parseSubtitleLanguage(sf.name);
+      const subExt = sf.name.substring(sf.name.lastIndexOf("."));
+      const langSuffix = lang ? `.${lang}` : "";
+
+      let seasonNumber = row.seasonNumber ?? undefined;
+      let targetSubName: string | undefined;
+
+      if (mediaRow.type === "show") {
+        const match = EP_PATTERN.exec(sf.name);
+        if (match) {
+          seasonNumber = parseInt(match[1]!, 10);
+          const epNum = parseInt(match[2]!, 10);
+          targetSubName = buildFileName(mediaRow, {
+            seasonNumber,
+            episodeNumber: epNum,
+            quality: row.quality,
+            source: row.source ?? "unknown",
+            extension: `${langSuffix}${subExt}`,
+          });
+        }
+      } else {
+        targetSubName = buildFileName(mediaRow, {
+          quality: row.quality,
+          source: row.source ?? "unknown",
+          extension: `${langSuffix}${subExt}`,
+        });
+      }
+
+      if (targetSubName) {
+        const subMediaDir = buildMediaDir(mediaRow, seasonNumber);
+        const subTargetDir = `${basePath}/${subMediaDir}`;
+        const subSourcePath = containerToHost(`${qbt.save_path}/${sf.name}`);
+        const subTargetPath = `${subTargetDir}/${targetSubName}`;
+        await sshExec(`cp '${subSourcePath}' '${subTargetPath}'`);
+        console.log(`[import-torrents] Subtitle: ${sf.name} → ${subTargetPath}`);
+      }
+    } catch {
+      // Non-critical — skip subtitle
+    }
+  }
+
   await db
     .update(torrent)
     .set({
@@ -329,7 +400,64 @@ async function importTorrent(
     `[import-torrents] Imported ${importedCount} file(s) for "${mediaRow.title}" from "${row.title}"`,
   );
 
-  return { success: importedCount > 0, libraryId: mediaRow.libraryId ?? undefined };
+  return {
+    success: importedCount > 0,
+    libraryId: mediaRow.libraryId ?? undefined,
+    mediaRow: {
+      id: mediaRow.id,
+      type: mediaRow.type,
+      continuousDownload: mediaRow.continuousDownload,
+      title: mediaRow.title,
+    },
+  };
+}
+
+/**
+ * After a show episode import, check if continuous download is enabled.
+ * If so, find the next un-downloaded episode and auto-download it.
+ */
+async function tryContinuousDownload(
+  mediaRow: { id: string; type: string; continuousDownload: boolean; title: string },
+  importedSeasonNumber: number | null,
+  importedEpisodeNumbers: number[] | null,
+): Promise<void> {
+  if (mediaRow.type !== "show" || !mediaRow.continuousDownload) return;
+  if (!importedEpisodeNumbers?.length || !importedSeasonNumber) return;
+
+  const lastImportedEp = Math.max(...importedEpisodeNumbers);
+  const nextEp = lastImportedEp + 1;
+
+  console.log(`[continuous-download] Searching next episode S${String(importedSeasonNumber).padStart(2, "0")}E${String(nextEp).padStart(2, "0")} for "${mediaRow.title}"`);
+
+  try {
+    const results = await searchTorrents(db, {
+      mediaId: mediaRow.id,
+      seasonNumber: importedSeasonNumber,
+      episodeNumbers: [nextEp],
+    });
+
+    if (results.length === 0) {
+      console.log(`[continuous-download] No results for next episode`);
+      return;
+    }
+
+    const best = results[0]!;
+    console.log(`[continuous-download] Auto-downloading "${best.title}" (confidence: ${best.confidence})`);
+
+    await downloadTorrent(db, {
+      mediaId: mediaRow.id,
+      title: best.title,
+      magnetUrl: best.magnetUrl ?? undefined,
+      torrentUrl: best.downloadUrl ?? undefined,
+      seasonNumber: importedSeasonNumber,
+      episodeNumbers: [nextEp],
+    });
+  } catch (err) {
+    console.warn(
+      `[continuous-download] Failed for "${mediaRow.title}":`,
+      err instanceof Error ? err.message : err,
+    );
+  }
 }
 
 export async function importSingleTorrent(torrentId: string): Promise<boolean> {

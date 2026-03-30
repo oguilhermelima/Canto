@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 
 import type { Database } from "@canto/db/client";
-import { media } from "@canto/db/schema";
+import { blocklist, media } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
 
 import { getJackettClient } from "../../infrastructure/adapters/jackett";
@@ -105,6 +105,16 @@ export async function searchTorrents(
       code: "INTERNAL_SERVER_ERROR",
       message: `Indexer search failed: ${message}`,
     });
+  }
+
+  // Filter out blocklisted titles
+  const blockedRows = await db.query.blocklist.findMany({
+    where: eq(blocklist.mediaId, input.mediaId),
+    columns: { title: true },
+  });
+  if (blockedRows.length > 0) {
+    const blockedTitles = new Set(blockedRows.map((b) => b.title.toLowerCase()));
+    results = results.filter((r) => !blockedTitles.has(r.title.toLowerCase()));
   }
 
   // Determine if media has a digital release (not just in theaters)

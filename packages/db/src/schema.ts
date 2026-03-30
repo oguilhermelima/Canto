@@ -344,22 +344,6 @@ export const mediaFile = pgTable(
   ],
 );
 
-export const extrasCache = pgTable("extras_cache", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  mediaId: uuid("media_id")
-    .notNull()
-    .references(() => media.id, { onDelete: "cascade" })
-    .unique(),
-  data: jsonb("data").notNull(),
-
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
-
 // ─── Sync items (reverse sync from Jellyfin/Plex) ───
 
 export const syncItem = pgTable(
@@ -614,10 +598,6 @@ export const mediaRelations = relations(media, ({ many, one }) => ({
   videos: many(mediaVideo),
   watchProviders: many(mediaWatchProvider),
   recommendations: many(recommendationPool),
-  extrasCache: one(extrasCache, {
-    fields: [media.id],
-    references: [extrasCache.mediaId],
-  }),
 }));
 
 export const seasonRelations = relations(season, ({ one, many }) => ({
@@ -652,13 +632,6 @@ export const mediaFileRelations = relations(mediaFile, ({ one }) => ({
   torrent: one(torrent, {
     fields: [mediaFile.torrentId],
     references: [torrent.id],
-  }),
-}));
-
-export const extrasCacheRelations = relations(extrasCache, ({ one }) => ({
-  media: one(media, {
-    fields: [extrasCache.mediaId],
-    references: [media.id],
   }),
 }));
 

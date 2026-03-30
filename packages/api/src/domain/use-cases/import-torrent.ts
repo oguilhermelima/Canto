@@ -6,7 +6,8 @@ import { getSetting } from "@canto/db/settings";
 import { getJellyfinCredentials } from "../../lib/server-credentials";
 import type { QBittorrentClient } from "../../infrastructure/adapters/qbittorrent";
 import { isVideoFile, sanitizeName, buildMediaDir, buildFileName } from "../rules/naming";
-import { EP_PATTERN, BARE_EP_PATTERN } from "../rules/parsing";
+import { EP_PATTERN, BARE_EP_PATTERN, isSubtitleFile, parseSubtitleLanguage } from "../rules/parsing";
+import { createNotification } from "./create-notification";
 
 async function triggerMediaServerScans(db: Database, libraryId?: string): Promise<void> {
   const jellyfinUrl = await getSetting("jellyfin.url");
@@ -95,7 +96,24 @@ export async function autoImportTorrent(
 
   const files = await qbClient.getTorrentFiles(torrentRow.hash);
   const videoFiles = files.filter((f) => isVideoFile(f.name));
+  const subtitleFiles = files.filter((f) => isSubtitleFile(f.name));
+
   if (videoFiles.length === 0) return;
+
+  // Movie validation: warn if multiple video files (likely a pack, not a single movie)
+  if (mediaRow.type === "movie" && videoFiles.length > 1) {
+    console.warn(
+      `[auto-import] Movie "${mediaRow.title}" has ${videoFiles.length} video files — skipping auto-import (expected single file)`,
+    );
+    await createNotification(db, {
+      title: "Movie import skipped",
+      message: `"${mediaRow.title}" has ${videoFiles.length} video files — expected a single file for movies.`,
+      type: "movie_multi_file",
+      mediaId: mediaRow.id,
+    });
+    await db.update(torrent).set({ importing: false }).where(eq(torrent.id, torrentRow.id));
+    return;
+  }
 
   const mediaNaming = {
     title: mediaRow.title,
@@ -219,6 +237,52 @@ export async function autoImportTorrent(
     }
   }
 
+  // Rename and move subtitle files alongside their video
+  for (const sf of subtitleFiles) {
+    try {
+      const lang = parseSubtitleLanguage(sf.name);
+      const subExt = sf.name.substring(sf.name.lastIndexOf("."));
+      const langSuffix = lang ? `.${lang}` : "";
+
+      // Match subtitle to video by episode number
+      let targetSubName: string | undefined;
+      if (mediaRow.type === "show") {
+        const match = EP_PATTERN.exec(sf.name) ?? BARE_EP_PATTERN.exec(sf.name);
+        if (match) {
+          const epNum = parseInt(match[EP_PATTERN.exec(sf.name) ? 2 : 1]!, 10);
+          const sNum = EP_PATTERN.exec(sf.name)?.[1]
+            ? parseInt(EP_PATTERN.exec(sf.name)![1]!, 10)
+            : primarySeasonNumber;
+          targetSubName = buildFileName(mediaNaming, {
+            seasonNumber: sNum,
+            episodeNumber: epNum,
+            quality: torrentRow.quality,
+            source: torrentRow.source,
+            extension: `${langSuffix}${subExt}`,
+          });
+        }
+      } else {
+        // Movie subtitle
+        targetSubName = buildFileName(mediaNaming, {
+          quality: torrentRow.quality,
+          source: torrentRow.source,
+          extension: `${langSuffix}${subExt}`,
+        });
+      }
+
+      if (targetSubName) {
+        try {
+          await qbClient.renameFile(torrentRow.hash, sf.name, targetSubName);
+          console.log(`[auto-import] Renamed subtitle: ${sf.name} → ${targetSubName}`);
+        } catch {
+          console.warn(`[auto-import] renameFile failed for subtitle "${sf.name}"`);
+        }
+      }
+    } catch {
+      // Non-critical — skip subtitle
+    }
+  }
+
   // Cleanup empty subfolder check
   const firstOriginalFile = movedVideoFiles[0];
   if (firstOriginalFile && firstOriginalFile.name.includes("/")) {
@@ -252,5 +316,11 @@ export async function autoImportTorrent(
     console.log(`[auto-import] Imported ${importedCount} file(s) for "${mediaRow.title}"`);
     await triggerMediaServerScans(db, mediaRow.libraryId ?? undefined);
     await autoMergeIfEnabled(mediaRow);
+    await createNotification(db, {
+      title: "Import complete",
+      message: `Imported ${importedCount} file(s) for "${mediaRow.title}"`,
+      type: "import_success",
+      mediaId: mediaRow.id,
+    });
   }
 }

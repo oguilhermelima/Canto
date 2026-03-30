@@ -2,12 +2,13 @@ import { TRPCError } from "@trpc/server";
 import { and, eq, isNull } from "drizzle-orm";
 
 import type { Database } from "@canto/db/client";
-import { library, media, mediaFile, torrent } from "@canto/db/schema";
+import { blocklist, library, media, mediaFile, torrent } from "@canto/db/schema";
 import type { TorrentDownloadInput } from "@canto/validators";
 
 import { detectQuality, detectSource } from "../rules/quality";
 import { parseSeasons, parseEpisodes } from "../rules/parsing";
 import { getQBClient } from "../../infrastructure/adapters/qbittorrent";
+import { createNotification } from "./create-notification";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -144,6 +145,23 @@ async function coreDownload(
   // ── Resolve qBittorrent category from library assignment ──
 
   const qbCategory = await resolveQBCategory(db, mediaRow);
+
+  // ── Blocklist check: reject previously failed downloads ──
+
+  if (!opts.skipDedup) {
+    const blocked = await db.query.blocklist.findFirst({
+      where: and(
+        eq(blocklist.mediaId, input.mediaId),
+        eq(blocklist.title, input.title),
+      ),
+    });
+    if (blocked) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: `This release is blocklisted: ${blocked.reason}`,
+      });
+    }
+  }
 
   // ── Deduplication: check if we already have this torrent (by title) ──
 
@@ -392,6 +410,14 @@ async function coreDownload(
     // qBittorrent failed — rollback DB records
     await db.delete(mediaFile).where(eq(mediaFile.torrentId, torrentRow.id));
     await db.delete(torrent).where(eq(torrent.id, torrentRow.id));
+
+    void createNotification(db, {
+      title: "Download failed",
+      message: `Failed to add "${input.title}" to qBittorrent: ${qbErr instanceof Error ? qbErr.message : "Unknown error"}`,
+      type: "download_failed",
+      mediaId: input.mediaId,
+    }).catch(() => {});
+
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
       message: `Failed to add torrent to qBittorrent: ${qbErr instanceof Error ? qbErr.message : "Unknown error"}`,

@@ -153,7 +153,7 @@ export const mediaRouter = createTRPCRouter({
   /**
    * Get extras (credits, similar, recommendations, videos, watch providers).
    * Reads from dedicated tables (populated by refresh-extras job).
-   * Falls back to extrasCache or TMDB if new tables are empty.
+   * Falls back to TMDB direct fetch if tables are empty (dispatches background refresh).
    */
   getExtras: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
