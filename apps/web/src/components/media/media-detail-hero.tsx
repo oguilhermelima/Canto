@@ -46,6 +46,10 @@ interface MediaDetailHeroProps {
     logoPath: string | null;
   }>;
   onRemoveClick?: () => void;
+  availableSources?: Array<{
+    type: "jellyfin" | "plex";
+    resolution?: string | null;
+  }>;
 }
 
 export function MediaDetailHero({
@@ -66,6 +70,7 @@ export function MediaDetailHero({
   provider,
   inLibrary = false,
   onRemoveClick,
+  availableSources,
 }: MediaDetailHeroProps): React.JSX.Element {
   const resolveImage = (path: string, size: string): string =>
     path.startsWith("http") ? path : `${TMDB_IMAGE_BASE}/${size}${path}`;
@@ -140,6 +145,23 @@ export function MediaDetailHero({
                   </Badge>
                 )}
               </div>
+              {/* Availability badges */}
+              {availableSources && availableSources.length > 0 && (
+                <div className="absolute bottom-2 left-2 flex items-center gap-1.5">
+                  {availableSources.map((src) => (
+                    <Badge
+                      key={src.type}
+                      className={
+                        src.type === "jellyfin"
+                          ? "border-none bg-[#00a4dc] text-[10px] text-white"
+                          : "border-none bg-[#e5a00d] text-[10px] text-black"
+                      }
+                    >
+                      {src.resolution ? `${src.resolution} · ` : ""}{src.type === "jellyfin" ? "Jellyfin" : "Plex"}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Info */}
