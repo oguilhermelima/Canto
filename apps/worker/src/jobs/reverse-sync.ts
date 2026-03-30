@@ -632,16 +632,16 @@ export async function handleReverseSync(): Promise<void> {
     }
   }
 
-  // Record sync_items for duplicate items from other libraries (items filtered by dedup)
-  // These are items that exist in multiple servers — record them as skipped with correct libraryId
+  // Record sync_items for duplicate items from other sources (items filtered by dedup)
+  // These are items that exist in multiple servers — record them as skipped with correct source
   const processedKeys = new Set<string>();
   for (const item of deduplicated) {
     const key = item.tmdbId ? `tmdb:${item.tmdbId}` : `title:${item.title}:${item.year}`;
-    processedKeys.add(`${key}:${item.libraryId}`);
+    processedKeys.add(`${key}:${item.source}:${item.libraryId}`);
   }
   for (const item of pending) {
     const key = item.tmdbId ? `tmdb:${item.tmdbId}` : `title:${item.title}:${item.year}`;
-    const itemKey = `${key}:${item.libraryId}`;
+    const itemKey = `${key}:${item.source}:${item.libraryId}`;
     if (processedKeys.has(itemKey)) continue;
     processedKeys.add(itemKey);
 
