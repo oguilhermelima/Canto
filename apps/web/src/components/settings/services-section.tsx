@@ -369,6 +369,14 @@ function MediaServerRow({
     return <div className="px-5 py-5"><Skeleton className="h-10 w-full" /></div>;
   }
 
+  const isJellyfin = serviceKey === "jellyfin";
+  const brandGradient = isJellyfin
+    ? "from-[#a95ce0]/15 via-[#4bb8e8]/10 to-transparent"
+    : "from-[#e5a00d]/15 via-[#e5a00d]/5 to-transparent";
+  const logoStyle = isJellyfin
+    ? { background: "linear-gradient(135deg, #a95ce0, #4bb8e8)", mask: "url(/jellyfin-logo.svg) center/contain no-repeat", WebkitMask: "url(/jellyfin-logo.svg) center/contain no-repeat" }
+    : { background: "#e5a00d", mask: "url(/plex-logo.svg) center/contain no-repeat", WebkitMask: "url(/plex-logo.svg) center/contain no-repeat" };
+
   return (
     <div className={cn(!isLast && "border-b border-border/30")}>
       <div
@@ -376,10 +384,11 @@ function MediaServerRow({
         tabIndex={0}
         onClick={handleToggle}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleToggle(); } }}
-        className="flex w-full items-center justify-between px-5 py-5 text-left cursor-pointer"
+        className={cn("flex w-full items-center justify-between px-5 py-5 text-left cursor-pointer bg-gradient-to-r", brandGradient)}
       >
         <div className="min-w-0 pr-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            <span className="inline-block h-5 w-5 shrink-0" style={logoStyle} />
             <p className="text-sm font-medium text-foreground">{title}</p>
             {!!isConnected && <CheckCircle className="h-3.5 w-3.5 text-green-500" />}
           </div>
@@ -709,7 +718,7 @@ export function ServicesSection(): React.JSX.Element {
       </SettingsSection>
 
       <SettingsSection title="Media Servers" description="Connect media servers to sync libraries and trigger scans after downloads.">
-        <SectionCard title="Media Servers">
+        <SectionCard title="Jellyfin">
           <MediaServerRow
             title="Jellyfin"
             description="Free software media system. Sync libraries and trigger scans after downloads."
@@ -720,7 +729,10 @@ export function ServicesSection(): React.JSX.Element {
               { key: "username", label: "Username", placeholder: "admin" },
               { key: "password", label: "Password", placeholder: "Password", secret: true },
             ]}
+            isLast
           />
+        </SectionCard>
+        <SectionCard title="Plex">
           <MediaServerRow
             title="Plex"
             description="Popular media server. Sync libraries and trigger scans after downloads."

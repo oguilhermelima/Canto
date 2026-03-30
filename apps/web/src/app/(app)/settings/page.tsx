@@ -348,8 +348,22 @@ function ServerLibraryGroup({
   return (
     <div className="rounded-xl border border-border/40 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between bg-muted/30 px-5 py-3.5">
-        <p className="text-base font-semibold text-foreground">{server}</p>
+      <div className={cn(
+        "flex items-center justify-between px-5 py-3.5 bg-gradient-to-r",
+        source === "jellyfin"
+          ? "from-[#a95ce0]/15 via-[#4bb8e8]/10 to-transparent"
+          : "from-[#e5a00d]/15 via-[#e5a00d]/5 to-transparent",
+      )}>
+        <div className="flex items-center gap-2.5">
+          <span
+            className="inline-block h-5 w-5 shrink-0"
+            style={source === "jellyfin"
+              ? { background: "linear-gradient(135deg, #a95ce0, #4bb8e8)", mask: "url(/jellyfin-logo.svg) center/contain no-repeat", WebkitMask: "url(/jellyfin-logo.svg) center/contain no-repeat" }
+              : { background: "#e5a00d", mask: "url(/plex-logo.svg) center/contain no-repeat", WebkitMask: "url(/plex-logo.svg) center/contain no-repeat" }
+            }
+          />
+          <p className="text-base font-semibold text-foreground">{server}</p>
+        </div>
         <Button
           size="sm"
           variant="ghost"
