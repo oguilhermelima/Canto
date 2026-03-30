@@ -1,143 +1,295 @@
-# Roadmap: Automation Engine
+# Roadmap: Automation & Import Engine
 
-O que falta pro Canto ter um pipeline de automação equivalente ao Sonarr/Radarr, integrado na UX que já temos.
+Features do código antigo (Python) que precisam ser portadas, melhorias sobre o que já existia, e features novas inspiradas no Sonarr/Radarr.
+
+**Legenda**: ✅ já existe no Canto | 🔧 existe parcialmente | ❌ falta implementar
 
 ---
 
-## 1. Quality Profiles
+## 1. Import Pipeline (portar do código antigo)
 
-Hoje o usuário escolhe manualmente qual torrent baixar. Não existe conceito de "qualidade aceitável" nem hierarquia.
+### 1.1 File Naming com nome da mídia ❌
 
-### O que construir
+Hoje: `S01E01 - [1080p Blu-Ray].mkv`
+Antigo: `Show Name S01E01 - suffix.mkv`
+Ideal: `I Parry Everything (2024) - S01E01 - [1080p Blu-Ray].mkv`
+
+Sem o título no filename, Jellyfin e providers de legenda não conseguem resolver. Uma linha no auto-import.
+
+### 1.2 Subtitle Import ❌
+
+O código antigo importava `.srt` junto com os vídeos, detectando idioma pelo padrão `*.en.srt`, `*.pt-BR.srt`.
+
+- Detectar arquivos `.srt`/`.ass`/`.sub` no torrent
+- Extrair código de idioma do nome (`[. ]([A-Za-z]{2})[. ]srt`)
+- Copiar pro mesmo diretório com naming Jellyfin: `Show Name S01E01.pt-BR.srt`
+- Suportar múltiplos idiomas por episódio
+
+### 1.3 Archive Extraction ❌
+
+O código antigo extraía 7z, RAR, ZIP antes de importar (via `patoolib`). Torrents de anime frequentemente vêm com arquivos comprimidos.
+
+- Detectar arquivos de archive no torrent (7z, rar, zip, tar.gz)
+- Extrair antes do import usando child_process (`7z x`, `unrar x`)
+- Re-escanear arquivos após extração
+- Cleanup dos archives após extração bem-sucedida
+
+### 1.4 Hardlink com fallback pra copy ❌
+
+O código antigo usava hardlink (economiza espaço, torrent continua seeding do mesmo arquivo) com fallback pra copy quando cross-filesystem.
+
+Hoje usamos `setLocation` do qBittorrent que **move** os arquivos. Isso funciona mas:
+- Se o torrent e a library estão no mesmo filesystem, hardlink seria melhor
+- Move quebra o seeding se não for feito via qBit API
+
+**Decisão**: manter `setLocation` + `renameFile` (funciona com qBit seeding) mas adicionar opção de hardlink pra quem quer manter o original intacto.
+
+### 1.5 Rollback on Import Failure ❌
+
+O código antigo rastreava todos os arquivos copiados e diretórios criados, e fazia cleanup completo em caso de erro.
+
+- Trackear `copiedFiles[]` e `createdDirectories[]` durante import
+- No catch: deletar arquivos, remover diretórios vazios (reverse order)
+- Resetar `importing = false` no torrent record (já fazemos isso)
+- Log detalhado de cada rollback action
+
+### 1.6 Movie Import com validação ❌
+
+O código antigo validava que movies tinham exatamente 1 arquivo de vídeo. Se tivesse múltiplos, enviava notificação e falhava.
+
+- Validar contagem de vídeos antes de importar
+- Se múltiplos: logar warning + notificar (não importar automaticamente)
+- Se nenhum: logar erro + notificar
+
+---
+
+## 2. Scheduled Tasks (portar + melhorar)
+
+### 2.1 Import sweep a cada 2 minutos 🔧
+
+O código antigo rodava `import_all_torrents` a cada 2 minutos. O Canto tem o `import-torrents` job mas ele roda integrado ao `listLive` (sob demanda quando alguém abre a página de torrents).
+
+- Garantir que o job `import-torrents` roda como repeatable a cada 2 minutos independente de UI
+- Não depender de `listLive` pra detectar completions
+
+### 2.2 Metadata refresh semanal ❌
+
+O código antigo atualizava metadata de shows não-finalizados toda segunda-feira.
+
+- Job `refresh-metadata` no worker (BullMQ repeatable, weekly)
+- Atualizar shows onde `status !== "Ended"` e `inLibrary = true`
+- Atualizar filmes onde `inLibrary = true` e metadata tem mais de 30 dias
+- Detectar novos episódios e seasons adicionados
+
+### 2.3 Continuous Download (auto-download novos episódios) ✅
+
+Já existe: `continuousDownload` flag por mídia. O worker deveria buscar episódios novos (air date recente) sem arquivo e triggerar download.
+
+- Verificar se o job existente realmente funciona end-to-end
+- Integrar com quality profiles quando implementados
+
+---
+
+## 3. Quality & Scoring (novo + inspirado no antigo)
+
+### 3.1 Quality Profiles ❌
+
+O código antigo tinha quality enum + scoring rules por library. Sonarr/Radarr expandem isso com profiles completos.
 
 - Tabela `quality_profile` com nome e lista ordenada de qualidades aceitas
-- Hierarquia padrão: `SD < 720p < 1080p WEB-DL < 1080p Blu-Ray < 2160p WEB-DL < 2160p Remux`
-- **Cutoff**: qualidade a partir da qual para de fazer upgrade (ex: se cutoff é 1080p Blu-Ray, não busca 4K)
-- Qualidades agrupáveis (ex: WEB-DL e WEBRip 1080p são equivalentes)
-- Profile atribuído por mídia ou por library (default da library, override por mídia)
+- Hierarquia: `SD < 720p < 1080p WEB-DL < 1080p Blu-Ray < 2160p WEB-DL < 2160p Remux`
+- **Cutoff**: qualidade a partir da qual para de fazer upgrade
+- Qualidades agrupáveis (WEB-DL e WEBRip 1080p = equivalentes)
+- Profile atribuído por library (default) com override por mídia
 - UI em Settings para criar/editar profiles
-- Na busca de torrent, o profile filtra automaticamente os resultados — mostra só o que é aceito, destaca o que é ideal
 
-### Impacto
+### 3.2 Decision Engine (Release Scoring) ❌
 
-- `packages/db/src/schema.ts` — nova tabela `quality_profile` + `quality_profile_item`
-- `packages/api/src/routers/library.ts` — CRUD de profiles, atribuição a libraries
-- `apps/web/src/app/(app)/settings/page.tsx` — UI de gestão de profiles
-- `packages/api/src/routers/torrent.ts` — filtro de resultados baseado no profile ativo
-- `apps/web/src/app/(app)/media/[id]/page.tsx` — indicar no torrent search quais resultados atendem o profile
+O código antigo tinha title rules + flag rules com score modifiers por library. Sonarr/Radarr expandem com custom formats.
 
----
+- **Custom Formats**: regras regex que tagueiam releases
+  - Condições: título regex, codec, áudio, HDR, release group, tamanho, indexer flags
+  - Score numérico no quality profile (+150 HEVC, +100 Atmos, -200 hardcoded subs)
+- **Scoring total**: quality tier + custom format scores
+- **Rejection reasons**: mostrar no interactive search por que um release foi rejeitado
+- **Negation support**: regra aplica quando keyword NÃO presente (do código antigo)
 
-## 2. Decision Engine (Release Scoring)
+### 3.3 Automatic Upgrades ❌
 
-Hoje os resultados de busca são ordenados por confidence score básico (seeders + qualidade + source). Não existe scoring granular nem custom formats.
-
-### O que construir
-
-- **Custom Formats**: regras regex que tagueiam releases com atributos
-  - Condições: título (regex), codec (x265/x264/AV1), áudio (Atmos/DTS-HD/AAC), HDR (DV/HDR10+), grupo de release, tamanho, flags do indexer (freeleech)
-  - Cada custom format recebe um score numérico no quality profile (ex: +150 pra HEVC, +100 pra Atmos, -200 pra hardcoded subs)
-- **Scoring total**: quality tier base + soma dos custom format scores = score final do release
-- O release com maior score é o preferido (grab automático ou destaque no manual search)
-- **Rejection reasons**: no interactive search, mostrar por que um release foi rejeitado (qualidade fora do profile, tamanho excede limite, formato penalizado)
-
-### Impacto
-
-- `packages/db/src/schema.ts` — tabelas `custom_format`, `custom_format_condition`, `profile_format_score`
-- `packages/api/src/routers/torrent.ts` — scoring engine aplicado nos resultados de search
-- `apps/web/src/app/(app)/media/[id]/page.tsx` — torrent search dialog mostra score e rejection reasons
-- `apps/web/src/app/(app)/settings/page.tsx` — UI de custom formats (criar regras, atribuir scores nos profiles)
-
----
-
-## 3. Automatic Upgrades
-
-Hoje se o usuário baixou uma versão 720p e depois aparece uma 1080p, nada acontece automaticamente.
-
-### O que construir
-
-- Job periódico `upgrade-check` no worker (BullMQ repeatable, ex: a cada 6h)
-- Para cada mídia monitorada com arquivo abaixo do cutoff do quality profile:
-  1. Busca nos indexers
-  2. Passa pelo decision engine
-  3. Se encontrou release com score melhor que o atual → grab automático
-  4. Ao completar, substitui o arquivo antigo (mesmo flow do replace que já existe)
-  5. Notifica Jellyfin/Plex
-- Setting global pra habilitar/desabilitar upgrades automáticos
-- Setting por mídia pra opt-out individual
+- Job `upgrade-check` (BullMQ repeatable, a cada 6h)
+- Varre mídia com arquivo abaixo do cutoff → busca → decision engine → grab
+- Ao completar, substitui arquivo antigo (reusa flow de replace)
+- Setting global + per-mídia pra habilitar/desabilitar
 - Log de upgrades no histórico
 
-### Impacto
+---
 
-- `apps/worker/src/jobs/upgrade-check.ts` — **NOVO** — job que varre mídia abaixo do cutoff
-- `packages/db/src/schema.ts` — campo `upgrade_allowed` na media, `upgrade_history` table
-- `packages/api/src/routers/torrent.ts` — reusar `search` + decision engine + `download`/`replace`
-- `apps/web/src/app/(app)/settings/page.tsx` — toggle global de auto-upgrade
-- Preferences modal da mídia — toggle de auto-upgrade por título
+## 4. Background Automation (novo, inspirado Sonarr)
+
+### 4.1 RSS Sync ❌
+
+- Job `rss-sync` (BullMQ repeatable, a cada 15min configurável)
+- Fetch RSS feeds dos indexers → parse → match contra mídia monitorada → decision engine → grab
+- **Delay profiles** (fase 2): segurar grab por X horas pra esperar releases melhores
+
+### 4.2 Failed Download Handling ❌
+
+- **Blocklist**: release falho → adicionado à blocklist
+- **Auto-retry**: busca próximo melhor release (excluindo blocklist)
+- Stalled por mais de X horas → marca como falho → retry
+- Retry limit: máximo 3 tentativas
+- UI de blocklist management
 
 ---
 
-## 4. RSS Sync (Background Monitoring)
+## 5. Notification System (portar do antigo)
 
-Hoje o `continuous_download` busca novos episódios, mas não existe polling contínuo dos indexers pra conteúdo novo/melhor.
+### 5.1 Multi-provider Notifications ❌
 
-### O que construir
+O código antigo tinha 4 providers: Email (SMTP), Gotify, Ntfy, Pushover.
 
-- Job `rss-sync` no worker (BullMQ repeatable, a cada 15min configurável)
-- Flow:
-  1. Fetch RSS feeds de todos os indexers configurados (Prowlarr expõe RSS endpoints)
-  2. Parse cada release (título → qualidade, source, season, episode)
-  3. Match contra mídia monitorada (in_library = true)
-  4. Passa pelo decision engine
-  5. Se release é aceito e melhor que o atual → grab automático
-  6. Se release é pra episódio novo que ainda não existe → criar episódio + grab
-- **Delay profiles** (opcional, fase 2): segurar o grab por X horas pra esperar releases melhores
-- Dashboard de atividade: mostrar o que o RSS sync encontrou, grabou, rejeitou
+- Interface `NotificationProvider` com `send(title, message)`
+- Providers: Email, Gotify, Ntfy, Pushover, Discord webhook, Telegram bot
+- Configuração em Settings com test de cada provider
+- Todos os providers habilitados recebem simultaneamente
 
-### Impacto
+### 5.2 Eventos que geram notificação ❌
 
-- `apps/worker/src/jobs/rss-sync.ts` — **NOVO** — job principal de polling
-- `packages/api/src/routers/torrent.ts` — adaptar `search` pra aceitar RSS results (já parseados)
-- `packages/db/src/schema.ts` — tabela `rss_sync_history` pra log de atividade
-- `packages/api/src/routers/settings.ts` — config de intervalo do RSS sync
-- `apps/web/src/app/(app)/settings/page.tsx` — config de RSS sync (intervalo, toggle)
-- Activity page ou section mostrando histórico do RSS sync
+- Import de episódio/filme com sucesso
+- Import falhou (arquivo não encontrado, multiple files, etc.)
+- Download completado
+- Download falhou (stalled, error)
+- Upgrade aplicado
+- Metadata atualizado (novos episódios detectados)
+- Health check: serviço não disponível (qBit, Jellyfin, Plex offline)
 
----
+### 5.3 In-app Notifications ❌
 
-## 5. Failed Download Handling
+O código antigo tinha tabela de notificações com status read/unread. O Canto tem um ícone de notificação no topbar mas sem backend.
 
-Hoje se um torrent falha (stalled, sem seeds, arquivo corrompido), fica no estado "incomplete" ou "error" e o usuário precisa intervir manualmente.
-
-### O que construir
-
-- **Blocklist**: quando um download falha, o release é adicionado a uma blocklist (por hash ou título+indexer)
-- **Auto-retry**: ao detectar falha, buscar automaticamente o próximo melhor release (que não está na blocklist)
-  1. Torrent fica stalled por mais de X horas → marca como falho
-  2. Remove do qBittorrent
-  3. Busca nos indexers novamente
-  4. Decision engine exclui releases na blocklist
-  5. Grab o próximo melhor
-- **Retry limit**: máximo de tentativas antes de desistir (default: 3)
-- **Blocklist management**: UI pra ver e limpar blocklist
-- **Health check notifications**: alertar quando algo falha repetidamente
-
-### Impacto
-
-- `packages/db/src/schema.ts` — tabela `blocklist` (release_title, indexer, hash, reason, created_at)
-- `apps/worker/src/jobs/import-torrents.ts` — detectar stalled/failed, trigger retry
-- `packages/api/src/routers/torrent.ts` — lógica de auto-retry com blocklist, CRUD da blocklist
-- `apps/web/src/app/(app)/settings/page.tsx` — UI de blocklist management
-- `apps/web/src/app/(app)/torrents/page.tsx` — indicar quando um torrent é retry automático
+- Tabela `notification` (title, message, type, read, created_at)
+- Badge counter no topbar
+- Dropdown com lista de notificações recentes
+- Mark as read / mark all as read
 
 ---
 
-## Ordem sugerida de implementação
+## 6. Subtitle System (novo)
 
-| Fase | Feature | Justificativa |
-|------|---------|---------------|
-| 1 | Quality Profiles | Base pra tudo — sem profiles, não dá pra automatizar decisões |
-| 2 | Decision Engine | Usa os profiles pra scoring — permite melhor seleção manual e prepara pra automação |
-| 3 | Failed Download Handling | Quick win — melhora a experiência atual sem precisar de automação completa |
-| 4 | RSS Sync | Automação real — polling contínuo, grab automático |
-| 5 | Automatic Upgrades | Cereja do bolo — depende de tudo acima funcionando |
+### 6.1 Subtitle Import from Torrents 🔧
+
+O código antigo importava .srt do torrent. O novo não faz.
+
+- Detectar .srt/.ass/.sub no torrent durante auto-import
+- Extrair idioma do filename
+- Renomear e mover junto com o vídeo
+- Jellyfin/Plex pegam automaticamente
+
+### 6.2 Subtitle Provider Integration (novo) ❌
+
+Busca automática de legendas quando o torrent não inclui.
+
+- Provider: OpenSubtitles.com (API REST, busca por TMDB ID + hash)
+- Provider: Legendas.net (scraping, melhor pra PT-BR)
+- Provider: Podnapisi (REST, sem auth, bom acervo multi-idioma)
+- Job `fetch-subtitles` no worker: varre mídia sem legenda no idioma preferido
+- Configuração de idiomas preferidos em Settings
+- Busca manual na media page (botão "Search Subtitle")
+- Hash-based matching (primeiros 64KB do arquivo) pra melhor precisão
+
+---
+
+## 7. Import & File Management (melhorias)
+
+### 7.1 Import Candidates (portar do antigo) ❌
+
+O código antigo escaneava diretórios de mídia e sugeria imports baseado em metadata.
+
+- Scan de diretórios que existem no disco mas não estão no banco
+- Extrair TMDB/TVDB ID do nome da pasta (padrão `[tmdbid-12345]`)
+- Buscar metadata e sugerir match
+- UI em Settings: lista de candidatos com botão "Import"
+
+### 7.2 Bulk Import ❌
+
+- Importar múltiplos diretórios de uma vez
+- Progress tracking
+- Dry-run mode (mostra o que seria importado sem fazer)
+
+### 7.3 File Path Suffix / Quality Variant Tracking ❌
+
+O código antigo rastreava sufixos de qualidade por arquivo (ex: "1080p", "IMPORTED", "4K HDR").
+
+- Campo `quality_suffix` no `media_file`
+- Permite múltiplas versões do mesmo episódio (1080p + 4K)
+- UI mostra qual versão existe
+
+### 7.4 Episode Deduplication ❌
+
+O código antigo prevenia episode files duplicados (IntegrityError handling).
+
+- Antes de criar `media_file`, verificar se já existe um para aquele `episodeId` com qualidade igual ou superior
+- Se inferior: substituir
+- Se igual: skip
+- Se superior: skip (a menos que upgrade automático)
+
+---
+
+## 8. Usenet Support (futuro)
+
+### 8.1 SABnzbd Integration ❌
+
+O código antigo suportava SABnzbd como download client de Usenet.
+
+- `AbstractDownloadClient` pattern com implementação pra SABnzbd
+- Detecção automática: se indexer retorna NZB → usa SABnzbd, senão → qBittorrent
+- Status tracking similar ao de torrents
+- Import flow idêntico (mesma lógica de rename/move)
+
+---
+
+## Ordem de implementação sugerida
+
+| Fase | Features | Prioridade | Justificativa |
+|------|----------|-----------|---------------|
+| **1** | 1.1 (naming), 1.2 (subtitles), 1.5 (rollback) | Alta | Corrige problemas atuais de import |
+| **2** | 3.1 (quality profiles), 3.2 (decision engine) | Alta | Base pra toda automação |
+| **3** | 5.1-5.3 (notifications) | Média | Visibilidade do que tá acontecendo |
+| **4** | 4.2 (failed download handling) | Média | Melhora experiência sem automação completa |
+| **5** | 2.2 (metadata refresh), 2.1 (import sweep) | Média | Manutenção automática |
+| **6** | 4.1 (RSS sync), 3.3 (auto-upgrades) | Média | Automação real — grab automático |
+| **7** | 6.1-6.2 (subtitles provider) | Baixa | Feature independente, pode ser plugada depois |
+| **8** | 1.3 (archives), 1.4 (hardlink), 7.1 (import candidates) | Baixa | Nice-to-have, edge cases |
+| **9** | 8.1 (usenet) | Baixa | Público menor, pode esperar |
+
+---
+
+## Status atual do Canto vs código antigo
+
+| Feature | Antigo (Python) | Canto (TypeScript) |
+|---------|----------------|-------------------|
+| Import via qBit API (setLocation + rename) | ❌ (hardlink/copy) | ✅ |
+| S01E01 pattern matching | ✅ | ✅ |
+| Bare episode numbers (anime fansub) | ❌ | ✅ |
+| Subtitle import from torrent | ✅ | ❌ |
+| Archive extraction (7z/rar) | ✅ | ❌ |
+| Rollback on import failure | ✅ | ❌ |
+| Hardlink import | ✅ | ❌ (usa move via qBit) |
+| Filename includes show title | ✅ | ❌ |
+| Multi-library support | ✅ | ✅ |
+| Continuous download | ✅ | ✅ |
+| Scoring rules per library | ✅ (basic) | ❌ |
+| Notifications (4 providers) | ✅ | ❌ |
+| Scheduled import every 2min | ✅ | 🔧 (via listLive) |
+| Weekly metadata refresh | ✅ | ❌ |
+| Import candidates from disk | ✅ | ❌ |
+| Movie single-file validation | ✅ | ❌ |
+| Plex OAuth flow | ❌ | ✅ |
+| Reverse sync (Jellyfin/Plex → Canto) | ❌ | ✅ |
+| Media availability badges | ❌ | ✅ |
+| Interactive torrent search with filters | ❌ (basic) | ✅ |
+| Settings modal per-media | ❌ | ✅ |
+| Server deep links (Jellyfin/Plex) | ❌ | ✅ |
+| Auto-discover Plex server | ❌ | ✅ |
+| Episode list with availability | ❌ | ✅ |
+| Torrent flatten (subfolder fix) | ❌ | ✅ |
