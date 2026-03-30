@@ -59,14 +59,14 @@ export default function DiscoverPage(): React.JSX.Element {
 
   const library = trpc.library.list.useQuery({
     page: 1,
-    pageSize: 20,
+    pageSize: 500,
     sortBy: "addedAt",
     sortOrder: "desc",
   });
 
   const utils = trpc.useUtils();
 
-  // Check if current spotlight item is in library
+  // Check if any spotlight/carousel item is in library
   const libraryIds = useMemo(() => {
     const items = library.data?.items ?? [];
     return new Set(items.map((i) => `${i.provider}-${i.externalId}`));
@@ -337,6 +337,7 @@ export default function DiscoverPage(): React.JSX.Element {
               return true;
             });
           })()}
+          libraryIds={libraryIds}
           isLoading={recommendations.isLoading}
           isFetchingMore={recommendations.isFetchingNextPage}
           onLoadMore={recommendations.hasNextPage ? () => void recommendations.fetchNextPage() : undefined}

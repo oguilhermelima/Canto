@@ -33,6 +33,7 @@ import {
   Plus,
   Check,
   ArrowUpDown,
+  Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
@@ -460,6 +461,67 @@ export default function MediaDetailPage({
           servers={mediaServers.data}
         />
 
+        {/* Movie download management */}
+        {media.type === "movie" && media.inLibrary && (
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-xl font-semibold tracking-tight">Download</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openTorrentDialog()}
+                  className="flex h-8 items-center gap-1.5 rounded-lg bg-muted/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Search Torrent</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreferencesOpen(true)}
+                  className="flex h-8 items-center gap-1.5 rounded-lg bg-muted/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <Settings2 className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Settings</span>
+                </button>
+              </div>
+            </div>
+            {mediaTorrents && mediaTorrents.length > 0 ? (
+              <div className="divide-y divide-border rounded-xl border border-border bg-card">
+                {mediaTorrents.map((t) => {
+                  const qb = qualityBadge(t.quality);
+                  const sb = sourceBadge(t.source);
+                  const resolvedStatus = t.imported
+                    ? { label: "Imported", className: "bg-green-500/15 text-green-400 border-green-500/20" }
+                    : t.progress >= 1
+                      ? { label: "Downloaded", className: "bg-green-500/15 text-green-400 border-green-500/20" }
+                      : t.status === "downloading"
+                        ? { label: "Downloading", className: "bg-blue-500/15 text-blue-400 border-blue-500/20" }
+                        : t.status === "paused"
+                          ? { label: "Paused", className: "bg-yellow-500/15 text-yellow-400 border-yellow-500/20" }
+                          : { label: t.status, className: "bg-muted text-muted-foreground border-border" };
+                  return (
+                    <div key={t.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3">
+                      <span className="min-w-0 flex-1 truncate text-sm text-foreground">{t.title}</span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {qb && <Badge variant="outline" className={qb.className}>{qb.label}</Badge>}
+                        {sb && <Badge variant="outline" className={sb.className}>{sb.label}</Badge>}
+                        <Badge variant="outline" className={resolvedStatus.className}>{resolvedStatus.label}</Badge>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-border bg-card p-8 text-center">
+                <Download className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">
+                  No files downloaded yet. Use the search button to find torrents.
+                </p>
+              </div>
+            )}
+          </section>
+        )}
+
         {/* Seasons (TV Shows) */}
         {media.type === "show" && media.seasons && (
           <SeasonTabs
@@ -592,7 +654,7 @@ export default function MediaDetailPage({
               <div>
                 <p className="text-sm font-medium text-foreground">Delete files from disk</p>
                 <p className="text-xs text-muted-foreground">
-                  Remove imported files from the media library. Raw download files are not affected.
+                  Permanently delete all downloaded and imported files from disk.
                 </p>
               </div>
             </label>

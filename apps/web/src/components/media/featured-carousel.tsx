@@ -31,6 +31,7 @@ interface FeaturedCarouselProps {
   isLoading?: boolean;
   isFetchingMore?: boolean;
   onLoadMore?: () => void;
+  libraryIds?: Set<string>;
   className?: string;
 }
 
@@ -45,6 +46,7 @@ export function FeaturedCarousel({
   isLoading = false,
   isFetchingMore = false,
   onLoadMore,
+  libraryIds,
   className,
 }: FeaturedCarouselProps): React.JSX.Element | null {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -146,6 +148,7 @@ export function FeaturedCarousel({
                   item={item}
                   isOpen={hoveredIndex === i}
                   onHover={() => handleCardHover(i)}
+                  inLibrary={libraryIds?.has(`${item.provider}-${item.externalId}`) ?? false}
                 />
               ))}
           {isFetchingMore &&
@@ -167,10 +170,12 @@ function FeaturedCard({
   item,
   isOpen,
   onHover,
+  inLibrary,
 }: {
   item: FeaturedItem;
   isOpen: boolean;
   onHover: () => void;
+  inLibrary: boolean;
 }): React.JSX.Element {
   const [showTrailer, setShowTrailer] = useState(false);
   const [muted, setMuted] = useState(true);
@@ -350,6 +355,7 @@ function FeaturedCard({
               provider={item.provider}
               type={item.type}
               title={item.title}
+              inLibrary={inLibrary}
               redirectOnAdd
               variant="dark"
             />
