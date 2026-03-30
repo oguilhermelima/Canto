@@ -1,4 +1,4 @@
-import { Film, Tv } from "lucide-react";
+// Icons replaced with SVG masks from public/
 
 export interface WatchProviderItem {
   providerId: number;
@@ -58,10 +58,17 @@ export function WhereToWatch({
                   target="_blank"
                   rel="noopener noreferrer"
                   title="Open in Jellyfin"
-                  className="flex h-12 shrink-0 items-center gap-2 rounded-xl bg-[#00a4dc] px-4 text-white transition-transform hover:scale-105"
+                  className="flex h-12 shrink-0 items-center gap-2.5 rounded-xl border border-[#a95ce0]/25 bg-gradient-to-r from-[#a95ce0]/15 to-[#4bb8e8]/15 px-4 transition-colors hover:from-[#a95ce0]/25 hover:to-[#4bb8e8]/25"
                 >
-                  <Film className="h-5 w-5" />
-                  <span className="text-sm font-medium">Jellyfin</span>
+                  <span
+                    className="inline-block h-5 w-5 shrink-0"
+                    style={{
+                      background: "linear-gradient(135deg, #a95ce0, #4bb8e8)",
+                      mask: "url(/jellyfin-logo.svg) center/contain no-repeat",
+                      WebkitMask: "url(/jellyfin-logo.svg) center/contain no-repeat",
+                    }}
+                  />
+                  <span className="bg-gradient-to-r from-[#a95ce0] to-[#4bb8e8] bg-clip-text text-sm font-medium text-transparent">Jellyfin</span>
                 </a>
               )}
               {servers.plex && (
@@ -70,10 +77,16 @@ export function WhereToWatch({
                   target="_blank"
                   rel="noopener noreferrer"
                   title="Open in Plex"
-                  className="flex h-12 shrink-0 items-center gap-2 rounded-xl bg-[#e5a00d] px-4 text-black transition-transform hover:scale-105"
+                  className="flex h-12 shrink-0 items-center gap-2.5 rounded-xl border border-[#e5a00d]/25 bg-[#e5a00d]/15 px-4 transition-colors hover:bg-[#e5a00d]/25"
                 >
-                  <Tv className="h-5 w-5" />
-                  <span className="text-sm font-medium">Plex</span>
+                  <span
+                    className="inline-block h-5 w-5 shrink-0 bg-[#e5a00d]"
+                    style={{
+                      mask: "url(/plex-logo.svg) center/contain no-repeat",
+                      WebkitMask: "url(/plex-logo.svg) center/contain no-repeat",
+                    }}
+                  />
+                  <span className="text-sm font-medium text-[#e5a00d]">Plex</span>
                 </a>
               )}
             </div>
