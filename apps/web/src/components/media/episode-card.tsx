@@ -43,114 +43,58 @@ export function EpisodeCard({
     !!episode.airDate && new Date(episode.airDate) > new Date();
   const isInteractive = selectable && !isFuture;
 
+  const hasJellyfin = serverAvailability?.some((s) => s.type === "jellyfin");
+  const hasPlex = serverAvailability?.some((s) => s.type === "plex");
+
   return (
     <div
-      role={isInteractive ? "button" : undefined}
-      tabIndex={isInteractive ? 0 : undefined}
-      onClick={isInteractive ? onToggle : undefined}
-      onKeyDown={
-        isInteractive
-          ? (e) => {
-              if (e.key === " " || e.key === "Enter") {
-                e.preventDefault();
-                onToggle();
-              }
-            }
-          : undefined
-      }
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-xl transition-all",
+        "group flex items-center gap-4 py-4 pr-3 pl-3 transition-colors sm:pr-4 sm:pl-4",
         isFuture && "pointer-events-none opacity-40",
-        isInteractive && "cursor-pointer",
-        !isFuture && isSelected && !isMuted
-          ? "ring-2 ring-primary"
-          : !isFuture && !isMuted && "hover:ring-1 hover:ring-border",
+        !isFuture && !isMuted && "hover:bg-muted/40",
         !isFuture && isMuted && "opacity-40",
       )}
     >
-      <div className="relative aspect-video w-full overflow-hidden bg-muted">
+      {/* Thumbnail */}
+      <div className="relative h-20 w-36 shrink-0 overflow-hidden rounded-lg bg-muted sm:h-[88px] sm:w-40">
         {episode.stillPath ? (
           <Image
-            src={`https://image.tmdb.org/t/p/w400${episode.stillPath}`}
+            src={`https://image.tmdb.org/t/p/w300${episode.stillPath}`}
             alt={episode.title || `Episode ${episode.episodeNumber}`}
             fill
-            className={cn(
-              "object-cover transition-transform duration-300",
-              !isMuted && "group-hover:scale-105",
-            )}
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            className="object-cover"
+            sizes="160px"
             loading="lazy"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-muted to-muted/50">
-            <span className="text-2xl font-black text-muted-foreground/8">
+            <span className="text-xl font-black text-muted-foreground/10">
               E{num}
             </span>
           </div>
         )}
 
-        <div className="absolute left-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-bold tracking-wide text-white backdrop-blur-sm">
-          E{num}
-        </div>
+        {/* Rating badge — top left */}
+        {episode.voteAverage != null && episode.voteAverage > 0 && (
+          <div className="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-xs font-medium text-yellow-500 backdrop-blur-sm">
+            <Star size={10} className="fill-current" />
+            {episode.voteAverage.toFixed(1)}
+          </div>
+        )}
 
+        {/* Runtime badge — bottom right */}
         {episode.runtime != null && episode.runtime > 0 && (
-          <div className="absolute bottom-2 right-2 rounded-md bg-black/60 px-2 py-0.5 text-[11px] text-white/70 backdrop-blur-sm">
+          <div className="absolute bottom-1.5 right-1.5 rounded-md bg-black/70 px-1.5 py-0.5 text-xs font-medium text-white/80 backdrop-blur-sm">
             {episode.runtime}m
-          </div>
-        )}
-
-        {/* Availability indicators */}
-        {!isSelected && !isMuted && (
-          <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
-            {downloadInfo?.status === "imported" && (
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500/90 text-white shadow-sm backdrop-blur-sm" title="Downloaded">
-                <CheckCircle2 size={14} />
-              </div>
-            )}
-            {(downloadInfo?.status === "pending" || downloadInfo?.status === "downloading") && (
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500/90 text-white shadow-sm backdrop-blur-sm" title={downloadInfo.status === "downloading" ? "Downloading" : "Pending"}>
-                <Download size={14} />
-              </div>
-            )}
-            {serverAvailability?.some((s) => s.type === "jellyfin") && (
-              <div className="flex h-5 items-center gap-0.5 rounded-full bg-[#00a4dc]/90 px-1.5 text-[9px] font-bold text-white shadow-sm backdrop-blur-sm" title="Available on Jellyfin">
-                JF
-              </div>
-            )}
-            {serverAvailability?.some((s) => s.type === "plex") && (
-              <div className="flex h-5 items-center gap-0.5 rounded-full bg-[#e5a00d]/90 px-1.5 text-[9px] font-bold text-black shadow-sm backdrop-blur-sm" title="Available on Plex">
-                PX
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Hover selection indicator */}
-        {isInteractive && !isSelected && !isMuted && !downloadInfo && !serverAvailability?.length && (
-          <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white/30 bg-black/30 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100" />
-        )}
-
-        {/* Selected overlay */}
-        {!isFuture && isSelected && !isMuted && (
-          <div className="absolute inset-0 flex items-center justify-center bg-primary/25">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
-              <Check size={18} strokeWidth={3} />
-            </div>
           </div>
         )}
       </div>
 
-      <div className="flex flex-col gap-0.5 px-3 py-2.5">
-        <p className="line-clamp-1 text-sm font-semibold leading-snug">
-          {episode.title || `Episode ${episode.episodeNumber}`}
-        </p>
-        <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
-          {episode.voteAverage != null && episode.voteAverage > 0 && (
-            <span className="flex items-center gap-0.5 text-yellow-500">
-              <Star size={10} className="fill-current" />
-              {episode.voteAverage.toFixed(1)}
-            </span>
-          )}
+      {/* Info */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="font-medium">E{num}</span>
+          <span className="text-muted-foreground/30">·</span>
           {episode.airDate && (
             <span>
               {new Date(episode.airDate).toLocaleDateString("en-US", {
@@ -161,10 +105,84 @@ export function EpisodeCard({
             </span>
           )}
         </div>
+        <p className="mt-1 line-clamp-1 text-sm font-bold leading-snug sm:text-base">
+          {episode.title || `Episode ${episode.episodeNumber}`}
+        </p>
         {episode.overview && (
-          <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground/60">
+          <p className="mt-1 line-clamp-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">
             {episode.overview}
           </p>
+        )}
+      </div>
+
+      {/* Right side — badges + checkbox */}
+      <div className="flex shrink-0 items-center gap-3">
+        {/* Download status */}
+        {downloadInfo?.status === "imported" && (
+          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500/90 text-white" title="Downloaded">
+            <CheckCircle2 size={12} />
+          </div>
+        )}
+        {(downloadInfo?.status === "pending" || downloadInfo?.status === "downloading") && (
+          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500/90 text-white" title={downloadInfo.status === "downloading" ? "Downloading" : "Pending"}>
+            <Download size={12} />
+          </div>
+        )}
+
+        {/* Jellyfin badge */}
+        {hasJellyfin && (
+          <div className="flex items-center gap-1.5 rounded-xl border border-[#a95ce0]/20 bg-gradient-to-r from-[#a95ce0]/10 to-[#4bb8e8]/10 p-1.5 sm:px-2.5 sm:py-1" title="Available on Jellyfin">
+            <span
+              className="inline-block h-4 w-4 shrink-0"
+              style={{
+                background: "linear-gradient(135deg, #a95ce0, #4bb8e8)",
+                mask: "url(/jellyfin-logo.svg) center/contain no-repeat",
+                WebkitMask: "url(/jellyfin-logo.svg) center/contain no-repeat",
+              }}
+            />
+            <span className="hidden bg-gradient-to-r from-[#a95ce0] to-[#4bb8e8] bg-clip-text text-xs font-medium text-transparent sm:inline">
+              Available
+            </span>
+          </div>
+        )}
+
+        {/* Plex badge */}
+        {hasPlex && (
+          <div className="flex items-center gap-1.5 rounded-xl border border-[#e5a00d]/20 bg-[#e5a00d]/10 p-1.5 sm:px-2.5 sm:py-1" title="Available on Plex">
+            <span
+              className="inline-block h-4 w-4 shrink-0 bg-[#e5a00d]"
+              style={{
+                mask: "url(/plex-logo.svg) center/contain no-repeat",
+                WebkitMask: "url(/plex-logo.svg) center/contain no-repeat",
+              }}
+            />
+            <span className="hidden text-xs font-medium text-[#e5a00d] sm:inline">
+              Available
+            </span>
+          </div>
+        )}
+
+        {/* Select checkbox */}
+        {isInteractive && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            className="flex shrink-0 items-center justify-center"
+          >
+            <div
+              className={cn(
+                "flex h-6 w-6 items-center justify-center rounded-lg border-2 transition-all",
+                isSelected && !isMuted
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-muted-foreground/30 hover:border-muted-foreground/50",
+              )}
+            >
+              {isSelected && !isMuted && <Check size={13} strokeWidth={3} />}
+            </div>
+          </button>
         )}
       </div>
     </div>

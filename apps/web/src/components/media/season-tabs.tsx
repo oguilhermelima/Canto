@@ -5,14 +5,6 @@ import { cn } from "@canto/ui/cn";
 import { Button } from "@canto/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@canto/ui/dialog";
 import { Input } from "@canto/ui/input";
-import { Switch } from "@canto/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@canto/ui/select";
 import {
   Search,
   Check,
@@ -20,7 +12,6 @@ import {
   Minus,
   ChevronRight,
   Download,
-  Folder,
   Settings2,
   Search as SearchIcon,
 } from "lucide-react";
@@ -65,6 +56,8 @@ interface SeasonTabsProps {
   downloadedEpisodes?: Map<string, EpisodeDownloadInfo>;
   /** Media config panel above seasons */
   mediaConfig?: MediaConfig;
+  /** Callback to open the preferences modal */
+  onOpenPreferences?: () => void;
   /** Episode availability from servers: key = "S01E05" -> [{ type, resolution }] */
   episodeAvailability?: Record<string, Array<{ type: string; resolution?: string | null }>>;
   /** Server links for "Watch on" buttons */
@@ -79,6 +72,7 @@ export function SeasonTabs({
   hideFloatingBar = false,
   downloadedEpisodes,
   mediaConfig,
+  onOpenPreferences,
   episodeAvailability,
   serverLinks,
   className,
@@ -177,8 +171,6 @@ export function SeasonTabs({
     }
   }, [allSeasonsSelected, filteredSeasons]);
 
-  const [settingsOpen, setSettingsOpen] = useState(false);
-
   return (
     <section className={cn("relative", className)}>
       {/* Row 1: Seasons title + Custom Search + Preferences */}
@@ -197,59 +189,16 @@ export function SeasonTabs({
             </button>
           )}
 
-          {/* Preferences popover */}
-          {mediaConfig && (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setSettingsOpen((p) => !p)}
-                className={cn(
-                  "flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs transition-all",
-                  settingsOpen
-                    ? "bg-foreground text-background"
-                    : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-              >
-                <Settings2 className={cn("h-3.5 w-3.5 transition-transform duration-300", settingsOpen && "rotate-90")} />
-                <span className="hidden sm:inline">Preferences</span>
-              </button>
-
-              {settingsOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setSettingsOpen(false)} />
-                  <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-border/60 bg-card p-1 shadow-xl">
-                    <div className="flex items-center justify-between px-3 py-3">
-                      <div className="flex items-center gap-2">
-                        <Folder className="h-3.5 w-3.5 text-muted-foreground/60" />
-                        <span className="text-xs text-muted-foreground">Library</span>
-                      </div>
-                      <Select
-                        value={mediaConfig.libraryId ?? "default"}
-                        onValueChange={(v) => mediaConfig.onLibraryChange(v === "default" ? null : v)}
-                      >
-                        <SelectTrigger className="h-7 w-[130px] border-border/40 text-xs">
-                          <SelectValue placeholder="Default" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="default">Default</SelectItem>
-                          {mediaConfig.libraries.map((lib) => (
-                            <SelectItem key={lib.id} value={lib.id}>{lib.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="border-t border-border/40" />
-                    <div className="flex items-center justify-between px-3 py-3">
-                      <span className="text-xs text-muted-foreground">Auto-download new episodes</span>
-                      <Switch
-                        checked={mediaConfig.continuousDownload}
-                        onCheckedChange={mediaConfig.onContinuousDownloadChange}
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+          {/* Preferences button */}
+          {onOpenPreferences && (
+            <button
+              type="button"
+              onClick={onOpenPreferences}
+              className="flex h-8 items-center gap-1.5 rounded-lg bg-muted/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <Settings2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Settings</span>
+            </button>
           )}
         </div>
       </div>
@@ -409,13 +358,20 @@ function SeasonBlock({
     episodes.length > 0 &&
     episodes.every((e) => selectedEpisodes.has(e.id));
 
-  // Count available episodes from server sync
-  const availableEpCount = episodeAvailability
+  // Count available episodes per server
+  const jellyfinEpCount = episodeAvailability
     ? episodes.filter((ep) => {
         const key = `S${String(season.seasonNumber).padStart(2, "0")}E${String(ep.episodeNumber).padStart(2, "0")}`;
-        return !!episodeAvailability[key];
+        return episodeAvailability[key]?.some((a) => a.type === "jellyfin");
       }).length
     : 0;
+  const plexEpCount = episodeAvailability
+    ? episodes.filter((ep) => {
+        const key = `S${String(season.seasonNumber).padStart(2, "0")}E${String(ep.episodeNumber).padStart(2, "0")}`;
+        return episodeAvailability[key]?.some((a) => a.type === "plex");
+      }).length
+    : 0;
+  const availableEpCount = Math.max(jellyfinEpCount, plexEpCount);
 
   const isSpecials = season.seasonNumber === 0;
   const sNum = String(season.seasonNumber).padStart(2, "0");
@@ -476,33 +432,48 @@ function SeasonBlock({
               </>
             )}
           </div>
-          {/* Watch on server buttons */}
-          {availableEpCount > 0 && (serverLinks?.jellyfin || serverLinks?.plex) && (
-            <div className="mt-1 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-              {serverLinks.jellyfin && (
-                <a
-                  href={serverLinks.jellyfin.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 rounded-md bg-[#00a4dc]/15 px-2 py-0.5 text-[10px] font-medium text-[#00a4dc] transition-colors hover:bg-[#00a4dc]/25"
-                >
-                  Watch on Jellyfin
-                </a>
-              )}
-              {serverLinks.plex && (
-                <a
-                  href={serverLinks.plex.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 rounded-md bg-[#e5a00d]/15 px-2 py-0.5 text-[10px] font-medium text-[#e5a00d] transition-colors hover:bg-[#e5a00d]/25"
-                >
-                  Watch on Plex
-                </a>
-              )}
-            </div>
-          )}
         </div>
         <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+          {/* Server availability badges */}
+          {jellyfinEpCount > 0 && serverLinks?.jellyfin && (
+            <a
+              href={serverLinks.jellyfin.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden items-center gap-1.5 rounded-xl border border-[#a95ce0]/20 bg-gradient-to-r from-[#a95ce0]/10 to-[#4bb8e8]/10 px-2.5 py-1 transition-colors hover:from-[#a95ce0]/20 hover:to-[#4bb8e8]/20 sm:flex"
+            >
+              <span
+                className="inline-block h-3.5 w-3.5 shrink-0"
+                style={{
+                  background: "linear-gradient(135deg, #a95ce0, #4bb8e8)",
+                  mask: "url(/jellyfin-logo.svg) center/contain no-repeat",
+                  WebkitMask: "url(/jellyfin-logo.svg) center/contain no-repeat",
+                }}
+              />
+              <span className="bg-gradient-to-r from-[#a95ce0] to-[#4bb8e8] bg-clip-text text-[11px] font-medium text-transparent">
+                {jellyfinEpCount >= epCount ? "Available" : "Partially available"}
+              </span>
+            </a>
+          )}
+          {plexEpCount > 0 && serverLinks?.plex && (
+            <a
+              href={serverLinks.plex.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden items-center gap-1.5 rounded-xl border border-[#e5a00d]/20 bg-[#e5a00d]/10 px-2.5 py-1 transition-colors hover:bg-[#e5a00d]/20 sm:flex"
+            >
+              <span
+                className="inline-block h-3.5 w-3.5 shrink-0 bg-[#e5a00d]"
+                style={{
+                  mask: "url(/plex-logo.svg) center/contain no-repeat",
+                  WebkitMask: "url(/plex-logo.svg) center/contain no-repeat",
+                }}
+              />
+              <span className="text-[11px] font-medium text-[#e5a00d]">
+                {plexEpCount >= epCount ? "Available" : "Partially available"}
+              </span>
+            </a>
+          )}
           {onDownload && (
             <button
               type="button"
@@ -545,9 +516,9 @@ function SeasonBlock({
           isExpanded ? "max-h-[5000px] opacity-100" : "max-h-0 opacity-0",
         )}
       >
-        {/* Episode grid */}
+        {/* Episode list */}
         {episodes.length > 0 && (
-          <div className="grid grid-cols-2 gap-3 px-3 pb-3 sm:px-4 md:grid-cols-4 xl:grid-cols-5">
+          <div className="flex flex-col divide-y divide-border/30 pb-2">
             {episodes.map((ep) => (
               <EpisodeCard
                 key={ep.id}
