@@ -141,7 +141,7 @@ export default function LibraryPage(): React.JSX.Element {
       >
 
         {/* Toolbar: filter toggle + type tabs + search + count */}
-        <div className="sticky top-16 z-20 -mx-4 mb-6 flex flex-col gap-4 border-b border-border/40 bg-background/80 px-4 py-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between md:-mx-8 md:px-8 lg:-mx-12 lg:px-12 xl:-mx-16 xl:px-16 2xl:-mx-24 2xl:px-24">
+        <div className="sticky top-14 z-20 -mx-4 mb-6 flex flex-col gap-4 border-b border-border/40 bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:top-16 md:-mx-8 md:px-8 lg:-mx-12 lg:px-12 xl:-mx-16 xl:px-16 2xl:-mx-24 2xl:px-24">
           {/* Left: filter toggle + type tabs */}
           <div className="flex items-center gap-3">
             <button

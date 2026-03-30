@@ -31,6 +31,7 @@ export default function DiscoverPage(): React.JSX.Element {
   const MAX_CAROUSEL_PAGES = 3;
 
   const infiniteOpts = {
+    staleTime: 60 * 1000,
     getNextPageParam: (
       lastPage: { totalPages: number },
       allPages: unknown[],
@@ -50,7 +51,7 @@ export default function DiscoverPage(): React.JSX.Element {
   const recommendations = trpc.media.recommendations.useInfiniteQuery(
     { pageSize: 10 },
     {
-      staleTime: 10 * 60 * 1000,
+      staleTime: 5 * 60 * 1000,
       getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
       initialCursor: 0,
     },

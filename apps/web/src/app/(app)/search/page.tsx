@@ -147,7 +147,7 @@ export default function SearchPage(): React.JSX.Element {
   return (
     <>
       {/* Mobile search input */}
-      <div className="sticky top-0 z-30 border-b border-border/40 bg-background/80 px-4 py-2.5 backdrop-blur-md md:hidden">
+      <div className="sticky top-0 z-30 border-b border-border/40 bg-background px-4 py-2.5 md:hidden">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
