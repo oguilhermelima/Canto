@@ -1590,21 +1590,27 @@ export const torrentRouter = createTRPCRouter({
 
         await qb.addTorrent(magnetOrUrl, qbCategory);
 
-        // If no hash from magnet, poll qBittorrent for the new torrent
+        // If no hash from magnet/URL, poll qBittorrent to find the new torrent
         if (!extractedHash) {
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-          try {
-            const current = await qb.listTorrents();
-            const newTorrent = current.find((t) => !existingHashes.has(t.hash));
-            if (newTorrent) {
-              extractedHash = newTorrent.hash;
-              await ctx.db
-                .update(torrent)
-                .set({ hash: extractedHash, updatedAt: new Date() })
-                .where(eq(torrent.id, torrentRow.id));
+          for (let attempt = 0; attempt < 5; attempt++) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            try {
+              const current = await qb.listTorrents();
+              const newTorrent = current.find((t) => !existingHashes.has(t.hash));
+              if (newTorrent) {
+                extractedHash = newTorrent.hash;
+                await ctx.db
+                  .update(torrent)
+                  .set({ hash: extractedHash, updatedAt: new Date() })
+                  .where(eq(torrent.id, torrentRow.id));
+                break;
+              }
+            } catch {
+              // Retry
             }
-          } catch {
-            // Best effort
+          }
+          if (!extractedHash) {
+            console.warn(`[download] Could not detect hash for "${torrentRow.title}" after 5 attempts`);
           }
         }
       } catch (qbErr) {
