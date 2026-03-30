@@ -223,13 +223,13 @@ export const syncRouter = createTRPCRouter({
               const identity = await identityRes.json() as { MediaContainer: { machineIdentifier: string } };
               const machineId = identity.MediaContainer.machineIdentifier;
               result.plex = {
-                url: `https://app.plex.tv/desktop/#!/server/${machineId}/details?key=%2Flibrary%2Fmetadata%2F${plexItem.plexRatingKey}`,
+                url: `https://app.plex.tv/desktop#!/server/${machineId}/details?key=%2Flibrary%2Fmetadata%2F${plexItem.plexRatingKey}&context%5Bdevice%5D%5Bproduct%5D=Canto`,
               };
             }
           } catch {
             // Fallback to local URL
             result.plex = {
-              url: `${plexUrl}/web/index.html#!/server/details?key=%2Flibrary%2Fmetadata%2F${plexItem.plexRatingKey}`,
+              url: `${plexUrl}/web/index.html#!/details?key=%2Flibrary%2Fmetadata%2F${plexItem.plexRatingKey}`,
             };
           }
         }
