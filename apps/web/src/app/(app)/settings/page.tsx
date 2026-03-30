@@ -327,8 +327,14 @@ function ServerLibraryGroup({
   if (!enabled) return null;
 
   const [showSyncedItems, setShowSyncedItems] = useState(false);
+  const importMedia = trpc.sync.importMedia.useMutation({
+    onSuccess: (data) => {
+      if (data.started) toast.success("Sync started");
+      else toast.info("Sync already running");
+    },
+    onError: () => toast.error("Failed to start sync"),
+  });
 
-  // Global auto-sync: true if any library has syncEnabled
   const globalAutoSync = libraries.some((l) => l.syncEnabled);
 
   const handleGlobalAutoSync = (checked: boolean): void => {
@@ -351,7 +357,7 @@ function ServerLibraryGroup({
           disabled={isSyncingLibraries}
         >
           {isSyncingLibraries ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
-          {isSyncingLibraries ? "Refreshing..." : "Refresh"}
+          {isSyncingLibraries ? "Scanning..." : "Scan libraries"}
         </Button>
       </div>
 
@@ -366,18 +372,18 @@ function ServerLibraryGroup({
                 type="button"
                 onClick={() => onToggle(lib.id, !lib.enabled)}
                 className={cn(
-                  "flex w-36 shrink-0 flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all select-none",
+                  "flex w-36 shrink-0 flex-col items-center gap-2 rounded-xl border p-4 transition-all select-none",
                   lib.enabled
-                    ? "border-primary bg-primary/5"
-                    : "border-border/40 hover:border-border/60",
+                    ? "border-primary/50 bg-primary/5"
+                    : "border-transparent bg-muted/40 hover:bg-muted/60",
                 )}
               >
-                <Folder className={cn("h-8 w-8", lib.enabled ? "text-primary" : "text-muted-foreground/40")} />
-                <span className={cn("text-sm font-medium text-center leading-tight", lib.enabled ? "text-foreground" : "text-muted-foreground")}>
+                <Folder className={cn("h-8 w-8", lib.enabled ? "text-primary" : "text-muted-foreground/30")} />
+                <span className={cn("text-sm font-medium text-center leading-tight", lib.enabled ? "text-foreground" : "text-muted-foreground/60")}>
                   {lib.name}
                 </span>
                 {lib.mediaPath && (
-                  <span className="w-full truncate text-center text-[10px] text-muted-foreground/50">
+                  <span className="w-full truncate text-center text-[10px] text-muted-foreground/40">
                     {lib.mediaPath.split("/").pop()}
                   </span>
                 )}
@@ -388,7 +394,7 @@ function ServerLibraryGroup({
       ) : (
         <div className="px-5 py-8 text-center">
           <p className="text-sm text-muted-foreground">
-            {isSyncingLibraries ? "Discovering libraries..." : `No libraries found on ${server}.`}
+            {isSyncingLibraries ? "Scanning libraries..." : `No libraries found on ${server}.`}
           </p>
         </div>
       )}
@@ -409,14 +415,30 @@ function ServerLibraryGroup({
 
       {/* Synced Items */}
       <div className="border-t border-border/30">
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => setShowSyncedItems((p) => !p)}
-          className="flex w-full items-center justify-between px-5 py-3.5 text-left transition-colors hover:bg-muted/20"
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSyncedItems((p) => !p); } }}
+          className="flex w-full cursor-pointer items-center justify-between px-5 py-3.5 text-left transition-colors hover:bg-muted/20"
         >
-          <p className="text-sm font-medium text-foreground">Synced items</p>
-          <ChevronRight size={16} className={cn("text-muted-foreground/50 transition-transform duration-200", showSyncedItems && "rotate-90")} />
-        </button>
+          <div>
+            <p className="text-sm font-medium text-foreground">Synced items</p>
+            <p className="text-xs text-muted-foreground">Runs every 5 minutes</p>
+          </div>
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => importMedia.mutate()}
+              disabled={importMedia.isPending}
+            >
+              {importMedia.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
+              Sync now
+            </Button>
+            <ChevronRight size={16} className={cn("text-muted-foreground/50 transition-transform duration-200", showSyncedItems && "rotate-90")} />
+          </div>
+        </div>
 
         <AnimatedCollapse open={showSyncedItems}>
           <div className="px-5 pb-5">
