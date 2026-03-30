@@ -32,8 +32,6 @@ import {
   Library,
   Plus,
   Check,
-  Film,
-  Tv,
   ArrowUpDown,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -45,6 +43,9 @@ import {
 import { SeasonTabs } from "~/components/media/season-tabs";
 import { CastSection } from "~/components/media/cast-section";
 import { SimilarSection } from "~/components/media/similar-section";
+import { WhereToWatch } from "~/components/media/where-to-watch";
+import { useWatchRegion } from "~/hooks/use-watch-region";
+import { useDirectSearch } from "~/hooks/use-direct-search";
 
 /* ─── Helpers ─── */
 
@@ -171,6 +172,9 @@ export default function MediaDetailPage({
     episodeNumbers?: number[];
   } | null>(null);
 
+  const { region: watchRegion } = useWatchRegion();
+  const { enabled: directSearchEnabled } = useDirectSearch();
+
   const provider = searchParams.get("provider");
   const externalId = searchParams.get("externalId");
   const type = searchParams.get("type");
@@ -203,6 +207,21 @@ export default function MediaDetailPage({
   const extras = trpc.media.getExtras.useQuery(
     { id: media?.id ?? "" },
     { enabled: !!media?.id },
+  );
+
+  const availability = trpc.sync.mediaAvailability.useQuery(
+    { mediaId: media?.id ?? "" },
+    { enabled: !!media?.id, staleTime: Infinity },
+  );
+
+  const mediaServers = trpc.sync.mediaServers.useQuery(
+    { mediaId: media?.id ?? "" },
+    { enabled: !!media?.id, staleTime: Infinity },
+  );
+
+  const watchProviderLinks = trpc.provider.watchProviderLinks.useQuery(
+    undefined,
+    { staleTime: Infinity, enabled: directSearchEnabled },
   );
 
   const isMovieInLibrary = media?.type === "movie" && media?.inLibrary === true;
@@ -408,28 +427,32 @@ export default function MediaDetailPage({
   });
 
   const watchProvidersByRegion = extras.data?.watchProviders ?? {};
-  const flatrateProviders = Object.values(watchProvidersByRegion)
-    .flatMap((region) => region.flatrate ?? [])
-    .filter(
-      (p, i, arr) =>
-        arr.findIndex(
-          (x) => x.providerId === p.providerId || x.logoPath === p.logoPath,
-        ) === i,
-    );
-  const rentBuyProviders = Object.values(watchProvidersByRegion)
-    .flatMap((region) => [...(region.rent ?? []), ...(region.buy ?? [])])
-    .filter(
-      (p, i, arr) =>
-        arr.findIndex(
-          (x) => x.providerId === p.providerId || x.logoPath === p.logoPath,
-        ) === i,
-    )
-    .filter(
-      (p) =>
-        !flatrateProviders.some(
-          (f) => f.providerId === p.providerId || f.logoPath === p.logoPath,
-        ),
-    );
+  const regionData = watchProvidersByRegion[watchRegion];
+  const tmdbType = media?.type === "show" ? "tv" : "movie";
+  const watchLink = regionData?.link
+    ?? (media?.externalId ? `https://www.themoviedb.org/${tmdbType}/${media.externalId}/watch?locale=${watchRegion}` : undefined);
+  const providerLinks = watchProviderLinks.data ?? {};
+  const dedup = (
+    providers: typeof regionData extends undefined ? never : NonNullable<typeof regionData>["flatrate"],
+  ): NonNullable<typeof providers> => {
+    const seen = new Set<string>();
+    return (providers ?? []).filter((p) => {
+      const key = providerLinks[p.providerId] ?? `__id:${p.providerId}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+  const flatrateProviders = dedup(regionData?.flatrate);
+  const rentBuyProviders = dedup([
+    ...(regionData?.rent ?? []),
+    ...(regionData?.buy ?? []),
+  ]).filter(
+    (p) =>
+      !flatrateProviders.some(
+        (f) => f.providerId === p.providerId || f.logoPath === p.logoPath,
+      ),
+  );
 
   // Filter + sort torrent results
   const allFilteredTorrents = (torrentSearch.data ?? [])
@@ -507,84 +530,21 @@ export default function MediaDetailPage({
         provider={media.provider}
         inLibrary={media.inLibrary}
         onRemoveClick={media.inLibrary ? () => setRemoveDialogOpen(true) : undefined}
+        availableSources={availability.data?.sources}
       />
 
       {/* Main content */}
       <div className="mx-auto flex w-full flex-1 flex-col gap-16 px-4 pb-2 pt-10 md:gap-20 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {/* Where to Watch */}
-        {(flatrateProviders.length > 0 || rentBuyProviders.length > 0) && (
-          <section>
-            <h2 className="mb-4 text-xl font-semibold tracking-tight text-foreground">
-              Where to Watch
-            </h2>
-            <div className="flex flex-col gap-5">
-              {flatrateProviders.length > 0 && (
-                <div>
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground/60">
-                    Stream
-                  </p>
-                  <div
-                    className="flex gap-3 overflow-x-auto"
-                    style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-                  >
-                    {flatrateProviders.map((wp) => (
-                      <div
-                        key={wp.providerId}
-                        title={wp.providerName}
-                        className="shrink-0 overflow-hidden rounded-xl transition-transform hover:scale-110"
-                      >
-                        {wp.logoPath ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={`https://image.tmdb.org/t/p/w92${wp.logoPath}`}
-                            alt={wp.providerName}
-                            className="h-12 w-12 rounded-xl object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-[10px] font-bold text-muted-foreground">
-                            {wp.providerName.slice(0, 2)}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {rentBuyProviders.length > 0 && (
-                <div>
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground/60">
-                    Rent / Buy
-                  </p>
-                  <div
-                    className="flex gap-3 overflow-x-auto"
-                    style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-                  >
-                    {rentBuyProviders.map((wp) => (
-                      <div
-                        key={wp.providerId}
-                        title={wp.providerName}
-                        className="shrink-0 overflow-hidden rounded-xl transition-transform hover:scale-110"
-                      >
-                        {wp.logoPath ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={`https://image.tmdb.org/t/p/w92${wp.logoPath}`}
-                            alt={wp.providerName}
-                            className="h-12 w-12 rounded-xl object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-[10px] font-bold text-muted-foreground">
-                            {wp.providerName.slice(0, 2)}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
+        <WhereToWatch
+          mediaId={media.id}
+          mediaTitle={media.title}
+          flatrateProviders={flatrateProviders}
+          rentBuyProviders={rentBuyProviders}
+          watchLink={watchLink}
+          watchProviderLinks={watchProviderLinks.data ?? {}}
+          servers={mediaServers.data}
+        />
 
         {/* Seasons (TV Shows) */}
         {media.type === "show" && media.seasons && (
@@ -635,6 +595,8 @@ export default function MediaDetailPage({
                 setTorrentDialogOpen(true);
               },
             } : undefined}
+            episodeAvailability={availability.data?.episodes}
+            serverLinks={mediaServers.data}
           />
         )}
 

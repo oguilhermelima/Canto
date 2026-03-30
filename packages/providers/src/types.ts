@@ -114,6 +114,7 @@ export interface WatchProvider {
 
 export interface WatchProvidersByRegion {
   [region: string]: {
+    link?: string;
     flatrate?: WatchProvider[];
     rent?: WatchProvider[];
     buy?: WatchProvider[];

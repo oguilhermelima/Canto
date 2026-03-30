@@ -80,7 +80,7 @@ function yearFromDate(dateStr: string | null | undefined): number | undefined {
 }
 
 function normalizeWatchProviders(
-  raw: Record<string, { flatrate?: unknown[]; rent?: unknown[]; buy?: unknown[] }> | undefined,
+  raw: Record<string, { link?: string; flatrate?: unknown[]; rent?: unknown[]; buy?: unknown[] }> | undefined,
 ): WatchProvidersByRegion | undefined {
   if (!raw) return undefined;
 
@@ -99,6 +99,7 @@ function normalizeWatchProviders(
     };
 
     const entry: WatchProvidersByRegion[string] = {};
+    if (data.link) entry.link = data.link;
     const flatrate = mapProviders(data.flatrate);
     const rent = mapProviders(data.rent);
     const buy = mapProviders(data.buy);
@@ -106,7 +107,7 @@ function normalizeWatchProviders(
     if (rent) entry.rent = rent;
     if (buy) entry.buy = buy;
 
-    if (Object.keys(entry).length > 0) {
+    if (flatrate || rent || buy) {
       result[region] = entry;
     }
   }
@@ -236,6 +237,24 @@ export class TmdbProvider implements MetadataProvider {
     return normalized;
   }
 
+  /* ── Find by IMDB ID ────────────────────────────────────────────────── */
+
+  async findByImdbId(imdbId: string): Promise<SearchResult[]> {
+    const data = await this.fetch<{
+      movie_results: unknown[];
+      tv_results: unknown[];
+    }>(`/find/${imdbId}`, { external_source: "imdb_id" });
+
+    const results: SearchResult[] = [];
+    for (const r of data.movie_results ?? []) {
+      results.push(this.normalizeSearchResult(r, "movie"));
+    }
+    for (const r of data.tv_results ?? []) {
+      results.push(this.normalizeSearchResult(r, "show"));
+    }
+    return results;
+  }
+
   /* ── Extras ─────────────────────────────────────────────────────────── */
 
   async getExtras(externalId: number, type: MediaType): Promise<MediaExtras> {
@@ -308,7 +327,7 @@ export class TmdbProvider implements MetadataProvider {
       | undefined;
     const watchProviders = normalizeWatchProviders(
       watchProvidersRaw?.results as
-        | Record<string, { flatrate?: unknown[]; rent?: unknown[]; buy?: unknown[] }>
+        | Record<string, { link?: string; flatrate?: unknown[]; rent?: unknown[]; buy?: unknown[] }>
         | undefined,
     );
 
