@@ -3,7 +3,10 @@ import { Queue, Worker } from "bullmq";
 import { handleImportTorrents } from "./jobs/import-torrents";
 import { handleReverseSync } from "./jobs/reverse-sync";
 import { refreshExtras } from "@canto/api/domain/use-cases/refresh-extras";
+import { replaceShowWithTvdb } from "@canto/api/domain/use-cases/replace-show-with-tvdb";
+import { replacePoolShowsTvdb } from "@canto/api/domain/use-cases/replace-pool-shows-tvdb";
 import { db } from "@canto/db/client";
+import { seedGenres } from "@canto/db";
 
 /* -------------------------------------------------------------------------- */
 /*  Redis connection                                                          */
@@ -82,6 +85,28 @@ const refreshExtrasWorker = new Worker(
   { connection: redisConnection, concurrency: 2 },
 );
 
+const replaceTvdbWorker = new Worker(
+  "replace-tvdb",
+  async (job) => {
+    const { mediaId } = job.data as { mediaId: string };
+    console.log(`[replace-tvdb] Running for media ${mediaId}`);
+    await replaceShowWithTvdb(db, mediaId);
+    console.log(`[replace-tvdb] Completed for media ${mediaId}`);
+  },
+  { connection: redisConnection, concurrency: 1 },
+);
+
+const replacePoolTvdbWorker = new Worker(
+  "replace-pool-tvdb",
+  async (job) => {
+    const { mediaId } = job.data as { mediaId: string };
+    console.log(`[replace-pool-tvdb] Running for source ${mediaId}`);
+    await replacePoolShowsTvdb(db, mediaId);
+    console.log(`[replace-pool-tvdb] Completed for source ${mediaId}`);
+  },
+  { connection: redisConnection, concurrency: 1 },
+);
+
 /* -------------------------------------------------------------------------- */
 /*  Error handling                                                            */
 /* -------------------------------------------------------------------------- */
@@ -90,6 +115,8 @@ for (const worker of [
   importTorrentsWorker,
   reverseSyncWorker,
   refreshExtrasWorker,
+  replaceTvdbWorker,
+  replacePoolTvdbWorker,
 ]) {
   worker.on("failed", (job, err) => {
     console.error(`[${worker.name}] Job ${job?.id} failed:`, err);
@@ -110,6 +137,8 @@ async function shutdown(): Promise<void> {
     importTorrentsWorker.close(),
     reverseSyncWorker.close(),
     refreshExtrasWorker.close(),
+    replaceTvdbWorker.close(),
+    replacePoolTvdbWorker.close(),
     importTorrentsQueue.close(),
     reverseSyncQueue.close(),
   ]);
@@ -127,6 +156,7 @@ process.on("SIGINT", shutdown);
 async function main(): Promise<void> {
   console.log("Setting up repeatable jobs...");
   await setupRepeatableJobs();
+  await seedGenres(db);
   console.log("Workers started. Waiting for jobs...");
 }
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getProvider } from "@canto/providers";
 import { persistMedia, updateMediaFromNormalized } from "@canto/db/persist-media";
+import { getSetting } from "@canto/db/settings";
 import {
   addToLibraryInput,
   getByExternalInput,
@@ -12,7 +13,8 @@ import {
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getTmdbProvider } from "../lib/tmdb-client";
 import { getTvdbProvider } from "../lib/tvdb-client";
-import { dispatchRefreshExtras } from "../infrastructure/queue/bullmq-dispatcher";
+import { SETTINGS } from "../lib/settings-keys";
+import { dispatchRefreshExtras, dispatchReplaceWithTvdb } from "../infrastructure/queue/bullmq-dispatcher";
 import { cached } from "../infrastructure/cache/redis";
 import {
   findMediaById,
@@ -78,12 +80,19 @@ export const mediaRouter = createTRPCRouter({
           throw new TRPCError({ code: "BAD_REQUEST", message: "Query is required for search mode" });
         }
 
-        // Search always uses TMDB (TVDB is only for series detail via "Replace with TVDB")
+        // When TVDB default is ON, shows search via TVDB
+        let searchProvider = input.provider;
+        if (input.type === "show") {
+          const tvdbDefault = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+          const tvdbKey = await getSetting(SETTINGS.TVDB_API_KEY);
+          if (tvdbDefault && tvdbKey) searchProvider = "tvdb";
+        }
+
         return cached(
-          `browse:search:${input.provider}:${input.type}:${input.query}:${page}`,
+          `browse:search:${searchProvider}:${input.type}:${input.query}:${page}`,
           300,
           async () => {
-            const provider = await getProviderWithKey(input.provider);
+            const provider = await getProviderWithKey(searchProvider);
             return provider.search(input.query!, input.type, { page });
           },
         );
@@ -150,6 +159,12 @@ export const mediaRouter = createTRPCRouter({
       const provider = await getProviderWithKey(input.provider);
       const normalized = await provider.getMetadata(input.externalId, input.type);
       const inserted = await persistMedia(ctx.db, normalized);
+
+      // If this is a TMDB show and TVDB toggle is on, dispatch background replacement
+      if (normalized.type === "show" && normalized.provider === "tmdb") {
+        void dispatchReplaceWithTvdb(inserted.id).catch(() => {});
+      }
+
       const result = await findMediaByIdWithSeasons(ctx.db, inserted.id);
       return result!;
     }),

@@ -24,6 +24,14 @@
       "types": "./src/domain/use-cases/refresh-extras.ts",
       "default": "./src/domain/use-cases/refresh-extras.ts"
     },
+    "./domain/use-cases/replace-show-with-tvdb": {
+      "types": "./src/domain/use-cases/replace-show-with-tvdb.ts",
+      "default": "./src/domain/use-cases/replace-show-with-tvdb.ts"
+    },
+    "./domain/use-cases/replace-pool-shows-tvdb": {
+      "types": "./src/domain/use-cases/replace-pool-shows-tvdb.ts",
+      "default": "./src/domain/use-cases/replace-pool-shows-tvdb.ts"
+    },
     "./domain/use-cases/search-torrents": {
       "types": "./src/domain/use-cases/search-torrents.ts",
       "default": "./src/domain/use-cases/search-torrents.ts"

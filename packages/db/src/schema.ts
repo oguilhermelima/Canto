@@ -556,6 +556,15 @@ export const blocklist = pgTable(
   (table) => [index("idx_blocklist_media").on(table.mediaId)],
 );
 
+// ─── Genres (unified provider-agnostic) ───
+
+export const genre = pgTable("genre", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  tmdbQuery: varchar("tmdb_query", { length: 200 }),
+  tvdbQuery: varchar("tvdb_query", { length: 200 }),
+});
+
 // ─── Relations ───
 
 export const userRelations = relations(user, ({ many }) => ({

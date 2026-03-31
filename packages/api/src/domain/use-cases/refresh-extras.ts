@@ -11,6 +11,7 @@ import {
 import type { MediaType, SearchResult } from "@canto/providers";
 import { getTmdbProvider } from "../../lib/tmdb-client";
 import { findMediaById } from "../../infrastructure/repositories";
+import { dispatchReplacePoolShowsTvdb } from "../../infrastructure/queue/bullmq-dispatcher";
 
 function calculatePoolScore(
   voteAverage: number | undefined,
@@ -268,4 +269,7 @@ export async function refreshExtras(
       .set({ extrasUpdatedAt: new Date() })
       .where(eq(media.id, mediaId));
   });
+
+  // If TVDB toggle is on, dispatch pool show replacement
+  void dispatchReplacePoolShowsTvdb(mediaId).catch(() => {});
 }

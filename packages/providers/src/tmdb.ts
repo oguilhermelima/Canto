@@ -560,7 +560,7 @@ export class TmdbProvider implements MetadataProvider {
     }
 
     // External IDs
-    const externalIds = data.external_ids as { imdb_id?: string } | undefined;
+    const externalIds = data.external_ids as { imdb_id?: string; tvdb_id?: number } | undefined;
 
     // Production companies
     const rawCompanies = (data.production_companies ?? []) as TmdbProductionCompany[];
@@ -623,6 +623,7 @@ export class TmdbProvider implements MetadataProvider {
       backdropPath: (data.backdrop_path as string | null) ?? undefined,
       logoPath,
       imdbId: externalIds?.imdb_id ?? (data.imdb_id as string) ?? undefined,
+      tvdbId: externalIds?.tvdb_id ?? undefined,
       budget: (data.budget as number) ?? undefined,
       revenue: (data.revenue as number) ?? undefined,
       collection,
@@ -658,7 +659,7 @@ export class TmdbProvider implements MetadataProvider {
     }
 
     // External IDs
-    const externalIds = data.external_ids as { imdb_id?: string } | undefined;
+    const externalIds = data.external_ids as { imdb_id?: string; tvdb_id?: number } | undefined;
 
     // Networks
     const rawNetworks = (data.networks ?? []) as TmdbNetwork[];
@@ -738,6 +739,7 @@ export class TmdbProvider implements MetadataProvider {
       backdropPath: (data.backdrop_path as string | null) ?? undefined,
       logoPath,
       imdbId: externalIds?.imdb_id ?? undefined,
+      tvdbId: externalIds?.tvdb_id ?? undefined,
       seasons,
       networks,
       numberOfSeasons: (data.number_of_seasons as number) ?? undefined,

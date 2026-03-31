@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { db } from "@canto/db/client";
+import { genre } from "@canto/db/schema";
 import { getSetting, setSetting } from "@canto/db/settings";
 import { SETTINGS } from "../lib/settings-keys";
 
@@ -252,6 +253,16 @@ export const providerRouter = createTRPCRouter({
     });
 
     return spotlightResults;
+  }),
+
+  /**
+   * Get all unified genres (provider-agnostic).
+   */
+  genres: publicProcedure.query(async () => {
+    const rows = await db.query.genre.findMany({
+      orderBy: (g, { asc }) => [asc(g.name)],
+    });
+    return rows;
   }),
 
   /**
