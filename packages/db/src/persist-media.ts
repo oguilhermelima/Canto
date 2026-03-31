@@ -67,6 +67,8 @@ export async function updateMediaFromNormalized(
   const [updated] = await db
     .update(media)
     .set({
+      externalId: normalized.externalId,
+      provider: normalized.provider,
       title: normalized.title,
       originalTitle: normalized.originalTitle,
       overview: normalized.overview,

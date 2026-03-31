@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getProvider } from "@canto/providers";
 import { persistMedia, updateMediaFromNormalized } from "@canto/db/persist-media";
+import { getSetting } from "@canto/db/settings";
 import {
   addToLibraryInput,
   getByExternalInput,
@@ -12,6 +13,7 @@ import {
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getTmdbProvider } from "../lib/tmdb-client";
 import { getTvdbProvider } from "../lib/tvdb-client";
+import { SETTINGS } from "../lib/settings-keys";
 import { dispatchRefreshExtras } from "../infrastructure/queue/bullmq-dispatcher";
 import { cached } from "../infrastructure/cache/redis";
 import {
@@ -70,18 +72,27 @@ export const mediaRouter = createTRPCRouter({
       page: z.number().int().min(1).default(1),
       cursor: z.number().int().positive().nullish(),
     }))
-    .query(({ input }) => {
+    .query(async ({ input }) => {
       const page = input.cursor ?? input.page;
 
       if (input.mode === "search") {
         if (!input.query) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Query is required for search mode" });
         }
+
+        // Check if TVDB is default for shows
+        let searchProvider = input.provider;
+        if (input.type === "show" && input.provider === "tmdb") {
+          const tvdbDefault = await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS);
+          const tvdbKey = await getSetting(SETTINGS.TVDB_API_KEY);
+          if (tvdbDefault && tvdbKey) searchProvider = "tvdb";
+        }
+
         return cached(
-          `browse:search:${input.provider}:${input.type}:${input.query}:${page}`,
+          `browse:search:${searchProvider}:${input.type}:${input.query}:${page}`,
           300,
           async () => {
-            const provider = await getProviderWithKey(input.provider);
+            const provider = await getProviderWithKey(searchProvider);
             return provider.search(input.query!, input.type, { page });
           },
         );
@@ -253,11 +264,16 @@ export const mediaRouter = createTRPCRouter({
       void dispatchRefreshExtras(input.id).catch(() => {});
 
       // Fetch from TMDB directly as one-time response (next call will have new tables populated)
-      const provider = await getProviderWithKey(row.provider as "tmdb" | "anilist" | "tvdb");
-      return provider.getExtras(
-        row.externalId,
-        row.type as "movie" | "show",
-      );
+      const tmdb = await getTmdbProvider();
+      // For non-TMDB media, try to find TMDB equivalent via IMDB ID
+      let tmdbExternalId = row.externalId;
+      if (row.provider !== "tmdb" && row.imdbId) {
+        try {
+          const found = await tmdb.findByImdbId(row.imdbId);
+          if (found.length > 0) tmdbExternalId = found[0]!.externalId;
+        } catch { /* use original ID as fallback */ }
+      }
+      return tmdb.getExtras(tmdbExternalId, row.type as "movie" | "show");
     }),
 
   /**
@@ -308,6 +324,20 @@ export const mediaRouter = createTRPCRouter({
       const deleted = await deleteMedia(ctx.db, input.id);
       if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
       return { success: true };
+    }),
+
+  /**
+   * Replace the metadata provider for a media item (e.g. TMDB -> TVDB).
+   * Fetches full metadata from the target provider and updates the DB record.
+   */
+  replaceProvider: protectedProcedure
+    .input(z.object({
+      id: z.string().uuid(),
+      provider: z.enum(["tmdb", "tvdb"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { replaceMediaProvider } = await import("../domain/use-cases/replace-provider");
+      return replaceMediaProvider(ctx.db, input.id, input.provider);
     }),
 
   /**

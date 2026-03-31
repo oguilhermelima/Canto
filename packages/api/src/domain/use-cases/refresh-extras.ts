@@ -72,11 +72,30 @@ export async function refreshExtras(
   const row = await findMediaById(db, mediaId);
   if (!row) return;
 
-  const provider = await getTmdbProvider();
-  const extras = await provider.getExtras(
-    row.externalId,
-    row.type as MediaType,
-  );
+  const tmdb = await getTmdbProvider();
+
+  // Resolve TMDB external ID for extras (always fetch from TMDB)
+  let extrasExternalId = row.externalId;
+  if (row.provider !== "tmdb") {
+    // Try IMDB cross-reference first
+    if (row.imdbId) {
+      try {
+        const found = await tmdb.findByImdbId(row.imdbId);
+        const match = found.find((r) => r.type === row.type);
+        if (match) extrasExternalId = match.externalId;
+      } catch { /* fallback to title search */ }
+    }
+    // If IMDB didn't work, try title search
+    if (extrasExternalId === row.externalId) {
+      try {
+        const search = await tmdb.search(row.title, row.type as "movie" | "show");
+        if (search.results.length > 0) extrasExternalId = search.results[0]!.externalId;
+      } catch { /* skip extras if we can't find TMDB equivalent */ }
+    }
+    if (extrasExternalId === row.externalId && row.provider !== "tmdb") return; // Can't find TMDB match
+  }
+
+  const extras = await tmdb.getExtras(extrasExternalId, row.type as MediaType);
 
   await db.transaction(async (tx) => {
     // Clear existing data for this media
