@@ -18,24 +18,23 @@ function calculatePoolScore(
   popularity: number | undefined,
   releaseDate: string | null | undefined,
 ): number {
-  // Base: weighted vote (penalize low vote counts — a 10/10 with 1 vote is not trustworthy)
+  // Base: Bayesian weighted average (penalize low vote counts)
   const avg = voteAverage ?? 0;
   const count = voteCount ?? 0;
   const minVotes = 50;
   const weightedAvg = (count / (count + minVotes)) * avg + (minVotes / (count + minVotes)) * 6;
-  let score = weightedAvg * 10;
+  let score = weightedAvg * 10; // 0-100 range
 
-  // Popularity boost (log scale, capped)
+  // Popularity boost (log scale, capped at 20)
   if (popularity && popularity > 0) {
-    score += Math.min(Math.log10(popularity) * 10, 30);
+    score += Math.min(Math.log10(popularity) * 8, 20);
   }
 
-  // Recency boost
+  // Recency: continuous decay — halves every 5 years
+  // Recent content gets up to +30, very old content gets ~0
   if (releaseDate) {
-    const days = (Date.now() - new Date(releaseDate).getTime()) / (1000 * 60 * 60 * 24);
-    if (days <= 30) score += 20;
-    else if (days <= 90) score += 10;
-    else if (days <= 365) score += 5;
+    const years = (Date.now() - new Date(releaseDate).getTime()) / (1000 * 60 * 60 * 24 * 365);
+    score += 30 * Math.pow(0.5, years / 5);
   }
 
   return Math.round(score * 100) / 100;
