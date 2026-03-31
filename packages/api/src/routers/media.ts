@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import { getProvider } from "@canto/providers";
 import { persistMedia, updateMediaFromNormalized } from "@canto/db/persist-media";
-import { getSetting } from "@canto/db/settings";
 import {
   addToLibraryInput,
   getByExternalInput,
@@ -13,7 +12,6 @@ import {
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getTmdbProvider } from "../lib/tmdb-client";
 import { getTvdbProvider } from "../lib/tvdb-client";
-import { SETTINGS } from "../lib/settings-keys";
 import { dispatchRefreshExtras } from "../infrastructure/queue/bullmq-dispatcher";
 import { cached } from "../infrastructure/cache/redis";
 import {
@@ -80,19 +78,12 @@ export const mediaRouter = createTRPCRouter({
           throw new TRPCError({ code: "BAD_REQUEST", message: "Query is required for search mode" });
         }
 
-        // Check if TVDB is default for shows
-        let searchProvider = input.provider;
-        if (input.type === "show" && input.provider === "tmdb") {
-          const tvdbDefault = await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS);
-          const tvdbKey = await getSetting(SETTINGS.TVDB_API_KEY);
-          if (tvdbDefault && tvdbKey) searchProvider = "tvdb";
-        }
-
+        // Search always uses TMDB (TVDB is only for series detail via "Replace with TVDB")
         return cached(
-          `browse:search:${searchProvider}:${input.type}:${input.query}:${page}`,
+          `browse:search:${input.provider}:${input.type}:${input.query}:${page}`,
           300,
           async () => {
-            const provider = await getProviderWithKey(searchProvider);
+            const provider = await getProviderWithKey(input.provider);
             return provider.search(input.query!, input.type, { page });
           },
         );
