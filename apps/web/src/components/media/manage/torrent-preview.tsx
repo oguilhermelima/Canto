@@ -28,6 +28,25 @@ function buildMagnet(hash: string): string {
   return `magnet:?xt=urn:btih:${hash}${params}`;
 }
 
+/** Load WebTorrent browser bundle via CDN (avoids Node.js polyfill issues) */
+function loadWebTorrent(): Promise<unknown> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if ((window as any).WebTorrent) return Promise.resolve((window as any).WebTorrent);
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/webtorrent@2/webtorrent.min.js";
+    script.onload = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const WT = (window as any).WebTorrent;
+      if (WT) resolve(WT);
+      else reject(new Error("WebTorrent failed to load"));
+    };
+    script.onerror = () => reject(new Error("Failed to load WebTorrent script"));
+    document.head.appendChild(script);
+  });
+}
+
 export function TorrentPreview({
   open,
   onOpenChange,
@@ -68,10 +87,11 @@ export function TorrentPreview({
 
     async function startStream() {
       try {
-        const WebTorrent = (await import("webtorrent")).default;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const WT = await loadWebTorrent() as any;
         if (destroyed) return;
 
-        const client = new WebTorrent();
+        const client = new WT();
         clientRef.current = client;
 
         const magnet = magnetUrl || buildMagnet(hash);
@@ -88,8 +108,12 @@ export function TorrentPreview({
           if (destroyed) return;
 
           const videoExts = [".mp4", ".mkv", ".avi", ".webm", ".mov", ".m4v"];
-          const sorted = [...torrent.files].sort((a, b) => b.length - a.length);
-          const videoFile = sorted.find((f) =>
+          const sorted = [...torrent.files].sort(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (a: any, b: any) => b.length - a.length,
+          );
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const videoFile = sorted.find((f: any) =>
             videoExts.some((ext) => f.name.toLowerCase().endsWith(ext)),
           );
 
@@ -99,9 +123,7 @@ export function TorrentPreview({
             return;
           }
 
-          // WebTorrent's renderTo streams the file into a video element
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (videoFile as any).renderTo(videoRef.current!, (err: Error | undefined) => {
+          videoFile.renderTo(videoRef.current!, (err: Error | undefined) => {
             if (destroyed) return;
             if (err) {
               setStatus("error");
@@ -112,10 +134,10 @@ export function TorrentPreview({
           });
         });
 
-        client.on("error", (err: string | Error) => {
+        client.on("error", (err: Error) => {
           if (destroyed) return;
           setStatus("error");
-          setErrorMsg(typeof err === "string" ? err : err.message);
+          setErrorMsg(err.message ?? "WebTorrent error");
         });
       } catch (err) {
         if (!destroyed) {
