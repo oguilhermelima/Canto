@@ -15,7 +15,7 @@ import {
   findSyncItemsPaginated,
   updateSyncItem,
 } from "../infrastructure/repositories/sync-repository";
-import { findMediaByExternalId, updateMedia } from "../infrastructure/repositories/media-repository";
+import { findMediaByAnyReference, updateMedia } from "../infrastructure/repositories/media-repository";
 
 /* -------------------------------------------------------------------------- */
 /*  Queue (lazy singleton)                                                     */
@@ -128,7 +128,7 @@ export const syncRouter = createTRPCRouter({
       const normalized = await tmdb.getMetadata(input.tmdbId, input.type);
 
       // Check if media already exists by external ID
-      const existing = await findMediaByExternalId(db, input.tmdbId, "tmdb");
+      const existing = await findMediaByAnyReference(db, input.tmdbId, "tmdb");
 
       let mediaId: string;
       if (existing) {

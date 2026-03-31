@@ -51,6 +51,64 @@ export async function findMediaByExternalId(
   });
 }
 
+/**
+ * Find a media record by any cross-reference: externalId+provider, IMDB ID, or TVDB ID.
+ * Prevents duplicates when a show has been replaced from TMDB→TVDB (or vice versa).
+ * Returns the record with seasons if found by any reference.
+ */
+export async function findMediaByAnyReference(
+  db: Database,
+  externalId: number,
+  provider: string,
+  imdbId?: string,
+  tvdbId?: number,
+) {
+  // 1. Direct match by externalId + provider
+  const direct = await db.query.media.findFirst({
+    where: and(eq(media.externalId, externalId), eq(media.provider, provider)),
+    with: withSeasonsAndEpisodes,
+  });
+  if (direct) return direct;
+
+  // 2. Cross-reference by IMDB ID (most reliable for cross-provider matching)
+  if (imdbId) {
+    const byImdb = await db.query.media.findFirst({
+      where: eq(media.imdbId, imdbId),
+      with: withSeasonsAndEpisodes,
+    });
+    if (byImdb) return byImdb;
+  }
+
+  // 3. Cross-reference by TVDB ID
+  if (tvdbId) {
+    const byTvdb = await db.query.media.findFirst({
+      where: eq(media.tvdbId, tvdbId),
+      with: withSeasonsAndEpisodes,
+    });
+    if (byTvdb) return byTvdb;
+  }
+
+  // 4. If provider is TVDB, check if TMDB has this tvdbId stored
+  if (provider === "tvdb") {
+    const byTvdbRef = await db.query.media.findFirst({
+      where: eq(media.tvdbId, externalId),
+      with: withSeasonsAndEpisodes,
+    });
+    if (byTvdbRef) return byTvdbRef;
+  }
+
+  // 5. If provider is TMDB, check if a TVDB record has this as tvdbId cross-ref
+  if (provider === "tmdb") {
+    const byTmdbRef = await db.query.media.findFirst({
+      where: and(eq(media.provider, "tvdb"), eq(media.tvdbId, externalId)),
+      with: withSeasonsAndEpisodes,
+    });
+    if (byTmdbRef) return byTmdbRef;
+  }
+
+  return null;
+}
+
 export async function updateMedia(
   db: Database,
   id: string,

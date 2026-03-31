@@ -5,6 +5,7 @@ import { TmdbProvider } from "@canto/providers";
 import {
   findEnabledSyncLibraries,
   findMediaByExternalId,
+  findMediaByAnyReference,
   updateMedia,
   deleteSyncItemsByLibraryIds,
   createSyncItem,
@@ -500,7 +501,7 @@ export async function handleReverseSync(): Promise<void> {
         }
 
         // Check if already in library
-        const existing = await findMediaByExternalId(db, tmdbId, "tmdb");
+        const existing = await findMediaByAnyReference(db, tmdbId, "tmdb");
 
         if (existing?.inLibrary) {
           status.skipped++;
@@ -639,7 +640,7 @@ export async function handleReverseSync(): Promise<void> {
     const tmdbId = item.tmdbId;
     let mediaId: string | undefined;
     if (tmdbId) {
-      const existing = await findMediaByExternalId(db, tmdbId, "tmdb");
+      const existing = await findMediaByAnyReference(db, tmdbId, "tmdb");
       mediaId = existing?.id;
     }
 

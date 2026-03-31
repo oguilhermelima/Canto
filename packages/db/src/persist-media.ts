@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 
 import type { NormalizedMedia } from "@canto/providers";
 
@@ -10,6 +10,21 @@ export async function persistMedia(
   db: Database,
   normalized: NormalizedMedia,
 ): Promise<typeof media.$inferSelect> {
+  // Check for existing record by any cross-reference to prevent duplicates
+  const conditions = [
+    and(eq(media.externalId, normalized.externalId), eq(media.provider, normalized.provider)),
+  ];
+  if (normalized.imdbId) conditions.push(eq(media.imdbId, normalized.imdbId));
+  if (normalized.tvdbId) conditions.push(eq(media.tvdbId, normalized.tvdbId));
+
+  const existing = await db.query.media.findFirst({
+    where: or(...conditions),
+  });
+
+  if (existing) {
+    return updateMediaFromNormalized(db, existing.id, normalized);
+  }
+
   const [inserted] = await db
     .insert(media)
     .values({

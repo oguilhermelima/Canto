@@ -20,6 +20,7 @@ import {
   findMediaById,
   findMediaByIdWithSeasons,
   findMediaByExternalId,
+  findMediaByAnyReference,
   updateMedia,
   deleteMedia,
   findLibraryExternalIds,
@@ -143,7 +144,8 @@ export const mediaRouter = createTRPCRouter({
   getByExternal: publicProcedure
     .input(getByExternalInput)
     .query(async ({ ctx, input }) => {
-      const existing = await findMediaByExternalId(ctx.db, input.externalId, input.provider);
+      // Check by direct match AND cross-references (IMDB, TVDB) to prevent duplicates
+      const existing = await findMediaByAnyReference(ctx.db, input.externalId, input.provider);
 
       if (existing) {
         if (existing.inLibrary) {
@@ -158,9 +160,16 @@ export const mediaRouter = createTRPCRouter({
 
       const provider = await getProviderWithKey(input.provider);
       const normalized = await provider.getMetadata(input.externalId, input.type);
+
+      // Before inserting, check again by IMDB/TVDB cross-refs from the fetched metadata
+      const crossRef = await findMediaByAnyReference(
+        ctx.db, normalized.externalId, normalized.provider,
+        normalized.imdbId, normalized.tvdbId,
+      );
+      if (crossRef) return crossRef;
+
       const inserted = await persistMedia(ctx.db, normalized);
 
-      // If this is a TMDB show and TVDB toggle is on, dispatch background replacement
       if (normalized.type === "show" && normalized.provider === "tmdb") {
         void dispatchReplaceWithTvdb(inserted.id).catch(() => {});
       }
