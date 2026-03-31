@@ -14,16 +14,30 @@ import { findMediaById } from "../../infrastructure/repositories";
 
 function calculatePoolScore(
   voteAverage: number | undefined,
+  voteCount: number | undefined,
+  popularity: number | undefined,
   releaseDate: string | null | undefined,
 ): number {
-  let score = (voteAverage ?? 0) * 10;
-  if (releaseDate) {
-    const days =
-      (Date.now() - new Date(releaseDate).getTime()) / (1000 * 60 * 60 * 24);
-    if (days <= 30) score += 50;
-    else if (days <= 90) score += 30;
-    else if (days <= 365) score += 10;
+  // Base: weighted vote (penalize low vote counts — a 10/10 with 1 vote is not trustworthy)
+  const avg = voteAverage ?? 0;
+  const count = voteCount ?? 0;
+  const minVotes = 50;
+  const weightedAvg = (count / (count + minVotes)) * avg + (minVotes / (count + minVotes)) * 6;
+  let score = weightedAvg * 10;
+
+  // Popularity boost (log scale, capped)
+  if (popularity && popularity > 0) {
+    score += Math.min(Math.log10(popularity) * 10, 30);
   }
+
+  // Recency boost
+  if (releaseDate) {
+    const days = (Date.now() - new Date(releaseDate).getTime()) / (1000 * 60 * 60 * 24);
+    if (days <= 30) score += 20;
+    else if (days <= 90) score += 10;
+    else if (days <= 365) score += 5;
+  }
+
   return Math.round(score * 100) / 100;
 }
 
@@ -44,7 +58,7 @@ function mapToPoolRow(
     trailerKey: trailerKey ?? null,
     releaseDate: result.releaseDate,
     voteAverage: result.voteAverage,
-    score: calculatePoolScore(result.voteAverage, result.releaseDate),
+    score: calculatePoolScore(result.voteAverage, result.voteCount, result.popularity, result.releaseDate),
     frequency: 1,
     sourceType,
   };

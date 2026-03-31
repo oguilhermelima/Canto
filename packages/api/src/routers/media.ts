@@ -342,13 +342,15 @@ export const mediaRouter = createTRPCRouter({
 
       const libraryItems = await findLibraryExternalIds(ctx.db);
       const libraryTmdbIds = libraryItems.map((m) => m.externalId);
-      const poolItems = await findPoolRecommendations(ctx.db, libraryTmdbIds, pageSize + 1, offset);
+      // Fetch extra to account for dedup + poster filtering
+      const poolItems = await findPoolRecommendations(ctx.db, libraryTmdbIds, (pageSize + 1) * 3, offset);
 
       if (poolItems.length > 0) {
-        // Deduplicate by tmdbId (same media can be recommended by multiple sources)
+        // Deduplicate by tmdbId and filter out items without poster
         const seen = new Set<number>();
         const unique = poolItems.filter((item) => {
           if (seen.has(item.tmdbId)) return false;
+          if (!item.posterPath) return false;
           seen.add(item.tmdbId);
           return true;
         });
