@@ -5,17 +5,26 @@ import type { NormalizedMedia } from "@canto/providers";
 import { episode, media, season } from "./schema";
 import type { Database } from "./client";
 
-/** Persist normalized media + seasons + episodes into the database. */
+/**
+ * Persist normalized media + seasons + episodes into the database.
+ * When `crossRefLookup` is true, checks IMDB/TVDB cross-references to avoid
+ * duplicates (used when TVDB toggle is ON). When false, only checks exact match.
+ */
 export async function persistMedia(
   db: Database,
   normalized: NormalizedMedia,
+  opts?: { crossRefLookup?: boolean },
 ): Promise<typeof media.$inferSelect> {
-  // Check for existing record by any cross-reference to prevent duplicates
+  // Check for existing record — exact match always
   const conditions = [
     and(eq(media.externalId, normalized.externalId), eq(media.provider, normalized.provider)),
   ];
-  if (normalized.imdbId) conditions.push(eq(media.imdbId, normalized.imdbId));
-  if (normalized.tvdbId) conditions.push(eq(media.tvdbId, normalized.tvdbId));
+
+  // Cross-reference lookup only when TVDB integration is active
+  if (opts?.crossRefLookup) {
+    if (normalized.imdbId) conditions.push(eq(media.imdbId, normalized.imdbId));
+    if (normalized.tvdbId) conditions.push(eq(media.tvdbId, normalized.tvdbId));
+  }
 
   const existing = await db.query.media.findFirst({
     where: or(...conditions),
@@ -23,7 +32,6 @@ export async function persistMedia(
 
   if (existing) {
     // If found by cross-reference but from a DIFFERENT provider, don't overwrite
-    // (e.g., a TVDB show found via IMDB ID when TMDB tries to persist it)
     if (existing.provider !== normalized.provider) {
       return existing;
     }

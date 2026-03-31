@@ -11,6 +11,7 @@ import {
   createSyncItem,
   createSyncEpisodes,
 } from "@canto/api/infrastructure/repositories";
+import { SETTINGS } from "@canto/api/lib/settings-keys";
 
 /* -------------------------------------------------------------------------- */
 /*  Constants                                                                  */
@@ -391,6 +392,7 @@ export async function handleReverseSync(): Promise<void> {
   if (!tmdbApiKey) throw new Error("TMDB API key not configured");
 
   const tmdb = new TmdbProvider(tmdbApiKey);
+  const tvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
 
   // Gather pending imports from Jellyfin and Plex
   const pending: PendingImport[] = [];
@@ -501,7 +503,9 @@ export async function handleReverseSync(): Promise<void> {
         }
 
         // Check if already in library
-        const existing = await findMediaByAnyReference(db, tmdbId, "tmdb");
+        const existing = tvdbEnabled
+          ? await findMediaByAnyReference(db, tmdbId, "tmdb")
+          : await findMediaByExternalId(db, tmdbId, "tmdb");
 
         if (existing?.inLibrary) {
           status.skipped++;
@@ -556,7 +560,7 @@ export async function handleReverseSync(): Promise<void> {
           mediaId = existing.id;
         } else {
           const normalized = await tmdb.getMetadata(tmdbId, resolvedType);
-          const inserted = await persistMedia(db, normalized);
+          const inserted = await persistMedia(db, normalized, { crossRefLookup: tvdbEnabled });
           await updateMedia(db, inserted.id, { inLibrary: true, libraryId: item.libraryId, libraryPath: item.path, addedAt: new Date() });
           mediaId = inserted.id;
         }
@@ -640,7 +644,9 @@ export async function handleReverseSync(): Promise<void> {
     const tmdbId = item.tmdbId;
     let mediaId: string | undefined;
     if (tmdbId) {
-      const existing = await findMediaByAnyReference(db, tmdbId, "tmdb");
+      const existing = tvdbEnabled
+          ? await findMediaByAnyReference(db, tmdbId, "tmdb")
+          : await findMediaByExternalId(db, tmdbId, "tmdb");
       mediaId = existing?.id;
     }
 
