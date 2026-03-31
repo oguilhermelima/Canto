@@ -44,7 +44,7 @@ function mapToPoolRow(
   result: SearchResult,
   sourceMediaId: string,
   sourceType: "similar" | "recommendation",
-  trailerKey?: string,
+  extras?: { trailerKey?: string; logoPath?: string },
 ) {
   return {
     tmdbId: result.externalId,
@@ -54,7 +54,8 @@ function mapToPoolRow(
     overview: result.overview,
     posterPath: result.posterPath,
     backdropPath: result.backdropPath,
-    trailerKey: trailerKey ?? null,
+    logoPath: extras?.logoPath ?? null,
+    trailerKey: extras?.trailerKey ?? null,
     releaseDate: result.releaseDate,
     voteAverage: result.voteAverage,
     score: calculatePoolScore(result.voteAverage, result.voteCount, result.popularity, result.releaseDate),
@@ -195,9 +196,10 @@ export async function refreshExtras(
     }
 
     const trailerMap = new Map<number, string>();
+    const logoMap = new Map<number, string>();
     const tmdb = await getTmdbProvider();
 
-    // Fetch trailers for all unique pool items in batches of 10 (TMDB rate limit ~40 req/10s)
+    // Fetch trailers + logos for all unique pool items in batches of 10
     const uniqueItems = [...uniquePoolItems.values()];
     for (let i = 0; i < uniqueItems.length; i += 10) {
       const batch = uniqueItems.slice(i, i + 10);
@@ -205,9 +207,17 @@ export async function refreshExtras(
         batch.map(async (item) => {
           try {
             const tmdbType = item.result.type === "show" ? "tv" : "movie";
-            const videos = await tmdb.getVideos(item.result.externalId, tmdbType);
+            const [videos, images] = await Promise.all([
+              tmdb.getVideos(item.result.externalId, tmdbType),
+              tmdb.getImages(item.result.externalId, tmdbType),
+            ]);
             const trailer = videos.find((v) => v.type === "Trailer" && v.site === "YouTube");
             if (trailer) trailerMap.set(item.result.externalId, trailer.key);
+
+            const enLogos = (images.logos ?? []).filter(
+              (l) => l.iso_639_1 === "en" || l.iso_639_1 === null,
+            );
+            if (enLogos.length > 0) logoMap.set(item.result.externalId, enLogos[0]!.file_path);
           } catch {
             // Best-effort
           }
@@ -215,13 +225,16 @@ export async function refreshExtras(
       );
     }
 
-    // Build pool rows with trailer keys
+    // Build pool rows with trailer keys + logos
     const poolRows = allPoolItems.map((item) =>
       mapToPoolRow(
         item.result,
         mediaId,
         item.sourceType,
-        trailerMap.get(item.result.externalId),
+        {
+          trailerKey: trailerMap.get(item.result.externalId),
+          logoPath: logoMap.get(item.result.externalId),
+        },
       ),
     );
 
