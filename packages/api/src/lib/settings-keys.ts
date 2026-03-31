@@ -29,6 +29,7 @@ export const SETTINGS = {
   TMDB_API_KEY: "tmdb.apiKey",
 
   // TVDB
+  TVDB_ENABLED: "tvdb.enabled",
   TVDB_API_KEY: "tvdb.apiKey",
   TVDB_TOKEN: "tvdb.token",
   TVDB_TOKEN_EXPIRES: "tvdb.tokenExpires",

@@ -26,6 +26,7 @@ const serviceEnum = z.enum([
   "qbittorrent",
   "prowlarr",
   "jackett",
+  "tvdb",
 ]);
 
 const ALL_SERVICES = serviceEnum.options;
@@ -36,6 +37,7 @@ const SERVICE_ENABLED_KEY: Record<z.infer<typeof serviceEnum>, string> = {
   qbittorrent: SETTINGS.QBITTORRENT_ENABLED,
   prowlarr: SETTINGS.PROWLARR_ENABLED,
   jackett: SETTINGS.JACKETT_ENABLED,
+  tvdb: SETTINGS.TVDB_ENABLED,
 };
 
 export const settingsRouter = createTRPCRouter({
@@ -182,6 +184,31 @@ export const settingsRouter = createTRPCRouter({
               `${url}/api/v2.0/indexers/all/results/torznab/api?apikey=${apiKey}&t=caps`,
             );
             if (!res.ok) return { connected: false, error: `HTTP ${res.status}` };
+            return { connected: true };
+          } catch (err) {
+            return { connected: false, error: err instanceof Error ? err.message : "Connection failed" };
+          }
+        }
+
+        case "tvdb": {
+          const apiKey = v[SETTINGS.TVDB_API_KEY];
+          if (!apiKey) {
+            return { connected: false, error: "API key not configured" };
+          }
+          try {
+            const res = await fetch("https://api4.thetvdb.com/v4/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ apikey: apiKey }),
+            });
+            if (!res.ok) return { connected: false, error: `HTTP ${res.status}` };
+            const body = (await res.json()) as { data: { token: string } };
+            // Cache the token
+            await setSetting(SETTINGS.TVDB_TOKEN, body.data.token);
+            await setSetting(
+              SETTINGS.TVDB_TOKEN_EXPIRES,
+              new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(),
+            );
             return { connected: true };
           } catch (err) {
             return { connected: false, error: err instanceof Error ? err.message : "Connection failed" };

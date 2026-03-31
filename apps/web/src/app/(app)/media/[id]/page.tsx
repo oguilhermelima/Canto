@@ -34,6 +34,8 @@ import {
   Check,
   ArrowUpDown,
   Settings2,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
@@ -208,6 +210,7 @@ export default function MediaDetailPage({
   const addToLibrary = trpc.media.addToLibrary.useMutation();
   const removeFromLibrary = trpc.media.removeFromLibrary.useMutation();
   const deleteTorrentMutation = trpc.torrent.delete.useMutation();
+  const replaceProvider = trpc.media.replaceProvider.useMutation();
   const utils = trpc.useUtils();
 
   // Library config queries
@@ -447,6 +450,40 @@ export default function MediaDetailPage({
         onRemoveClick={media.inLibrary ? () => setRemoveDialogOpen(true) : undefined}
         availableSources={availability.data?.sources}
       />
+
+      {/* Replace provider button for TV shows */}
+      {media.type === "show" && media.inLibrary && (media.provider === "tmdb" || media.provider === "tvdb") && (
+        <div className="mx-auto flex w-full px-4 pt-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+          <button
+            type="button"
+            disabled={replaceProvider.isPending}
+            onClick={() => {
+              const targetProvider = media.provider === "tmdb" ? "tvdb" : "tmdb";
+              replaceProvider.mutate(
+                { id: media.id, provider: targetProvider as "tmdb" | "tvdb" },
+                {
+                  onSuccess: () => {
+                    void utils.media.getById.invalidate({ id: media.id });
+                    void utils.media.getByExternal.invalidate();
+                    toast.success(`Metadata replaced with ${targetProvider.toUpperCase()}`);
+                  },
+                  onError: (error) => {
+                    toast.error(`Failed to replace provider: ${error.message}`);
+                  },
+                },
+              );
+            }}
+            className="flex items-center gap-1.5 rounded-lg bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+          >
+            {replaceProvider.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            Replace with {media.provider === "tmdb" ? "TVDB" : "TMDB"}
+          </button>
+        </div>
+      )}
 
       {/* Main content */}
       <div className="mx-auto flex w-full flex-1 flex-col gap-16 px-4 pb-2 pt-10 md:gap-20 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
