@@ -28,23 +28,11 @@ function buildMagnet(hash: string): string {
   return `magnet:?xt=urn:btih:${hash}${params}`;
 }
 
-/** Load WebTorrent browser bundle via CDN (avoids Node.js polyfill issues) */
-function loadWebTorrent(): Promise<unknown> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  if ((window as any).WebTorrent) return Promise.resolve((window as any).WebTorrent);
-
-  return new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = "/webtorrent.min.js";
-    script.onload = () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const WT = (window as any).WebTorrent;
-      if (WT) resolve(WT);
-      else reject(new Error("WebTorrent failed to load"));
-    };
-    script.onerror = () => reject(new Error("Failed to load WebTorrent script"));
-    document.head.appendChild(script);
-  });
+/** Load WebTorrent browser bundle (the dist/ build avoids Node.js polyfill issues) */
+async function loadWebTorrent(): Promise<unknown> {
+  // Import the pre-built browser bundle from the npm package
+  const mod = await import("webtorrent/dist/webtorrent.min.js");
+  return mod.default ?? mod;
 }
 
 export function TorrentPreview({
