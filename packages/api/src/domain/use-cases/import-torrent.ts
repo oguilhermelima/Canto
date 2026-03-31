@@ -3,7 +3,7 @@ import type { torrent as torrentSchema } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
 import { SETTINGS } from "../../lib/settings-keys";
 import { getJellyfinCredentials } from "../../lib/server-credentials";
-import { scanJellyfinLibrary, mergeJellyfinVersions } from "../../infrastructure/adapters/jellyfin";
+import { scanJellyfinLibrary, searchJellyfinItems, mergeJellyfinVersions } from "../../infrastructure/adapters/jellyfin";
 import { scanPlexLibrary } from "../../infrastructure/adapters/plex";
 import type { QBittorrentClient } from "../../infrastructure/adapters/qbittorrent";
 import { isVideoFile, sanitizeName, buildMediaDir, buildFileName } from "../rules/naming";
@@ -44,18 +44,11 @@ async function autoMergeIfEnabled(
 
     await new Promise((resolve) => setTimeout(resolve, 5000));
 
-    const searchRes = await fetch(
-      `${jellyfinCreds.url}/Items?searchTerm=${encodeURIComponent(mediaRow.title)}&Recursive=true&IncludeItemTypes=${mediaRow.type === "movie" ? "Movie" : "Series"}&Fields=Path,ProviderIds`,
-      { headers: { "X-Emby-Token": jellyfinCreds.apiKey } },
-    );
-    if (!searchRes.ok) return;
-
-    const searchData = await searchRes.json() as {
-      Items: Array<{ Id: string; Name: string; ProviderIds?: Record<string, string> }>;
-    };
+    const itemType = mediaRow.type === "movie" ? "Movie" : "Series";
+    const items = await searchJellyfinItems(jellyfinCreds.url, jellyfinCreds.apiKey, mediaRow.title, itemType);
 
     const tmdbId = String(mediaRow.externalId);
-    const matchingItems = searchData.Items.filter((item) => {
+    const matchingItems = items.filter((item) => {
       const providerTmdb = item.ProviderIds?.Tmdb ?? item.ProviderIds?.tmdb;
       return providerTmdb === tmdbId;
     });

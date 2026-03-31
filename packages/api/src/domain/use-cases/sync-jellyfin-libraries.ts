@@ -6,6 +6,7 @@ import {
   updateLibrary,
   createLibrary,
 } from "../../infrastructure/repositories";
+import { getJellyfinLibraryFolders } from "../../infrastructure/adapters/jellyfin";
 import { autoElectDefaults } from "./sync-library-helpers";
 
 export async function syncJellyfinLibraries(
@@ -13,17 +14,12 @@ export async function syncJellyfinLibraries(
   url: string,
   apiKey: string,
 ): Promise<Array<{ id: string; name: string; action: "created" | "updated" }>> {
-  const res = await fetch(`${url}/Library/VirtualFolders`, {
-    headers: { "X-Emby-Token": apiKey },
-  });
-  if (!res.ok) return [];
-
-  const folders = (await res.json()) as Array<{
-    ItemId: string;
-    Name: string;
-    CollectionType: string;
-    Locations: string[];
-  }>;
+  let folders: Array<{ Id: string; Name: string; CollectionType: string; Locations: string[] }>;
+  try {
+    folders = await getJellyfinLibraryFolders(url, apiKey);
+  } catch {
+    return [];
+  }
 
   const synced: Array<{ id: string; name: string; action: "created" | "updated" }> = [];
 
@@ -38,7 +34,7 @@ export async function syncJellyfinLibraries(
     const defaultCategory =
       type === "movies" ? "movies" : type === "animes" ? "animes" : "shows";
 
-    let existing = await findLibraryByJellyfinId(db, folder.ItemId);
+    let existing = await findLibraryByJellyfinId(db, folder.Id);
 
     if (!existing) {
       const allOfType = await findLibrariesByType(db, type);
@@ -49,7 +45,7 @@ export async function syncJellyfinLibraries(
       await updateLibrary(db, existing.id, {
         name: folder.Name,
         jellyfinPath: folder.Locations[0] ?? null,
-        jellyfinLibraryId: folder.ItemId,
+        jellyfinLibraryId: folder.Id,
       });
       synced.push({ id: existing.id, name: folder.Name, action: "updated" });
     } else {
@@ -57,7 +53,7 @@ export async function syncJellyfinLibraries(
         name: folder.Name,
         type,
         jellyfinPath: folder.Locations[0] ?? null,
-        jellyfinLibraryId: folder.ItemId,
+        jellyfinLibraryId: folder.Id,
         qbitCategory: defaultCategory,
         isDefault: false,
         enabled: true,

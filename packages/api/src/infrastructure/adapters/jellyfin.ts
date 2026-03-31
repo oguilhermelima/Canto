@@ -40,6 +40,45 @@ export async function scanJellyfinLibrary(
 }
 
 /**
+ * Retrieve all virtual (library) folders from Jellyfin.
+ */
+export async function getJellyfinLibraryFolders(
+  url: string,
+  apiKey: string,
+): Promise<
+  Array<{ Id: string; Name: string; CollectionType: string; Locations: string[] }>
+> {
+  const res = await fetch(`${url}/Library/VirtualFolders`, {
+    headers: headers(apiKey),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const folders = (await res.json()) as Array<{
+    ItemId: string; Name: string; CollectionType: string; Locations: string[];
+  }>;
+  return folders.map((f) => ({
+    Id: f.ItemId, Name: f.Name, CollectionType: f.CollectionType, Locations: f.Locations,
+  }));
+}
+
+/**
+ * Search Jellyfin items by title (used for auto-merge matching).
+ */
+export async function searchJellyfinItems(
+  url: string,
+  apiKey: string,
+  query: string,
+  itemType: "Movie" | "Series",
+): Promise<Array<{ Id: string; Name: string; ProviderIds?: Record<string, string> }>> {
+  const res = await fetch(
+    `${url}/Items?searchTerm=${encodeURIComponent(query)}&Recursive=true&IncludeItemTypes=${itemType}&Fields=Path,ProviderIds`,
+    { headers: headers(apiKey) },
+  );
+  if (!res.ok) return [];
+  const data = (await res.json()) as { Items: Array<{ Id: string; Name: string; ProviderIds?: Record<string, string> }> };
+  return data.Items;
+}
+
+/**
  * Merge multiple Jellyfin items into a single multi-version entry.
  */
 export async function mergeJellyfinVersions(

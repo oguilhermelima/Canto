@@ -37,6 +37,21 @@ export async function testPlexConnection(
 }
 
 /**
+ * Retrieve all library sections from a Plex server.
+ */
+export async function getPlexSections(
+  url: string,
+  token: string,
+): Promise<Array<{ key: string; title: string; type: string; Location: Array<{ path: string }> }>> {
+  const data = await plexFetch<{
+    MediaContainer: {
+      Directory: Array<{ key: string; title: string; type: string; Location: Array<{ path: string }> }>;
+    };
+  }>(url, token, "/library/sections");
+  return data.MediaContainer.Directory ?? [];
+}
+
+/**
  * Trigger a library scan on one or more Plex sections.
  * If no section IDs are provided, scans all sections.
  */

@@ -6,44 +6,15 @@ import {
   updateLibrary,
   createLibrary,
 } from "../../infrastructure/repositories";
+import { getPlexSections } from "../../infrastructure/adapters/plex";
 import { autoElectDefaults } from "./sync-library-helpers";
-
-interface PlexSection {
-  key: string;
-  title: string;
-  type: string;
-  Location: Array<{ path: string }>;
-}
-
-async function plexFetch<T>(
-  url: string,
-  token: string,
-  endpoint: string,
-): Promise<T> {
-  const res = await fetch(`${url}${endpoint}`, {
-    headers: {
-      Accept: "application/json",
-      "X-Plex-Token": token,
-    },
-  });
-
-  if (!res.ok) {
-    throw new Error(`Plex ${endpoint} failed: ${res.status}`);
-  }
-
-  return res.json() as Promise<T>;
-}
 
 export async function syncPlexLibraries(
   db: Database,
   url: string,
   token: string,
 ): Promise<Array<{ id: string; name: string; action: "created" | "updated" }>> {
-  const data = await plexFetch<{
-    MediaContainer: { Directory: PlexSection[] };
-  }>(url, token, "/library/sections");
-
-  const sections = data.MediaContainer.Directory ?? [];
+  const sections = await getPlexSections(url, token);
   const synced: Array<{ id: string; name: string; action: "created" | "updated" }> = [];
 
   for (const section of sections) {
