@@ -47,6 +47,7 @@ import { SimilarSection } from "~/components/media/similar-section";
 import { WhereToWatch } from "~/components/media/where-to-watch";
 import { useWatchRegion } from "~/hooks/use-watch-region";
 import { useDirectSearch } from "~/hooks/use-direct-search";
+import { TorrentPreview } from "~/components/media/manage/torrent-preview";
 import { PreferencesModal } from "~/components/media/manage/preferences-modal";
 
 import {
@@ -80,6 +81,7 @@ export default function MediaDetailPage({
   const [torrentSizeFilter, setTorrentSizeFilter] = useState<string>("all");
   const [torrentSort, setTorrentSort] = useState<"seeders" | "peers" | "size" | "age" | "confidence">("confidence");
   const [torrentSortDir, setTorrentSortDir] = useState<"asc" | "desc">("desc");
+  const [previewTarget, setPreviewTarget] = useState<{ magnetUrl: string; title: string } | null>(null);
   const TORRENTS_PER_PAGE = 20;
 
   const [torrentSearchContext, setTorrentSearchContext] = useState<{
@@ -1062,15 +1064,26 @@ export default function MediaDetailPage({
                         <td className="overflow-hidden px-3 py-3 text-xs text-muted-foreground/60">
                           <span className="block truncate">{t.indexer ?? "—"}</span>
                         </td>
-                        {/* Download */}
+                        {/* Actions */}
                         <td className="px-3 py-3">
-                          <button
-                            onClick={() => url && handleDownload(url, t.title)}
-                            disabled={!url || downloadTorrent.isPending}
-                            className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-80 disabled:opacity-40"
-                          >
-                            <Download size={14} />
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            {t.magnetUrl && (
+                              <button
+                                onClick={() => setPreviewTarget({ magnetUrl: t.magnetUrl!, title: t.title })}
+                                className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                title="Preview video"
+                              >
+                                <Play size={14} />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => url && handleDownload(url, t.title)}
+                              disabled={!url || downloadTorrent.isPending}
+                              className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-80 disabled:opacity-40"
+                            >
+                              <Download size={14} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1136,6 +1149,15 @@ export default function MediaDetailPage({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Torrent video preview (WebTorrent) */}
+      <TorrentPreview
+        open={previewTarget !== null}
+        onOpenChange={(open) => { if (!open) setPreviewTarget(null); }}
+        hash=""
+        title={previewTarget?.title ?? ""}
+        magnetUrl={previewTarget?.magnetUrl}
+      />
 
     </div>
   );

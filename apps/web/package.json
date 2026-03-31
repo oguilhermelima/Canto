@@ -32,6 +32,7 @@
     "tailwindcss": "catalog:",
     "tailwindcss-animate": "^1.0.7",
     "usehooks-ts": "^3.1.1",
+    "webtorrent": "^2.8.5",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -43,6 +44,7 @@
     "@types/node": "^22.13.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/webtorrent": "^0.110.1",
     "dotenv-cli": "^11.0.0",
     "prettier": "catalog:",
     "typescript": "catalog:"
