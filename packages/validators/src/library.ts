@@ -17,6 +17,7 @@ export const listInput = z.object({
   search: z.string().optional(),
   downloaded: z.boolean().optional(),
   page: z.number().int().positive().default(1),
+  cursor: z.number().int().positive().nullish(),
   pageSize: z.number().int().positive().max(100).default(20),
   sortBy: z
     .enum([

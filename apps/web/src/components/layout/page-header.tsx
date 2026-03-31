@@ -24,7 +24,7 @@ export function PageHeader({ title, subtitle, children, className }: PageHeaderP
         title={!isTitleVisible ? title : ""}
         border={!isTitleVisible}
       />
-      <div className={cn("px-4 pt-16 pb-2 md:px-8 md:pt-8 md:pb-4 lg:px-12 xl:px-16 2xl:px-24", className)}>
+      <div className={cn("px-4 pt-16 pb-1 md:px-8 md:pt-8 md:pb-2 lg:px-12 xl:px-16 2xl:px-24", className)}>
         <h1
           className="text-2xl font-bold tracking-tight text-foreground md:text-3xl"
           ref={titleRef}

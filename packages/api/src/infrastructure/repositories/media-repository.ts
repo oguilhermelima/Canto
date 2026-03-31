@@ -176,7 +176,7 @@ export async function listLibraryMedia(
   db: Database,
   input: ListInput,
 ): Promise<{ items: MediaRow[]; total: number; page: number; pageSize: number }> {
-  const page = input.page;
+  const page = input.cursor ?? input.page;
   const pageSize = input.pageSize;
   const offset = (page - 1) * pageSize;
 
