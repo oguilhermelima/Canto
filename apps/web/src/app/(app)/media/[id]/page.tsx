@@ -82,6 +82,7 @@ export default function MediaDetailPage({
   const [torrentSort, setTorrentSort] = useState<"seeders" | "peers" | "size" | "age" | "confidence">("confidence");
   const [torrentSortDir, setTorrentSortDir] = useState<"asc" | "desc">("desc");
   const [previewTarget, setPreviewTarget] = useState<{ magnetUrl: string; title: string } | null>(null);
+  const [resolvingPreview, setResolvingPreview] = useState(false);
   const TORRENTS_PER_PAGE = 20;
 
   const [torrentSearchContext, setTorrentSearchContext] = useState<{
@@ -1067,10 +1068,32 @@ export default function MediaDetailPage({
                         {/* Actions */}
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-1.5">
-                            {t.magnetUrl && (
+                            {(t.magnetUrl || t.downloadUrl) && (
                               <button
-                                onClick={() => setPreviewTarget({ magnetUrl: t.magnetUrl!, title: t.title })}
-                                className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                onClick={async () => {
+                                  const raw = t.magnetUrl ?? t.downloadUrl;
+                                  if (!raw) return;
+                                  if (raw.startsWith("magnet:")) {
+                                    setPreviewTarget({ magnetUrl: raw, title: t.title });
+                                    return;
+                                  }
+                                  // Resolve Prowlarr proxy URL to magnet server-side
+                                  setResolvingPreview(true);
+                                  try {
+                                    const resolved = await utils.torrent.resolveMagnet.fetch({ url: raw });
+                                    if (resolved.magnet) {
+                                      setPreviewTarget({ magnetUrl: resolved.magnet, title: t.title });
+                                    } else {
+                                      toast.error("Could not resolve magnet link for preview");
+                                    }
+                                  } catch {
+                                    toast.error("Failed to resolve magnet link");
+                                  } finally {
+                                    setResolvingPreview(false);
+                                  }
+                                }}
+                                disabled={resolvingPreview}
+                                className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
                                 title="Preview video"
                               >
                                 <Play size={14} />
