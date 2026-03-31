@@ -11,6 +11,7 @@ import {
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getTmdbProvider } from "../lib/tmdb-client";
+import { getTvdbProvider } from "../lib/tvdb-client";
 import { dispatchRefreshExtras } from "../infrastructure/queue/bullmq-dispatcher";
 import { cached } from "../infrastructure/cache/redis";
 import {
@@ -42,6 +43,9 @@ import {
 async function getProviderWithKey(name: "tmdb" | "anilist" | "tvdb"): ReturnType<typeof getProvider> {
   if (name === "tmdb") {
     return getTmdbProvider();
+  }
+  if (name === "tvdb") {
+    return getTvdbProvider();
   }
   return getProvider(name);
 }
@@ -192,8 +196,8 @@ export const mediaRouter = createTRPCRouter({
           }));
 
         const mapPoolToSearchResult = (item: typeof similar[number]) => ({
-          externalId: item.tmdbId,
-          provider: "tmdb" as const,
+          externalId: item.externalId,
+          provider: item.provider ?? "tmdb" as const,
           type: item.mediaType as "movie" | "show",
           title: item.title,
           overview: item.overview ?? undefined,
@@ -341,26 +345,26 @@ export const mediaRouter = createTRPCRouter({
       const offset = page * pageSize;
 
       const libraryItems = await findLibraryExternalIds(ctx.db);
-      const libraryTmdbIds = libraryItems.map((m) => m.externalId);
+      const libraryExternalIds = libraryItems.map((m) => m.externalId);
       // Fetch extra to account for dedup + poster filtering
-      const poolItems = await findPoolRecommendations(ctx.db, libraryTmdbIds, (pageSize + 1) * 3, offset);
+      const poolItems = await findPoolRecommendations(ctx.db, libraryExternalIds, (pageSize + 1) * 3, offset);
 
       if (poolItems.length > 0) {
-        // Deduplicate by tmdbId: prefer row with trailerKey, then highest score
-        const bestByTmdb = new Map<number, typeof poolItems[number]>();
+        // Deduplicate by externalId: prefer row with trailerKey, then highest score
+        const bestByExternal = new Map<number, typeof poolItems[number]>();
         for (const item of poolItems) {
           if (!item.posterPath) continue;
-          const existing = bestByTmdb.get(item.tmdbId);
+          const existing = bestByExternal.get(item.externalId);
           if (!existing || (!existing.trailerKey && item.trailerKey)) {
-            bestByTmdb.set(item.tmdbId, item);
+            bestByExternal.set(item.externalId, item);
           }
         }
-        const unique = [...bestByTmdb.values()];
+        const unique = [...bestByExternal.values()];
 
         const hasMore = unique.length > pageSize;
         const items = unique.slice(0, pageSize).map((item) => ({
-          externalId: item.tmdbId,
-          provider: "tmdb",
+          externalId: item.externalId,
+          provider: item.provider ?? "tmdb",
           type: item.mediaType as "movie" | "show",
           title: item.title,
           posterPath: item.posterPath ?? null,

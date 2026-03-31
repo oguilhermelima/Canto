@@ -169,6 +169,7 @@ export const media = pgTable(
     imdbId: varchar("imdb_id", { length: 20 }),
     anilistId: integer("anilist_id"),
     anilistScore: real("anilist_score"),
+    tvdbId: integer("tvdb_id"),
 
     // TV-specific
     numberOfSeasons: integer("number_of_seasons"),
@@ -242,6 +243,7 @@ export const season = pgTable(
     airDate: date("air_date"),
     posterPath: varchar("poster_path", { length: 255 }),
     episodeCount: integer("episode_count"),
+    seasonType: varchar("season_type", { length: 30 }),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -270,6 +272,8 @@ export const episode = pgTable(
     runtime: integer("runtime"),
     stillPath: varchar("still_path", { length: 255 }),
     voteAverage: real("vote_average"),
+    absoluteNumber: integer("absolute_number"),
+    finaleType: varchar("finale_type", { length: 50 }),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -425,7 +429,8 @@ export const recommendationPool = pgTable(
   "recommendation_pool",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    tmdbId: integer("tmdb_id").notNull(),
+    externalId: integer("external_id").notNull(),
+    provider: varchar("provider", { length: 20 }).notNull().default("tmdb"),
     mediaType: varchar("media_type", { length: 10 }).notNull(),
     sourceMediaId: uuid("source_media_id")
       .notNull()
@@ -450,7 +455,7 @@ export const recommendationPool = pgTable(
   },
   (table) => [
     index("idx_rec_pool_source").on(table.sourceMediaId),
-    index("idx_rec_pool_tmdb").on(table.tmdbId, table.mediaType),
+    index("idx_rec_pool_external").on(table.externalId, table.provider, table.mediaType),
     index("idx_rec_pool_score").on(table.score),
   ],
 );

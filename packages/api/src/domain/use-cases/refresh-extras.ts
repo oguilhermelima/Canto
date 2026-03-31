@@ -47,7 +47,8 @@ function mapToPoolRow(
   extras?: { trailerKey?: string; logoPath?: string },
 ) {
   return {
-    tmdbId: result.externalId,
+    externalId: result.externalId,
+    provider: result.provider ?? "tmdb",
     mediaType: result.type,
     sourceMediaId,
     title: result.title,

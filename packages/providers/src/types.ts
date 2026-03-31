@@ -27,6 +27,7 @@ export interface NormalizedSeason {
   airDate?: string;
   posterPath?: string;
   episodeCount?: number;
+  seasonType?: string;
   episodes?: NormalizedEpisode[];
 }
 
@@ -39,6 +40,8 @@ export interface NormalizedEpisode {
   runtime?: number;
   stillPath?: string;
   voteAverage?: number;
+  absoluteNumber?: number;
+  finaleType?: string;
 }
 
 export interface NormalizedMedia {
@@ -66,6 +69,7 @@ export interface NormalizedMedia {
   backdropPath?: string;
   logoPath?: string;
   imdbId?: string;
+  tvdbId?: number;
   // TV
   seasons?: NormalizedSeason[];
   networks?: string[];

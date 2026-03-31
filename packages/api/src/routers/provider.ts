@@ -126,8 +126,8 @@ export const providerRouter = createTRPCRouter({
 
     if (poolItems.length > 0) {
       return poolItems.map((item) => ({
-        externalId: item.tmdbId,
-        provider: "tmdb",
+        externalId: item.externalId,
+        provider: item.provider ?? "tmdb",
         type: item.mediaType as "movie" | "show",
         title: item.title,
         overview: item.overview ?? "",

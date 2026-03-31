@@ -1,5 +1,6 @@
 import { AniListProvider } from "./anilist";
 import { TmdbProvider } from "./tmdb";
+import { TvdbProvider } from "./tvdb";
 import type { MetadataProvider, ProviderName } from "./types";
 
 const providers = new Map<ProviderName, MetadataProvider>();
@@ -24,6 +25,10 @@ export async function getProvider(
       case "anilist":
         provider = new AniListProvider();
         break;
+      case "tvdb":
+        throw new Error(
+          'TVDB provider requires explicit construction via getTvdbProvider() — use the factory in api/src/lib/tvdb-client.ts',
+        );
       default:
         throw new Error(`Provider "${name}" not implemented`);
     }
@@ -35,3 +40,4 @@ export async function getProvider(
 export * from "./types";
 export { AniListProvider } from "./anilist";
 export { TmdbProvider } from "./tmdb";
+export { TvdbProvider } from "./tvdb";

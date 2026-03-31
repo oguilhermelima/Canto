@@ -37,6 +37,7 @@ export async function persistMedia(
       backdropPath: normalized.backdropPath,
       logoPath: normalized.logoPath,
       imdbId: normalized.imdbId,
+      tvdbId: normalized.tvdbId,
       numberOfSeasons: normalized.numberOfSeasons,
       numberOfEpisodes: normalized.numberOfEpisodes,
       inProduction: normalized.inProduction,
@@ -87,6 +88,7 @@ export async function updateMediaFromNormalized(
       backdropPath: normalized.backdropPath,
       logoPath: normalized.logoPath,
       imdbId: normalized.imdbId,
+      tvdbId: normalized.tvdbId,
       numberOfSeasons: normalized.numberOfSeasons,
       numberOfEpisodes: normalized.numberOfEpisodes,
       inProduction: normalized.inProduction,
@@ -133,6 +135,7 @@ async function persistSeasons(
         airDate: s.airDate,
         posterPath: s.posterPath,
         episodeCount: s.episodeCount,
+        seasonType: s.seasonType,
       })
       .returning();
 
@@ -148,6 +151,8 @@ async function persistSeasons(
           runtime: ep.runtime,
           stillPath: ep.stillPath,
           voteAverage: ep.voteAverage,
+          absoluteNumber: ep.absoluteNumber,
+          finaleType: ep.finaleType,
         })),
       );
     }
