@@ -265,8 +265,10 @@ export class TvdbProvider implements MetadataProvider {
       episodesBySeason.get(seasonNum)!.push(ep);
     }
 
-    // Build NormalizedSeason[]
+    // Build NormalizedSeason[] — only include default/official seasons
+    const allowedSeasonTypes = new Set(["default", "official"]);
     const seasons: NormalizedSeason[] = (series.seasons ?? [])
+      .filter((s) => !s.type?.type || allowedSeasonTypes.has(s.type.type))
       .map((s): NormalizedSeason | null => {
         const seasonEpisodes = episodesBySeason.get(s.number) ?? [];
         const episodes: NormalizedEpisode[] = seasonEpisodes
