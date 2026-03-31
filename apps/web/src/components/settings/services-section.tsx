@@ -7,6 +7,13 @@ import { Badge } from "@canto/ui/badge";
 import { Switch } from "@canto/ui/switch";
 import { Input } from "@canto/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@canto/ui/select";
+import {
   Save,
   Check,
   Loader2,
@@ -19,7 +26,11 @@ import {
 import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
+import { useWatchRegion } from "~/hooks/use-watch-region";
+import { useDirectSearch } from "~/hooks/use-direct-search";
 import { SectionCard, SettingsSection } from "~/components/settings/shared";
+
+const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
 /* -------------------------------------------------------------------------- */
 /*  Animated collapse                                                          */
@@ -692,16 +703,219 @@ function TmdbSection(): React.JSX.Element {
 }
 
 /* -------------------------------------------------------------------------- */
+/*  TVDB API Key                                                               */
+/* -------------------------------------------------------------------------- */
+
+function TvdbApiKeySection(): React.JSX.Element {
+  const utils = trpc.useUtils();
+  const { data: allSettings, isLoading } = trpc.settings.getAll.useQuery();
+  const setMany = trpc.settings.setMany.useMutation({
+    onSuccess: () => void utils.settings.getAll.invalidate(),
+  });
+  const testService = trpc.settings.testService.useMutation();
+
+  const [apiKey, setApiKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [defaultShows, setDefaultShows] = useState(false);
+
+  useEffect(() => {
+    if (allSettings) {
+      setApiKey((allSettings["tvdb.apiKey"] as string) ?? "");
+      setDefaultShows(allSettings["tvdb.defaultShows"] === true);
+      setDirty(false);
+    }
+  }, [allSettings]);
+
+  const handleSave = (): void => {
+    const values: Record<string, string> = { "tvdb.apiKey": apiKey };
+    testService.mutate(
+      { service: "tvdb", values },
+      {
+        onSuccess: (data) => {
+          if (data.connected) {
+            setMany.mutate(values, {
+              onSuccess: () => {
+                setDirty(false);
+                setSaved(true);
+                setTimeout(() => setSaved(false), 2000);
+                toast.success("TVDB connected and saved");
+              },
+              onError: () => toast.error("Failed to save settings"),
+            });
+          } else {
+            toast.error(data.error ?? "Connection failed");
+          }
+        },
+        onError: () => toast.error("Connection test failed"),
+      },
+    );
+  };
+
+  const handleToggleDefault = (checked: boolean): void => {
+    setDefaultShows(checked);
+    setMany.mutate(
+      { "tvdb.defaultShows": checked },
+      {
+        onSuccess: () => toast.success(checked ? "TVDB set as default for TV shows" : "TMDB restored as default"),
+        onError: () => toast.error("Failed to update preference"),
+      },
+    );
+  };
+
+  if (isLoading) return <Skeleton className="h-32 w-full rounded-xl" />;
+
+  const isConnected = !!allSettings?.["tvdb.token"];
+  const isPending = testService.isPending || setMany.isPending;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-2">
+        {isConnected && (
+          <span className="inline-flex items-center gap-1.5 text-sm text-green-500">
+            <CheckCircle className="h-3.5 w-3.5" />
+            Connected
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-sm font-medium text-muted-foreground">API Key</label>
+        <div className="relative">
+          <Input
+            type={showKey ? "text" : "password"}
+            value={apiKey}
+            placeholder="Enter your TVDB API key"
+            onChange={(e) => { setApiKey(e.target.value); setDirty(true); }}
+            className="h-10 rounded-lg border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+          />
+          <button
+            type="button"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
+            onClick={() => setShowKey((p) => !p)}
+          >
+            {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+
+      <Button size="sm" onClick={handleSave} disabled={!dirty || isPending}>
+        {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : saved ? <Check className="mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
+        {saved ? "Saved" : "Save & Test"}
+      </Button>
+
+      <div className="border-t border-border/40 pt-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-foreground">Use TVDB as default for TV shows</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">When enabled, TV shows use TVDB metadata and seasons.</p>
+          </div>
+          <Switch checked={defaultShows} onCheckedChange={handleToggleDefault} disabled={!isConnected} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Watch Region & Direct Search                                               */
+/* -------------------------------------------------------------------------- */
+
+function WatchRegionSection(): React.JSX.Element {
+  const { enabled: directSearchEnabled, setEnabled: setDirectSearch } = useDirectSearch();
+  const { region, setRegion } = useWatchRegion();
+  const [saved, setSaved] = useState(false);
+  const [pendingRegion, setPendingRegion] = useState<string | null>(null);
+  const displayRegion = pendingRegion ?? region;
+
+  const { data: regionsRaw, isLoading: regionsLoading } = trpc.provider.filterOptions.useQuery({ type: "regions" });
+  const regions = regionsRaw as Array<{ code: string; englishName: string; nativeName: string }> | undefined;
+  const { data: wpRaw, isLoading: providersLoading } =
+    trpc.provider.filterOptions.useQuery({ type: "watchProviders", mediaType: "movie", region: displayRegion }, { enabled: !!displayRegion });
+  const watchProviders = wpRaw as Array<{ providerId: number; providerName: string; logoPath: string; displayPriority: number }> | undefined;
+
+  const handleSaveRegion = (): void => {
+    setRegion(pendingRegion ?? region);
+    setPendingRegion(null);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+  const hasPendingChange = pendingRegion !== null && pendingRegion !== region;
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <div>
+          <p className="text-sm font-medium text-foreground mb-1">Watch Region</p>
+          <p className="text-xs text-muted-foreground mb-3">Determines which streaming providers appear on media pages.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {regionsLoading ? <Skeleton className="h-9 w-[240px]" /> : (
+            <Select value={displayRegion} onValueChange={(v) => setPendingRegion(v)}>
+              <SelectTrigger className="h-9 w-[240px] text-sm"><SelectValue placeholder="Select region..." /></SelectTrigger>
+              <SelectContent className="max-h-64">
+                {regions?.sort((a, b) => a.englishName.localeCompare(b.englishName)).map((r) => (
+                  <SelectItem key={r.code} value={r.code}>{r.englishName}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Button size="sm" onClick={handleSaveRegion} disabled={!hasPendingChange && !saved}>
+            {saved ? <Check className="mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
+            {saved ? "Saved" : "Save"}
+          </Button>
+        </div>
+
+        {displayRegion && (
+          <div>
+            <p className="mb-3 text-xs text-muted-foreground">Available streaming services</p>
+            {providersLoading ? (
+              <div className="flex flex-wrap gap-2.5">
+                {Array.from({ length: 12 }).map((_, i) => <Skeleton key={i} className="h-11 w-11 rounded-lg" />)}
+              </div>
+            ) : watchProviders && watchProviders.length > 0 ? (
+              <div className="flex flex-wrap gap-2.5">
+                {watchProviders.slice(0, 30).map((p) => (
+                  <img key={p.providerId} src={`${TMDB_IMAGE_BASE}/w92${p.logoPath}`} alt={p.providerName} title={p.providerName} className="h-11 w-11 rounded-lg border border-border/60 object-cover" />
+                ))}
+              </div>
+            ) : <p className="text-xs text-muted-foreground">No providers found.</p>}
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-border/40 pt-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-foreground">Direct search on streamings</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">When enabled, clicking a provider opens a search directly on that streaming service.</p>
+          </div>
+          <Switch checked={directSearchEnabled} onCheckedChange={setDirectSearch} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /*  ServicesSection                                                             */
 /* -------------------------------------------------------------------------- */
 
 export function ServicesSection(): React.JSX.Element {
   return (
     <div>
-      <SettingsSection title="Metadata" description="Configure your metadata provider API key.">
+      <SettingsSection title="Metadata" description="Configure your metadata provider API keys.">
         <SectionCard title="TMDB">
           <TmdbSection />
         </SectionCard>
+        <SectionCard title="TVDB">
+          <TvdbApiKeySection />
+        </SectionCard>
+      </SettingsSection>
+
+      <SettingsSection title="Metadata Preferences" description="Configure watch region and search behavior.">
+        <WatchRegionSection />
       </SettingsSection>
 
       <SettingsSection title="Media Servers" description="Connect media servers to sync libraries and trigger scans after downloads.">
