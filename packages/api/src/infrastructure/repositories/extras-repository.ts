@@ -1,4 +1,4 @@
-import { and, desc, eq, not, isNull, isNotNull, notInArray } from "drizzle-orm";
+import { and, desc, eq, lte, not, isNull, isNotNull, notInArray, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
   blocklist,
@@ -50,8 +50,12 @@ export async function findPoolBySource(
 }
 
 export async function findPoolItemsWithBackdrops(db: Database, limit: number) {
+  const today = new Date().toISOString().slice(0, 10);
   return db.query.recommendationPool.findMany({
-    where: not(isNull(recommendationPool.backdropPath)),
+    where: and(
+      not(isNull(recommendationPool.backdropPath)),
+      lte(recommendationPool.releaseDate, today),
+    ),
     orderBy: [desc(recommendationPool.releaseDate)],
     limit,
   });
@@ -63,15 +67,19 @@ export async function findPoolRecommendations(
   limit: number,
   offset: number,
 ) {
+  const today = new Date().toISOString().slice(0, 10);
+  const released = lte(recommendationPool.releaseDate, today);
+
   if (excludeTmdbIds.length > 0) {
     return db.query.recommendationPool.findMany({
-      where: notInArray(recommendationPool.tmdbId, excludeTmdbIds),
+      where: and(notInArray(recommendationPool.tmdbId, excludeTmdbIds), released),
       orderBy: [desc(recommendationPool.score)],
       limit,
       offset,
     });
   }
   return db.query.recommendationPool.findMany({
+    where: released,
     orderBy: [desc(recommendationPool.score)],
     limit,
     offset,
