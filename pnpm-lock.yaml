@@ -49,10 +49,17 @@ catalogs:
 importers:
 
   .:
+    dependencies:
+      webtorrent:
+        specifier: ^2.8.5
+        version: 2.8.5(bare-url@2.4.0)
     devDependencies:
       '@canto/prettier-config':
         specifier: workspace:*
         version: link:tooling/prettier
+      '@types/webtorrent':
+        specifier: ^0.110.1
+        version: 0.110.1
       prettier:
         specifier: 'catalog:'
         version: 3.8.1
@@ -95,6 +102,9 @@ importers:
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.15.1(typescript@5.9.3)
+      '@types/webtorrent':
+        specifier: ^0.110.1
+        version: 0.110.1
       lucide-react:
         specifier: ^0.474.0
         version: 0.474.0(react@19.2.4)
@@ -1972,14 +1982,26 @@ packages:
   '@tybys/wasm-util@0.10.1':
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
 
+  '@types/bittorrent-protocol@3.1.7':
+    resolution: {integrity: sha512-RGOjJndPEuMDP7563SE+s7Yu3ctibhPizVKcFaDYiv6hmckNgdSXMqhABhb48wn2XWIRnj9nF66ryLTb2VuKZQ==}
+
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
 
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
 
+  '@types/magnet-uri@5.1.5':
+    resolution: {integrity: sha512-SbBjlb1KGe38VfjRR+mwqztJd/4skhdKkRbIzPDhTy7IAeEAPZWIVSEkZw00Qr4ZZOGR3/ATJ20WWPBfrKHGdA==}
+
   '@types/node@22.19.15':
     resolution: {integrity: sha512-F0R/h2+dsy5wJAUe3tAU6oqa2qbWY5TpNfL/RGmo1y38hiyO1w3x2jPtt76wmuaJI4DQnOBu21cNXQ2STIUUWg==}
+
+  '@types/parse-torrent-file@4.0.6':
+    resolution: {integrity: sha512-SxqVth0Iv0WuEkqWS5MaY4S4Tlyi+QHkElQREvsUPw2xHcPgKyQ2dkJRRv5vAxmLzH+tnMdOj1Nws/wsenbzUw==}
+
+  '@types/parse-torrent@5.8.8':
+    resolution: {integrity: sha512-CInK3z3BxMXUeO/UiUeSfpQ0CkjOAWZUCUigVn3ZkppeLZTm32/TepolcxzgYuk6q3z91gdWsmOW2S6fYx326w==}
 
   '@types/react-dom@19.2.3':
     resolution: {integrity: sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==}
@@ -1988,6 +2010,12 @@ packages:
 
   '@types/react@19.2.14':
     resolution: {integrity: sha512-ilcTH/UniCkMdtexkoCN0bI7pMcJDvmQFPvuPvmEaYA/NSfFTAgdUSLAoVjaRJm7+6PvcM+q1zYOwS4wTYMF9w==}
+
+  '@types/simple-peer@9.11.9':
+    resolution: {integrity: sha512-6Gdl7TSS5oh9nuwKD4Pl8cSmaxWycYeZz9HLnJBNvIwWjZuGVsmHe9RwW3+9RxfhC1aIR9Z83DvaJoMw6rhkbg==}
+
+  '@types/webtorrent@0.110.1':
+    resolution: {integrity: sha512-fyW/LbaphpGWXdmmuXuerUb+dba/VlWAunMI7MLk44wbA27yIeSHZGuprf4FvXm9M9iqnLu1fmiPlMitg5nhJQ==}
 
   '@typescript-eslint/eslint-plugin@8.57.2':
     resolution: {integrity: sha512-NZZgp0Fm2IkD+La5PR81sd+g+8oS6JwJje+aRWsDocxHkjyRw0J5L5ZTlN3LI1LlOcGL7ph3eaIUmTXMIjLk0w==}
@@ -5059,13 +5087,31 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
+  '@types/bittorrent-protocol@3.1.7':
+    dependencies:
+      '@types/node': 22.19.15
+
   '@types/estree@1.0.8': {}
 
   '@types/json-schema@7.0.15': {}
 
+  '@types/magnet-uri@5.1.5':
+    dependencies:
+      '@types/node': 22.19.15
+
   '@types/node@22.19.15':
     dependencies:
       undici-types: 6.21.0
+
+  '@types/parse-torrent-file@4.0.6':
+    dependencies:
+      '@types/node': 22.19.15
+
+  '@types/parse-torrent@5.8.8':
+    dependencies:
+      '@types/magnet-uri': 5.1.5
+      '@types/node': 22.19.15
+      '@types/parse-torrent-file': 4.0.6
 
   '@types/react-dom@19.2.3(@types/react@19.2.14)':
     dependencies:
@@ -5074,6 +5120,17 @@ snapshots:
   '@types/react@19.2.14':
     dependencies:
       csstype: 3.2.3
+
+  '@types/simple-peer@9.11.9':
+    dependencies:
+      '@types/node': 22.19.15
+
+  '@types/webtorrent@0.110.1':
+    dependencies:
+      '@types/bittorrent-protocol': 3.1.7
+      '@types/node': 22.19.15
+      '@types/parse-torrent': 5.8.8
+      '@types/simple-peer': 9.11.9
 
   '@typescript-eslint/eslint-plugin@8.57.2(@typescript-eslint/parser@8.57.2(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3)':
     dependencies:

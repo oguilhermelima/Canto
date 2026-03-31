@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,135 +13,62 @@ import { Loader2, Volume2, VolumeX } from "lucide-react";
 interface TorrentPreviewProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  hash: string;
   title: string;
   magnetUrl?: string | null;
-}
-
-function buildMagnet(hash: string): string {
-  const trackers = [
-    "udp://tracker.opentrackr.org:1337/announce",
-    "udp://open.stealth.si:80/announce",
-    "udp://tracker.torrent.eu.org:451/announce",
-  ];
-  const params = trackers.map((t) => `&tr=${encodeURIComponent(t)}`).join("");
-  return `magnet:?xt=urn:btih:${hash}${params}`;
-}
-
-/** Load WebTorrent browser bundle (the dist/ build avoids Node.js polyfill issues) */
-async function loadWebTorrent(): Promise<unknown> {
-  // Import the pre-built browser bundle from the npm package
-  const mod = await import("webtorrent/dist/webtorrent.min.js");
-  return mod.default ?? mod;
 }
 
 export function TorrentPreview({
   open,
   onOpenChange,
-  hash,
   title,
   magnetUrl,
 }: TorrentPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const clientRef = useRef<any>(null);
-  const [status, setStatus] = useState<"loading" | "buffering" | "playing" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "playing" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
-  const [progress, setProgress] = useState(0);
   const [muted, setMuted] = useState(true);
 
-  const cleanup = useCallback(() => {
-    try {
-      if (clientRef.current?.destroy) clientRef.current.destroy();
-    } catch { /* best-effort */ }
-    clientRef.current = null;
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.removeAttribute("src");
-      videoRef.current.load();
-    }
-  }, []);
-
   useEffect(() => {
-    if (!open) {
-      cleanup();
+    if (!open || !magnetUrl) {
       setStatus("loading");
-      setProgress(0);
       setErrorMsg("");
       return;
     }
 
-    let destroyed = false;
+    // Build the stream URL — the backend handles WebTorrent + HTTP range
+    const streamUrl = `/api/stream?magnet=${encodeURIComponent(magnetUrl)}`;
+    const video = videoRef.current;
+    if (!video) return;
 
-    async function startStream() {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const WT = await loadWebTorrent() as any;
-        if (destroyed) return;
+    setStatus("loading");
 
-        const client = new WT();
-        clientRef.current = client;
+    video.src = streamUrl;
+    video.load();
 
-        const magnet = magnetUrl || buildMagnet(hash);
-        setStatus("buffering");
+    const onCanPlay = () => setStatus("playing");
+    const onError = () => {
+      setStatus("error");
+      const err = video.error;
+      setErrorMsg(err?.message ?? "Failed to load video stream");
+    };
 
-        const torrent = client.add(magnet);
-
-        torrent.on("download", () => {
-          if (destroyed) return;
-          setProgress(Math.round(torrent.progress * 100));
-        });
-
-        torrent.on("ready", () => {
-          if (destroyed) return;
-
-          const videoExts = [".mp4", ".mkv", ".avi", ".webm", ".mov", ".m4v"];
-          const sorted = [...torrent.files].sort(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (a: any, b: any) => b.length - a.length,
-          );
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const videoFile = sorted.find((f: any) =>
-            videoExts.some((ext) => f.name.toLowerCase().endsWith(ext)),
-          );
-
-          if (!videoFile) {
-            setStatus("error");
-            setErrorMsg("No video file found in torrent");
-            return;
-          }
-
-          videoFile.renderTo(videoRef.current!, (err: Error | undefined) => {
-            if (destroyed) return;
-            if (err) {
-              setStatus("error");
-              setErrorMsg(err.message ?? "Cannot play this format in browser");
-            } else {
-              setStatus("playing");
-            }
-          });
-        });
-
-        client.on("error", (err: Error) => {
-          if (destroyed) return;
-          setStatus("error");
-          setErrorMsg(err.message ?? "WebTorrent error");
-        });
-      } catch (err) {
-        if (!destroyed) {
-          setStatus("error");
-          setErrorMsg(err instanceof Error ? err.message : "Failed to start WebTorrent");
-        }
-      }
-    }
-
-    void startStream();
+    video.addEventListener("canplay", onCanPlay);
+    video.addEventListener("error", onError);
 
     return () => {
-      destroyed = true;
-      cleanup();
+      video.removeEventListener("canplay", onCanPlay);
+      video.removeEventListener("error", onError);
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+
+      // Cleanup torrent on close
+      const hashMatch = /xt=urn:btih:([a-fA-F0-9]+)/i.exec(magnetUrl);
+      if (hashMatch?.[1]) {
+        void fetch(`/api/stream?hash=${hashMatch[1]}`, { method: "DELETE" }).catch(() => {});
+      }
     };
-  }, [open, hash, magnetUrl, cleanup]);
+  }, [open, magnetUrl]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -151,14 +78,12 @@ export function TorrentPreview({
         </DialogHeader>
 
         <div className="relative aspect-video bg-black">
-          {(status === "loading" || status === "buffering") && (
+          {status === "loading" && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white">
               <Loader2 className="h-8 w-8 animate-spin" />
-              <p className="text-sm">
-                {status === "loading" ? "Connecting to peers..." : `Buffering... ${progress}%`}
-              </p>
+              <p className="text-sm">Connecting to peers & buffering...</p>
               <p className="text-xs text-white/50">
-                Streaming via WebTorrent (peer-to-peer in browser)
+                Server-side streaming via WebTorrent (connects to all peers)
               </p>
             </div>
           )}
@@ -167,9 +92,6 @@ export function TorrentPreview({
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-8 text-white">
               <p className="text-sm font-medium">Preview unavailable</p>
               <p className="max-w-md text-center text-xs text-white/60">{errorMsg}</p>
-              <p className="mt-2 text-xs text-white/40">
-                WebTorrent needs WebRTC peers. Some trackers/formats may not work in-browser.
-              </p>
             </div>
           )}
 
@@ -186,7 +108,7 @@ export function TorrentPreview({
             <Button
               variant="ghost"
               size="sm"
-              className="absolute bottom-4 right-4 h-8 w-8 rounded-full bg-black/60 p-0 text-white hover:bg-black/80"
+              className="absolute bottom-14 right-4 h-8 w-8 rounded-full bg-black/60 p-0 text-white hover:bg-black/80"
               onClick={() => {
                 setMuted((m) => !m);
                 if (videoRef.current) videoRef.current.muted = !muted;

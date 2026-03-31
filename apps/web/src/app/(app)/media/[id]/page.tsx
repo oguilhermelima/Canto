@@ -1177,7 +1177,6 @@ export default function MediaDetailPage({
       <TorrentPreview
         open={previewTarget !== null}
         onOpenChange={(open) => { if (!open) setPreviewTarget(null); }}
-        hash=""
         title={previewTarget?.title ?? ""}
         magnetUrl={previewTarget?.magnetUrl}
       />
