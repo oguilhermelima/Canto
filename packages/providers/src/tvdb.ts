@@ -85,6 +85,13 @@ interface TvdbSearchResult {
 /*  Helpers                                                                    */
 /* -------------------------------------------------------------------------- */
 
+const TVDB_IMAGE_BASE = "https://artworks.thetvdb.com/banners/";
+
+function prefixImageUrl(url: string): string {
+  if (url.startsWith("http")) return url;
+  return `${TVDB_IMAGE_BASE}${url}`;
+}
+
 function mapStatus(status: string | null | undefined): string | undefined {
   if (!status) return undefined;
   switch (status) {
@@ -252,7 +259,20 @@ export class TvdbProvider implements MetadataProvider {
       `/series/${externalId}/extended`,
     );
 
-    // Fetch all episodes (paginated)
+    // Fetch English translation for series (title + overview)
+    let engTitle: string | undefined;
+    let engOverview: string | undefined;
+    try {
+      const translation = await this.request<{ name?: string; overview?: string }>(
+        `/series/${externalId}/translations/eng`,
+      );
+      engTitle = translation?.name || undefined;
+      engOverview = translation?.overview || undefined;
+    } catch {
+      // English translation not available, use original
+    }
+
+    // Fetch all episodes (paginated, in English)
     const allEpisodes = await this.fetchAllEpisodes(externalId);
 
     // Group episodes by season
@@ -280,7 +300,7 @@ export class TvdbProvider implements MetadataProvider {
             overview: ep.overview ?? undefined,
             airDate: ep.aired ?? undefined,
             runtime: ep.runtime ?? undefined,
-            stillPath: ep.image ?? undefined,
+            stillPath: ep.image ? prefixImageUrl(ep.image) : undefined,
             absoluteNumber: ep.absoluteNumber ?? undefined,
             finaleType: ep.finaleType ?? undefined,
           }));
@@ -289,7 +309,7 @@ export class TvdbProvider implements MetadataProvider {
           number: s.number,
           externalId: s.id,
           name: s.name ?? undefined,
-          posterPath: s.image ?? undefined,
+          posterPath: s.image ? prefixImageUrl(s.image) : undefined,
           episodeCount: episodes.length,
           seasonType: s.type?.type ?? undefined,
           episodes,
@@ -298,8 +318,10 @@ export class TvdbProvider implements MetadataProvider {
       .filter((s): s is NormalizedSeason => s !== null);
 
     // Extract artwork
-    const posterPath = findArtwork(series.artworks, 2, "eng") ?? series.image ?? undefined;
-    const backdropPath = findArtwork(series.artworks, 3, "eng");
+    const rawPoster = findArtwork(series.artworks, 2, "eng") ?? series.image ?? undefined;
+    const rawBackdrop = findArtwork(series.artworks, 3, "eng");
+    const posterPath = rawPoster ? prefixImageUrl(rawPoster) : undefined;
+    const backdropPath = rawBackdrop ? prefixImageUrl(rawBackdrop) : undefined;
 
     // Networks
     const networks: string[] = [];
@@ -321,8 +343,9 @@ export class TvdbProvider implements MetadataProvider {
       externalId: series.id,
       provider: "tvdb",
       type: "show",
-      title: series.name,
-      overview: series.overview ?? undefined,
+      title: engTitle ?? series.name,
+      originalTitle: series.name !== (engTitle ?? series.name) ? series.name : undefined,
+      overview: engOverview ?? series.overview ?? undefined,
       releaseDate: series.firstAired ?? undefined,
       year: series.year ? parseInt(series.year, 10) : undefined,
       lastAirDate: series.lastAired ?? undefined,
@@ -352,7 +375,7 @@ export class TvdbProvider implements MetadataProvider {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     while (true) {
       const data = await this.request<{ episodes: TvdbEpisode[] }>(
-        `/series/${seriesId}/episodes/default?page=${page}`,
+        `/series/${seriesId}/episodes/default/eng?page=${page}`,
       );
 
       const episodes = data?.episodes ?? [];

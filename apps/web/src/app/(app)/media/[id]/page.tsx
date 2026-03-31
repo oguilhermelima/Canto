@@ -463,8 +463,9 @@ export default function MediaDetailPage({
                 { id: media.id, provider: targetProvider as "tmdb" | "tvdb" },
                 {
                   onSuccess: () => {
-                    void utils.media.getById.invalidate({ id: media.id });
+                    void utils.media.getById.invalidate();
                     void utils.media.getByExternal.invalidate();
+                    void utils.media.getExtras.invalidate();
                     toast.success(`Metadata replaced with ${targetProvider.toUpperCase()}`);
                   },
                   onError: (error) => {

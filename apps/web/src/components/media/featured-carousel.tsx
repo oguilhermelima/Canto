@@ -208,8 +208,9 @@ function FeaturedCard({
   }, [muted]);
 
   const href = `/media/ext?provider=${item.provider}&externalId=${item.externalId}&type=${item.type}`;
-  const posterSrc = item.posterPath ? `${TMDB_IMAGE_BASE}/w500${item.posterPath}` : null;
-  const backdropSrc = item.backdropPath ? `${TMDB_IMAGE_BASE}/w780${item.backdropPath}` : null;
+  const imgUrl = (path: string, size: string) => path.startsWith("http") ? path : `${TMDB_IMAGE_BASE}/${size}${path}`;
+  const posterSrc = item.posterPath ? imgUrl(item.posterPath, "w500") : null;
+  const backdropSrc = item.backdropPath ? imgUrl(item.backdropPath, "w780") : null;
 
   return (
     <div
