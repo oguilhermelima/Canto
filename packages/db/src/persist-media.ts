@@ -22,6 +22,11 @@ export async function persistMedia(
   });
 
   if (existing) {
+    // If found by cross-reference but from a DIFFERENT provider, don't overwrite
+    // (e.g., a TVDB show found via IMDB ID when TMDB tries to persist it)
+    if (existing.provider !== normalized.provider) {
+      return existing;
+    }
     return updateMediaFromNormalized(db, existing.id, normalized);
   }
 
