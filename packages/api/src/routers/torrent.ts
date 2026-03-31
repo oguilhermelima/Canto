@@ -26,30 +26,6 @@ import { findDefaultLibrary, findLibraryById } from "../infrastructure/repositor
 
 export const torrentRouter = createTRPCRouter({
   /**
-   * Resolve a Prowlarr/Jackett download URL to its final magnet link.
-   * Prowlarr proxies magnet links through its API — this follows the redirect
-   * server-side and returns the raw magnet URI for WebTorrent preview.
-   */
-  resolveMagnet: publicProcedure
-    .input(z.object({ url: z.string() }))
-    .query(async ({ input }) => {
-      // If it's already a magnet link, return as-is
-      if (input.url.startsWith("magnet:")) return { magnet: input.url };
-
-      // Follow redirects manually to capture the magnet: redirect
-      const res = await fetch(input.url, { redirect: "manual" });
-      const location = res.headers.get("location");
-      if (location?.startsWith("magnet:")) return { magnet: location };
-
-      // If no redirect, try following fully
-      const res2 = await fetch(input.url, { redirect: "follow" });
-      const finalUrl = res2.url;
-      if (finalUrl.startsWith("magnet:")) return { magnet: finalUrl };
-
-      return { magnet: null };
-    }),
-
-  /**
    * Search for torrents via Prowlarr/Jackett, building a search query from the
    * media item's title (+ season number if provided).
    */

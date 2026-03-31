@@ -47,7 +47,6 @@ import { SimilarSection } from "~/components/media/similar-section";
 import { WhereToWatch } from "~/components/media/where-to-watch";
 import { useWatchRegion } from "~/hooks/use-watch-region";
 import { useDirectSearch } from "~/hooks/use-direct-search";
-import { TorrentPreview } from "~/components/media/manage/torrent-preview";
 import { PreferencesModal } from "~/components/media/manage/preferences-modal";
 
 import {
@@ -81,8 +80,6 @@ export default function MediaDetailPage({
   const [torrentSizeFilter, setTorrentSizeFilter] = useState<string>("all");
   const [torrentSort, setTorrentSort] = useState<"seeders" | "peers" | "size" | "age" | "confidence">("confidence");
   const [torrentSortDir, setTorrentSortDir] = useState<"asc" | "desc">("desc");
-  const [previewTarget, setPreviewTarget] = useState<{ magnetUrl: string; title: string } | null>(null);
-  const [resolvingPreview, setResolvingPreview] = useState(false);
   const TORRENTS_PER_PAGE = 20;
 
   const [torrentSearchContext, setTorrentSearchContext] = useState<{
@@ -1065,48 +1062,15 @@ export default function MediaDetailPage({
                         <td className="overflow-hidden px-3 py-3 text-xs text-muted-foreground/60">
                           <span className="block truncate">{t.indexer ?? "—"}</span>
                         </td>
-                        {/* Actions */}
+                        {/* Download */}
                         <td className="px-3 py-3">
-                          <div className="flex items-center gap-1.5">
-                            {(t.magnetUrl || t.downloadUrl) && (
-                              <button
-                                onClick={async () => {
-                                  const raw = t.magnetUrl ?? t.downloadUrl;
-                                  if (!raw) return;
-                                  if (raw.startsWith("magnet:")) {
-                                    setPreviewTarget({ magnetUrl: raw, title: t.title });
-                                    return;
-                                  }
-                                  // Resolve Prowlarr proxy URL to magnet server-side
-                                  setResolvingPreview(true);
-                                  try {
-                                    const resolved = await utils.torrent.resolveMagnet.fetch({ url: raw });
-                                    if (resolved.magnet) {
-                                      setPreviewTarget({ magnetUrl: resolved.magnet, title: t.title });
-                                    } else {
-                                      toast.error("Could not resolve magnet link for preview");
-                                    }
-                                  } catch {
-                                    toast.error("Failed to resolve magnet link");
-                                  } finally {
-                                    setResolvingPreview(false);
-                                  }
-                                }}
-                                disabled={resolvingPreview}
-                                className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
-                                title="Preview video"
-                              >
-                                <Play size={14} />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => url && handleDownload(url, t.title)}
-                              disabled={!url || downloadTorrent.isPending}
-                              className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-80 disabled:opacity-40"
-                            >
-                              <Download size={14} />
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => url && handleDownload(url, t.title)}
+                            disabled={!url || downloadTorrent.isPending}
+                            className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-80 disabled:opacity-40"
+                          >
+                            <Download size={14} />
+                          </button>
                         </td>
                       </tr>
                     );
@@ -1172,14 +1136,6 @@ export default function MediaDetailPage({
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Torrent video preview (WebTorrent) */}
-      <TorrentPreview
-        open={previewTarget !== null}
-        onOpenChange={(open) => { if (!open) setPreviewTarget(null); }}
-        title={previewTarget?.title ?? ""}
-        magnetUrl={previewTarget?.magnetUrl}
-      />
 
     </div>
   );

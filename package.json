@@ -25,13 +25,9 @@
   },
   "devDependencies": {
     "@canto/prettier-config": "workspace:*",
-    "@types/webtorrent": "^0.110.1",
     "prettier": "catalog:",
     "turbo": "catalog:",
     "typescript": "catalog:"
   },
-  "prettier": "@canto/prettier-config",
-  "dependencies": {
-    "webtorrent": "^2.8.5"
-  }
+  "prettier": "@canto/prettier-config"
 }

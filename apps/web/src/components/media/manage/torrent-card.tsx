@@ -13,7 +13,6 @@ import {
   ArrowUp,
   Users,
   Clock,
-  Eye,
 } from "lucide-react";
 import {
   formatBytes,
@@ -43,8 +42,6 @@ interface TorrentLive {
 export interface TorrentWithLive {
   id: string;
   title: string;
-  hash: string | null;
-  magnetUrl: string | null;
   status: string;
   quality: string;
   source: string;
@@ -65,7 +62,6 @@ interface TorrentCardProps {
   onDelete: (id: string, title: string) => void;
   onRetry: (id: string) => void;
   onImport: (id: string) => void;
-  onPreview?: (hash: string, title: string, magnetUrl?: string | null) => void;
   compact?: boolean;
 }
 
@@ -76,7 +72,6 @@ export function TorrentCard({
   onDelete,
   onRetry,
   onImport,
-  onPreview,
   compact,
 }: TorrentCardProps) {
   const state: ResolvedState = resolveState(
@@ -206,11 +201,6 @@ export function TorrentCard({
         {state.isDownloaded && !t.imported && !t.importing && (
           <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => onImport(t.id)}>
             <Download className="h-3 w-3" /> Import
-          </Button>
-        )}
-        {t.hash && onPreview && (
-          <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => onPreview(t.hash!, t.title, t.magnetUrl)}>
-            <Eye className="h-3 w-3" /> Preview
           </Button>
         )}
         {t.importing && (

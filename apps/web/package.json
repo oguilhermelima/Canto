@@ -22,7 +22,6 @@
     "@trpc/client": "catalog:",
     "@trpc/react-query": "catalog:",
     "@trpc/server": "catalog:",
-    "@types/webtorrent": "^0.110.1",
     "lucide-react": "^0.474.0",
     "next": "^15.3.0",
     "next-themes": "^0.4.6",
@@ -33,7 +32,6 @@
     "tailwindcss": "catalog:",
     "tailwindcss-animate": "^1.0.7",
     "usehooks-ts": "^3.1.1",
-    "webtorrent": "^2.8.5",
     "zod": "catalog:"
   },
   "devDependencies": {
