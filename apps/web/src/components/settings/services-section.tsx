@@ -872,9 +872,13 @@ function WatchRegionSection(): React.JSX.Element {
 
       <div className="border-t border-border/40 pt-4">
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-foreground">Direct search on streamings</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">When enabled, clicking a provider opens a search directly on that streaming service.</p>
+          <div className="mr-4">
+            <p className="text-sm font-medium text-foreground">Direct search on streaming apps</p>
+            <p className="mt-1 text-xs text-muted-foreground leading-relaxed max-w-lg">
+              On media detail pages, clicking a streaming provider logo (Netflix, Disney+, etc.)
+              will open a search for that title directly on the streaming app&apos;s website.
+              When disabled, it opens the TMDB watch page instead.
+            </p>
           </div>
           <Switch checked={directSearchEnabled} onCheckedChange={setDirectSearch} />
         </div>
@@ -896,35 +900,6 @@ export function ServicesSection(): React.JSX.Element {
         </SectionCard>
         <SectionCard title="TVDB">
           <TvdbApiKeySection />
-        </SectionCard>
-      </SettingsSection>
-
-      <SettingsSection title="Media Servers" description="Connect media servers to sync libraries and trigger scans after downloads.">
-        <SectionCard title="Jellyfin">
-          <MediaServerRow
-            title="Jellyfin"
-            serviceKey="jellyfin"
-            urlField={{ key: "jellyfin.url", label: "Server URL", placeholder: "http://192.168.1.100:8096" }}
-            apiKeyField={{ key: "jellyfin.apiKey", label: "API Key", placeholder: "Your Jellyfin API key", secret: true }}
-            loginFields={[
-              { key: "username", label: "Username", placeholder: "admin" },
-              { key: "password", label: "Password", placeholder: "Password", secret: true },
-            ]}
-            isLast
-          />
-        </SectionCard>
-        <SectionCard title="Plex">
-          <MediaServerRow
-            title="Plex"
-            serviceKey="plex"
-            urlField={{ key: "plex.url", label: "Server URL", placeholder: "http://192.168.1.100:32400" }}
-            apiKeyField={{ key: "plex.token", label: "X-Plex-Token", placeholder: "Your Plex authentication token", secret: true }}
-            loginFields={[
-              { key: "email", label: "Email", placeholder: "your@email.com" },
-              { key: "password", label: "Password", placeholder: "Password", secret: true },
-            ]}
-            isLast
-          />
         </SectionCard>
       </SettingsSection>
 
@@ -967,6 +942,35 @@ export function ServicesSection(): React.JSX.Element {
           />
         </SectionCard>
       </SettingsSection>
+
+      <SettingsSection title="Media Servers" description="Connect media servers to sync libraries and trigger scans after downloads.">
+        <SectionCard title="Jellyfin">
+          <MediaServerRow
+            title="Jellyfin"
+            serviceKey="jellyfin"
+            urlField={{ key: "jellyfin.url", label: "Server URL", placeholder: "http://192.168.1.100:8096" }}
+            apiKeyField={{ key: "jellyfin.apiKey", label: "API Key", placeholder: "Your Jellyfin API key", secret: true }}
+            loginFields={[
+              { key: "username", label: "Username", placeholder: "admin" },
+              { key: "password", label: "Password", placeholder: "Password", secret: true },
+            ]}
+            isLast
+          />
+        </SectionCard>
+        <SectionCard title="Plex">
+          <MediaServerRow
+            title="Plex"
+            serviceKey="plex"
+            urlField={{ key: "plex.url", label: "Server URL", placeholder: "http://192.168.1.100:32400" }}
+            apiKeyField={{ key: "plex.token", label: "X-Plex-Token", placeholder: "Your Plex authentication token", secret: true }}
+            loginFields={[
+              { key: "email", label: "Email", placeholder: "your@email.com" },
+              { key: "password", label: "Password", placeholder: "Password", secret: true },
+            ]}
+            isLast
+          />
+        </SectionCard>
+      </SettingsSection>
     </div>
   );
 }
@@ -997,20 +1001,23 @@ export function MetadataSettingsSection(): React.JSX.Element {
 
   return (
     <div>
-      <SettingsSection title="Default Provider" description="Choose which metadata provider to use for TV shows and anime seasons.">
-        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card px-5 py-5">
-          <div>
+      <SettingsSection title="Default Provider" description="Controls where TV show and anime metadata comes from.">
+        <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-card px-5 py-5">
+          <div className="mr-4">
             <p className="text-sm font-medium text-foreground">Use TVDB as default for TV shows</p>
-            <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
-              When enabled, new TV shows and anime will use TVDB for seasons and episodes.
-              {!isConnected && " Connect TVDB in Services first."}
+            <p className="mt-1 text-xs text-muted-foreground leading-relaxed max-w-lg">
+              When enabled, TV shows and anime will use TVDB for seasons and episodes instead of TMDB.
+              TVDB provides more accurate season structures (e.g. Bleach with 16 arcs vs TMDB&apos;s 2 seasons)
+              and native absolute episode numbering for anime.
+              Ratings, recommendations and trailers will still come from TMDB.
+              {!isConnected && <span className="block mt-1 text-yellow-500">Connect TVDB in Services first to enable this.</span>}
             </p>
           </div>
           <Switch checked={defaultShows} onCheckedChange={handleToggleDefault} disabled={!isConnected} />
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Watch Region" description="Configure watch region and search behavior.">
+      <SettingsSection title="Watch Region" description="Controls which streaming providers (Netflix, Disney+, etc.) appear on media detail pages.">
         <WatchRegionSection />
       </SettingsSection>
     </div>

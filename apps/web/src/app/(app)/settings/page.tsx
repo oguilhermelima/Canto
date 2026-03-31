@@ -23,10 +23,11 @@ import {
   SkipForward,
 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
+import { TabBar } from "~/components/layout/tab-bar";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
+import { authClient } from "~/lib/auth-client";
 import { PageHeader } from "~/components/layout/page-header";
-import { TabBar } from "~/components/layout/tab-bar";
 import { SettingsSection } from "~/components/settings/shared";
 import { ServicesSection, MetadataSettingsSection } from "~/components/settings/services-section";
 import { AboutSection } from "~/components/settings/about-section";
@@ -38,10 +39,10 @@ const themeOptions = [
 ] as const;
 
 const NAV_ITEMS = [
+  { key: "account", label: "Account" },
   { key: "services", label: "Services" },
   { key: "metadata", label: "Metadata" },
   { key: "libraries", label: "Libraries" },
-  { key: "preferences", label: "Preferences" },
   { key: "about", label: "About" },
 ] as const;
 
@@ -556,35 +557,156 @@ function LibrariesSection(): React.JSX.Element {
   );
 }
 
-function PreferencesSection(): React.JSX.Element {
+function AccountSection(): React.JSX.Element {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  const { data: session } = authClient.useSession();
+  const user = session?.user;
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [profileDirty, setProfileDirty] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name ?? "");
+      setEmail(user.email ?? "");
+    }
+  }, [user]);
+
+  const handleSaveProfile = async (): Promise<void> => {
+    setProfileSaving(true);
+    try {
+      await authClient.updateUser({ name, image: user?.image });
+      if (email !== user?.email) {
+        await authClient.changeEmail({ newEmail: email });
+      }
+      setProfileDirty(false);
+      toast.success("Profile updated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update profile");
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleChangePassword = async (): Promise<void> => {
+    if (!currentPassword || !newPassword) return;
+    setPasswordSaving(true);
+    try {
+      await authClient.changePassword({ currentPassword, newPassword });
+      setCurrentPassword("");
+      setNewPassword("");
+      toast.success("Password changed");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to change password");
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
   return (
-    <SettingsSection title="Appearance" description="Choose a theme for the interface.">
-      <div className="grid grid-cols-3 gap-3">
-        {themeOptions.map(({ value, label, description: desc, icon: Icon }) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setTheme(value)}
-            className={cn(
-              "flex flex-col items-center gap-2.5 rounded-xl border p-4 transition-all",
-              mounted && theme === value
-                ? "border-primary bg-primary/5 text-foreground ring-1 ring-primary/20"
-                : "border-border/60 text-muted-foreground hover:border-foreground/20 hover:text-foreground",
-            )}
-          >
-            <Icon className="h-5 w-5" />
-            <div className="text-center">
-              <span className="block text-xs font-medium">{label}</span>
-              <span className="mt-0.5 block text-[10px] text-muted-foreground">{desc}</span>
+    <div>
+      <SettingsSection title="Profile" description="Update your account information.">
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground">
+              {user?.name?.charAt(0).toUpperCase() ?? "?"}
             </div>
-          </button>
-        ))}
-      </div>
-    </SettingsSection>
+            <div>
+              <p className="text-sm font-medium text-foreground">{user?.name}</p>
+              <p className="text-xs text-muted-foreground">{user?.email}</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-muted-foreground">Name</label>
+              <Input
+                value={name}
+                onChange={(e) => { setName(e.target.value); setProfileDirty(true); }}
+                className="h-10"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-muted-foreground">Email</label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setProfileDirty(true); }}
+                className="h-10"
+              />
+            </div>
+          </div>
+
+          {profileDirty && (
+            <Button size="sm" onClick={handleSaveProfile} disabled={profileSaving}>
+              {profileSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Save
+            </Button>
+          )}
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Password" description="Change your account password.">
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-muted-foreground">Current password</label>
+            <Input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Enter current password"
+              className="h-10"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-muted-foreground">New password</label>
+            <Input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Enter new password"
+              className="h-10"
+            />
+          </div>
+          <Button size="sm" onClick={handleChangePassword} disabled={passwordSaving || !currentPassword || !newPassword}>
+            {passwordSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            Change password
+          </Button>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Appearance" description="Choose a theme for the interface.">
+        <div className="grid grid-cols-3 gap-3">
+          {themeOptions.map(({ value, label, description: desc, icon: Icon }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setTheme(value)}
+              className={cn(
+                "flex flex-col items-center gap-2.5 rounded-2xl border p-4 transition-all",
+                mounted && theme === value
+                  ? "border-primary bg-primary/5 text-foreground ring-1 ring-primary/20"
+                  : "border-border/60 text-muted-foreground hover:border-foreground/20 hover:text-foreground",
+              )}
+            >
+              <Icon className="h-5 w-5" />
+              <div className="text-center">
+                <span className="block text-xs font-medium">{label}</span>
+                <span className="mt-0.5 block text-[10px] text-muted-foreground">{desc}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </SettingsSection>
+    </div>
   );
 }
 
@@ -593,7 +715,7 @@ function PreferencesSection(): React.JSX.Element {
 /* -------------------------------------------------------------------------- */
 
 export default function SettingsPage(): React.JSX.Element {
-  const [activeNav, setActiveNav] = useState<NavKey>("services");
+  const [activeNav, setActiveNav] = useState<NavKey>("account");
 
   useEffect(() => { document.title = "Settings — Canto"; }, []);
 
@@ -601,7 +723,7 @@ export default function SettingsPage(): React.JSX.Element {
     <div className="w-full">
       <PageHeader title="Settings" subtitle="Manage your account settings and preferences" />
 
-      {/* Sticky tab bar */}
+      {/* Sticky nav */}
       <div className="sticky top-14 z-20 bg-background px-4 py-2.5 md:top-16 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         <TabBar
           tabs={NAV_ITEMS.map((item) => ({ value: item.key, label: item.label }))}
@@ -611,10 +733,10 @@ export default function SettingsPage(): React.JSX.Element {
       </div>
 
       <div className="px-4 pt-6 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+        {activeNav === "account" && <AccountSection />}
         {activeNav === "services" && <ServicesSection />}
         {activeNav === "metadata" && <MetadataSettingsSection />}
         {activeNav === "libraries" && <LibrariesSection />}
-        {activeNav === "preferences" && <PreferencesSection />}
         {activeNav === "about" && <AboutSection />}
       </div>
     </div>
