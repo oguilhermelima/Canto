@@ -1,5 +1,14 @@
 # Canto — Roadmap
 
+## Torrent Preview (pre-download)
+- **TODO**: Stream torrent video before downloading to validate quality
+- **Approach**: Run WebTorrent Node.js (or libtorrent) on the qBit host as a microservice
+- Server connects to all peers via TCP/UDP, streams video via HTTP to the browser
+- Next.js proxies the stream to the frontend `<video>` player
+- **Why not browser**: WebTorrent browser only uses WebRTC (most seeders don't support it)
+- **Why not on Next.js host**: macOS ARM lacks uTP native binaries, connectivity issues
+- **Alternative**: "Open in VLC" button using `vlc://magnet:` protocol handler
+
 ## Quality System
 
 ### Quality Profiles (foundation ready)
