@@ -64,6 +64,14 @@ export default function DiscoverPage(): React.JSX.Element {
     sortOrder: "desc",
   });
 
+  const downloadedLibrary = trpc.library.list.useQuery({
+    page: 1,
+    pageSize: 20,
+    downloaded: true,
+    sortBy: "addedAt",
+    sortOrder: "desc",
+  });
+
   const utils = trpc.useUtils();
 
   // Check if any spotlight/carousel item is in library
@@ -138,6 +146,16 @@ export default function DiscoverPage(): React.JSX.Element {
   const animeMovieItems = useMemo(() => mapItems(flatAnimeMovies), [mapItems, flatAnimeMovies]);
 
   const recentLibrary = (library.data?.items ?? []).map((item) => ({
+    id: item.id,
+    type: item.type as "movie" | "show",
+    title: item.title,
+    posterPath: item.posterPath,
+    year: item.year,
+    voteAverage: item.voteAverage,
+    href: `/media/${item.id}`,
+  }));
+
+  const myDownloads = (downloadedLibrary.data?.items ?? []).map((item) => ({
     id: item.id,
     type: item.type as "movie" | "show",
     title: item.title,
@@ -318,6 +336,15 @@ export default function DiscoverPage(): React.JSX.Element {
 
       {/* Carousels */}
       <div className="relative -mt-4 flex w-full min-w-0 flex-1 flex-col gap-12 overflow-x-hidden pb-12">
+        {myDownloads.length > 0 && (
+          <MediaCarousel
+            title="My Library"
+            seeAllHref="/library"
+            items={myDownloads}
+            isLoading={downloadedLibrary.isLoading}
+          />
+        )}
+
         {recentLibrary.length > 0 && (
           <MediaCarousel
             title="Recently Added"

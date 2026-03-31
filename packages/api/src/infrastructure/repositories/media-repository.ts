@@ -147,11 +147,11 @@ function buildLibraryFilters(input: ListInput): SQL {
   if (input.downloaded !== undefined) {
     if (input.downloaded) {
       conditions.push(
-        sql`EXISTS (SELECT 1 FROM ${mediaFile} WHERE ${mediaFile.mediaId} = ${media.id})`,
+        sql`EXISTS (SELECT 1 FROM media_file WHERE media_file.media_id = ${media.id})`,
       );
     } else {
       conditions.push(
-        sql`NOT EXISTS (SELECT 1 FROM ${mediaFile} WHERE ${mediaFile.mediaId} = ${media.id})`,
+        sql`NOT EXISTS (SELECT 1 FROM media_file WHERE media_file.media_id = ${media.id})`,
       );
     }
   }
