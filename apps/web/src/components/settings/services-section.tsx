@@ -139,6 +139,7 @@ const BRAND_GRADIENT: Record<string, string> = {
   jellyfin: "from-[#a95ce0]/15 via-[#4bb8e8]/10 to-transparent",
   plex: "from-[#e5a00d]/15 via-[#e5a00d]/5 to-transparent",
   tmdb: "from-[#01b4e4]/15 via-[#90cea1]/10 to-transparent",
+  tvdb: "from-[#6cd491]/15 via-[#6cd491]/5 to-transparent",
   qbittorrent: "from-[#4488cc]/15 via-[#4488cc]/5 to-transparent",
   prowlarr: "from-[#e77220]/15 via-[#e77220]/5 to-transparent",
   jackett: "from-[#c23c2a]/15 via-[#c23c2a]/5 to-transparent",
@@ -151,6 +152,7 @@ const BRAND_LOGO: Record<string, { type: "img"; src: string } | { type: "mask"; 
   prowlarr: { type: "img", src: "/prowlarr.svg" },
   jackett: { type: "mask", src: "/jackett.svg", color: "#c23c2a" },
   tmdb: { type: "img", src: "/tmdb.svg" },
+  tvdb: { type: "img", src: "/tvdb.svg" },
 };
 
 const SERVICE_INFO: Record<string, { subtitle?: string; link?: { label: string; href: string }; apiKeyHint?: string; apiKeyLink?: { label: string; href: string } }> = {
@@ -717,13 +719,10 @@ function TvdbApiKeySection(): React.JSX.Element {
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [defaultShows, setDefaultShows] = useState(false);
 
   useEffect(() => {
     if (allSettings) {
       setApiKey((allSettings["tvdb.apiKey"] as string) ?? "");
-      setDefaultShows(allSettings["tvdb.defaultShows"] === true);
       setDirty(false);
     }
   }, [allSettings]);
@@ -735,13 +734,8 @@ function TvdbApiKeySection(): React.JSX.Element {
       {
         onSuccess: (data) => {
           if (data.connected) {
-            setMany.mutate(values, {
-              onSuccess: () => {
-                setDirty(false);
-                setSaved(true);
-                setTimeout(() => setSaved(false), 2000);
-                toast.success("TVDB connected and saved");
-              },
+            setMany.mutate({ ...values, "tvdb.enabled": true }, {
+              onSuccess: () => { setDirty(false); toast.success("TVDB connected and saved"); },
               onError: () => toast.error("Failed to save settings"),
             });
           } else {
@@ -753,65 +747,56 @@ function TvdbApiKeySection(): React.JSX.Element {
     );
   };
 
-  const handleToggleDefault = (checked: boolean): void => {
-    setDefaultShows(checked);
-    setMany.mutate(
-      { "tvdb.defaultShows": checked },
-      {
-        onSuccess: () => toast.success(checked ? "TVDB set as default for TV shows" : "TMDB restored as default"),
-        onError: () => toast.error("Failed to update preference"),
-      },
-    );
-  };
+  if (isLoading) return <div className="px-5 py-5"><Skeleton className="h-10 w-full" /></div>;
 
-  if (isLoading) return <Skeleton className="h-32 w-full rounded-xl" />;
-
-  const isConnected = !!allSettings?.["tvdb.token"];
   const isPending = testService.isPending || setMany.isPending;
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-2">
-        {isConnected && (
-          <span className="inline-flex items-center gap-1.5 text-sm text-green-500">
-            <CheckCircle className="h-3.5 w-3.5" />
-            Connected
-          </span>
+    <div>
+      {/* Header — matches TMDB style */}
+      <div className={cn("flex items-center justify-between px-5 py-3.5 bg-gradient-to-r", BRAND_GRADIENT.tvdb)}>
+        <div>
+          <div className="flex items-center gap-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/tvdb.svg" alt="" className="h-5 w-5 shrink-0" />
+            <p className="text-base font-semibold text-foreground">TVDB</p>
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Optional</Badge>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">Better TV show seasons and anime episode numbering.</p>
+        </div>
+        {dirty && (
+          <Button
+            size="sm"
+            className="h-7 text-xs"
+            onClick={handleSave}
+            disabled={isPending}
+          >
+            {isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
+            Save & Test
+          </Button>
         )}
       </div>
 
-      <div className="space-y-1.5">
-        <label className="text-sm font-medium text-muted-foreground">API Key</label>
-        <div className="relative">
-          <Input
-            type={showKey ? "text" : "password"}
-            value={apiKey}
-            placeholder="Enter your TVDB API key"
-            onChange={(e) => { setApiKey(e.target.value); setDirty(true); }}
-            className="h-10 rounded-lg border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
-          />
-          <button
-            type="button"
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
-            onClick={() => setShowKey((p) => !p)}
-          >
-            {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
-        </div>
-      </div>
-
-      <Button size="sm" onClick={handleSave} disabled={!dirty || isPending}>
-        {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : saved ? <Check className="mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
-        {saved ? "Saved" : "Save & Test"}
-      </Button>
-
-      <div className="border-t border-border/40 pt-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-foreground">Use TVDB as default for TV shows</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">When enabled, TV shows use TVDB metadata and seasons.</p>
+      {/* Content */}
+      <div className="px-5 py-5 space-y-4">
+        <a href="https://thetvdb.com/api-information" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
+          <ExternalLink className="h-3.5 w-3.5" />
+          Get your free API key
+        </a>
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium text-muted-foreground">API Key</label>
+          <div className="relative">
+            <Input
+              type={showKey ? "text" : "password"}
+              value={apiKey}
+              placeholder="Enter your TVDB API key"
+              onChange={(e) => { setApiKey(e.target.value); setDirty(true); }}
+              className="h-10 rounded-lg border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+            />
+            <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors" onClick={() => setShowKey((p) => !p)}>
+              {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
           </div>
-          <Switch checked={defaultShows} onCheckedChange={handleToggleDefault} disabled={!isConnected} />
         </div>
       </div>
     </div>
@@ -914,10 +899,6 @@ export function ServicesSection(): React.JSX.Element {
         </SectionCard>
       </SettingsSection>
 
-      <SettingsSection title="Metadata Preferences" description="Configure watch region and search behavior.">
-        <WatchRegionSection />
-      </SettingsSection>
-
       <SettingsSection title="Media Servers" description="Connect media servers to sync libraries and trigger scans after downloads.">
         <SectionCard title="Jellyfin">
           <MediaServerRow
@@ -985,6 +966,52 @@ export function ServicesSection(): React.JSX.Element {
             isLast
           />
         </SectionCard>
+      </SettingsSection>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Metadata Settings (separate tab)                                          */
+/* -------------------------------------------------------------------------- */
+
+export function MetadataSettingsSection(): React.JSX.Element {
+  const utils = trpc.useUtils();
+  const { data: allSettings } = trpc.settings.getAll.useQuery();
+  const setMany = trpc.settings.setMany.useMutation({
+    onSuccess: () => void utils.settings.getAll.invalidate(),
+  });
+
+  const isConnected = !!allSettings?.["tvdb.token"];
+  const defaultShows = allSettings?.["tvdb.defaultShows"] === true;
+
+  const handleToggleDefault = (checked: boolean): void => {
+    setMany.mutate(
+      { "tvdb.defaultShows": checked },
+      {
+        onSuccess: () => toast.success(checked ? "TVDB set as default for TV shows" : "TMDB restored as default"),
+        onError: () => toast.error("Failed to update preference"),
+      },
+    );
+  };
+
+  return (
+    <div>
+      <SettingsSection title="Default Provider" description="Choose which metadata provider to use for TV shows and anime seasons.">
+        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card px-5 py-5">
+          <div>
+            <p className="text-sm font-medium text-foreground">Use TVDB as default for TV shows</p>
+            <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
+              When enabled, new TV shows and anime will use TVDB for seasons and episodes.
+              {!isConnected && " Connect TVDB in Services first."}
+            </p>
+          </div>
+          <Switch checked={defaultShows} onCheckedChange={handleToggleDefault} disabled={!isConnected} />
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Watch Region" description="Configure watch region and search behavior.">
+        <WatchRegionSection />
       </SettingsSection>
     </div>
   );

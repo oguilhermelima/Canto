@@ -28,7 +28,7 @@ import { trpc } from "~/lib/trpc/client";
 import { PageHeader } from "~/components/layout/page-header";
 import { TabBar } from "~/components/layout/tab-bar";
 import { SettingsSection } from "~/components/settings/shared";
-import { ServicesSection } from "~/components/settings/services-section";
+import { ServicesSection, MetadataSettingsSection } from "~/components/settings/services-section";
 import { AboutSection } from "~/components/settings/about-section";
 
 const themeOptions = [
@@ -39,6 +39,7 @@ const themeOptions = [
 
 const NAV_ITEMS = [
   { key: "services", label: "Services" },
+  { key: "metadata", label: "Metadata" },
   { key: "libraries", label: "Libraries" },
   { key: "preferences", label: "Preferences" },
   { key: "about", label: "About" },
@@ -611,6 +612,7 @@ export default function SettingsPage(): React.JSX.Element {
 
       <div className="px-4 pt-6 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {activeNav === "services" && <ServicesSection />}
+        {activeNav === "metadata" && <MetadataSettingsSection />}
         {activeNav === "libraries" && <LibrariesSection />}
         {activeNav === "preferences" && <PreferencesSection />}
         {activeNav === "about" && <AboutSection />}
