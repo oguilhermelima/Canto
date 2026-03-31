@@ -115,3 +115,9 @@ export async function createLibrary(db: Database, data: LibraryInsert) {
   const [row] = await db.insert(library).values(data).returning();
   return row;
 }
+
+export async function findEnabledSyncLibraries(db: Database) {
+  return db.query.library.findMany({
+    where: and(eq(library.enabled, true), eq(library.syncEnabled, true)),
+  });
+}

@@ -80,3 +80,9 @@ export async function claimTorrentForImport(db: Database, id: string) {
     .returning();
   return claimed;
 }
+
+export async function findUnimportedTorrents(db: Database) {
+  return db.query.torrent.findMany({
+    where: eq(torrent.imported, false),
+  });
+}

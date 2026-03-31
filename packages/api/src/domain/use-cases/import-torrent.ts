@@ -3,6 +3,8 @@ import type { torrent as torrentSchema } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
 import { SETTINGS } from "../../lib/settings-keys";
 import { getJellyfinCredentials } from "../../lib/server-credentials";
+import { scanJellyfinLibrary, mergeJellyfinVersions } from "../../infrastructure/adapters/jellyfin";
+import { scanPlexLibrary } from "../../infrastructure/adapters/plex";
 import type { QBittorrentClient } from "../../infrastructure/adapters/qbittorrent";
 import { isVideoFile, sanitizeName, buildMediaDir, buildFileName } from "../rules/naming";
 import { EP_PATTERN, BARE_EP_PATTERN, isSubtitleFile, parseSubtitleLanguage } from "../rules/parsing";
@@ -20,10 +22,7 @@ async function triggerMediaServerScans(db: Database, libraryId?: string): Promis
   const jellyfinUrl = await getSetting(SETTINGS.JELLYFIN_URL);
   const jellyfinKey = await getSetting(SETTINGS.JELLYFIN_API_KEY);
   if (jellyfinUrl && jellyfinKey) {
-    void fetch(`${jellyfinUrl}/Library/Refresh`, {
-      method: "POST",
-      headers: { "X-Emby-Token": jellyfinKey },
-    }).catch(() => {});
+    void scanJellyfinLibrary(jellyfinUrl, jellyfinKey).catch(() => {});
   }
 
   const plexUrl = await getSetting(SETTINGS.PLEX_URL);
@@ -31,9 +30,7 @@ async function triggerMediaServerScans(db: Database, libraryId?: string): Promis
   if (plexUrl && plexToken && libraryId) {
     const lib = await findLibraryById(db, libraryId);
     if (lib?.plexLibraryId) {
-      void fetch(
-        `${plexUrl}/library/sections/${lib.plexLibraryId}/refresh?X-Plex-Token=${plexToken}`,
-      ).catch(() => {});
+      void scanPlexLibrary(plexUrl, plexToken, [lib.plexLibraryId]).catch(() => {});
     }
   }
 }
@@ -64,11 +61,7 @@ async function autoMergeIfEnabled(
     });
 
     if (matchingItems.length >= 2) {
-      const ids = matchingItems.map((i) => i.Id).join(",");
-      await fetch(`${jellyfinCreds.url}/Videos/MergeVersions?Ids=${ids}`, {
-        method: "POST",
-        headers: { "X-Emby-Token": jellyfinCreds.apiKey },
-      });
+      await mergeJellyfinVersions(jellyfinCreds.url, jellyfinCreds.apiKey, matchingItems.map((i) => i.Id));
       console.log(`[auto-import] Merged ${matchingItems.length} Jellyfin versions for "${mediaRow.title}"`);
     }
   } catch (err) {

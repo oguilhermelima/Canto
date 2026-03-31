@@ -1,13 +1,16 @@
-import { eq } from "drizzle-orm";
-
 import { db } from "@canto/db/client";
-import { library, media, torrent } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
 import { SETTINGS } from "@canto/api/lib/settings-keys";
 import { searchTorrents } from "@canto/api/domain/use-cases/search-torrents";
 import { downloadTorrent } from "@canto/api/domain/use-cases/download-torrent";
 import { autoImportTorrent } from "@canto/api/domain/use-cases/import-torrent";
 import { getQBClient } from "@canto/api/infrastructure/adapters/qbittorrent";
+import {
+  findUnimportedTorrents,
+  findTorrentById,
+  findMediaById,
+  findLibraryById,
+} from "@canto/api/infrastructure/repositories";
 
 /* -------------------------------------------------------------------------- */
 /*  Media server scan trigger                                                  */
@@ -33,9 +36,7 @@ async function triggerMediaServerScans(libraryId?: string): Promise<void> {
   const plexUrl = await getSetting(SETTINGS.PLEX_URL);
   const plexToken = await getSetting(SETTINGS.PLEX_TOKEN);
   if (plexUrl && plexToken && libraryId) {
-    const lib = await db.query.library.findFirst({
-      where: eq(library.id, libraryId),
-    });
+    const lib = await findLibraryById(db, libraryId);
     if (lib?.plexLibraryId) {
       try {
         await fetch(
@@ -54,9 +55,7 @@ async function triggerMediaServerScans(libraryId?: string): Promise<void> {
 /* -------------------------------------------------------------------------- */
 
 export async function handleImportTorrents(): Promise<void> {
-  const rows = await db.query.torrent.findMany({
-    where: eq(torrent.imported, false),
-  });
+  const rows = await findUnimportedTorrents(db);
 
   const toImport = rows.filter(
     (r) => r.status === "completed" && r.hash && r.mediaId,
@@ -77,17 +76,13 @@ export async function handleImportTorrents(): Promise<void> {
       await autoImportTorrent(db, row, qbClient);
 
       // Re-read row to check if import succeeded
-      const updated = await db.query.torrent.findFirst({
-        where: eq(torrent.id, row.id),
-      });
+      const updated = await findTorrentById(db, row.id);
 
       if (updated?.imported) {
         importedAny = true;
         // Get the library ID from the linked media
         const mediaRow = updated.mediaId
-          ? await db.query.media.findFirst({
-              where: eq(media.id, updated.mediaId),
-            })
+          ? await findMediaById(db, updated.mediaId)
           : null;
         lastLibraryId = mediaRow?.libraryId ?? undefined;
 
@@ -167,9 +162,7 @@ async function tryContinuousDownload(
 }
 
 export async function importSingleTorrent(torrentId: string): Promise<boolean> {
-  const row = await db.query.torrent.findFirst({
-    where: eq(torrent.id, torrentId),
-  });
+  const row = await findTorrentById(db, torrentId);
 
   if (!row || !row.hash || !row.mediaId) return false;
   if (row.imported) return true;
@@ -179,13 +172,11 @@ export async function importSingleTorrent(torrentId: string): Promise<boolean> {
     await autoImportTorrent(db, row, qbClient);
 
     // Re-read row to check if import succeeded
-    const updated = await db.query.torrent.findFirst({
-      where: eq(torrent.id, row.id),
-    });
+    const updated = await findTorrentById(db, row.id);
 
     if (updated?.imported) {
       const linkedMedia = updated.mediaId
-        ? await db.query.media.findFirst({ where: eq(media.id, updated.mediaId) })
+        ? await findMediaById(db, updated.mediaId)
         : null;
       await triggerMediaServerScans(linkedMedia?.libraryId ?? undefined);
       return true;

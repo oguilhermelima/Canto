@@ -30,6 +30,14 @@ const serviceEnum = z.enum([
 
 const ALL_SERVICES = serviceEnum.options;
 
+const SERVICE_ENABLED_KEY: Record<z.infer<typeof serviceEnum>, string> = {
+  jellyfin: SETTINGS.JELLYFIN_ENABLED,
+  plex: SETTINGS.PLEX_ENABLED,
+  qbittorrent: SETTINGS.QBITTORRENT_ENABLED,
+  prowlarr: SETTINGS.PROWLARR_ENABLED,
+  jackett: SETTINGS.JACKETT_ENABLED,
+};
+
 export const settingsRouter = createTRPCRouter({
   /** Get all settings as a key-value record */
   getAll: publicProcedure.query(async () => {
@@ -82,8 +90,8 @@ export const settingsRouter = createTRPCRouter({
 
       switch (input.service) {
         case "jellyfin": {
-          const url = v["jellyfin.url"];
-          const apiKey = v["jellyfin.apiKey"];
+          const url = v[SETTINGS.JELLYFIN_URL];
+          const apiKey = v[SETTINGS.JELLYFIN_API_KEY];
           if (!url || !apiKey) {
             return { connected: false, error: "URL or API key not configured" };
           }
@@ -100,8 +108,8 @@ export const settingsRouter = createTRPCRouter({
         }
 
         case "plex": {
-          const url = v["plex.url"];
-          const token = v["plex.token"];
+          const url = v[SETTINGS.PLEX_URL];
+          const token = v[SETTINGS.PLEX_TOKEN];
           if (!url || !token) {
             return { connected: false, error: "URL or token not configured" };
           }
@@ -124,9 +132,9 @@ export const settingsRouter = createTRPCRouter({
         }
 
         case "qbittorrent": {
-          const url = v["qbittorrent.url"];
-          const username = v["qbittorrent.username"] ?? "";
-          const password = v["qbittorrent.password"] ?? "";
+          const url = v[SETTINGS.QBITTORRENT_URL];
+          const username = v[SETTINGS.QBITTORRENT_USERNAME] ?? "";
+          const password = v[SETTINGS.QBITTORRENT_PASSWORD] ?? "";
           if (!url) {
             return { connected: false, error: "URL not configured" };
           }
@@ -149,8 +157,8 @@ export const settingsRouter = createTRPCRouter({
         }
 
         case "prowlarr": {
-          const url = v["prowlarr.url"];
-          const apiKey = v["prowlarr.apiKey"];
+          const url = v[SETTINGS.PROWLARR_URL];
+          const apiKey = v[SETTINGS.PROWLARR_API_KEY];
           if (!url || !apiKey) {
             return { connected: false, error: "URL or API key not configured" };
           }
@@ -164,8 +172,8 @@ export const settingsRouter = createTRPCRouter({
         }
 
         case "jackett": {
-          const url = v["jackett.url"];
-          const apiKey = v["jackett.apiKey"];
+          const url = v[SETTINGS.JACKETT_URL];
+          const apiKey = v[SETTINGS.JACKETT_API_KEY];
           if (!url || !apiKey) {
             return { connected: false, error: "URL or API key not configured" };
           }
@@ -186,7 +194,7 @@ export const settingsRouter = createTRPCRouter({
   toggleService: protectedProcedure
     .input(z.object({ service: serviceEnum, enabled: z.boolean() }))
     .mutation(async ({ input }) => {
-      await setSetting(`${input.service}.enabled`, input.enabled);
+      await setSetting(SERVICE_ENABLED_KEY[input.service], input.enabled);
       return { success: true };
     }),
 
@@ -194,7 +202,7 @@ export const settingsRouter = createTRPCRouter({
   getEnabledServices: publicProcedure.query(async () => {
     const result: Record<string, boolean> = {};
     for (const s of ALL_SERVICES) {
-      const val = await getSetting<boolean>(`${s}.enabled`);
+      const val = await getSetting<boolean>(SERVICE_ENABLED_KEY[s]);
       result[s] = val === true;
     }
     return result;

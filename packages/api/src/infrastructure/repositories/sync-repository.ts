@@ -1,4 +1,4 @@
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { syncItem, syncEpisode } from "@canto/db/schema";
 
@@ -67,4 +67,19 @@ export async function updateSyncItem(
   data: Partial<typeof syncItem.$inferInsert>,
 ) {
   await db.update(syncItem).set(data).where(eq(syncItem.id, id));
+}
+
+export async function deleteSyncItemsByLibraryIds(db: Database, libraryIds: string[]) {
+  if (libraryIds.length === 0) return;
+  await db.delete(syncItem).where(inArray(syncItem.libraryId, libraryIds));
+}
+
+export async function createSyncItem(db: Database, data: typeof syncItem.$inferInsert) {
+  const [row] = await db.insert(syncItem).values(data).returning();
+  return row;
+}
+
+export async function createSyncEpisodes(db: Database, episodes: Array<typeof syncEpisode.$inferInsert>) {
+  if (episodes.length === 0) return;
+  await db.insert(syncEpisode).values(episodes);
 }

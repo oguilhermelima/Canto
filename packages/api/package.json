@@ -43,6 +43,10 @@
     "./lib/settings-keys": {
       "types": "./src/lib/settings-keys.ts",
       "default": "./src/lib/settings-keys.ts"
+    },
+    "./infrastructure/repositories": {
+      "types": "./src/infrastructure/repositories/index.ts",
+      "default": "./src/infrastructure/repositories/index.ts"
     }
   },
   "scripts": {

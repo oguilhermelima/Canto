@@ -4,7 +4,6 @@ import { z } from "zod";
 import { listInput } from "@canto/validators";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
-import { listLibraryMedia } from "../domain/use-cases/list-library-media";
 import {
   findAllLibraries,
   findDefaultLibraries,
@@ -15,7 +14,7 @@ import {
   findUserPreferences,
   upsertUserPreference,
 } from "../infrastructure/repositories/library-repository";
-import { findLibraryStats, updateMedia } from "../infrastructure/repositories/media-repository";
+import { findLibraryStats, listLibraryMedia, updateMedia } from "../infrastructure/repositories/media-repository";
 
 /* -------------------------------------------------------------------------- */
 /*  Library Router                                                            */

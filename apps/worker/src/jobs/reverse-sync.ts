@@ -1,10 +1,15 @@
-import { and, eq, inArray } from "drizzle-orm";
-
 import { db } from "@canto/db/client";
-import { library, media, syncItem, syncEpisode } from "@canto/db/schema";
 import { getSetting, setSetting } from "@canto/db/settings";
 import { persistMedia } from "@canto/db/persist-media";
 import { TmdbProvider } from "@canto/providers";
+import {
+  findEnabledSyncLibraries,
+  findMediaByExternalId,
+  updateMedia,
+  deleteSyncItemsByLibraryIds,
+  createSyncItem,
+  createSyncEpisodes,
+} from "@canto/api/infrastructure/repositories";
 
 /* -------------------------------------------------------------------------- */
 /*  Constants                                                                  */
@@ -395,9 +400,7 @@ export async function handleReverseSync(): Promise<void> {
   const jellyfinEnabled = await getSetting<boolean>("jellyfin.enabled");
 
   if (jellyfinEnabled && jellyfinUrl && jellyfinKey) {
-    const jellyfinLibs = await db.query.library.findMany({
-      where: and(eq(library.enabled, true), eq(library.syncEnabled, true)),
-    });
+    const jellyfinLibs = await findEnabledSyncLibraries(db);
     const linked = jellyfinLibs
       .filter((l) => l.jellyfinLibraryId)
       .map((l) => ({ id: l.id, jellyfinLibraryId: l.jellyfinLibraryId!, type: l.type }));
@@ -415,9 +418,7 @@ export async function handleReverseSync(): Promise<void> {
   const plexEnabled = await getSetting<boolean>("plex.enabled");
 
   if (plexEnabled && plexUrl && plexToken) {
-    const plexLibs = await db.query.library.findMany({
-      where: and(eq(library.enabled, true), eq(library.syncEnabled, true)),
-    });
+    const plexLibs = await findEnabledSyncLibraries(db);
     const linked = plexLibs
       .filter((l) => l.plexLibraryId)
       .map((l) => ({ id: l.id, plexLibraryId: l.plexLibraryId!, type: l.type }));
@@ -431,9 +432,7 @@ export async function handleReverseSync(): Promise<void> {
 
   // Clear previous sync items for libraries being synced
   const syncedLibraryIds = [...new Set(pending.map((i) => i.libraryId))];
-  if (syncedLibraryIds.length > 0) {
-    await db.delete(syncItem).where(inArray(syncItem.libraryId, syncedLibraryIds));
-  }
+  await deleteSyncItemsByLibraryIds(db, syncedLibraryIds);
 
   // Deduplicate for processing (don't fetch TMDB twice for same item)
   // But we still record sync_items for all libraries
@@ -489,7 +488,7 @@ export async function handleReverseSync(): Promise<void> {
         if (!tmdbId) {
           console.log(`[reverse-sync] Could not resolve: ${item.title} (${item.year})`);
           status.failed++;
-          await db.insert(syncItem).values({
+          await createSyncItem(db, {
             ...syncItemBase(item),
             result: "failed",
             reason: "Could not find on TMDB",
@@ -501,22 +500,17 @@ export async function handleReverseSync(): Promise<void> {
         }
 
         // Check if already in library
-        const existing = await db.query.media.findFirst({
-          where: and(
-            eq(media.externalId, tmdbId),
-            eq(media.provider, "tmdb"),
-          ),
-        });
+        const existing = await findMediaByExternalId(db, tmdbId, "tmdb");
 
         if (existing?.inLibrary) {
           status.skipped++;
-          const [skippedSyncItem] = await db.insert(syncItem).values({
+          const skippedSyncItem = await createSyncItem(db, {
             ...syncItemBase(item),
             tmdbId,
             mediaId: existing.id,
             result: "skipped",
             reason: "Already in library",
-          }).returning();
+          });
 
           // Still fetch media info for skipped items (they exist on this server)
           if (skippedSyncItem) {
@@ -528,7 +522,8 @@ export async function handleReverseSync(): Promise<void> {
                 mediaFiles = await fetchPlexMediaInfo(plexUrl, plexToken, item.plexRatingKey, item.type);
               }
               if (mediaFiles.length > 0) {
-                await db.insert(syncEpisode).values(
+                await createSyncEpisodes(
+                  db,
                   mediaFiles.map((f) => ({
                     syncItemId: skippedSyncItem.id,
                     seasonNumber: f.seasonNumber,
@@ -556,28 +551,22 @@ export async function handleReverseSync(): Promise<void> {
 
         let mediaId: string;
         if (existing) {
-          await db
-            .update(media)
-            .set({ inLibrary: true, libraryId: item.libraryId, libraryPath: item.path, addedAt: new Date() })
-            .where(eq(media.id, existing.id));
+          await updateMedia(db, existing.id, { inLibrary: true, libraryId: item.libraryId, libraryPath: item.path, addedAt: new Date() });
           mediaId = existing.id;
         } else {
           const normalized = await tmdb.getMetadata(tmdbId, resolvedType);
           const inserted = await persistMedia(db, normalized);
-          await db
-            .update(media)
-            .set({ inLibrary: true, libraryId: item.libraryId, libraryPath: item.path, addedAt: new Date() })
-            .where(eq(media.id, inserted.id));
+          await updateMedia(db, inserted.id, { inLibrary: true, libraryId: item.libraryId, libraryPath: item.path, addedAt: new Date() });
           mediaId = inserted.id;
         }
 
         status.imported++;
-        const [insertedSyncItem] = await db.insert(syncItem).values({
+        const insertedSyncItem = await createSyncItem(db, {
           ...syncItemBase(item),
           tmdbId,
           mediaId,
           result: "imported",
-        }).returning();
+        });
 
         // Fetch media file info (resolution, codec, etc.)
         if (insertedSyncItem) {
@@ -589,7 +578,8 @@ export async function handleReverseSync(): Promise<void> {
               mediaFiles = await fetchPlexMediaInfo(plexUrl, plexToken, item.plexRatingKey, item.type);
             }
             if (mediaFiles.length > 0) {
-              await db.insert(syncEpisode).values(
+              await createSyncEpisodes(
+                db,
                 mediaFiles.map((f) => ({
                   syncItemId: insertedSyncItem.id,
                   seasonNumber: f.seasonNumber,
@@ -614,7 +604,7 @@ export async function handleReverseSync(): Promise<void> {
         const msg = err instanceof Error ? err.message : "Unknown error";
         console.error(`[reverse-sync] Error processing ${item.title}:`, msg);
         status.failed++;
-        await db.insert(syncItem).values({
+        await createSyncItem(db, {
           ...syncItemBase(item),
           tmdbId: item.tmdbId,
           result: "failed",
@@ -649,13 +639,11 @@ export async function handleReverseSync(): Promise<void> {
     const tmdbId = item.tmdbId;
     let mediaId: string | undefined;
     if (tmdbId) {
-      const existing = await db.query.media.findFirst({
-        where: and(eq(media.externalId, tmdbId), eq(media.provider, "tmdb")),
-      });
+      const existing = await findMediaByExternalId(db, tmdbId, "tmdb");
       mediaId = existing?.id;
     }
 
-    await db.insert(syncItem).values({
+    await createSyncItem(db, {
       ...syncItemBase(item),
       tmdbId: item.tmdbId,
       mediaId: mediaId ?? null,
