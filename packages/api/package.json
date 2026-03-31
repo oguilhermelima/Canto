@@ -39,6 +39,10 @@
     "./infrastructure/adapters/qbittorrent": {
       "types": "./src/infrastructure/adapters/qbittorrent.ts",
       "default": "./src/infrastructure/adapters/qbittorrent.ts"
+    },
+    "./lib/settings-keys": {
+      "types": "./src/lib/settings-keys.ts",
+      "default": "./src/lib/settings-keys.ts"
     }
   },
   "scripts": {

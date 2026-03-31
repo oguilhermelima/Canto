@@ -28,6 +28,10 @@ export const SETTINGS = {
   // Sync
   SYNC_MEDIA_IMPORT_STATUS: "sync.mediaImport.status",
 
+  // Redis
+  REDIS_HOST: "redis.host",
+  REDIS_PORT: "redis.port",
+
   // Cache
   CACHE_SPOTLIGHT: "cache.spotlight",
 } as const;

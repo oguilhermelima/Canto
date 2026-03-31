@@ -35,12 +35,6 @@ export async function findAllTorrents(db: Database) {
   });
 }
 
-export async function findPendingImports(db: Database) {
-  return db.query.torrent.findMany({
-    where: eq(torrent.imported, false),
-  });
-}
-
 export async function createTorrent(
   db: Database,
   data: typeof torrent.$inferInsert,

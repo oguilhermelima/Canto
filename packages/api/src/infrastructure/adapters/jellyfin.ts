@@ -40,41 +40,6 @@ export async function scanJellyfinLibrary(
 }
 
 /**
- * Retrieve all virtual (library) folders from Jellyfin.
- */
-export async function getJellyfinLibraryFolders(
-  url: string,
-  apiKey: string,
-): Promise<
-  Array<{
-    Id: string;
-    Name: string;
-    CollectionType: string;
-    Locations: string[];
-  }>
-> {
-  const res = await fetch(`${url}/Library/VirtualFolders`, {
-    headers: headers(apiKey),
-  });
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}`);
-  }
-  const folders = (await res.json()) as Array<{
-    ItemId: string;
-    Name: string;
-    CollectionType: string;
-    Locations: string[];
-  }>;
-  // Normalize ItemId → Id for a cleaner external API
-  return folders.map((f) => ({
-    Id: f.ItemId,
-    Name: f.Name,
-    CollectionType: f.CollectionType,
-    Locations: f.Locations,
-  }));
-}
-
-/**
  * Merge multiple Jellyfin items into a single multi-version entry.
  */
 export async function mergeJellyfinVersions(

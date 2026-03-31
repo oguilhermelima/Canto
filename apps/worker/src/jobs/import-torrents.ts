@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@canto/db/client";
 import { library, media, torrent } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
+import { SETTINGS } from "@canto/api/lib/settings-keys";
 import { searchTorrents } from "@canto/api/domain/use-cases/search-torrents";
 import { downloadTorrent } from "@canto/api/domain/use-cases/download-torrent";
 import { autoImportTorrent } from "@canto/api/domain/use-cases/import-torrent";
@@ -14,8 +15,8 @@ import { getQBClient } from "@canto/api/infrastructure/adapters/qbittorrent";
 
 async function triggerMediaServerScans(libraryId?: string): Promise<void> {
   // Jellyfin
-  const jellyfinUrl = await getSetting("jellyfin.url");
-  const jellyfinKey = await getSetting("jellyfin.apiKey");
+  const jellyfinUrl = await getSetting(SETTINGS.JELLYFIN_URL);
+  const jellyfinKey = await getSetting(SETTINGS.JELLYFIN_API_KEY);
   if (jellyfinUrl && jellyfinKey) {
     try {
       await fetch(`${jellyfinUrl}/Library/Refresh`, {
@@ -29,8 +30,8 @@ async function triggerMediaServerScans(libraryId?: string): Promise<void> {
   }
 
   // Plex
-  const plexUrl = await getSetting("plex.url");
-  const plexToken = await getSetting("plex.token");
+  const plexUrl = await getSetting(SETTINGS.PLEX_URL);
+  const plexToken = await getSetting(SETTINGS.PLEX_TOKEN);
   if (plexUrl && plexToken && libraryId) {
     const lib = await db.query.library.findFirst({
       where: eq(library.id, libraryId),
