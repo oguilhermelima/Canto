@@ -346,14 +346,16 @@ export const mediaRouter = createTRPCRouter({
       const poolItems = await findPoolRecommendations(ctx.db, libraryTmdbIds, (pageSize + 1) * 3, offset);
 
       if (poolItems.length > 0) {
-        // Deduplicate by tmdbId and filter out items without poster
-        const seen = new Set<number>();
-        const unique = poolItems.filter((item) => {
-          if (seen.has(item.tmdbId)) return false;
-          if (!item.posterPath) return false;
-          seen.add(item.tmdbId);
-          return true;
-        });
+        // Deduplicate by tmdbId: prefer row with trailerKey, then highest score
+        const bestByTmdb = new Map<number, typeof poolItems[number]>();
+        for (const item of poolItems) {
+          if (!item.posterPath) continue;
+          const existing = bestByTmdb.get(item.tmdbId);
+          if (!existing || (!existing.trailerKey && item.trailerKey)) {
+            bestByTmdb.set(item.tmdbId, item);
+          }
+        }
+        const unique = [...bestByTmdb.values()];
 
         const hasMore = unique.length > pageSize;
         const items = unique.slice(0, pageSize).map((item) => ({
