@@ -334,7 +334,7 @@ export class TvdbProvider implements MetadataProvider {
       backdropPath,
       imdbId: extractImdbId(series.remoteIds),
       tvdbId: series.id,
-      nextAirDate: series.nextAired ?? undefined,
+      nextAirDate: series.nextAired || undefined,
       seasons,
       networks: networks.length > 0 ? networks : undefined,
       numberOfSeasons: regularSeasons.length > 0 ? regularSeasons.length : undefined,

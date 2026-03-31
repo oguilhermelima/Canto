@@ -6,7 +6,7 @@ import { getTmdbProvider } from "../../lib/tmdb-client";
 import { getTvdbProvider } from "../../lib/tvdb-client";
 import { updateMediaFromNormalized } from "@canto/db/persist-media";
 import { dispatchRefreshExtras } from "../../infrastructure/queue/bullmq-dispatcher";
-import { findMediaById } from "../../infrastructure/repositories";
+import { findMediaById, findMediaByExternalId } from "../../infrastructure/repositories";
 
 export async function replaceMediaProvider(
   db: Database,
@@ -23,8 +23,10 @@ export async function replaceMediaProvider(
   // Find equivalent on target provider
   let targetExternalId: number | null = null;
 
-  // Try IMDB ID first (most reliable)
-  if (row.imdbId && targetProvider === "tmdb") {
+  // Try cross-reference IDs first
+  if (targetProvider === "tvdb" && row.tvdbId) {
+    targetExternalId = row.tvdbId;
+  } else if (targetProvider === "tmdb" && row.imdbId) {
     try {
       const tmdb = await getTmdbProvider();
       const found = await tmdb.findByImdbId(row.imdbId);
@@ -33,7 +35,7 @@ export async function replaceMediaProvider(
     } catch { /* fallback to search */ }
   }
 
-  // Try title search
+  // Fallback: title search
   if (!targetExternalId) {
     const searchResults = await provider.search(row.title, row.type as MediaType);
     if (searchResults.results.length > 0) {
@@ -42,6 +44,13 @@ export async function replaceMediaProvider(
   }
 
   if (!targetExternalId) throw new Error(`Could not find "${row.title}" on ${targetProvider}`);
+
+  // Check if a media with this externalId+provider already exists (avoid unique constraint violation)
+  const existing = await findMediaByExternalId(db, targetExternalId, targetProvider);
+  if (existing && existing.id !== mediaId) {
+    // Merge: delete the duplicate and keep the current one
+    await db.delete(media).where(eq(media.id, existing.id));
+  }
 
   // Fetch full metadata from target provider
   const normalized = await provider.getMetadata(targetExternalId, row.type as MediaType);
