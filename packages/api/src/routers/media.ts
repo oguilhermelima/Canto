@@ -365,7 +365,7 @@ export const mediaRouter = createTRPCRouter({
           voteAverage: item.voteAverage ?? undefined,
           overview: item.overview ?? undefined,
           logoPath: item.logoPath ?? null,
-          trailerKey: null as string | null,
+          trailerKey: item.trailerKey ?? null,
         }));
 
         return { items, nextCursor: hasMore ? page + 1 : null };

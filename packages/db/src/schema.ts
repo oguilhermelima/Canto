@@ -435,6 +435,7 @@ export const recommendationPool = pgTable(
     posterPath: varchar("poster_path", { length: 255 }),
     backdropPath: varchar("backdrop_path", { length: 255 }),
     logoPath: varchar("logo_path", { length: 255 }),
+    trailerKey: varchar("trailer_key", { length: 100 }),
     releaseDate: date("release_date"),
     voteAverage: real("vote_average"),
     score: real("score").notNull().default(0),

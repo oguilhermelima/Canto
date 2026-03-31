@@ -31,20 +31,8 @@ function mapToPoolRow(
   result: SearchResult,
   sourceMediaId: string,
   sourceType: "similar" | "recommendation",
-): {
-  tmdbId: number;
-  mediaType: string;
-  sourceMediaId: string;
-  title: string;
-  overview: string | undefined;
-  posterPath: string | undefined;
-  backdropPath: string | undefined;
-  releaseDate: string | undefined;
-  voteAverage: number | undefined;
-  score: number;
-  frequency: number;
-  sourceType: string;
-} {
+  trailerKey?: string,
+) {
   return {
     tmdbId: result.externalId,
     mediaType: result.type,
@@ -53,6 +41,7 @@ function mapToPoolRow(
     overview: result.overview,
     posterPath: result.posterPath,
     backdropPath: result.backdropPath,
+    trailerKey: trailerKey ?? null,
     releaseDate: result.releaseDate,
     voteAverage: result.voteAverage,
     score: calculatePoolScore(result.voteAverage, result.releaseDate),
@@ -179,13 +168,41 @@ export async function refreshExtras(
       }
     }
 
-    // Insert recommendation pool (recommendations + similar)
-    const poolRows = [
-      ...extras.recommendations.map((r) =>
-        mapToPoolRow(r, mediaId, "recommendation"),
-      ),
-      ...extras.similar.map((r) => mapToPoolRow(r, mediaId, "similar")),
+    // Fetch trailers for pool items (best-effort, parallel, top items with backdrops)
+    const allPoolItems = [
+      ...extras.recommendations.map((r) => ({ result: r, sourceType: "recommendation" as const })),
+      ...extras.similar.map((r) => ({ result: r, sourceType: "similar" as const })),
     ];
+    const itemsWithBackdrops = allPoolItems.filter((i) => i.result.backdropPath);
+    const trailerMap = new Map<number, string>();
+
+    // Fetch trailers in parallel for items with backdrops (max 10 to avoid rate limits)
+    const toFetch = itemsWithBackdrops.slice(0, 10);
+    if (toFetch.length > 0) {
+      const tmdb = await getTmdbProvider();
+      await Promise.allSettled(
+        toFetch.map(async (item) => {
+          try {
+            const tmdbType = item.result.type === "show" ? "tv" : "movie";
+            const videos = await tmdb.getVideos(item.result.externalId, tmdbType);
+            const trailer = videos.find((v) => v.type === "Trailer" && v.site === "YouTube");
+            if (trailer) trailerMap.set(item.result.externalId, trailer.key);
+          } catch {
+            // Best-effort, skip on failure
+          }
+        }),
+      );
+    }
+
+    // Build pool rows with trailer keys
+    const poolRows = allPoolItems.map((item) =>
+      mapToPoolRow(
+        item.result,
+        mediaId,
+        item.sourceType,
+        trailerMap.get(item.result.externalId),
+      ),
+    );
 
     if (poolRows.length > 0) {
       await tx.insert(recommendationPool).values(poolRows);
