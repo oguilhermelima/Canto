@@ -85,11 +85,13 @@ interface TvdbSearchResult {
 /*  Helpers                                                                    */
 /* -------------------------------------------------------------------------- */
 
-const TVDB_IMAGE_BASE = "https://artworks.thetvdb.com/banners/";
+const TVDB_IMAGE_HOST = "https://artworks.thetvdb.com";
 
 function prefixImageUrl(url: string): string {
   if (url.startsWith("http")) return url;
-  return `${TVDB_IMAGE_BASE}${url}`;
+  // TVDB paths may start with / or /banners/ — normalize
+  if (url.startsWith("/")) return `${TVDB_IMAGE_HOST}${url}`;
+  return `${TVDB_IMAGE_HOST}/banners/${url}`;
 }
 
 function mapStatus(status: string | null | undefined): string | undefined {
@@ -316,6 +318,21 @@ export class TvdbProvider implements MetadataProvider {
         };
       })
       .filter((s): s is NormalizedSeason => s !== null);
+
+    // Fetch English season names (best-effort, parallel)
+    await Promise.allSettled(
+      seasons.map(async (s) => {
+        if (!s.externalId) return;
+        try {
+          const translation = await this.request<{ name?: string }>(
+            `/seasons/${s.externalId}/translations/eng`,
+          );
+          if (translation?.name) s.name = translation.name;
+        } catch {
+          // Keep original name
+        }
+      }),
+    );
 
     // Extract artwork
     const rawPoster = findArtwork(series.artworks, 2, "eng") ?? series.image ?? undefined;
