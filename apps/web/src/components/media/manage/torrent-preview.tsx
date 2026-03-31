@@ -35,7 +35,7 @@ function loadWebTorrent(): Promise<unknown> {
 
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/webtorrent@2/webtorrent.min.js";
+    script.src = "/webtorrent.min.js";
     script.onload = () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const WT = (window as any).WebTorrent;
