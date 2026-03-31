@@ -187,22 +187,30 @@ export async function refreshExtras(
       ...extras.recommendations.map((r) => ({ result: r, sourceType: "recommendation" as const })),
       ...extras.similar.map((r) => ({ result: r, sourceType: "similar" as const })),
     ];
-    const itemsWithBackdrops = allPoolItems.filter((i) => i.result.backdropPath);
-    const trailerMap = new Map<number, string>();
+    // Dedup pool items by tmdbId before fetching trailers (avoid duplicate calls)
+    const uniquePoolItems = new Map<number, typeof allPoolItems[number]>();
+    for (const item of allPoolItems) {
+      if (!uniquePoolItems.has(item.result.externalId)) {
+        uniquePoolItems.set(item.result.externalId, item);
+      }
+    }
 
-    // Fetch trailers in parallel for items with backdrops (max 10 to avoid rate limits)
-    const toFetch = itemsWithBackdrops.slice(0, 10);
-    if (toFetch.length > 0) {
-      const tmdb = await getTmdbProvider();
+    const trailerMap = new Map<number, string>();
+    const tmdb = await getTmdbProvider();
+
+    // Fetch trailers for all unique pool items in batches of 10 (TMDB rate limit ~40 req/10s)
+    const uniqueItems = [...uniquePoolItems.values()];
+    for (let i = 0; i < uniqueItems.length; i += 10) {
+      const batch = uniqueItems.slice(i, i + 10);
       await Promise.allSettled(
-        toFetch.map(async (item) => {
+        batch.map(async (item) => {
           try {
             const tmdbType = item.result.type === "show" ? "tv" : "movie";
             const videos = await tmdb.getVideos(item.result.externalId, tmdbType);
             const trailer = videos.find((v) => v.type === "Trailer" && v.site === "YouTube");
             if (trailer) trailerMap.set(item.result.externalId, trailer.key);
           } catch {
-            // Best-effort, skip on failure
+            // Best-effort
           }
         }),
       );
