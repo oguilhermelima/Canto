@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { listInput } from "@canto/validators";
 
-import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure } from "../trpc";
+import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
 import {
   findAllLibraries,
   findDefaultLibraries,

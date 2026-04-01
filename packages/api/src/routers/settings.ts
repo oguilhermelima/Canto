@@ -42,12 +42,12 @@ const SERVICE_ENABLED_KEY: Record<z.infer<typeof serviceEnum>, string> = {
 
 export const settingsRouter = createTRPCRouter({
   /** Get all settings as a key-value record */
-  getAll: publicProcedure.query(async () => {
+  getAll: adminProcedure.query(async () => {
     return getAllSettings();
   }),
 
   /** Get a single setting by key */
-  get: publicProcedure
+  get: adminProcedure
     .input(z.object({ key: z.string() }))
     .query(async ({ input }) => {
       return getSetting(input.key);
@@ -80,7 +80,7 @@ export const settingsRouter = createTRPCRouter({
     }),
 
   /** Test connectivity using the provided values (not from DB) */
-  testService: publicProcedure
+  testService: adminProcedure
     .input(
       z.object({
         service: serviceEnum,
