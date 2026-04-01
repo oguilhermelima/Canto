@@ -49,7 +49,7 @@ const NavLinks = memo(function NavLinks(): React.JSX.Element {
             key={href}
             href={href}
             className={cn(
-              "rounded-md px-3 py-1.5 text-sm font-semibold transition-colors",
+              "rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors",
               isActive
                 ? "bg-foreground/10 text-foreground"
                 : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground",
@@ -152,7 +152,7 @@ const TopbarSearch = memo(function TopbarSearch(): React.JSX.Element {
         open || value ? "w-[32rem]" : "w-[24rem]",
       )}
     >
-      <div className="flex w-full items-center gap-2 rounded-full border border-border/60 bg-muted py-1.5 pl-4 pr-1.5">
+      <div className="flex w-full items-center gap-2 rounded-xl border border-border/60 bg-muted py-1.5 pl-4 pr-1.5">
         <Search size={15} className="shrink-0 text-muted-foreground" />
         <div className="relative flex flex-1">
           <input
@@ -189,7 +189,7 @@ const TopbarSearch = memo(function TopbarSearch(): React.JSX.Element {
           <button
             type="button"
             onMouseDown={(e) => { e.preventDefault(); submit(); }}
-            className="shrink-0 rounded-full bg-primary px-4 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="shrink-0 rounded-xl bg-primary px-4 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Search
           </button>

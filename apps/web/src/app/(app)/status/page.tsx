@@ -51,7 +51,7 @@ export default function StatusPage(): React.JSX.Element {
           <Link href="/library?type=show">
             <Card className="cursor-pointer transition-colors hover:bg-muted/50">
               <CardContent className="flex flex-col gap-3 p-5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
                   <Tv size={20} className="text-primary" />
                 </div>
                 <div>
@@ -71,7 +71,7 @@ export default function StatusPage(): React.JSX.Element {
           <Link href="/library?type=movie">
             <Card className="cursor-pointer transition-colors hover:bg-muted/50">
               <CardContent className="flex flex-col gap-3 p-5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
                   <Film size={20} className="text-primary" />
                 </div>
                 <div>
@@ -90,7 +90,7 @@ export default function StatusPage(): React.JSX.Element {
 
           <Card>
             <CardContent className="flex flex-col gap-3 p-5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
                 <HardDrive size={20} className="text-primary" />
               </div>
               <div>
@@ -110,7 +110,7 @@ export default function StatusPage(): React.JSX.Element {
 
           <Card>
             <CardContent className="flex flex-col gap-3 p-5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
                 <Activity size={20} className="text-primary" />
               </div>
               <div>
@@ -133,7 +133,7 @@ export default function StatusPage(): React.JSX.Element {
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardContent className="flex items-center gap-4 p-5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-muted">
                 <Activity size={22} className="text-muted-foreground" />
               </div>
               <div className="flex-1">
@@ -146,7 +146,7 @@ export default function StatusPage(): React.JSX.Element {
           <Link href="/settings">
             <Card className="cursor-pointer transition-colors hover:bg-muted/50">
               <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-muted">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-muted">
                   <Settings size={22} className="text-muted-foreground" />
                 </div>
                 <div>
@@ -304,7 +304,7 @@ export default function StatusPage(): React.JSX.Element {
           <Link href="/search?type=show">
             <Card className="cursor-pointer transition-colors hover:bg-muted/50">
               <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
                   <Plus size={20} className="text-muted-foreground" />
                 </div>
                 <div>
@@ -320,7 +320,7 @@ export default function StatusPage(): React.JSX.Element {
           <Link href="/search?type=movie">
             <Card className="cursor-pointer transition-colors hover:bg-muted/50">
               <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
                   <Plus size={20} className="text-muted-foreground" />
                 </div>
                 <div>
@@ -336,7 +336,7 @@ export default function StatusPage(): React.JSX.Element {
           <Link href="/torrents">
             <Card className="cursor-pointer transition-colors hover:bg-muted/50">
               <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
                   <HardDrive size={20} className="text-muted-foreground" />
                 </div>
                 <div>
@@ -352,7 +352,7 @@ export default function StatusPage(): React.JSX.Element {
           <Link href="/">
             <Card className="cursor-pointer transition-colors hover:bg-muted/50">
               <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
                   <Search size={20} className="text-muted-foreground" />
                 </div>
                 <div>

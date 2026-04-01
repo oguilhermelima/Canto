@@ -91,7 +91,7 @@ function SettingsFields({
               placeholder={f.placeholder}
               onChange={(e) => onChange(f.key, e.target.value)}
               disabled={disabled}
-              className="h-10 rounded-lg border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+              className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
             />
             {f.secret && !disabled && (
               <button
@@ -484,7 +484,7 @@ function MediaServerRow({
               value={url}
               placeholder={urlField.placeholder}
               onChange={(e) => { setUrl(e.target.value); setDirty(true); }}
-              className="h-10 rounded-lg border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+              className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
             />
           </div>
 
@@ -503,7 +503,7 @@ function MediaServerRow({
                       value={apiKey}
                       placeholder={apiKeyField.placeholder}
                       onChange={(e) => { setApiKey(e.target.value); setDirty(true); setActiveSection(e.target.value ? "token" : null); }}
-                      className="h-10 rounded-lg border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+                      className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
                       disabled={activeSection === "login"}
                     />
                     {apiKeyField.secret && activeSection !== "login" && (
@@ -555,7 +555,7 @@ function MediaServerRow({
                       value={apiKey}
                       placeholder={apiKeyField.placeholder}
                       onChange={(e) => { setApiKey(e.target.value); setDirty(true); setActiveSection(e.target.value ? "token" : null); }}
-                      className="h-10 rounded-lg border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+                      className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
                       disabled={activeSection === "login"}
                     />
                     {apiKeyField.secret && activeSection !== "login" && (
@@ -692,7 +692,7 @@ function TmdbSection(): React.JSX.Element {
               value={tmdbKey}
               placeholder="Enter your TMDB API key"
               onChange={(e) => { setTmdbKey(e.target.value); setDirty(true); }}
-              className="h-10 rounded-lg border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+              className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
             />
             <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors" onClick={() => setShowKey((p) => !p)}>
               {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -791,7 +791,7 @@ function TvdbApiKeySection(): React.JSX.Element {
               value={apiKey}
               placeholder="Enter your TVDB API key"
               onChange={(e) => { setApiKey(e.target.value); setDirty(true); }}
-              className="h-10 rounded-lg border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+              className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
             />
             <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors" onClick={() => setShowKey((p) => !p)}>
               {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -856,12 +856,12 @@ function WatchRegionSection(): React.JSX.Element {
             <p className="mb-3 text-xs text-muted-foreground">Available streaming services</p>
             {providersLoading ? (
               <div className="flex flex-wrap gap-2.5">
-                {Array.from({ length: 12 }).map((_, i) => <Skeleton key={i} className="h-11 w-11 rounded-lg" />)}
+                {Array.from({ length: 12 }).map((_, i) => <Skeleton key={i} className="h-11 w-11 rounded-xl" />)}
               </div>
             ) : watchProviders && watchProviders.length > 0 ? (
               <div className="flex flex-wrap gap-2.5">
                 {watchProviders.slice(0, 30).map((p) => (
-                  <img key={p.providerId} src={`${TMDB_IMAGE_BASE}/w92${p.logoPath}`} alt={p.providerName} title={p.providerName} className="h-11 w-11 rounded-lg border border-border/60 object-cover" />
+                  <img key={p.providerId} src={`${TMDB_IMAGE_BASE}/w92${p.logoPath}`} alt={p.providerName} title={p.providerName} className="h-11 w-11 rounded-xl border border-border/60 object-cover" />
                 ))}
               </div>
             ) : <p className="text-xs text-muted-foreground">No providers found.</p>}
@@ -1025,7 +1025,7 @@ export function MetadataSettingsSection(): React.JSX.Element {
               </ul>
 
               {!isConnected && (
-                <p className="mt-2 rounded-lg bg-yellow-500/10 px-3 py-2 text-yellow-500">
+                <p className="mt-2 rounded-xl bg-yellow-500/10 px-3 py-2 text-yellow-500">
                   You need to connect your TVDB API key in the Services tab before enabling this.
                 </p>
               )}

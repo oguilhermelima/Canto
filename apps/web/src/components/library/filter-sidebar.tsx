@@ -217,7 +217,7 @@ export function FilterSidebar({
                   <button
                     key={genre}
                     className={cn(
-                      "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors",
+                      "rounded-xl px-2.5 py-1 text-xs font-medium transition-colors",
                       isActive
                         ? "bg-primary text-primary-foreground"
                         : "border border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
@@ -309,7 +309,7 @@ export function FilterSidebar({
                   <button
                     key={value}
                     className={cn(
-                      "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors",
+                      "rounded-xl px-2.5 py-1 text-xs font-medium transition-colors",
                       isActive
                         ? "bg-primary text-primary-foreground"
                         : "border border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",

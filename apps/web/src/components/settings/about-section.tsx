@@ -7,7 +7,7 @@ export function AboutSection(): React.JSX.Element {
       <SettingsSection title="Application" description="Details about this Canto instance.">
         <div className="space-y-2.5">
           {[["Version", "0.1.0"], ["Stack", "Next.js + tRPC + Drizzle"], ["Metadata", "TMDB + AniList"]].map(([label, value]) => (
-            <div key={label} className="flex items-center justify-between rounded-lg bg-muted/20 px-3.5 py-2.5 text-sm">
+            <div key={label} className="flex items-center justify-between rounded-xl bg-muted/20 px-3.5 py-2.5 text-sm">
               <span className="text-muted-foreground text-xs">{label}</span>
               <span className="text-xs text-foreground">{value}</span>
             </div>

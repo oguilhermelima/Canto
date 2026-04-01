@@ -87,7 +87,7 @@ export function TorrentCard({
 
   if (compact) {
     return (
-      <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-3">
+      <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-foreground">
             {dlLabel && <span className="text-muted-foreground">{dlLabel} · </span>}
@@ -111,7 +111,7 @@ export function TorrentCard({
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
+    <div className="rounded-xl border border-border bg-card p-4">
       {/* Title + badges */}
       <div className="flex flex-wrap items-start gap-2">
         <div className="min-w-0 flex-1">

@@ -94,16 +94,16 @@ export function FilesTab({ mediaId, drawerOpen }: FilesTabProps) {
   if (filesLoading) {
     return (
       <div className="flex flex-col gap-3">
-        <Skeleton className="h-12 rounded-lg" />
-        <Skeleton className="h-12 rounded-lg" />
-        <Skeleton className="h-12 rounded-lg" />
+        <Skeleton className="h-12 rounded-xl" />
+        <Skeleton className="h-12 rounded-xl" />
+        <Skeleton className="h-12 rounded-xl" />
       </div>
     );
   }
 
   if (!files || files.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border py-10 text-center">
+      <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border py-10 text-center">
         <File className="h-8 w-8 text-muted-foreground" />
         <p className="text-sm font-medium text-foreground">No files found</p>
       </div>
@@ -117,7 +117,7 @@ export function FilesTab({ mediaId, drawerOpen }: FilesTabProps) {
   return (
     <div className="flex flex-col gap-3">
       {isMovie && (
-        <div className="divide-y divide-border rounded-lg border border-border">
+        <div className="divide-y divide-border rounded-xl border border-border">
           {movieFiles.map((file) => (
             <FileRow
               key={file.id}
@@ -143,7 +143,7 @@ export function FilesTab({ mediaId, drawerOpen }: FilesTabProps) {
           });
 
           return (
-            <div key={sn ?? "null"} className="rounded-lg border border-border">
+            <div key={sn ?? "null"} className="rounded-xl border border-border">
               <button
                 onClick={() => toggleSeason(sn)}
                 className="flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-muted/50"

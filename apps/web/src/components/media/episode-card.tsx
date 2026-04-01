@@ -56,7 +56,7 @@ export function EpisodeCard({
       )}
     >
       {/* Thumbnail */}
-      <div className="relative h-20 w-36 shrink-0 overflow-hidden rounded-lg bg-muted sm:h-[88px] sm:w-40">
+      <div className="relative h-20 w-36 shrink-0 overflow-hidden rounded-xl bg-muted sm:h-[88px] sm:w-40">
         {episode.stillPath ? (
           <Image
             src={episode.stillPath.startsWith("http") ? episode.stillPath : `https://image.tmdb.org/t/p/w300${episode.stillPath}`}

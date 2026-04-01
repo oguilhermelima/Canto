@@ -8,13 +8,13 @@ export default function SearchLoading(): React.JSX.Element {
         <Skeleton className="mb-6 h-9 w-32" />
 
         {/* Search input skeleton */}
-        <Skeleton className="mb-6 h-12 max-w-2xl rounded-md" />
+        <Skeleton className="mb-6 h-12 max-w-2xl rounded-xl" />
 
         {/* Type tabs skeleton */}
         <div className="flex gap-1">
-          <Skeleton className="h-8 w-14 rounded-lg" />
-          <Skeleton className="h-8 w-20 rounded-lg" />
-          <Skeleton className="h-8 w-24 rounded-lg" />
+          <Skeleton className="h-8 w-14 rounded-xl" />
+          <Skeleton className="h-8 w-20 rounded-xl" />
+          <Skeleton className="h-8 w-24 rounded-xl" />
         </div>
       </div>
 

@@ -9,15 +9,15 @@ export default function LibraryLoading(): React.JSX.Element {
       {/* Toolbar skeleton */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <Skeleton className="hidden h-9 w-24 rounded-md md:block" />
+          <Skeleton className="hidden h-9 w-24 rounded-xl md:block" />
           <div className="flex items-center gap-1">
-            <Skeleton className="h-8 w-14 rounded-lg" />
-            <Skeleton className="h-8 w-24 rounded-lg" />
-            <Skeleton className="h-8 w-20 rounded-lg" />
+            <Skeleton className="h-8 w-14 rounded-xl" />
+            <Skeleton className="h-8 w-24 rounded-xl" />
+            <Skeleton className="h-8 w-20 rounded-xl" />
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Skeleton className="h-9 w-[200px] rounded-md" />
+          <Skeleton className="h-9 w-[200px] rounded-xl" />
         </div>
       </div>
 

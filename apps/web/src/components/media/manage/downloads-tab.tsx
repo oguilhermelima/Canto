@@ -100,14 +100,14 @@ export function DownloadsTab({
       {/* Loading */}
       {isLoading && (
         <div className="flex flex-col gap-3">
-          <Skeleton className="h-32 rounded-lg" />
-          <Skeleton className="h-32 rounded-lg" />
+          <Skeleton className="h-32 rounded-xl" />
+          <Skeleton className="h-32 rounded-xl" />
         </div>
       )}
 
       {/* Empty state */}
       {!isLoading && data?.length === 0 && (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border py-10 text-center">
+        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border py-10 text-center">
           <Download className="h-8 w-8 text-muted-foreground" />
           <div>
             <p className="text-sm font-medium text-foreground">

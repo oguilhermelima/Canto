@@ -107,7 +107,7 @@ export function MediaDetailHero({
         <div className="relative mx-auto flex min-h-[600px] w-full flex-col justify-end px-4 pb-10 pt-28 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
           <div className="flex max-w-5xl flex-col gap-8 md:flex-row md:items-end">
             {/* Poster */}
-            <div className="relative aspect-[2/3] w-[220px] shrink-0 self-center overflow-hidden rounded-lg shadow-2xl ring-1 ring-white/10 md:w-[330px] md:self-auto lg:w-[380px]">
+            <div className="relative aspect-[2/3] w-[220px] shrink-0 self-center overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/10 md:w-[330px] md:self-auto lg:w-[380px]">
               {posterPath ? (
                 <Image
                   src={resolveImage(posterPath, "w500")}
@@ -258,7 +258,7 @@ export function MediaDetailHeroSkeleton(): React.JSX.Element {
       <div className="absolute inset-0 bg-gradient-to-b from-muted/30 to-background" />
       <div className="relative mx-auto flex min-h-[600px] w-full flex-col justify-end px-4 pb-10 pt-28 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         <div className="flex max-w-5xl flex-col gap-8 md:flex-row md:items-end">
-          <Skeleton className="aspect-[2/3] w-[220px] shrink-0 self-center rounded-lg md:w-[330px] md:self-auto lg:w-[380px]" />
+          <Skeleton className="aspect-[2/3] w-[220px] shrink-0 self-center rounded-xl md:w-[330px] md:self-auto lg:w-[380px]" />
           <div className="flex flex-1 flex-col gap-4 pb-1">
             <Skeleton className="h-10 w-96 max-w-full" />
             <div className="flex gap-2">
@@ -272,8 +272,8 @@ export function MediaDetailHeroSkeleton(): React.JSX.Element {
               <Skeleton className="h-6 w-24 rounded-full" />
             </div>
             <div className="flex gap-2.5">
-              <Skeleton className="h-9 w-32 rounded-md" />
-              <Skeleton className="h-9 w-24 rounded-md" />
+              <Skeleton className="h-9 w-32 rounded-xl" />
+              <Skeleton className="h-9 w-24 rounded-xl" />
             </div>
           </div>
         </div>

@@ -50,7 +50,7 @@ export function TitleBar({
           <button
             type="button"
             onClick={onNavigate ?? handleBack}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-foreground"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-foreground"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>

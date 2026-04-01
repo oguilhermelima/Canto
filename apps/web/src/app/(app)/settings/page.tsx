@@ -158,7 +158,7 @@ function SyncedItemsTable({ source }: { source?: "jellyfin" | "plex" }): React.J
       {/* Table */}
       {isLoading ? (
         <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}
+          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full rounded-xl" />)}
         </div>
       ) : data && data.items.length > 0 ? (
         <div className="rounded-xl border border-border/40 overflow-hidden">
@@ -228,7 +228,7 @@ function SyncedItemsTable({ source }: { source?: "jellyfin" | "plex" }): React.J
                   value={tmdbIdInput}
                   onChange={(e) => setTmdbIdInput(e.target.value)}
                   placeholder="e.g. 12345"
-                  className="h-10 rounded-lg border-none bg-muted/50 text-sm focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+                  className="h-10 rounded-xl border-none bg-muted/50 text-sm focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
                 />
                 <Button
                   size="sm"
@@ -253,13 +253,13 @@ function SyncedItemsTable({ source }: { source?: "jellyfin" | "plex" }): React.J
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search TMDB..."
-                className="h-10 rounded-lg border-none bg-muted/50 text-sm focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+                className="h-10 rounded-xl border-none bg-muted/50 text-sm focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
               />
             </div>
 
             {/* Search results */}
             {searchResults.data && searchResults.data.results.length > 0 && (
-              <div className="max-h-60 overflow-y-auto rounded-lg border border-border/40">
+              <div className="max-h-60 overflow-y-auto rounded-xl border border-border/40">
                 {searchResults.data.results.slice(0, 10).map((result) => (
                   <button
                     key={`${result.externalId}-${result.type}`}

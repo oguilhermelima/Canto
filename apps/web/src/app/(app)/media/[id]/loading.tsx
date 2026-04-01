@@ -32,8 +32,8 @@ export default function MediaDetailLoading(): React.JSX.Element {
               </div>
               <Skeleton className="mx-auto h-20 w-full max-w-2xl md:mx-0" />
               <div className="flex justify-center gap-3 md:justify-start">
-                <Skeleton className="h-11 w-40 rounded-lg" />
-                <Skeleton className="h-11 w-36 rounded-lg" />
+                <Skeleton className="h-11 w-40 rounded-xl" />
+                <Skeleton className="h-11 w-36 rounded-xl" />
               </div>
             </div>
           </div>
@@ -63,7 +63,7 @@ export default function MediaDetailLoading(): React.JSX.Element {
             {Array.from({ length: 6 }).map((_, i) => (
               <Skeleton
                 key={i}
-                className="aspect-[2/3] w-[180px] shrink-0 rounded-lg"
+                className="aspect-[2/3] w-[180px] shrink-0 rounded-xl"
               />
             ))}
           </div>

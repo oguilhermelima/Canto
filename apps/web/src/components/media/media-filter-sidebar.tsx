@@ -185,7 +185,7 @@ function FilterPill({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-150",
+        "inline-flex items-center rounded-xl px-3 py-1.5 text-xs font-medium transition-all duration-150",
         active
           ? "border border-primary bg-primary text-primary-foreground shadow-sm"
           : "border border-border text-muted-foreground hover:border-foreground hover:text-foreground",

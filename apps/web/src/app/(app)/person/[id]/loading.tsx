@@ -10,7 +10,7 @@ export default function PersonLoading(): React.JSX.Element {
         </div>
         <div className="relative mx-auto -mt-48 max-w-screen-2xl px-4 pb-8 md:-mt-56 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
           <div className="flex flex-col items-center gap-8 md:flex-row md:items-end">
-            <Skeleton className="h-[240px] w-[240px] rounded-2xl md:h-[280px] md:w-[280px]" />
+            <Skeleton className="h-[240px] w-[240px] rounded-xl md:h-[280px] md:w-[280px]" />
             <div className="flex flex-col items-center gap-3 pb-2 md:items-start">
               <Skeleton className="h-10 w-64 md:h-12 md:w-80" />
               <Skeleton className="h-5 w-32" />

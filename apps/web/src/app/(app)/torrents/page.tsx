@@ -147,7 +147,7 @@ export default function DownloadsPage(): React.JSX.Element {
       {isLoading ? (
         <div className="space-y-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex gap-6 rounded-2xl border border-border bg-card p-6">
+            <div key={i} className="flex gap-6 rounded-xl border border-border bg-card p-6">
               <Skeleton className="h-36 w-24 shrink-0 rounded-xl" />
               <div className="flex-1 space-y-4">
                 <Skeleton className="h-5 w-3/4" />
@@ -236,11 +236,11 @@ export default function DownloadsPage(): React.JSX.Element {
                       <h3 className="min-w-0 text-sm font-semibold text-foreground sm:truncate sm:text-base">
                         {composedTitle || t.title}
                       </h3>
-                      <span className={cn("shrink-0 rounded-lg px-2 py-0.5 text-[10px] font-semibold sm:px-2.5 sm:text-xs", resolved.color)}>
+                      <span className={cn("shrink-0 rounded-xl px-2 py-0.5 text-[10px] font-semibold sm:px-2.5 sm:text-xs", resolved.color)}>
                         {resolved.label}
                       </span>
                       {resolved.seedingLabel && (
-                        <span className={cn("shrink-0 rounded-lg px-2 py-0.5 text-[10px] font-semibold sm:px-2.5 sm:text-xs", resolved.seedingColor)}>
+                        <span className={cn("shrink-0 rounded-xl px-2 py-0.5 text-[10px] font-semibold sm:px-2.5 sm:text-xs", resolved.seedingColor)}>
                           {resolved.seedingLabel}
                         </span>
                       )}
@@ -264,30 +264,30 @@ export default function DownloadsPage(): React.JSX.Element {
                   {/* Actions */}
                   <div className="hidden shrink-0 items-start gap-2 sm:flex">
                     {resolved.canRetry && (
-                      <button onClick={() => retryMutation.mutate({ id: t.id })} disabled={retryMutation.isPending} className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-blue-500/15 hover:text-blue-500 disabled:opacity-40" title="Retry"><RotateCcw size={16} /></button>
+                      <button onClick={() => retryMutation.mutate({ id: t.id })} disabled={retryMutation.isPending} className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors hover:bg-blue-500/15 hover:text-blue-500 disabled:opacity-40" title="Retry"><RotateCcw size={16} /></button>
                     )}
                     {resolved.canResume && (
-                      <button onClick={() => resumeMutation.mutate({ id: t.id })} disabled={resumeMutation.isPending} className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-green-500/15 hover:text-green-500 disabled:opacity-40" title="Resume"><Play size={16} /></button>
+                      <button onClick={() => resumeMutation.mutate({ id: t.id })} disabled={resumeMutation.isPending} className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors hover:bg-green-500/15 hover:text-green-500 disabled:opacity-40" title="Resume"><Play size={16} /></button>
                     )}
                     {resolved.canPause && (
-                      <button onClick={() => pauseMutation.mutate({ id: t.id })} disabled={pauseMutation.isPending} className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-yellow-500/15 hover:text-yellow-500 disabled:opacity-40" title="Pause"><Pause size={16} /></button>
+                      <button onClick={() => pauseMutation.mutate({ id: t.id })} disabled={pauseMutation.isPending} className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors hover:bg-yellow-500/15 hover:text-yellow-500 disabled:opacity-40" title="Pause"><Pause size={16} /></button>
                     )}
-                    <button onClick={() => setDeleteTarget({ id: t.id, title: t.media?.title ?? t.title })} className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-500" title="Delete"><Trash2 size={16} /></button>
+                    <button onClick={() => setDeleteTarget({ id: t.id, title: t.media?.title ?? t.title })} className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-500" title="Delete"><Trash2 size={16} /></button>
                   </div>
                 </div>
 
                 {/* ── Mobile actions ── */}
                 <div className="flex items-center justify-end gap-2 px-4 pb-3 sm:hidden">
                   {resolved.canRetry && (
-                    <button onClick={() => retryMutation.mutate({ id: t.id })} disabled={retryMutation.isPending} className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-blue-500/15 hover:text-blue-500 disabled:opacity-40" title="Retry"><RotateCcw size={14} /></button>
+                    <button onClick={() => retryMutation.mutate({ id: t.id })} disabled={retryMutation.isPending} className="flex h-8 w-8 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors hover:bg-blue-500/15 hover:text-blue-500 disabled:opacity-40" title="Retry"><RotateCcw size={14} /></button>
                   )}
                   {resolved.canResume && (
-                    <button onClick={() => resumeMutation.mutate({ id: t.id })} disabled={resumeMutation.isPending} className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-green-500/15 hover:text-green-500 disabled:opacity-40" title="Resume"><Play size={14} /></button>
+                    <button onClick={() => resumeMutation.mutate({ id: t.id })} disabled={resumeMutation.isPending} className="flex h-8 w-8 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors hover:bg-green-500/15 hover:text-green-500 disabled:opacity-40" title="Resume"><Play size={14} /></button>
                   )}
                   {resolved.canPause && (
-                    <button onClick={() => pauseMutation.mutate({ id: t.id })} disabled={pauseMutation.isPending} className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-yellow-500/15 hover:text-yellow-500 disabled:opacity-40" title="Pause"><Pause size={14} /></button>
+                    <button onClick={() => pauseMutation.mutate({ id: t.id })} disabled={pauseMutation.isPending} className="flex h-8 w-8 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors hover:bg-yellow-500/15 hover:text-yellow-500 disabled:opacity-40" title="Pause"><Pause size={14} /></button>
                   )}
-                  <button onClick={() => setDeleteTarget({ id: t.id, title: t.media?.title ?? t.title })} className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-500" title="Delete"><Trash2 size={14} /></button>
+                  <button onClick={() => setDeleteTarget({ id: t.id, title: t.media?.title ?? t.title })} className="flex h-8 w-8 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-500" title="Delete"><Trash2 size={14} /></button>
                 </div>
 
                 {/* ── Row 3: Stats bar ── */}

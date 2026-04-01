@@ -322,7 +322,7 @@ export function PreferencesModal({
                 key={tab.value}
                 onClick={() => setActiveTab(tab.value)}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                  "flex items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition-colors",
                   activeTab === tab.value
                     ? "bg-foreground font-medium text-background"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -706,7 +706,7 @@ function ContentSeasonList({
   };
 
   if (loading) {
-    return <div className="space-y-3"><Skeleton className="h-12 rounded-lg" /><Skeleton className="h-12 rounded-lg" /></div>;
+    return <div className="space-y-3"><Skeleton className="h-12 rounded-xl" /><Skeleton className="h-12 rounded-xl" /></div>;
   }
 
   // Movie
@@ -715,8 +715,8 @@ function ContentSeasonList({
     if (!files.length && !torrents.length) return <EmptyState text={emptyText} />;
     return (
       <div className="space-y-2">
-        {files.map((f) => <div key={f.id} className="rounded-lg border border-border p-3">{renderFileRow(f)}</div>)}
-        {torrents.map((t) => <div key={t.id} className="rounded-lg border border-border p-3">{renderTorrentRow(t)}</div>)}
+        {files.map((f) => <div key={f.id} className="rounded-xl border border-border p-3">{renderFileRow(f)}</div>)}
+        {torrents.map((t) => <div key={t.id} className="rounded-xl border border-border p-3">{renderTorrentRow(t)}</div>)}
       </div>
     );
   }
@@ -950,7 +950,7 @@ function ServerSeasonList({
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border py-16 text-center">
+    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border py-16 text-center">
       <Download className="h-8 w-8 text-muted-foreground/40" />
       <p className="text-sm text-muted-foreground">{text}</p>
     </div>

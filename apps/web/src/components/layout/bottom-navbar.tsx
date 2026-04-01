@@ -83,7 +83,7 @@ export function BottomNavbar(): React.JSX.Element {
           <Separator className="my-3" />
           <div className="flex flex-col gap-1 px-1">
             <button
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-accent"
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors hover:bg-accent"
               onClick={() => {
                 setSheetOpen(false);
                 router.push("/status");
@@ -93,7 +93,7 @@ export function BottomNavbar(): React.JSX.Element {
               Status
             </button>
             <button
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-accent"
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors hover:bg-accent"
               onClick={() => {
                 setSheetOpen(false);
                 router.push("/settings");
@@ -103,7 +103,7 @@ export function BottomNavbar(): React.JSX.Element {
               Settings
             </button>
             <button
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-accent"
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors hover:bg-accent"
               onClick={() => {
                 setSheetOpen(false);
                 router.push("/notifications");
@@ -114,7 +114,7 @@ export function BottomNavbar(): React.JSX.Element {
             </button>
             <Separator className="my-1" />
             <button
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-accent"
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors hover:bg-accent"
               onClick={() =>
                 setTheme(theme === "dark" ? "light" : "dark")
               }
@@ -125,7 +125,7 @@ export function BottomNavbar(): React.JSX.Element {
               <span className="hidden dark:inline">Light mode</span>
             </button>
             <Separator className="my-1" />
-            <button className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-destructive transition-colors hover:bg-destructive/10">
+            <button className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-destructive transition-colors hover:bg-destructive/10">
               <LogOut className="h-4 w-4" />
               Log out
             </button>

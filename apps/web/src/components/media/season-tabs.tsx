@@ -182,7 +182,7 @@ export function SeasonTabs({
             <button
               type="button"
               onClick={() => setCustomSearchOpen(true)}
-              className="flex h-8 items-center gap-1.5 rounded-lg bg-muted/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="flex h-8 items-center gap-1.5 rounded-xl bg-muted/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <SearchIcon className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Custom Search</span>
@@ -194,7 +194,7 @@ export function SeasonTabs({
             <button
               type="button"
               onClick={onOpenPreferences}
-              className="flex h-8 items-center gap-1.5 rounded-lg bg-muted/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="flex h-8 items-center gap-1.5 rounded-xl bg-muted/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <Settings2 className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Settings</span>
@@ -389,7 +389,7 @@ function SeasonBlock({
       ) || rawTitle;
 
   return (
-    <div className="rounded-2xl bg-card p-1">
+    <div className="rounded-xl bg-card p-1">
       {/* Header — clickable to expand, with download + checkbox on right */}
       <div
         role="button"

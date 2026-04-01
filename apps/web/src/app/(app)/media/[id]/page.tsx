@@ -474,7 +474,7 @@ export default function MediaDetailPage({
                 },
               );
             }}
-            className="flex items-center gap-1.5 rounded-lg bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-xl bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
           >
             {replaceProvider.isPending ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -508,7 +508,7 @@ export default function MediaDetailPage({
                 <button
                   type="button"
                   onClick={() => openTorrentDialog()}
-                  className="flex h-8 items-center gap-1.5 rounded-lg bg-muted/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="flex h-8 items-center gap-1.5 rounded-xl bg-muted/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   <Search className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Search Torrent</span>
@@ -516,7 +516,7 @@ export default function MediaDetailPage({
                 <button
                   type="button"
                   onClick={() => setPreferencesOpen(true)}
-                  className="flex h-8 items-center gap-1.5 rounded-lg bg-muted/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="flex h-8 items-center gap-1.5 rounded-xl bg-muted/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   <Settings2 className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Settings</span>
@@ -818,7 +818,7 @@ export default function MediaDetailPage({
                 setTorrentQualityFilter(e.target.value);
                 setTorrentPage(0);
               }}
-              className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none"
+              className="h-9 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none"
             >
               <option value="all">All Quality</option>
               <option value="uhd">4K</option>
@@ -834,7 +834,7 @@ export default function MediaDetailPage({
                 setTorrentSourceFilter(e.target.value);
                 setTorrentPage(0);
               }}
-              className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none"
+              className="h-9 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none"
             >
               <option value="all">All Sources</option>
               <option value="remux">Remux</option>
@@ -851,7 +851,7 @@ export default function MediaDetailPage({
                 setTorrentSizeFilter(e.target.value);
                 setTorrentPage(0);
               }}
-              className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none"
+              className="h-9 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none"
             >
               <option value="all">All Sizes</option>
               <option value="small">&lt; 2 GB</option>
@@ -1053,7 +1053,7 @@ export default function MediaDetailPage({
                           {badge ? (
                             <Badge
                               variant="outline"
-                              className={`w-[56px] justify-center rounded-lg text-[10px] font-bold ${badge.className}`}
+                              className={`w-[56px] justify-center rounded-xl text-[10px] font-bold ${badge.className}`}
                             >
                               {badge.label}
                             </Badge>
@@ -1066,7 +1066,7 @@ export default function MediaDetailPage({
                           {srcBdg ? (
                             <Badge
                               variant="outline"
-                              className={`w-[60px] justify-center rounded-lg text-[10px] font-bold ${srcBdg.className}`}
+                              className={`w-[60px] justify-center rounded-xl text-[10px] font-bold ${srcBdg.className}`}
                             >
                               {srcBdg.label}
                             </Badge>
@@ -1188,7 +1188,7 @@ function MediaDetailPageSkeleton(): React.JSX.Element {
           <Skeleton className="mb-4 h-7 w-32" />
           <div className="space-y-2">
             {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 w-full rounded-lg" />
+              <Skeleton key={i} className="h-16 w-full rounded-xl" />
             ))}
           </div>
         </section>
