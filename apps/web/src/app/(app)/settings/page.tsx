@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Skeleton } from "@canto/ui/skeleton";
 import { Button } from "@canto/ui/button";
@@ -691,7 +692,7 @@ function AccountSection(): React.JSX.Element {
               type="button"
               onClick={() => setTheme(value)}
               className={cn(
-                "flex flex-col items-center gap-2.5 rounded-2xl border p-4 transition-all",
+                "flex flex-col items-center gap-2.5 rounded-xl border p-4 transition-all",
                 mounted && theme === value
                   ? "border-primary bg-primary/5 text-foreground ring-1 ring-primary/20"
                   : "border-border/60 text-muted-foreground hover:border-foreground/20 hover:text-foreground",
@@ -715,7 +716,14 @@ function AccountSection(): React.JSX.Element {
 /* -------------------------------------------------------------------------- */
 
 export default function SettingsPage(): React.JSX.Element {
-  const [activeNav, setActiveNav] = useState<NavKey>("account");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const tabParam = searchParams.get("tab") as NavKey | null;
+  const activeNav = tabParam && NAV_ITEMS.some((i) => i.key === tabParam) ? tabParam : "account";
+
+  const setActiveNav = useCallback((key: string) => {
+    router.replace(`/settings?tab=${key}`, { scroll: false });
+  }, [router]);
 
   useEffect(() => { document.title = "Settings — Canto"; }, []);
 
@@ -728,7 +736,7 @@ export default function SettingsPage(): React.JSX.Element {
         <TabBar
           tabs={NAV_ITEMS.map((item) => ({ value: item.key, label: item.label }))}
           value={activeNav}
-          onChange={(v) => setActiveNav(v as NavKey)}
+          onChange={setActiveNav}
         />
       </div>
 
