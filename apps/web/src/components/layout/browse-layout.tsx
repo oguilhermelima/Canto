@@ -59,6 +59,8 @@ interface BrowseLayoutProps {
   emptyState?: React.ReactNode;
   /** Hide the title (e.g. for search page where topbar handles it) */
   hideTitle?: boolean;
+  /** Content rendered above the toolbar, inside the sidebar-aware content area */
+  header?: React.ReactNode;
 }
 
 export function BrowseLayout({
@@ -73,6 +75,7 @@ export function BrowseLayout({
   onFetchNextPage,
   emptyState,
   hideTitle = false,
+  header,
 }: BrowseLayoutProps): React.JSX.Element {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
@@ -174,8 +177,10 @@ export function BrowseLayout({
           showFilters && "md:ml-[17rem] lg:ml-[19rem]",
         )}
       >
-        {/* Toolbar — sticky below topbar */}
-        <div className="sticky top-14 z-20 -mx-4 mb-6 flex items-center justify-between border-b border-border/40 bg-background px-4 py-3 md:top-16 md:-mx-8 md:px-8 lg:-mx-12 lg:px-12 xl:-mx-16 xl:px-16 2xl:-mx-24 2xl:px-24">
+        {header}
+
+        {/* Toolbar — sticky on mobile, static on desktop */}
+        <div className="sticky top-14 z-20 -mx-4 mb-6 flex items-center justify-between bg-background px-4 py-3 md:static md:-mx-8 md:px-8 lg:-mx-12 lg:px-12 xl:-mx-16 xl:px-16 2xl:-mx-24 2xl:px-24">
           <div className="flex items-center gap-3">
             <button
               type="button"

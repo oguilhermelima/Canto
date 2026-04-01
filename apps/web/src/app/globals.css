@@ -69,30 +69,6 @@
   &::-webkit-scrollbar { display: none; }
 }
 
-/* Topbar scroll-driven background — pure CSS, zero JS, zero lag */
-@keyframes topbar-bg {
-  from { background-color: transparent; }
-  to { background-color: var(--background); }
-}
-
-.topbar-scroll {
-  background-color: var(--background);
-}
-
-@supports (animation-timeline: scroll()) {
-  .topbar-scroll {
-    background-color: transparent;
-    animation: topbar-bg linear both;
-    animation-timeline: scroll(root);
-    animation-range: 0px 1px;
-  }
-}
-
-/* Search hint rotation animation */
-@keyframes hintRotate {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
 
 /* Spotlight animations */
 @keyframes spotlightFadeIn {

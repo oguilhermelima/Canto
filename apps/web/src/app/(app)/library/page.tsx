@@ -159,7 +159,7 @@ export default function LibraryPage(): React.JSX.Element {
         )}
       >
         {/* Toolbar */}
-        <div className="sticky top-14 z-20 -mx-4 mb-4 flex flex-col gap-4 border-b border-border/40 bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:top-16 md:-mx-8 md:px-8 lg:-mx-12 lg:px-12 xl:-mx-16 xl:px-16 2xl:-mx-24 2xl:px-24">
+        <div className="sticky top-14 z-20 -mx-4 mb-4 flex flex-col gap-4 bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:static md:-mx-8 md:px-8 lg:-mx-12 lg:px-12 xl:-mx-16 xl:px-16 2xl:-mx-24 2xl:px-24">
           <div className="flex items-center gap-3">
             <button
               type="button"

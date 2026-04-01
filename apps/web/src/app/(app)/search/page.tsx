@@ -146,8 +146,8 @@ export default function SearchPage(): React.JSX.Element {
 
   return (
     <>
-      {/* Mobile search input */}
-      <div className="sticky top-0 z-30 border-b border-border/40 bg-background px-4 py-2.5 md:hidden">
+      {/* Mobile search input — sticky */}
+      <div className="sticky top-0 z-30 bg-background px-4 pb-1 pt-2.5 md:hidden">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -160,7 +160,7 @@ export default function SearchPage(): React.JSX.Element {
               router.replace(`/search?${params.toString()}`, { scroll: false });
             }}
             placeholder="Search movies and shows..."
-            className="h-9 pl-9 text-sm"
+            className="h-9 rounded-none border-x-0 border-t-0 border-b-border bg-transparent pl-9 text-sm focus-visible:border-b-ring focus-visible:ring-0 focus-visible:ring-offset-0"
             autoFocus
           />
         </div>
@@ -170,6 +170,26 @@ export default function SearchPage(): React.JSX.Element {
       title="Search"
       hideTitle
       mediaType={mediaType as "all" | "movie" | "show"}
+      header={
+        <div className="hidden pb-1 pt-4 md:block">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                const params = new URLSearchParams();
+                if (e.target.value) params.set("q", e.target.value);
+                if (searchType !== "multi") params.set("type", searchType);
+                router.replace(`/search?${params.toString()}`, { scroll: false });
+              }}
+              placeholder="Search movies and shows..."
+              className="h-12 rounded-none border-x-0 border-t-0 border-b-border bg-transparent pl-10 text-lg focus-visible:border-b-ring focus-visible:ring-0 focus-visible:ring-offset-0"
+              autoFocus
+            />
+          </div>
+        </div>
+      }
       items={items}
       totalResults={totalResults}
       isLoading={isLoading}
