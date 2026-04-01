@@ -210,7 +210,7 @@ function FeaturedCard({
   return (
     <div
       className={cn(
-        "relative shrink-0 overflow-hidden rounded-xl transition-[width] duration-300 ease-in-out",
+        "group relative shrink-0 overflow-hidden rounded-xl transition-[width] duration-300 ease-in-out",
         "h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px]",
         isOpen
           ? "border border-border/40 w-[calc(360px*16/9)] sm:w-[calc(400px*16/9)] lg:w-[calc(440px*16/9)] 2xl:w-[calc(500px*16/9)]"
@@ -245,10 +245,6 @@ function FeaturedCard({
             )}
           </div>
         )}
-
-        <div className="absolute right-2 top-2">
-          <MediaBadges type={item.type} size="sm" />
-        </div>
       </Link>
 
       {/* Backdrop — visible when open */}
@@ -326,14 +322,16 @@ function FeaturedCard({
 
           <MediaBadges type={item.type} year={item.year} voteAverage={item.voteAverage} size="md" />
 
-          {item.id && (
-            <div className="flex items-center gap-2 pt-0.5" onClick={(e) => e.preventDefault()}>
-              <AddToListButton
-                mediaId={item.id}
-                title={item.title}
-              />
-            </div>
-          )}
+          <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+            <AddToListButton
+              mediaId={item.id}
+              externalId={item.externalId}
+              provider={item.provider}
+              type={item.type}
+              title={item.title}
+              size="sm"
+            />
+          </div>
         </div>
       </Link>
     </div>

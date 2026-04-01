@@ -16,20 +16,28 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@canto/ui/sheet";
-import { Bookmark, Check, Plus } from "lucide-react";
+import { Bookmark, Check, Loader2, Plus } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { trpc } from "~/lib/trpc/client";
 import { toast } from "sonner";
 
 interface AddToListButtonProps {
-  mediaId: string;
+  /** Internal media ID — if provided, used directly */
+  mediaId?: string;
+  /** External identifiers — used to persist media if mediaId is not available */
+  externalId?: number | string;
+  provider?: string;
+  type?: "movie" | "show";
   title?: string;
   size?: "sm" | "lg";
   className?: string;
 }
 
 export function AddToListButton({
-  mediaId,
+  mediaId: initialMediaId,
+  externalId,
+  provider,
+  type,
   title,
   size = "sm",
   className,
@@ -41,13 +49,54 @@ export function AddToListButton({
   const [optimisticWatchlist, setOptimisticWatchlist] = useState<
     boolean | null
   >(null);
+  const [resolvedMediaId, setResolvedMediaId] = useState<string | undefined>(
+    initialMediaId,
+  );
+  const [resolving, setResolving] = useState(false);
   const utils = trpc.useUtils();
 
+  const mediaId = resolvedMediaId ?? initialMediaId;
+
   const { data: lists } = trpc.list.getAll.useQuery();
-  const { data: inLists } = trpc.list.isInLists.useQuery({ mediaId });
+  const { data: inLists } = trpc.list.isInLists.useQuery(
+    { mediaId: mediaId! },
+    { enabled: !!mediaId },
+  );
+
+  // Lazy resolve: persist media via getByExternal when needed
+  const getByExternal = trpc.media.getByExternal.useQuery(
+    {
+      externalId: Number(externalId),
+      provider: (provider ?? "tmdb") as "tmdb" | "anilist" | "tvdb",
+      type: (type ?? "movie") as "movie" | "show",
+    },
+    { enabled: false }, // manual trigger only
+  );
+
+  const resolveMediaId = async (): Promise<string | undefined> => {
+    if (mediaId) return mediaId;
+    if (!externalId || !provider || !type) return undefined;
+
+    setResolving(true);
+    try {
+      const result = await getByExternal.refetch();
+      const id = result.data?.id;
+      if (id) {
+        setResolvedMediaId(id);
+        return id;
+      }
+    } catch {
+      toast.error("Failed to load media");
+    } finally {
+      setResolving(false);
+    }
+    return undefined;
+  };
 
   const invalidate = (): void => {
-    void utils.list.isInLists.invalidate({ mediaId });
+    if (mediaId) {
+      void utils.list.isInLists.invalidate({ mediaId });
+    }
     void utils.list.getAll.invalidate();
     void utils.list.getBySlug.invalidate();
   };
@@ -71,15 +120,17 @@ export function AddToListButton({
   });
 
   const createList = trpc.list.create.useMutation({
-    onSuccess: (newList) => {
+    onSuccess: async (newList) => {
       invalidate();
       setNewListName("");
       toast.success(`Created "${newList.name}"`);
-      // Auto-add current media to the new list
-      addItem.mutate(
-        { listId: newList.id, mediaId },
-        { onSuccess: () => toast.success(`Added to "${newList.name}"`) },
-      );
+      const id = await resolveMediaId();
+      if (id) {
+        addItem.mutate(
+          { listId: newList.id, mediaId: id },
+          { onSuccess: () => toast.success(`Added to "${newList.name}"`) },
+        );
+      }
     },
     onError: (err) => toast.error(err.message),
   });
@@ -93,9 +144,10 @@ export function AddToListButton({
   const userLists =
     lists?.filter((l) => l.type !== "server" && l.type !== "watchlist") ?? [];
 
-  const toggleWatchlist = (): void => {
+  const toggleWatchlist = async (): Promise<void> => {
     if (!watchlist) return;
-    if (isInWatchlist) {
+
+    if (isInWatchlist && mediaId) {
       setOptimisticWatchlist(false);
       removeItem.mutate(
         { listId: watchlist.id, mediaId },
@@ -110,8 +162,13 @@ export function AddToListButton({
       );
     } else {
       setOptimisticWatchlist(true);
+      const id = await resolveMediaId();
+      if (!id) {
+        setOptimisticWatchlist(null);
+        return;
+      }
       addItem.mutate(
-        { listId: watchlist.id, mediaId },
+        { listId: watchlist.id, mediaId: id },
         {
           onSuccess: () =>
             toast.success(
@@ -124,15 +181,20 @@ export function AddToListButton({
     }
   };
 
-  const toggleList = (listId: string, listName: string): void => {
-    if (inListIds.has(listId)) {
+  const toggleList = async (
+    listId: string,
+    listName: string,
+  ): Promise<void> => {
+    if (inListIds.has(listId) && mediaId) {
       removeItem.mutate(
         { listId, mediaId },
         { onSuccess: () => toast.success(`Removed from "${listName}"`) },
       );
     } else {
+      const id = await resolveMediaId();
+      if (!id) return;
       addItem.mutate(
-        { listId, mediaId },
+        { listId, mediaId: id },
         { onSuccess: () => toast.success(`Added to "${listName}"`) },
       );
     }
@@ -144,7 +206,8 @@ export function AddToListButton({
     createList.mutate({ name });
   };
 
-  const isLoading = addItem.isPending || removeItem.isPending;
+  const isLoading =
+    addItem.isPending || removeItem.isPending || resolving;
   const isSmall = size === "sm";
   const btnHeight = isSmall ? "h-8" : "h-10";
   const btnText = isSmall ? "text-xs" : "text-sm";
@@ -162,7 +225,7 @@ export function AddToListButton({
           <button
             key={l.id}
             className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-accent"
-            onClick={() => toggleList(l.id, l.name)}
+            onClick={() => void toggleList(l.id, l.name)}
             disabled={isLoading}
           >
             {inListIds.has(l.id) ? (
@@ -213,10 +276,12 @@ export function AddToListButton({
           btnPx,
           btnText,
         )}
-        onClick={toggleWatchlist}
-        disabled={!watchlist}
+        onClick={() => void toggleWatchlist()}
+        disabled={!watchlist || isLoading}
       >
-        {isInWatchlist ? (
+        {resolving ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : isInWatchlist ? (
           <Check className="h-4 w-4" />
         ) : (
           <Plus className="h-4 w-4" />

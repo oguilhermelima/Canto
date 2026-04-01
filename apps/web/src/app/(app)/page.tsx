@@ -10,6 +10,7 @@ import { MediaBadges } from "~/components/media/media-badges";
 import { trpc } from "~/lib/trpc/client";
 import { MediaCarousel } from "~/components/media/media-carousel";
 import { FeaturedCarousel } from "~/components/media/featured-carousel";
+import { AddToListButton } from "~/components/media/add-to-list-button";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -242,9 +243,16 @@ export default function DiscoverPage(): React.JSX.Element {
               </Link>
 
               <div className="flex items-center gap-3 pt-1">
+                <AddToListButton
+                  externalId={currentItem.externalId}
+                  provider={currentItem.provider}
+                  type={currentItem.type}
+                  title={currentItem.title}
+                  size="lg"
+                />
                 <Link
                   href={getPreviewUrl(currentItem)}
-                  className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm font-medium text-foreground/80 backdrop-blur-sm transition-colors hover:bg-white/15 hover:text-foreground"
                 >
                   More Info
                 </Link>
