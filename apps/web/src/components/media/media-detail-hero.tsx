@@ -8,6 +8,7 @@ import {
   Film,
   Tv,
 } from "lucide-react";
+import Link from "next/link";
 import { AddToListButton } from "~/components/media/add-to-list-button";
 import { MediaBadges } from "~/components/media/media-badges";
 
@@ -46,6 +47,7 @@ interface MediaDetailHeroProps {
     type: "jellyfin" | "plex";
     resolution?: string | null;
   }>;
+  isAdmin?: boolean;
 }
 
 export function MediaDetailHero({
@@ -65,6 +67,7 @@ export function MediaDetailHero({
   logoPath,
   provider,
   availableSources,
+  isAdmin,
 }: MediaDetailHeroProps): React.JSX.Element {
   const resolveImage = (path: string, size: string): string =>
     path.startsWith("http") ? path : `${TMDB_IMAGE_BASE}/${size}${path}`;
@@ -210,12 +213,20 @@ export function MediaDetailHero({
               )}
 
               {/* Buttons */}
-              <div className="mt-2 flex flex-wrap gap-2.5">
+              <div className="mt-2 flex flex-wrap items-center gap-2.5">
                 <AddToListButton
                   mediaId={id}
                   title={title}
                   size="lg"
                 />
+                {isAdmin && (
+                  <Link
+                    href={`/media/${id}/manage`}
+                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-muted px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
+                  >
+                    Manage
+                  </Link>
+                )}
               </div>
             </div>
           </div>

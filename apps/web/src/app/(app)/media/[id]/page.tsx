@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { cn } from "@canto/ui/cn";
 import { Button } from "@canto/ui/button";
@@ -428,10 +429,11 @@ export default function MediaDetailPage({
         externalId={media.externalId}
         provider={media.provider}
         availableSources={availability.data?.sources}
+        isAdmin={isAdmin}
       />
 
-      {/* Replace provider button for TV shows */}
-      {media.type === "show" && media.libraryId && (media.provider === "tmdb" || media.provider === "tvdb") && (
+      {/* Replace provider button for TV shows — admin only */}
+      {isAdmin && media.type === "show" && media.libraryId && (media.provider === "tmdb" || media.provider === "tvdb") && (
         <div className="mx-auto flex w-full px-4 pt-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
           <button
             type="button"
@@ -543,14 +545,13 @@ export default function MediaDetailPage({
                   <Search className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Search Torrent</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setPreferencesOpen(true)}
+                <Link
+                  href={`/media/${media.id}/manage`}
                   className="flex h-8 items-center gap-1.5 rounded-xl bg-muted/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   <Settings2 className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Settings</span>
-                </button>
+                  <span className="hidden sm:inline">Manage</span>
+                </Link>
               </div>
             </div>
             {!media.libraryId ? (
@@ -646,7 +647,7 @@ export default function MediaDetailPage({
                 setTorrentDialogOpen(true);
               },
             } : undefined}
-            onOpenPreferences={media.libraryId ? () => setPreferencesOpen(true) : undefined}
+            onOpenPreferences={isAdmin ? () => router.push(`/media/${media.id}/manage`) : undefined}
             episodeAvailability={availability.data?.episodes}
             serverLinks={mediaServers.data}
           />
