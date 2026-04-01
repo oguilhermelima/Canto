@@ -299,22 +299,31 @@ export default function DiscoverPage(): React.JSX.Element {
           />
         )}
 
-        <FeaturedCarousel
-          title="Recommended for you"
-          seeAllHref="/discover?preset=recommended"
-          items={(() => {
-            const seen = new Set<string>();
-            return (recommendations.data?.pages ?? []).flatMap((p) => p.items).filter((r) => {
-              const key = `${r.provider}-${r.externalId}`;
-              if (seen.has(key)) return false;
-              seen.add(key);
-              return true;
-            });
-          })()}
-          isLoading={recommendations.isLoading}
-          isFetchingMore={recommendations.isFetchingNextPage}
-          onLoadMore={recommendations.hasNextPage ? () => void recommendations.fetchNextPage() : undefined}
-        />
+        {!recommendations.isLoading && (recommendations.data?.pages ?? []).flatMap((p) => p.items).length === 0 ? (
+          <section className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+            <h2 className="text-xl font-semibold text-foreground">Recommended for you</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Add items to your watchlist to get personalized recommendations.
+            </p>
+          </section>
+        ) : (
+          <FeaturedCarousel
+            title="Recommended for you"
+            seeAllHref="/discover?preset=recommended"
+            items={(() => {
+              const seen = new Set<string>();
+              return (recommendations.data?.pages ?? []).flatMap((p) => p.items).filter((r) => {
+                const key = `${r.provider}-${r.externalId}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+              });
+            })()}
+            isLoading={recommendations.isLoading}
+            isFetchingMore={recommendations.isFetchingNextPage}
+            onLoadMore={recommendations.hasNextPage ? () => void recommendations.fetchNextPage() : undefined}
+          />
+        )}
 
         <MediaCarousel
           title="Trending TV Shows"
