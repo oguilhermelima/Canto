@@ -43,8 +43,8 @@ export async function replacePoolShowsTvdb(
             .set({
               title: match.title,
               overview: match.overview ?? item.overview,
-              posterPath: match.posterPath ?? item.posterPath,
-              backdropPath: item.backdropPath, // TVDB search doesn't return backdrop
+              posterPath: item.posterPath ?? match.posterPath, // Prefer existing TMDB poster
+              backdropPath: item.backdropPath, // Keep existing TMDB backdrop
               provider: "tvdb",
               externalId: match.externalId,
               updatedAt: new Date(),

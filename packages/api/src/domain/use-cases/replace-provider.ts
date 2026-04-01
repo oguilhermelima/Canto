@@ -55,11 +55,13 @@ export async function replaceMediaProvider(
   // Fetch full metadata from target provider
   const normalized = await provider.getMetadata(targetExternalId, row.type as MediaType);
 
-  // Preserve TMDB ratings when replacing with TVDB (TVDB has no ratings)
+  // Preserve TMDB data when replacing with TVDB (ratings, images)
   if (targetProvider === "tvdb") {
     normalized.voteAverage = row.voteAverage ?? normalized.voteAverage;
     normalized.voteCount = row.voteCount ?? normalized.voteCount;
     normalized.popularity = row.popularity ?? normalized.popularity;
+    normalized.posterPath = row.posterPath ?? normalized.posterPath;
+    normalized.backdropPath = row.backdropPath ?? normalized.backdropPath;
     normalized.logoPath = row.logoPath ?? normalized.logoPath;
   }
 

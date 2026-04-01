@@ -1018,6 +1018,7 @@ export function MetadataSettingsSection(): React.JSX.Element {
 
               <p className="font-medium text-foreground">What stays the same:</p>
               <ul className="list-disc pl-5 space-y-1.5">
+                <li>Posters, backdrops and logo images still come from TMDB.</li>
                 <li>Ratings, popularity and vote counts still come from TMDB.</li>
                 <li>Recommendations, similar titles and trailers are powered by TMDB.</li>
                 <li>Trending, discover and spotlight sections are unaffected.</li>
