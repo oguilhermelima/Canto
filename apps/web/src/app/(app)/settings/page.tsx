@@ -314,12 +314,10 @@ function ServerLibraryGroup({
   onToggle: (id: string, enabled: boolean) => void;
   onToggleSync: (id: string, syncEnabled: boolean) => void;
 }): React.JSX.Element | null {
-  if (!enabled) return null;
-
   const [showSyncedItems, setShowSyncedItems] = useState(false);
   const importMedia = trpc.sync.importMedia.useMutation({
     onSuccess: (data) => {
-      if (data.started) toast.success("Sync started");
+      if (data.started.jellyfin || data.started.plex) toast.success("Sync started");
       else toast.info("Sync already running");
     },
     onError: () => toast.error("Failed to start sync"),
@@ -334,6 +332,8 @@ function ServerLibraryGroup({
       }
     }
   };
+
+  if (!enabled) return null;
 
   return (
     <div className="rounded-xl border border-border/40 overflow-hidden">

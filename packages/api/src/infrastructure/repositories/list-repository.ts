@@ -101,6 +101,7 @@ export async function ensureServerLibrary(db: Database) {
   const existing = await findServerLibrary(db);
   if (existing) return existing;
 
+  // Use onConflictDoNothing to handle concurrent inserts safely
   const [row] = await db
     .insert(list)
     .values({
@@ -109,8 +110,16 @@ export async function ensureServerLibrary(db: Database) {
       type: "server",
       isSystem: true,
     })
+    .onConflictDoNothing()
     .returning();
-  return row!;
+
+  // If conflict occurred, the row wasn't returned — re-fetch
+  if (!row) {
+    const refetched = await findServerLibrary(db);
+    if (!refetched) throw new Error("Failed to create or find server library");
+    return refetched;
+  }
+  return row;
 }
 
 // ── List Items ──

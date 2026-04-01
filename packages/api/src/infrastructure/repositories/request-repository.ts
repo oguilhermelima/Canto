@@ -14,24 +14,19 @@ export async function createDownloadRequest(
   return row;
 }
 
-export async function findRequestsByUser(db: Database, userId: string) {
+export async function findRequestsByUser(db: Database, userId: string, status?: string) {
   return db.query.downloadRequest.findMany({
-    where: eq(downloadRequest.userId, userId),
+    where: status
+      ? and(eq(downloadRequest.userId, userId), eq(downloadRequest.status, status))
+      : eq(downloadRequest.userId, userId),
     with: { media: true },
     orderBy: [desc(downloadRequest.createdAt)],
   });
 }
 
-export async function findAllRequests(db: Database) {
+export async function findAllRequests(db: Database, status?: string) {
   return db.query.downloadRequest.findMany({
-    with: { media: true, user: { columns: { id: true, name: true, email: true } } },
-    orderBy: [desc(downloadRequest.createdAt)],
-  });
-}
-
-export async function findPendingRequests(db: Database) {
-  return db.query.downloadRequest.findMany({
-    where: eq(downloadRequest.status, "pending"),
+    where: status ? eq(downloadRequest.status, status) : undefined,
     with: { media: true, user: { columns: { id: true, name: true, email: true } } },
     orderBy: [desc(downloadRequest.createdAt)],
   });

@@ -82,11 +82,15 @@ export function BottomNavbar(): React.JSX.Element {
             <SheetTitle className="sr-only">Menu</SheetTitle>
             <div className="flex items-center gap-3 px-1">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                <UserRound className="h-5 w-5" />
+                {session?.user?.name ? (
+                  <span className="text-sm font-medium">{session.user.name.charAt(0).toUpperCase()}</span>
+                ) : (
+                  <UserRound className="h-5 w-5" />
+                )}
               </div>
               <div className="flex-1 text-left text-sm leading-tight">
-                <p className="font-semibold">User</p>
-                <p className="text-xs text-muted-foreground">user@canto.app</p>
+                <p className="font-semibold">{session?.user?.name ?? "User"}</p>
+                <p className="text-xs text-muted-foreground">{session?.user?.email ?? ""}</p>
               </div>
             </div>
           </SheetHeader>
@@ -135,7 +139,14 @@ export function BottomNavbar(): React.JSX.Element {
               <span className="hidden dark:inline">Light mode</span>
             </button>
             <Separator className="my-1" />
-            <button className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-destructive transition-colors hover:bg-destructive/10">
+            <button
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-destructive transition-colors hover:bg-destructive/10"
+              onClick={async () => {
+                await authClient.signOut();
+                router.push("/login");
+                router.refresh();
+              }}
+            >
               <LogOut className="h-4 w-4" />
               Log out
             </button>

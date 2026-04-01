@@ -414,9 +414,10 @@ async function processPendingImports(
   const plexUrl = await getSetting<string>("plex.url");
   const plexToken = await getSetting<string>("plex.token");
 
-  // Clear previous sync items for libraries being synced
+  // Clear previous sync items for libraries being synced (scoped to this source only)
   const syncedLibraryIds = [...new Set(pending.map((i) => i.libraryId))];
-  await deleteSyncItemsByLibraryIds(db, syncedLibraryIds);
+  const source = pending[0]?.source;
+  await deleteSyncItemsByLibraryIds(db, syncedLibraryIds, source);
 
   // Deduplicate for processing (don't fetch TMDB twice for same item)
   // But we still record sync_items for all libraries

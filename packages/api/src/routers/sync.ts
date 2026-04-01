@@ -80,10 +80,10 @@ export const syncRouter = createTRPCRouter({
   }),
 
   /**
-   * Get the current status of a reverse sync job (progress counters).
+   * Get the current status of sync jobs (per-source progress counters).
    */
   importMediaStatus: publicProcedure.query(async () => {
-    const status = await getSetting<{
+    type SyncStatus = {
       status: "running" | "completed" | "failed";
       total: number;
       processed: number;
@@ -92,8 +92,12 @@ export const syncRouter = createTRPCRouter({
       failed: number;
       startedAt: string;
       completedAt?: string;
-    }>(SETTINGS.SYNC_MEDIA_IMPORT_STATUS);
-    return status ?? null;
+    };
+    const [jellyfin, plex] = await Promise.all([
+      getSetting<SyncStatus>(`${SETTINGS.SYNC_MEDIA_IMPORT_STATUS}.jellyfin-sync`),
+      getSetting<SyncStatus>(`${SETTINGS.SYNC_MEDIA_IMPORT_STATUS}.plex-sync`),
+    ]);
+    return { jellyfin: jellyfin ?? null, plex: plex ?? null };
   }),
 
   /**

@@ -6,7 +6,6 @@ import {
   createDownloadRequest,
   findRequestsByUser,
   findAllRequests,
-  findPendingRequests,
   findRequestById,
   resolveRequest,
   cancelRequest,
@@ -49,12 +48,9 @@ export const requestRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       if (ctx.session.user.role === "admin") {
-        if (input?.status === "pending") {
-          return findPendingRequests(ctx.db);
-        }
-        return findAllRequests(ctx.db);
+        return findAllRequests(ctx.db, input?.status);
       }
-      return findRequestsByUser(ctx.db, ctx.session.user.id);
+      return findRequestsByUser(ctx.db, ctx.session.user.id, input?.status);
     }),
 
   /** Admin: approve or reject a request */

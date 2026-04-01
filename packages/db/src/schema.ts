@@ -627,7 +627,7 @@ export const downloadRequest = pgTable(
     mediaId: uuid("media_id")
       .notNull()
       .references(() => media.id, { onDelete: "cascade" }),
-    status: varchar("status", { length: 20 }).notNull().default("pending"), // 'pending' | 'approved' | 'rejected' | 'downloaded'
+    status: varchar("status", { length: 20 }).notNull().default("pending"), // 'pending' | 'approved' | 'rejected' | 'downloaded' | 'cancelled'
     note: text("note"),
     adminNote: text("admin_note"),
     resolvedBy: varchar("resolved_by", { length: 36 }).references(

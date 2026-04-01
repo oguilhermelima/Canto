@@ -55,17 +55,9 @@ export default function DiscoverPage(): React.JSX.Element {
     },
   );
 
-  const library = trpc.library.list.useQuery({
+  const recentlyAdded = trpc.library.list.useQuery({
     page: 1,
     pageSize: 20,
-    sortBy: "addedAt",
-    sortOrder: "desc",
-  });
-
-  const downloadedLibrary = trpc.library.list.useQuery({
-    page: 1,
-    pageSize: 20,
-    downloaded: true,
     sortBy: "addedAt",
     sortOrder: "desc",
   });
@@ -132,17 +124,7 @@ export default function DiscoverPage(): React.JSX.Element {
   const animeItems = useMemo(() => mapItems(flatAnime), [mapItems, flatAnime]);
   const animeMovieItems = useMemo(() => mapItems(flatAnimeMovies), [mapItems, flatAnimeMovies]);
 
-  const recentLibrary = (library.data?.items ?? []).map((item) => ({
-    id: item.id,
-    type: item.type as "movie" | "show",
-    title: item.title,
-    posterPath: item.posterPath,
-    year: item.year,
-    voteAverage: item.voteAverage,
-    href: `/media/${item.id}`,
-  }));
-
-  const myDownloads = (downloadedLibrary.data?.items ?? []).map((item) => ({
+  const recentItems = (recentlyAdded.data?.items ?? []).map((item) => ({
     id: item.id,
     type: item.type as "movie" | "show",
     title: item.title,
@@ -305,20 +287,12 @@ export default function DiscoverPage(): React.JSX.Element {
 
       {/* Carousels */}
       <div className="relative -mt-4 flex w-full min-w-0 flex-1 flex-col gap-12 overflow-x-hidden pb-12">
-        {myDownloads.length > 0 && (
-          <MediaCarousel
-            title="My Library"
-            seeAllHref="/library"
-            items={myDownloads}
-            isLoading={downloadedLibrary.isLoading}
-          />
-        )}
-
-        {recentLibrary.length > 0 && (
+        {recentItems.length > 0 && (
           <MediaCarousel
             title="Recently Added"
-            seeAllHref="/library"
-            items={recentLibrary}
+            seeAllHref="/lists/server-library"
+            items={recentItems}
+            isLoading={recentlyAdded.isLoading}
           />
         )}
 

@@ -69,9 +69,13 @@ export async function updateSyncItem(
   await db.update(syncItem).set(data).where(eq(syncItem.id, id));
 }
 
-export async function deleteSyncItemsByLibraryIds(db: Database, libraryIds: string[]) {
+export async function deleteSyncItemsByLibraryIds(db: Database, libraryIds: string[], source?: string) {
   if (libraryIds.length === 0) return;
-  await db.delete(syncItem).where(inArray(syncItem.libraryId, libraryIds));
+  if (source) {
+    await db.delete(syncItem).where(and(inArray(syncItem.libraryId, libraryIds), eq(syncItem.source, source)));
+  } else {
+    await db.delete(syncItem).where(inArray(syncItem.libraryId, libraryIds));
+  }
 }
 
 export async function createSyncItem(db: Database, data: typeof syncItem.$inferInsert) {
