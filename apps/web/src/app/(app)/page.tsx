@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@canto/ui/button";
-import { Badge } from "@canto/ui/badge";
 import { Skeleton } from "@canto/ui/skeleton";
-import { Star, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { MediaBadges } from "~/components/media/media-badges";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { MediaCarousel } from "~/components/media/media-carousel";
@@ -251,27 +251,13 @@ export default function DiscoverPage(): React.JSX.Element {
                 </h1>
               )}
 
-              {/* Meta row */}
-              <div className="flex items-center gap-2.5">
-                {currentItem.voteAverage != null &&
-                  currentItem.voteAverage > 0 && (
-                    <div className="flex items-center gap-1 font-medium text-yellow-400">
-                      <Star size={14} fill="currentColor" />
-                      {Math.round(currentItem.voteAverage * 10) / 10}
-                    </div>
-                  )}
-                {currentItem.year && (
-                  <span className="text-sm text-foreground/60">
-                    {currentItem.year}
-                  </span>
-                )}
-                <Badge
-                  variant="outline"
-                  className="border-foreground/20 text-[10px] uppercase text-foreground/70"
-                >
-                  {currentItem.type === "show" ? "TV Show" : "Movie"}
-                </Badge>
-              </div>
+              {/* Meta badges */}
+              <MediaBadges
+                type={currentItem.type}
+                voteAverage={currentItem.voteAverage}
+                year={currentItem.year}
+                size="md"
+              />
 
               {currentItem.overview && (
                 <p className="line-clamp-3 text-sm leading-relaxed text-foreground/70 md:text-base">

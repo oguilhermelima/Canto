@@ -60,6 +60,10 @@ export function MediaGrid({
         <MediaCard
           key={item.id ?? `${item.provider}-${item.externalId}-${i}`}
           {...item}
+          showTypeBadge
+          showRating={false}
+          showYear={false}
+          showTitle={false}
         />
       ))}
     </div>

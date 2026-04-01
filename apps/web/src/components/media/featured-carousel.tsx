@@ -4,8 +4,9 @@ import { useRef, useState, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
-import { ChevronLeft, ChevronRight, Star, Film, Tv, Volume2, VolumeOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, Film, Tv, Volume2, VolumeOff } from "lucide-react";
 import { LibraryButton } from "~/components/media/library-button";
+import { MediaBadges } from "~/components/media/media-badges";
 import { Skeleton } from "@canto/ui/skeleton";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
@@ -35,8 +36,6 @@ interface FeaturedCarouselProps {
   className?: string;
 }
 
-const CARD_HEIGHT = 500;
-const CARD_WIDTH_OPEN = 750;
 const TRAILER_DELAY_MS = 800;
 
 export function FeaturedCarousel({
@@ -96,7 +95,7 @@ export function FeaturedCarousel({
 
   return (
     <section className={cn("relative", className)}>
-      <div className="mb-4 flex items-center justify-between pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24">
+      <div className="mb-0 flex items-center justify-between pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24">
         <h2 className="text-xl font-semibold text-foreground">{title}</h2>
         {seeAllHref && (
           <Link
@@ -138,8 +137,7 @@ export function FeaturedCarousel({
             ? Array.from({ length: 12 }).map((_, i) => (
                 <Skeleton
                   key={i}
-                  className="shrink-0 rounded-xl w-[240px] sm:w-[260px] lg:w-[280px] 2xl:w-[320px]"
-                  style={{ height: CARD_HEIGHT }}
+                  className="shrink-0 rounded-xl h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px] w-[200px] sm:w-[220px] lg:w-[260px] 2xl:w-[300px]"
                 />
               ))
             : items.map((item, i) => (
@@ -155,8 +153,7 @@ export function FeaturedCarousel({
             Array.from({ length: 4 }).map((_, i) => (
               <Skeleton
                 key={`loading-${i}`}
-                className="shrink-0 rounded-xl w-[240px] sm:w-[260px] lg:w-[280px] 2xl:w-[320px]"
-                style={{ height: CARD_HEIGHT }}
+                className="shrink-0 rounded-xl h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px] w-[200px] sm:w-[220px] lg:w-[260px] 2xl:w-[300px]"
               />
             ))}
           <div className="w-4 shrink-0 md:w-8 lg:w-12 xl:w-16 2xl:w-24" />
@@ -216,12 +213,11 @@ function FeaturedCard({
     <div
       className={cn(
         "relative shrink-0 overflow-hidden rounded-xl transition-[width] duration-300 ease-in-out",
-        isOpen ? "border border-border/40" : "w-[280px] sm:w-[260px] lg:w-[280px] 2xl:w-[320px]",
+        "h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px]",
+        isOpen
+          ? "border border-border/40 w-[calc(360px*16/9)] sm:w-[calc(400px*16/9)] lg:w-[calc(440px*16/9)] 2xl:w-[calc(500px*16/9)]"
+          : "w-[200px] sm:w-[220px] lg:w-[260px] 2xl:w-[300px]",
       )}
-      style={{
-        ...(isOpen ? { width: CARD_WIDTH_OPEN } : {}),
-        height: CARD_HEIGHT,
-      }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
@@ -252,15 +248,8 @@ function FeaturedCard({
           </div>
         )}
 
-        {item.voteAverage != null && item.voteAverage > 0 && (
-          <div className="absolute left-2 top-2 flex items-center gap-1 rounded-md bg-black/60 px-1.5 py-0.5 backdrop-blur-sm">
-            <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-            <span className="text-[11px] font-semibold text-white">{item.voteAverage.toFixed(1)}</span>
-          </div>
-        )}
-
-        <div className="absolute right-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white/80 backdrop-blur-sm">
-          {item.type === "movie" ? "Movie" : "TV"}
+        <div className="absolute right-2 top-2">
+          <MediaBadges type={item.type} size="sm" />
         </div>
       </Link>
 
@@ -337,18 +326,7 @@ function FeaturedCard({
             <h3 className="text-lg font-bold text-white drop-shadow-lg">{item.title}</h3>
           )}
 
-          <div className="flex items-center gap-2.5 text-xs text-white/70">
-            {item.voteAverage != null && item.voteAverage > 0 && (
-              <span className="flex items-center gap-0.5 text-yellow-400">
-                <Star className="h-3 w-3 fill-yellow-400" />
-                {item.voteAverage.toFixed(1)}
-              </span>
-            )}
-            {item.year && <span>{item.year}</span>}
-            <span className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white/80">
-              {item.type === "movie" ? "Movie" : "TV"}
-            </span>
-          </div>
+          <MediaBadges type={item.type} year={item.year} voteAverage={item.voteAverage} size="md" />
 
           <div className="flex items-center gap-2 pt-0.5" onClick={(e) => e.preventDefault()}>
             <LibraryButton

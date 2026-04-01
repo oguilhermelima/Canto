@@ -70,7 +70,7 @@ export function MediaCarousel({
   return (
     <section className={cn("relative", className)}>
       {/* Header */}
-      <div className="mb-4 flex items-center justify-between pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24">
+      <div className="mb-0 flex items-center justify-between pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24">
         <h2 className="text-xl font-semibold text-foreground">{title}</h2>
         {seeAllHref && (
           <Link
@@ -108,13 +108,13 @@ export function MediaCarousel({
         <div
           ref={scrollRef}
           onScroll={updateScrollButtons}
-          className="flex gap-6 overflow-x-auto overflow-y-visible py-6 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
+          className="flex gap-6 overflow-x-auto overflow-y-visible pt-4 pb-6 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
         >
           {isLoading
             ? Array.from({ length: 8 }).map((_, i) => (
                 <MediaCardSkeleton
                   key={i}
-                  className="w-[160px] shrink-0 sm:w-[185px] lg:w-[200px] 2xl:w-[220px]"
+                  className="w-[180px] shrink-0 sm:w-[200px] lg:w-[220px] 2xl:w-[240px]"
                 />
               ))
             : items.map((item, i) => (
@@ -122,7 +122,10 @@ export function MediaCarousel({
                   key={item.id ?? `${item.provider}-${item.externalId}-${i}`}
                   {...item}
                   showTypeBadge
-                  className="w-[160px] shrink-0 sm:w-[185px] lg:w-[200px] 2xl:w-[220px]"
+                  showRating={false}
+                  showYear={false}
+                  showTitle={false}
+                  className="w-[180px] shrink-0 sm:w-[200px] lg:w-[220px] 2xl:w-[240px]"
                 />
               ))}
           {/* Loading more skeletons */}
@@ -130,7 +133,7 @@ export function MediaCarousel({
             Array.from({ length: 4 }).map((_, i) => (
               <MediaCardSkeleton
                 key={`loading-${i}`}
-                className="w-[160px] shrink-0 sm:w-[185px] lg:w-[200px] 2xl:w-[220px]"
+                className="w-[180px] shrink-0 sm:w-[200px] lg:w-[220px] 2xl:w-[240px]"
               />
             ))}
           {/* End spacer to match page padding */}

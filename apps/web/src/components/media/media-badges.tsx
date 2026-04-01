@@ -20,28 +20,17 @@ export function MediaBadges({
 }: MediaBadgesProps): React.JSX.Element {
   const isSm = size === "sm";
   const badgeBase = cn(
-    "inline-flex items-center gap-1 rounded-md font-medium backdrop-blur-sm",
+    "inline-flex items-center gap-1.5 rounded-xl font-semibold capitalize",
     isSm
-      ? "px-1.5 py-0.5 text-[10px]"
-      : "px-2 py-0.5 text-xs",
+      ? "px-2.5 py-1 text-[11px]"
+      : "px-3 py-1.5 text-xs",
   );
 
   return (
     <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
-      {voteAverage != null && voteAverage > 0 && (
-        <span className={cn(badgeBase, "bg-yellow-500/20 text-yellow-500")}>
-          <Star className={cn("fill-current", isSm ? "h-2.5 w-2.5" : "h-3 w-3")} />
-          {voteAverage.toFixed(1)}
-        </span>
-      )}
-      {year && (
-        <span className={cn(badgeBase, "bg-white/10 text-white/80")}>
-          <Calendar className={cn(isSm ? "h-2.5 w-2.5" : "h-3 w-3")} />
-          {year}
-        </span>
-      )}
+      {/* 1. Type — identify what it is */}
       {type && (
-        <span className={cn(badgeBase, "bg-white/10 text-white/80 uppercase tracking-wide")}>
+        <span className={cn(badgeBase, "bg-black/90 text-white")}>
           {type === "movie" ? (
             <>
               <Film className={cn(isSm ? "h-2.5 w-2.5" : "h-3 w-3")} />
@@ -50,9 +39,23 @@ export function MediaBadges({
           ) : (
             <>
               <Tv className={cn(isSm ? "h-2.5 w-2.5" : "h-3 w-3")} />
-              TV Show
+              Tv Show
             </>
           )}
+        </span>
+      )}
+      {/* 2. Rating — how good */}
+      {voteAverage != null && voteAverage > 0 && (
+        <span className={cn(badgeBase, "bg-yellow-500/90 text-black")}>
+          <Star className={cn("fill-current", isSm ? "h-2.5 w-2.5" : "h-3 w-3")} />
+          {voteAverage.toFixed(1)}
+        </span>
+      )}
+      {/* 3. Year — when */}
+      {year && (
+        <span className={cn(badgeBase, "bg-black/90 text-white")}>
+          <Calendar className={cn(isSm ? "h-2.5 w-2.5" : "h-3 w-3")} />
+          {year}
         </span>
       )}
     </div>

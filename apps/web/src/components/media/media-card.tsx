@@ -19,6 +19,9 @@ interface MediaCardProps {
   overview?: string | null;
   inLibrary?: boolean;
   showTypeBadge?: boolean;
+  showRating?: boolean;
+  showYear?: boolean;
+  showTitle?: boolean;
   href?: string;
   className?: string;
 }
@@ -34,6 +37,9 @@ export function MediaCard({
   voteAverage,
   inLibrary,
   showTypeBadge = true,
+  showRating = true,
+  showYear = true,
+  showTitle = true,
   href,
   className,
 }: MediaCardProps): React.JSX.Element {
@@ -47,12 +53,12 @@ export function MediaCard({
     <Link
       href={linkHref}
       className={cn(
-        "group relative flex flex-col rounded-xl transition-transform duration-300 ease-out hover:z-10 hover:scale-110",
+        "group relative flex flex-col rounded-xl transition-all duration-300 ease-out hover:z-10 hover:scale-105 [&:hover_.poster-frame]:ring-2 [&:hover_.poster-frame]:ring-white/60",
         className,
       )}
     >
       {/* Poster */}
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-muted">
+      <div className="poster-frame relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-muted transition-shadow duration-300">
         {posterPath ? (
           <Image
             src={posterPath.startsWith("http") ? posterPath : `https://image.tmdb.org/t/p/w500${posterPath}`}
@@ -79,23 +85,29 @@ export function MediaCard({
           </div>
         )}
 
-        {/* Badges — bottom left */}
-        <div className="absolute bottom-2 left-2">
+        {/* Badges — hidden by default, visible on hover */}
+        <div className="absolute left-2 top-2 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
           <MediaBadges
-            type={showTypeBadge ? type : undefined}
-            year={year}
             voteAverage={voteAverage}
+            year={showYear ? year : undefined}
             size="sm"
           />
         </div>
+        {showTypeBadge && (
+          <div className="absolute right-2 top-2 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+            <MediaBadges type={type} size="sm" />
+          </div>
+        )}
       </div>
 
       {/* Title below poster */}
-      <div className="mt-2 px-0.5">
-        <p className="line-clamp-2 text-sm font-medium leading-tight text-foreground">
-          {title}
-        </p>
-      </div>
+      {showTitle && (
+        <div className="mt-2 px-0.5">
+          <p className="line-clamp-2 text-sm font-medium leading-tight text-foreground">
+            {title}
+          </p>
+        </div>
+      )}
     </Link>
   );
 }
