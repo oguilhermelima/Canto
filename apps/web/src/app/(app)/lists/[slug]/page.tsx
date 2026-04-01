@@ -22,6 +22,7 @@ export default function ListDetailPage(): React.JSX.Element {
 
   const gridItems =
     data?.items.map((item) => ({
+      id: item.media.id,
       externalId: String(item.media.externalId),
       provider: item.media.provider,
       type: item.media.type as "movie" | "show",

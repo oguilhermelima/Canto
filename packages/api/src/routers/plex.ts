@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { getPlexCredentials } from "../lib/server-credentials";
-import { createTRPCRouter, publicProcedure } from "../trpc";
+import { createTRPCRouter, adminProcedure } from "../trpc";
 import { syncPlexLibraries } from "../domain/use-cases/sync-plex-libraries";
 import { testPlexConnection, scanPlexLibrary } from "../infrastructure/adapters/plex";
 import { findAllLibraries, updateLibrary } from "../infrastructure/repositories/library-repository";
@@ -13,7 +13,7 @@ import { findAllLibraries, updateLibrary } from "../infrastructure/repositories/
 
 export const plexRouter = createTRPCRouter({
   /** Test connection and auto-sync libraries */
-  testConnection: publicProcedure.query(async ({ ctx }) => {
+  testConnection: adminProcedure.query(async ({ ctx }) => {
     const creds = await getPlexCredentials();
     if (!creds) return { connected: false, error: "Plex URL or token not configured" };
 
@@ -27,7 +27,7 @@ export const plexRouter = createTRPCRouter({
   }),
 
   /** Manual re-sync of libraries from Plex */
-  syncLibraries: publicProcedure.mutation(async ({ ctx }) => {
+  syncLibraries: adminProcedure.mutation(async ({ ctx }) => {
     const creds = await getPlexCredentials();
     if (!creds) {
       throw new TRPCError({
@@ -38,7 +38,7 @@ export const plexRouter = createTRPCRouter({
     return syncPlexLibraries(ctx.db, creds.url, creds.token);
   }),
 
-  scan: publicProcedure.mutation(async ({ ctx }) => {
+  scan: adminProcedure.mutation(async ({ ctx }) => {
     const creds = await getPlexCredentials();
     if (!creds) throw new TRPCError({ code: "BAD_REQUEST", message: "Plex not configured" });
 
@@ -48,7 +48,7 @@ export const plexRouter = createTRPCRouter({
     return { success: true };
   }),
 
-  toggleLibrary: publicProcedure
+  toggleLibrary: adminProcedure
     .input(z.object({ id: z.string().uuid(), enabled: z.boolean() }))
     .mutation(({ ctx, input }) => updateLibrary(ctx.db, input.id, { enabled: input.enabled })),
 });

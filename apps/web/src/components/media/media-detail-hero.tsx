@@ -214,6 +214,7 @@ export function MediaDetailHero({
                 <AddToListButton
                   mediaId={id}
                   title={title}
+                  size="lg"
                 />
               </div>
             </div>

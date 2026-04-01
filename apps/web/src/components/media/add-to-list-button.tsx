@@ -37,6 +37,7 @@ export function AddToListButton({
   const invalidate = (): void => {
     void utils.list.isInLists.invalidate({ mediaId });
     void utils.list.getAll.invalidate();
+    void utils.list.getBySlug.invalidate();
   };
 
   const addItem = trpc.list.addItem.useMutation({

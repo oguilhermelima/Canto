@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { getJellyfinCredentials } from "../lib/server-credentials";
-import { createTRPCRouter, publicProcedure } from "../trpc";
+import { createTRPCRouter, adminProcedure } from "../trpc";
 import { syncJellyfinLibraries } from "../domain/use-cases/sync-jellyfin-libraries";
 import {
   testJellyfinConnection,
@@ -17,7 +17,7 @@ import { updateLibrary } from "../infrastructure/repositories/library-repository
 
 export const jellyfinRouter = createTRPCRouter({
   /** Test connection and auto-sync libraries when connected */
-  testConnection: publicProcedure.query(async ({ ctx }) => {
+  testConnection: adminProcedure.query(async ({ ctx }) => {
     const creds = await getJellyfinCredentials();
     if (!creds) return { connected: false, error: "Jellyfin URL or API key not configured" };
 
@@ -31,7 +31,7 @@ export const jellyfinRouter = createTRPCRouter({
   }),
 
   /** Manual re-sync of libraries from Jellyfin */
-  syncLibraries: publicProcedure.mutation(async ({ ctx }) => {
+  syncLibraries: adminProcedure.mutation(async ({ ctx }) => {
     const creds = await getJellyfinCredentials();
     if (!creds) {
       throw new TRPCError({
@@ -42,18 +42,18 @@ export const jellyfinRouter = createTRPCRouter({
     return syncJellyfinLibraries(ctx.db, creds.url, creds.apiKey);
   }),
 
-  toggleLibrary: publicProcedure
+  toggleLibrary: adminProcedure
     .input(z.object({ id: z.string().uuid(), enabled: z.boolean() }))
     .mutation(({ ctx, input }) => updateLibrary(ctx.db, input.id, { enabled: input.enabled })),
 
-  scan: publicProcedure.mutation(async () => {
+  scan: adminProcedure.mutation(async () => {
     const creds = await getJellyfinCredentials();
     if (!creds) throw new TRPCError({ code: "BAD_REQUEST", message: "Jellyfin not configured" });
     await scanJellyfinLibrary(creds.url, creds.apiKey);
     return { success: true };
   }),
 
-  mergeVersions: publicProcedure
+  mergeVersions: adminProcedure
     .input(z.object({ jellyfinItemIds: z.array(z.string()).min(2) }))
     .mutation(async ({ input }) => {
       const creds = await getJellyfinCredentials();

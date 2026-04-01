@@ -486,6 +486,7 @@ export default function MediaDetailPage({
               pending: { text: "Download Requested — Pending approval", className: "bg-yellow-500/15 text-yellow-600" },
               approved: { text: "Download Approved — Waiting for admin to download", className: "bg-blue-500/15 text-blue-600" },
               rejected: { text: "Request Rejected", className: "bg-red-500/15 text-red-600" },
+              downloaded: { text: "Downloaded — Available on server", className: "bg-green-500/15 text-green-600" },
             };
             const info = statusLabels[existing.status];
             if (!info) return null;

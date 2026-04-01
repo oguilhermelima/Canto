@@ -57,7 +57,7 @@ export async function resolveRequest(
       resolvedAt: new Date(),
       updatedAt: new Date(),
     })
-    .where(eq(downloadRequest.id, id))
+    .where(and(eq(downloadRequest.id, id), eq(downloadRequest.status, "pending")))
     .returning();
   return row;
 }

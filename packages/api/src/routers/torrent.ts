@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { torrentDownloadInput, torrentSearchInput } from "@canto/validators";
 
-import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure } from "../trpc";
+import { createTRPCRouter, adminProcedure } from "../trpc";
 import { getQBClient } from "../infrastructure/adapters/qbittorrent";
 import { autoImportTorrent } from "../domain/use-cases/import-torrent";
 import { mergeLiveData } from "../domain/use-cases/merge-live-data";
@@ -100,16 +100,16 @@ export const torrentRouter = createTRPCRouter({
   /**
    * List all torrent records from the database.
    */
-  list: publicProcedure.query(({ ctx }) => findAllTorrents(ctx.db)),
+  list: adminProcedure.query(({ ctx }) => findAllTorrents(ctx.db)),
 
-  listByMedia: publicProcedure
+  listByMedia: adminProcedure
     .input(z.object({ mediaId: z.string().uuid() }))
     .query(({ ctx, input }) => findTorrentsByMediaId(ctx.db, input.mediaId)),
 
   /**
    * List live torrent data from qBittorrent merged with DB records + media info.
    */
-  listLive: publicProcedure.query(async ({ ctx }) => {
+  listLive: adminProcedure.query(async ({ ctx }) => {
     const dbRows = await findAllTorrents(ctx.db);
     const merged = await mergeLiveData(ctx.db, dbRows);
 
@@ -131,7 +131,7 @@ export const torrentRouter = createTRPCRouter({
   /**
    * List live torrent data for a specific media, merged with qBittorrent.
    */
-  listLiveByMedia: publicProcedure
+  listLiveByMedia: adminProcedure
     .input(z.object({ mediaId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const dbRows = await findTorrentsByMediaId(ctx.db, input.mediaId);

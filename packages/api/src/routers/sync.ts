@@ -6,7 +6,7 @@ import { getSetting } from "@canto/db/settings";
 import { SETTINGS } from "../lib/settings-keys";
 import { persistMedia } from "@canto/db/persist-media";
 
-import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure } from "../trpc";
+import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
 import { getTmdbProvider } from "../lib/tmdb-client";
 import {
   findSyncItemById,
@@ -82,7 +82,7 @@ export const syncRouter = createTRPCRouter({
   /**
    * Get the current status of sync jobs (per-source progress counters).
    */
-  importMediaStatus: publicProcedure.query(async () => {
+  importMediaStatus: protectedProcedure.query(async () => {
     type SyncStatus = {
       status: "running" | "completed" | "failed";
       total: number;
@@ -103,7 +103,7 @@ export const syncRouter = createTRPCRouter({
   /**
    * List synced items with pagination and optional filter by result.
    */
-  listSyncedItems: publicProcedure
+  listSyncedItems: protectedProcedure
     .input(
       z.object({
         libraryId: z.string().uuid().optional(),
@@ -126,7 +126,7 @@ export const syncRouter = createTRPCRouter({
   /**
    * Search TMDB for a sync item that failed to match automatically.
    */
-  searchForSyncItem: publicProcedure
+  searchForSyncItem: protectedProcedure
     .input(z.object({ query: z.string().min(1) }))
     .query(async ({ input }) => {
       const tmdb = await getTmdbProvider();
@@ -182,7 +182,7 @@ export const syncRouter = createTRPCRouter({
   /**
    * Get which media servers have a given media item, with deep links.
    */
-  mediaServers: publicProcedure
+  mediaServers: protectedProcedure
     .input(z.object({ mediaId: z.string().uuid() }))
     .query(async ({ input }) => {
       const items = await findSyncItemsByMediaId(db, input.mediaId);
@@ -220,7 +220,7 @@ export const syncRouter = createTRPCRouter({
    * Get media availability across all sources (downloads, Jellyfin, Plex).
    * Returns source-level info + episode-level availability for shows.
    */
-  mediaAvailability: publicProcedure
+  mediaAvailability: protectedProcedure
     .input(z.object({ mediaId: z.string().uuid() }))
     .query(async ({ input }) => {
       const items = await findSyncItemsWithEpisodes(db, input.mediaId);

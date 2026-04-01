@@ -342,7 +342,7 @@ export const mediaRouter = createTRPCRouter({
    * Replace the metadata provider for a media item (e.g. TMDB -> TVDB).
    * Fetches full metadata from the target provider and updates the DB record.
    */
-  replaceProvider: protectedProcedure
+  replaceProvider: adminProcedure
     .input(z.object({
       id: z.string().uuid(),
       provider: z.enum(["tmdb", "tvdb"]),

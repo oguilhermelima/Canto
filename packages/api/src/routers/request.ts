@@ -6,7 +6,6 @@ import {
   createDownloadRequest,
   findRequestsByUser,
   findAllRequests,
-  findRequestById,
   resolveRequest,
   cancelRequest,
 } from "../infrastructure/repositories/request-repository";
@@ -63,22 +62,18 @@ export const requestRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const existing = await findRequestById(ctx.db, input.id);
-      if (!existing) {
-        throw new TRPCError({ code: "NOT_FOUND" });
-      }
-      if (existing.status !== "pending") {
+      const row = await resolveRequest(ctx.db, input.id, {
+        status: input.status,
+        adminNote: input.adminNote,
+        resolvedBy: ctx.session.user.id,
+      });
+      if (!row) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Request has already been resolved",
         });
       }
-
-      return resolveRequest(ctx.db, input.id, {
-        status: input.status,
-        adminNote: input.adminNote,
-        resolvedBy: ctx.session.user.id,
-      });
+      return row;
     }),
 
   /** Cancel own pending request */

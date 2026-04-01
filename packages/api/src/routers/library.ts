@@ -46,7 +46,7 @@ export const libraryRouter = createTRPCRouter({
   /**
    * List all library configs (the library table rows, not media items).
    */
-  listLibraries: publicProcedure.query(({ ctx }) => findAllLibraries(ctx.db)),
+  listLibraries: adminProcedure.query(({ ctx }) => findAllLibraries(ctx.db)),
 
   /**
    * Set a library as the default for its type (un-defaults the others of the same type).
@@ -73,7 +73,7 @@ export const libraryRouter = createTRPCRouter({
   /**
    * Get the default library for each type.
    */
-  getDefaults: publicProcedure.query(async ({ ctx }) => {
+  getDefaults: adminProcedure.query(async ({ ctx }) => {
     const defaults = await findDefaultLibraries(ctx.db);
     const result: Record<string, typeof defaults[number]> = {};
     for (const lib of defaults) result[lib.type] = lib;

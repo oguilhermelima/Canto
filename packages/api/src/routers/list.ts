@@ -66,17 +66,29 @@ export const listRouter = createTRPCRouter({
       if (!slug || slug === "server-library" || slug === "watchlist") {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Invalid or reserved list name",
+          message: slug
+            ? "This list name is reserved"
+            : "List name must contain at least one letter or number",
         });
       }
 
-      return createList(ctx.db, {
-        userId: ctx.session.user.id,
-        name: input.name,
-        slug,
-        description: input.description,
-        type: "custom",
-      });
+      try {
+        return await createList(ctx.db, {
+          userId: ctx.session.user.id,
+          name: input.name,
+          slug,
+          description: input.description,
+          type: "custom",
+        });
+      } catch (err) {
+        if (err instanceof Error && err.message.includes("unique")) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "A list with this name already exists",
+          });
+        }
+        throw err;
+      }
     }),
 
   /** Update a custom list (name/description) */

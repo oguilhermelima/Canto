@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
 import {
@@ -34,6 +35,8 @@ export default function ListsPage(): React.JSX.Element {
     name: string;
   } | null>(null);
 
+  const router = useRouter();
+
   useEffect(() => {
     document.title = "My Lists \u2014 Canto";
   }, []);
@@ -48,12 +51,13 @@ export default function ListsPage(): React.JSX.Element {
     trpc.list.getBySlug.useQuery({ slug: "server-library", limit: 20 });
 
   const createMutation = trpc.list.create.useMutation({
-    onSuccess: () => {
+    onSuccess: (newList) => {
       void utils.list.getAll.invalidate();
       setCreateOpen(false);
       setName("");
       setDescription("");
       toast.success("List created");
+      router.push(`/lists/${newList.slug}`);
     },
     onError: (err) => toast.error(err.message),
   });
