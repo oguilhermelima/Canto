@@ -216,6 +216,18 @@ export default function SearchPage(): React.JSX.Element {
               </p>
             </div>
           </div>
+        ) : !isLoading && totalResults === 0 ? (
+          <div className="flex min-h-[400px] items-center justify-center">
+            <div className="text-center">
+              <Search className="mx-auto mb-4 h-12 w-12 text-muted-foreground/20" />
+              <p className="text-lg font-medium text-muted-foreground">
+                No results for &ldquo;{query}&rdquo;
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground/70">
+                Try different keywords or check the spelling
+              </p>
+            </div>
+          </div>
         ) : undefined
       }
     />

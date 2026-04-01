@@ -33,6 +33,7 @@ import {
   Upload,
 } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
+import { authClient } from "~/lib/auth-client";
 import {
   formatBytes,
   formatSpeed,
@@ -62,6 +63,9 @@ export default function DownloadsPage(): React.JSX.Element {
   } | null>(null);
   const [deleteFiles, setDeleteFiles] = useState(false);
   const [deleteTorrent, setDeleteTorrent] = useState(true);
+
+  const { data: session } = authClient.useSession();
+  const isAdmin = (session?.user as { role?: string } | undefined)?.role === "admin";
 
   useEffect(() => {
     document.title = "Downloads — Canto";
@@ -112,6 +116,14 @@ export default function DownloadsPage(): React.JSX.Element {
       return r.canResume && !r.isDownloaded;
     }).length ?? 0,
   };
+
+  if (!isAdmin) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <p className="text-muted-foreground">This page is only available to administrators.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">

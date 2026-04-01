@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
@@ -18,6 +18,7 @@ import { authClient } from "~/lib/auth-client";
 
 export default function LoginPage(): React.JSX.Element {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +46,9 @@ export default function LoginPage(): React.JSX.Element {
         return;
       }
 
-      router.push("/");
+      const callbackUrl = searchParams.get("callbackUrl");
+      const redirect = callbackUrl && callbackUrl.startsWith("/") ? callbackUrl : "/";
+      router.push(redirect);
       router.refresh();
     } catch {
       setError("An unexpected error occurred");

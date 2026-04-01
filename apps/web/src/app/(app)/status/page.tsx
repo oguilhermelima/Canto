@@ -17,6 +17,7 @@ import {
   Search,
 } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
+import { authClient } from "~/lib/auth-client";
 import { PageHeader } from "~/components/layout/page-header";
 
 function getStatusBadgeClass(status: string): string {
@@ -27,10 +28,13 @@ function getStatusBadgeClass(status: string): string {
 }
 
 export default function StatusPage(): React.JSX.Element {
+  const { data: session } = authClient.useSession();
+  const isAdmin = (session?.user as { role?: string } | undefined)?.role === "admin";
+
   const { data: stats, isLoading: statsLoading } =
     trpc.library.stats.useQuery();
   const { data: torrents, isLoading: torrentsLoading } =
-    trpc.torrent.list.useQuery();
+    trpc.torrent.list.useQuery(undefined, { enabled: isAdmin });
 
   const activeTorrents =
     torrents?.filter((t) => t.status === "downloading") ?? [];
@@ -88,25 +92,27 @@ export default function StatusPage(): React.JSX.Element {
             </Card>
           </Link>
 
-          <Card>
-            <CardContent className="flex flex-col gap-3 p-5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                <HardDrive size={20} className="text-primary" />
-              </div>
-              <div>
-                {torrentsLoading ? (
-                  <Skeleton className="mb-1 h-8 w-16" />
-                ) : (
-                  <p className="text-3xl font-bold">
-                    {torrents?.length ?? 0}
+          {isAdmin && (
+            <Card>
+              <CardContent className="flex flex-col gap-3 p-5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                  <HardDrive size={20} className="text-primary" />
+                </div>
+                <div>
+                  {torrentsLoading ? (
+                    <Skeleton className="mb-1 h-8 w-16" />
+                  ) : (
+                    <p className="text-3xl font-bold">
+                      {torrents?.length ?? 0}
+                    </p>
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    Total Torrents
                   </p>
-                )}
-                <p className="text-sm text-muted-foreground">
-                  Total Torrents
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardContent className="flex flex-col gap-3 p-5">
@@ -161,141 +167,143 @@ export default function StatusPage(): React.JSX.Element {
         </div>
       </section>
 
-      {/* Active Downloads */}
-      <section className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Active Downloads</h2>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="gap-1.5">
-              <Download size={12} />
-              {activeTorrents.length} active
-            </Badge>
-            <Badge variant="outline" className="gap-1.5">
-              <CheckCircle2 size={12} />
-              {finishedTorrents.length} completed
-            </Badge>
-            {errorTorrents.length > 0 && (
-              <Badge variant="destructive" className="gap-1.5">
-                <AlertCircle size={12} />
-                {errorTorrents.length} error
-                {errorTorrents.length !== 1 ? "s" : ""}
+      {/* Active Downloads — admin only */}
+      {isAdmin && (
+        <section className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Active Downloads</h2>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="gap-1.5">
+                <Download size={12} />
+                {activeTorrents.length} active
               </Badge>
-            )}
+              <Badge variant="outline" className="gap-1.5">
+                <CheckCircle2 size={12} />
+                {finishedTorrents.length} completed
+              </Badge>
+              {errorTorrents.length > 0 && (
+                <Badge variant="destructive" className="gap-1.5">
+                  <AlertCircle size={12} />
+                  {errorTorrents.length} error
+                  {errorTorrents.length !== 1 ? "s" : ""}
+                </Badge>
+              )}
+            </div>
           </div>
-        </div>
 
-        {torrentsLoading ? (
-          <Card>
-            <CardContent className="p-5">
-              <Skeleton className="h-20 w-full" />
-            </CardContent>
-          </Card>
-        ) : activeTorrents.length > 0 ? (
-          <Card>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-muted/30">
-                      <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                        Title
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                        Quality
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                        Status
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activeTorrents.map((torrent) => (
-                      <tr
-                        key={torrent.id}
-                        className="border-b last:border-0 hover:bg-muted/40"
-                      >
-                        <td className="max-w-[400px] truncate px-4 py-3 text-sm font-medium">
-                          {torrent.title}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant="outline">{torrent.quality}</Badge>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge
-                            variant="secondary"
-                            className={getStatusBadgeClass(torrent.status)}
-                          >
-                            {torrent.status}
-                          </Badge>
-                        </td>
+          {torrentsLoading ? (
+            <Card>
+              <CardContent className="p-5">
+                <Skeleton className="h-20 w-full" />
+              </CardContent>
+            </Card>
+          ) : activeTorrents.length > 0 ? (
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b bg-muted/30">
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          Title
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          Quality
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          Status
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <Download
-                size={32}
-                className="mx-auto mb-3 text-muted-foreground/50"
-              />
-              <p className="text-sm text-muted-foreground">
-                No active downloads.
-              </p>
-            </CardContent>
-          </Card>
-        )}
+                    </thead>
+                    <tbody>
+                      {activeTorrents.map((torrent) => (
+                        <tr
+                          key={torrent.id}
+                          className="border-b last:border-0 hover:bg-muted/40"
+                        >
+                          <td className="max-w-[400px] truncate px-4 py-3 text-sm font-medium">
+                            {torrent.title}
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge variant="outline">{torrent.quality}</Badge>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge
+                              variant="secondary"
+                              className={getStatusBadgeClass(torrent.status)}
+                            >
+                              {torrent.status}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <Download
+                  size={32}
+                  className="mx-auto mb-3 text-muted-foreground/50"
+                />
+                <p className="text-sm text-muted-foreground">
+                  No active downloads.
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
-        {errorTorrents.length > 0 && (
-          <Card className="border-destructive/50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base text-destructive">
-                Failed Downloads
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-muted/30">
-                      <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                        Title
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                        Quality
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-                        Status
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {errorTorrents.map((torrent) => (
-                      <tr
-                        key={torrent.id}
-                        className="border-b last:border-0 hover:bg-muted/40"
-                      >
-                        <td className="max-w-[400px] truncate px-4 py-3 text-sm font-medium">
-                          {torrent.title}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant="outline">{torrent.quality}</Badge>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant="destructive">error</Badge>
-                        </td>
+          {errorTorrents.length > 0 && (
+            <Card className="border-destructive/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base text-destructive">
+                  Failed Downloads
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b bg-muted/30">
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          Title
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          Quality
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                          Status
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </section>
+                    </thead>
+                    <tbody>
+                      {errorTorrents.map((torrent) => (
+                        <tr
+                          key={torrent.id}
+                          className="border-b last:border-0 hover:bg-muted/40"
+                        >
+                          <td className="max-w-[400px] truncate px-4 py-3 text-sm font-medium">
+                            {torrent.title}
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge variant="outline">{torrent.quality}</Badge>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge variant="destructive">error</Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </section>
+      )}
 
       {/* Quick Actions */}
       <section className="flex flex-col gap-4">

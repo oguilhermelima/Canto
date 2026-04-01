@@ -25,14 +25,14 @@ export const libraryRouter = createTRPCRouter({
    * Paginated + filtered library listing.
    * Only returns items where downloaded = true.
    */
-  list: publicProcedure.input(listInput).query(({ ctx, input }) =>
+  list: protectedProcedure.input(listInput).query(({ ctx, input }) =>
     listLibraryMedia(ctx.db, input),
   ),
 
   /**
    * Library statistics: counts of movies, shows, total, and storage usage.
    */
-  stats: publicProcedure.query(({ ctx }) => findLibraryStats(ctx.db)),
+  stats: protectedProcedure.query(({ ctx }) => findLibraryStats(ctx.db)),
 
   /* ────────────────────────────────────────────────────────────────────────── */
   /*  Library config (the `library` table)                                     */
