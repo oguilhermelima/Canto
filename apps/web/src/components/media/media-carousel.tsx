@@ -35,7 +35,7 @@ export function MediaCarousel({
   isFetchingMore = false,
   onLoadMore,
   className,
-}: MediaCarouselProps): React.JSX.Element {
+}: MediaCarouselProps): React.JSX.Element | null {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -66,6 +66,8 @@ export function MediaCarousel({
     },
     [updateScrollButtons],
   );
+
+  if (!isLoading && items.length === 0) return null;
 
   return (
     <section className={cn("relative", className)}>

@@ -14,6 +14,8 @@ import {
   DialogTitle,
 } from "@canto/ui/dialog";
 import { Inbox, X, Check, Film, Tv } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "~/components/layout/page-header";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
@@ -55,6 +57,7 @@ function formatDate(date: string | Date): string {
 /* ─── Page ─── */
 
 export default function RequestsPage(): React.JSX.Element {
+  const router = useRouter();
   const { data: session } = authClient.useSession();
   const isAdmin = (session?.user as { role?: string } | undefined)?.role === "admin";
 
@@ -62,6 +65,7 @@ export default function RequestsPage(): React.JSX.Element {
     id: string;
     title: string;
     action: "approved" | "rejected";
+    mediaId?: string;
   } | null>(null);
   const [adminNote, setAdminNote] = useState("");
 
@@ -83,9 +87,19 @@ export default function RequestsPage(): React.JSX.Element {
   const resolveMutation = trpc.request.resolve.useMutation({
     onSuccess: (_, vars) => {
       void utils.request.list.invalidate();
+      const mediaId = resolveTarget?.mediaId;
       setResolveTarget(null);
       setAdminNote("");
-      toast.success(vars.status === "approved" ? "Request approved" : "Request rejected");
+      if (vars.status === "approved" && mediaId) {
+        toast.success("Request approved", {
+          action: {
+            label: "Go to media",
+            onClick: () => router.push(`/media/${mediaId}`),
+          },
+        });
+      } else {
+        toast.success(vars.status === "approved" ? "Request approved" : "Request rejected");
+      }
     },
     onError: (err) => toast.error(err.message),
   });
@@ -94,8 +108,9 @@ export default function RequestsPage(): React.JSX.Element {
     id: string,
     title: string,
     action: "approved" | "rejected",
+    mediaId?: string,
   ): void {
-    setResolveTarget({ id, title, action });
+    setResolveTarget({ id, title, action, mediaId });
     setAdminNote("");
   }
 
@@ -156,100 +171,110 @@ export default function RequestsPage(): React.JSX.Element {
                   className="overflow-hidden rounded-xl border border-border bg-card"
                 >
                   <div className="flex gap-4 p-4 sm:gap-5 sm:p-5">
-                    {/* Poster */}
-                    <div className="relative aspect-[2/3] w-16 shrink-0 overflow-hidden rounded-xl bg-muted sm:w-20">
-                      {media?.posterPath ? (
-                        <Image
-                          src={`https://image.tmdb.org/t/p/w185${media.posterPath}`}
-                          alt=""
-                          fill
-                          className="object-cover"
-                          sizes="80px"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center">
-                          {media?.type === "show" ? (
-                            <Tv
-                              size={18}
-                              className="text-muted-foreground/30"
-                            />
-                          ) : (
-                            <Film
-                              size={18}
-                              className="text-muted-foreground/30"
-                            />
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Info */}
-                    <div className="min-w-0 flex-1 space-y-1.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate text-sm font-semibold text-foreground sm:text-base">
-                          {media?.title ?? "Unknown media"}
-                        </h3>
-                        <StatusBadge status={req.status} />
+                    {/* Poster + Info — clickable link to media detail */}
+                    <Link
+                      href={media?.id ? `/media/${media.id}` : "#"}
+                      className="flex min-w-0 flex-1 gap-4 sm:gap-5"
+                    >
+                      {/* Poster */}
+                      <div className="relative aspect-[2/3] w-16 shrink-0 overflow-hidden rounded-xl bg-muted sm:w-20">
+                        {media?.posterPath ? (
+                          <Image
+                            src={`https://image.tmdb.org/t/p/w185${media.posterPath}`}
+                            alt=""
+                            fill
+                            className="object-cover"
+                            sizes="80px"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center">
+                            {media?.type === "show" ? (
+                              <Tv
+                                size={18}
+                                className="text-muted-foreground/30"
+                              />
+                            ) : (
+                              <Film
+                                size={18}
+                                className="text-muted-foreground/30"
+                              />
+                            )}
+                          </div>
+                        )}
                       </div>
 
-                      {media?.year && (
-                        <p className="text-xs text-muted-foreground/60">
-                          {media.year} &middot;{" "}
-                          {media.type === "show" ? "TV Show" : "Movie"}
-                        </p>
-                      )}
+                      {/* Info */}
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="truncate text-sm font-semibold text-foreground sm:text-base">
+                            {media?.title ?? "Unknown media"}
+                          </h3>
+                          <StatusBadge status={req.status} />
+                        </div>
 
-                      {isAdmin && "user" in req && req.user != null && (
-                        <p className="text-xs text-muted-foreground">
-                          Requested by{" "}
-                          <span className="font-medium text-foreground">
-                            {(req.user as { name: string | null }).name ?? (req.user as { email: string }).email}
-                          </span>
-                        </p>
-                      )}
+                        {media?.year && (
+                          <p className="text-xs text-muted-foreground/60">
+                            {media.year} &middot;{" "}
+                            {media.type === "show" ? "TV Show" : "Movie"}
+                          </p>
+                        )}
 
-                      {req.note && (
-                        <p className="text-sm text-muted-foreground">
-                          {req.note}
-                        </p>
-                      )}
+                        {isAdmin && "user" in req && req.user != null && (
+                          <p className="text-xs text-muted-foreground">
+                            Requested by{" "}
+                            <span className="font-medium text-foreground">
+                              {(req.user as { name: string | null }).name ?? (req.user as { email: string }).email}
+                            </span>
+                          </p>
+                        )}
 
-                      {req.adminNote && (
-                        <p className="text-sm text-muted-foreground/70 italic">
-                          Admin: {req.adminNote}
-                        </p>
-                      )}
+                        {req.note && (
+                          <p className="text-sm text-muted-foreground">
+                            {req.note}
+                          </p>
+                        )}
 
-                      <p className="text-xs text-muted-foreground/50">
-                        {formatDate(req.createdAt)}
-                      </p>
-                    </div>
+                        {req.adminNote && (
+                          <p className="text-sm text-muted-foreground/70 italic">
+                            Admin: {req.adminNote}
+                          </p>
+                        )}
+
+                        <p className="text-xs text-muted-foreground/50">
+                          {formatDate(req.createdAt)}
+                        </p>
+                      </div>
+                    </Link>
 
                     {/* Actions */}
                     <div className="flex shrink-0 items-start gap-2">
                       {isPending && isAdmin && (
                         <>
                           <button
-                            onClick={() =>
+                            onClick={(e) => {
+                              e.stopPropagation();
                               openResolveDialog(
                                 req.id,
                                 media?.title ?? "this request",
                                 "approved",
-                              )
-                            }
+                                media?.id,
+                              );
+                            }}
                             className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors hover:bg-green-500/15 hover:text-green-500"
                             title="Approve"
                           >
                             <Check size={16} />
                           </button>
                           <button
-                            onClick={() =>
+                            onClick={(e) => {
+                              e.stopPropagation();
                               openResolveDialog(
                                 req.id,
                                 media?.title ?? "this request",
                                 "rejected",
-                              )
-                            }
+                                media?.id,
+                              );
+                            }}
                             className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-500"
                             title="Reject"
                           >
@@ -263,9 +288,10 @@ export default function RequestsPage(): React.JSX.Element {
                           variant="outline"
                           size="sm"
                           className="rounded-xl"
-                          onClick={() =>
-                            cancelMutation.mutate({ id: req.id })
-                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            cancelMutation.mutate({ id: req.id });
+                          }}
                           disabled={cancelMutation.isPending}
                         >
                           Cancel

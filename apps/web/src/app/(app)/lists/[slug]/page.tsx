@@ -12,7 +12,7 @@ export default function ListDetailPage(): React.JSX.Element {
   const params = useParams<{ slug: string }>();
   const slug = params.slug;
 
-  const { data, isLoading } = trpc.list.getBySlug.useQuery({ slug });
+  const { data, isLoading, error } = trpc.list.getBySlug.useQuery({ slug });
 
   useEffect(() => {
     if (data?.list.name) {
@@ -47,6 +47,21 @@ export default function ListDetailPage(): React.JSX.Element {
         {isLoading ? (
           <div className="flex min-h-[300px] items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : error ? (
+          <div className="flex min-h-[300px] items-center justify-center">
+            <div className="text-center">
+              <List className="mx-auto mb-4 h-12 w-12 text-muted-foreground/20" />
+              <p className="text-lg font-medium text-muted-foreground">
+                List not found
+              </p>
+              <Link
+                href="/lists"
+                className="mt-4 inline-block rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                Back to Lists
+              </Link>
+            </div>
           </div>
         ) : gridItems.length === 0 ? (
           <div className="flex min-h-[300px] items-center justify-center">

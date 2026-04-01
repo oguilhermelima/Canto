@@ -136,7 +136,7 @@ export function AddToListButton({
             <Plus className="h-4 w-4" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-56 p-2">
+        <PopoverContent align="start" className="w-56 max-h-[300px] overflow-y-auto p-2">
           <p className="mb-2 px-2 text-xs font-medium text-muted-foreground">
             Add to list
           </p>

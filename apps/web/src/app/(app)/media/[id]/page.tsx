@@ -2,6 +2,7 @@
 
 import { use, useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { cn } from "@canto/ui/cn";
 import { Button } from "@canto/ui/button";
 import { Badge } from "@canto/ui/badge";
 import { Input } from "@canto/ui/input";
@@ -209,11 +210,18 @@ export default function MediaDetailPage({
 
   const deleteTorrentMutation = trpc.torrent.delete.useMutation();
   const replaceProvider = trpc.media.replaceProvider.useMutation();
+  const utils = trpc.useUtils();
   const requestDownload = trpc.request.create.useMutation({
-    onSuccess: () => toast.success("Download requested"),
+    onSuccess: () => {
+      toast.success("Download requested");
+      void utils.request.list.invalidate();
+    },
     onError: (err) => toast.error(err.message),
   });
-  const utils = trpc.useUtils();
+  const existingRequest = trpc.request.list.useQuery(undefined, {
+    select: (data) => data.find((r) => r.mediaId === media?.id),
+    enabled: !isAdmin && !!media?.id,
+  });
 
   // Library config queries
   const { data: allLibraries } = trpc.library.listLibraries.useQuery();
@@ -471,31 +479,57 @@ export default function MediaDetailPage({
         />
 
         {/* Request Download — non-admin users */}
-        {!isAdmin && media.id && !media.downloaded && (
-          <section className="flex items-center gap-4">
-            <div className="flex-1">
-              <h2 className="text-lg font-semibold tracking-tight">Want to watch this?</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Request the admin to download this content for you.
-              </p>
-            </div>
-            <Button
-              className="rounded-xl"
-              onClick={() => requestDownload.mutate({ mediaId: media.id })}
-              disabled={requestDownload.isPending}
-            >
-              {requestDownload.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="mr-2 h-4 w-4" />
-              )}
-              Request Download
-            </Button>
-          </section>
-        )}
+        {!isAdmin && media.id && !media.downloaded && (() => {
+          const existing = existingRequest.data;
+          if (existing) {
+            const statusLabels: Record<string, { text: string; className: string }> = {
+              pending: { text: "Download Requested — Pending approval", className: "bg-yellow-500/15 text-yellow-600" },
+              approved: { text: "Download Approved — Waiting for admin to download", className: "bg-blue-500/15 text-blue-600" },
+              rejected: { text: "Request Rejected", className: "bg-red-500/15 text-red-600" },
+            };
+            const info = statusLabels[existing.status];
+            if (!info) return null;
+            return (
+              <section className="flex flex-col gap-2">
+                <div className="flex items-center gap-3">
+                  <span className={cn("rounded-xl px-3 py-1.5 text-sm font-medium", info.className)}>
+                    {info.text}
+                  </span>
+                </div>
+                {existing.status === "rejected" && existing.adminNote && (
+                  <p className="text-sm text-muted-foreground italic">
+                    Admin: {existing.adminNote}
+                  </p>
+                )}
+              </section>
+            );
+          }
+          return (
+            <section className="flex items-center gap-4">
+              <div className="flex-1">
+                <h2 className="text-lg font-semibold tracking-tight">Want to watch this?</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Request the admin to download this content for you.
+                </p>
+              </div>
+              <Button
+                className="rounded-xl"
+                onClick={() => requestDownload.mutate({ mediaId: media.id })}
+                disabled={requestDownload.isPending}
+              >
+                {requestDownload.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                Request Download
+              </Button>
+            </section>
+          );
+        })()}
 
         {/* Movie download management — admin only */}
-        {isAdmin && media.type === "movie" && media.libraryId && (
+        {isAdmin && media.type === "movie" && (
           <section>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-xl font-semibold tracking-tight">Download</h2>
@@ -518,7 +552,14 @@ export default function MediaDetailPage({
                 </button>
               </div>
             </div>
-            {mediaTorrents && mediaTorrents.length > 0 ? (
+            {!media.libraryId ? (
+              <div className="rounded-xl border border-border bg-card p-8 text-center">
+                <Settings2 className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">
+                  Assign a library first to enable downloads. Use the Settings button above.
+                </p>
+              </div>
+            ) : mediaTorrents && mediaTorrents.length > 0 ? (
               <div className="divide-y divide-border rounded-xl border border-border bg-card">
                 {mediaTorrents.map((t) => {
                   const qb = qualityBadge(t.quality);
@@ -577,16 +618,16 @@ export default function MediaDetailPage({
                 voteAverage: e.voteAverage,
               })),
             }))}
-            onDownloadSeasons={isAdmin && media.libraryId ? (seasonNumbers) => {
+            onDownloadSeasons={isAdmin ? (seasonNumbers) => {
               if (seasonNumbers.length > 0) {
                 openTorrentDialog({ seasonNumber: seasonNumbers[0]! });
               }
             } : undefined}
-            onDownloadEpisodes={isAdmin && media.libraryId ? (seasonNumber, episodeNumbers) => {
+            onDownloadEpisodes={isAdmin ? (seasonNumber, episodeNumbers) => {
               openTorrentDialog({ seasonNumber, episodeNumbers });
             } : undefined}
             hideFloatingBar={torrentDialogOpen}
-            mediaConfig={isAdmin && media.libraryId ? {
+            mediaConfig={isAdmin ? {
               libraryId: media.libraryId ?? null,
               libraryPath: media.libraryPath ?? null,
               continuousDownload: media.continuousDownload ?? false,
