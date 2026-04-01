@@ -1062,9 +1062,11 @@ export function MetadataSettingsSection(): React.JSX.Element {
                 </li>
               </ul>
 
-              <p className="text-xs text-muted-foreground/70 italic">
-                Not all streaming providers support direct search. Providers without a known search URL
-                will always open the TMDB watch page regardless of this setting.
+              <p className="text-sm text-muted-foreground/70">
+                <strong className="text-muted-foreground">Note:</strong> Not all streaming providers support direct search.
+                Only providers with a known search URL (such as Netflix, Disney+, Amazon Prime, HBO Max, and Crunchyroll)
+                will open a direct search. Other providers will fall back to the TMDB watch page regardless of this setting.
+                The list of supported providers is updated automatically.
               </p>
             </div>
             <Switch checked={directSearchEnabled} onCheckedChange={setDirectSearch} className="mt-1 shrink-0" />
