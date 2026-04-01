@@ -125,7 +125,7 @@ export default function MediaDetailPage({
 
   const extras = trpc.media.getExtras.useQuery(
     { id: media?.id ?? "" },
-    { enabled: !!media?.id },
+    { enabled: !!media?.id, staleTime: 30 * 60 * 1000 },
   );
 
   const availability = trpc.sync.mediaAvailability.useQuery(
@@ -225,7 +225,9 @@ export default function MediaDetailPage({
   });
 
   // Library config queries
-  const { data: allLibraries } = trpc.library.listLibraries.useQuery();
+  const { data: allLibraries } = trpc.library.listLibraries.useQuery(undefined, {
+    staleTime: 30 * 60 * 1000,
+  });
   const setContinuousDownload = trpc.library.setContinuousDownload.useMutation({
     onSuccess: () => {
       void utils.media.getById.invalidate({ id: media?.id });

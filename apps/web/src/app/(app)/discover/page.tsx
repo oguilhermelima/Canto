@@ -115,6 +115,7 @@ function DiscoverPresetPage({ presetKey }: { presetKey: string }): React.JSX.Ele
       language: preset.language,
     },
     {
+      staleTime: 10 * 60 * 1000,
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
         const currentPage = (lastPageParam as number) ?? 1;
         if (currentPage >= lastPage.totalPages) return undefined;

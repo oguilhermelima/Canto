@@ -30,7 +30,7 @@ export default function DiscoverPage(): React.JSX.Element {
   const MAX_CAROUSEL_PAGES = 3;
 
   const infiniteOpts = {
-    staleTime: 60 * 1000,
+    staleTime: 10 * 60 * 1000,
     getNextPageParam: (
       lastPage: { totalPages: number },
       allPages: unknown[],
@@ -50,7 +50,7 @@ export default function DiscoverPage(): React.JSX.Element {
   const recommendations = trpc.media.recommendations.useInfiniteQuery(
     { pageSize: 10 },
     {
-      staleTime: 5 * 60 * 1000,
+      staleTime: 15 * 60 * 1000,
       getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
       initialCursor: 0,
     },
@@ -65,11 +65,12 @@ export default function DiscoverPage(): React.JSX.Element {
 
   // Spotlight from backend
   const spotlightQuery = trpc.provider.spotlight.useQuery(undefined, {
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
   });
   const spotlightItems = (spotlightQuery.data ?? []) as SpotlightItem[];
   const loadingSpotlight = spotlightQuery.isLoading;
   const [currentSpotlight, setCurrentSpotlight] = useState(0);
+  const [spotlightPaused, setSpotlightPaused] = useState(false);
 
   const currentItem = spotlightItems[currentSpotlight];
 
@@ -99,12 +100,12 @@ export default function DiscoverPage(): React.JSX.Element {
     document.title = "Discover — Canto";
   }, []);
 
-  // Auto-rotate spotlight
+  // Auto-rotate spotlight (paused when popover/sheet is open)
   useEffect(() => {
-    if (spotlightItems.length <= 1) return;
+    if (spotlightPaused || spotlightItems.length <= 1) return;
     const interval = setInterval(nextSpotlight, 8000);
     return () => clearInterval(interval);
-  }, [spotlightItems.length, nextSpotlight]);
+  }, [spotlightPaused, spotlightItems.length, nextSpotlight]);
 
   const mapItems = useCallback(
     (results: typeof flatMovies) =>
@@ -135,9 +136,22 @@ export default function DiscoverPage(): React.JSX.Element {
     href: `/media/${item.id}`,
   }));
 
+  const utils = trpc.useUtils();
+
   const getPreviewUrl = (item: SpotlightItem): string => {
     return `/media/ext?provider=${item.provider}&externalId=${item.externalId}&type=${item.type}`;
   };
+
+  const prefetchSpotlight = useCallback(
+    (item: SpotlightItem) => {
+      void utils.media.getByExternal.prefetch({
+        provider: item.provider as "tmdb" | "anilist" | "tvdb",
+        externalId: item.externalId,
+        type: item.type,
+      });
+    },
+    [utils],
+  );
 
   return (
     <div className="min-h-screen">
@@ -207,7 +221,7 @@ export default function DiscoverPage(): React.JSX.Element {
               key={currentSpotlight}
               className="flex max-w-2xl flex-col gap-5 animate-[contentSlideIn_0.7s_cubic-bezier(0.16,1,0.3,1)_both_0.2s]"
             >
-              <Link href={getPreviewUrl(currentItem)} className="flex flex-col gap-5">
+              <Link href={getPreviewUrl(currentItem)} onMouseEnter={() => prefetchSpotlight(currentItem)} className="flex flex-col gap-5">
               {/* Logo or Title */}
               {currentItem.logoPath ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -249,9 +263,11 @@ export default function DiscoverPage(): React.JSX.Element {
                   type={currentItem.type}
                   title={currentItem.title}
                   size="lg"
+                  onOpenChange={setSpotlightPaused}
                 />
                 <Link
                   href={getPreviewUrl(currentItem)}
+                  onMouseEnter={() => prefetchSpotlight(currentItem)}
                   className="inline-flex h-10 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm font-medium text-foreground/80 backdrop-blur-sm transition-colors hover:bg-white/15 hover:text-foreground"
                 >
                   More Info

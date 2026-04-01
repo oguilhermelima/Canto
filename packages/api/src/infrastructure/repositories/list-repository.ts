@@ -1,6 +1,6 @@
 import { and, eq, or, isNull, desc, count, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { list, listItem } from "@canto/db/schema";
+import { list, listItem, media } from "@canto/db/schema";
 
 // ── Lists ──
 
@@ -38,9 +38,37 @@ export async function findUserListsWithCounts(
 
   const countMap = new Map(counts.map((c) => [c.listId, c.count]));
 
+  // Fetch preview posters for each list (up to 4 most recently added)
+  const previewRows = await db
+    .select({
+      listId: listItem.listId,
+      posterPath: media.posterPath,
+    })
+    .from(listItem)
+    .innerJoin(media, eq(listItem.mediaId, media.id))
+    .where(
+      sql`${listItem.listId} IN (${sql.join(
+        lists.map((l) => sql`${l.id}`),
+        sql`, `,
+      )})`,
+    )
+    .orderBy(desc(listItem.addedAt));
+
+  const previewMap = new Map<string, string[]>();
+  for (const r of previewRows) {
+    if (!r.posterPath) continue;
+    const arr = previewMap.get(r.listId) ?? [];
+    if (arr.length < 4) {
+      arr.push(r.posterPath);
+      previewMap.set(r.listId, arr);
+    }
+  }
+
   return lists.map((l) => ({
     ...l,
     itemCount: countMap.get(l.id) ?? 0,
+    previewPoster: previewMap.get(l.id)?.[0] ?? null,
+    previewPosters: previewMap.get(l.id) ?? [],
   }));
 }
 
@@ -181,6 +209,29 @@ export async function findMediaInLists(
       ),
     );
   return items;
+}
+
+/** Returns externalId+provider for all media items in the user's lists (watchlist + custom). */
+export async function findUserListExternalIds(
+  db: Database,
+  userId: string,
+) {
+  return db
+    .select({
+      externalId: media.externalId,
+      provider: media.provider,
+    })
+    .from(listItem)
+    .innerJoin(list, eq(listItem.listId, list.id))
+    .innerJoin(media, eq(listItem.mediaId, media.id))
+    .where(
+      and(
+        eq(list.userId, userId),
+        // exclude server library — already handled by findLibraryExternalIds
+        sql`${list.type} != 'server'`,
+      ),
+    )
+    .groupBy(media.externalId, media.provider);
 }
 
 export async function isMediaInServerLibrary(

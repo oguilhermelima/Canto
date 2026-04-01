@@ -14,8 +14,9 @@ import {
   Armchair,
   Compass,
   Download,
-  List,
+  ListPlus,
   Search,
+  Send,
   User,
   LayoutDashboard,
   Settings,
@@ -33,22 +34,27 @@ import { authClient } from "~/lib/auth-client";
 
 const userNavLinks: Array<{ href: string; label: string; icon: LucideIcon }> = [
   { href: "/", label: "Discover", icon: Compass },
-  { href: "/lists", label: "My Lists", icon: List },
+  { href: "/lists", label: "My Lists", icon: ListPlus },
+  { href: "/requests", label: "Requests", icon: Send },
 ];
 
 const adminNavLinks: Array<{ href: string; label: string; icon: LucideIcon }> = [
   { href: "/", label: "Discover", icon: Compass },
-  { href: "/lists", label: "My Lists", icon: List },
+  { href: "/lists", label: "My Lists", icon: ListPlus },
+  { href: "/requests", label: "Requests", icon: Send },
   { href: "/torrents", label: "Downloads", icon: Download },
 ];
 
 /* ─── Nav Links ─── */
 
-const NavLinks = memo(function NavLinks({ role }: { role?: string }): React.JSX.Element {
+const NavLinks = memo(function NavLinks({ role, scrolled }: { role?: string; scrolled?: boolean }): React.JSX.Element {
   const pathname = usePathname();
   const links = role === "admin" ? adminNavLinks : userNavLinks;
   return (
-    <nav className="flex items-center gap-0.5 rounded-2xl bg-foreground/5 p-1 backdrop-blur-sm">
+    <nav className={cn(
+      "flex items-center gap-0.5 rounded-2xl p-1 transition-colors duration-300",
+      scrolled ? "bg-transparent" : "bg-foreground/5 backdrop-blur-sm",
+    )}>
       {links.map(({ href, label, icon: Icon }) => {
         const isActive =
           href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -169,12 +175,6 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
             Notifications
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/requests">
-            <Download className="mr-2 h-4 w-4" />
-            Requests
-          </Link>
-        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -234,7 +234,7 @@ export function Topbar(): React.JSX.Element {
 
         {/* Center: Nav Links */}
         <div className="flex flex-1 items-center justify-center">
-          <NavLinks role={role} />
+          <NavLinks role={role} scrolled={scrolled} />
         </div>
 
         {/* Right: Search + User */}

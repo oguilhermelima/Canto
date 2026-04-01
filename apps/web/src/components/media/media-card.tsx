@@ -1,11 +1,13 @@
 "use client";
 
+import { useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
 import { Film, Tv } from "lucide-react";
 import { MediaBadges } from "./media-badges";
+import { trpc } from "~/lib/trpc/client";
 
 interface MediaCardProps {
   id?: string;
@@ -47,9 +49,25 @@ export function MediaCard({
       ? `/media/${id}`
       : `/media/ext?provider=${provider}&externalId=${externalId}&type=${type}`);
 
+  const utils = trpc.useUtils();
+
+  const handlePrefetch = useCallback(() => {
+    if (id) {
+      void utils.media.getById.prefetch({ id });
+      void utils.media.getExtras.prefetch({ id });
+    } else if (externalId && provider && type) {
+      void utils.media.getByExternal.prefetch({
+        provider: provider as "tmdb" | "anilist" | "tvdb",
+        externalId: parseInt(externalId, 10),
+        type: type as "movie" | "show",
+      });
+    }
+  }, [id, externalId, provider, type, utils]);
+
   return (
     <Link
       href={linkHref}
+      onMouseEnter={handlePrefetch}
       className={cn(
         "group relative flex flex-col rounded-xl transition-all duration-300 ease-out hover:z-10 hover:scale-105 [&:hover_.poster-frame]:ring-2 [&:hover_.poster-frame]:ring-white/60",
         className,

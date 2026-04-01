@@ -15,8 +15,7 @@ import {
   DialogTitle,
 } from "@canto/ui/dialog";
 import {
-  ChevronRight,
-  List,
+  Bookmark,
   Loader2,
   Plus,
   Trash2,
@@ -25,6 +24,7 @@ import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { MediaCarousel } from "~/components/media/media-carousel";
+import { PageHeader } from "~/components/layout/page-header";
 
 export default function ListsPage(): React.JSX.Element {
   const [createOpen, setCreateOpen] = useState(false);
@@ -34,11 +34,12 @@ export default function ListsPage(): React.JSX.Element {
     id: string;
     name: string;
   } | null>(null);
+  const [showAllLists, setShowAllLists] = useState(false);
 
   const router = useRouter();
 
   useEffect(() => {
-    document.title = "My Lists \u2014 Canto";
+    document.title = "My Lists — Canto";
   }, []);
 
   const utils = trpc.useUtils();
@@ -79,6 +80,23 @@ export default function ListsPage(): React.JSX.Element {
     });
   };
 
+  // Calculate how many cards fit in 2 rows based on current breakpoint
+  const [cols, setCols] = useState(3);
+  useEffect(() => {
+    const update = (): void => {
+      const w = window.innerWidth;
+      if (w >= 1280) setCols(6);
+      else if (w >= 1024) setCols(5);
+      else if (w >= 640) setCols(4);
+      else setCols(3);
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  const visibleCount = showAllLists ? Infinity : cols * 2;
+
   const customLists = lists?.filter((l) => l.type === "custom") ?? [];
 
   const mapItems = (
@@ -94,22 +112,15 @@ export default function ListsPage(): React.JSX.Element {
     }));
 
   return (
-    <div className="w-full pt-6 pb-12">
+    <div className="w-full pb-12">
+      <PageHeader title="My Lists" />
+
       {/* Watchlist Carousel */}
       <MediaCarousel
         title="Watchlist"
         seeAllHref="/lists/watchlist"
         items={watchlistData ? mapItems(watchlistData.items) : []}
         isLoading={watchlistLoading}
-      />
-
-      {/* Server Library Carousel */}
-      <MediaCarousel
-        title="Server Library"
-        seeAllHref="/lists/server-library"
-        items={serverData ? mapItems(serverData.items) : []}
-        isLoading={serverLoading}
-        className="mt-8"
       />
 
       {/* My Lists Section */}
@@ -127,16 +138,16 @@ export default function ListsPage(): React.JSX.Element {
         </div>
 
         {listsLoading ? (
-          <div className="flex gap-4 px-4 pb-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-24 w-[280px] shrink-0 animate-pulse rounded-xl bg-muted" />
+          <div className="grid grid-cols-3 gap-2.5 px-4 sm:grid-cols-4 md:px-8 lg:grid-cols-5 lg:px-12 xl:grid-cols-6 xl:px-16 2xl:px-24">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="aspect-square animate-pulse rounded-lg bg-muted" />
             ))}
           </div>
         ) : customLists.length === 0 ? (
           <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
             <div className="flex min-h-[160px] items-center justify-center rounded-2xl border border-dashed border-border/60">
               <div className="text-center">
-                <List className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
+                <Bookmark className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
                 <p className="text-sm text-muted-foreground">
                   No custom lists yet
                 </p>
@@ -153,52 +164,113 @@ export default function ListsPage(): React.JSX.Element {
             </div>
           </div>
         ) : (
-          <div className="flex gap-4 overflow-x-auto px-4 pb-4 scrollbar-none md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-            {customLists.map((l) => (
-              <Link
-                key={l.id}
-                href={`/lists/${l.slug}`}
-                className="group relative flex w-[280px] shrink-0 flex-col rounded-xl bg-muted p-4 transition-colors hover:bg-muted/80"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground">
-                    <List className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-sm font-semibold text-foreground">
-                      {l.name}
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      {l.itemCount} {l.itemCount === 1 ? "item" : "items"}
-                    </p>
-                  </div>
-                </div>
+          <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+            <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+              {customLists.slice(0, visibleCount).map((l) => {
+                const posters = l.previewPosters ?? [];
 
-                <div className="mt-3 flex items-center gap-1">
-                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />
-                  <span className="text-xs text-muted-foreground/50">
-                    View list
-                  </span>
-                </div>
+                return (
+                  <Link
+                    key={l.id}
+                    href={`/lists/${l.slug}`}
+                    className="group relative aspect-square overflow-hidden rounded-lg bg-muted transition-transform duration-200 hover:scale-[1.03]"
+                  >
+                    {/* Thumbnail mosaic */}
+                    {posters.length >= 4 ? (
+                      <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-px">
+                        {posters.slice(0, 4).map((p, i) => (
+                          <Image
+                            key={i}
+                            src={`https://image.tmdb.org/t/p/w500${p}`}
+                            alt=""
+                            width={92}
+                            height={138}
+                            className="h-full w-full object-cover"
+                          />
+                        ))}
+                      </div>
+                    ) : posters.length > 0 ? (
+                      <div className={cn(
+                        "grid h-full w-full gap-px",
+                        posters.length === 1 && "grid-cols-1",
+                        posters.length === 2 && "grid-cols-2",
+                        posters.length === 3 && "grid-cols-2 grid-rows-2",
+                      )}>
+                        {posters.map((p, i) => (
+                          <Image
+                            key={i}
+                            src={`https://image.tmdb.org/t/p/w500${p}`}
+                            alt=""
+                            width={92}
+                            height={138}
+                            className={cn(
+                              "h-full w-full object-cover",
+                              posters.length === 3 && i === 0 && "row-span-2",
+                            )}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <Bookmark className="h-8 w-8 text-muted-foreground/20" />
+                      </div>
+                    )}
 
-                {/* Delete button */}
-                <button
-                  type="button"
-                  aria-label={`Delete ${l.name}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setDeleteTarget({ id: l.id, name: l.name });
-                  }}
-                  className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground opacity-0 transition-all hover:bg-red-500/15 hover:text-red-500 group-hover:opacity-100"
+                    {/* Hover overlay */}
+                    <div className="absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/10" />
+
+                    {/* Gradient overlay + label */}
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3 pb-3 pt-14">
+                      <h3 className="truncate text-base font-semibold text-white">
+                        {l.name}
+                      </h3>
+                      <p className="text-sm text-white/70">
+                        {l.itemCount} {l.itemCount === 1 ? "item" : "items"}
+                      </p>
+                    </div>
+
+                    {/* Delete button */}
+                    <button
+                      type="button"
+                      aria-label={`Delete ${l.name}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDeleteTarget({ id: l.id, name: l.name });
+                      }}
+                      className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/40 text-white/70 opacity-0 backdrop-blur-sm transition-all hover:bg-red-500/80 hover:text-white group-hover:opacity-100"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </Link>
+                );
+              })}
+            </div>
+
+            {customLists.length > visibleCount && (
+              <div className="mt-3 flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground"
+                  onClick={() => setShowAllLists(true)}
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </Link>
-            ))}
+                  See all ({customLists.length})
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </section>
+
+      {/* Server Library Carousel */}
+      <MediaCarousel
+        title="Server Library"
+        seeAllHref="/lists/server-library"
+        items={serverData ? mapItems(serverData.items) : []}
+        isLoading={serverLoading}
+        className="mt-10"
+      />
 
       {/* Create List Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
