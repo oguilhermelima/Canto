@@ -808,7 +808,6 @@ function TvdbApiKeySection(): React.JSX.Element {
 /* -------------------------------------------------------------------------- */
 
 function WatchRegionSection(): React.JSX.Element {
-  const { enabled: directSearchEnabled, setEnabled: setDirectSearch } = useDirectSearch();
   const { region, setRegion } = useWatchRegion();
   const [saved, setSaved] = useState(false);
   const [pendingRegion, setPendingRegion] = useState<string | null>(null);
@@ -870,19 +869,6 @@ function WatchRegionSection(): React.JSX.Element {
         )}
       </div>
 
-      <div className="border-t border-border/40 pt-4">
-        <div className="flex items-center justify-between">
-          <div className="mr-4">
-            <p className="text-sm font-medium text-foreground">Direct search on streaming apps</p>
-            <p className="mt-1 text-xs text-muted-foreground leading-relaxed max-w-lg">
-              On media detail pages, clicking a streaming provider logo (Netflix, Disney+, etc.)
-              will open a search for that title directly on the streaming app&apos;s website.
-              When disabled, it opens the TMDB watch page instead.
-            </p>
-          </div>
-          <Switch checked={directSearchEnabled} onCheckedChange={setDirectSearch} />
-        </div>
-      </div>
     </div>
   );
 }
@@ -985,6 +971,7 @@ export function MetadataSettingsSection(): React.JSX.Element {
   const setMany = trpc.settings.setMany.useMutation({
     onSuccess: () => void utils.settings.getAll.invalidate(),
   });
+  const { enabled: directSearchEnabled, setEnabled: setDirectSearch } = useDirectSearch();
 
   const isConnected = !!allSettings?.["tvdb.token"];
   const defaultShows = allSettings?.["tvdb.defaultShows"] === true;
@@ -1001,23 +988,86 @@ export function MetadataSettingsSection(): React.JSX.Element {
 
   return (
     <div>
-      <SettingsSection title="Default Provider" description="Controls where TV show and anime metadata comes from.">
-        <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-card px-5 py-5">
-          <div className="mr-4">
-            <p className="text-sm font-medium text-foreground">Use TVDB as default for TV shows</p>
-            <p className="mt-1 text-xs text-muted-foreground leading-relaxed max-w-lg">
-              When enabled, TV shows and anime will use TVDB for seasons and episodes instead of TMDB.
-              TVDB provides more accurate season structures (e.g. Bleach with 16 arcs vs TMDB&apos;s 2 seasons)
-              and native absolute episode numbering for anime.
-              Ratings, recommendations and trailers will still come from TMDB.
-              {!isConnected && <span className="block mt-1 text-yellow-500">Connect TVDB in Services first to enable this.</span>}
-            </p>
+      <SettingsSection title="TV Show Provider" description="Choose the metadata source for TV show seasons and episodes.">
+        <div className="space-y-5">
+          <div className="flex items-start justify-between gap-6">
+            <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+              <p>
+                By default, Canto uses <strong className="text-foreground">TMDB</strong> for all metadata.
+                Enabling TVDB replaces the <strong className="text-foreground">season and episode structure</strong> of
+                TV shows and anime with data from TheTVDB.
+              </p>
+
+              <p className="font-medium text-foreground">What changes with TVDB enabled:</p>
+              <ul className="list-disc pl-5 space-y-1.5">
+                <li>
+                  <strong className="text-foreground">Accurate season splits</strong> — TMDB often groups
+                  entire series into 1-2 seasons. TVDB separates them by arc
+                  (e.g. Bleach: 16 seasons on TVDB vs 2 on TMDB).
+                </li>
+                <li>
+                  <strong className="text-foreground">Absolute episode numbering</strong> — TVDB natively
+                  provides absolute episode numbers for anime, so Episode 1 of Season 5
+                  also shows as Episode 110 overall.
+                </li>
+                <li>
+                  <strong className="text-foreground">Finale indicators</strong> — Episodes are tagged as
+                  season finale, mid-season finale, or series finale.
+                </li>
+              </ul>
+
+              <p className="font-medium text-foreground">What stays the same:</p>
+              <ul className="list-disc pl-5 space-y-1.5">
+                <li>Ratings, popularity and vote counts still come from TMDB.</li>
+                <li>Recommendations, similar titles and trailers are powered by TMDB.</li>
+                <li>Trending, discover and spotlight sections are unaffected.</li>
+                <li>Movies always use TMDB regardless of this setting.</li>
+              </ul>
+
+              {!isConnected && (
+                <p className="mt-2 rounded-lg bg-yellow-500/10 px-3 py-2 text-yellow-500">
+                  You need to connect your TVDB API key in the Services tab before enabling this.
+                </p>
+              )}
+            </div>
+            <Switch checked={defaultShows} onCheckedChange={handleToggleDefault} disabled={!isConnected} className="mt-1 shrink-0" />
           </div>
-          <Switch checked={defaultShows} onCheckedChange={handleToggleDefault} disabled={!isConnected} />
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Watch Region" description="Controls which streaming providers (Netflix, Disney+, etc.) appear on media detail pages.">
+      <SettingsSection title="Direct Search on Streaming Apps" description="Controls what happens when you click a streaming provider on a media page.">
+        <div className="space-y-5">
+          <div className="flex items-start justify-between gap-6">
+            <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+              <p>
+                On every media detail page, the <strong className="text-foreground">Where to Watch</strong> section
+                shows logos of streaming services where the title is available (Netflix, Disney+, HBO Max, etc.).
+              </p>
+
+              <p className="font-medium text-foreground">When enabled:</p>
+              <ul className="list-disc pl-5 space-y-1.5">
+                <li>
+                  Clicking a provider logo opens a <strong className="text-foreground">direct search</strong> on
+                  that streaming service&apos;s website — e.g. clicking the Netflix logo
+                  opens <code className="rounded bg-muted px-1 text-xs">netflix.com/search?q=Title</code>.
+                </li>
+                <li>This lets you jump straight to the content on the app you subscribe to.</li>
+              </ul>
+
+              <p className="font-medium text-foreground">When disabled:</p>
+              <ul className="list-disc pl-5 space-y-1.5">
+                <li>
+                  Clicking a provider logo opens the <strong className="text-foreground">TMDB watch page</strong> instead,
+                  which shows all available providers and links for that title across regions.
+                </li>
+              </ul>
+            </div>
+            <Switch checked={directSearchEnabled} onCheckedChange={setDirectSearch} className="mt-1 shrink-0" />
+          </div>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Watch Region" description="Controls which streaming providers appear on media detail pages.">
         <WatchRegionSection />
       </SettingsSection>
     </div>
