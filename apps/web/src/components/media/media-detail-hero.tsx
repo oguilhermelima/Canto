@@ -6,6 +6,7 @@ import { Skeleton } from "@canto/ui/skeleton";
 import {
   Clock,
   Film,
+  Settings2,
   Tv,
 } from "lucide-react";
 import Link from "next/link";
@@ -224,6 +225,7 @@ export function MediaDetailHero({
                     href={`/media/${id}/manage`}
                     className="inline-flex h-10 items-center gap-2 rounded-xl bg-muted px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
                   >
+                    <Settings2 className="h-4 w-4" />
                     Manage
                   </Link>
                 )}
