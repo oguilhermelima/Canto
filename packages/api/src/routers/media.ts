@@ -397,18 +397,18 @@ export const mediaRouter = createTRPCRouter({
       const offset = page * pageSize;
 
       const libraryItems = await findLibraryExternalIds(ctx.db);
-      const libraryExternalIds = libraryItems.map((m) => m.externalId);
       // Fetch extra to account for dedup + poster filtering
-      const poolItems = await findPoolRecommendations(ctx.db, libraryExternalIds, (pageSize + 1) * 3, offset);
+      const poolItems = await findPoolRecommendations(ctx.db, libraryItems, (pageSize + 1) * 3, offset);
 
       if (poolItems.length > 0) {
-        // Deduplicate by externalId: prefer row with trailerKey, then highest score
-        const bestByExternal = new Map<number, typeof poolItems[number]>();
+        // Deduplicate by provider+externalId: prefer row with trailerKey
+        const bestByExternal = new Map<string, typeof poolItems[number]>();
         for (const item of poolItems) {
           if (!item.posterPath) continue;
-          const existing = bestByExternal.get(item.externalId);
+          const key = `${item.provider ?? "tmdb"}-${item.externalId}`;
+          const existing = bestByExternal.get(key);
           if (!existing || (!existing.trailerKey && item.trailerKey)) {
-            bestByExternal.set(item.externalId, item);
+            bestByExternal.set(key, item);
           }
         }
         const unique = [...bestByExternal.values()];

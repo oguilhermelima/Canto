@@ -63,23 +63,32 @@ export async function findPoolItemsWithBackdrops(db: Database, limit: number) {
 
 export async function findPoolRecommendations(
   db: Database,
-  excludeExternalIds: number[],
+  excludeItems: Array<{ externalId: number; provider: string }>,
   limit: number,
   offset: number,
 ) {
   const today = new Date().toISOString().slice(0, 10);
   const released = lte(recommendationPool.releaseDate, today);
 
-  if (excludeExternalIds.length > 0) {
-    return db.query.recommendationPool.findMany({
-      where: and(notInArray(recommendationPool.externalId, excludeExternalIds), released),
-      orderBy: [desc(recommendationPool.score)],
-      limit,
-      offset,
-    });
-  }
+  // Build exclusion: items already in library (match by provider+externalId)
+  const excludeConditions =
+    excludeItems.length > 0
+      ? excludeItems.map(
+          (item) =>
+            and(
+              eq(recommendationPool.externalId, item.externalId),
+              eq(recommendationPool.provider, item.provider),
+            )!,
+        )
+      : [];
+
+  const where =
+    excludeConditions.length > 0
+      ? and(released, not(sql`(${sql.join(excludeConditions, sql` OR `)})`))
+      : released;
+
   return db.query.recommendationPool.findMany({
-    where: released,
+    where,
     orderBy: [desc(recommendationPool.score)],
     limit,
     offset,

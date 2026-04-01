@@ -246,8 +246,8 @@ export async function refreshExtras(
       );
     }
 
-    // Build pool rows with trailer keys + logos
-    const poolRows = allPoolItems.map((item) =>
+    // Build pool rows with trailer keys + logos (use uniquePoolItems to avoid duplicates)
+    const poolRows = [...uniquePoolItems.values()].map((item) =>
       mapToPoolRow(
         item.result,
         mediaId,

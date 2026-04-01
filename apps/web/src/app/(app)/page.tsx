@@ -343,10 +343,11 @@ export default function DiscoverPage(): React.JSX.Element {
           title="Recommended for you"
           seeAllHref="/discover?preset=recommended"
           items={(() => {
-            const seen = new Set<number>();
+            const seen = new Set<string>();
             return (recommendations.data?.pages ?? []).flatMap((p) => p.items).filter((r) => {
-              if (seen.has(r.externalId)) return false;
-              seen.add(r.externalId);
+              const key = `${r.provider}-${r.externalId}`;
+              if (seen.has(key)) return false;
+              seen.add(key);
               return true;
             });
           })()}

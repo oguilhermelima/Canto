@@ -130,7 +130,7 @@ export async function deleteMedia(db: Database, id: string) {
 export async function findLibraryExternalIds(db: Database) {
   return db.query.media.findMany({
     where: eq(media.inLibrary, true),
-    columns: { externalId: true },
+    columns: { externalId: true, provider: true },
   });
 }
 
