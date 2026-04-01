@@ -4,14 +4,13 @@ import Image from "next/image";
 import { Badge } from "@canto/ui/badge";
 import { Skeleton } from "@canto/ui/skeleton";
 import {
-  Star,
   Clock,
-  Calendar,
   Film,
   Tv,
 } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { LibraryButton } from "~/components/media/library-button";
+import { MediaBadges } from "~/components/media/media-badges";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -188,30 +187,19 @@ export function MediaDetailHero({
                 </h1>
               )}
 
-              {/* Meta row */}
+              {/* Meta badges */}
               <div className="flex flex-wrap items-center gap-2 text-sm">
-                {year && (
-                  <div className="flex items-center gap-1 text-foreground/70">
-                    <Calendar size={14} />
-                    {year}
-                  </div>
-                )}
+                <MediaBadges
+                  type={type as "movie" | "show"}
+                  year={year}
+                  voteAverage={voteAverage}
+                  size="md"
+                />
                 {runtime != null && runtime > 0 && (
-                  <div className="flex items-center gap-1 text-foreground/70">
-                    <Clock size={14} />
+                  <span className="inline-flex items-center gap-1 rounded-md bg-white/10 px-2 py-0.5 text-xs font-medium text-white/80 backdrop-blur-sm">
+                    <Clock className="h-3 w-3" />
                     {formatRuntime(runtime)}
-                  </div>
-                )}
-                {voteAverage != null && voteAverage > 0 && (
-                  <div className="flex items-center gap-1 font-medium text-yellow-500">
-                    <Star size={14} fill="currentColor" />
-                    {Math.round(voteAverage * 10) / 10}
-                    {voteCount != null && (
-                      <span className="font-normal text-foreground/50">
-                        ({voteCount.toLocaleString()})
-                      </span>
-                    )}
-                  </div>
+                  </span>
                 )}
               </div>
 

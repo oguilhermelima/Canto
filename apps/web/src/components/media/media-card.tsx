@@ -4,7 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
-import { Star, Film, Tv, Check } from "lucide-react";
+import { Film, Tv, Check } from "lucide-react";
+import { MediaBadges } from "./media-badges";
 
 interface MediaCardProps {
   id?: string;
@@ -71,16 +72,6 @@ export function MediaCard({
           </div>
         )}
 
-        {/* Rating badge — top left */}
-        {voteAverage != null && voteAverage > 0 && (
-          <div className="absolute left-2 top-2 flex items-center gap-1 rounded-md bg-black/60 px-1.5 py-0.5 backdrop-blur-sm">
-            <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-            <span className="text-[11px] font-semibold text-white">
-              {voteAverage.toFixed(1)}
-            </span>
-          </div>
-        )}
-
         {/* In library badge — top right */}
         {inLibrary && (
           <div className="absolute right-2 top-2 flex items-center gap-0.5 rounded-md bg-primary px-1.5 py-0.5">
@@ -88,22 +79,22 @@ export function MediaCard({
           </div>
         )}
 
-        {/* Type badge — top right (only if not in library) */}
-        {showTypeBadge && !inLibrary && (
-          <div className="absolute right-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white/80 backdrop-blur-sm">
-            {type === "movie" ? "Movie" : "TV"}
-          </div>
-        )}
+        {/* Badges — bottom left */}
+        <div className="absolute bottom-2 left-2">
+          <MediaBadges
+            type={showTypeBadge ? type : undefined}
+            year={year}
+            voteAverage={voteAverage}
+            size="sm"
+          />
+        </div>
       </div>
 
-      {/* Title + year below poster */}
+      {/* Title below poster */}
       <div className="mt-2 px-0.5">
         <p className="line-clamp-2 text-sm font-medium leading-tight text-foreground">
           {title}
         </p>
-        {year && (
-          <p className="mt-1 text-sm text-muted-foreground/60">{year}</p>
-        )}
       </div>
     </Link>
   );
