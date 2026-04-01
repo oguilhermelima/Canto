@@ -15,6 +15,7 @@ import {
 } from "@canto/ui/dialog";
 import { Inbox, X, Check, Film, Tv } from "lucide-react";
 import { PageHeader } from "~/components/layout/page-header";
+import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { authClient } from "~/lib/auth-client";
 
@@ -72,15 +73,21 @@ export default function RequestsPage(): React.JSX.Element {
   const { data: requests, isLoading } = trpc.request.list.useQuery();
 
   const cancelMutation = trpc.request.cancel.useMutation({
-    onSuccess: () => void utils.request.list.invalidate(),
+    onSuccess: () => {
+      void utils.request.list.invalidate();
+      toast.success("Request cancelled");
+    },
+    onError: (err) => toast.error(err.message),
   });
 
   const resolveMutation = trpc.request.resolve.useMutation({
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       void utils.request.list.invalidate();
       setResolveTarget(null);
       setAdminNote("");
+      toast.success(vars.status === "approved" ? "Request approved" : "Request rejected");
     },
+    onError: (err) => toast.error(err.message),
   });
 
   function openResolveDialog(

@@ -2,7 +2,8 @@
 
 import { useEffect } from "react";
 import { useParams } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Bookmark, Loader2, Server, List } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { PageHeader } from "~/components/layout/page-header";
 import { MediaGrid } from "~/components/media/media-grid";
@@ -30,6 +31,11 @@ export default function ListDetailPage(): React.JSX.Element {
       voteAverage: item.media.voteAverage,
     })) ?? [];
 
+  const emptyIcon =
+    data?.list.type === "watchlist" ? Bookmark :
+    data?.list.type === "server" ? Server : List;
+  const EmptyIcon = emptyIcon;
+
   return (
     <div className="w-full">
       <PageHeader
@@ -41,6 +47,24 @@ export default function ListDetailPage(): React.JSX.Element {
         {isLoading ? (
           <div className="flex min-h-[300px] items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : gridItems.length === 0 ? (
+          <div className="flex min-h-[300px] items-center justify-center">
+            <div className="text-center">
+              <EmptyIcon className="mx-auto mb-4 h-12 w-12 text-muted-foreground/20" />
+              <p className="text-lg font-medium text-muted-foreground">
+                This list is empty
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground/70">
+                Browse media and add items to get started.
+              </p>
+              <Link
+                href="/"
+                className="mt-4 inline-block rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                Discover Media
+              </Link>
+            </div>
           </div>
         ) : (
           <MediaGrid items={gridItems} />

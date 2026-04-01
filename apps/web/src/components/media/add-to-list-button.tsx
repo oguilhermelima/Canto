@@ -28,49 +28,75 @@ export function AddToListButton({
   variant = "default",
 }: AddToListButtonProps): React.JSX.Element {
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [optimisticWatchlist, setOptimisticWatchlist] = useState<boolean | null>(null);
   const utils = trpc.useUtils();
 
   const { data: lists } = trpc.list.getAll.useQuery();
-
   const { data: inLists } = trpc.list.isInLists.useQuery({ mediaId });
 
+  const invalidate = (): void => {
+    void utils.list.isInLists.invalidate({ mediaId });
+    void utils.list.getAll.invalidate();
+  };
+
   const addItem = trpc.list.addItem.useMutation({
-    onSuccess: () => {
-      void utils.list.isInLists.invalidate({ mediaId });
-      void utils.list.getAll.invalidate();
+    onSuccess: () => invalidate(),
+    onError: (err) => {
+      setOptimisticWatchlist(null);
+      toast.error(err.message);
     },
+    onSettled: () => setOptimisticWatchlist(null),
   });
 
   const removeItem = trpc.list.removeItem.useMutation({
-    onSuccess: () => {
-      void utils.list.isInLists.invalidate({ mediaId });
-      void utils.list.getAll.invalidate();
+    onSuccess: () => invalidate(),
+    onError: (err) => {
+      setOptimisticWatchlist(null);
+      toast.error(err.message);
     },
+    onSettled: () => setOptimisticWatchlist(null),
   });
 
   const inListIds = new Set(inLists?.map((l) => l.listId) ?? []);
   const watchlist = lists?.find((l) => l.type === "watchlist");
-  const isInWatchlist = watchlist ? inListIds.has(watchlist.id) : false;
+  const isInWatchlist =
+    optimisticWatchlist ?? (watchlist ? inListIds.has(watchlist.id) : false);
 
-  const toggleWatchlist = async (): Promise<void> => {
+  const toggleWatchlist = (): void => {
     if (!watchlist) return;
 
     if (isInWatchlist) {
-      await removeItem.mutateAsync({ listId: watchlist.id, mediaId });
-      toast.success(title ? `Removed "${title}" from Watchlist` : "Removed from Watchlist");
+      setOptimisticWatchlist(false);
+      removeItem.mutate(
+        { listId: watchlist.id, mediaId },
+        { onSuccess: () => toast.success(title ? `Removed "${title}" from Watchlist` : "Removed from Watchlist") },
+      );
     } else {
-      await addItem.mutateAsync({ listId: watchlist.id, mediaId });
-      toast.success(title ? `Added "${title}" to Watchlist` : "Added to Watchlist");
+      setOptimisticWatchlist(true);
+      addItem.mutate(
+        { listId: watchlist.id, mediaId },
+        { onSuccess: () => toast.success(title ? `Added "${title}" to Watchlist` : "Added to Watchlist") },
+      );
     }
   };
 
-  const toggleList = async (listId: string, listName: string): Promise<void> => {
+  const toggleList = (listId: string, listName: string): void => {
     if (inListIds.has(listId)) {
-      await removeItem.mutateAsync({ listId, mediaId });
-      toast.success(`Removed from "${listName}"`);
+      removeItem.mutate(
+        { listId, mediaId },
+        {
+          onSuccess: () => toast.success(`Removed from "${listName}"`),
+          onError: (err) => toast.error(err.message),
+        },
+      );
     } else {
-      await addItem.mutateAsync({ listId, mediaId });
-      toast.success(`Added to "${listName}"`);
+      addItem.mutate(
+        { listId, mediaId },
+        {
+          onSuccess: () => toast.success(`Added to "${listName}"`),
+          onError: (err) => toast.error(err.message),
+        },
+      );
     }
   };
 
@@ -87,12 +113,10 @@ export function AddToListButton({
           "rounded-xl",
           isSmall ? "h-8 px-3 text-xs" : "h-10 px-4 text-sm",
         )}
-        onClick={() => void toggleWatchlist()}
-        disabled={isLoading || !watchlist}
+        onClick={toggleWatchlist}
+        disabled={!watchlist}
       >
-        {isLoading ? (
-          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-        ) : isInWatchlist ? (
+        {isInWatchlist ? (
           <Check className="mr-1.5 h-3.5 w-3.5" />
         ) : (
           <Bookmark className="mr-1.5 h-3.5 w-3.5" />
@@ -106,10 +130,8 @@ export function AddToListButton({
           <Button
             size="icon"
             variant="ghost"
-            className={cn(
-              "rounded-xl",
-              isSmall ? "h-8 w-8" : "h-10 w-10",
-            )}
+            className={cn("rounded-xl", isSmall ? "h-8 w-8" : "h-10 w-10")}
+            aria-label="Add to list"
           >
             <Plus className="h-4 w-4" />
           </Button>
@@ -124,7 +146,7 @@ export function AddToListButton({
               <button
                 key={l.id}
                 className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-accent"
-                onClick={() => void toggleList(l.id, l.name)}
+                onClick={() => toggleList(l.id, l.name)}
                 disabled={isLoading}
               >
                 {inListIds.has(l.id) ? (

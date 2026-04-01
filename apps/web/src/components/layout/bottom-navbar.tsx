@@ -126,6 +126,16 @@ export function BottomNavbar(): React.JSX.Element {
               <Bell className="h-4 w-4" />
               Notifications
             </button>
+            <button
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors hover:bg-accent"
+              onClick={() => {
+                setSheetOpen(false);
+                router.push("/requests");
+              }}
+            >
+              <Download className="h-4 w-4" />
+              Requests
+            </button>
             <Separator className="my-1" />
             <button
               className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors hover:bg-accent"

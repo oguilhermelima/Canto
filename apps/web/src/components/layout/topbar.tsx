@@ -12,6 +12,7 @@ import {
 } from "@canto/ui/dropdown-menu";
 import {
   Armchair,
+  Download,
   Search,
   User,
   LayoutDashboard,
@@ -86,6 +87,7 @@ const TopbarSearch = memo(function TopbarSearch(): React.JSX.Element {
   return (
     <Link
       href="/search"
+      aria-label="Search"
       className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors hover:bg-foreground/5"
     >
       <Search className="h-[18px] w-[18px] text-foreground/70" />
@@ -117,7 +119,7 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <button className="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-foreground/5 focus:outline-none">
+        <button aria-label="User menu" className="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-foreground/5 focus:outline-none">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-foreground/10">
             {session?.user?.name ? (
               <span className="text-xs font-medium">
@@ -161,6 +163,12 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
           <a href="/notifications">
             <Bell className="mr-2 h-4 w-4" />
             Notifications
+          </a>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <a href="/requests">
+            <Download className="mr-2 h-4 w-4" />
+            Requests
           </a>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

@@ -39,7 +39,7 @@ export default function ListsPage(): React.JSX.Element {
   }, []);
 
   const utils = trpc.useUtils();
-  const { data: lists } = trpc.list.getAll.useQuery();
+  const { data: lists, isLoading: listsLoading } = trpc.list.getAll.useQuery();
 
   // Fetch watchlist and server library items for inline carousels
   const { data: watchlistData, isLoading: watchlistLoading } =
@@ -114,6 +114,7 @@ export default function ListsPage(): React.JSX.Element {
           <h2 className="text-xl font-semibold text-foreground">My Lists</h2>
           <button
             type="button"
+            aria-label="Create list"
             onClick={() => setCreateOpen(true)}
             className="flex h-7 w-7 items-center justify-center rounded-full bg-foreground/10 text-foreground/60 transition-colors hover:bg-foreground/15 hover:text-foreground"
           >
@@ -121,7 +122,13 @@ export default function ListsPage(): React.JSX.Element {
           </button>
         </div>
 
-        {customLists.length === 0 ? (
+        {listsLoading ? (
+          <div className="flex gap-4 px-4 pb-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-24 w-[280px] shrink-0 animate-pulse rounded-xl bg-muted" />
+            ))}
+          </div>
+        ) : customLists.length === 0 ? (
           <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
             <div className="flex min-h-[160px] items-center justify-center rounded-2xl border border-dashed border-border/60">
               <div className="text-center">

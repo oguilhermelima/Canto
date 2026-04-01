@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
+import { authClient } from "~/lib/auth-client";
 import {
   MediaDetailHero,
   MediaDetailHeroSkeleton,
@@ -67,6 +68,8 @@ export default function MediaDetailPage({
   const { id } = use(params);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { data: session } = authClient.useSession();
+  const isAdmin = (session?.user as { role?: string } | undefined)?.role === "admin";
   const [torrentDialogOpen, setTorrentDialogOpen] = useState(false);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
@@ -206,6 +209,10 @@ export default function MediaDetailPage({
 
   const deleteTorrentMutation = trpc.torrent.delete.useMutation();
   const replaceProvider = trpc.media.replaceProvider.useMutation();
+  const requestDownload = trpc.request.create.useMutation({
+    onSuccess: () => toast.success("Download requested"),
+    onError: (err) => toast.error(err.message),
+  });
   const utils = trpc.useUtils();
 
   // Library config queries
@@ -463,8 +470,32 @@ export default function MediaDetailPage({
           servers={mediaServers.data}
         />
 
-        {/* Movie download management */}
-        {media.type === "movie" && media.libraryId && (
+        {/* Request Download — non-admin users */}
+        {!isAdmin && media.id && !media.downloaded && (
+          <section className="flex items-center gap-4">
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold tracking-tight">Want to watch this?</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Request the admin to download this content for you.
+              </p>
+            </div>
+            <Button
+              className="rounded-xl"
+              onClick={() => requestDownload.mutate({ mediaId: media.id })}
+              disabled={requestDownload.isPending}
+            >
+              {requestDownload.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              Request Download
+            </Button>
+          </section>
+        )}
+
+        {/* Movie download management — admin only */}
+        {isAdmin && media.type === "movie" && media.libraryId && (
           <section>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-xl font-semibold tracking-tight">Download</h2>
@@ -546,16 +577,16 @@ export default function MediaDetailPage({
                 voteAverage: e.voteAverage,
               })),
             }))}
-            onDownloadSeasons={media.libraryId ? (seasonNumbers) => {
+            onDownloadSeasons={isAdmin && media.libraryId ? (seasonNumbers) => {
               if (seasonNumbers.length > 0) {
                 openTorrentDialog({ seasonNumber: seasonNumbers[0]! });
               }
             } : undefined}
-            onDownloadEpisodes={media.libraryId ? (seasonNumber, episodeNumbers) => {
+            onDownloadEpisodes={isAdmin && media.libraryId ? (seasonNumber, episodeNumbers) => {
               openTorrentDialog({ seasonNumber, episodeNumbers });
             } : undefined}
             hideFloatingBar={torrentDialogOpen}
-            mediaConfig={media.libraryId ? {
+            mediaConfig={isAdmin && media.libraryId ? {
               libraryId: media.libraryId ?? null,
               libraryPath: media.libraryPath ?? null,
               continuousDownload: media.continuousDownload ?? false,
