@@ -988,7 +988,7 @@ export function MetadataSettingsSection(): React.JSX.Element {
 
   return (
     <div>
-      <SettingsSection title="TV Show Provider" description="Choose the metadata source for TV show seasons and episodes.">
+      <SettingsSection title="Enable TVDB as TV Shows and Animes provider" description="Choose the metadata source for TV show seasons and episodes.">
         <div className="space-y-5">
           <div className="flex items-start justify-between gap-6">
             <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
