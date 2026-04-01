@@ -5,12 +5,11 @@ import { getProvider } from "@canto/providers";
 import { persistMedia, updateMediaFromNormalized } from "@canto/db/persist-media";
 import { getSetting } from "@canto/db/settings";
 import {
-  addToLibraryInput,
   getByExternalInput,
   getByIdInput,
 } from "@canto/validators";
 
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
+import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure } from "../trpc";
 import { getTmdbProvider } from "../lib/tmdb-client";
 import { getTvdbProvider } from "../lib/tvdb-client";
 import { SETTINGS } from "../lib/settings-keys";
@@ -153,7 +152,7 @@ export const mediaRouter = createTRPCRouter({
         : await findMediaByExternalId(ctx.db, input.externalId, input.provider);
 
       if (existing) {
-        if (existing.inLibrary) {
+        if (existing.downloaded) {
           const STALE_MS = 30 * 24 * 60 * 60 * 1000;
           const isStale =
             !existing.extrasUpdatedAt ||
@@ -299,32 +298,6 @@ export const mediaRouter = createTRPCRouter({
     }),
 
   /**
-   * Add media to the user's library.
-   */
-  addToLibrary: protectedProcedure
-    .input(addToLibraryInput)
-    .mutation(async ({ ctx, input }) => {
-      const updated = await updateMedia(ctx.db, input.id, {
-        inLibrary: true,
-        addedAt: new Date(),
-      });
-      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
-      void dispatchRefreshExtras(updated.id).catch(() => {});
-      return updated;
-    }),
-
-  /**
-   * Remove media from the user's library.
-   */
-  removeFromLibrary: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .mutation(async ({ ctx, input }) => {
-      const updated = await updateMedia(ctx.db, input.id, { inLibrary: false, addedAt: null });
-      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
-      return updated;
-    }),
-
-  /**
    * Re-fetch metadata from the original provider and update the DB record.
    */
   updateMetadata: protectedProcedure
@@ -338,9 +311,26 @@ export const mediaRouter = createTRPCRouter({
     }),
 
   /**
+   * Admin: mark media as no longer downloaded (removes from server library).
+   */
+  unmarkDownloaded: adminProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const updated = await updateMedia(ctx.db, input.id, { downloaded: false });
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
+      // Remove from server library list
+      const { findServerLibrary, removeListItem } = await import(
+        "../infrastructure/repositories/list-repository"
+      );
+      const serverLib = await findServerLibrary(ctx.db);
+      if (serverLib) await removeListItem(ctx.db, serverLib.id, input.id);
+      return updated;
+    }),
+
+  /**
    * Hard delete a media record (cascades to seasons, episodes, files, cache).
    */
-  delete: protectedProcedure
+  delete: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const deleted = await deleteMedia(ctx.db, input.id);

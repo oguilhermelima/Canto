@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { torrentDownloadInput, torrentSearchInput } from "@canto/validators";
 
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
+import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure } from "../trpc";
 import { getQBClient } from "../infrastructure/adapters/qbittorrent";
 import { autoImportTorrent } from "../domain/use-cases/import-torrent";
 import { mergeLiveData } from "../domain/use-cases/merge-live-data";
@@ -29,7 +29,7 @@ export const torrentRouter = createTRPCRouter({
    * Search for torrents via Prowlarr/Jackett, building a search query from the
    * media item's title (+ season number if provided).
    */
-  search: protectedProcedure
+  search: adminProcedure
     .input(torrentSearchInput)
     .query(({ ctx, input }) => searchTorrents(ctx.db, input)),
 
@@ -38,7 +38,7 @@ export const torrentRouter = createTRPCRouter({
    * Pre-associates media_file placeholders so we know what episodes are
    * covered BEFORE the download completes.
    */
-  download: publicProcedure
+  download: adminProcedure
     .input(torrentDownloadInput)
     .mutation(({ ctx, input }) => downloadTorrent(ctx.db, input)),
 
@@ -46,7 +46,7 @@ export const torrentRouter = createTRPCRouter({
    * Replace existing media_file records and re-download with a new torrent.
    * Deletes the specified old files, then runs the standard download flow.
    */
-  replace: publicProcedure
+  replace: adminProcedure
     .input(
       z.object({
         replaceFileIds: z.array(z.string().uuid()),
@@ -63,7 +63,7 @@ export const torrentRouter = createTRPCRouter({
   /**
    * Re-download a torrent that was removed or errored.
    */
-  retry: publicProcedure
+  retry: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const row = await findTorrentById(ctx.db, input.id);
@@ -143,7 +143,7 @@ export const torrentRouter = createTRPCRouter({
   /**
    * Pause a torrent in qBittorrent.
    */
-  pause: publicProcedure
+  pause: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const row = await findTorrentById(ctx.db, input.id);
@@ -152,7 +152,7 @@ export const torrentRouter = createTRPCRouter({
       return updateTorrent(ctx.db, input.id, { status: "paused" });
     }),
 
-  resume: publicProcedure
+  resume: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const row = await findTorrentById(ctx.db, input.id);
@@ -161,7 +161,7 @@ export const torrentRouter = createTRPCRouter({
       return updateTorrent(ctx.db, input.id, { status: "downloading" });
     }),
 
-  cancel: publicProcedure
+  cancel: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const row = await findTorrentById(ctx.db, input.id);
@@ -173,7 +173,7 @@ export const torrentRouter = createTRPCRouter({
   /**
    * Trigger import for a completed torrent — organizes files and triggers Jellyfin scan.
    */
-  import: publicProcedure
+  import: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const row = await findTorrentById(ctx.db, input.id);
@@ -204,7 +204,7 @@ export const torrentRouter = createTRPCRouter({
   /**
    * Delete a torrent record from DB and optionally from qBittorrent.
    */
-  delete: publicProcedure
+  delete: adminProcedure
     .input(z.object({
       id: z.string().uuid(),
       deleteFiles: z.boolean().default(false),
@@ -226,7 +226,7 @@ export const torrentRouter = createTRPCRouter({
   /**
    * Rename a torrent's file in qBittorrent.
    */
-  rename: protectedProcedure
+  rename: adminProcedure
     .input(z.object({ id: z.string().uuid(), newName: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const row = await findTorrentById(ctx.db, input.id);
@@ -248,7 +248,7 @@ export const torrentRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  move: protectedProcedure
+  move: adminProcedure
     .input(z.object({ id: z.string().uuid(), newPath: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const row = await findTorrentById(ctx.db, input.id);

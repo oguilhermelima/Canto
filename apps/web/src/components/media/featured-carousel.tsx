@@ -5,13 +5,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { ChevronLeft, ChevronRight, Film, Tv, Volume2, VolumeOff } from "lucide-react";
-import { LibraryButton } from "~/components/media/library-button";
+import { AddToListButton } from "~/components/media/add-to-list-button";
 import { MediaBadges } from "~/components/media/media-badges";
 import { Skeleton } from "@canto/ui/skeleton";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
 interface FeaturedItem {
+  id?: string;
   externalId: number | string;
   provider: string;
   type: "movie" | "show";
@@ -32,7 +33,6 @@ interface FeaturedCarouselProps {
   isLoading?: boolean;
   isFetchingMore?: boolean;
   onLoadMore?: () => void;
-  libraryIds?: Set<string>;
   className?: string;
 }
 
@@ -45,7 +45,6 @@ export function FeaturedCarousel({
   isLoading = false,
   isFetchingMore = false,
   onLoadMore,
-  libraryIds,
   className,
 }: FeaturedCarouselProps): React.JSX.Element | null {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -146,7 +145,6 @@ export function FeaturedCarousel({
                   item={item}
                   isOpen={hoveredIndex === i}
                   onHover={() => handleCardHover(i)}
-                  inLibrary={libraryIds?.has(`${item.provider}-${item.externalId}`) ?? false}
                 />
               ))}
           {isFetchingMore &&
@@ -167,12 +165,10 @@ function FeaturedCard({
   item,
   isOpen,
   onHover,
-  inLibrary,
 }: {
   item: FeaturedItem;
   isOpen: boolean;
   onHover: () => void;
-  inLibrary: boolean;
 }): React.JSX.Element {
   const [showTrailer, setShowTrailer] = useState(false);
   const [muted, setMuted] = useState(true);
@@ -328,17 +324,15 @@ function FeaturedCard({
 
           <MediaBadges type={item.type} year={item.year} voteAverage={item.voteAverage} size="md" />
 
-          <div className="flex items-center gap-2 pt-0.5" onClick={(e) => e.preventDefault()}>
-            <LibraryButton
-              externalId={item.externalId}
-              provider={item.provider}
-              type={item.type}
-              title={item.title}
-              inLibrary={inLibrary}
-              redirectOnAdd
-              variant="dark"
-            />
-          </div>
+          {item.id && (
+            <div className="flex items-center gap-2 pt-0.5" onClick={(e) => e.preventDefault()}>
+              <AddToListButton
+                mediaId={item.id}
+                title={item.title}
+                variant="dark"
+              />
+            </div>
+          )}
         </div>
       </Link>
     </div>

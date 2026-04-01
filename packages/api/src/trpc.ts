@@ -6,7 +6,7 @@ import type { Database } from "@canto/db/client";
 
 export interface Context {
   db: Database;
-  session: { user: { id: string; name: string; email: string } } | null;
+  session: { user: { id: string; name: string; email: string; role: string } } | null;
 }
 
 const t = initTRPC.context<Context>().create({
@@ -30,6 +30,16 @@ export const publicProcedure = t.procedure;
 export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
   if (!ctx.session) {
     throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+  return next({ ctx: { ...ctx, session: ctx.session } });
+});
+
+export const adminProcedure = t.procedure.use(({ ctx, next }) => {
+  if (!ctx.session) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+  if (ctx.session.user.role !== "admin") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
   }
   return next({ ctx: { ...ctx, session: ctx.session } });
 });

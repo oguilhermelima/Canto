@@ -197,7 +197,7 @@ export const media = pgTable(
     libraryId: uuid("library_id").references(() => library.id, {
       onDelete: "set null",
     }),
-    inLibrary: boolean("in_library").notNull().default(false),
+    downloaded: boolean("downloaded").notNull().default(false),
     libraryPath: varchar("library_path", { length: 500 }),
     addedAt: timestamp("added_at", { withTimezone: true }),
     continuousDownload: boolean("continuous_download").notNull().default(false),
@@ -224,7 +224,7 @@ export const media = pgTable(
   (table) => [
     uniqueIndex("idx_media_external").on(table.externalId, table.provider),
     index("idx_media_type").on(table.type),
-    index("idx_media_in_library").on(table.inLibrary),
+    index("idx_media_downloaded").on(table.downloaded),
     index("idx_media_provider").on(table.provider, table.externalId),
   ],
 );
@@ -565,12 +565,97 @@ export const genre = pgTable("genre", {
   tvdbQuery: varchar("tvdb_query", { length: 200 }),
 });
 
+// ─── Lists (per-user watchlist, custom lists, shared server library) ───
+
+export const list = pgTable(
+  "list",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: varchar("user_id", { length: 36 }).references(() => user.id, {
+      onDelete: "cascade",
+    }),
+    name: varchar("name", { length: 200 }).notNull(),
+    slug: varchar("slug", { length: 200 }).notNull(),
+    description: text("description"),
+    type: varchar("type", { length: 20 }).notNull(), // 'watchlist' | 'custom' | 'server'
+    isSystem: boolean("is_system").notNull().default(false),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("idx_list_user_slug").on(table.userId, table.slug),
+    index("idx_list_type").on(table.type),
+  ],
+);
+
+export const listItem = pgTable(
+  "list_item",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    listId: uuid("list_id")
+      .notNull()
+      .references(() => list.id, { onDelete: "cascade" }),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    addedAt: timestamp("added_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    position: integer("position").notNull().default(0),
+    notes: text("notes"),
+  },
+  (table) => [
+    uniqueIndex("idx_list_item_unique").on(table.listId, table.mediaId),
+    index("idx_list_item_media").on(table.mediaId),
+  ],
+);
+
+// ─── Download Requests (user → admin) ───
+
+export const downloadRequest = pgTable(
+  "download_request",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    status: varchar("status", { length: 20 }).notNull().default("pending"), // 'pending' | 'approved' | 'rejected' | 'downloaded'
+    note: text("note"),
+    adminNote: text("admin_note"),
+    resolvedBy: varchar("resolved_by", { length: 36 }).references(
+      () => user.id,
+    ),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_request_user").on(table.userId),
+    index("idx_request_status").on(table.status),
+    uniqueIndex("idx_request_user_media").on(table.userId, table.mediaId),
+  ],
+);
+
 // ─── Relations ───
 
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
   preferences: many(userPreference),
+  lists: many(list),
+  downloadRequests: many(downloadRequest),
 }));
 
 export const userPreferenceRelations = relations(userPreference, ({ one }) => ({
@@ -613,6 +698,7 @@ export const mediaRelations = relations(media, ({ many, one }) => ({
   videos: many(mediaVideo),
   watchProviders: many(mediaWatchProvider),
   recommendations: many(recommendationPool),
+  listItems: many(listItem),
 }));
 
 export const seasonRelations = relations(season, ({ one, many }) => ({
@@ -720,3 +806,36 @@ export const blocklistRelations = relations(blocklist, ({ one }) => ({
     references: [media.id],
   }),
 }));
+
+export const listRelations = relations(list, ({ one, many }) => ({
+  user: one(user, {
+    fields: [list.userId],
+    references: [user.id],
+  }),
+  items: many(listItem),
+}));
+
+export const listItemRelations = relations(listItem, ({ one }) => ({
+  list: one(list, {
+    fields: [listItem.listId],
+    references: [list.id],
+  }),
+  media: one(media, {
+    fields: [listItem.mediaId],
+    references: [media.id],
+  }),
+}));
+
+export const downloadRequestRelations = relations(
+  downloadRequest,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [downloadRequest.userId],
+      references: [user.id],
+    }),
+    media: one(media, {
+      fields: [downloadRequest.mediaId],
+      references: [media.id],
+    }),
+  }),
+);

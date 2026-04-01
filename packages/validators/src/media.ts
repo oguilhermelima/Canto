@@ -27,7 +27,3 @@ export const getByIdInput = z.object({
 });
 export type GetByIdInput = z.infer<typeof getByIdInput>;
 
-export const addToLibraryInput = z.object({
-  id: z.string().uuid(),
-});
-export type AddToLibraryInput = z.infer<typeof addToLibraryInput>;

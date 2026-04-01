@@ -5,3 +5,5 @@ export * from "./library-repository";
 export * from "./extras-repository";
 export * from "./sync-repository";
 export * from "./notification-repository";
+export * from "./list-repository";
+export * from "./request-repository";

@@ -7,7 +7,7 @@ import {
   deleteSetting,
 } from "@canto/db/settings";
 
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
+import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure } from "../trpc";
 import { SETTINGS } from "../lib/settings-keys";
 import { randomUUID } from "crypto";
 
@@ -54,7 +54,7 @@ export const settingsRouter = createTRPCRouter({
     }),
 
   /** Upsert a setting (admin only) */
-  set: protectedProcedure
+  set: adminProcedure
     .input(z.object({ key: z.string(), value: z.unknown() }))
     .mutation(async ({ input }) => {
       await setSetting(input.key, input.value);
@@ -62,7 +62,7 @@ export const settingsRouter = createTRPCRouter({
     }),
 
   /** Delete a setting (admin only) */
-  delete: protectedProcedure
+  delete: adminProcedure
     .input(z.object({ key: z.string() }))
     .mutation(async ({ input }) => {
       await deleteSetting(input.key);
@@ -70,7 +70,7 @@ export const settingsRouter = createTRPCRouter({
     }),
 
   /** Bulk upsert multiple settings at once */
-  setMany: protectedProcedure
+  setMany: adminProcedure
     .input(z.record(z.string(), z.unknown()))
     .mutation(async ({ input }) => {
       for (const [key, value] of Object.entries(input)) {
@@ -218,7 +218,7 @@ export const settingsRouter = createTRPCRouter({
     }),
 
   /** Toggle a service on/off */
-  toggleService: protectedProcedure
+  toggleService: adminProcedure
     .input(z.object({ service: serviceEnum, enabled: z.boolean() }))
     .mutation(async ({ input }) => {
       await setSetting(SERVICE_ENABLED_KEY[input.service], input.enabled);

@@ -1,7 +1,7 @@
 import { Queue, Worker } from "bullmq";
 
 import { handleImportTorrents } from "./jobs/import-torrents";
-import { handleReverseSync } from "./jobs/reverse-sync";
+import { handleJellyfinSync, handlePlexSync } from "./jobs/reverse-sync";
 import { refreshExtras } from "@canto/api/domain/use-cases/refresh-extras";
 import { replaceShowWithTvdb } from "@canto/api/domain/use-cases/replace-show-with-tvdb";
 import { replacePoolShowsTvdb } from "@canto/api/domain/use-cases/replace-pool-shows-tvdb";
@@ -26,7 +26,11 @@ const importTorrentsQueue = new Queue("import-torrents", {
   connection: redisConnection,
 });
 
-const reverseSyncQueue = new Queue("reverse-sync", {
+const jellyfinSyncQueue = new Queue("jellyfin-sync", {
+  connection: redisConnection,
+});
+
+const plexSyncQueue = new Queue("plex-sync", {
   connection: redisConnection,
 });
 
@@ -42,11 +46,18 @@ async function setupRepeatableJobs(): Promise<void> {
     { name: "import-torrents" },
   );
 
-  // Reverse sync (import from Jellyfin/Plex): every 5 minutes
-  await reverseSyncQueue.upsertJobScheduler(
-    "reverse-sync-scheduler",
+  // Jellyfin sync: every 5 minutes
+  await jellyfinSyncQueue.upsertJobScheduler(
+    "jellyfin-sync-scheduler",
     { every: 5 * 60 * 1000 },
-    { name: "reverse-sync" },
+    { name: "jellyfin-sync" },
+  );
+
+  // Plex sync: every 5 minutes (offset by 30s to avoid parallel TMDB calls)
+  await plexSyncQueue.upsertJobScheduler(
+    "plex-sync-scheduler",
+    { every: 5 * 60 * 1000 },
+    { name: "plex-sync" },
   );
 }
 
@@ -64,12 +75,22 @@ const importTorrentsWorker = new Worker(
   { connection: redisConnection, concurrency: 1 },
 );
 
-const reverseSyncWorker = new Worker(
-  "reverse-sync",
+const jellyfinSyncWorker = new Worker(
+  "jellyfin-sync",
   async (job) => {
-    console.log(`[reverse-sync] Running job ${job.id}`);
-    await handleReverseSync();
-    console.log(`[reverse-sync] Completed job ${job.id}`);
+    console.log(`[jellyfin-sync] Running job ${job.id}`);
+    await handleJellyfinSync();
+    console.log(`[jellyfin-sync] Completed job ${job.id}`);
+  },
+  { connection: redisConnection, concurrency: 1 },
+);
+
+const plexSyncWorker = new Worker(
+  "plex-sync",
+  async (job) => {
+    console.log(`[plex-sync] Running job ${job.id}`);
+    await handlePlexSync();
+    console.log(`[plex-sync] Completed job ${job.id}`);
   },
   { connection: redisConnection, concurrency: 1 },
 );
@@ -113,7 +134,8 @@ const replacePoolTvdbWorker = new Worker(
 
 for (const worker of [
   importTorrentsWorker,
-  reverseSyncWorker,
+  jellyfinSyncWorker,
+  plexSyncWorker,
   refreshExtrasWorker,
   replaceTvdbWorker,
   replacePoolTvdbWorker,
@@ -135,12 +157,14 @@ async function shutdown(): Promise<void> {
   console.log("Shutting down workers...");
   await Promise.all([
     importTorrentsWorker.close(),
-    reverseSyncWorker.close(),
+    jellyfinSyncWorker.close(),
+    plexSyncWorker.close(),
     refreshExtrasWorker.close(),
     replaceTvdbWorker.close(),
     replacePoolTvdbWorker.close(),
     importTorrentsQueue.close(),
-    reverseSyncQueue.close(),
+    jellyfinSyncQueue.close(),
+    plexSyncQueue.close(),
   ]);
   console.log("All workers shut down.");
   process.exit(0);

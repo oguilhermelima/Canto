@@ -129,14 +129,14 @@ export async function deleteMedia(db: Database, id: string) {
 
 export async function findLibraryExternalIds(db: Database) {
   return db.query.media.findMany({
-    where: eq(media.inLibrary, true),
+    where: eq(media.downloaded, true),
     columns: { externalId: true, provider: true },
   });
 }
 
 export async function findLibraryMediaBrief(db: Database, limit = 100) {
   return db.query.media.findMany({
-    where: eq(media.inLibrary, true),
+    where: eq(media.downloaded, true),
     columns: { id: true, externalId: true, provider: true, type: true },
     limit,
   });
@@ -146,17 +146,17 @@ export async function findLibraryStats(db: Database) {
   const [totalRow] = await db
     .select({ total: count() })
     .from(media)
-    .where(eq(media.inLibrary, true));
+    .where(eq(media.downloaded, true));
 
   const [moviesRow] = await db
     .select({ total: count() })
     .from(media)
-    .where(and(eq(media.inLibrary, true), eq(media.type, "movie")));
+    .where(and(eq(media.downloaded, true), eq(media.type, "movie")));
 
   const [showsRow] = await db
     .select({ total: count() })
     .from(media)
-    .where(and(eq(media.inLibrary, true), eq(media.type, "show")));
+    .where(and(eq(media.downloaded, true), eq(media.type, "show")));
 
   const [storageRow] = await db
     .select({ totalBytes: sql<string>`COALESCE(SUM(${mediaFile.sizeBytes}), 0)` })
@@ -175,7 +175,7 @@ export async function findLibraryStats(db: Database) {
 /* -------------------------------------------------------------------------- */
 
 function buildLibraryFilters(input: ListInput): SQL {
-  const conditions: SQL[] = [eq(media.inLibrary, true)];
+  const conditions: SQL[] = [eq(media.downloaded, true)];
 
   if (input.type) conditions.push(eq(media.type, input.type));
 

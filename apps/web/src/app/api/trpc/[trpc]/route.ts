@@ -21,6 +21,7 @@ const handler = (req: Request): Promise<Response> =>
                 id: session.user.id,
                 name: session.user.name,
                 email: session.user.email,
+                role: (session.user as { role?: string }).role ?? "user",
               },
             }
           : null,

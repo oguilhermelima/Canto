@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
-import { Film, Tv, Check } from "lucide-react";
+import { Film, Tv } from "lucide-react";
 import { MediaBadges } from "./media-badges";
 
 interface MediaCardProps {
@@ -17,7 +17,6 @@ interface MediaCardProps {
   year?: number | null;
   voteAverage?: number | null;
   overview?: string | null;
-  inLibrary?: boolean;
   showTypeBadge?: boolean;
   showRating?: boolean;
   showYear?: boolean;
@@ -35,7 +34,6 @@ export function MediaCard({
   posterPath,
   year,
   voteAverage,
-  inLibrary,
   showTypeBadge = true,
   showRating = true,
   showYear = true,
@@ -75,13 +73,6 @@ export function MediaCard({
             ) : (
               <Tv className="h-10 w-10 text-muted-foreground/20" />
             )}
-          </div>
-        )}
-
-        {/* In library badge — top right */}
-        {inLibrary && (
-          <div className="absolute right-2 top-2 flex items-center gap-0.5 rounded-md bg-primary px-1.5 py-0.5">
-            <Check className="h-3 w-3 text-primary-foreground" />
           </div>
         )}
 

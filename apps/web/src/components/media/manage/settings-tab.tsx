@@ -107,14 +107,14 @@ export function SettingsTab({
     },
   });
 
-  const removeFromLibrary = trpc.media.removeFromLibrary.useMutation({
+  const removeFromLibrary = trpc.media.unmarkDownloaded.useMutation({
     onSuccess: () => {
       invalidateAll();
-      toast.success(`Removed "${mediaTitle}" from library`);
+      toast.success(`Removed "${mediaTitle}" from server`);
       setRemoveDialogOpen(false);
       onCloseDrawer();
     },
-    onError: (error) => {
+    onError: (error: { message: string }) => {
       toast.error(`Failed to remove: ${error.message}`);
     },
   });

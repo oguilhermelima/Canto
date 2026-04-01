@@ -13,7 +13,6 @@ interface MediaItem {
   year?: number | null;
   voteAverage?: number | null;
   overview?: string | null;
-  inLibrary?: boolean;
 }
 
 interface MediaGridProps {

@@ -39,15 +39,15 @@ const themeOptions = [
   { value: "system", label: "System", description: "Follow your OS setting", icon: Monitor },
 ] as const;
 
-const NAV_ITEMS = [
-  { key: "account", label: "Account" },
-  { key: "services", label: "Services" },
-  { key: "metadata", label: "Metadata" },
-  { key: "libraries", label: "Libraries" },
-  { key: "about", label: "About" },
+const ALL_NAV_ITEMS = [
+  { key: "account", label: "Account", adminOnly: false },
+  { key: "services", label: "Services", adminOnly: true },
+  { key: "metadata", label: "Metadata", adminOnly: true },
+  { key: "libraries", label: "Libraries", adminOnly: true },
+  { key: "about", label: "About", adminOnly: false },
 ] as const;
 
-type NavKey = (typeof NAV_ITEMS)[number]["key"];
+type NavKey = (typeof ALL_NAV_ITEMS)[number]["key"];
 
 /* -------------------------------------------------------------------------- */
 /*  Animated collapse                                                          */
@@ -718,6 +718,9 @@ function AccountSection(): React.JSX.Element {
 export default function SettingsPage(): React.JSX.Element {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { data: session } = authClient.useSession();
+  const isAdmin = (session?.user as { role?: string } | undefined)?.role === "admin";
+  const NAV_ITEMS = ALL_NAV_ITEMS.filter((i) => !i.adminOnly || isAdmin);
   const tabParam = searchParams.get("tab") as NavKey | null;
   const activeNav = tabParam && NAV_ITEMS.some((i) => i.key === tabParam) ? tabParam : "account";
 

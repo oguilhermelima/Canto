@@ -8,8 +8,7 @@ import {
   Film,
   Tv,
 } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
-import { LibraryButton } from "~/components/media/library-button";
+import { AddToListButton } from "~/components/media/add-to-list-button";
 import { MediaBadges } from "~/components/media/media-badges";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
@@ -32,7 +31,6 @@ interface MediaDetailHeroProps {
   logoPath?: string | null;
   externalId?: number | null;
   provider?: string | null;
-  inLibrary?: boolean;
   trailerUrl?: string | null;
   watchProviders?: Array<{
     providerId: number;
@@ -44,7 +42,6 @@ interface MediaDetailHeroProps {
     providerName: string;
     logoPath: string | null;
   }>;
-  onRemoveClick?: () => void;
   availableSources?: Array<{
     type: "jellyfin" | "plex";
     resolution?: string | null;
@@ -67,8 +64,6 @@ export function MediaDetailHero({
   status,
   logoPath,
   provider,
-  inLibrary = false,
-  onRemoveClick,
   availableSources,
 }: MediaDetailHeroProps): React.JSX.Element {
   const resolveImage = (path: string, size: string): string =>
@@ -216,11 +211,9 @@ export function MediaDetailHero({
 
               {/* Buttons */}
               <div className="mt-2 flex flex-wrap gap-2.5">
-                <LibraryButton
+                <AddToListButton
                   mediaId={id}
                   title={title}
-                  inLibrary={inLibrary}
-                  onRemoveClick={onRemoveClick}
                 />
               </div>
             </div>

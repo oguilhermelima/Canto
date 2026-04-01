@@ -29,9 +29,6 @@ import {
   ChevronDown,
   Search,
   ExternalLink,
-  Library,
-  Plus,
-  Check,
   ArrowUpDown,
   Settings2,
   RefreshCw,
@@ -141,7 +138,7 @@ export default function MediaDetailPage({
     { staleTime: Infinity, enabled: directSearchEnabled },
   );
 
-  const isMovieInLibrary = media?.type === "movie" && media?.inLibrary === true;
+  const isMovieInLibrary = media?.type === "movie" && !!media?.libraryId;
   const mediaTorrentsQuery = trpc.torrent.listByMedia.useQuery(
     { mediaId: media?.id ?? "" },
     { enabled: !!media?.id && isMovieInLibrary },
@@ -207,8 +204,6 @@ export default function MediaDetailPage({
     },
   });
 
-  const addToLibrary = trpc.media.addToLibrary.useMutation();
-  const removeFromLibrary = trpc.media.removeFromLibrary.useMutation();
   const deleteTorrentMutation = trpc.torrent.delete.useMutation();
   const replaceProvider = trpc.media.replaceProvider.useMutation();
   const utils = trpc.useUtils();
@@ -231,32 +226,6 @@ export default function MediaDetailPage({
       toast.error(`Failed to update library: ${error.message}`);
     },
   });
-
-  const handleLibraryToggle = (): void => {
-    if (!media) return;
-    const wasInLibrary = media.inLibrary;
-    const mutation = wasInLibrary ? removeFromLibrary : addToLibrary;
-    mutation.mutate(
-      { id: media.id },
-      {
-        onSuccess: () => {
-          void utils.media.getById.invalidate({ id: media.id });
-          void utils.media.getByExternal.invalidate();
-          void utils.library.list.invalidate();
-          void utils.library.stats.invalidate();
-          toast.success(
-            wasInLibrary
-              ? `Removed "${media.title}" from library`
-              : `Added "${media.title}" to library`,
-          );
-          // Redirect to canonical URL when adding from /media/ext
-          if (!wasInLibrary && isExternal) {
-            router.replace(`/media/${media.id}`);
-          }
-        },
-      },
-    );
-  };
 
   const handleDownload = (url: string, title: string): void => {
     if (!media?.id) return;
@@ -422,9 +391,6 @@ export default function MediaDetailPage({
     setTorrentPage(0);
   };
 
-  const isLibraryPending =
-    addToLibrary.isPending || removeFromLibrary.isPending;
-
   return (
     <div className="min-h-screen bg-background">
       {/* Hero */}
@@ -446,13 +412,11 @@ export default function MediaDetailPage({
         logoPath={media.logoPath}
         externalId={media.externalId}
         provider={media.provider}
-        inLibrary={media.inLibrary}
-        onRemoveClick={media.inLibrary ? () => setRemoveDialogOpen(true) : undefined}
         availableSources={availability.data?.sources}
       />
 
       {/* Replace provider button for TV shows */}
-      {media.type === "show" && media.inLibrary && (media.provider === "tmdb" || media.provider === "tvdb") && (
+      {media.type === "show" && media.libraryId && (media.provider === "tmdb" || media.provider === "tvdb") && (
         <div className="mx-auto flex w-full px-4 pt-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
           <button
             type="button"
@@ -500,7 +464,7 @@ export default function MediaDetailPage({
         />
 
         {/* Movie download management */}
-        {media.type === "movie" && media.inLibrary && (
+        {media.type === "movie" && media.libraryId && (
           <section>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-xl font-semibold tracking-tight">Download</h2>
@@ -582,16 +546,16 @@ export default function MediaDetailPage({
                 voteAverage: e.voteAverage,
               })),
             }))}
-            onDownloadSeasons={media.inLibrary ? (seasonNumbers) => {
+            onDownloadSeasons={media.libraryId ? (seasonNumbers) => {
               if (seasonNumbers.length > 0) {
                 openTorrentDialog({ seasonNumber: seasonNumbers[0]! });
               }
             } : undefined}
-            onDownloadEpisodes={media.inLibrary ? (seasonNumber, episodeNumbers) => {
+            onDownloadEpisodes={media.libraryId ? (seasonNumber, episodeNumbers) => {
               openTorrentDialog({ seasonNumber, episodeNumbers });
             } : undefined}
             hideFloatingBar={torrentDialogOpen}
-            mediaConfig={media.inLibrary ? {
+            mediaConfig={media.libraryId ? {
               libraryId: media.libraryId ?? null,
               libraryPath: media.libraryPath ?? null,
               continuousDownload: media.continuousDownload ?? false,
@@ -609,7 +573,7 @@ export default function MediaDetailPage({
                 setTorrentDialogOpen(true);
               },
             } : undefined}
-            onOpenPreferences={media.inLibrary ? () => setPreferencesOpen(true) : undefined}
+            onOpenPreferences={media.libraryId ? () => setPreferencesOpen(true) : undefined}
             episodeAvailability={availability.data?.episodes}
             serverLinks={mediaServers.data}
           />
@@ -636,7 +600,7 @@ export default function MediaDetailPage({
 
 
       {/* Preferences modal */}
-      {media.inLibrary && (
+      {media.libraryId && (
         <PreferencesModal
           open={preferencesOpen}
           onOpenChange={setPreferencesOpen}
@@ -719,7 +683,7 @@ export default function MediaDetailPage({
             </Button>
             <Button
               className="bg-red-500 text-white hover:bg-red-600"
-              disabled={removeFromLibrary.isPending}
+              disabled={setMediaLibrary.isPending || deleteTorrentMutation.isPending}
               onClick={async () => {
                 if (!media) return;
                 try {
@@ -736,8 +700,8 @@ export default function MediaDetailPage({
                       ),
                     );
                   }
-                  // Then remove from library
-                  await removeFromLibrary.mutateAsync({ id: media.id });
+                  // Then remove from library by clearing libraryId
+                  await setMediaLibrary.mutateAsync({ mediaId: media.id, libraryId: null });
                   void utils.media.getById.invalidate({ id: media.id });
                   void utils.media.getByExternal.invalidate();
                   void utils.library.list.invalidate();
@@ -749,7 +713,7 @@ export default function MediaDetailPage({
                 }
               }}
             >
-              {removeFromLibrary.isPending ? "Removing..." : "Remove"}
+              {setMediaLibrary.isPending ? "Removing..." : "Remove"}
             </Button>
           </div>
         </DialogContent>

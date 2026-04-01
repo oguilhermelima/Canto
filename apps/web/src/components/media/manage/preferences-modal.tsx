@@ -168,14 +168,14 @@ export function PreferencesModal({
     onSuccess: () => { invalidateMedia(); toast.success("Metadata refreshed"); },
     onError: (err) => toast.error(err.message),
   });
-  const removeFromLibrary = trpc.media.removeFromLibrary.useMutation({
+  const removeFromLibrary = trpc.media.unmarkDownloaded.useMutation({
     onSuccess: () => {
       invalidateMedia();
       void utils.library.list.invalidate();
-      toast.success(`Removed "${mediaTitle}" from library`);
+      toast.success(`Removed "${mediaTitle}" from server`);
       onOpenChange(false);
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err: { message: string }) => toast.error(err.message),
   });
   const deleteMutation = trpc.media.delete.useMutation({
     onSuccess: () => {

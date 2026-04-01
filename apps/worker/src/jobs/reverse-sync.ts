@@ -10,6 +10,8 @@ import {
   deleteSyncItemsByLibraryIds,
   createSyncItem,
   createSyncEpisodes,
+  ensureServerLibrary,
+  addListItem,
 } from "@canto/api/infrastructure/repositories";
 import { SETTINGS } from "@canto/api/lib/settings-keys";
 
@@ -50,7 +52,7 @@ interface SyncStatus {
   error?: string;
 }
 
-const STATUS_KEY = "sync.mediaImport.status";
+const STATUS_KEY_PREFIX = "sync.mediaImport.status";
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                    */
@@ -60,8 +62,8 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function updateStatus(status: SyncStatus): Promise<void> {
-  await setSetting(STATUS_KEY, status);
+async function updateStatus(tag: string, status: SyncStatus): Promise<void> {
+  await setSetting(`${STATUS_KEY_PREFIX}.${tag}`, status);
 }
 
 function syncItemBase(item: PendingImport): {
@@ -387,51 +389,30 @@ async function fetchPlexMediaInfo(
 /*  Main handler                                                               */
 /* -------------------------------------------------------------------------- */
 
-export async function handleReverseSync(): Promise<void> {
+/* -------------------------------------------------------------------------- */
+/*  Shared processing                                                          */
+/* -------------------------------------------------------------------------- */
+
+async function processPendingImports(
+  pending: PendingImport[],
+  tag: string,
+): Promise<void> {
+  if (pending.length === 0) {
+    console.log(`[${tag}] No items to process`);
+    return;
+  }
+
   const tmdbApiKey = await getSetting<string>("tmdb.apiKey");
   if (!tmdbApiKey) throw new Error("TMDB API key not configured");
 
   const tmdb = new TmdbProvider(tmdbApiKey);
   const tvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
 
-  // Gather pending imports from Jellyfin and Plex
-  const pending: PendingImport[] = [];
-
-  // Jellyfin
+  // Settings for media info fetching
   const jellyfinUrl = await getSetting<string>("jellyfin.url");
   const jellyfinKey = await getSetting<string>("jellyfin.apiKey");
-  const jellyfinEnabled = await getSetting<boolean>("jellyfin.enabled");
-
-  if (jellyfinEnabled && jellyfinUrl && jellyfinKey) {
-    const jellyfinLibs = await findEnabledSyncLibraries(db);
-    const linked = jellyfinLibs
-      .filter((l) => l.jellyfinLibraryId)
-      .map((l) => ({ id: l.id, jellyfinLibraryId: l.jellyfinLibraryId!, type: l.type }));
-
-    if (linked.length > 0) {
-      console.log(`[reverse-sync] Scanning ${linked.length} Jellyfin libraries...`);
-      const jellyfinItems = await scanJellyfin(jellyfinUrl, jellyfinKey, linked);
-      pending.push(...jellyfinItems);
-    }
-  }
-
-  // Plex
   const plexUrl = await getSetting<string>("plex.url");
   const plexToken = await getSetting<string>("plex.token");
-  const plexEnabled = await getSetting<boolean>("plex.enabled");
-
-  if (plexEnabled && plexUrl && plexToken) {
-    const plexLibs = await findEnabledSyncLibraries(db);
-    const linked = plexLibs
-      .filter((l) => l.plexLibraryId)
-      .map((l) => ({ id: l.id, plexLibraryId: l.plexLibraryId!, type: l.type }));
-
-    if (linked.length > 0) {
-      console.log(`[reverse-sync] Scanning ${linked.length} Plex libraries...`);
-      const plexItems = await scanPlex(plexUrl, plexToken, linked);
-      pending.push(...plexItems);
-    }
-  }
 
   // Clear previous sync items for libraries being synced
   const syncedLibraryIds = [...new Set(pending.map((i) => i.libraryId))];
@@ -447,7 +428,7 @@ export async function handleReverseSync(): Promise<void> {
     return true;
   });
 
-  console.log(`[reverse-sync] Found ${pending.length} items (${deduplicated.length} unique) to process`);
+  console.log(`[${tag}] Found ${pending.length} items (${deduplicated.length} unique) to process`);
 
   const status: SyncStatus = {
     status: "running",
@@ -458,7 +439,7 @@ export async function handleReverseSync(): Promise<void> {
     failed: 0,
     startedAt: new Date().toISOString(),
   };
-  await updateStatus(status);
+  await updateStatus(tag, status);
 
   // Process in batches
   for (let i = 0; i < deduplicated.length; i += BATCH_SIZE) {
@@ -497,17 +478,15 @@ export async function handleReverseSync(): Promise<void> {
             reason: "Could not find on TMDB",
           });
           status.processed++;
-          await updateStatus(status);
+          await updateStatus(tag, status);
           await sleep(ITEM_DELAY_MS);
           continue;
         }
 
-        // Check if already in library
-        const existing = tvdbEnabled
-          ? await findMediaByAnyReference(db, tmdbId, "tmdb")
-          : await findMediaByExternalId(db, tmdbId, "tmdb");
+        // Check if already in library (always cross-reference by IMDB for dedup)
+        const existing = await findMediaByAnyReference(db, tmdbId, "tmdb", item.imdbId);
 
-        if (existing?.inLibrary) {
+        if (existing?.downloaded) {
           status.skipped++;
           const skippedSyncItem = await createSyncItem(db, {
             ...syncItemBase(item),
@@ -549,21 +528,27 @@ export async function handleReverseSync(): Promise<void> {
           }
 
           status.processed++;
-          await updateStatus(status);
+          await updateStatus(tag, status);
           await sleep(ITEM_DELAY_MS);
           continue;
         }
 
         let mediaId: string;
         if (existing) {
-          await updateMedia(db, existing.id, { inLibrary: true, libraryId: item.libraryId, libraryPath: item.path, addedAt: new Date() });
+          await updateMedia(db, existing.id, { downloaded: true, libraryId: item.libraryId, libraryPath: item.path, addedAt: new Date() });
           mediaId = existing.id;
         } else {
           const normalized = await tmdb.getMetadata(tmdbId, resolvedType);
           const inserted = await persistMedia(db, normalized, { crossRefLookup: tvdbEnabled });
-          await updateMedia(db, inserted.id, { inLibrary: true, libraryId: item.libraryId, libraryPath: item.path, addedAt: new Date() });
+          await updateMedia(db, inserted.id, { downloaded: true, libraryId: item.libraryId, libraryPath: item.path, addedAt: new Date() });
           mediaId = inserted.id;
         }
+
+        // Add to Server Library list
+        try {
+          const serverLib = await ensureServerLibrary(db);
+          await addListItem(db, { listId: serverLib.id, mediaId });
+        } catch { /* already in server library */ }
 
         status.imported++;
         const insertedSyncItem = await createSyncItem(db, {
@@ -618,7 +603,7 @@ export async function handleReverseSync(): Promise<void> {
       }
 
       status.processed++;
-      await updateStatus(status);
+      await updateStatus(tag, status);
       await sleep(ITEM_DELAY_MS);
     }
 
@@ -644,9 +629,7 @@ export async function handleReverseSync(): Promise<void> {
     const tmdbId = item.tmdbId;
     let mediaId: string | undefined;
     if (tmdbId) {
-      const existing = tvdbEnabled
-          ? await findMediaByAnyReference(db, tmdbId, "tmdb")
-          : await findMediaByExternalId(db, tmdbId, "tmdb");
+      const existing = await findMediaByAnyReference(db, tmdbId, "tmdb", item.imdbId);
       mediaId = existing?.id;
     }
 
@@ -659,11 +642,111 @@ export async function handleReverseSync(): Promise<void> {
     });
   }
 
+  // Reconcile Server Library — ensure it matches what's actually on servers
+  try {
+    const serverLib = await ensureServerLibrary(db);
+    const { sql } = await import("drizzle-orm");
+
+    // All media IDs that are confirmed on a server (imported torrents + synced items)
+    const onServerRows = await db.execute(sql`
+      SELECT DISTINCT media_id::text FROM (
+        SELECT media_id FROM torrent WHERE imported = true AND media_id IS NOT NULL
+        UNION
+        SELECT media_id FROM sync_item WHERE result IN ('imported', 'skipped') AND media_id IS NOT NULL
+      ) x
+    `);
+    const serverMediaIds = new Set(
+      (onServerRows as unknown as Array<{ media_id: string }>).map((r) => r.media_id),
+    );
+
+    // Add missing items
+    for (const mediaId of serverMediaIds) {
+      await addListItem(db, { listId: serverLib.id, mediaId }).catch(() => {});
+    }
+
+    // Remove items no longer on server
+    if (serverMediaIds.size > 0) {
+      const idsArray = [...serverMediaIds];
+      await db.execute(sql`
+        DELETE FROM list_item
+        WHERE list_id = ${serverLib.id}::uuid
+        AND media_id NOT IN (${sql.join(idsArray.map((id) => sql`${id}::uuid`), sql`, `)})
+      `);
+    }
+
+    console.log(`[${tag}] Server Library reconciled: ${serverMediaIds.size} items`);
+  } catch (err) {
+    console.warn(`[${tag}] Failed to reconcile Server Library:`, err);
+  }
+
   status.status = "completed";
   status.completedAt = new Date().toISOString();
-  await updateStatus(status);
+  await updateStatus(tag, status);
 
   console.log(
-    `[reverse-sync] Done. Imported: ${status.imported}, Skipped: ${status.skipped}, Failed: ${status.failed}`,
+    `[${tag}] Done. Imported: ${status.imported}, Skipped: ${status.skipped}, Failed: ${status.failed}`,
   );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Individual sync handlers                                                    */
+/* -------------------------------------------------------------------------- */
+
+export async function handleJellyfinSync(): Promise<void> {
+  const jellyfinUrl = await getSetting<string>("jellyfin.url");
+  const jellyfinKey = await getSetting<string>("jellyfin.apiKey");
+  const jellyfinEnabled = await getSetting<boolean>("jellyfin.enabled");
+
+  if (!jellyfinEnabled || !jellyfinUrl || !jellyfinKey) {
+    console.log("[jellyfin-sync] Jellyfin not enabled or not configured");
+    return;
+  }
+
+  const jellyfinLibs = await findEnabledSyncLibraries(db);
+  const linked = jellyfinLibs
+    .filter((l) => l.jellyfinLibraryId)
+    .map((l) => ({ id: l.id, jellyfinLibraryId: l.jellyfinLibraryId!, type: l.type }));
+
+  if (linked.length === 0) {
+    console.log("[jellyfin-sync] No linked Jellyfin libraries");
+    return;
+  }
+
+  console.log(`[jellyfin-sync] Scanning ${linked.length} Jellyfin libraries...`);
+  const items = await scanJellyfin(jellyfinUrl, jellyfinKey, linked);
+  await processPendingImports(items, "jellyfin-sync");
+}
+
+export async function handlePlexSync(): Promise<void> {
+  const plexUrl = await getSetting<string>("plex.url");
+  const plexToken = await getSetting<string>("plex.token");
+  const plexEnabled = await getSetting<boolean>("plex.enabled");
+
+  if (!plexEnabled || !plexUrl || !plexToken) {
+    console.log("[plex-sync] Plex not enabled or not configured");
+    return;
+  }
+
+  const plexLibs = await findEnabledSyncLibraries(db);
+  const linked = plexLibs
+    .filter((l) => l.plexLibraryId)
+    .map((l) => ({ id: l.id, plexLibraryId: l.plexLibraryId!, type: l.type }));
+
+  if (linked.length === 0) {
+    console.log("[plex-sync] No linked Plex libraries");
+    return;
+  }
+
+  console.log(`[plex-sync] Scanning ${linked.length} Plex libraries...`);
+  const items = await scanPlex(plexUrl, plexToken, linked);
+  await processPendingImports(items, "plex-sync");
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Combined handler (for backward compat / global scheduler)                  */
+/* -------------------------------------------------------------------------- */
+
+export async function handleReverseSync(): Promise<void> {
+  await handleJellyfinSync();
+  await handlePlexSync();
 }

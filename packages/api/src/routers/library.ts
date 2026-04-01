@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { listInput } from "@canto/validators";
 
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
+import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure } from "../trpc";
 import {
   findAllLibraries,
   findDefaultLibraries,
@@ -23,7 +23,7 @@ import { findLibraryStats, listLibraryMedia, updateMedia } from "../infrastructu
 export const libraryRouter = createTRPCRouter({
   /**
    * Paginated + filtered library listing.
-   * Only returns items where in_library = true.
+   * Only returns items where downloaded = true.
    */
   list: publicProcedure.input(listInput).query(({ ctx, input }) =>
     listLibraryMedia(ctx.db, input),
@@ -41,7 +41,7 @@ export const libraryRouter = createTRPCRouter({
   /**
    * Seed default libraries if none exist.
    */
-  seed: publicProcedure.mutation(({ ctx }) => seedDefaultLibraries(ctx.db)),
+  seed: adminProcedure.mutation(({ ctx }) => seedDefaultLibraries(ctx.db)),
 
   /**
    * List all library configs (the library table rows, not media items).
@@ -51,7 +51,7 @@ export const libraryRouter = createTRPCRouter({
   /**
    * Set a library as the default for its type (un-defaults the others of the same type).
    */
-  setDefault: publicProcedure
+  setDefault: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const target = await findLibraryById(ctx.db, input.id);
@@ -64,7 +64,7 @@ export const libraryRouter = createTRPCRouter({
   /**
    * Toggle sync (media import) for a library.
    */
-  toggleSync: publicProcedure
+  toggleSync: adminProcedure
     .input(z.object({ id: z.string().uuid(), syncEnabled: z.boolean() }))
     .mutation(({ ctx, input }) =>
       updateLibrary(ctx.db, input.id, { syncEnabled: input.syncEnabled }),
@@ -83,7 +83,7 @@ export const libraryRouter = createTRPCRouter({
   /**
    * Assign a specific library to a media item (override the default).
    */
-  setMediaLibrary: publicProcedure
+  setMediaLibrary: adminProcedure
     .input(z.object({
       mediaId: z.string().uuid(),
       libraryId: z.string().uuid().nullable(),
@@ -92,7 +92,7 @@ export const libraryRouter = createTRPCRouter({
       updateMedia(ctx.db, input.mediaId, { libraryId: input.libraryId }),
     ),
 
-  setContinuousDownload: publicProcedure
+  setContinuousDownload: adminProcedure
     .input(z.object({
       mediaId: z.string().uuid(),
       enabled: z.boolean(),

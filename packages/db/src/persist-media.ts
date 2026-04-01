@@ -15,15 +15,17 @@ export async function persistMedia(
   normalized: NormalizedMedia,
   opts?: { crossRefLookup?: boolean },
 ): Promise<typeof media.$inferSelect> {
-  // Check for existing record — exact match always
+  // Check for existing record — exact match + IMDB cross-reference always
   const conditions = [
     and(eq(media.externalId, normalized.externalId), eq(media.provider, normalized.provider)),
   ];
 
-  // Cross-reference lookup only when TVDB integration is active
-  if (opts?.crossRefLookup) {
-    if (normalized.imdbId) conditions.push(eq(media.imdbId, normalized.imdbId));
-    if (normalized.tvdbId) conditions.push(eq(media.tvdbId, normalized.tvdbId));
+  // IMDB cross-reference is always active (universal dedup)
+  if (normalized.imdbId) conditions.push(eq(media.imdbId, normalized.imdbId));
+
+  // TVDB cross-reference only when integration is active
+  if (opts?.crossRefLookup && normalized.tvdbId) {
+    conditions.push(eq(media.tvdbId, normalized.tvdbId));
   }
 
   const existing = await db.query.media.findFirst({
@@ -32,7 +34,11 @@ export async function persistMedia(
 
   if (existing) {
     // If found by cross-reference but from a DIFFERENT provider, don't overwrite
+    // but do fill in missing cross-reference IDs
     if (existing.provider !== normalized.provider) {
+      if (normalized.imdbId && !existing.imdbId) {
+        await db.update(media).set({ imdbId: normalized.imdbId }).where(eq(media.id, existing.id));
+      }
       return existing;
     }
     return updateMediaFromNormalized(db, existing.id, normalized);

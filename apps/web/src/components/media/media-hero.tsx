@@ -3,8 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Skeleton } from "@canto/ui/skeleton";
-import { Star, Info, Plus } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
+import { Star, Info } from "lucide-react";
+import { AddToListButton } from "~/components/media/add-to-list-button";
 
 interface MediaHeroProps {
   id?: string;
@@ -18,7 +18,6 @@ interface MediaHeroProps {
   year?: number | null;
   voteAverage?: number | null;
   genres?: string[];
-  inLibrary?: boolean;
 }
 
 export function MediaHero({
@@ -32,27 +31,10 @@ export function MediaHero({
   year,
   voteAverage,
   genres,
-  inLibrary,
 }: MediaHeroProps): React.JSX.Element {
-  const addToLibrary = trpc.media.addToLibrary.useMutation();
-  const utils = trpc.useUtils();
-
   const detailHref = id
     ? `/media/${id}`
     : `/media/ext?provider=${provider}&externalId=${externalId}&type=${type}`;
-
-  const handleAddToLibrary = (): void => {
-    if (!id) return;
-    addToLibrary.mutate(
-      { id },
-      {
-        onSuccess: () => {
-          void utils.media.getById.invalidate({ id });
-          void utils.library.list.invalidate();
-        },
-      },
-    );
-  };
 
   return (
     <section className="relative h-[80vh] min-h-[500px] w-full overflow-hidden">
@@ -126,14 +108,11 @@ export function MediaHero({
               <Info className="h-4 w-4" />
               More Info
             </Link>
-            {id && !inLibrary && (
-              <button
-                onClick={handleAddToLibrary}
-                disabled={addToLibrary.isPending}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-white text-white transition-colors hover:bg-white/10 disabled:opacity-50"
-              >
-                <Plus className="h-5 w-5" />
-              </button>
+            {id && (
+              <AddToListButton
+                mediaId={id}
+                variant="dark"
+              />
             )}
           </div>
         </div>

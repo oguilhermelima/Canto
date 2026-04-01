@@ -26,10 +26,17 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useTheme } from "next-themes";
+import { authClient } from "~/lib/auth-client";
 
-const navItems = [
+const userNavItems = [
   { title: "Discover", href: "/", icon: Compass },
-  { title: "Library", href: "/library", icon: BookOpen },
+  { title: "My Lists", href: "/lists", icon: BookOpen },
+  { title: "Search", href: "/search", icon: Search },
+] as const;
+
+const adminNavItems = [
+  { title: "Discover", href: "/", icon: Compass },
+  { title: "My Lists", href: "/lists", icon: BookOpen },
   { title: "Search", href: "/search", icon: Search },
   { title: "Downloads", href: "/torrents", icon: Download },
 ] as const;
@@ -39,6 +46,9 @@ export function BottomNavbar(): React.JSX.Element {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const { data: session } = authClient.useSession();
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  const navItems = role === "admin" ? adminNavItems : userNavItems;
 
   function isActive(href: string): boolean {
     return pathname === href || (href !== "/" && pathname.startsWith(href));

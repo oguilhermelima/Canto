@@ -10,6 +10,8 @@ import {
   findTorrentById,
   findMediaById,
   findLibraryById,
+  ensureServerLibrary,
+  addListItem,
 } from "@canto/api/infrastructure/repositories";
 
 /* -------------------------------------------------------------------------- */
@@ -85,6 +87,14 @@ export async function handleImportTorrents(): Promise<void> {
           ? await findMediaById(db, updated.mediaId)
           : null;
         lastLibraryId = mediaRow?.libraryId ?? undefined;
+
+        // Add to Server Library list
+        if (updated.mediaId) {
+          try {
+            const serverLib = await ensureServerLibrary(db);
+            await addListItem(db, { listId: serverLib.id, mediaId: updated.mediaId });
+          } catch { /* already in server library */ }
+        }
 
         // Continuous download: try to grab next episode
         if (updated.mediaId && mediaRow) {

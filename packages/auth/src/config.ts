@@ -50,6 +50,16 @@ export const auth = betterAuth({
 
           return { data: user };
         },
+        after: async (user) => {
+          // Auto-create watchlist for every new user
+          await db.insert(schema.list).values({
+            userId: user.id,
+            name: "Watchlist",
+            slug: "watchlist",
+            type: "watchlist",
+            isSystem: true,
+          });
+        },
       },
     },
   },

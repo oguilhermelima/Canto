@@ -27,19 +27,25 @@ import { authClient } from "~/lib/auth-client";
 
 /* ─── Constants ─── */
 
-const navLinks = [
+const userNavLinks = [
   { href: "/", label: "Discover" },
-  { href: "/library", label: "Library" },
+  { href: "/lists", label: "My Lists" },
+] as const;
+
+const adminNavLinks = [
+  { href: "/", label: "Discover" },
+  { href: "/lists", label: "My Lists" },
   { href: "/torrents", label: "Downloads" },
 ] as const;
 
 /* ─── Nav Links ─── */
 
-const NavLinks = memo(function NavLinks(): React.JSX.Element {
+const NavLinks = memo(function NavLinks({ role }: { role?: string }): React.JSX.Element {
   const pathname = usePathname();
+  const links = role === "admin" ? adminNavLinks : userNavLinks;
   return (
     <nav className="flex items-center gap-1">
-      {navLinks.map(({ href, label }) => {
+      {links.map(({ href, label }) => {
         const isActive =
           href === "/" ? pathname === "/" : pathname.startsWith(href);
         return (
@@ -186,6 +192,8 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
 
 export function Topbar(): React.JSX.Element {
   const [scrolled, setScrolled] = useState(false);
+  const { data: session } = authClient.useSession();
+  const role = (session?.user as { role?: string } | undefined)?.role;
 
   useEffect(() => {
     const handler = (): void => setScrolled(window.scrollY > 0);
@@ -214,7 +222,7 @@ export function Topbar(): React.JSX.Element {
 
         {/* Center: Nav Links */}
         <div className="flex flex-1 items-center justify-center">
-          <NavLinks />
+          <NavLinks role={role} />
         </div>
 
         {/* Right: Search + User */}

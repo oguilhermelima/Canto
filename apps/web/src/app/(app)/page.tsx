@@ -5,13 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@canto/ui/button";
 import { Skeleton } from "@canto/ui/skeleton";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { MediaBadges } from "~/components/media/media-badges";
-import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { MediaCarousel } from "~/components/media/media-carousel";
 import { FeaturedCarousel } from "~/components/media/featured-carousel";
-import { LibraryButton } from "~/components/media/library-button";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -59,7 +57,7 @@ export default function DiscoverPage(): React.JSX.Element {
 
   const library = trpc.library.list.useQuery({
     page: 1,
-    pageSize: 500,
+    pageSize: 20,
     sortBy: "addedAt",
     sortOrder: "desc",
   });
@@ -72,14 +70,6 @@ export default function DiscoverPage(): React.JSX.Element {
     sortOrder: "desc",
   });
 
-  const utils = trpc.useUtils();
-
-  // Check if any spotlight/carousel item is in library
-  const libraryIds = useMemo(() => {
-    const items = library.data?.items ?? [];
-    return new Set(items.map((i) => `${i.provider}-${i.externalId}`));
-  }, [library.data]);
-
   // Spotlight from backend
   const spotlightQuery = trpc.provider.spotlight.useQuery(undefined, {
     staleTime: 5 * 60 * 1000,
@@ -89,9 +79,6 @@ export default function DiscoverPage(): React.JSX.Element {
   const [currentSpotlight, setCurrentSpotlight] = useState(0);
 
   const currentItem = spotlightItems[currentSpotlight];
-  const isInLibrary = currentItem
-    ? libraryIds.has(`${currentItem.provider}-${currentItem.externalId}`)
-    : false;
 
   const nextSpotlight = useCallback(() => {
     setCurrentSpotlight((prev) =>
@@ -268,16 +255,12 @@ export default function DiscoverPage(): React.JSX.Element {
               </Link>
 
               <div className="flex items-center gap-3 pt-1">
-                <LibraryButton
-                  externalId={currentItem.externalId}
-                  provider={currentItem.provider}
-                  type={currentItem.type}
-                  title={currentItem.title}
-                  inLibrary={isInLibrary}
-                  redirectOnAdd
-                  size="lg"
-                  variant="dark"
-                />
+                <Link
+                  href={getPreviewUrl(currentItem)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-white/90"
+                >
+                  More Info
+                </Link>
               </div>
             </div>
           ) : null}
@@ -351,7 +334,6 @@ export default function DiscoverPage(): React.JSX.Element {
               return true;
             });
           })()}
-          libraryIds={libraryIds}
           isLoading={recommendations.isLoading}
           isFetchingMore={recommendations.isFetchingNextPage}
           onLoadMore={recommendations.hasNextPage ? () => void recommendations.fetchNextPage() : undefined}

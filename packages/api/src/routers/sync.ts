@@ -6,7 +6,7 @@ import { getSetting } from "@canto/db/settings";
 import { SETTINGS } from "../lib/settings-keys";
 import { persistMedia } from "@canto/db/persist-media";
 
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
+import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure } from "../trpc";
 import { getTmdbProvider } from "../lib/tmdb-client";
 import {
   findSyncItemById,
@@ -21,19 +21,34 @@ import { findMediaByAnyReference, updateMedia } from "../infrastructure/reposito
 /*  Queue (lazy singleton)                                                     */
 /* -------------------------------------------------------------------------- */
 
-let reverseSyncQueue: Queue | null = null;
+const redisConnection = {
+  host: process.env.REDIS_HOST ?? "localhost",
+  port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+  password: process.env.REDIS_PASSWORD ?? undefined,
+};
 
-function getQueue(): Queue {
-  if (!reverseSyncQueue) {
-    reverseSyncQueue = new Queue("reverse-sync", {
-      connection: {
-        host: process.env.REDIS_HOST ?? "localhost",
-        port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
-        password: process.env.REDIS_PASSWORD ?? undefined,
-      },
-    });
+let jellyfinQueue: Queue | null = null;
+let plexQueue: Queue | null = null;
+
+function getJellyfinQueue(): Queue {
+  if (!jellyfinQueue) jellyfinQueue = new Queue("jellyfin-sync", { connection: redisConnection });
+  return jellyfinQueue;
+}
+
+function getPlexQueue(): Queue {
+  if (!plexQueue) plexQueue = new Queue("plex-sync", { connection: redisConnection });
+  return plexQueue;
+}
+
+async function dispatchQueue(queue: Queue, jobId: string): Promise<boolean> {
+  const existing = await queue.getJob(jobId);
+  if (existing) {
+    const state = await existing.getState();
+    if (state === "active" || state === "waiting") return false;
+    await existing.remove();
   }
-  return reverseSyncQueue;
+  await queue.add(queue.name, {}, { jobId });
+  return true;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -42,20 +57,26 @@ function getQueue(): Queue {
 
 export const syncRouter = createTRPCRouter({
   /**
-   * Trigger a reverse sync — import media from Jellyfin/Plex into Canto.
+   * Trigger sync for both Jellyfin and Plex.
    */
-  importMedia: protectedProcedure.mutation(async () => {
-    const queue = getQueue();
-    const existing = await queue.getJob("reverse-sync-run");
-    if (existing) {
-      const state = await existing.getState();
-      if (state === "active" || state === "waiting") {
-        return { started: false, reason: "already-running" };
-      }
-      await existing.remove();
-    }
-    await queue.add("reverse-sync", {}, { jobId: "reverse-sync-run" });
-    return { started: true };
+  importMedia: adminProcedure.mutation(async () => {
+    const [jellyfin, plex] = await Promise.all([
+      dispatchQueue(getJellyfinQueue(), "jellyfin-sync-run"),
+      dispatchQueue(getPlexQueue(), "plex-sync-run"),
+    ]);
+    return { started: { jellyfin, plex } };
+  }),
+
+  /** Trigger Jellyfin sync only */
+  syncJellyfin: adminProcedure.mutation(async () => {
+    const started = await dispatchQueue(getJellyfinQueue(), "jellyfin-sync-run");
+    return { started };
+  }),
+
+  /** Trigger Plex sync only */
+  syncPlex: adminProcedure.mutation(async () => {
+    const started = await dispatchQueue(getPlexQueue(), "plex-sync-run");
+    return { started };
   }),
 
   /**
@@ -112,7 +133,7 @@ export const syncRouter = createTRPCRouter({
    * Manually resolve a failed sync item with a specific TMDB ID.
    * Fetches metadata, persists to DB, marks as imported.
    */
-  resolveSyncItem: protectedProcedure
+  resolveSyncItem: adminProcedure
     .input(
       z.object({
         syncItemId: z.string().uuid(),
@@ -133,15 +154,15 @@ export const syncRouter = createTRPCRouter({
       let mediaId: string;
       if (existing) {
         mediaId = existing.id;
-        if (!existing.inLibrary) {
+        if (!existing.downloaded) {
           await updateMedia(db, existing.id, {
-            inLibrary: true, libraryId: item.libraryId, libraryPath: item.serverItemPath, addedAt: new Date(),
+            downloaded: true, libraryId: item.libraryId, libraryPath: item.serverItemPath, addedAt: new Date(),
           });
         }
       } else {
         const inserted = await persistMedia(db, normalized);
         await updateMedia(db, inserted.id, {
-          inLibrary: true, libraryId: item.libraryId, libraryPath: item.serverItemPath, addedAt: new Date(),
+          downloaded: true, libraryId: item.libraryId, libraryPath: item.serverItemPath, addedAt: new Date(),
         });
         mediaId = inserted.id;
       }
