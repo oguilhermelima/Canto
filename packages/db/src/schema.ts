@@ -632,6 +632,7 @@ export const downloadRequest = pgTable(
     adminNote: text("admin_note"),
     resolvedBy: varchar("resolved_by", { length: 36 }).references(
       () => user.id,
+      { onDelete: "set null" },
     ),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })

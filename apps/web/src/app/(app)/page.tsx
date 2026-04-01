@@ -168,6 +168,11 @@ export default function DiscoverPage(): React.JSX.Element {
         {/* Content */}
         <div
           className="relative mx-auto flex min-h-[90vh] w-full flex-col justify-end px-4 pb-16 pt-24 md:min-h-[80vh] md:px-8 lg:px-12 xl:px-16 2xl:px-24"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowLeft") prevSpotlight();
+            if (e.key === "ArrowRight") nextSpotlight();
+          }}
           onTouchStart={(e) => {
             const touch = e.touches[0];
             if (touch) (e.currentTarget as HTMLElement).dataset.touchX = String(touch.clientX);

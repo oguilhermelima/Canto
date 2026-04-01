@@ -324,6 +324,11 @@ export const mediaRouter = createTRPCRouter({
       );
       const serverLib = await findServerLibrary(ctx.db);
       if (serverLib) await removeListItem(ctx.db, serverLib.id, input.id);
+      // Revert downloaded requests back to approved
+      const { revertRequestStatus } = await import(
+        "../infrastructure/repositories/request-repository"
+      );
+      await revertRequestStatus(ctx.db, input.id, "downloaded", "approved");
       return updated;
     }),
 

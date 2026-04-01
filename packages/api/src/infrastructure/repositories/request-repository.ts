@@ -78,6 +78,23 @@ export async function updateRequestStatus(
     );
 }
 
+export async function revertRequestStatus(
+  db: Database,
+  mediaId: string,
+  fromStatus: string,
+  toStatus: string,
+) {
+  await db
+    .update(downloadRequest)
+    .set({ status: toStatus, updatedAt: new Date() })
+    .where(
+      and(
+        eq(downloadRequest.mediaId, mediaId),
+        eq(downloadRequest.status, fromStatus),
+      ),
+    );
+}
+
 export async function cancelRequest(db: Database, id: string, userId: string) {
   const [row] = await db
     .update(downloadRequest)

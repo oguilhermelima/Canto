@@ -628,16 +628,18 @@ function AccountSection(): React.JSX.Element {
 
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-muted-foreground">Name</label>
+              <label htmlFor="settings-name" className="text-sm font-medium text-muted-foreground">Name</label>
               <Input
+                id="settings-name"
                 value={name}
                 onChange={(e) => { setName(e.target.value); setProfileDirty(true); }}
                 className="h-10"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-muted-foreground">Email</label>
+              <label htmlFor="settings-email" className="text-sm font-medium text-muted-foreground">Email</label>
               <Input
+                id="settings-email"
                 type="email"
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setProfileDirty(true); }}
@@ -658,8 +660,9 @@ function AccountSection(): React.JSX.Element {
       <SettingsSection title="Password" description="Change your account password.">
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-muted-foreground">Current password</label>
+            <label htmlFor="settings-current-password" className="text-sm font-medium text-muted-foreground">Current password</label>
             <Input
+              id="settings-current-password"
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
@@ -668,8 +671,9 @@ function AccountSection(): React.JSX.Element {
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-muted-foreground">New password</label>
+            <label htmlFor="settings-new-password" className="text-sm font-medium text-muted-foreground">New password</label>
             <Input
+              id="settings-new-password"
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}

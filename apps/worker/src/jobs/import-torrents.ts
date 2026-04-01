@@ -12,6 +12,7 @@ import {
   findLibraryById,
   ensureServerLibrary,
   addListItem,
+  updateRequestStatus,
 } from "@canto/api/infrastructure/repositories";
 
 /* -------------------------------------------------------------------------- */
@@ -94,6 +95,11 @@ export async function handleImportTorrents(): Promise<void> {
             const serverLib = await ensureServerLibrary(db);
             await addListItem(db, { listId: serverLib.id, mediaId: updated.mediaId });
           } catch { /* already in server library */ }
+
+          // Update download requests to "downloaded"
+          try {
+            await updateRequestStatus(db, updated.mediaId, "downloaded");
+          } catch { /* no pending requests */ }
         }
 
         // Continuous download: try to grab next episode
