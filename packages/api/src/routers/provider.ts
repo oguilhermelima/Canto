@@ -122,11 +122,20 @@ export const providerRouter = createTRPCRouter({
    * Falls back to TMDB trending if pool is empty (fresh install).
    */
   spotlight: publicProcedure.query(async () => {
-    // Try recommendation pool first
-    const poolItems = await findPoolItemsWithBackdrops(db, 10);
+    // Try recommendation pool first (fetch extra to allow dedup)
+    const poolItems = await findPoolItemsWithBackdrops(db, 30);
 
     if (poolItems.length > 0) {
-      return poolItems.map((item) => ({
+      // Deduplicate by provider+externalId
+      const seen = new Set<string>();
+      const unique = poolItems.filter((item) => {
+        const key = `${item.provider ?? "tmdb"}-${item.externalId}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      return unique.slice(0, 10).map((item) => ({
         externalId: item.externalId,
         provider: item.provider ?? "tmdb",
         type: item.mediaType as "movie" | "show",

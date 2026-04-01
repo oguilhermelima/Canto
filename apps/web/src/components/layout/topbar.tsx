@@ -12,7 +12,9 @@ import {
 } from "@canto/ui/dropdown-menu";
 import {
   Armchair,
+  Compass,
   Download,
+  List,
   Search,
   User,
   LayoutDashboard,
@@ -22,22 +24,23 @@ import {
   Sun,
   Moon,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useState, useEffect, memo } from "react";
 import { useTheme } from "next-themes";
 import { authClient } from "~/lib/auth-client";
 
 /* ─── Constants ─── */
 
-const userNavLinks = [
-  { href: "/", label: "Discover" },
-  { href: "/lists", label: "My Lists" },
-] as const;
+const userNavLinks: Array<{ href: string; label: string; icon: LucideIcon }> = [
+  { href: "/", label: "Discover", icon: Compass },
+  { href: "/lists", label: "My Lists", icon: List },
+];
 
-const adminNavLinks = [
-  { href: "/", label: "Discover" },
-  { href: "/lists", label: "My Lists" },
-  { href: "/torrents", label: "Downloads" },
-] as const;
+const adminNavLinks: Array<{ href: string; label: string; icon: LucideIcon }> = [
+  { href: "/", label: "Discover", icon: Compass },
+  { href: "/lists", label: "My Lists", icon: List },
+  { href: "/torrents", label: "Downloads", icon: Download },
+];
 
 /* ─── Nav Links ─── */
 
@@ -45,8 +48,8 @@ const NavLinks = memo(function NavLinks({ role }: { role?: string }): React.JSX.
   const pathname = usePathname();
   const links = role === "admin" ? adminNavLinks : userNavLinks;
   return (
-    <nav className="flex items-center gap-1">
-      {links.map(({ href, label }) => {
+    <nav className="flex items-center gap-0.5 rounded-2xl bg-foreground/5 p-1 backdrop-blur-sm">
+      {links.map(({ href, label, icon: Icon }) => {
         const isActive =
           href === "/" ? pathname === "/" : pathname.startsWith(href);
         return (
@@ -54,12 +57,13 @@ const NavLinks = memo(function NavLinks({ role }: { role?: string }): React.JSX.
             key={href}
             href={href}
             className={cn(
-              "rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors",
+              "flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors",
               isActive
                 ? "bg-foreground/10 text-foreground"
-                : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground",
+                : "text-foreground/60 hover:text-foreground",
             )}
           >
+            <Icon className="h-3.5 w-3.5" />
             {label}
           </Link>
         );
