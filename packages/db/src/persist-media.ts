@@ -98,6 +98,23 @@ export async function updateMediaFromNormalized(
   mediaId: string,
   normalized: NormalizedMedia,
 ): Promise<typeof media.$inferSelect> {
+  // When updating with TVDB data, preserve TMDB images (higher quality/consistency)
+  let posterPath = normalized.posterPath;
+  let backdropPath = normalized.backdropPath;
+  let logoPath = normalized.logoPath;
+
+  if (normalized.provider === "tvdb") {
+    const existing = await db.query.media.findFirst({
+      where: eq(media.id, mediaId),
+      columns: { posterPath: true, backdropPath: true, logoPath: true },
+    });
+    if (existing) {
+      posterPath = existing.posterPath ?? posterPath;
+      backdropPath = existing.backdropPath ?? backdropPath;
+      logoPath = existing.logoPath ?? logoPath;
+    }
+  }
+
   const [updated] = await db
     .update(media)
     .set({
@@ -120,9 +137,9 @@ export async function updateMediaFromNormalized(
       voteCount: normalized.voteCount,
       popularity: normalized.popularity,
       runtime: normalized.runtime,
-      posterPath: normalized.posterPath,
-      backdropPath: normalized.backdropPath,
-      logoPath: normalized.logoPath,
+      posterPath,
+      backdropPath,
+      logoPath,
       imdbId: normalized.imdbId,
       tvdbId: normalized.tvdbId,
       numberOfSeasons: normalized.numberOfSeasons,
