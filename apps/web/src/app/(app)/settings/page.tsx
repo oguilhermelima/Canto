@@ -685,7 +685,7 @@ function AccountSection(): React.JSX.Element {
       </SettingsSection>
 
       <SettingsSection title="Appearance" description="Choose a theme for the interface.">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {themeOptions.map(({ value, label, description: desc, icon: Icon }) => (
             <button
               key={value}

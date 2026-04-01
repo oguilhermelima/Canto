@@ -255,6 +255,7 @@ export default function DiscoverPage(): React.JSX.Element {
                 size="icon"
                 className="h-8 w-8 text-foreground/50 hover:text-foreground"
                 onClick={prevSpotlight}
+                aria-label="Previous"
               >
                 <ChevronLeft size={20} />
               </Button>
@@ -263,6 +264,7 @@ export default function DiscoverPage(): React.JSX.Element {
                   <button
                     key={i}
                     type="button"
+                    aria-label={`Go to slide ${i + 1}`}
                     className={`h-1 rounded-full transition-all duration-300 ${
                       i === currentSpotlight
                         ? "w-6 bg-foreground"
@@ -277,6 +279,7 @@ export default function DiscoverPage(): React.JSX.Element {
                 size="icon"
                 className="h-8 w-8 text-foreground/50 hover:text-foreground"
                 onClick={nextSpotlight}
+                aria-label="Next"
               >
                 <ChevronRight size={20} />
               </Button>

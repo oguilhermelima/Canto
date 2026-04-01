@@ -148,28 +148,28 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
           </>
         )}
         <DropdownMenuItem asChild>
-          <a href="/status">
+          <Link href="/status">
             <LayoutDashboard className="mr-2 h-4 w-4" />
             Status
-          </a>
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <a href="/settings">
+          <Link href="/settings">
             <Settings className="mr-2 h-4 w-4" />
             Settings
-          </a>
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <a href="/notifications">
+          <Link href="/notifications">
             <Bell className="mr-2 h-4 w-4" />
             Notifications
-          </a>
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <a href="/requests">
+          <Link href="/requests">
             <Download className="mr-2 h-4 w-4" />
             Requests
-          </a>
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

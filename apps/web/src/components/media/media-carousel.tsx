@@ -88,6 +88,7 @@ export function MediaCarousel({
         {/* Left arrow with gradient */}
         {canScrollLeft && (
           <button
+            aria-label="Scroll left"
             className="absolute left-0 top-0 z-20 hidden h-full w-14 items-center justify-center bg-gradient-to-r from-background/80 to-transparent text-foreground/60 opacity-0 transition-opacity hover:text-foreground group-hover/carousel:opacity-100 md:flex lg:w-20"
             onClick={() => scroll("left")}
           >
@@ -98,6 +99,7 @@ export function MediaCarousel({
         {/* Right arrow with gradient */}
         {canScrollRight && (
           <button
+            aria-label="Scroll right"
             className="absolute right-0 top-0 z-20 hidden h-full w-14 items-center justify-center bg-gradient-to-l from-background/80 to-transparent text-foreground/60 opacity-0 transition-opacity hover:text-foreground group-hover/carousel:opacity-100 md:flex lg:w-20"
             onClick={() => scroll("right")}
           >

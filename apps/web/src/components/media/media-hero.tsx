@@ -73,7 +73,7 @@ export function MediaHero({
             {year && (
               <span className="text-sm text-white/70">{year}</span>
             )}
-            <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-medium uppercase text-white">
+            <span className="rounded-xl bg-white/20 px-2.5 py-0.5 text-xs font-medium uppercase text-white">
               {type === "movie" ? "Movie" : "TV Series"}
             </span>
           </div>
@@ -84,7 +84,7 @@ export function MediaHero({
               {genres.map((genre) => (
                 <span
                   key={genre}
-                  className="rounded-full border border-white/40 px-3 py-1 text-sm text-white"
+                  className="rounded-xl border border-white/40 px-3 py-1 text-sm text-white"
                 >
                   {genre}
                 </span>
@@ -103,7 +103,7 @@ export function MediaHero({
           <div className="flex items-center gap-3">
             <Link
               href={detailHref}
-              className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <Info className="h-4 w-4" />
               More Info

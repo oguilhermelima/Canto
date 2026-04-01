@@ -180,6 +180,7 @@ export default function ListsPage(): React.JSX.Element {
                 {/* Delete button */}
                 <button
                   type="button"
+                  aria-label={`Delete ${l.name}`}
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
