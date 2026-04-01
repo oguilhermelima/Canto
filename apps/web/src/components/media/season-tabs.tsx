@@ -189,17 +189,6 @@ export function SeasonTabs({
             </button>
           )}
 
-          {/* Preferences button */}
-          {onOpenPreferences && (
-            <button
-              type="button"
-              onClick={onOpenPreferences}
-              className="flex h-8 items-center gap-1.5 rounded-xl bg-muted/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <Settings2 className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Settings</span>
-            </button>
-          )}
         </div>
       </div>
 

@@ -1,19 +1,37 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import { Badge } from "@canto/ui/badge";
 import { Skeleton } from "@canto/ui/skeleton";
 import {
-  Clock,
-  Film,
-  Settings2,
-  Tv,
-} from "lucide-react";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@canto/ui/popover";
+import { ChevronRight, Film, Play, Settings2, Tv } from "lucide-react";
 import Link from "next/link";
+import { cn } from "@canto/ui/cn";
 import { AddToListButton } from "~/components/media/add-to-list-button";
-import { MediaBadges } from "~/components/media/media-badges";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
+
+interface WatchProvider {
+  providerId: number;
+  providerName: string;
+  logoPath: string | null;
+}
+
+interface CrewMember {
+  name: string;
+  job: string;
+}
+
+interface VideoItem {
+  key: string;
+  name?: string;
+  type?: string;
+}
 
 interface MediaDetailHeroProps {
   id: string;
@@ -29,51 +47,54 @@ interface MediaDetailHeroProps {
   voteCount?: number | null;
   genres?: string[];
   runtime?: number | null;
+  contentRating?: string | null;
   status?: string | null;
   logoPath?: string | null;
   externalId?: number | null;
   provider?: string | null;
-  trailerUrl?: string | null;
-  watchProviders?: Array<{
-    providerId: number;
-    providerName: string;
-    logoPath: string | null;
-  }>;
-  rentBuyProviders?: Array<{
-    providerId: number;
-    providerName: string;
-    logoPath: string | null;
-  }>;
   availableSources?: Array<{
     type: "jellyfin" | "plex";
     resolution?: string | null;
   }>;
   isAdmin?: boolean;
+  /** Content rendered at the bottom of the hero, still over the backdrop */
+  children?: React.ReactNode;
+  // Where to watch
+  servers?: { jellyfin?: { url: string }; plex?: { url: string } } | null;
+  flatrateProviders?: WatchProvider[];
+  rentBuyProviders?: WatchProvider[];
+  watchLink?: string;
+  watchProviderLinks?: Record<number, string>;
+  // Trailers
+  videos?: VideoItem[];
+  // Crew
+  crew?: CrewMember[];
 }
 
 export function MediaDetailHero({
   id,
   type,
   title,
-  tagline,
   overview,
   backdropPath,
-  posterPath,
   year,
-  voteAverage,
-  voteCount,
+  releaseDate,
   genres,
   runtime,
-  status,
+  contentRating,
   logoPath,
-  provider,
-  availableSources,
   isAdmin,
+  children,
+  servers,
+  flatrateProviders,
+  rentBuyProviders,
+  watchLink,
+  watchProviderLinks,
+  videos,
+  crew,
 }: MediaDetailHeroProps): React.JSX.Element {
   const resolveImage = (path: string, size: string): string =>
     path.startsWith("http") ? path : `${TMDB_IMAGE_BASE}/${size}${path}`;
-
-  const logoUrl = logoPath ? resolveImage(logoPath, "w500") : null;
 
   const formatRuntime = (mins: number): string => {
     const h = Math.floor(mins / 60);
@@ -81,197 +102,394 @@ export function MediaDetailHero({
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
   };
 
+  const formatDate = (date: string): string => {
+    try {
+      return new Date(date).toLocaleDateString(undefined, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return date;
+    }
+  };
+
+  const logoUrl = logoPath ? resolveImage(logoPath, "w500") : null;
+
+  // Director/Creator
+  const director = (crew ?? []).find(
+    (c) => c.job === "Director" || c.job === "Creator",
+  );
+
+  // Meta line: "27 May 2022 | Action, Adventure, Science Fiction"
+  const metaParts: string[] = [];
+  if (releaseDate) metaParts.push(formatDate(releaseDate));
+  if (genres && genres.length > 0) metaParts.push(genres.join(", "));
+
+  // Trailers (top 4)
+  const trailers = (videos ?? []).slice(0, 4);
+
+  // Watch providers
+  const hasServers = servers?.jellyfin || servers?.plex;
+  const allProviders = [...(flatrateProviders ?? []), ...(rentBuyProviders ?? [])];
+  const hasProviders = allProviders.length > 0;
+
+  const getProviderUrl = (providerId: number): string | undefined => {
+    const template = watchProviderLinks?.[providerId];
+    if (template) return template.replace("{title}", encodeURIComponent(title));
+    return watchLink;
+  };
+
   return (
-    <>
-      {/* Hero Backdrop — extends behind topbar */}
-      <div className="hero-backdrop relative -mt-16 min-h-[420px] w-full">
-        {backdropPath ? (
-          <div className="absolute inset-0 overflow-hidden">
-            <Image
-              src={resolveImage(backdropPath, "original")}
-              alt=""
-              fill
-              className="object-cover object-top"
-              priority
-              sizes="100vw"
+    <div className="hero-backdrop relative -mt-16 w-full overflow-x-hidden">
+      {/* Backdrop image — exactly 100dvh tall, scrolls with content */}
+      {backdropPath ? (
+        <div className="absolute inset-x-0 top-0 h-dvh overflow-hidden">
+          <Image
+            src={resolveImage(backdropPath, "original")}
+            alt=""
+            fill
+            className="object-cover object-top"
+            priority
+            sizes="100vw"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-background from-0% via-background/50 via-50% to-background/10" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/30 to-transparent" />
+        </div>
+      ) : (
+        <div className="absolute inset-x-0 top-0 h-dvh bg-gradient-to-b from-muted/30 to-background" />
+      )}
+
+      {/* Info section */}
+      <div className="relative mx-auto w-full px-4 pb-6 pt-[30dvh] md:pt-[25dvh] md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+        <div className="max-w-3xl space-y-4">
+          {/* Logo or Title */}
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl}
+              alt={title}
+              className="h-auto max-h-16 w-auto max-w-[70vw] object-contain object-left sm:max-h-20 md:max-h-28 lg:max-h-36"
+              style={{
+                filter:
+                  "drop-shadow(0 2px 8px rgba(0,0,0,0.5)) drop-shadow(0 0 20px rgba(0,0,0,0.3))",
+              }}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-background from-5% via-background/50 via-35% to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-r from-background/70 via-background/25 to-transparent" />
-          </div>
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-b from-muted/30 to-background" />
-        )}
+          ) : (
+            <h1 className="text-4xl font-extrabold tracking-tight text-foreground drop-shadow-lg lg:text-5xl">
+              {title}
+            </h1>
+          )}
 
-        <div className="relative mx-auto flex min-h-[600px] w-full flex-col justify-end px-4 pb-10 pt-28 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-          <div className="flex max-w-5xl flex-col gap-8 md:flex-row md:items-end">
-            {/* Poster */}
-            <div className="relative aspect-[2/3] w-[220px] shrink-0 self-center overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/10 md:w-[330px] md:self-auto lg:w-[380px]">
-              {posterPath ? (
-                <Image
-                  src={resolveImage(posterPath, "w500")}
-                  alt={title}
-                  fill
-                  className="object-cover"
-                  sizes="380px"
-                  priority
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-muted/50">
-                  {type === "movie" ? (
-                    <Film className="h-12 w-12 text-muted-foreground/40" />
-                  ) : (
-                    <Tv className="h-12 w-12 text-muted-foreground/40" />
-                  )}
-                </div>
-              )}
-              {/* Badges on poster */}
-              <div className="absolute left-2 top-2 flex items-center gap-1.5">
-                {status && (
-                  <Badge
-                    variant="secondary"
-                    className="border-none bg-black/60 text-[10px] text-white backdrop-blur-sm"
-                  >
-                    {status}
-                  </Badge>
-                )}
-                {provider && (
-                  <Badge
-                    variant="outline"
-                    className="border-none bg-black/60 text-[10px] uppercase text-white backdrop-blur-sm"
-                  >
-                    {provider}
-                  </Badge>
-                )}
-              </div>
-              {/* Availability badges */}
-              {availableSources && availableSources.length > 0 && (
-                <div className="absolute bottom-2 left-2 flex items-center gap-1.5">
-                  {availableSources.map((src) => (
-                    <Badge
-                      key={src.type}
-                      className={
-                        src.type === "jellyfin"
-                          ? "border-none bg-[#00a4dc] text-[10px] text-white"
-                          : "border-none bg-[#e5a00d] text-[10px] text-black"
-                      }
-                    >
-                      {src.resolution ? `${src.resolution} · ` : ""}{src.type === "jellyfin" ? "Jellyfin" : "Plex"}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
+          {/* Director/Creator */}
+          {director && (
+            <p className="text-sm text-foreground/60">
+              {director.job === "Director" ? "Directed by" : "Created by"}{" "}
+              <span className="font-medium text-foreground/80">
+                {director.name}
+              </span>
+            </p>
+          )}
 
-            {/* Info */}
-            <div className="flex flex-1 flex-col gap-4 pb-1">
-              {tagline && (
-                <p className="text-sm italic text-foreground/60">{tagline}</p>
-              )}
-
-              {/* Logo or Title */}
-              {logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={logoUrl}
-                  alt={title}
-                  className="h-auto max-h-24 w-auto max-w-sm object-contain object-left md:max-h-36 md:max-w-md lg:max-h-44 lg:max-w-lg"
-                  style={{
-                    filter:
-                      "drop-shadow(0 2px 8px rgba(0,0,0,0.5)) drop-shadow(0 0 20px rgba(0,0,0,0.3))",
-                  }}
-                />
-              ) : (
-                <h1 className="text-3xl font-extrabold tracking-tight text-foreground drop-shadow-sm lg:text-4xl xl:text-5xl">
-                  {title}
-                </h1>
-              )}
-
-              {/* Meta badges */}
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <MediaBadges
-                  type={type as "movie" | "show"}
-                  year={year}
-                  voteAverage={voteAverage}
-                  size="md"
-                />
-                {runtime != null && runtime > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-white/10 px-2 py-0.5 text-xs font-medium text-white/80 backdrop-blur-sm">
-                    <Clock className="h-3 w-3" />
-                    {formatRuntime(runtime)}
+          {/* Meta line */}
+          {metaParts.length > 0 && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-foreground/60">
+              {releaseDate && <span>{formatDate(releaseDate)}</span>}
+              {contentRating && (
+                <>
+                  <span className="text-foreground/20">|</span>
+                  <span className="rounded border border-foreground/20 px-1.5 py-0.5 text-xs font-medium leading-none">
+                    {contentRating}
                   </span>
-                )}
-              </div>
-
-              {/* Genres */}
+                </>
+              )}
+              {runtime != null && runtime > 0 && (
+                <>
+                  <span className="text-foreground/20">|</span>
+                  <span>{formatRuntime(runtime)}</span>
+                </>
+              )}
               {genres && genres.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {genres.map((genre) => (
-                    <Badge key={genre} variant="secondary" className="text-xs">
-                      {genre}
-                    </Badge>
-                  ))}
-                </div>
+                <>
+                  <span className="text-foreground/20">|</span>
+                  <span>{genres.join(", ")}</span>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Overview */}
+          {overview && (
+            <div className="max-w-2xl">
+              <p className="line-clamp-3 text-sm leading-relaxed text-foreground/70">
+                {overview}
+              </p>
+              {overview.length > 200 && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-foreground/50 transition-colors hover:text-foreground/80">
+                      See more
+                      <ChevronRight className="h-3 w-3" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="max-h-[400px] w-[min(420px,90vw)] overflow-y-auto">
+                    <p className="text-sm leading-relaxed text-foreground/80">
+                      {overview}
+                    </p>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+          )}
+
+          {/* Where to Watch row */}
+          {(hasServers || hasProviders) && (
+            <div className="flex items-center gap-3 overflow-x-auto scrollbar-none">
+              <span className="shrink-0 text-xs font-medium capitalize text-foreground/40">
+                Where to watch
+              </span>
+              {/* Jellyfin */}
+              {servers?.jellyfin && (
+                <a
+                  href={servers.jellyfin.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[#a95ce0]/25 bg-[#a95ce0]/10 px-3.5 text-sm font-medium transition-colors hover:bg-[#a95ce0]/20"
+                >
+                  <span
+                    className="inline-block h-4 w-4 shrink-0"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #a95ce0, #4bb8e8)",
+                      mask: "url(/jellyfin-logo.svg) center/contain no-repeat",
+                      WebkitMask:
+                        "url(/jellyfin-logo.svg) center/contain no-repeat",
+                    }}
+                  />
+                  <span className="bg-gradient-to-r from-[#a95ce0] to-[#4bb8e8] bg-clip-text text-transparent">
+                    Jellyfin
+                  </span>
+                </a>
               )}
 
-              {/* Buttons */}
-              <div className="mt-2 flex flex-wrap items-center gap-2.5">
-                <AddToListButton
-                  mediaId={id}
-                  title={title}
-                  size="lg"
+              {/* Plex */}
+              {servers?.plex && (
+                <a
+                  href={servers.plex.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[#e5a00d]/25 bg-[#e5a00d]/10 px-3.5 text-sm font-medium text-[#e5a00d] transition-colors hover:bg-[#e5a00d]/20"
+                >
+                  <span
+                    className="inline-block h-4 w-4 shrink-0 bg-[#e5a00d]"
+                    style={{
+                      mask: "url(/plex-logo.svg) center/contain no-repeat",
+                      WebkitMask:
+                        "url(/plex-logo.svg) center/contain no-repeat",
+                    }}
+                  />
+                  Plex
+                </a>
+              )}
+
+              {/* Top streaming (first 3 flatrate) */}
+              {(flatrateProviders ?? []).slice(0, 3).map((p) => (
+                <a
+                  key={p.providerId}
+                  href={getProviderUrl(p.providerId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex h-10 shrink-0 items-center gap-2 rounded-xl bg-white/10 px-3 backdrop-blur-sm transition-colors hover:bg-white/15"
+                >
+                  {p.logoPath && (
+                    <div className="relative h-5 w-5 shrink-0 overflow-hidden rounded">
+                      <Image
+                        src={`${TMDB_IMAGE_BASE}/w92${p.logoPath}`}
+                        alt=""
+                        fill
+                        className="object-cover"
+                        sizes="20px"
+                      />
+                    </div>
+                  )}
+                  <span className="text-sm text-foreground/80">
+                    {p.providerName}
+                  </span>
+                </a>
+              ))}
+
+              {/* More button with popover */}
+              {allProviders.length > 3 && (
+                <MoreProvidersPopover
+                  flatrate={flatrateProviders ?? []}
+                  rentBuy={rentBuyProviders ?? []}
+                  getUrl={getProviderUrl}
                 />
-                {isAdmin && (
-                  <Link
-                    href={`/media/${id}/manage`}
-                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-muted px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
-                  >
-                    <Settings2 className="h-4 w-4" />
-                    Manage
-                  </Link>
-                )}
-              </div>
+              )}
             </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <AddToListButton mediaId={id} title={title} size="lg" />
+            {isAdmin && (
+              <Link
+                href={`/media/${id}/manage`}
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm font-medium text-foreground/80 backdrop-blur-sm transition-colors hover:bg-white/15 hover:text-foreground"
+              >
+                <Settings2 className="h-4 w-4" />
+                Manage
+              </Link>
+            )}
           </div>
+
         </div>
       </div>
 
-      {/* Overview — below hero */}
-      {overview && (
-        <div className="px-4 pt-1 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-          <p className="max-w-4xl text-sm leading-relaxed text-foreground/70">
-            {overview}
-          </p>
+      {/* Children (e.g. videos) — still inside the hero backdrop */}
+      {children && (
+        <div className="relative pt-6 md:pt-8">
+          {children}
         </div>
       )}
-    </>
+    </div>
   );
+}
+
+/* ─── More Providers Popover ─── */
+
+function MoreProvidersPopover({
+  flatrate,
+  rentBuy,
+  getUrl,
+}: {
+  flatrate: WatchProvider[];
+  rentBuy: WatchProvider[];
+  getUrl: (id: number) => string | undefined;
+}): React.JSX.Element {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className="flex h-10 items-center gap-1.5 rounded-xl bg-white/10 px-3 text-sm text-foreground/70 backdrop-blur-sm transition-colors hover:bg-white/15 hover:text-foreground">
+          More
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="w-72 max-h-[400px] overflow-y-auto p-0"
+      >
+        {flatrate.length > 0 && (
+          <div className="p-3">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Stream
+            </p>
+            <div className="space-y-1">
+              {flatrate.map((p) => (
+                <ProviderRow key={p.providerId} provider={p} url={getUrl(p.providerId)} />
+              ))}
+            </div>
+          </div>
+        )}
+        {rentBuy.length > 0 && (
+          <div className={cn("p-3", flatrate.length > 0 && "border-t border-border")}>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Rent / Buy
+            </p>
+            <div className="space-y-1">
+              {rentBuy.map((p) => (
+                <ProviderRow key={p.providerId} provider={p} url={getUrl(p.providerId)} />
+              ))}
+            </div>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function ProviderRow({
+  provider: p,
+  url,
+}: {
+  provider: WatchProvider;
+  url: string | undefined;
+}): React.JSX.Element {
+  const content = (
+    <div className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent">
+      {p.logoPath ? (
+        <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-lg">
+          <Image
+            src={`${TMDB_IMAGE_BASE}/w92${p.logoPath}`}
+            alt=""
+            fill
+            className="object-cover"
+            sizes="32px"
+          />
+        </div>
+      ) : (
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-[10px] font-bold text-muted-foreground">
+          {p.providerName.slice(0, 2)}
+        </div>
+      )}
+      <span className="text-sm">{p.providerName}</span>
+    </div>
+  );
+
+  if (url) {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer">
+        {content}
+      </a>
+    );
+  }
+
+  return content;
 }
 
 export function MediaDetailHeroSkeleton(): React.JSX.Element {
   return (
-    <div className="relative -mt-16 min-h-[420px] w-full">
-      <div className="absolute inset-0 bg-gradient-to-b from-muted/30 to-background" />
-      <div className="relative mx-auto flex min-h-[600px] w-full flex-col justify-end px-4 pb-10 pt-28 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        <div className="flex max-w-5xl flex-col gap-8 md:flex-row md:items-end">
-          <Skeleton className="aspect-[2/3] w-[220px] shrink-0 self-center rounded-xl md:w-[330px] md:self-auto lg:w-[380px]" />
-          <div className="flex flex-1 flex-col gap-4 pb-1">
-            <Skeleton className="h-10 w-96 max-w-full" />
-            <div className="flex gap-2">
-              <Skeleton className="h-5 w-16" />
-              <Skeleton className="h-5 w-16" />
-              <Skeleton className="h-5 w-20" />
-            </div>
-            <div className="flex gap-1.5">
-              <Skeleton className="h-6 w-20 rounded-full" />
-              <Skeleton className="h-6 w-16 rounded-full" />
-              <Skeleton className="h-6 w-24 rounded-full" />
-            </div>
-            <div className="flex gap-2.5">
-              <Skeleton className="h-9 w-32 rounded-xl" />
-              <Skeleton className="h-9 w-24 rounded-xl" />
-            </div>
+    <div className="relative -mt-16 w-full">
+      <div className="absolute inset-x-0 top-0 h-dvh bg-gradient-to-b from-muted/30 to-background" />
+      <div className="relative mx-auto w-full px-4 pb-6 pt-[30dvh] md:pt-[25dvh] md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+        <div className="max-w-3xl space-y-4">
+          <Skeleton className="h-12 w-80 max-w-full md:h-16" />
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-4 w-72" />
+          <Skeleton className="h-14 w-full max-w-2xl" />
+          <div className="flex gap-3">
+            <Skeleton className="h-10 w-28 rounded-xl" />
+            <Skeleton className="h-10 w-24 rounded-xl" />
+            <Skeleton className="h-10 w-20 rounded-xl" />
+          </div>
+          <div className="flex gap-2.5">
+            <Skeleton className="h-10 w-32 rounded-xl" />
+            <Skeleton className="h-10 w-10 rounded-xl" />
+            <Skeleton className="h-10 w-28 rounded-xl" />
           </div>
         </div>
+      </div>
+      {/* Video skeletons */}
+      <div className="relative pt-6 md:pt-8">
+        <div className="mb-4 pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+          <Skeleton className="h-7 w-20" />
+        </div>
+        <div className="flex gap-4 overflow-hidden pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+          <Skeleton className="aspect-video w-[300px] shrink-0 rounded-xl sm:w-[340px] lg:w-[380px]" />
+          <Skeleton className="aspect-video w-[300px] shrink-0 rounded-xl sm:w-[340px] lg:w-[380px]" />
+          <Skeleton className="aspect-video w-[300px] shrink-0 rounded-xl sm:w-[340px] lg:w-[380px]" />
+        </div>
+      </div>
+      {/* Section skeletons */}
+      <div className="flex flex-col gap-12 px-4 pt-12 md:gap-16 md:px-8 md:pt-16 lg:px-12 xl:px-16 2xl:px-24">
+        <section>
+          <Skeleton className="mb-4 h-7 w-32" />
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full rounded-xl" />
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );

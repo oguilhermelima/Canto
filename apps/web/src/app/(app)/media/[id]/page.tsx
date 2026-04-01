@@ -414,71 +414,40 @@ export default function MediaDetailPage({
         id={media.id}
         type={media.type as "movie" | "show"}
         title={media.title}
-        tagline={media.tagline}
         overview={media.overview}
         backdropPath={media.backdropPath}
         posterPath={media.posterPath}
         year={media.year}
         releaseDate={media.releaseDate}
-        voteAverage={media.voteAverage}
-        voteCount={media.voteCount}
         genres={media.genres ?? undefined}
         runtime={media.runtime}
-        status={media.status}
+        contentRating={media.contentRating}
         logoPath={media.logoPath}
-        externalId={media.externalId}
         provider={media.provider}
-        availableSources={availability.data?.sources}
         isAdmin={isAdmin}
-      />
+        servers={mediaServers.data}
+        flatrateProviders={flatrateProviders}
+        rentBuyProviders={rentBuyProviders}
+        watchLink={watchLink}
+        watchProviderLinks={watchProviderLinks.data ?? {}}
+        videos={videos}
+        crew={extras.data?.credits?.crew?.map((c) => ({
+          name: c.name,
+          job: c.job,
+        }))}
+      >
+        {/* All sections below hero info — unified spacing */}
+        <div className="flex flex-col gap-12 pb-16 md:gap-16">
+          {/* Videos — show skeletons while loading, fade in when ready */}
+          {extras.isLoading ? (
+            <VideoCarouselSkeleton />
+          ) : videos.length > 0 ? (
+            <div className="animate-in fade-in-0 duration-500">
+              <VideoCarousel videos={videos.slice(0, 8)} />
+            </div>
+          ) : null}
 
-      {/* Replace provider button for TV shows — admin only */}
-      {isAdmin && media.type === "show" && media.libraryId && (media.provider === "tmdb" || media.provider === "tvdb") && (
-        <div className="mx-auto flex w-full px-4 pt-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-          <button
-            type="button"
-            disabled={replaceProvider.isPending}
-            onClick={() => {
-              const targetProvider = media.provider === "tmdb" ? "tvdb" : "tmdb";
-              replaceProvider.mutate(
-                { id: media.id, provider: targetProvider as "tmdb" | "tvdb" },
-                {
-                  onSuccess: () => {
-                    void utils.media.getById.invalidate();
-                    void utils.media.getByExternal.invalidate();
-                    void utils.media.getExtras.invalidate();
-                    toast.success(`Metadata replaced with ${targetProvider.toUpperCase()}`);
-                  },
-                  onError: (error) => {
-                    toast.error(`Failed to replace provider: ${error.message}`);
-                  },
-                },
-              );
-            }}
-            className="flex items-center gap-1.5 rounded-xl bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-          >
-            {replaceProvider.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <RefreshCw className="h-3.5 w-3.5" />
-            )}
-            Replace with {media.provider === "tmdb" ? "TVDB" : "TMDB"}
-          </button>
-        </div>
-      )}
-
-      {/* Main content */}
-      <div className="mx-auto flex w-full flex-1 flex-col gap-16 px-4 pb-2 pt-10 md:gap-20 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        {/* Where to Watch */}
-        <WhereToWatch
-          mediaId={media.id}
-          mediaTitle={media.title}
-          flatrateProviders={flatrateProviders}
-          rentBuyProviders={rentBuyProviders}
-          watchLink={watchLink}
-          watchProviderLinks={watchProviderLinks.data ?? {}}
-          servers={mediaServers.data}
-        />
+          <div className="flex flex-col gap-12 px-4 md:gap-16 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
 
         {/* Request Download — non-admin users */}
         {!isAdmin && media.id && !media.downloaded && (() => {
@@ -535,7 +504,7 @@ export default function MediaDetailPage({
         {isAdmin && media.type === "movie" && (
           <section>
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-xl font-semibold tracking-tight">Download</h2>
+              <h2 className="text-xl font-semibold text-foreground">Download</h2>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -656,22 +625,16 @@ export default function MediaDetailPage({
         {/* Cast */}
         <CastSection credits={credits} isLoading={extras.isLoading} />
 
-      </div>
+          </div>
 
-      {/* Full-width sections -- Videos, Recommendations, Similar */}
-      <div className="mt-16 flex flex-col gap-16 pb-16 md:mt-20 md:gap-20">
-        {/* Videos */}
-        {videos.length > 0 && (
-          <VideoCarousel videos={videos.slice(0, 8)} />
-        )}
-
-        <SimilarSection
-          similar={similar}
-          recommendations={recommendations}
-          isLoading={extras.isLoading}
-        />
-      </div>
-
+          {/* Full-width sections -- Recommendations, Similar */}
+          <SimilarSection
+            similar={similar}
+            recommendations={recommendations}
+            isLoading={extras.isLoading}
+          />
+        </div>
+      </MediaDetailHero>
 
       {/* Preferences modal */}
       {media.libraryId && (
@@ -1221,28 +1184,6 @@ function MediaDetailPageSkeleton(): React.JSX.Element {
   return (
     <div className="min-h-screen bg-background">
       <MediaDetailHeroSkeleton />
-      <div className="mx-auto flex w-full flex-col gap-12 px-4 pt-10 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        <section>
-          <Skeleton className="mb-4 h-7 w-32" />
-          <div className="space-y-2">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 w-full rounded-xl" />
-            ))}
-          </div>
-        </section>
-        <section>
-          <Skeleton className="mb-4 h-7 w-48" />
-          <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="flex flex-col items-center gap-2">
-                <Skeleton className="aspect-square w-full rounded-full" />
-                <Skeleton className="h-3 w-16" />
-                <Skeleton className="h-3 w-12" />
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
     </div>
   );
 }
@@ -1340,6 +1281,24 @@ function VideoCarousel({ videos }: { videos: Video[] }): React.JSX.Element {
           {/* End spacer */}
           <div className="w-4 shrink-0 md:w-8 lg:w-12 xl:w-16 2xl:w-24" />
         </div>
+      </div>
+    </section>
+  );
+}
+
+function VideoCarouselSkeleton(): React.JSX.Element {
+  return (
+    <section className="relative">
+      <div className="mb-4 pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+        <Skeleton className="h-7 w-20" />
+      </div>
+      <div className="flex gap-4 overflow-hidden pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton
+            key={i}
+            className="aspect-video w-[300px] shrink-0 rounded-xl sm:w-[340px] lg:w-[380px]"
+          />
+        ))}
       </div>
     </section>
   );

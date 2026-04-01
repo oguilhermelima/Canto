@@ -331,7 +331,6 @@ function FeaturedCard({
               <AddToListButton
                 mediaId={item.id}
                 title={item.title}
-                variant="dark"
               />
             </div>
           )}
