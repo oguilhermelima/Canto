@@ -1061,6 +1061,11 @@ export function MetadataSettingsSection(): React.JSX.Element {
                   which shows all available providers and links for that title across regions.
                 </li>
               </ul>
+
+              <p className="text-xs text-muted-foreground/70 italic">
+                Not all streaming providers support direct search. Providers without a known search URL
+                will always open the TMDB watch page regardless of this setting.
+              </p>
             </div>
             <Switch checked={directSearchEnabled} onCheckedChange={setDirectSearch} className="mt-1 shrink-0" />
           </div>
