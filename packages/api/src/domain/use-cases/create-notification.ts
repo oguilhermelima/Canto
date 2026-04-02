@@ -5,6 +5,7 @@ type NotificationType =
   | "import_success"
   | "import_failed"
   | "download_failed"
+  | "download_stalled"
   | "blocklist_added"
   | "movie_multi_file";
 

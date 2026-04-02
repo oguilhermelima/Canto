@@ -2,6 +2,8 @@ import { Queue, Worker } from "bullmq";
 
 import { handleImportTorrents } from "./jobs/import-torrents";
 import { handleJellyfinSync, handlePlexSync } from "./jobs/reverse-sync";
+import { handleStallDetection } from "./jobs/stall-detection";
+import { handleRssSync } from "./jobs/rss-sync";
 import { enrichMedia } from "@canto/api/domain/use-cases/enrich-media";
 import { refreshExtras } from "@canto/api/domain/use-cases/refresh-extras";
 import { replaceShowWithTvdb } from "@canto/api/domain/use-cases/replace-show-with-tvdb";
@@ -42,6 +44,14 @@ const plexSyncQueue = new Queue("plex-sync", {
   connection: redisConnection,
 });
 
+const stallDetectionQueue = new Queue("stall-detection", {
+  connection: redisConnection,
+});
+
+const rssSyncQueue = new Queue("rss-sync", {
+  connection: redisConnection,
+});
+
 const dailyRecsCheckQueue = new Queue("daily-recs-check", {
   connection: redisConnection,
 });
@@ -70,6 +80,20 @@ async function setupRepeatableJobs(): Promise<void> {
     "plex-sync-scheduler",
     { every: 5 * 60 * 1000 },
     { name: "plex-sync" },
+  );
+
+  // Stall detection: every 30 minutes
+  await stallDetectionQueue.upsertJobScheduler(
+    "stall-detection-scheduler",
+    { every: 30 * 60 * 1000 },
+    { name: "stall-detection" },
+  );
+
+  // RSS sync: every 15 minutes
+  await rssSyncQueue.upsertJobScheduler(
+    "rss-sync-scheduler",
+    { every: 15 * 60 * 1000 },
+    { name: "rss-sync" },
   );
 
   // Daily recs safety net: every hour, catches users with stale recommendations
@@ -150,6 +174,26 @@ const replaceTvdbWorker = new Worker(
   { connection: redisConnection, concurrency: 1 },
 );
 
+const rssSyncWorker = new Worker(
+  "rss-sync",
+  async (job) => {
+    console.log(`[rss-sync] Running job ${job.id}`);
+    await handleRssSync();
+    console.log(`[rss-sync] Completed job ${job.id}`);
+  },
+  { connection: redisConnection, concurrency: 1 },
+);
+
+const stallDetectionWorker = new Worker(
+  "stall-detection",
+  async (job) => {
+    console.log(`[stall-detection] Running job ${job.id}`);
+    await handleStallDetection();
+    console.log(`[stall-detection] Completed job ${job.id}`);
+  },
+  { connection: redisConnection, concurrency: 1 },
+);
+
 const dailyRecsCheckWorker = new Worker(
   "daily-recs-check",
   async () => {
@@ -204,6 +248,8 @@ for (const worker of [
   importTorrentsWorker,
   jellyfinSyncWorker,
   plexSyncWorker,
+  rssSyncWorker,
+  stallDetectionWorker,
   enrichMediaWorker,
   refreshExtrasWorker,
   replaceTvdbWorker,
@@ -231,6 +277,8 @@ async function shutdown(): Promise<void> {
     importTorrentsWorker.close(),
     jellyfinSyncWorker.close(),
     plexSyncWorker.close(),
+    rssSyncWorker.close(),
+    stallDetectionWorker.close(),
     enrichMediaWorker.close(),
     refreshExtrasWorker.close(),
     replaceTvdbWorker.close(),
@@ -241,6 +289,8 @@ async function shutdown(): Promise<void> {
     importTorrentsQueue.close(),
     jellyfinSyncQueue.close(),
     plexSyncQueue.close(),
+    rssSyncQueue.close(),
+    stallDetectionQueue.close(),
     dailyRecsCheckQueue.close(),
   ]);
   console.log("All workers shut down.");
