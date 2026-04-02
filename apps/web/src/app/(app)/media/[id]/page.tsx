@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useState, useEffect, useRef, useCallback } from "react";
+import { keepPreviousData } from "@tanstack/react-query";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { cn } from "@canto/ui/cn";
@@ -167,8 +168,14 @@ export default function MediaDetailPage({
       mediaId: media?.id ?? "",
       seasonNumber: torrentSearchContext?.seasonNumber,
       episodeNumbers: torrentSearchContext?.episodeNumbers,
+      page: torrentPage,
+      pageSize: TORRENTS_PER_PAGE,
     },
-    { enabled: torrentDialogOpen && !!media?.id, retry: 1 },
+    {
+      enabled: torrentDialogOpen && !!media?.id,
+      retry: 1,
+      placeholderData: keepPreviousData,
+    },
   );
 
   const [lastDownloadAttempt, setLastDownloadAttempt] = useState<{
@@ -372,7 +379,8 @@ export default function MediaDetailPage({
   );
 
   // Filter + sort torrent results
-  const allFilteredTorrents = (torrentSearch.data ?? [])
+  const hasMore = torrentSearch.data?.hasMore ?? false;
+  const allFilteredTorrents = (torrentSearch.data?.results ?? [])
     .filter((t) => {
       // Text filter
       if (torrentSearchQuery.trim()) {
@@ -402,14 +410,8 @@ export default function MediaDetailPage({
       if (torrentSort === "age") return (a.age - b.age) * dir;
       return (a.size - b.size) * dir;
     });
-  const totalPages = Math.max(
-    1,
-    Math.ceil(allFilteredTorrents.length / TORRENTS_PER_PAGE),
-  );
-  const paginatedTorrents = allFilteredTorrents.slice(
-    torrentPage * TORRENTS_PER_PAGE,
-    (torrentPage + 1) * TORRENTS_PER_PAGE,
-  );
+  // Server-side pagination: no client-side slicing needed
+  const paginatedTorrents = allFilteredTorrents;
 
   const toggleSort = (col: "seeders" | "peers" | "size" | "age" | "confidence"): void => {
     if (torrentSort === col) {
@@ -1149,45 +1151,33 @@ export default function MediaDetailPage({
           </div>
 
           {/* Pagination footer */}
-          {allFilteredTorrents.length > TORRENTS_PER_PAGE && (
+          {(torrentPage > 0 || hasMore) && (
             <div className="flex items-center justify-between border-t border-border px-5 py-3">
               <span className="text-xs text-muted-foreground">
-                {allFilteredTorrents.length} result
-                {allFilteredTorrents.length !== 1 ? "s" : ""}
+                Page {torrentPage + 1}
+                {allFilteredTorrents.length > 0 && (
+                  <> &middot; {allFilteredTorrents.length} result{allFilteredTorrents.length !== 1 ? "s" : ""}</>
+                )}
               </span>
               <div className="flex items-center gap-1.5">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 w-7 p-0"
+                  className="h-7 px-2 text-xs"
                   disabled={torrentPage === 0}
                   onClick={() => setTorrentPage((p) => p - 1)}
                 >
                   <ChevronLeft size={16} />
+                  Prev
                 </Button>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <input
-                    type="number"
-                    min={1}
-                    max={totalPages}
-                    value={torrentPage + 1}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
-                      if (!isNaN(val) && val >= 1 && val <= totalPages) {
-                        setTorrentPage(val - 1);
-                      }
-                    }}
-                    className="h-7 w-10 rounded-md border border-border bg-background text-center text-xs tabular-nums text-foreground outline-none focus:border-ring [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                  />
-                  <span>/ {totalPages}</span>
-                </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 w-7 p-0"
-                  disabled={torrentPage >= totalPages - 1}
+                  className="h-7 px-2 text-xs"
+                  disabled={!hasMore}
                   onClick={() => setTorrentPage((p) => p + 1)}
                 >
+                  Next
                   <ChevronRight size={16} />
                 </Button>
               </div>
