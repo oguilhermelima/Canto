@@ -6,6 +6,7 @@ import {
   listItem,
   media,
   mediaRecommendation,
+  mediaVideo,
   userRecommendation,
 } from "@canto/db/schema";
 
@@ -174,6 +175,7 @@ export async function findUserRecommendations(
       logoPath: media.logoPath,
       releaseDate: media.releaseDate,
       voteAverage: media.voteAverage,
+      trailerKey: sql<string | null>`(SELECT ${mediaVideo.externalKey} FROM ${mediaVideo} WHERE ${mediaVideo.mediaId} = ${media.id} AND ${mediaVideo.type} = 'Trailer' AND ${mediaVideo.site} = 'YouTube' LIMIT 1)`,
       relevance: sql<number>`SUM(${userRecommendation.weight})`,
     })
     .from(userRecommendation)
