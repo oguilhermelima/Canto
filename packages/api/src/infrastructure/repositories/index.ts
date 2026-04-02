@@ -7,3 +7,4 @@ export * from "./sync-repository";
 export * from "./notification-repository";
 export * from "./list-repository";
 export * from "./request-repository";
+export * from "./user-recommendation-repository";

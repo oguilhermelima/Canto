@@ -1,11 +1,12 @@
-import { and, desc, eq, lte, not, isNull, isNotNull, notInArray, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, isNotNull, not, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
   blocklist,
+  media,
   mediaCredit,
+  mediaRecommendation,
   mediaVideo,
   mediaWatchProvider,
-  recommendationPool,
   watchProviderLink,
 } from "@canto/db/schema";
 
@@ -34,62 +35,77 @@ export async function findWatchProvidersByMediaId(db: Database, mediaId: string)
   });
 }
 
-// ── Recommendation Pool ──
+// ── Recommendations (via media_recommendation junction) ──
 
-export async function findPoolBySource(
+export async function findRecommendationsBySource(
   db: Database,
   sourceMediaId: string,
   sourceType: string,
 ) {
-  return db.query.recommendationPool.findMany({
-    where: and(
-      eq(recommendationPool.sourceMediaId, sourceMediaId),
-      eq(recommendationPool.sourceType, sourceType),
-    ),
-  });
+  return db
+    .select({
+      id: media.id,
+      externalId: media.externalId,
+      provider: media.provider,
+      mediaType: media.type,
+      title: media.title,
+      overview: media.overview,
+      posterPath: media.posterPath,
+      backdropPath: media.backdropPath,
+      logoPath: media.logoPath,
+      releaseDate: media.releaseDate,
+      voteAverage: media.voteAverage,
+    })
+    .from(mediaRecommendation)
+    .innerJoin(media, eq(media.id, mediaRecommendation.mediaId))
+    .where(and(
+      eq(mediaRecommendation.sourceMediaId, sourceMediaId),
+      eq(mediaRecommendation.sourceType, sourceType),
+    ));
 }
 
-export async function findPoolItemsWithBackdrops(db: Database, limit: number) {
-  const today = new Date().toISOString().slice(0, 10);
-  return db.query.recommendationPool.findMany({
+export async function findRecommendedMediaWithBackdrops(db: Database, limit: number) {
+  return db.query.media.findMany({
     where: and(
-      not(isNull(recommendationPool.backdropPath)),
-      lte(recommendationPool.releaseDate, today),
+      sql`${media.id} IN (SELECT media_id FROM media_recommendation)`,
+      isNotNull(media.backdropPath),
+      sql`${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL`,
     ),
-    orderBy: [desc(recommendationPool.releaseDate)],
+    orderBy: [desc(media.releaseDate)],
     limit,
   });
 }
 
-export async function findPoolRecommendations(
+export async function findGlobalRecommendations(
   db: Database,
   excludeItems: Array<{ externalId: number; provider: string }>,
   limit: number,
   offset: number,
 ) {
-  const today = new Date().toISOString().slice(0, 10);
-  const released = lte(recommendationPool.releaseDate, today);
+  const released = sql`${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL`;
 
-  // Build exclusion: items already in library (match by provider+externalId)
   const excludeConditions =
     excludeItems.length > 0
       ? excludeItems.map(
           (item) =>
             and(
-              eq(recommendationPool.externalId, item.externalId),
-              eq(recommendationPool.provider, item.provider),
+              eq(media.externalId, item.externalId),
+              eq(media.provider, item.provider),
             )!,
         )
       : [];
 
-  const where =
-    excludeConditions.length > 0
-      ? and(released, not(sql`(${sql.join(excludeConditions, sql` OR `)})`))
-      : released;
+  const where = and(
+    sql`${media.id} IN (SELECT media_id FROM media_recommendation)`,
+    released,
+    ...(excludeConditions.length > 0
+      ? [not(sql`(${sql.join(excludeConditions, sql` OR `)})`)]
+      : []),
+  );
 
-  return db.query.recommendationPool.findMany({
+  return db.query.media.findMany({
     where,
-    orderBy: [desc(recommendationPool.score)],
+    orderBy: [desc(media.voteAverage)],
     limit,
     offset,
   });
