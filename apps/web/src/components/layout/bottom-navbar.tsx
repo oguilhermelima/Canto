@@ -30,13 +30,13 @@ import { authClient } from "~/lib/auth-client";
 
 const userNavItems = [
   { title: "Discover", href: "/", icon: Compass },
-  { title: "My Lists", href: "/lists", icon: BookOpen },
+  { title: "Library", href: "/lists", icon: BookOpen },
   { title: "Search", href: "/search", icon: Search },
 ] as const;
 
 const adminNavItems = [
   { title: "Discover", href: "/", icon: Compass },
-  { title: "My Lists", href: "/lists", icon: BookOpen },
+  { title: "Library", href: "/lists", icon: BookOpen },
   { title: "Search", href: "/search", icon: Search },
   { title: "Downloads", href: "/torrents", icon: Download },
 ] as const;

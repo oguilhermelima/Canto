@@ -310,7 +310,7 @@ export default function ManagePage({
     <div className="w-full">
       <PageHeader title={media.title} subtitle="Manage media settings" />
 
-      <div className="sticky top-14 z-20 bg-background px-4 py-2.5 md:top-16 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+      <div className="px-4 pt-6 pb-8 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         <TabBar
           tabs={TABS.map((t) => ({ value: t.value, label: t.label }))}
           value={activeTab}

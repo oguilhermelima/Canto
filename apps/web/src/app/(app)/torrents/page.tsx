@@ -25,7 +25,6 @@ import {
   ArrowDown,
   ArrowUp,
   Clock,
-  RefreshCw,
   RotateCcw,
   Film,
   Tv,
@@ -127,23 +126,10 @@ export default function DownloadsPage(): React.JSX.Element {
 
   return (
     <div className="w-full">
-      <PageHeader title="Downloads" />
+      <PageHeader title="Downloads" subtitle="Monitor and manage your active downloads." />
 
       <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-      {/* Header actions */}
-      <div className="mb-6 flex justify-end">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void utils.torrent.listLive.invalidate()}
-        >
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh
-        </Button>
-      </div>
-
-      {/* Status tabs */}
-      <div className="mb-6">
+      <div className="pt-6 pb-8">
         <TabBar
           tabs={STATUS_TABS.map(({ value, label }) => ({
             value,

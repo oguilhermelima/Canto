@@ -89,9 +89,9 @@ export function BrowseLayout({
     setFilters(DEFAULT_FILTERS);
   }, []);
 
-  // Apply client-side filters
+  // Apply client-side filters + sorting
   const filteredItems = useMemo(() => {
-    return items.filter((r) => {
+    const filtered = items.filter((r) => {
       if (r.year) {
         const yearMin = filters.yearMin ? Number(filters.yearMin) : 0;
         const yearMax = filters.yearMax ? Number(filters.yearMax) : 9999;
@@ -108,6 +108,19 @@ export function BrowseLayout({
       }
       return true;
     });
+
+    const { sortBy, sortOrder } = filters;
+    if (sortBy && sortBy !== "popularity") {
+      filtered.sort((a, b) => {
+        let cmp = 0;
+        if (sortBy === "name") cmp = a.title.localeCompare(b.title);
+        else if (sortBy === "year") cmp = (a.year ?? 0) - (b.year ?? 0);
+        else if (sortBy === "rating") cmp = (a.voteAverage ?? 0) - (b.voteAverage ?? 0);
+        return sortOrder === "desc" ? -cmp : cmp;
+      });
+    }
+
+    return filtered;
   }, [items, filters]);
 
   const gridItems = filteredItems.map((r) => ({
@@ -179,8 +192,8 @@ export function BrowseLayout({
       >
         {header}
 
-        {/* Toolbar — sticky on mobile, static on desktop */}
-        <div className="sticky top-14 z-20 -mx-4 mb-6 flex items-center justify-between bg-background px-4 py-3 md:static md:-mx-8 md:px-8 lg:-mx-12 lg:px-12 xl:-mx-16 xl:px-16 2xl:-mx-24 2xl:px-24">
+        {/* Toolbar */}
+        <div className="mb-6 flex items-center justify-between py-3">
           <div className="flex items-center gap-3">
             <button
               type="button"

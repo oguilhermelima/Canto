@@ -45,7 +45,7 @@ export function TitleBar({
         className,
       )}
     >
-      <div className="flex h-14 items-center gap-1 px-4">
+      <div className="flex h-14 items-center gap-1 px-2">
         {variant === "back" && (
           <button
             type="button"

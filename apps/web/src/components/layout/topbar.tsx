@@ -14,7 +14,7 @@ import {
   Armchair,
   Compass,
   Download,
-  ListPlus,
+  GalleryVerticalEnd,
   Search,
   Send,
   User,
@@ -26,7 +26,7 @@ import {
   Moon,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useState, useEffect, memo } from "react";
+import { useState, useEffect, useCallback, useRef, memo } from "react";
 import { useTheme } from "next-themes";
 import { authClient } from "~/lib/auth-client";
 
@@ -34,13 +34,13 @@ import { authClient } from "~/lib/auth-client";
 
 const userNavLinks: Array<{ href: string; label: string; icon: LucideIcon }> = [
   { href: "/", label: "Discover", icon: Compass },
-  { href: "/lists", label: "My Lists", icon: ListPlus },
+  { href: "/lists", label: "Library", icon: GalleryVerticalEnd },
   { href: "/requests", label: "Requests", icon: Send },
 ];
 
 const adminNavLinks: Array<{ href: string; label: string; icon: LucideIcon }> = [
   { href: "/", label: "Discover", icon: Compass },
-  { href: "/lists", label: "My Lists", icon: ListPlus },
+  { href: "/lists", label: "Library", icon: GalleryVerticalEnd },
   { href: "/requests", label: "Requests", icon: Send },
   { href: "/torrents", label: "Downloads", icon: Download },
 ];
@@ -50,23 +50,64 @@ const adminNavLinks: Array<{ href: string; label: string; icon: LucideIcon }> = 
 const NavLinks = memo(function NavLinks({ role, scrolled }: { role?: string; scrolled?: boolean }): React.JSX.Element {
   const pathname = usePathname();
   const links = role === "admin" ? adminNavLinks : userNavLinks;
+  const containerRef = useRef<HTMLElement>(null);
+  const linkRefs = useRef<Map<string, HTMLAnchorElement>>(new Map());
+  const [indicator, setIndicator] = useState({ left: 0, width: 0 });
+  const [ready, setReady] = useState(false);
+
+  const activeHref = links.find(({ href }) =>
+    href === "/" ? pathname === "/" : pathname.startsWith(href),
+  )?.href;
+
+  const updateIndicator = useCallback(() => {
+    if (!activeHref) return;
+    const el = linkRefs.current.get(activeHref);
+    const container = containerRef.current;
+    if (!el || !container) return;
+    const cr = container.getBoundingClientRect();
+    const er = el.getBoundingClientRect();
+    setIndicator({ left: er.left - cr.left, width: er.width });
+    setReady(true);
+  }, [activeHref]);
+
+  useEffect(() => { updateIndicator(); }, [updateIndicator]);
+  useEffect(() => {
+    window.addEventListener("resize", updateIndicator);
+    return () => window.removeEventListener("resize", updateIndicator);
+  }, [updateIndicator]);
+
   return (
-    <nav className={cn(
-      "flex items-center gap-0.5 rounded-2xl p-1 transition-colors duration-300",
-      scrolled ? "bg-transparent" : "bg-foreground/5 backdrop-blur-sm",
-    )}>
+    <nav
+      ref={containerRef}
+      className={cn(
+        "relative flex items-center gap-0.5 rounded-2xl p-1 transition-colors duration-300",
+        scrolled ? "bg-transparent" : "bg-muted/60",
+      )}
+    >
+      {/* Sliding pill */}
+      <div
+        className={cn(
+          "absolute top-1 bottom-1 rounded-xl shadow-sm",
+          ready
+            ? "transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
+            : "opacity-0",
+          "bg-foreground",
+        )}
+        style={{ left: indicator.left, width: indicator.width }}
+      />
+
       {links.map(({ href, label, icon: Icon }) => {
-        const isActive =
-          href === "/" ? pathname === "/" : pathname.startsWith(href);
+        const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);
         return (
           <Link
             key={href}
             href={href}
+            ref={(el) => { if (el) linkRefs.current.set(href, el); }}
             className={cn(
-              "flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors",
+              "relative z-10 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors duration-200",
               isActive
-                ? "bg-foreground/10 text-foreground"
-                : "text-foreground/60 hover:text-foreground",
+                ? "text-background"
+                : "text-foreground/80 hover:text-foreground",
             )}
           >
             <Icon className="h-3.5 w-3.5" />
@@ -98,9 +139,9 @@ const TopbarSearch = memo(function TopbarSearch(): React.JSX.Element {
     <Link
       href="/search"
       aria-label="Search"
-      className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors hover:bg-foreground/5"
+      className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted/60 transition-colors hover:bg-muted"
     >
-      <Search className="h-[18px] w-[18px] text-foreground/70" />
+      <Search className="h-[18px] w-[18px] text-foreground/80" />
     </Link>
   );
 });
@@ -118,10 +159,8 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
 
   if (!mounted) {
     return (
-      <div className="flex h-9 w-9 items-center justify-center rounded-full">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-foreground/10">
-          <User className="h-4 w-4" />
-        </div>
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted/60">
+        <User className="h-4 w-4 text-muted-foreground" />
       </div>
     );
   }
@@ -129,8 +168,7 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <button aria-label="User menu" className="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-foreground/5 focus:outline-none">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-foreground/10">
+        <button aria-label="User menu" className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted/60 transition-colors hover:bg-muted focus:outline-none">
             {session?.user?.name ? (
               <span className="text-xs font-medium">
                 {session.user.name.charAt(0).toUpperCase()}
@@ -138,7 +176,6 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
             ) : (
               <User className="h-4 w-4" />
             )}
-          </div>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -220,7 +257,7 @@ export function Topbar(): React.JSX.Element {
         className={cn(
           "pointer-events-auto flex w-full items-center rounded-2xl border py-2.5 transition-all duration-300 ease-out",
           scrolled
-            ? "max-w-[80%] border-border/50 bg-background/80 px-6 backdrop-blur-xl xl:max-w-[60%]"
+            ? "max-w-[80%] border-border/50 bg-background px-6 xl:max-w-[60%]"
             : "max-w-full border-transparent px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24",
         )}
       >
