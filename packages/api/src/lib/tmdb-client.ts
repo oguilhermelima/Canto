@@ -7,5 +7,6 @@ import { TmdbProvider } from "@canto/providers";
  */
 export async function getTmdbProvider(): Promise<TmdbProvider> {
   const apiKey = (await getSetting(SETTINGS.TMDB_API_KEY)) ?? "";
-  return new TmdbProvider(apiKey);
+  const language = (await getSetting(SETTINGS.LANGUAGE)) ?? "en-US";
+  return new TmdbProvider(apiKey, language);
 }

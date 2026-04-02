@@ -2,22 +2,38 @@ import { Queue } from "bullmq";
 import { getSetting } from "@canto/db/settings";
 import { SETTINGS } from "../../lib/settings-keys";
 
-let queue: Queue | null = null;
+function createQueueGetter(name: string): () => Promise<Queue> {
+  let queue: Queue | null = null;
+  return async () => {
+    if (!queue) {
+      const host = (await getSetting(SETTINGS.REDIS_HOST)) ?? process.env.REDIS_HOST ?? "localhost";
+      const port = parseInt((await getSetting(SETTINGS.REDIS_PORT)) ?? process.env.REDIS_PORT ?? "6379", 10);
+      queue = new Queue(name, { connection: { host, port } });
+    }
+    return queue;
+  };
+}
 
-async function getQueue(): Promise<Queue> {
-  if (!queue) {
-    const host = (await getSetting(SETTINGS.REDIS_HOST)) ?? process.env.REDIS_HOST ?? "localhost";
-    const port = parseInt((await getSetting(SETTINGS.REDIS_PORT)) ?? process.env.REDIS_PORT ?? "6379", 10);
+const getEnrichMediaQueue = createQueueGetter("enrich-media");
+const getRefreshExtrasQueue = createQueueGetter("refresh-extras");
+const getReplaceTvdbQueue = createQueueGetter("replace-tvdb");
+const getRebuildUserRecsQueue = createQueueGetter("rebuild-user-recs");
+const getRefreshAllLangQueue = createQueueGetter("refresh-all-language");
+const getTranslateEpisodesQueue = createQueueGetter("translate-episodes");
+const getJellyfinSyncQueue = createQueueGetter("jellyfin-sync");
+const getPlexSyncQueue = createQueueGetter("plex-sync");
 
-    queue = new Queue("refresh-extras", {
-      connection: { host, port },
-    });
-  }
-  return queue;
+export async function dispatchEnrichMedia(mediaId: string, full = false): Promise<void> {
+  const q = await getEnrichMediaQueue();
+  await q.add("enrich-media", { mediaId, full }, {
+    jobId: `enrich-media-${mediaId}`,
+    removeOnComplete: true,
+    removeOnFail: 100,
+  });
 }
 
 export async function dispatchRefreshExtras(mediaId: string): Promise<void> {
-  const q = await getQueue();
+  const q = await getRefreshExtrasQueue();
   await q.add("refresh-extras", { mediaId }, {
     jobId: `refresh-extras-${mediaId}`,
     removeOnComplete: true,
@@ -25,18 +41,7 @@ export async function dispatchRefreshExtras(mediaId: string): Promise<void> {
   });
 }
 
-let replaceTvdbQueue: Queue | null = null;
-
-async function getReplaceTvdbQueue(): Promise<Queue> {
-  if (!replaceTvdbQueue) {
-    const host = (await getSetting(SETTINGS.REDIS_HOST)) ?? process.env.REDIS_HOST ?? "localhost";
-    const port = parseInt((await getSetting(SETTINGS.REDIS_PORT)) ?? process.env.REDIS_PORT ?? "6379", 10);
-    replaceTvdbQueue = new Queue("replace-tvdb", { connection: { host, port } });
-  }
-  return replaceTvdbQueue;
-}
-
-export async function dispatchReplaceWithTvdb(mediaId: string): Promise<void> {
+export async function dispatchReconcileShow(mediaId: string): Promise<void> {
   const q = await getReplaceTvdbQueue();
   await q.add("replace-tvdb", { mediaId }, {
     jobId: `replace-tvdb-${mediaId}`,
@@ -45,22 +50,53 @@ export async function dispatchReplaceWithTvdb(mediaId: string): Promise<void> {
   });
 }
 
-let replacePoolTvdbQueue: Queue | null = null;
-
-async function getReplacePoolTvdbQueue(): Promise<Queue> {
-  if (!replacePoolTvdbQueue) {
-    const host = (await getSetting(SETTINGS.REDIS_HOST)) ?? process.env.REDIS_HOST ?? "localhost";
-    const port = parseInt((await getSetting(SETTINGS.REDIS_PORT)) ?? process.env.REDIS_PORT ?? "6379", 10);
-    replacePoolTvdbQueue = new Queue("replace-pool-tvdb", { connection: { host, port } });
-  }
-  return replacePoolTvdbQueue;
+export async function dispatchRefreshAllLanguage(): Promise<void> {
+  const q = await getRefreshAllLangQueue();
+  await q.add("refresh-all-language", {}, {
+    jobId: "refresh-all-language",
+    removeOnComplete: true,
+    removeOnFail: 5,
+  });
 }
 
-export async function dispatchReplacePoolShowsTvdb(mediaId: string): Promise<void> {
-  const q = await getReplacePoolTvdbQueue();
-  await q.add("replace-pool-tvdb", { mediaId }, {
-    jobId: `replace-pool-tvdb-${mediaId}`,
+export async function dispatchRebuildUserRecs(userId: string): Promise<void> {
+  const q = await getRebuildUserRecsQueue();
+  await q.add("rebuild-user-recs", { userId }, {
+    jobId: `rebuild-user-recs-${userId}`,
     removeOnComplete: true,
     removeOnFail: 100,
   });
+}
+
+export async function dispatchTranslateEpisodes(mediaId: string, tvdbId: number, language: string): Promise<void> {
+  const q = await getTranslateEpisodesQueue();
+  await q.add("translate-episodes", { mediaId, tvdbId, language }, {
+    jobId: `translate-eps-${mediaId}-${language}`,
+    removeOnComplete: true,
+    removeOnFail: 100,
+  });
+}
+
+/** Dispatch a one-off Jellyfin sync job (deduplicates active/waiting jobs). */
+export async function dispatchJellyfinSync(): Promise<boolean> {
+  const q = await getJellyfinSyncQueue();
+  return dispatchUniqueJob(q, "jellyfin-sync-run");
+}
+
+/** Dispatch a one-off Plex sync job (deduplicates active/waiting jobs). */
+export async function dispatchPlexSync(): Promise<boolean> {
+  const q = await getPlexSyncQueue();
+  return dispatchUniqueJob(q, "plex-sync-run");
+}
+
+/** Add a job only if no active/waiting job with the same ID exists. */
+async function dispatchUniqueJob(queue: Queue, jobId: string): Promise<boolean> {
+  const existing = await queue.getJob(jobId);
+  if (existing) {
+    const state = await existing.getState();
+    if (state === "active" || state === "waiting") return false;
+    await existing.remove();
+  }
+  await queue.add(queue.name, {}, { jobId });
+  return true;
 }

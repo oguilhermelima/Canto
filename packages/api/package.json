@@ -20,6 +20,10 @@
       "types": "./src/domain/ports/index.ts",
       "default": "./src/domain/ports/index.ts"
     },
+    "./domain/use-cases/enrich-media": {
+      "types": "./src/domain/use-cases/enrich-media.ts",
+      "default": "./src/domain/use-cases/enrich-media.ts"
+    },
     "./domain/use-cases/refresh-extras": {
       "types": "./src/domain/use-cases/refresh-extras.ts",
       "default": "./src/domain/use-cases/refresh-extras.ts"
@@ -27,10 +31,6 @@
     "./domain/use-cases/replace-show-with-tvdb": {
       "types": "./src/domain/use-cases/replace-show-with-tvdb.ts",
       "default": "./src/domain/use-cases/replace-show-with-tvdb.ts"
-    },
-    "./domain/use-cases/replace-pool-shows-tvdb": {
-      "types": "./src/domain/use-cases/replace-pool-shows-tvdb.ts",
-      "default": "./src/domain/use-cases/replace-pool-shows-tvdb.ts"
     },
     "./domain/use-cases/search-torrents": {
       "types": "./src/domain/use-cases/search-torrents.ts",
@@ -48,13 +48,57 @@
       "types": "./src/infrastructure/adapters/qbittorrent.ts",
       "default": "./src/infrastructure/adapters/qbittorrent.ts"
     },
+    "./infrastructure/adapters/jackett": {
+      "types": "./src/infrastructure/adapters/jackett.ts",
+      "default": "./src/infrastructure/adapters/jackett.ts"
+    },
+    "./infrastructure/adapters/prowlarr": {
+      "types": "./src/infrastructure/adapters/prowlarr.ts",
+      "default": "./src/infrastructure/adapters/prowlarr.ts"
+    },
     "./lib/settings-keys": {
       "types": "./src/lib/settings-keys.ts",
       "default": "./src/lib/settings-keys.ts"
     },
+    "./domain/use-cases/rebuild-user-recs": {
+      "types": "./src/domain/use-cases/rebuild-user-recs.ts",
+      "default": "./src/domain/use-cases/rebuild-user-recs.ts"
+    },
+    "./domain/use-cases/refresh-all-language": {
+      "types": "./src/domain/use-cases/refresh-all-language.ts",
+      "default": "./src/domain/use-cases/refresh-all-language.ts"
+    },
+    "./domain/use-cases/translate-episodes": {
+      "types": "./src/domain/use-cases/translate-episodes.ts",
+      "default": "./src/domain/use-cases/translate-episodes.ts"
+    },
     "./infrastructure/repositories": {
       "types": "./src/infrastructure/repositories/index.ts",
       "default": "./src/infrastructure/repositories/index.ts"
+    },
+    "./infrastructure/repositories/user-recommendation-repository": {
+      "types": "./src/infrastructure/repositories/user-recommendation-repository.ts",
+      "default": "./src/infrastructure/repositories/user-recommendation-repository.ts"
+    },
+    "./infrastructure/queue/bullmq-dispatcher": {
+      "types": "./src/infrastructure/queue/bullmq-dispatcher.ts",
+      "default": "./src/infrastructure/queue/bullmq-dispatcher.ts"
+    },
+    "./infrastructure/adapters/job-dispatcher.adapter": {
+      "types": "./src/infrastructure/adapters/job-dispatcher.adapter.ts",
+      "default": "./src/infrastructure/adapters/job-dispatcher.adapter.ts"
+    },
+    "./lib/log-error": {
+      "types": "./src/lib/log-error.ts",
+      "default": "./src/lib/log-error.ts"
+    },
+    "./lib/tmdb-client": {
+      "types": "./src/lib/tmdb-client.ts",
+      "default": "./src/lib/tmdb-client.ts"
+    },
+    "./lib/tvdb-client": {
+      "types": "./src/lib/tvdb-client.ts",
+      "default": "./src/lib/tvdb-client.ts"
     }
   },
   "scripts": {

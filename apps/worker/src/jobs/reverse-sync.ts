@@ -1,6 +1,6 @@
 import { db } from "@canto/db/client";
 import { getSetting, setSetting } from "@canto/db/settings";
-import { persistMedia } from "@canto/db/persist-media";
+import { persistMedia, getSupportedLanguageCodes } from "@canto/db/persist-media";
 import { TmdbProvider } from "@canto/providers";
 import {
   findEnabledSyncLibraries,
@@ -14,6 +14,8 @@ import {
   addListItem,
 } from "@canto/api/infrastructure/repositories";
 import { SETTINGS } from "@canto/api/lib/settings-keys";
+import { dispatchEnrichMedia } from "@canto/api/infrastructure/queue/bullmq-dispatcher";
+import { logAndSwallow } from "@canto/api/lib/log-error";
 
 /* -------------------------------------------------------------------------- */
 /*  Constants                                                                  */
@@ -539,10 +541,13 @@ async function processPendingImports(
           await updateMedia(db, existing.id, { downloaded: true, libraryId: item.libraryId, libraryPath: item.path, addedAt: new Date() });
           mediaId = existing.id;
         } else {
-          const normalized = await tmdb.getMetadata(tmdbId, resolvedType);
+          const supportedLangs = [...await getSupportedLanguageCodes(db)];
+          const normalized = await tmdb.getMetadata(tmdbId, resolvedType, { supportedLanguages: supportedLangs });
           const inserted = await persistMedia(db, normalized, { crossRefLookup: tvdbEnabled });
           await updateMedia(db, inserted.id, { downloaded: true, libraryId: item.libraryId, libraryPath: item.path, addedAt: new Date() });
           mediaId = inserted.id;
+          // Unified enrichment pipeline: metadata + extras + TVDB reconcile
+          void dispatchEnrichMedia(inserted.id, true).catch(logAndSwallow("reverse-sync dispatchEnrichMedia"));
         }
 
         // Add to Server Library list
@@ -662,7 +667,7 @@ async function processPendingImports(
 
     // Add missing items
     for (const mediaId of serverMediaIds) {
-      await addListItem(db, { listId: serverLib.id, mediaId }).catch(() => {});
+      await addListItem(db, { listId: serverLib.id, mediaId }).catch(() => { /* already in list */ });
     }
 
     // Remove items no longer on server

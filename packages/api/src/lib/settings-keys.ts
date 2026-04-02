@@ -28,6 +28,9 @@ export const SETTINGS = {
   // TMDB
   TMDB_API_KEY: "tmdb.apiKey",
 
+  // Language
+  LANGUAGE: "general.language",
+
   // TVDB
   TVDB_ENABLED: "tvdb.enabled",
   TVDB_API_KEY: "tvdb.apiKey",

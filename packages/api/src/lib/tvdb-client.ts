@@ -11,10 +11,13 @@ export async function getTvdbProvider(): Promise<TvdbProvider> {
   const token = await getSetting<string>(SETTINGS.TVDB_TOKEN);
   const tokenExpires = await getSetting<number>(SETTINGS.TVDB_TOKEN_EXPIRES);
 
+  const language = (await getSetting(SETTINGS.LANGUAGE)) ?? "en-US";
+
   return new TvdbProvider({
     apiKey,
     token,
     tokenExpires,
+    language,
     onTokenRefresh: async (newToken: string, expires: number) => {
       await setSetting(SETTINGS.TVDB_TOKEN, newToken);
       await setSetting(SETTINGS.TVDB_TOKEN_EXPIRES, expires);
