@@ -6,7 +6,6 @@ import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { ChevronLeft, ChevronRight, Film, Tv, Volume2, VolumeOff } from "lucide-react";
 import { AddToListButton } from "~/components/media/add-to-list-button";
-import { MediaBadges } from "~/components/media/media-badges";
 import { Skeleton } from "@canto/ui/skeleton";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
@@ -320,7 +319,21 @@ function FeaturedCard({
             <h3 className="text-lg font-bold text-white drop-shadow-lg">{item.title}</h3>
           )}
 
-          <MediaBadges type={item.type} year={item.year} voteAverage={item.voteAverage} size="md" />
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/70">
+            <span>{item.type === "movie" ? "Movie" : "TV Show"}</span>
+            {item.voteAverage != null && item.voteAverage > 0 && (
+              <>
+                <span className="text-white/30">|</span>
+                <span className="text-yellow-500">{item.voteAverage.toFixed(1)}</span>
+              </>
+            )}
+            {item.year && (
+              <>
+                <span className="text-white/30">|</span>
+                <span>{item.year}</span>
+              </>
+            )}
+          </div>
 
           <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
             <AddToListButton

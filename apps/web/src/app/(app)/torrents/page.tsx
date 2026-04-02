@@ -21,15 +21,13 @@ import {
   Pause,
   Play,
   Trash2,
-  HardDrive,
   ArrowDown,
   ArrowUp,
   Clock,
+  HardDrive,
   RotateCcw,
   Film,
   Tv,
-  Users,
-  Upload,
 } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { authClient } from "~/lib/auth-client";
@@ -39,8 +37,6 @@ import {
   formatEta,
   formatDownloadLabel,
   formatQualityLabel,
-  sourceLabel,
-  sourceColor,
   resolveState,
 } from "~/lib/torrent-utils";
 
@@ -143,15 +139,14 @@ export default function DownloadsPage(): React.JSX.Element {
 
       {/* Content */}
       {isLoading ? (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex gap-6 rounded-xl border border-border bg-card p-6">
-              <Skeleton className="h-36 w-24 shrink-0 rounded-xl" />
-              <div className="flex-1 space-y-4">
-                <Skeleton className="h-5 w-3/4" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-2 w-full rounded-full" />
-                <Skeleton className="h-4 w-1/2" />
+            <div key={i} className="flex items-center gap-5 rounded-2xl bg-muted/40 p-4">
+              <Skeleton className="h-16 w-16 shrink-0 rounded-2xl" />
+              <div className="flex-1 space-y-3">
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-3 w-1/3" />
+                <Skeleton className="h-1.5 w-full rounded-full" />
               </div>
             </div>
           ))}
@@ -175,160 +170,165 @@ export default function DownloadsPage(): React.JSX.Element {
             const progress = t.live?.progress ?? t.progress ?? (resolved.isDownloaded ? 1 : 0);
             const progressPct = Math.round(progress * 100);
             const qualityLabel = formatQualityLabel(t.quality);
-            const srcLabel = sourceLabel(t.source);
             const size = t.live?.size ?? t.fileSize ?? 0;
 
             const dlLabel = formatDownloadLabel(t.downloadType, t.seasonNumber, t.episodeNumbers);
             const mediaTitle = t.media?.title ?? "";
-            const composedTitle = [mediaTitle, dlLabel, qualityLabel].filter(Boolean).join(" ");
+            const fileName = t.title;
 
-            // "X days ago"
-            const daysAgo = t.createdAt
-              ? Math.floor((Date.now() - new Date(t.createdAt).getTime()) / 86400000)
-              : null;
-            const timeAgo = daysAgo != null
-              ? daysAgo === 0 ? "Today" : daysAgo === 1 ? "1 day ago" : `${daysAgo} days ago`
-              : null;
+            const progressColor = resolved.isDownloaded
+              ? "bg-green-500"
+              : resolved.canResume
+                ? "bg-yellow-500"
+                : "bg-blue-500";
 
             return (
-              <div key={t.id} className="overflow-hidden rounded-xl border border-border bg-card">
-                {/* ── Row 1: Time ago + Media page link ── */}
-                <div className="flex items-center justify-between px-5 pt-4">
-                  <span className="text-sm text-muted-foreground/60">{timeAgo}</span>
-                  {t.media && (
-                    <Link
-                      href={`/media/${t.media.id}`}
-                      className="flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      Media page
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </Link>
-                  )}
-                </div>
-
-                {/* ── Row 2: Poster + Info + Actions ── */}
-                <div className="flex gap-4 px-4 py-4 sm:gap-6 sm:px-5">
-                  {/* Poster — 2:3 ratio */}
-                  <div className="relative aspect-[2/3] w-20 shrink-0 overflow-hidden rounded-xl bg-muted sm:w-28">
+              <div key={t.id} className="overflow-hidden rounded-2xl bg-muted/40">
+                <div className="flex items-center gap-5 p-5 sm:p-6">
+                  {/* Poster */}
+                  <Link
+                    href={t.media ? `/media/${t.media.id}` : "#"}
+                    className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-muted sm:h-24 sm:w-24"
+                  >
                     {t.media?.posterPath ? (
                       <Image
                         src={`https://image.tmdb.org/t/p/w185${t.media.posterPath}`}
                         alt=""
                         fill
                         className="object-cover"
-                        sizes="112px"
+                        sizes="96px"
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
-                        {t.media?.type === "show" ? <Tv size={20} className="text-muted-foreground/30" /> : <Film size={20} className="text-muted-foreground/30" />}
+                        {t.media?.type === "show" ? <Tv size={26} className="text-muted-foreground/30" /> : <Film size={26} className="text-muted-foreground/30" />}
                       </div>
                     )}
-                  </div>
-
-                  {/* Info block */}
-                  <div className="min-w-0 flex-1 space-y-2.5">
-                    {/* Title + badges */}
-                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5">
-                      <h3 className="min-w-0 text-sm font-semibold text-foreground sm:truncate sm:text-base">
-                        {composedTitle || t.title}
-                      </h3>
-                      <span className={cn("shrink-0 rounded-xl px-2 py-0.5 text-[10px] font-semibold sm:px-2.5 sm:text-xs", resolved.color)}>
-                        {resolved.label}
+                    {qualityLabel && (
+                      <span className="absolute bottom-1 left-1 rounded-md bg-black/70 px-1.5 py-0.5 text-[11px] font-bold uppercase leading-none text-white backdrop-blur-sm">
+                        {qualityLabel}
                       </span>
-                      {resolved.seedingLabel && (
-                        <span className={cn("shrink-0 rounded-xl px-2 py-0.5 text-[10px] font-semibold sm:px-2.5 sm:text-xs", resolved.seedingColor)}>
-                          {resolved.seedingLabel}
+                    )}
+                  </Link>
+
+                  {/* Info + progress */}
+                  <div className="min-w-0 flex-1 space-y-2.5">
+                    {/* Title + file name */}
+                    <div>
+                      <p className="truncate text-base font-semibold text-foreground sm:text-lg">
+                        {mediaTitle || fileName}
+                        {dlLabel && <span className="ml-2 text-sm font-normal text-muted-foreground">{dlLabel}</span>}
+                      </p>
+                      <p className="mt-1 truncate text-sm text-muted-foreground/60">
+                        {fileName}
+                      </p>
+                    </div>
+
+                    {/* Stats row */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                      {t.live && !resolved.isDownloaded ? (
+                        <>
+                          <span className="flex items-center gap-1.5">
+                            <ArrowDown size={14} className="text-blue-400" />
+                            {formatSpeed(t.live.dlspeed)}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <ArrowUp size={14} className="text-green-400" />
+                            {formatSpeed(t.live.upspeed)}
+                          </span>
+                          {t.live.eta > 0 && t.live.eta < 8640000 && (
+                            <span className="flex items-center gap-1.5">
+                              <Clock size={14} />
+                              {formatEta(t.live.eta)}
+                            </span>
+                          )}
+                          <span className="text-muted-foreground/50">
+                            {t.live.seeds} seeds · {t.live.peers} peers
+                          </span>
+                        </>
+                      ) : resolved.isDownloaded && resolved.seedingLabel ? (
+                        <>
+                          <span className={cn("rounded-lg px-2.5 py-1 text-xs font-semibold", resolved.seedingColor)}>
+                            {resolved.seedingLabel}
+                          </span>
+                          {t.live && (
+                            <span className="text-muted-foreground/50">
+                              {t.live.seeds} seeds · {t.live.peers} peers
+                              {t.live.ratio > 0 && ` · Ratio ${t.live.ratio.toFixed(2)}`}
+                            </span>
+                          )}
+                        </>
+                      ) : null}
+                      {size > 0 && (
+                        <span className="flex items-center gap-1.5">
+                          <HardDrive size={14} className="text-muted-foreground/50" />
+                          {formatBytes(size)}
                         </span>
                       )}
                     </div>
 
-                    {/* Torrent name */}
-                    <p className="flex items-center gap-2 truncate text-sm text-muted-foreground/70">
-                      <Download size={14} className="shrink-0 text-muted-foreground/40" />
-                      {t.title}
-                    </p>
-
-                    {/* Download path */}
-                    {t.contentPath && resolved.isDownloaded && (
-                      <p className="flex items-center gap-2 truncate text-sm text-muted-foreground/50">
-                        <HardDrive size={14} className="shrink-0" />
-                        {t.contentPath}
-                      </p>
-                    )}
+                    {/* Progress bar */}
+                    <div className="flex items-center gap-3">
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={cn("h-full rounded-full transition-all duration-500", progressColor)}
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </div>
+                      <span className="w-10 text-right text-sm font-semibold tabular-nums text-muted-foreground">
+                        {progressPct}%
+                      </span>
+                    </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="hidden shrink-0 items-start gap-2 sm:flex">
+                  <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
+                    {t.media && (
+                      <Link
+                        href={`/media/${t.media.id}`}
+                        className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
+                        title="Info"
+                      >
+                        <Tv size={18} />
+                      </Link>
+                    )}
                     {resolved.canRetry && (
-                      <button onClick={() => retryMutation.mutate({ id: t.id })} disabled={retryMutation.isPending} className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors hover:bg-blue-500/15 hover:text-blue-500 disabled:opacity-40" title="Retry"><RotateCcw size={16} /></button>
+                      <button onClick={() => retryMutation.mutate({ id: t.id })} disabled={retryMutation.isPending} className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-blue-500 disabled:opacity-40" title="Retry">
+                        <RotateCcw size={18} />
+                      </button>
                     )}
                     {resolved.canResume && (
-                      <button onClick={() => resumeMutation.mutate({ id: t.id })} disabled={resumeMutation.isPending} className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors hover:bg-green-500/15 hover:text-green-500 disabled:opacity-40" title="Resume"><Play size={16} /></button>
+                      <button onClick={() => resumeMutation.mutate({ id: t.id })} disabled={resumeMutation.isPending} className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-green-500 disabled:opacity-40" title="Resume">
+                        <Play size={18} />
+                      </button>
                     )}
                     {resolved.canPause && (
-                      <button onClick={() => pauseMutation.mutate({ id: t.id })} disabled={pauseMutation.isPending} className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors hover:bg-yellow-500/15 hover:text-yellow-500 disabled:opacity-40" title="Pause"><Pause size={16} /></button>
+                      <button onClick={() => pauseMutation.mutate({ id: t.id })} disabled={pauseMutation.isPending} className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-yellow-500 disabled:opacity-40" title="Pause">
+                        <Pause size={18} />
+                      </button>
                     )}
-                    <button onClick={() => setDeleteTarget({ id: t.id, title: t.media?.title ?? t.title })} className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-500" title="Delete"><Trash2 size={16} /></button>
+                    <button onClick={() => setDeleteTarget({ id: t.id, title: t.media?.title ?? t.title })} className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-red-500" title="Delete">
+                      <Trash2 size={18} />
+                    </button>
                   </div>
                 </div>
 
-                {/* ── Mobile actions ── */}
-                <div className="flex items-center justify-end gap-2 px-4 pb-3 sm:hidden">
+                {/* Mobile actions */}
+                <div className="flex items-center justify-end gap-1.5 px-4 pb-4 sm:hidden">
+                  {t.media && (
+                    <Link href={`/media/${t.media.id}`} className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground" title="Info">
+                      <Tv size={16} />
+                    </Link>
+                  )}
                   {resolved.canRetry && (
-                    <button onClick={() => retryMutation.mutate({ id: t.id })} disabled={retryMutation.isPending} className="flex h-8 w-8 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors hover:bg-blue-500/15 hover:text-blue-500 disabled:opacity-40" title="Retry"><RotateCcw size={14} /></button>
+                    <button onClick={() => retryMutation.mutate({ id: t.id })} disabled={retryMutation.isPending} className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-blue-500 disabled:opacity-40" title="Retry"><RotateCcw size={16} /></button>
                   )}
                   {resolved.canResume && (
-                    <button onClick={() => resumeMutation.mutate({ id: t.id })} disabled={resumeMutation.isPending} className="flex h-8 w-8 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors hover:bg-green-500/15 hover:text-green-500 disabled:opacity-40" title="Resume"><Play size={14} /></button>
+                    <button onClick={() => resumeMutation.mutate({ id: t.id })} disabled={resumeMutation.isPending} className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-green-500 disabled:opacity-40" title="Resume"><Play size={16} /></button>
                   )}
                   {resolved.canPause && (
-                    <button onClick={() => pauseMutation.mutate({ id: t.id })} disabled={pauseMutation.isPending} className="flex h-8 w-8 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors hover:bg-yellow-500/15 hover:text-yellow-500 disabled:opacity-40" title="Pause"><Pause size={14} /></button>
+                    <button onClick={() => pauseMutation.mutate({ id: t.id })} disabled={pauseMutation.isPending} className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-yellow-500 disabled:opacity-40" title="Pause"><Pause size={16} /></button>
                   )}
-                  <button onClick={() => setDeleteTarget({ id: t.id, title: t.media?.title ?? t.title })} className="flex h-8 w-8 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-500" title="Delete"><Trash2 size={14} /></button>
-                </div>
-
-                {/* ── Row 3: Stats bar ── */}
-                <div className="flex items-center gap-5 border-t border-border px-5 py-3.5 text-sm text-muted-foreground">
-                  {/* Progress */}
-                  <div className="flex flex-1 items-center gap-3">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={cn("h-full rounded-full transition-all duration-500", resolved.isDownloaded ? "bg-green-500" : resolved.canResume ? "bg-yellow-500" : "bg-blue-500")}
-                        style={{ width: `${progressPct}%` }}
-                      />
-                    </div>
-                    <span className="w-10 text-right text-sm font-medium tabular-nums">{progressPct}%</span>
-                  </div>
-
-                  {/* Divider */}
-                  <span className="h-5 w-px bg-border" />
-
-                  {/* Stats */}
-                  {size > 0 && (
-                    <span className="flex items-center gap-1.5">
-                      <HardDrive size={14} className="text-muted-foreground/40" />
-                      {formatBytes(size)}
-                    </span>
-                  )}
-                  {t.live ? (
-                    <>
-                      <span className="flex items-center gap-1.5 text-blue-400">
-                        <ArrowDown size={14} />
-                        {formatSpeed(t.live.dlspeed)}
-                      </span>
-                      <span className="flex items-center gap-1.5 text-green-400">
-                        <ArrowUp size={14} />
-                        {formatSpeed(t.live.upspeed)}
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <Users size={14} className="text-muted-foreground/40" />
-                        {t.live.seeds} seeds · {t.live.peers} peers
-                      </span>
-                    </>
-                  ) : resolved.canRetry ? (
-                    <span className="text-muted-foreground/40">Removed from client</span>
-                  ) : null}
+                  <button onClick={() => setDeleteTarget({ id: t.id, title: t.media?.title ?? t.title })} className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-red-500" title="Delete"><Trash2 size={16} /></button>
                 </div>
               </div>
             );

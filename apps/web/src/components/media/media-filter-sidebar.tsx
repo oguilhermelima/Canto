@@ -395,7 +395,7 @@ export function MediaFilterSidebar({
             </FilterSection>
 
             {/* 8. Language */}
-            <FilterSection icon={Globe} label="Language" isLast>
+            <FilterSection icon={Globe} label="Language" isLast={mediaType !== "show"}>
               <Select
                 value={filters.language || "all"}
                 onValueChange={(v) => update({ language: v === "all" ? "" : v })}
@@ -412,6 +412,24 @@ export function MediaFilterSidebar({
                 </SelectContent>
               </Select>
             </FilterSection>
+
+            {/* 9. Provider — only show for TV shows when TVDB is connected */}
+            {mediaType === "show" && (
+              <FilterSection icon={Globe} label="Provider" isLast>
+                <Select
+                  value={filters.provider || "tmdb"}
+                  onValueChange={(v) => update({ provider: v })}
+                >
+                  <SelectTrigger className="h-8 w-full text-xs font-normal text-muted-foreground">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="tmdb">TMDB</SelectItem>
+                    <SelectItem value="tvdb">TVDB</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterSection>
+            )}
           </div>
         </div>
       </div>

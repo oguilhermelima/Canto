@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@canto/ui/button";
 import { Skeleton } from "@canto/ui/skeleton";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { MediaBadges } from "~/components/media/media-badges";
+import { ChevronLeft, ChevronRight, Info } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { MediaCarousel } from "~/components/media/media-carousel";
 import { FeaturedCarousel } from "~/components/media/featured-carousel";
@@ -15,6 +14,7 @@ import { AddToListButton } from "~/components/media/add-to-list-button";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
 interface SpotlightItem {
+  id?: string | null;
   externalId: number;
   provider: string;
   type: "movie" | "show";
@@ -47,14 +47,27 @@ export default function DiscoverPage(): React.JSX.Element {
   const trendingShows = trpc.media.browse.useInfiniteQuery({ type: "show" }, infiniteOpts);
   const trendingAnime = trpc.media.browse.useInfiniteQuery({ type: "show", genres: "16", language: "ja" }, infiniteOpts);
   const animeMovies = trpc.media.browse.useInfiniteQuery({ type: "movie", mode: "discover", genres: "16", language: "ja" }, infiniteOpts);
+  const utils = trpc.useUtils();
+  const recsVersionRef = useRef<number | null>(null);
   const recommendations = trpc.media.recommendations.useInfiniteQuery(
     { pageSize: 10 },
     {
-      staleTime: 15 * 60 * 1000,
+      staleTime: 5 * 60 * 1000,
+      refetchInterval: 30 * 1000, // light poll every 30s to detect version changes
       getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
       initialCursor: 0,
     },
   );
+
+  // Invalidate all pages when backend version changes (shadow swap completed)
+  const currentRecsVersion = recommendations.data?.pages[0]?.version;
+  useEffect(() => {
+    if (currentRecsVersion === undefined) return;
+    if (recsVersionRef.current !== null && recsVersionRef.current !== currentRecsVersion) {
+      void utils.media.recommendations.invalidate();
+    }
+    recsVersionRef.current = currentRecsVersion;
+  }, [currentRecsVersion, utils.media.recommendations]);
 
   const recentlyAdded = trpc.library.list.useQuery({
     page: 1,
@@ -103,7 +116,7 @@ export default function DiscoverPage(): React.JSX.Element {
   // Auto-rotate spotlight (paused when popover/sheet is open)
   useEffect(() => {
     if (spotlightPaused || spotlightItems.length <= 1) return;
-    const interval = setInterval(nextSpotlight, 8000);
+    const interval = setInterval(nextSpotlight, 15000);
     return () => clearInterval(interval);
   }, [spotlightPaused, spotlightItems.length, nextSpotlight]);
 
@@ -136,9 +149,8 @@ export default function DiscoverPage(): React.JSX.Element {
     href: `/media/${item.id}`,
   }));
 
-  const utils = trpc.useUtils();
-
   const getPreviewUrl = (item: SpotlightItem): string => {
+    if (item.id) return `/media/${item.id}`;
     return `/media/ext?provider=${item.provider}&externalId=${item.externalId}&type=${item.type}`;
   };
 
@@ -240,13 +252,22 @@ export default function DiscoverPage(): React.JSX.Element {
                 </h1>
               )}
 
-              {/* Meta badges */}
-              <MediaBadges
-                type={currentItem.type}
-                voteAverage={currentItem.voteAverage}
-                year={currentItem.year}
-                size="md"
-              />
+              {/* Meta line */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-foreground/70">
+                <span>{currentItem.type === "movie" ? "Movie" : "TV Show"}</span>
+                {currentItem.voteAverage != null && currentItem.voteAverage > 0 && (
+                  <>
+                    <span className="text-foreground/30">|</span>
+                    <span className="text-yellow-500">{currentItem.voteAverage.toFixed(1)}</span>
+                  </>
+                )}
+                {currentItem.year && (
+                  <>
+                    <span className="text-foreground/30">|</span>
+                    <span>{currentItem.year}</span>
+                  </>
+                )}
+              </div>
 
               {currentItem.overview && (
                 <p className="line-clamp-3 text-sm leading-relaxed text-foreground/70 md:text-base">
@@ -256,7 +277,7 @@ export default function DiscoverPage(): React.JSX.Element {
 
               </Link>
 
-              <div className="flex items-center gap-3 pt-1">
+              <div className="flex items-center gap-2 pt-1">
                 <AddToListButton
                   externalId={currentItem.externalId}
                   provider={currentItem.provider}
@@ -268,8 +289,9 @@ export default function DiscoverPage(): React.JSX.Element {
                 <Link
                   href={getPreviewUrl(currentItem)}
                   onMouseEnter={() => prefetchSpotlight(currentItem)}
-                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm font-medium text-foreground/80 backdrop-blur-sm transition-colors hover:bg-white/15 hover:text-foreground"
+                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-foreground/15 px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/25"
                 >
+                  <Info className="h-4 w-4" />
                   More Info
                 </Link>
               </div>

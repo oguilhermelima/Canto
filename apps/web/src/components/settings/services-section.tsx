@@ -973,8 +973,29 @@ export function MetadataSettingsSection(): React.JSX.Element {
   });
   const { enabled: directSearchEnabled, setEnabled: setDirectSearch } = useDirectSearch();
 
+  const { data: currentLanguage } = trpc.settings.getUserLanguage.useQuery();
+  const { data: supportedLanguages } = trpc.settings.getSupportedLanguages.useQuery();
+  const setUserLanguage = trpc.settings.setUserLanguage.useMutation({
+    onSuccess: () => void utils.settings.getUserLanguage.invalidate(),
+  });
+  const refreshLanguage = trpc.settings.refreshLanguage.useMutation();
   const isConnected = !!allSettings?.["tvdb.token"];
   const defaultShows = allSettings?.["tvdb.defaultShows"] === true;
+
+  const handleLanguageChange = (value: string): void => {
+    setUserLanguage.mutate(
+      { language: value },
+      {
+        onSuccess: () => {
+          // Also update global setting for pool items / browse
+          setMany.mutate({ "general.language": value });
+          toast.success("Language updated. Refreshing all metadata in background...");
+          refreshLanguage.mutate();
+        },
+        onError: () => toast.error("Failed to update language"),
+      },
+    );
+  };
 
   const handleToggleDefault = (checked: boolean): void => {
     setMany.mutate(
@@ -988,41 +1009,55 @@ export function MetadataSettingsSection(): React.JSX.Element {
 
   return (
     <div>
-      <SettingsSection title="Enable TVDB as TV Shows and Animes provider" description="Choose the metadata source for TV show seasons and episodes.">
+      <SettingsSection title="Language" description="Language used for metadata, titles, descriptions, and trailers from TMDB and TVDB.">
+        <div className="flex items-center gap-4">
+          <Select value={currentLanguage ?? "en-US"} onValueChange={handleLanguageChange}>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(supportedLanguages ?? []).map((lang) => (
+                <SelectItem key={lang.code} value={lang.code}>
+                  {lang.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-sm text-muted-foreground">
+            Changes apply to new metadata fetches. Existing items update on next refresh.
+          </p>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Use TVDB for season/episode structure" description="Validate and fix the season and episode structure using TVDB data.">
         <div className="space-y-5">
           <div className="flex items-start justify-between gap-6">
             <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
               <p>
-                By default, Canto uses <strong className="text-foreground">TMDB</strong> for all metadata.
-                Enabling TVDB replaces the <strong className="text-foreground">season and episode structure</strong> of
-                TV shows and anime with data from TheTVDB.
+                When enabled, Canto uses <strong className="text-foreground">TVDB</strong> to validate and correct the
+                <strong className="text-foreground"> season and episode organization</strong> of TV shows and anime.
+                All other metadata (titles, images, ratings, translations) stays from TMDB.
               </p>
 
               <p className="font-medium text-foreground">What changes with TVDB enabled:</p>
               <ul className="list-disc pl-5 space-y-1.5">
                 <li>
-                  <strong className="text-foreground">Accurate season splits</strong> — TMDB often groups
-                  entire series into 1-2 seasons. TVDB separates them by arc
-                  (e.g. Bleach: 16 seasons on TVDB vs 2 on TMDB).
+                  <strong className="text-foreground">Accurate season splits</strong> for anime and multi-season shows
                 </li>
                 <li>
-                  <strong className="text-foreground">Absolute episode numbering</strong> — TVDB natively
-                  provides absolute episode numbers for anime, so Episode 1 of Season 5
-                  also shows as Episode 110 overall.
+                  <strong className="text-foreground">Absolute episode numbering</strong> for anime
                 </li>
                 <li>
-                  <strong className="text-foreground">Finale indicators</strong> — Episodes are tagged as
-                  season finale, mid-season finale, or series finale.
+                  <strong className="text-foreground">Correct episode counts</strong> (specials separated)
                 </li>
               </ul>
 
               <p className="font-medium text-foreground">What stays the same:</p>
               <ul className="list-disc pl-5 space-y-1.5">
-                <li>Posters, backdrops and logo images still come from TMDB.</li>
-                <li>Ratings, popularity and vote counts still come from TMDB.</li>
-                <li>Recommendations, similar titles and trailers are powered by TMDB.</li>
-                <li>Trending, discover and spotlight sections are unaffected.</li>
-                <li>Movies always use TMDB regardless of this setting.</li>
+                <li>All titles, overviews, and translations (from TMDB)</li>
+                <li>Posters, logos, and backdrops (from TMDB)</li>
+                <li>Ratings, popularity, and recommendations</li>
+                <li>Trailers and videos</li>
               </ul>
 
               {!isConnected && (

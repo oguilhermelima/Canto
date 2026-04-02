@@ -83,8 +83,8 @@ export function CastSection({
             ? Array.from({ length: 8 }).map((_, i) => (
                 <CastCardSkeleton key={i} />
               ))
-            : sorted.map((member) => (
-                <CastCard key={member.id} {...member} />
+            : sorted.map((member, i) => (
+                <CastCard key={`${member.id}-${i}`} {...member} />
               ))}
         </div>
         {hasMore && !showAll && (

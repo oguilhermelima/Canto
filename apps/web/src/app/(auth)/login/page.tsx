@@ -61,9 +61,7 @@ export default function LoginPage(): React.JSX.Element {
     <Card>
       <CardHeader className="space-y-1">
         <div className="mb-4 flex justify-center">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor" className="text-foreground">
-            <path d="M2 2h12a8 8 0 0 1 8 8v12H10a8 8 0 0 1-8-8V2Z" />
-          </svg>
+          <img src="/room.png" alt="Canto" className="h-10 w-10 dark:invert" />
         </div>
         <CardTitle className="text-center text-2xl">Welcome back</CardTitle>
         <CardDescription className="text-center">

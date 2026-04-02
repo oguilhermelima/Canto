@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
 import {
@@ -16,7 +15,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@canto/ui/sheet";
-import { Bookmark, Check, Loader2, Plus } from "lucide-react";
+import { Bookmark, Check, Loader2, Plus, X } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { trpc } from "~/lib/trpc/client";
 import { toast } from "sonner";
@@ -31,6 +30,8 @@ interface AddToListButtonProps {
   title?: string;
   size?: "sm" | "lg";
   className?: string;
+  /** Called when any popover/sheet opens or closes */
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function AddToListButton({
@@ -41,14 +42,22 @@ export function AddToListButton({
   title,
   size = "sm",
   className,
+  onOpenChange,
 }: AddToListButtonProps): React.JSX.Element {
-  const router = useRouter();
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [newListName, setNewListName] = useState("");
+  const [creatingNew, setCreatingNew] = useState(false);
+  const storageKey = provider && externalId ? `canto:inlist:${provider}-${externalId}` : null;
+
   const [optimisticWatchlist, setOptimisticWatchlist] = useState<
     boolean | null
-  >(null);
+  >(() => {
+    // Restore from localStorage on mount (survives re-renders from carousel slides)
+    if (typeof window === "undefined" || !storageKey) return null;
+    const stored = localStorage.getItem(storageKey);
+    return stored === "true" ? true : stored === "false" ? false : null;
+  });
   const [resolvedMediaId, setResolvedMediaId] = useState<string | undefined>(
     initialMediaId,
   );
@@ -99,30 +108,31 @@ export function AddToListButton({
     }
     void utils.list.getAll.invalidate();
     void utils.list.getBySlug.invalidate();
+    // Don't invalidate recommendations/spotlight — let the item stay visible
+    // with its "In Watchlist" badge until next natural refresh
   };
 
   const addItem = trpc.list.addItem.useMutation({
     onSuccess: () => invalidate(),
     onError: (err) => {
-      setOptimisticWatchlist(null);
+      setWatchlistState(null);
       toast.error(err.message);
     },
-    onSettled: () => setOptimisticWatchlist(null),
   });
 
   const removeItem = trpc.list.removeItem.useMutation({
     onSuccess: () => invalidate(),
     onError: (err) => {
-      setOptimisticWatchlist(null);
+      setWatchlistState(null);
       toast.error(err.message);
     },
-    onSettled: () => setOptimisticWatchlist(null),
   });
 
   const createList = trpc.list.create.useMutation({
     onSuccess: async (newList) => {
       invalidate();
       setNewListName("");
+      setCreatingNew(false);
       toast.success(`Created "${newList.name}"`);
       const id = await resolveMediaId();
       if (id) {
@@ -137,8 +147,17 @@ export function AddToListButton({
 
   const inListIds = new Set(inLists?.map((l) => l.listId) ?? []);
   const watchlist = lists?.find((l) => l.type === "watchlist");
-  const isInWatchlist =
-    optimisticWatchlist ?? (watchlist ? inListIds.has(watchlist.id) : false);
+  // Persist optimistic state to localStorage so it survives carousel slide changes
+  const setWatchlistState = (value: boolean | null): void => {
+    setOptimisticWatchlist(value);
+    if (storageKey) {
+      if (value === null) localStorage.removeItem(storageKey);
+      else localStorage.setItem(storageKey, String(value));
+    }
+  };
+
+  const realWatchlistState = watchlist ? inListIds.has(watchlist.id) : false;
+  const isInWatchlist = optimisticWatchlist ?? realWatchlistState;
 
   // Filter: no server library, no watchlist
   const userLists =
@@ -148,7 +167,7 @@ export function AddToListButton({
     if (!watchlist) return;
 
     if (isInWatchlist && mediaId) {
-      setOptimisticWatchlist(false);
+      setWatchlistState(false);
       removeItem.mutate(
         { listId: watchlist.id, mediaId },
         {
@@ -161,10 +180,10 @@ export function AddToListButton({
         },
       );
     } else {
-      setOptimisticWatchlist(true);
+      setWatchlistState(true);
       const id = await resolveMediaId();
       if (!id) {
-        setOptimisticWatchlist(null);
+        setWatchlistState(null);
         return;
       }
       addItem.mutate(
@@ -213,55 +232,97 @@ export function AddToListButton({
   const btnText = isSmall ? "text-xs" : "text-sm";
   const btnPx = isSmall ? "px-3" : "px-4";
 
+  const posterUrl = (path: string | null | undefined): string | null =>
+    path
+      ? path.startsWith("http")
+        ? path
+        : `https://image.tmdb.org/t/p/w92${path}`
+      : null;
+
   const listContent = (
-    <div className="space-y-3">
-      <p className="text-xs font-medium text-muted-foreground">
-        Save to list
-      </p>
+    <div className="flex flex-col">
+      <p className="px-1 pb-3 text-base font-bold">Save to...</p>
 
       {/* Existing lists */}
-      <div className="max-h-[200px] space-y-0.5 overflow-y-auto">
-        {userLists.map((l) => (
-          <button
-            key={l.id}
-            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-accent"
-            onClick={() => void toggleList(l.id, l.name)}
-            disabled={isLoading}
-          >
-            {inListIds.has(l.id) ? (
-              <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-            ) : (
-              <div className="h-3.5 w-3.5 shrink-0" />
-            )}
-            <span className="truncate">{l.name}</span>
-          </button>
-        ))}
+      <div className="-mx-1 max-h-[280px] space-y-0.5 overflow-y-auto">
+        {userLists.map((l) => {
+          const thumb = posterUrl(l.previewPoster);
+          const saved = inListIds.has(l.id);
+          return (
+            <button
+              key={l.id}
+              className="flex w-full items-center gap-3 rounded-lg px-1 py-1.5 transition-colors hover:bg-accent"
+              onClick={() => void toggleList(l.id, l.name)}
+              disabled={isLoading}
+            >
+              <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
+                {thumb ? (
+                  <img
+                    src={thumb}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                    <Bookmark className="h-4 w-4" />
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1 text-left">
+                <p className="truncate text-sm font-medium">{l.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {l.itemCount} {l.itemCount === 1 ? "item" : "items"}
+                </p>
+              </div>
+              <Bookmark
+                className={cn(
+                  "h-5 w-5 shrink-0",
+                  saved
+                    ? "fill-foreground text-foreground"
+                    : "text-muted-foreground",
+                )}
+              />
+            </button>
+          );
+        })}
       </div>
 
       {/* New list */}
-      <div className="border-t border-border pt-3">
-        <p className="mb-2 text-xs font-medium text-muted-foreground">
-          New list
-        </p>
-        <div className="flex gap-2">
-          <Input
-            value={newListName}
-            onChange={(e) => setNewListName(e.target.value)}
-            placeholder="List name..."
-            className="h-8 text-sm"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleCreateList();
-            }}
-          />
-          <Button
-            size="sm"
-            className="h-8 shrink-0 rounded-xl px-3"
-            onClick={handleCreateList}
-            disabled={!newListName.trim() || createList.isPending}
+      <div className="mt-2 border-t border-border pt-2">
+        {creatingNew ? (
+          <div className="flex gap-2">
+            <Input
+              autoFocus
+              value={newListName}
+              onChange={(e) => setNewListName(e.target.value)}
+              placeholder="List name..."
+              className="h-9 text-sm"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCreateList();
+                if (e.key === "Escape") {
+                  setCreatingNew(false);
+                  setNewListName("");
+                }
+              }}
+            />
+            <Button
+              size="sm"
+              className="h-9 shrink-0 rounded-xl px-3"
+              onClick={handleCreateList}
+              disabled={!newListName.trim() || createList.isPending}
+            >
+              Create
+            </Button>
+          </div>
+        ) : (
+          <button
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-muted/60 py-2.5 text-sm font-medium transition-colors hover:bg-muted"
+            onClick={() => setCreatingNew(true)}
           >
-            Create
-          </Button>
-        </div>
+            <Plus className="h-4 w-4" />
+            New list
+          </button>
+        )}
       </div>
     </div>
   );
@@ -271,10 +332,13 @@ export function AddToListButton({
       {/* Watchlist toggle */}
       <button
         className={cn(
-          "inline-flex items-center gap-2 rounded-xl bg-white/10 font-medium text-foreground/80 backdrop-blur-sm transition-colors hover:bg-white/15 hover:text-foreground",
+          "group/wl inline-flex items-center gap-2 rounded-xl font-medium transition-all duration-200",
           btnHeight,
           btnPx,
           btnText,
+          isInWatchlist
+            ? "bg-green-500/20 text-green-500 hover:bg-red-500/20 hover:text-red-500"
+            : "bg-foreground text-background hover:bg-foreground/90",
         )}
         onClick={() => void toggleWatchlist()}
         disabled={!watchlist || isLoading}
@@ -282,30 +346,38 @@ export function AddToListButton({
         {resolving ? (
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : isInWatchlist ? (
-          <Check className="h-4 w-4" />
+          <>
+            <Check className="h-4 w-4 transition-transform duration-200 group-hover/wl:hidden" />
+            <X className="hidden h-4 w-4 transition-transform duration-200 group-hover/wl:block" />
+          </>
         ) : (
-          <Plus className="h-4 w-4" />
+          <Plus className="h-4 w-4 transition-transform duration-200" />
         )}
-        {isInWatchlist ? "In Watchlist" : "Watchlist"}
+        <span className={isInWatchlist ? "group-hover/wl:hidden" : ""}>
+          {isInWatchlist ? "In Watchlist" : "Watchlist"}
+        </span>
+        {isInWatchlist && (
+          <span className="hidden group-hover/wl:inline">Remove</span>
+        )}
       </button>
 
       {/* Save to list — Popover on desktop, Sheet on mobile */}
       {/* Desktop */}
       <div className="hidden md:block">
-        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+        <Popover open={popoverOpen} onOpenChange={(open) => { setPopoverOpen(open); onOpenChange?.(open); }}>
           <PopoverTrigger asChild>
             <button
               className={cn(
-                "inline-flex items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm transition-colors hover:bg-white/15",
+                "inline-flex items-center justify-center rounded-xl bg-foreground/15 transition-colors hover:bg-foreground/25",
                 btnHeight,
                 isSmall ? "w-8" : "w-10",
               )}
               aria-label="Save to list"
             >
-              <Bookmark className="h-4 w-4 text-foreground/80" />
+              <Bookmark className="h-4 w-4 text-foreground" />
             </button>
           </PopoverTrigger>
-          <PopoverContent align="start" sideOffset={8} className="w-64 p-3">
+          <PopoverContent align="start" sideOffset={8} className="w-72 p-3">
             {listContent}
           </PopoverContent>
         </Popover>
@@ -313,24 +385,24 @@ export function AddToListButton({
 
       {/* Mobile */}
       <div className="md:hidden">
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <Sheet open={sheetOpen} onOpenChange={(open) => { setSheetOpen(open); onOpenChange?.(open); }}>
           <SheetTrigger asChild>
             <button
               className={cn(
-                "inline-flex items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm transition-colors hover:bg-white/15",
+                "inline-flex items-center justify-center rounded-xl bg-foreground/15 transition-colors hover:bg-foreground/25",
                 btnHeight,
                 isSmall ? "w-8" : "w-10",
               )}
               aria-label="Save to list"
             >
-              <Bookmark className="h-4 w-4 text-foreground/80" />
+              <Bookmark className="h-4 w-4 text-foreground" />
             </button>
           </SheetTrigger>
           <SheetContent side="bottom" className="rounded-t-2xl">
-            <SheetHeader className="text-left">
+            <SheetHeader className="sr-only">
               <SheetTitle>Save to list</SheetTitle>
             </SheetHeader>
-            <div className="pt-4">{listContent}</div>
+            <div className="pt-2">{listContent}</div>
           </SheetContent>
         </Sheet>
       </div>

@@ -11,7 +11,6 @@ import {
   DropdownMenuTrigger,
 } from "@canto/ui/dropdown-menu";
 import {
-  Armchair,
   Compass,
   Download,
   GalleryVerticalEnd,
@@ -60,17 +59,19 @@ const NavLinks = memo(function NavLinks({ role, scrolled }: { role?: string; scr
   )?.href;
 
   const updateIndicator = useCallback(() => {
-    if (!activeHref) return;
+    if (!activeHref) { setReady(false); return; }
     const el = linkRefs.current.get(activeHref);
-    const container = containerRef.current;
-    if (!el || !container) return;
-    const cr = container.getBoundingClientRect();
-    const er = el.getBoundingClientRect();
-    setIndicator({ left: er.left - cr.left, width: er.width });
+    if (!el || !el.offsetWidth) return;
+    setIndicator({ left: el.offsetLeft, width: el.offsetWidth });
     setReady(true);
   }, [activeHref]);
 
-  useEffect(() => { updateIndicator(); }, [updateIndicator]);
+  useEffect(() => {
+    // Delay to ensure layout is ready after mount/navigation
+    const raf = requestAnimationFrame(updateIndicator);
+    return () => cancelAnimationFrame(raf);
+  }, [updateIndicator]);
+
   useEffect(() => {
     window.addEventListener("resize", updateIndicator);
     return () => window.removeEventListener("resize", updateIndicator);
@@ -257,13 +258,13 @@ export function Topbar(): React.JSX.Element {
         className={cn(
           "pointer-events-auto flex w-full items-center rounded-2xl border py-2.5 transition-all duration-300 ease-out",
           scrolled
-            ? "max-w-[80%] border-border/50 bg-background px-6 xl:max-w-[60%]"
+            ? "max-w-[80%] border-border/50 bg-background/80 px-6 backdrop-blur-xl xl:max-w-[60%]"
             : "max-w-full border-transparent px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24",
         )}
       >
         {/* Left: Logo */}
-        <Link href="/" className="flex shrink-0 items-center gap-2.5">
-          <Armchair className="h-6 w-6 text-foreground" />
+        <Link href="/" className="flex shrink-0 items-center gap-2">
+          <img src="/room.png" alt="Canto" className="h-9 w-9 dark:invert" />
           <span className="text-lg font-bold tracking-tight text-foreground">
             Canto
           </span>

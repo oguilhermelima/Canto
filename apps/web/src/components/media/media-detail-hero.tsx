@@ -79,6 +79,7 @@ export function MediaDetailHero({
   backdropPath,
   year,
   releaseDate,
+  voteAverage,
   genres,
   runtime,
   contentRating,
@@ -192,31 +193,41 @@ export function MediaDetailHero({
           )}
 
           {/* Meta line */}
-          {metaParts.length > 0 && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-foreground/60">
-              {releaseDate && <span>{formatDate(releaseDate)}</span>}
-              {contentRating && (
-                <>
-                  <span className="text-foreground/20">|</span>
-                  <span className="rounded border border-foreground/20 px-1.5 py-0.5 text-xs font-medium leading-none">
-                    {contentRating}
-                  </span>
-                </>
-              )}
-              {runtime != null && runtime > 0 && (
-                <>
-                  <span className="text-foreground/20">|</span>
-                  <span>{formatRuntime(runtime)}</span>
-                </>
-              )}
-              {genres && genres.length > 0 && (
-                <>
-                  <span className="text-foreground/20">|</span>
-                  <span>{genres.join(", ")}</span>
-                </>
-              )}
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-foreground/60">
+            <span>{type === "movie" ? "Movie" : "TV Show"}</span>
+            {voteAverage != null && voteAverage > 0 && (
+              <>
+                <span className="text-foreground/20">|</span>
+                <span className="text-yellow-500">{voteAverage.toFixed(1)}</span>
+              </>
+            )}
+            {releaseDate && (
+              <>
+                <span className="text-foreground/20">|</span>
+                <span>{formatDate(releaseDate)}</span>
+              </>
+            )}
+            {contentRating && (
+              <>
+                <span className="text-foreground/20">|</span>
+                <span className="rounded border border-foreground/20 px-1.5 py-0.5 text-xs font-medium leading-none">
+                  {contentRating}
+                </span>
+              </>
+            )}
+            {runtime != null && runtime > 0 && (
+              <>
+                <span className="text-foreground/20">|</span>
+                <span>{formatRuntime(runtime)}</span>
+              </>
+            )}
+            {genres && genres.length > 0 && (
+              <>
+                <span className="text-foreground/20">|</span>
+                <span>{genres.join(", ")}</span>
+              </>
+            )}
+          </div>
 
           {/* Overview */}
           {overview && (
@@ -330,12 +341,12 @@ export function MediaDetailHero({
           )}
 
           {/* Action buttons */}
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             <AddToListButton mediaId={id} title={title} size="lg" />
             {isAdmin && (
               <Link
                 href={`/media/${id}/manage`}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-white/10 px-4 text-sm font-medium text-foreground/80 backdrop-blur-sm transition-colors hover:bg-white/15 hover:text-foreground"
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-foreground/15 px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/25"
               >
                 <Settings2 className="h-4 w-4" />
                 Manage
