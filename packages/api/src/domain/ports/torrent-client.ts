@@ -8,6 +8,7 @@ export interface TorrentClientPort {
   getTorrentFiles(hash: string): Promise<TorrentFileInfo[]>;
   setLocation(hash: string, location: string): Promise<void>;
   renameFile(hash: string, oldPath: string, newPath: string): Promise<void>;
+  ensureCategory(category: string, savePath?: string): Promise<void>;
 }
 
 export interface TorrentInfo {

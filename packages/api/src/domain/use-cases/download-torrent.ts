@@ -4,6 +4,7 @@ import type { Database } from "@canto/db/client";
 import type { TorrentDownloadInput } from "@canto/validators";
 
 import { logAndSwallow } from "../../lib/log-error";
+import { resolveDownloadUrl } from "../../lib/follow-redirects";
 import { detectQuality, detectSource } from "../rules/quality";
 import { parseSeasons, parseEpisodes } from "../rules/parsing";
 import type { TorrentClientPort } from "../ports/torrent-client";
@@ -336,6 +337,9 @@ async function coreDownload(
   // ── Add to qBittorrent ──
 
   try {
+    // Ensure category exists before adding torrent
+    await qbClient.ensureCategory(qbCategory);
+
     // Snapshot existing hashes before adding
     let existingHashes: Set<string>;
     try {
@@ -345,7 +349,18 @@ async function coreDownload(
       existingHashes = new Set();
     }
 
-    await qbClient.addTorrent(magnetOrUrl, qbCategory);
+    // Resolve redirects (indexers often use redirect chains)
+    const resolvedUrl = await resolveDownloadUrl(magnetOrUrl);
+
+    // Update extracted hash if redirect resolved to a magnet link
+    if (!extractedHash && resolvedUrl.startsWith("magnet:")) {
+      extractedHash = extractHashFromMagnet(resolvedUrl);
+      if (extractedHash) {
+        await updateTorrent(db, torrentRow.id, { hash: extractedHash });
+      }
+    }
+
+    await qbClient.addTorrent(resolvedUrl, qbCategory);
 
     // If no hash from magnet/URL, poll qBittorrent to find the new torrent
     if (!extractedHash) {

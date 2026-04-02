@@ -232,6 +232,25 @@ export class QBittorrentClient {
       throw new Error(`qBittorrent renameFile failed: ${response.status}`);
     }
   }
+
+  async createCategory(category: string, savePath?: string): Promise<void> {
+    const body = new URLSearchParams({ category });
+    if (savePath) body.set("savePath", savePath);
+    await this.request("/api/v2/torrents/createCategory", {
+      method: "POST",
+      body,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    // 409 = category already exists, which is fine
+  }
+
+  async ensureCategory(category: string, savePath?: string): Promise<void> {
+    try {
+      await this.createCategory(category, savePath);
+    } catch {
+      // Category likely already exists — ignore
+    }
+  }
 }
 
 /* Singleton */
