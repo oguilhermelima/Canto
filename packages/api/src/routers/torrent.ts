@@ -196,8 +196,11 @@ export const torrentRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const row = await findTorrentById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
-      if (row.hash) { const qb = await getQBClient(); await qb.pauseTorrent(row.hash); }
-      return updateTorrent(ctx.db, input.id, { status: "paused" });
+      if (row.hash) {
+        try { const qb = await getQBClient(); await qb.deleteTorrent(row.hash, false); }
+        catch { /* qBit may not have it */ }
+      }
+      return updateTorrent(ctx.db, input.id, { status: "cancelled" });
     }),
 
   /**

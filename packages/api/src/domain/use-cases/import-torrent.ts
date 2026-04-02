@@ -142,7 +142,7 @@ export async function autoImportTorrent(
 
       const hostTargetLocation = (libRow?.mediaPath && libRow?.containerMediaPath)
         ? targetLocation.replace(libRow.containerMediaPath, libRow.mediaPath)
-        : targetLocation.replace("/medias/", "/home/user/Medias/");
+        : targetLocation;
       const finalPath = `${hostTargetLocation}/${targetFilename}`;
 
       if (episodeId) {
@@ -249,7 +249,7 @@ export async function autoImportTorrent(
 
   const hostContentPath = (libRow?.mediaPath && libRow?.containerMediaPath)
     ? targetLocation.replace(libRow.containerMediaPath, libRow.mediaPath)
-    : targetLocation.replace("/medias/", "/home/user/Medias/");
+    : targetLocation;
 
   await updateTorrent(db, torrentRow.id, {
     imported: true,

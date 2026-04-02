@@ -191,6 +191,10 @@ export function resolveState(dbStatus: string, liveState?: string, progress?: nu
     return { isDownloaded: false, label: "Paused", color: "bg-yellow-500/15 text-yellow-500", canPause: false, canResume: true, canRetry: false };
   if (dbStatus === "downloading")
     return { isDownloaded: false, label: "Downloading", color: "bg-blue-500/15 text-blue-500", canPause: false, canResume: false, canRetry: false };
+  if (dbStatus === "cancelled")
+    return { isDownloaded: false, label: "Cancelled", color: "bg-red-500/15 text-red-500", canPause: false, canResume: false, canRetry: true };
+  if (dbStatus === "stalled")
+    return { isDownloaded: false, label: "Stalled", color: "bg-orange-500/15 text-orange-500", canPause: false, canResume: false, canRetry: true };
   if (dbStatus === "incomplete")
     return { isDownloaded: false, label: "Incomplete", color: "bg-orange-500/15 text-orange-500", canPause: false, canResume: false, canRetry: true };
   if (dbStatus === "removed")
