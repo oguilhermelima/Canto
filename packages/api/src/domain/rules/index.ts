@@ -8,6 +8,7 @@ export {
   SOURCE_HIERARCHY,
 } from "./quality";
 export { calculateConfidence, CAM_KEYWORDS } from "./scoring";
+export { mapSearchResultToMediaFields } from "./pool-scoring";
 export {
   EP_PATTERN,
   BARE_EP_PATTERN,

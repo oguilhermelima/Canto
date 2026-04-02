@@ -11,7 +11,10 @@ import {
   type SQL,
 } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { media, mediaFile, season } from "@canto/db/schema";
+import {
+  media,
+  mediaFile,
+} from "@canto/db/schema";
 import type { ListInput } from "@canto/validators";
 
 type MediaRow = typeof media.$inferSelect;
