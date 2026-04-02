@@ -44,6 +44,10 @@
       "types": "./src/domain/use-cases/import-torrent.ts",
       "default": "./src/domain/use-cases/import-torrent.ts"
     },
+    "./domain/use-cases/create-notification": {
+      "types": "./src/domain/use-cases/create-notification.ts",
+      "default": "./src/domain/use-cases/create-notification.ts"
+    },
     "./infrastructure/adapters/qbittorrent": {
       "types": "./src/infrastructure/adapters/qbittorrent.ts",
       "default": "./src/infrastructure/adapters/qbittorrent.ts"
@@ -99,6 +103,18 @@
     "./lib/tvdb-client": {
       "types": "./src/lib/tvdb-client.ts",
       "default": "./src/lib/tvdb-client.ts"
+    },
+    "./domain/rules/quality": {
+      "types": "./src/domain/rules/quality.ts",
+      "default": "./src/domain/rules/quality.ts"
+    },
+    "./domain/rules/scoring": {
+      "types": "./src/domain/rules/scoring.ts",
+      "default": "./src/domain/rules/scoring.ts"
+    },
+    "./domain/rules/parsing": {
+      "types": "./src/domain/rules/parsing.ts",
+      "default": "./src/domain/rules/parsing.ts"
     }
   },
   "scripts": {

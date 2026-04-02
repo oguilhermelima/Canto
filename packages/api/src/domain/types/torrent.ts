@@ -1,3 +1,18 @@
+export interface SearchContext {
+  query: string;
+  mediaType: "movie" | "show";
+  tmdbId?: number;
+  imdbId?: string;
+  tvdbId?: number;
+  seasonNumber?: number;
+  episodeNumbers?: number[];
+  categories?: number[];
+  /** Per-indexer result limit (Torznab `limit` param) */
+  limit?: number;
+  /** Per-indexer result offset (Torznab `offset` param) */
+  offset?: number;
+}
+
 export interface IndexerResult {
   guid: string;
   title: string;

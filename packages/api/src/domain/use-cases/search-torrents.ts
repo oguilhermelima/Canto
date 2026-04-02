@@ -4,8 +4,9 @@ import type { Database } from "@canto/db/client";
 
 import { detectQuality, detectSource } from "../rules/quality";
 import { calculateConfidence } from "../rules/scoring";
+import { detectLanguages, detectReleaseGroup, detectCodec } from "../rules/parsing";
 import type { ConfidenceContext } from "../types/common";
-import type { IndexerResult } from "../types/torrent";
+import type { IndexerResult, SearchContext } from "../types/torrent";
 import type { IndexerPort } from "../ports/indexer";
 import {
   findMediaById,
@@ -29,13 +30,32 @@ export interface SearchResult {
   source: string;
   confidence: number;
   categories: Array<{ id: number; name: string }>;
+  languages: string[];
+  releaseGroup: string | null;
+  codec: string | null;
+}
+
+export interface PaginatedSearchResults {
+  results: SearchResult[];
+  page: number;
+  pageSize: number;
+  /** Whether indexers returned a full page (i.e. there's likely more) */
+  hasMore: boolean;
+}
+
+export interface SearchInput {
+  mediaId: string;
+  seasonNumber?: number;
+  episodeNumbers?: number[] | null;
+  page?: number;
+  pageSize?: number;
 }
 
 export async function searchTorrents(
   db: Database,
-  input: { mediaId: string; seasonNumber?: number; episodeNumbers?: number[] | null },
+  input: SearchInput,
   indexers: IndexerPort[],
-): Promise<SearchResult[]> {
+): Promise<PaginatedSearchResults> {
   const row = await findMediaById(db, input.mediaId);
 
   if (!row) {
@@ -45,7 +65,10 @@ export async function searchTorrents(
     });
   }
 
-  // Build search query
+  const page = input.page ?? 0;
+  const pageSize = input.pageSize ?? 50;
+
+  // Build text query
   let query = row.title;
   if (input.seasonNumber !== undefined) {
     const paddedSeason = String(input.seasonNumber).padStart(2, "0");
@@ -54,20 +77,36 @@ export async function searchTorrents(
       input.episodeNumbers.length === 1 &&
       input.episodeNumbers[0] !== undefined
     ) {
-      // Single episode: use S01E01 format
       const paddedEp = String(input.episodeNumbers[0]).padStart(2, "0");
       query += ` S${paddedSeason}E${paddedEp}`;
     } else {
-      // Multiple episodes or no episodes: use season pack query
       query += ` S${paddedSeason}`;
     }
   }
 
   if (indexers.length === 0) {
-    return [];
+    return { results: [], page, pageSize, hasMore: false };
   }
 
-  const searches: Promise<IndexerResult[]>[] = indexers.map((idx) => idx.search(query));
+  // Build structured search context with external IDs + pagination
+  // Each indexer gets `pageSize` results at the corresponding offset.
+  // We ask for pageSize+1 per indexer so we can detect hasMore after dedup.
+  const ctx: SearchContext = {
+    query,
+    mediaType: row.type as "movie" | "show",
+    tmdbId: row.provider === "tmdb" ? row.externalId : undefined,
+    imdbId: row.imdbId ?? undefined,
+    tvdbId: row.tvdbId ?? undefined,
+    seasonNumber: input.seasonNumber,
+    episodeNumbers: input.episodeNumbers ?? undefined,
+    categories: row.type === "movie" ? [2000] : [5000],
+    limit: pageSize,
+    offset: page * pageSize,
+  };
+
+  const searches: Promise<IndexerResult[]>[] = indexers.map((idx) =>
+    idx.search(ctx),
+  );
 
   let results: IndexerResult[];
   try {
@@ -100,9 +139,7 @@ export async function searchTorrents(
     results = results.filter((r) => !blockedTitles.has(r.title.toLowerCase()));
   }
 
-  // Determine if media has a digital release (not just in theaters)
-  // A movie released > 3 months ago, or with status "Released", or a show,
-  // is considered to have a digital release available.
+  // Determine if media has a digital release
   const isShow = row.type === "show";
   const releaseDate = row.releaseDate ? new Date(row.releaseDate) : null;
   const monthsSinceRelease = releaseDate
@@ -112,7 +149,7 @@ export async function searchTorrents(
 
   const confidenceCtx: ConfidenceContext = { hasDigitalRelease };
 
-  return results
+  const scored = results
     .map((r) => {
       const flags = r.indexerFlags ?? [];
       const quality = detectQuality(r.title);
@@ -136,8 +173,16 @@ export async function searchTorrents(
         source: detectSource(r.title),
         confidence,
         categories: r.categories,
+        languages: detectLanguages(r.title),
+        releaseGroup: detectReleaseGroup(r.title),
+        codec: detectCodec(r.title),
       };
     })
     .filter((r) => r.confidence > 0)
     .sort((a, b) => b.confidence - a.confidence);
+
+  // If any indexer returned a full page, there's likely more
+  const hasMore = results.length >= pageSize;
+
+  return { results: scored, page, pageSize, hasMore };
 }

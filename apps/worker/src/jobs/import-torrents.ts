@@ -161,7 +161,7 @@ async function tryContinuousDownload(
 
   try {
     const indexers = await buildIndexers();
-    const results = await searchTorrents(db, {
+    const { results } = await searchTorrents(db, {
       mediaId: mediaRow.id,
       seasonNumber: importedSeasonNumber,
       episodeNumbers: [nextEp],

@@ -7,6 +7,8 @@ export const torrentSearchInput = z.object({
   mediaId: z.string().uuid(),
   seasonNumber: z.number().int().nonnegative().optional(),
   episodeNumbers: z.array(z.number().int().positive()).nullish(),
+  page: z.number().int().nonnegative().default(0),
+  pageSize: z.number().int().min(10).max(200).default(50),
 });
 export type TorrentSearchInput = z.infer<typeof torrentSearchInput>;
 
