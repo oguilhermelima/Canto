@@ -6,7 +6,6 @@ import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
 import { Film, Tv } from "lucide-react";
-import { MediaBadges } from "./media-badges";
 import { trpc } from "~/lib/trpc/client";
 
 interface MediaCardProps {
@@ -36,9 +35,6 @@ export function MediaCard({
   posterPath,
   year,
   voteAverage,
-  showTypeBadge = true,
-  showRating = true,
-  showYear = true,
   showTitle = true,
   href,
   className,
@@ -69,7 +65,7 @@ export function MediaCard({
       href={linkHref}
       onMouseEnter={handlePrefetch}
       className={cn(
-        "group relative flex flex-col rounded-xl transition-all duration-300 ease-out hover:z-10 hover:scale-105 [&:hover_.poster-frame]:ring-2 [&:hover_.poster-frame]:ring-white/60",
+        "group relative flex flex-col rounded-xl transition-all duration-300 ease-out hover:z-10 hover:scale-105",
         className,
       )}
     >
@@ -80,7 +76,7 @@ export function MediaCard({
             src={posterPath.startsWith("http") ? posterPath : `https://image.tmdb.org/t/p/w500${posterPath}`}
             alt={title}
             fill
-            className="object-cover transition-opacity duration-300"
+            className="object-cover"
             loading="lazy"
             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
           />
@@ -94,19 +90,29 @@ export function MediaCard({
           </div>
         )}
 
-        {/* Badges — hidden by default, visible on hover */}
-        <div className="absolute left-2 top-2 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-          <MediaBadges
-            voteAverage={voteAverage}
-            year={showYear ? year : undefined}
-            size="sm"
-          />
-        </div>
-        {showTypeBadge && (
-          <div className="absolute right-2 top-2 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-            <MediaBadges type={type} size="sm" />
+        {/* Hover overlay with gradient + info */}
+        <div className="absolute inset-0 flex flex-col justify-end opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+          <div className="bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pb-3 pt-16">
+            <p className="line-clamp-4 text-sm font-semibold leading-tight text-white">
+              {title}
+            </p>
+            <div className="mt-1.5 flex items-center gap-2 text-[11px] text-white/60">
+              <span>{type === "movie" ? "Movie" : "TV Show"}</span>
+              {voteAverage != null && voteAverage > 0 && (
+                <>
+                  <span className="text-white/30">|</span>
+                  <span className="text-yellow-500">{voteAverage.toFixed(1)}</span>
+                </>
+              )}
+              {year && (
+                <>
+                  <span className="text-white/30">|</span>
+                  <span>{year}</span>
+                </>
+              )}
+            </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Title below poster */}

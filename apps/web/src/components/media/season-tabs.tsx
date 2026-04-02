@@ -173,22 +173,43 @@ export function SeasonTabs({
 
   return (
     <section className={cn("relative", className)}>
-      {/* Row 1: Seasons title + Custom Search + Preferences */}
+      {/* Row 1: Seasons title + Custom Download + Select All */}
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-xl font-semibold tracking-tight">Seasons</h2>
-        <div className="flex items-center gap-2">
-          {/* Custom Torrent Search */}
+        <div className="flex items-center gap-3 pr-5">
+          {/* Custom Download */}
           {mediaConfig?.onCustomSearch && (
             <button
               type="button"
               onClick={() => setCustomSearchOpen(true)}
-              className="flex h-8 items-center gap-1.5 rounded-xl bg-muted/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="inline-flex h-8 items-center gap-1.5 rounded-xl bg-foreground px-3 text-xs font-medium text-background transition-colors hover:bg-foreground/90"
             >
               <SearchIcon className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Custom Search</span>
+              <span className="hidden sm:inline">Custom Download</span>
             </button>
           )}
-
+          {/* Select All checkbox */}
+          {selectable && (
+            <button
+              type="button"
+              onClick={selectAllSeasons}
+              className={cn(
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 transition-all",
+                allSeasonsSelected
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : hasSelection
+                    ? "border-primary/50 bg-primary/20"
+                    : "border-muted-foreground/30 hover:border-muted-foreground/50",
+              )}
+              title="Select all"
+            >
+              {allSeasonsSelected ? (
+                <Check size={13} strokeWidth={3} />
+              ) : hasSelection ? (
+                <Minus size={13} strokeWidth={3} className="text-primary" />
+              ) : null}
+            </button>
+          )}
         </div>
       </div>
 
@@ -429,7 +450,7 @@ function SeasonBlock({
               href={serverLinks.jellyfin.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden items-center gap-1.5 rounded-xl border border-[#a95ce0]/20 bg-gradient-to-r from-[#a95ce0]/10 to-[#4bb8e8]/10 px-2.5 py-1 transition-colors hover:from-[#a95ce0]/20 hover:to-[#4bb8e8]/20 sm:flex"
+              className="hidden items-center gap-1.5 rounded-xl border border-[#a95ce0]/20 bg-gradient-to-r from-[#a95ce0]/10 to-[#4bb8e8]/10 px-2.5 py-1.5 transition-colors hover:from-[#a95ce0]/20 hover:to-[#4bb8e8]/20 sm:flex"
             >
               <span
                 className="inline-block h-3.5 w-3.5 shrink-0"
@@ -440,7 +461,7 @@ function SeasonBlock({
                 }}
               />
               <span className="bg-gradient-to-r from-[#a95ce0] to-[#4bb8e8] bg-clip-text text-[11px] font-medium text-transparent">
-                {jellyfinEpCount >= epCount ? "Available" : "Partially available"}
+                {jellyfinEpCount >= epCount ? "Available" : `${jellyfinEpCount}/${epCount}`}
               </span>
             </a>
           )}
@@ -449,7 +470,7 @@ function SeasonBlock({
               href={serverLinks.plex.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden items-center gap-1.5 rounded-xl border border-[#e5a00d]/20 bg-[#e5a00d]/10 px-2.5 py-1 transition-colors hover:bg-[#e5a00d]/20 sm:flex"
+              className="hidden items-center gap-1.5 rounded-xl border border-[#e5a00d]/20 bg-[#e5a00d]/10 px-2.5 py-1.5 transition-colors hover:bg-[#e5a00d]/20 sm:flex"
             >
               <span
                 className="inline-block h-3.5 w-3.5 shrink-0 bg-[#e5a00d]"
@@ -459,7 +480,7 @@ function SeasonBlock({
                 }}
               />
               <span className="text-[11px] font-medium text-[#e5a00d]">
-                {plexEpCount >= epCount ? "Available" : "Partially available"}
+                {plexEpCount >= epCount ? "Available" : `${plexEpCount}/${epCount}`}
               </span>
             </a>
           )}

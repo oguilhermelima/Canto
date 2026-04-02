@@ -129,36 +129,30 @@ export function EpisodeCard({
           </div>
         )}
 
-        {/* Jellyfin badge */}
+        {/* Jellyfin badge — icon only */}
         {hasJellyfin && (
-          <div className="flex items-center gap-1.5 rounded-xl border border-[#a95ce0]/20 bg-gradient-to-r from-[#a95ce0]/10 to-[#4bb8e8]/10 p-1.5 sm:px-2.5 sm:py-1" title="Available on Jellyfin">
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg border border-[#a95ce0]/20 bg-gradient-to-r from-[#a95ce0]/10 to-[#4bb8e8]/10" title="Available on Jellyfin">
             <span
-              className="inline-block h-4 w-4 shrink-0"
+              className="inline-block h-3 w-3 shrink-0"
               style={{
                 background: "linear-gradient(135deg, #a95ce0, #4bb8e8)",
                 mask: "url(/jellyfin-logo.svg) center/contain no-repeat",
                 WebkitMask: "url(/jellyfin-logo.svg) center/contain no-repeat",
               }}
             />
-            <span className="hidden bg-gradient-to-r from-[#a95ce0] to-[#4bb8e8] bg-clip-text text-xs font-medium text-transparent sm:inline">
-              Available
-            </span>
           </div>
         )}
 
-        {/* Plex badge */}
+        {/* Plex badge — icon only */}
         {hasPlex && (
-          <div className="flex items-center gap-1.5 rounded-xl border border-[#e5a00d]/20 bg-[#e5a00d]/10 p-1.5 sm:px-2.5 sm:py-1" title="Available on Plex">
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg border border-[#e5a00d]/20 bg-[#e5a00d]/10" title="Available on Plex">
             <span
-              className="inline-block h-4 w-4 shrink-0 bg-[#e5a00d]"
+              className="inline-block h-3 w-3 shrink-0 bg-[#e5a00d]"
               style={{
                 mask: "url(/plex-logo.svg) center/contain no-repeat",
                 WebkitMask: "url(/plex-logo.svg) center/contain no-repeat",
               }}
             />
-            <span className="hidden text-xs font-medium text-[#e5a00d] sm:inline">
-              Available
-            </span>
           </div>
         )}
 
