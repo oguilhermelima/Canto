@@ -15,6 +15,8 @@ import {
   upsertUserPreference,
 } from "../infrastructure/repositories/library-repository";
 import { findLibraryStats, listLibraryMedia, updateMedia } from "../infrastructure/repositories/media-repository";
+import { getUserLanguage } from "../domain/services/user-service";
+import { batchMediaTranslations } from "../domain/services/translation-service";
 
 /* -------------------------------------------------------------------------- */
 /*  Library Router                                                            */
@@ -25,9 +27,25 @@ export const libraryRouter = createTRPCRouter({
    * Paginated + filtered library listing.
    * Only returns items where downloaded = true.
    */
-  list: protectedProcedure.input(listInput).query(({ ctx, input }) =>
-    listLibraryMedia(ctx.db, input),
-  ),
+  list: protectedProcedure.input(listInput).query(async ({ ctx, input }) => {
+    const result = await listLibraryMedia(ctx.db, input);
+    const userLang = await getUserLanguage(ctx.db, ctx.session.user.id);
+    if (userLang.startsWith("en")) return result;
+
+    const translations = await batchMediaTranslations(ctx.db, result.items.map((i) => i.id), userLang);
+    const items = result.items.map((item) => {
+      const t = translations.get(item.id);
+      if (!t) return item;
+      return {
+        ...item,
+        title: t.title ?? item.title,
+        overview: t.overview ?? item.overview,
+        posterPath: t.posterPath ?? item.posterPath,
+        logoPath: t.logoPath ?? item.logoPath,
+      };
+    });
+    return { ...result, items };
+  }),
 
   /**
    * Library statistics: counts of movies, shows, total, and storage usage.

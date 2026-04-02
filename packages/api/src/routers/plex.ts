@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getPlexCredentials } from "../lib/server-credentials";
 import { createTRPCRouter, adminProcedure } from "../trpc";
 import { syncPlexLibraries } from "../domain/use-cases/sync-plex-libraries";
-import { testPlexConnection, scanPlexLibrary } from "../infrastructure/adapters/plex";
+import { testPlexConnection, scanPlexLibrary, getPlexSections } from "../infrastructure/adapters/plex";
 import { findAllLibraries, updateLibrary } from "../infrastructure/repositories/library-repository";
 
 /* -------------------------------------------------------------------------- */
@@ -19,7 +19,7 @@ export const plexRouter = createTRPCRouter({
 
     try {
       const info = await testPlexConnection(creds.url, creds.token);
-      await syncPlexLibraries(ctx.db, creds.url, creds.token);
+      await syncPlexLibraries(ctx.db, creds.url, creds.token, getPlexSections);
       return { connected: true, serverName: info.serverName, version: info.version };
     } catch (err) {
       return { connected: false, error: err instanceof Error ? err.message : "Unknown error" };
@@ -35,7 +35,7 @@ export const plexRouter = createTRPCRouter({
         message: "Plex not configured",
       });
     }
-    return syncPlexLibraries(ctx.db, creds.url, creds.token);
+    return syncPlexLibraries(ctx.db, creds.url, creds.token, getPlexSections);
   }),
 
   scan: adminProcedure.mutation(async ({ ctx }) => {

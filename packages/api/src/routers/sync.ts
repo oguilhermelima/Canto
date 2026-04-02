@@ -1,10 +1,9 @@
-import { Queue } from "bullmq";
 import { z } from "zod";
 
 import { db } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
 import { SETTINGS } from "../lib/settings-keys";
-import { persistMedia } from "@canto/db/persist-media";
+import { persistMedia, getSupportedLanguageCodes } from "@canto/db/persist-media";
 
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
 import { getTmdbProvider } from "../lib/tmdb-client";
@@ -16,40 +15,7 @@ import {
   updateSyncItem,
 } from "../infrastructure/repositories/sync-repository";
 import { findMediaByAnyReference, updateMedia } from "../infrastructure/repositories/media-repository";
-
-/* -------------------------------------------------------------------------- */
-/*  Queue (lazy singleton)                                                     */
-/* -------------------------------------------------------------------------- */
-
-const redisConnection = {
-  host: process.env.REDIS_HOST ?? "localhost",
-  port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
-  password: process.env.REDIS_PASSWORD ?? undefined,
-};
-
-let jellyfinQueue: Queue | null = null;
-let plexQueue: Queue | null = null;
-
-function getJellyfinQueue(): Queue {
-  if (!jellyfinQueue) jellyfinQueue = new Queue("jellyfin-sync", { connection: redisConnection });
-  return jellyfinQueue;
-}
-
-function getPlexQueue(): Queue {
-  if (!plexQueue) plexQueue = new Queue("plex-sync", { connection: redisConnection });
-  return plexQueue;
-}
-
-async function dispatchQueue(queue: Queue, jobId: string): Promise<boolean> {
-  const existing = await queue.getJob(jobId);
-  if (existing) {
-    const state = await existing.getState();
-    if (state === "active" || state === "waiting") return false;
-    await existing.remove();
-  }
-  await queue.add(queue.name, {}, { jobId });
-  return true;
-}
+import { dispatchJellyfinSync, dispatchPlexSync } from "../infrastructure/queue/bullmq-dispatcher";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                     */
@@ -61,21 +27,21 @@ export const syncRouter = createTRPCRouter({
    */
   importMedia: adminProcedure.mutation(async () => {
     const [jellyfin, plex] = await Promise.all([
-      dispatchQueue(getJellyfinQueue(), "jellyfin-sync-run"),
-      dispatchQueue(getPlexQueue(), "plex-sync-run"),
+      dispatchJellyfinSync(),
+      dispatchPlexSync(),
     ]);
     return { started: { jellyfin, plex } };
   }),
 
   /** Trigger Jellyfin sync only */
   syncJellyfin: adminProcedure.mutation(async () => {
-    const started = await dispatchQueue(getJellyfinQueue(), "jellyfin-sync-run");
+    const started = await dispatchJellyfinSync();
     return { started };
   }),
 
   /** Trigger Plex sync only */
   syncPlex: adminProcedure.mutation(async () => {
-    const started = await dispatchQueue(getPlexQueue(), "plex-sync-run");
+    const started = await dispatchPlexSync();
     return { started };
   }),
 
@@ -150,7 +116,8 @@ export const syncRouter = createTRPCRouter({
       if (!item) throw new Error("Sync item not found");
 
       const tmdb = await getTmdbProvider();
-      const normalized = await tmdb.getMetadata(input.tmdbId, input.type);
+      const supportedLangs = [...await getSupportedLanguageCodes(db)];
+      const normalized = await tmdb.getMetadata(input.tmdbId, input.type, { supportedLanguages: supportedLangs });
 
       // Check if media already exists by external ID
       const existing = await findMediaByAnyReference(db, input.tmdbId, "tmdb");

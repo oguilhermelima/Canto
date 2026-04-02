@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import {
@@ -7,8 +8,11 @@ import {
   deleteSetting,
 } from "@canto/db/settings";
 
+import { eq } from "drizzle-orm";
+import { user, supportedLanguage } from "@canto/db/schema";
 import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure } from "../trpc";
 import { SETTINGS } from "../lib/settings-keys";
+import { dispatchRefreshAllLanguage } from "../infrastructure/queue/bullmq-dispatcher";
 import { randomUUID } from "crypto";
 
 /** Get or create a stable Plex client identifier (persisted in settings). */
@@ -216,6 +220,46 @@ export const settingsRouter = createTRPCRouter({
         }
       }
     }),
+
+  /** Get/set user language preference */
+  getUserLanguage: protectedProcedure.query(async ({ ctx }) => {
+    const row = await ctx.db.query.user.findFirst({
+      where: eq(user.id, ctx.session.user.id),
+      columns: { language: true },
+    });
+    return row?.language ?? "en-US";
+  }),
+
+  setUserLanguage: protectedProcedure
+    .input(z.object({ language: z.string().min(2).max(10) }))
+    .mutation(async ({ ctx, input }) => {
+      // Validate language is supported
+      const lang = await ctx.db.query.supportedLanguage.findFirst({
+        where: eq(supportedLanguage.code, input.language),
+      });
+      if (!lang) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Language "${input.language}" is not supported` });
+      }
+      await ctx.db
+        .update(user)
+        .set({ language: input.language })
+        .where(eq(user.id, ctx.session.user.id));
+      return { success: true };
+    }),
+
+  /** Get all supported languages */
+  getSupportedLanguages: publicProcedure.query(async ({ ctx }) => {
+    return ctx.db.query.supportedLanguage.findMany({
+      where: eq(supportedLanguage.enabled, true),
+      orderBy: (t, { asc }) => [asc(t.name)],
+    });
+  }),
+
+  /** Refresh all metadata, pool items, and user recs in the configured language */
+  refreshLanguage: adminProcedure.mutation(async () => {
+    await dispatchRefreshAllLanguage();
+    return { success: true };
+  }),
 
   /** Toggle a service on/off */
   toggleService: adminProcedure

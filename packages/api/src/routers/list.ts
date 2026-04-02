@@ -14,6 +14,10 @@ import {
   removeListItem,
   findMediaInLists,
 } from "../infrastructure/repositories/list-repository";
+import { dispatchRefreshExtras } from "../infrastructure/queue/bullmq-dispatcher";
+import { deleteUserRecommendationsForSource, removeMediaFromUserRecs } from "../infrastructure/repositories/user-recommendation-repository";
+import { addMediaToUserRecs } from "../domain/use-cases/rebuild-user-recs";
+import { logAndSwallow } from "../lib/log-error";
 
 function slugify(name: string): string {
   return name
@@ -175,11 +179,23 @@ export const listRouter = createTRPCRouter({
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
-      return addListItem(ctx.db, {
+      const item = await addListItem(ctx.db, {
         listId: input.listId,
         mediaId: input.mediaId,
         notes: input.notes,
       });
+
+      // 1. Remove the item itself from user's recommendations (it's now in a list)
+      void removeMediaFromUserRecs(ctx.db, ctx.session.user.id, input.mediaId)
+        .catch(logAndSwallow("list:addItem removeMediaFromUserRecs"));
+      // 2. Enrich the media (credits, videos, recs) in background
+      void dispatchRefreshExtras(input.mediaId)
+        .catch(logAndSwallow("list:addItem dispatchRefreshExtras"));
+      // 3. Add new recommendations based on this media (additive, instant)
+      void addMediaToUserRecs(ctx.db, ctx.session.user.id, input.mediaId)
+        .catch(logAndSwallow("list:addItem addMediaToUserRecs"));
+
+      return item;
     }),
 
   /** Remove a media item from a list */
@@ -206,6 +222,10 @@ export const listRouter = createTRPCRouter({
       }
 
       await removeListItem(ctx.db, input.listId, input.mediaId);
+
+      // Clean up per-user recommendation links sourced from the removed media
+      void deleteUserRecommendationsForSource(ctx.db, ctx.session.user.id, input.mediaId).catch(logAndSwallow("list:removeItem deleteUserRecommendationsForSource"));
+
       return { success: true };
     }),
 

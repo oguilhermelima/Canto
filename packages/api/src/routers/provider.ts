@@ -5,9 +5,14 @@ import { genre } from "@canto/db/schema";
 import { getSetting, setSetting } from "@canto/db/settings";
 import { SETTINGS } from "../lib/settings-keys";
 
-import { createTRPCRouter, publicProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { cached } from "../infrastructure/cache/redis";
-import { findPoolItemsWithBackdrops, findWatchProviderLinks } from "../infrastructure/repositories/extras-repository";
+import { findRecommendedMediaWithBackdrops, findWatchProviderLinks } from "../infrastructure/repositories/extras-repository";
+import { findUserSpotlightItems } from "../infrastructure/repositories/user-recommendation-repository";
+import { translateMediaItems } from "../domain/services/translation-service";
+import { getUserLanguage } from "../domain/services/user-service";
+import { buildExclusionSet } from "../domain/services/recommendation-service";
+import { mapPoolItem } from "../domain/mappers/media-mapper";
 
 /* -------------------------------------------------------------------------- */
 /*  TMDB direct API helper                                                    */
@@ -117,38 +122,36 @@ export const providerRouter = createTRPCRouter({
     }),
 
   /**
-   * Get spotlight items for the home page hero.
-   * Reads from recommendation_pool (most recent with backdrops).
-   * Falls back to TMDB trending if pool is empty (fresh install).
+   * Get per-user spotlight items for the home page hero.
+   * Primary: user_recommendation with backdrops.
+   * Fallback: global pool, then TMDB trending.
    */
-  spotlight: publicProcedure.query(async () => {
-    // Try recommendation pool first (fetch extra to allow dedup)
-    const poolItems = await findPoolItemsWithBackdrops(db, 30);
+  spotlight: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    const userLang = await getUserLanguage(db, userId);
+    const { excludeSet, excludeItems } = await buildExclusionSet(db, userId);
 
+    // Path 1: Per-user spotlight
+    const userItems = await findUserSpotlightItems(db, userId, excludeItems, 10);
+    if (userItems.length > 0) {
+      return translateMediaItems(db, userItems.map(mapPoolItem), userLang);
+    }
+
+    // Path 2: Global pool fallback
+    const poolItems = await findRecommendedMediaWithBackdrops(db, 30);
     if (poolItems.length > 0) {
-      // Deduplicate by provider+externalId
       const seen = new Set<string>();
       const unique = poolItems.filter((item) => {
         const key = `${item.provider ?? "tmdb"}-${item.externalId}`;
-        if (seen.has(key)) return false;
+        if (seen.has(key) || excludeSet.has(key)) return false;
         seen.add(key);
         return true;
       });
 
-      return unique.slice(0, 10).map((item) => ({
-        externalId: item.externalId,
-        provider: item.provider ?? "tmdb",
-        type: item.mediaType as "movie" | "show",
-        title: item.title,
-        overview: item.overview ?? "",
-        year: item.releaseDate ? new Date(item.releaseDate).getFullYear() : undefined,
-        voteAverage: item.voteAverage ?? 0,
-        backdropPath: item.backdropPath!,
-        logoPath: item.logoPath ?? null,
-      }));
+      return translateMediaItems(db, unique.slice(0, 10).map(mapPoolItem), userLang);
     }
 
-    // Fallback: TMDB trending (fresh install, pool empty)
+    // Path 3: TMDB trending fallback (fresh install)
     const CACHE_KEY = SETTINGS.CACHE_SPOTLIGHT;
     const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -261,7 +264,7 @@ export const providerRouter = createTRPCRouter({
       updatedAt: new Date().toISOString(),
     });
 
-    return spotlightResults;
+    return translateMediaItems(db, spotlightResults, userLang);
   }),
 
   /**

@@ -8,6 +8,7 @@ import {
   testJellyfinConnection,
   scanJellyfinLibrary,
   mergeJellyfinVersions,
+  getJellyfinLibraryFolders,
 } from "../infrastructure/adapters/jellyfin";
 import { updateLibrary } from "../infrastructure/repositories/library-repository";
 
@@ -23,7 +24,7 @@ export const jellyfinRouter = createTRPCRouter({
 
     try {
       const info = await testJellyfinConnection(creds.url, creds.apiKey);
-      await syncJellyfinLibraries(ctx.db, creds.url, creds.apiKey);
+      await syncJellyfinLibraries(ctx.db, creds.url, creds.apiKey, getJellyfinLibraryFolders);
       return { connected: true, serverName: info.serverName, version: info.version };
     } catch (err) {
       return { connected: false, error: err instanceof Error ? err.message : "Unknown error" };
@@ -39,7 +40,7 @@ export const jellyfinRouter = createTRPCRouter({
         message: "Jellyfin not configured",
       });
     }
-    return syncJellyfinLibraries(ctx.db, creds.url, creds.apiKey);
+    return syncJellyfinLibraries(ctx.db, creds.url, creds.apiKey, getJellyfinLibraryFolders);
   }),
 
   toggleLibrary: adminProcedure

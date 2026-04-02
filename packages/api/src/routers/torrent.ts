@@ -3,8 +3,14 @@ import { z } from "zod";
 
 import { torrentDownloadInput, torrentSearchInput } from "@canto/validators";
 
+import { getSetting } from "@canto/db/settings";
+
 import { createTRPCRouter, adminProcedure } from "../trpc";
+import { SETTINGS } from "../lib/settings-keys";
 import { getQBClient } from "../infrastructure/adapters/qbittorrent";
+import { getJackettClient } from "../infrastructure/adapters/jackett";
+import { getProwlarrClient } from "../infrastructure/adapters/prowlarr";
+import type { IndexerPort } from "../domain/ports/indexer";
 import { autoImportTorrent } from "../domain/use-cases/import-torrent";
 import { mergeLiveData } from "../domain/use-cases/merge-live-data";
 import { searchTorrents } from "../domain/use-cases/search-torrents";
@@ -21,6 +27,19 @@ import { findMediaById } from "../infrastructure/repositories/media-repository";
 import { findDefaultLibrary, findLibraryById } from "../infrastructure/repositories/library-repository";
 
 /* -------------------------------------------------------------------------- */
+/*  Helpers                                                                   */
+/* -------------------------------------------------------------------------- */
+
+async function buildIndexers(): Promise<IndexerPort[]> {
+  const indexers: IndexerPort[] = [];
+  const prowlarrEnabled = (await getSetting<boolean>(SETTINGS.PROWLARR_ENABLED)) === true;
+  const jackettEnabled = (await getSetting<boolean>(SETTINGS.JACKETT_ENABLED)) === true;
+  if (prowlarrEnabled) indexers.push(await getProwlarrClient());
+  if (jackettEnabled) indexers.push(await getJackettClient());
+  return indexers;
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Router                                                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -31,7 +50,10 @@ export const torrentRouter = createTRPCRouter({
    */
   search: adminProcedure
     .input(torrentSearchInput)
-    .query(({ ctx, input }) => searchTorrents(ctx.db, input)),
+    .query(async ({ ctx, input }) => {
+      const indexers = await buildIndexers();
+      return searchTorrents(ctx.db, input, indexers);
+    }),
 
   /**
    * Send a magnet/torrent URL to qBittorrent and create a torrent DB record.
@@ -40,7 +62,10 @@ export const torrentRouter = createTRPCRouter({
    */
   download: adminProcedure
     .input(torrentDownloadInput)
-    .mutation(({ ctx, input }) => downloadTorrent(ctx.db, input)),
+    .mutation(async ({ ctx, input }) => {
+      const qb = await getQBClient();
+      return downloadTorrent(ctx.db, input, qb);
+    }),
 
   /**
    * Replace existing media_file records and re-download with a new torrent.
@@ -58,7 +83,10 @@ export const torrentRouter = createTRPCRouter({
         episodeNumbers: z.array(z.number().int().positive()).optional(),
       }),
     )
-    .mutation(({ ctx, input }) => replaceTorrent(ctx.db, input)),
+    .mutation(async ({ ctx, input }) => {
+      const qb = await getQBClient();
+      return replaceTorrent(ctx.db, input, qb);
+    }),
 
   /**
    * Re-download a torrent that was removed or errored.
@@ -111,7 +139,8 @@ export const torrentRouter = createTRPCRouter({
    */
   listLive: adminProcedure.query(async ({ ctx }) => {
     const dbRows = await findAllTorrents(ctx.db);
-    const merged = await mergeLiveData(ctx.db, dbRows);
+    const qb = await getQBClient();
+    const merged = await mergeLiveData(ctx.db, dbRows, qb);
 
     // Batch-fetch linked media info
     const mediaIds = [...new Set(dbRows.map((r) => r.mediaId).filter(Boolean))] as string[];
@@ -136,7 +165,8 @@ export const torrentRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const dbRows = await findTorrentsByMediaId(ctx.db, input.mediaId);
       if (dbRows.length === 0) return [];
-      const merged = await mergeLiveData(ctx.db, dbRows);
+      const qb = await getQBClient();
+      const merged = await mergeLiveData(ctx.db, dbRows, qb);
       return merged.map((item) => ({ ...item.row, live: item.live }));
     }),
 
