@@ -1,23 +1,19 @@
 import type { Database } from "@canto/db/client";
-import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "../../lib/settings-keys";
-import { findMediaById } from "../../infrastructure/repositories";
-import { replaceMediaProvider } from "./replace-provider";
+import { reconcileShowStructure } from "./reconcile-show-structure";
+import type { MediaProviderPort } from "../ports/media-provider.port";
+import type { JobDispatcherPort } from "../ports/job-dispatcher.port";
 
 export async function replaceShowWithTvdb(
   db: Database,
   mediaId: string,
+  deps: { tmdb: MediaProviderPort; tvdb: MediaProviderPort; dispatcher: JobDispatcherPort },
 ): Promise<void> {
-  const tvdbDefault = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
-  if (!tvdbDefault) return;
-
-  const row = await findMediaById(db, mediaId);
-  if (!row || row.type !== "show" || row.provider === "tvdb") return;
-
   try {
-    await replaceMediaProvider(db, mediaId, "tvdb");
-    console.log(`[replace-tvdb] Replaced "${row.title}" with TVDB data`);
+    await reconcileShowStructure(db, mediaId, deps);
   } catch (err) {
-    console.warn(`[replace-tvdb] Failed for "${row.title}":`, err instanceof Error ? err.message : err);
+    console.warn(
+      `[reconcile-show] Failed for mediaId ${mediaId}:`,
+      err instanceof Error ? err.message : err,
+    );
   }
 }

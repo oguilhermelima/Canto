@@ -1,15 +1,12 @@
 import { TRPCError } from "@trpc/server";
 
 import type { Database } from "@canto/db/client";
-import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "../../lib/settings-keys";
 
-import { getJackettClient } from "../../infrastructure/adapters/jackett";
-import { getProwlarrClient } from "../../infrastructure/adapters/prowlarr";
 import { detectQuality, detectSource } from "../rules/quality";
 import { calculateConfidence } from "../rules/scoring";
 import type { ConfidenceContext } from "../types/common";
 import type { IndexerResult } from "../types/torrent";
+import type { IndexerPort } from "../ports/indexer";
 import {
   findMediaById,
   findBlocklistByMediaId,
@@ -37,6 +34,7 @@ export interface SearchResult {
 export async function searchTorrents(
   db: Database,
   input: { mediaId: string; seasonNumber?: number; episodeNumbers?: number[] | null },
+  indexers: IndexerPort[],
 ): Promise<SearchResult[]> {
   const row = await findMediaById(db, input.mediaId);
 
@@ -65,24 +63,11 @@ export async function searchTorrents(
     }
   }
 
-  const prowlarrEnabled =
-    (await getSetting<boolean>(SETTINGS.PROWLARR_ENABLED)) === true;
-  const jackettEnabled =
-    (await getSetting<boolean>(SETTINGS.JACKETT_ENABLED)) === true;
-
-  if (!prowlarrEnabled && !jackettEnabled) {
+  if (indexers.length === 0) {
     return [];
   }
 
-  const searches: Promise<IndexerResult[]>[] = [];
-  if (prowlarrEnabled) {
-    const prowlarr = await getProwlarrClient();
-    searches.push(prowlarr.search(query));
-  }
-  if (jackettEnabled) {
-    const jackett = await getJackettClient();
-    searches.push(jackett.search(query));
-  }
+  const searches: Promise<IndexerResult[]>[] = indexers.map((idx) => idx.search(query));
 
   let results: IndexerResult[];
   try {

@@ -6,17 +6,19 @@ import {
   updateLibrary,
   createLibrary,
 } from "../../infrastructure/repositories";
-import { getJellyfinLibraryFolders } from "../../infrastructure/adapters/jellyfin";
 import { autoElectDefaults } from "./sync-library-helpers";
+
+type JellyfinFolder = { Id: string; Name: string; CollectionType: string; Locations: string[] };
 
 export async function syncJellyfinLibraries(
   db: Database,
   url: string,
   apiKey: string,
+  getLibraryFolders: (url: string, apiKey: string) => Promise<JellyfinFolder[]>,
 ): Promise<Array<{ id: string; name: string; action: "created" | "updated" }>> {
-  let folders: Array<{ Id: string; Name: string; CollectionType: string; Locations: string[] }>;
+  let folders: JellyfinFolder[];
   try {
-    folders = await getJellyfinLibraryFolders(url, apiKey);
+    folders = await getLibraryFolders(url, apiKey);
   } catch {
     return [];
   }

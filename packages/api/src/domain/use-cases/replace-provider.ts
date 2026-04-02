@@ -2,23 +2,24 @@ import type { Database } from "@canto/db/client";
 import { eq } from "drizzle-orm";
 import { media, season } from "@canto/db/schema";
 import type { MediaType } from "@canto/providers";
-import { getTmdbProvider } from "../../lib/tmdb-client";
-import { getTvdbProvider } from "../../lib/tvdb-client";
-import { updateMediaFromNormalized } from "@canto/db/persist-media";
-import { dispatchRefreshExtras } from "../../infrastructure/queue/bullmq-dispatcher";
+import { updateMediaFromNormalized, getSupportedLanguageCodes } from "@canto/db/persist-media";
 import { findMediaById, findMediaByExternalId } from "../../infrastructure/repositories";
+import { logAndSwallow } from "../../lib/log-error";
+import type { MediaProviderPort } from "../ports/media-provider.port";
+import type { JobDispatcherPort } from "../ports/job-dispatcher.port";
 
 export async function replaceMediaProvider(
   db: Database,
   mediaId: string,
   targetProvider: "tmdb" | "tvdb",
+  deps: { tmdb: MediaProviderPort; tvdb: MediaProviderPort; dispatcher: JobDispatcherPort },
 ): Promise<typeof media.$inferSelect> {
   const row = await findMediaById(db, mediaId);
   if (!row) throw new Error("Media not found");
   if (row.provider === targetProvider) throw new Error(`Media is already using ${targetProvider}`);
   if (row.type === "movie" && targetProvider === "tvdb") throw new Error("TVDB does not support movies");
 
-  const provider = targetProvider === "tmdb" ? await getTmdbProvider() : await getTvdbProvider();
+  const provider = targetProvider === "tmdb" ? deps.tmdb : deps.tvdb;
 
   // Find equivalent on target provider
   let targetExternalId: number | null = null;
@@ -26,10 +27,9 @@ export async function replaceMediaProvider(
   // Try cross-reference IDs first
   if (targetProvider === "tvdb" && row.tvdbId) {
     targetExternalId = row.tvdbId;
-  } else if (targetProvider === "tmdb" && row.imdbId) {
+  } else if (targetProvider === "tmdb" && row.imdbId && deps.tmdb.findByImdbId) {
     try {
-      const tmdb = await getTmdbProvider();
-      const found = await tmdb.findByImdbId(row.imdbId);
+      const found = await deps.tmdb.findByImdbId(row.imdbId);
       const match = found.find((r) => r.type === row.type);
       if (match) targetExternalId = match.externalId;
     } catch { /* fallback to search */ }
@@ -53,10 +53,15 @@ export async function replaceMediaProvider(
   }
 
   // Fetch full metadata from target provider
-  const normalized = await provider.getMetadata(targetExternalId, row.type as MediaType);
+  const supportedLangs = [...await getSupportedLanguageCodes(db)];
+  const normalized = await provider.getMetadata(targetExternalId, row.type as MediaType, { supportedLanguages: supportedLangs });
 
-  // Preserve TMDB data when replacing with TVDB (ratings, images)
+  // Preserve TMDB data when replacing with TVDB
+  // TVDB lacks ratings/popularity and often has inferior images/text vs TMDB
   if (targetProvider === "tvdb") {
+    normalized.title = row.title ?? normalized.title;
+    normalized.overview = row.overview ?? normalized.overview;
+    normalized.tagline = row.tagline ?? normalized.tagline;
     normalized.voteAverage = row.voteAverage ?? normalized.voteAverage;
     normalized.voteCount = row.voteCount ?? normalized.voteCount;
     normalized.popularity = row.popularity ?? normalized.popularity;
@@ -72,7 +77,7 @@ export async function replaceMediaProvider(
   const updated = await updateMediaFromNormalized(db, mediaId, normalized);
 
   // Dispatch refresh-extras to populate credits/similar/recommendations from TMDB
-  void dispatchRefreshExtras(mediaId).catch(() => {});
+  void deps.dispatcher.refreshExtras(mediaId).catch(logAndSwallow("replace-provider dispatchRefreshExtras"));
 
   return updated;
 }

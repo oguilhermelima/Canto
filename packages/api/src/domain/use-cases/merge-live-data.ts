@@ -1,5 +1,5 @@
 import type { Database } from "@canto/db/client";
-import { getQBClient } from "../../infrastructure/adapters/qbittorrent";
+import type { TorrentClientPort } from "../ports/torrent-client";
 import type { LiveData } from "../types/torrent";
 import { autoImportTorrent } from "./import-torrent";
 import {
@@ -7,12 +7,14 @@ import {
   updateTorrentBatch,
   claimTorrentForImport,
 } from "../../infrastructure/repositories";
+import { logAndSwallow } from "../../lib/log-error";
 
 type TorrentRow = Awaited<ReturnType<Database["query"]["torrent"]["findMany"]>>[number];
 
 export async function mergeLiveData(
   db: Database,
   dbRows: TorrentRow[],
+  qbClient: TorrentClientPort,
 ): Promise<Array<{ row: TorrentRow; live: LiveData | null }>> {
   let liveTorrents: Array<{
     hash: string;
@@ -32,10 +34,9 @@ export async function mergeLiveData(
     save_path: string;
   }> = [];
   let qbReachable = false;
-  const qbImportClient = await getQBClient();
 
   try {
-    liveTorrents = await qbImportClient.listTorrents();
+    liveTorrents = await qbClient.listTorrents();
     qbReachable = true;
   } catch {
     // qBittorrent may be unreachable
@@ -59,7 +60,7 @@ export async function mergeLiveData(
         (row as { fileSize: number | null }).fileSize = live.size;
       }
       (row as { progress: number }).progress = live.progress;
-      void updateTorrent(db, row.id, updates).catch(() => {});
+      void updateTorrent(db, row.id, updates).catch(logAndSwallow("merge-live-data updateTorrent"));
     }
   }
 
@@ -90,7 +91,7 @@ export async function mergeLiveData(
     byStatus.get(status)!.push(id);
   }
   for (const [status, ids] of byStatus) {
-    void updateTorrentBatch(db, ids, { status }).catch(() => {});
+    void updateTorrentBatch(db, ids, { status }).catch(logAndSwallow("merge-live-data updateTorrentBatch"));
   }
 
   // 3. Auto-import newly completed torrents
@@ -107,10 +108,10 @@ export async function mergeLiveData(
         try {
           const claimed = await claimTorrentForImport(db, row.id);
           if (!claimed) return;
-          await autoImportTorrent(db, claimed, qbImportClient);
+          await autoImportTorrent(db, claimed, qbClient);
         } catch (err) {
           console.error(`[auto-import] Failed for "${row.title}":`, err instanceof Error ? err.message : err);
-          await updateTorrent(db, row.id, { importing: false }).catch(() => {});
+          await updateTorrent(db, row.id, { importing: false }).catch(logAndSwallow("merge-live-data reset importing flag"));
         }
       })();
     }

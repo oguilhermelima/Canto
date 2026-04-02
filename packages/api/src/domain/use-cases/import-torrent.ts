@@ -1,11 +1,6 @@
 import type { Database } from "@canto/db/client";
 import type { torrent as torrentSchema } from "@canto/db/schema";
-import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "../../lib/settings-keys";
-import { getJellyfinCredentials } from "../../lib/server-credentials";
-import { scanJellyfinLibrary, searchJellyfinItems, mergeJellyfinVersions } from "../../infrastructure/adapters/jellyfin";
-import { scanPlexLibrary } from "../../infrastructure/adapters/plex";
-import type { QBittorrentClient } from "../../infrastructure/adapters/qbittorrent";
+import type { TorrentClientPort } from "../ports/torrent-client";
 import { isVideoFile, sanitizeName, buildMediaDir, buildFileName } from "../rules/naming";
 import { EP_PATTERN, BARE_EP_PATTERN, isSubtitleFile, parseSubtitleLanguage } from "../rules/parsing";
 import { createNotification } from "./create-notification";
@@ -18,54 +13,15 @@ import {
   updateTorrent,
 } from "../../infrastructure/repositories";
 
-async function triggerMediaServerScans(db: Database, libraryId?: string): Promise<void> {
-  const jellyfinUrl = await getSetting(SETTINGS.JELLYFIN_URL);
-  const jellyfinKey = await getSetting(SETTINGS.JELLYFIN_API_KEY);
-  if (jellyfinUrl && jellyfinKey) {
-    void scanJellyfinLibrary(jellyfinUrl, jellyfinKey).catch(() => {});
-  }
-
-  const plexUrl = await getSetting(SETTINGS.PLEX_URL);
-  const plexToken = await getSetting(SETTINGS.PLEX_TOKEN);
-  if (plexUrl && plexToken && libraryId) {
-    const lib = await findLibraryById(db, libraryId);
-    if (lib?.plexLibraryId) {
-      void scanPlexLibrary(plexUrl, plexToken, [lib.plexLibraryId]).catch(() => {});
-    }
-  }
-}
-
-async function autoMergeIfEnabled(
-  mediaRow: { title: string; externalId: number; provider: string; type: string },
-): Promise<void> {
-  try {
-    const jellyfinCreds = await getJellyfinCredentials();
-    if (!jellyfinCreds) return;
-
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-
-    const itemType = mediaRow.type === "movie" ? "Movie" : "Series";
-    const items = await searchJellyfinItems(jellyfinCreds.url, jellyfinCreds.apiKey, mediaRow.title, itemType);
-
-    const tmdbId = String(mediaRow.externalId);
-    const matchingItems = items.filter((item) => {
-      const providerTmdb = item.ProviderIds?.Tmdb ?? item.ProviderIds?.tmdb;
-      return providerTmdb === tmdbId;
-    });
-
-    if (matchingItems.length >= 2) {
-      await mergeJellyfinVersions(jellyfinCreds.url, jellyfinCreds.apiKey, matchingItems.map((i) => i.Id));
-      console.log(`[auto-import] Merged ${matchingItems.length} Jellyfin versions for "${mediaRow.title}"`);
-    }
-  } catch (err) {
-    console.warn("[auto-import] Auto-merge failed:", err instanceof Error ? err.message : err);
-  }
+export interface ImportHooks {
+  onImported?: (mediaRow: { id: string; title: string; externalId: number; provider: string; type: string; libraryId: string | null }) => void;
 }
 
 export async function autoImportTorrent(
   db: Database,
   torrentRow: typeof torrentSchema.$inferSelect,
-  qbClient: QBittorrentClient,
+  qbClient: TorrentClientPort,
+  hooks?: ImportHooks,
 ): Promise<void> {
   if (!torrentRow.hash || !torrentRow.mediaId) return;
 
@@ -303,8 +259,7 @@ export async function autoImportTorrent(
 
   if (importedCount > 0) {
     console.log(`[auto-import] Imported ${importedCount} file(s) for "${mediaRow.title}"`);
-    await triggerMediaServerScans(db, mediaRow.libraryId ?? undefined);
-    await autoMergeIfEnabled(mediaRow);
+    hooks?.onImported?.(mediaRow);
     await createNotification(db, {
       title: "Import complete",
       message: `Imported ${importedCount} file(s) for "${mediaRow.title}"`,

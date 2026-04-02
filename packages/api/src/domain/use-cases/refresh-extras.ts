@@ -1,85 +1,35 @@
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import type { Database } from "@canto/db/client";
 import {
   media,
   mediaCredit,
+  mediaRecommendation,
   mediaVideo,
   mediaWatchProvider,
-  recommendationPool,
 } from "@canto/db/schema";
-import type { MediaType, SearchResult } from "@canto/providers";
-import { getTmdbProvider } from "../../lib/tmdb-client";
+import { getSupportedLanguageCodes } from "@canto/db/persist-media";
+import { dispatchEnrichMedia } from "../../infrastructure/queue/bullmq-dispatcher";
+import type { MediaType } from "@canto/providers";
 import { findMediaById } from "../../infrastructure/repositories";
-import { dispatchReplacePoolShowsTvdb } from "../../infrastructure/queue/bullmq-dispatcher";
-
-function calculatePoolScore(
-  voteAverage: number | undefined,
-  voteCount: number | undefined,
-  popularity: number | undefined,
-  releaseDate: string | null | undefined,
-): number {
-  // Base: Bayesian weighted average (penalize low vote counts)
-  const avg = voteAverage ?? 0;
-  const count = voteCount ?? 0;
-  const minVotes = 50;
-  const weightedAvg = (count / (count + minVotes)) * avg + (minVotes / (count + minVotes)) * 6;
-  let score = weightedAvg * 10; // 0-100 range
-
-  // Popularity boost (log scale, capped at 20)
-  if (popularity && popularity > 0) {
-    score += Math.min(Math.log10(popularity) * 8, 20);
-  }
-
-  // Recency: continuous decay — halves every 5 years
-  // Recent content gets up to +30, very old content gets ~0
-  if (releaseDate) {
-    const years = (Date.now() - new Date(releaseDate).getTime()) / (1000 * 60 * 60 * 24 * 365);
-    score += 30 * Math.pow(0.5, years / 5);
-  }
-
-  return Math.round(score * 100) / 100;
-}
-
-function mapToPoolRow(
-  result: SearchResult,
-  sourceMediaId: string,
-  sourceType: "similar" | "recommendation",
-  extras?: { trailerKey?: string; logoPath?: string },
-) {
-  return {
-    externalId: result.externalId,
-    provider: result.provider ?? "tmdb",
-    mediaType: result.type,
-    sourceMediaId,
-    title: result.title,
-    overview: result.overview,
-    posterPath: result.posterPath,
-    backdropPath: result.backdropPath,
-    logoPath: extras?.logoPath ?? null,
-    trailerKey: extras?.trailerKey ?? null,
-    releaseDate: result.releaseDate,
-    voteAverage: result.voteAverage,
-    score: calculatePoolScore(result.voteAverage, result.voteCount, result.popularity, result.releaseDate),
-    frequency: 1,
-    sourceType,
-  };
-}
+import type { MediaProviderPort } from "../ports/media-provider.port";
+import { mapSearchResultToMediaFields } from "../rules/pool-scoring";
 
 export async function refreshExtras(
   db: Database,
   mediaId: string,
+  deps: { tmdb: MediaProviderPort },
 ): Promise<void> {
   const row = await findMediaById(db, mediaId);
   if (!row) return;
 
-  const tmdb = await getTmdbProvider();
+  const tmdb = deps.tmdb;
 
   // Resolve TMDB external ID for extras (always fetch from TMDB)
   let extrasExternalId = row.externalId;
   if (row.provider !== "tmdb") {
     // Try IMDB cross-reference first
-    if (row.imdbId) {
+    if (row.imdbId && tmdb.findByImdbId) {
       try {
         const found = await tmdb.findByImdbId(row.imdbId);
         const match = found.find((r) => r.type === row.type);
@@ -96,7 +46,139 @@ export async function refreshExtras(
     if (extrasExternalId === row.externalId && row.provider !== "tmdb") return; // Can't find TMDB match
   }
 
-  const extras = await tmdb.getExtras(extrasExternalId, row.type as MediaType);
+  const supportedLangs = [...await getSupportedLanguageCodes(db)];
+  const extras = await tmdb.getExtras(extrasExternalId, row.type as MediaType, { supportedLanguages: supportedLangs });
+
+  // ── Pre-transaction: build recommendation items and fetch trailers/logos (NETWORK I/O) ──
+
+  const allRecItems = [
+    ...extras.recommendations.map((r) => ({
+      result: r,
+      sourceType: "recommendation" as const,
+    })),
+    ...extras.similar.map((r) => ({
+      result: r,
+      sourceType: "similar" as const,
+    })),
+  ];
+
+  // Dedup by externalId before fetching trailers
+  const uniqueRecItems = new Map<number, (typeof allRecItems)[number]>();
+  for (const item of allRecItems) {
+    if (!uniqueRecItems.has(item.result.externalId)) {
+      uniqueRecItems.set(item.result.externalId, item);
+    }
+  }
+
+  // Fetch existing media_recommendation entries BEFORE the transaction (for diff)
+  const existingRecs = await db
+    .select({
+      id: mediaRecommendation.id,
+      mediaId: mediaRecommendation.mediaId,
+      sourceType: mediaRecommendation.sourceType,
+    })
+    .from(mediaRecommendation)
+    .where(eq(mediaRecommendation.sourceMediaId, mediaId));
+
+  // Also look up existing media rows for the recommended items' external IDs
+  const recExternalIds = [...uniqueRecItems.values()].map((i) => i.result.externalId);
+  const existingMedia = recExternalIds.length > 0
+    ? await db.query.media.findMany({
+        where: sql`${media.externalId} IN (${sql.join(recExternalIds.map((id) => sql`${id}`), sql`, `)}) AND ${media.provider} = 'tmdb'`,
+        columns: { id: true, externalId: true, logoPath: true },
+      })
+    : [];
+  const existingMediaByExtId = new Map(existingMedia.map((m) => [m.externalId, m]));
+
+  const trailerMap = new Map<number, string>();
+  const logoMap = new Map<number, string>();
+
+  // Only fetch trailers + logos for items that don't already have them
+  const itemsNeedingFetch = [...uniqueRecItems.values()].filter((item) => {
+    const existing = existingMediaByExtId.get(item.result.externalId);
+    return !existing?.logoPath;
+  });
+
+  for (let i = 0; i < itemsNeedingFetch.length; i += 10) {
+    const batch = itemsNeedingFetch.slice(i, i + 10);
+    await Promise.allSettled(
+      batch.map(async (item) => {
+        try {
+          if (!tmdb.getVideos || !tmdb.getImages) return;
+          const tmdbType = item.result.type === "show" ? "tv" : "movie";
+          const [videos, images] = await Promise.all([
+            tmdb.getVideos(item.result.externalId, tmdbType, supportedLangs),
+            tmdb.getImages(item.result.externalId, tmdbType),
+          ]);
+
+          const enTrailer = videos.find(
+            (v) =>
+              v.type === "Trailer" &&
+              v.site === "YouTube" &&
+              (!v.language || v.language === "en"),
+          );
+          if (enTrailer) trailerMap.set(item.result.externalId, enTrailer.key);
+
+          const enLogos = (images.logos ?? []).filter(
+            (l) => l.iso_639_1 === "en" || l.iso_639_1 === null,
+          );
+          if (enLogos.length > 0)
+            logoMap.set(item.result.externalId, enLogos[0]!.file_path);
+        } catch {
+          // Best-effort
+        }
+      }),
+    );
+  }
+
+  // Build media field objects for recommendation items
+  const newRecFields = [...uniqueRecItems.values()].map((item) =>
+    mapSearchResultToMediaFields(item.result, item.sourceType, {
+      logoPath: logoMap.get(item.result.externalId),
+    }),
+  );
+  const newKeys = new Set(
+    newRecFields.map((r) => `${r.provider}-${r.externalId}`),
+  );
+
+  // ── Persist light media rows outside transaction (may already exist) ──
+  const mediaIdByExtKey = new Map<string, string>();
+  for (const fields of newRecFields) {
+    const key = `${fields.provider}-${fields.externalId}`;
+    const existing = existingMediaByExtId.get(fields.externalId);
+    if (existing) {
+      mediaIdByExtKey.set(key, existing.id);
+      // Update logoPath if we fetched a new one and existing doesn't have one
+      if (!existing.logoPath && fields.logoPath) {
+        await db.update(media).set({ logoPath: fields.logoPath }).where(eq(media.id, existing.id));
+      }
+    } else {
+      const [inserted] = await db.insert(media).values({
+        type: fields.type,
+        externalId: fields.externalId,
+        provider: fields.provider,
+        title: fields.title,
+        overview: fields.overview ?? null,
+        posterPath: fields.posterPath ?? null,
+        backdropPath: fields.backdropPath ?? null,
+        logoPath: fields.logoPath ?? null,
+        releaseDate: fields.releaseDate || null,
+        voteAverage: fields.voteAverage ?? null,
+        downloaded: false,
+        processingStatus: "pending",
+      }).returning();
+      mediaIdByExtKey.set(key, inserted!.id);
+      // Dispatch metadata enrichment in background
+      void dispatchEnrichMedia(inserted!.id, false).catch(() => {});
+    }
+  }
+
+  // Build lookup for existing recommendation junction entries
+  const existingRecByMediaId = new Map(
+    existingRecs.map((r) => [r.mediaId, r]),
+  );
+
+  // ── Transaction: only DB writes, no network I/O ──
 
   await db.transaction(async (tx) => {
     // Clear existing data for this media
@@ -105,9 +187,6 @@ export async function refreshExtras(
     await tx
       .delete(mediaWatchProvider)
       .where(eq(mediaWatchProvider.mediaId, mediaId));
-    await tx
-      .delete(recommendationPool)
-      .where(eq(recommendationPool.sourceMediaId, mediaId));
 
     // Insert credits (cast)
     if (extras.credits.cast.length > 0) {
@@ -140,7 +219,7 @@ export async function refreshExtras(
       );
     }
 
-    // Insert videos
+    // Insert videos (with language tag for localization)
     if (extras.videos.length > 0) {
       await tx.insert(mediaVideo).values(
         extras.videos.map((v) => ({
@@ -150,6 +229,7 @@ export async function refreshExtras(
           name: v.name,
           type: v.type,
           official: v.official,
+          language: v.language ?? null,
         })),
       );
     }
@@ -203,64 +283,38 @@ export async function refreshExtras(
       }
     }
 
-    // Fetch trailers for pool items (best-effort, parallel, top items with backdrops)
-    const allPoolItems = [
-      ...extras.recommendations.map((r) => ({ result: r, sourceType: "recommendation" as const })),
-      ...extras.similar.map((r) => ({ result: r, sourceType: "similar" as const })),
-    ];
-    // Dedup pool items by tmdbId before fetching trailers (avoid duplicate calls)
-    const uniquePoolItems = new Map<number, typeof allPoolItems[number]>();
-    for (const item of allPoolItems) {
-      if (!uniquePoolItems.has(item.result.externalId)) {
-        uniquePoolItems.set(item.result.externalId, item);
-      }
-    }
+    // ── Diff-based media_recommendation update ──
 
-    const trailerMap = new Map<number, string>();
-    const logoMap = new Map<number, string>();
-    const tmdb = await getTmdbProvider();
-
-    // Fetch trailers + logos for all unique pool items in batches of 10
-    const uniqueItems = [...uniquePoolItems.values()];
-    for (let i = 0; i < uniqueItems.length; i += 10) {
-      const batch = uniqueItems.slice(i, i + 10);
-      await Promise.allSettled(
-        batch.map(async (item) => {
-          try {
-            const tmdbType = item.result.type === "show" ? "tv" : "movie";
-            const [videos, images] = await Promise.all([
-              tmdb.getVideos(item.result.externalId, tmdbType),
-              tmdb.getImages(item.result.externalId, tmdbType),
-            ]);
-            const trailer = videos.find((v) => v.type === "Trailer" && v.site === "YouTube");
-            if (trailer) trailerMap.set(item.result.externalId, trailer.key);
-
-            const enLogos = (images.logos ?? []).filter(
-              (l) => l.iso_639_1 === "en" || l.iso_639_1 === null,
-            );
-            if (enLogos.length > 0) logoMap.set(item.result.externalId, enLogos[0]!.file_path);
-          } catch {
-            // Best-effort
-          }
-        }),
+    // Delete junction entries for items no longer in the TMDB response
+    const existingRecMediaIds = new Set(existingRecs.map((r) => r.mediaId));
+    const newRecMediaIds = new Set(mediaIdByExtKey.values());
+    const toDelete = existingRecs
+      .filter((r) => !newRecMediaIds.has(r.mediaId))
+      .map((r) => r.id);
+    if (toDelete.length > 0) {
+      await tx.delete(mediaRecommendation).where(
+        sql`${mediaRecommendation.id} IN (${sql.join(
+          toDelete.map((id) => sql`${id}`),
+          sql`, `,
+        )})`,
       );
     }
 
-    // Build pool rows with trailer keys + logos (use uniquePoolItems to avoid duplicates)
-    const poolRows = [...uniquePoolItems.values()].map((item) =>
-      mapToPoolRow(
-        item.result,
-        mediaId,
-        item.sourceType,
-        {
-          trailerKey: trailerMap.get(item.result.externalId),
-          logoPath: logoMap.get(item.result.externalId),
-        },
-      ),
-    );
+    // Insert new junction entries (skip existing)
+    for (const fields of newRecFields) {
+      const key = `${fields.provider}-${fields.externalId}`;
+      const recMediaId = mediaIdByExtKey.get(key);
+      if (!recMediaId) continue;
+      if (existingRecByMediaId.has(recMediaId)) continue; // Already linked
 
-    if (poolRows.length > 0) {
-      await tx.insert(recommendationPool).values(poolRows);
+      await tx
+        .insert(mediaRecommendation)
+        .values({
+          mediaId: recMediaId,
+          sourceMediaId: mediaId,
+          sourceType: fields.sourceType,
+        })
+        .onConflictDoNothing();
     }
 
     // Update extrasUpdatedAt
@@ -269,7 +323,4 @@ export async function refreshExtras(
       .set({ extrasUpdatedAt: new Date() })
       .where(eq(media.id, mediaId));
   });
-
-  // If TVDB toggle is on, dispatch pool show replacement
-  void dispatchReplacePoolShowsTvdb(mediaId).catch(() => {});
 }

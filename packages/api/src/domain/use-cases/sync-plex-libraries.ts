@@ -6,15 +6,17 @@ import {
   updateLibrary,
   createLibrary,
 } from "../../infrastructure/repositories";
-import { getPlexSections } from "../../infrastructure/adapters/plex";
 import { autoElectDefaults } from "./sync-library-helpers";
+
+type PlexSection = { key: string; title: string; type: string; Location: Array<{ path: string }> };
 
 export async function syncPlexLibraries(
   db: Database,
   url: string,
   token: string,
+  getSections: (url: string, token: string) => Promise<PlexSection[]>,
 ): Promise<Array<{ id: string; name: string; action: "created" | "updated" }>> {
-  const sections = await getPlexSections(url, token);
+  const sections = await getSections(url, token);
   const synced: Array<{ id: string; name: string; action: "created" | "updated" }> = [];
 
   for (const section of sections) {

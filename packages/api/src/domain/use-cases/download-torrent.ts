@@ -3,9 +3,10 @@ import { TRPCError } from "@trpc/server";
 import type { Database } from "@canto/db/client";
 import type { TorrentDownloadInput } from "@canto/validators";
 
+import { logAndSwallow } from "../../lib/log-error";
 import { detectQuality, detectSource } from "../rules/quality";
 import { parseSeasons, parseEpisodes } from "../rules/parsing";
-import { getQBClient } from "../../infrastructure/adapters/qbittorrent";
+import type { TorrentClientPort } from "../ports/torrent-client";
 import {
   findMediaByIdWithSeasons,
   findLibraryById,
@@ -129,6 +130,7 @@ async function coreDownload(
   db: Database,
   input: DownloadInput,
   opts: { skipDedup: boolean },
+  qbClient: TorrentClientPort,
 ): Promise<TorrentRow> {
   const magnetOrUrl = input.magnetUrl ?? input.torrentUrl;
 
@@ -169,11 +171,9 @@ async function coreDownload(
     const existingByTitle = await findTorrentByTitle(db, input.title);
 
     if (existingByTitle) {
-      const qb = await getQBClient();
-
       if (existingByTitle.hash) {
         try {
-          await qb.setCategory(existingByTitle.hash, qbCategory);
+          await qbClient.setCategory(existingByTitle.hash, qbCategory);
         } catch {
           // Best effort
         }
@@ -184,13 +184,13 @@ async function coreDownload(
       }
 
       if (existingByTitle.status === "paused" && existingByTitle.hash) {
-        await qb.resumeTorrent(existingByTitle.hash);
+        await qbClient.resumeTorrent(existingByTitle.hash);
         const updated = await updateTorrent(db, existingByTitle.id, { status: "downloading" });
         return updated!;
       }
 
       if (["incomplete", "removed", "error"].includes(existingByTitle.status)) {
-        await qb.addTorrent(magnetOrUrl, qbCategory);
+        await qbClient.addTorrent(magnetOrUrl, qbCategory);
 
         let hash = existingByTitle.hash;
         if (!hash && magnetOrUrl.startsWith("magnet:")) {
@@ -335,26 +335,24 @@ async function coreDownload(
 
   // ── Add to qBittorrent ──
 
-  const qb = await getQBClient();
-
   try {
     // Snapshot existing hashes before adding
     let existingHashes: Set<string>;
     try {
-      const live = await qb.listTorrents();
+      const live = await qbClient.listTorrents();
       existingHashes = new Set(live.map((t) => t.hash));
     } catch {
       existingHashes = new Set();
     }
 
-    await qb.addTorrent(magnetOrUrl, qbCategory);
+    await qbClient.addTorrent(magnetOrUrl, qbCategory);
 
     // If no hash from magnet/URL, poll qBittorrent to find the new torrent
     if (!extractedHash) {
       for (let attempt = 0; attempt < 5; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
         try {
-          const current = await qb.listTorrents();
+          const current = await qbClient.listTorrents();
           const newTorrent = current.find((t) => !existingHashes.has(t.hash));
           if (newTorrent) {
             extractedHash = newTorrent.hash;
@@ -379,7 +377,7 @@ async function coreDownload(
       message: `Failed to add "${input.title}" to qBittorrent: ${qbErr instanceof Error ? qbErr.message : "Unknown error"}`,
       type: "download_failed",
       mediaId: input.mediaId,
-    }).catch(() => {});
+    }).catch(logAndSwallow("download-torrent createNotification"));
 
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
@@ -398,8 +396,9 @@ async function coreDownload(
 export async function downloadTorrent(
   db: Database,
   input: DownloadInput,
+  qbClient: TorrentClientPort,
 ): Promise<TorrentRow> {
-  return coreDownload(db, input, { skipDedup: false });
+  return coreDownload(db, input, { skipDedup: false }, qbClient);
 }
 
 /**
@@ -410,6 +409,7 @@ export async function downloadTorrent(
 export async function replaceTorrent(
   db: Database,
   input: ReplaceInput,
+  qbClient: TorrentClientPort,
 ): Promise<TorrentRow> {
   // Delete old media_file records
   for (const fileId of input.replaceFileIds) {
@@ -417,5 +417,5 @@ export async function replaceTorrent(
   }
 
   // Run download flow skipping dedup (we just deleted the files being replaced)
-  return coreDownload(db, input, { skipDedup: true });
+  return coreDownload(db, input, { skipDedup: true }, qbClient);
 }
