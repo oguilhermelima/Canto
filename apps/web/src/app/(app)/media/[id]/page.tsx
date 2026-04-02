@@ -463,14 +463,6 @@ export default function MediaDetailPage({
 
           <div className="flex flex-col gap-12 px-4 md:gap-16 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
 
-        {/* Processing indicator */}
-        {media.processingStatus && media.processingStatus !== "ready" && (
-          <div className="flex items-center gap-1.5 self-start rounded-xl bg-amber-500/10 px-3 py-1.5 text-xs text-amber-400">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            <span className="hidden sm:inline">Processing media...</span>
-          </div>
-        )}
-
         {/* Request Download — non-admin users */}
         {!isAdmin && media.id && !media.downloaded && (() => {
           const existing = existingRequest.data;
@@ -543,6 +535,12 @@ export default function MediaDetailPage({
                   <Settings2 className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline">Manage</span>
                 </Link>
+                {media.processingStatus && media.processingStatus !== "ready" && (
+                  <div className="flex items-center gap-1.5 rounded-xl bg-amber-500/10 px-3 py-1.5 text-xs text-amber-400">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span className="hidden sm:inline">Refreshing metadata</span>
+                  </div>
+                )}
               </div>
             </div>
             {!media.libraryId ? (
