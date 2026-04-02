@@ -16,15 +16,100 @@ import {
 } from "@canto/ui/dialog";
 import {
   Bookmark,
+  ChevronRight,
+  Eye,
   Loader2,
   Plus,
+  Server,
   Trash2,
 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
-import { MediaCarousel } from "~/components/media/media-carousel";
 import { PageHeader } from "~/components/layout/page-header";
+
+interface ListPreviewItem {
+  id: string;
+  type: string;
+  title: string;
+  posterPath: string | null;
+}
+
+function ListPreview({
+  title,
+  icon: Icon,
+  href,
+  items,
+  isLoading,
+}: {
+  title: string;
+  icon: React.ElementType;
+  href: string;
+  items: ListPreviewItem[];
+  isLoading: boolean;
+}): React.JSX.Element {
+  return (
+    <section className="rounded-2xl bg-muted/50 p-4 sm:p-5">
+      {/* Header */}
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <Icon className="h-4.5 w-4.5 text-muted-foreground" />
+          <h3 className="text-base font-semibold text-foreground">{title}</h3>
+          <span className="text-sm text-muted-foreground">
+            {isLoading ? "..." : items.length}
+          </span>
+        </div>
+        <Link
+          href={href}
+          className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          See all
+          <ChevronRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
+
+      {/* Poster strip */}
+      {isLoading ? (
+        <div className="flex gap-2 overflow-hidden">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="aspect-[2/3] w-[100px] shrink-0 animate-pulse rounded-lg bg-muted sm:w-[110px] lg:w-[120px]"
+            />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="flex h-20 items-center justify-center rounded-xl">
+          <p className="text-sm text-muted-foreground/60">No items yet</p>
+        </div>
+      ) : (
+        <div className="flex gap-2 overflow-x-auto scrollbar-none">
+          {items.map((item) => (
+            <Link
+              key={item.id}
+              href={`/media/${item.id}`}
+              className="group/poster aspect-[2/3] w-[100px] shrink-0 overflow-hidden rounded-lg bg-muted transition-transform duration-200 hover:scale-105 sm:w-[110px] lg:w-[120px]"
+            >
+              {item.posterPath ? (
+                <Image
+                  src={`https://image.tmdb.org/t/p/w342${item.posterPath}`}
+                  alt={item.title}
+                  width={120}
+                  height={180}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center">
+                  <Bookmark className="h-5 w-5 text-muted-foreground/20" />
+                </div>
+              )}
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 
 export default function ListsPage(): React.JSX.Element {
   const [createOpen, setCreateOpen] = useState(false);
@@ -45,7 +130,6 @@ export default function ListsPage(): React.JSX.Element {
   const utils = trpc.useUtils();
   const { data: lists, isLoading: listsLoading } = trpc.list.getAll.useQuery();
 
-  // Fetch watchlist and server library items for inline carousels
   const { data: watchlistData, isLoading: watchlistLoading } =
     trpc.list.getBySlug.useQuery({ slug: "watchlist", limit: 20 });
   const { data: serverData, isLoading: serverLoading } =
@@ -85,87 +169,59 @@ export default function ListsPage(): React.JSX.Element {
   useEffect(() => {
     const update = (): void => {
       const w = window.innerWidth;
-      if (w >= 1280) setCols(6);
-      else if (w >= 1024) setCols(5);
-      else if (w >= 640) setCols(4);
-      else setCols(3);
+      if (w >= 1280) setCols(5);
+      else if (w >= 1024) setCols(4);
+      else if (w >= 640) setCols(3);
+      else setCols(2);
     };
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, []);
 
-  const visibleCount = showAllLists ? Infinity : cols * 2;
+  // +1 for the "New Collection" card
+  const visibleCount = showAllLists ? Infinity : cols * 2 - 1;
 
   const customLists = lists?.filter((l) => l.type === "custom") ?? [];
 
-  const mapItems = (
-    items: NonNullable<typeof watchlistData>["items"],
-  ) =>
+  const mapPreviewItems = (items: NonNullable<typeof watchlistData>["items"]): ListPreviewItem[] =>
     items.map((item) => ({
       id: item.media.id,
-      type: item.media.type as "movie" | "show",
+      type: item.media.type,
       title: item.media.title,
       posterPath: item.media.posterPath,
-      year: item.media.year,
-      voteAverage: item.media.voteAverage,
     }));
 
   return (
     <div className="w-full pb-12">
       <PageHeader title="My Lists" />
 
-      {/* Watchlist Carousel */}
-      <MediaCarousel
-        title="Watchlist"
-        seeAllHref="/lists/watchlist"
-        items={watchlistData ? mapItems(watchlistData.items) : []}
-        isLoading={watchlistLoading}
-      />
+      {/* Watchlist */}
+      <div className="px-4 pt-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+        <ListPreview
+          title="Watchlist"
+          icon={Eye}
+          href="/lists/watchlist"
+          items={watchlistData ? mapPreviewItems(watchlistData.items) : []}
+          isLoading={watchlistLoading}
+        />
+      </div>
 
-      {/* My Lists Section */}
+      {/* Collections */}
       <section className="mt-10">
-        <div className="mb-4 flex items-center gap-3 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-          <h2 className="text-xl font-semibold text-foreground">My Lists</h2>
-          <button
-            type="button"
-            aria-label="Create list"
-            onClick={() => setCreateOpen(true)}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-foreground/10 text-foreground/60 transition-colors hover:bg-foreground/15 hover:text-foreground"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
+        <div className="mb-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+          <h2 className="text-xl font-semibold text-foreground">Collections</h2>
         </div>
 
         {listsLoading ? (
-          <div className="grid grid-cols-3 gap-2.5 px-4 sm:grid-cols-4 md:px-8 lg:grid-cols-5 lg:px-12 xl:grid-cols-6 xl:px-16 2xl:px-24">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="aspect-square animate-pulse rounded-lg bg-muted" />
+          <div className="grid grid-cols-2 gap-2.5 px-4 sm:grid-cols-3 md:px-8 lg:grid-cols-4 lg:px-12 xl:grid-cols-5 xl:px-16 2xl:px-24">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
             ))}
-          </div>
-        ) : customLists.length === 0 ? (
-          <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-            <div className="flex min-h-[160px] items-center justify-center rounded-2xl border border-dashed border-border/60">
-              <div className="text-center">
-                <Bookmark className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
-                <p className="text-sm text-muted-foreground">
-                  No custom lists yet
-                </p>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="mt-2"
-                  onClick={() => setCreateOpen(true)}
-                >
-                  <Plus className="mr-1.5 h-3.5 w-3.5" />
-                  Create list
-                </Button>
-              </div>
-            </div>
           </div>
         ) : (
           <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-            <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {customLists.slice(0, visibleCount).map((l) => {
                 const posters = l.previewPosters ?? [];
 
@@ -173,26 +229,25 @@ export default function ListsPage(): React.JSX.Element {
                   <Link
                     key={l.id}
                     href={`/lists/${l.slug}`}
-                    className="group relative aspect-square overflow-hidden rounded-lg bg-muted transition-transform duration-200 hover:scale-[1.03]"
+                    className="group relative aspect-[4/3] overflow-hidden rounded-xl bg-muted transition-transform duration-200 hover:scale-[1.03]"
                   >
                     {/* Thumbnail mosaic */}
                     {posters.length >= 4 ? (
-                      <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-px">
+                      <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-0.5">
                         {posters.slice(0, 4).map((p, i) => (
                           <Image
                             key={i}
                             src={`https://image.tmdb.org/t/p/w500${p}`}
                             alt=""
-                            width={92}
-                            height={138}
+                            width={250}
+                            height={188}
                             className="h-full w-full object-cover"
                           />
                         ))}
                       </div>
-                    ) : posters.length > 0 ? (
+                    ) : posters.length >= 2 ? (
                       <div className={cn(
-                        "grid h-full w-full gap-px",
-                        posters.length === 1 && "grid-cols-1",
+                        "grid h-full w-full gap-0.5",
                         posters.length === 2 && "grid-cols-2",
                         posters.length === 3 && "grid-cols-2 grid-rows-2",
                       )}>
@@ -201,8 +256,8 @@ export default function ListsPage(): React.JSX.Element {
                             key={i}
                             src={`https://image.tmdb.org/t/p/w500${p}`}
                             alt=""
-                            width={92}
-                            height={138}
+                            width={250}
+                            height={188}
                             className={cn(
                               "h-full w-full object-cover",
                               posters.length === 3 && i === 0 && "row-span-2",
@@ -210,8 +265,28 @@ export default function ListsPage(): React.JSX.Element {
                           />
                         ))}
                       </div>
+                    ) : posters.length === 1 ? (
+                      <div className="relative h-full w-full">
+                        {/* Blurred backdrop */}
+                        <Image
+                          src={`https://image.tmdb.org/t/p/w92${posters[0]}`}
+                          alt=""
+                          fill
+                          className="object-cover blur-2xl scale-110 brightness-50"
+                        />
+                        {/* Centered poster */}
+                        <div className="relative flex h-full w-full items-center justify-center">
+                          <Image
+                            src={`https://image.tmdb.org/t/p/w500${posters[0]}`}
+                            alt=""
+                            width={120}
+                            height={180}
+                            className="h-[85%] w-auto rounded-md object-cover shadow-xl"
+                          />
+                        </div>
+                      </div>
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center">
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-muted to-muted/60">
                         <Bookmark className="h-8 w-8 text-muted-foreground/20" />
                       </div>
                     )}
@@ -220,11 +295,11 @@ export default function ListsPage(): React.JSX.Element {
                     <div className="absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/10" />
 
                     {/* Gradient overlay + label */}
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3 pb-3 pt-14">
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3 pb-3 pt-10">
                       <h3 className="truncate text-base font-semibold text-white">
                         {l.name}
                       </h3>
-                      <p className="text-sm text-white/70">
+                      <p className="text-sm text-white/60">
                         {l.itemCount} {l.itemCount === 1 ? "item" : "items"}
                       </p>
                     </div>
@@ -245,17 +320,33 @@ export default function ListsPage(): React.JSX.Element {
                   </Link>
                 );
               })}
+
+              {/* New Collection card */}
+              {(showAllLists || customLists.length < visibleCount + 1) && (
+                <button
+                  type="button"
+                  onClick={() => setCreateOpen(true)}
+                  className="group flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border/50 bg-muted/30 transition-all duration-200 hover:scale-[1.03] hover:border-foreground/20 hover:bg-muted/50"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-foreground/5 transition-colors group-hover:bg-foreground/10">
+                    <Plus className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-foreground" />
+                  </div>
+                  <span className="text-sm font-medium text-muted-foreground transition-colors group-hover:text-foreground">
+                    New Collection
+                  </span>
+                </button>
+              )}
             </div>
 
-            {customLists.length > visibleCount && (
-              <div className="mt-3 flex justify-center">
+            {customLists.length > visibleCount && !showAllLists && (
+              <div className="mt-4 flex justify-center">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-muted-foreground"
+                  className="text-muted-foreground hover:text-foreground"
                   onClick={() => setShowAllLists(true)}
                 >
-                  See all ({customLists.length})
+                  See all collections ({customLists.length})
                 </Button>
               </div>
             )}
@@ -263,22 +354,29 @@ export default function ListsPage(): React.JSX.Element {
         )}
       </section>
 
-      {/* Server Library Carousel */}
-      <MediaCarousel
-        title="Server Library"
-        seeAllHref="/lists/server-library"
-        items={serverData ? mapItems(serverData.items) : []}
-        isLoading={serverLoading}
-        className="mt-10"
-      />
+      {/* Shared */}
+      <section className="mt-10">
+        <div className="mb-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+          <h2 className="text-xl font-semibold text-foreground">Shared</h2>
+        </div>
+        <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+          <ListPreview
+            title="Server Library"
+            icon={Server}
+            href="/lists/server-library"
+            items={serverData ? mapPreviewItems(serverData.items) : []}
+            isLoading={serverLoading}
+          />
+        </div>
+      </section>
 
       {/* Create List Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Create List</DialogTitle>
+            <DialogTitle>New Collection</DialogTitle>
             <DialogDescription>
-              Create a new list to organize your media.
+              Create a collection to organize your movies and shows.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
@@ -305,7 +403,7 @@ export default function ListsPage(): React.JSX.Element {
               <Input
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="What's this list for?"
+                placeholder="What's this collection for?"
                 className="h-10"
               />
             </div>
@@ -336,7 +434,7 @@ export default function ListsPage(): React.JSX.Element {
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete List</DialogTitle>
+            <DialogTitle>Delete Collection</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete &quot;{deleteTarget?.name}&quot;?
               This action cannot be undone.
