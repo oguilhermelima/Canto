@@ -64,6 +64,93 @@ export function parseEpisodes(title: string): number[] {
   return [];
 }
 
+/* ── Language detection ── */
+
+const LANGUAGE_MAP: Record<string, string> = {
+  multi: "multi", "multi-vf": "multi",
+  dual: "dual", "dual.audio": "dual",
+  english: "en", eng: "en",
+  portuguese: "pt", "pt-br": "pt-br", "por": "pt", "brazilian": "pt-br",
+  french: "fr", fra: "fr", vff: "fr", vostfr: "fr", truefrench: "fr",
+  spanish: "es", spa: "es", latino: "es-la", castellano: "es",
+  german: "de", ger: "de", deu: "de",
+  italian: "it", ita: "it",
+  japanese: "ja", jpn: "ja",
+  korean: "ko", kor: "ko",
+  chinese: "zh", chi: "zh", "zh-cn": "zh", "zh-tw": "zh-tw",
+  russian: "ru", rus: "ru",
+  arabic: "ar", ara: "ar",
+  hindi: "hi", hin: "hi",
+  turkish: "tr", tur: "tr",
+  dutch: "nl", dut: "nl",
+  polish: "pl", pol: "pl",
+  swedish: "sv", swe: "sv",
+  norwegian: "no", nor: "no",
+  danish: "da", dan: "da",
+  finnish: "fi", fin: "fi",
+  czech: "cs", cze: "cs",
+  hungarian: "hu", hun: "hu",
+  romanian: "ro", rum: "ro",
+  thai: "th", tha: "th",
+  vietnamese: "vi", vie: "vi",
+  indonesian: "id", ind: "id",
+  malay: "ms", may: "ms",
+};
+
+export function detectLanguages(title: string): string[] {
+  const lower = title.toLowerCase();
+  const found: string[] = [];
+  const seen = new Set<string>();
+
+  for (const [keyword, lang] of Object.entries(LANGUAGE_MAP)) {
+    const pattern = new RegExp(`\\b${keyword.replace(/[.-]/g, "[.\\-]?")}\\b`, "i");
+    if (pattern.test(lower) && !seen.has(lang)) {
+      seen.add(lang);
+      found.push(lang);
+    }
+  }
+
+  return found;
+}
+
+/* ── Release group detection ── */
+
+export function detectReleaseGroup(title: string): string | null {
+  // Standard pattern: "-GroupName" at end (before optional extension)
+  // e.g. "Movie.2024.1080p.WEB-DL.x265-FLUX" → "FLUX"
+  // e.g. "Movie.2024.1080p.WEB-DL.x265-FLUX[rarbg]" → "FLUX"
+  const match = /-([A-Za-z0-9]+)(?:\[.*\])?(?:\.\w{2,4})?$/.exec(title);
+  if (match?.[1]) {
+    const group = match[1];
+    // Filter out common false positives (codecs, sources)
+    const falsePositives = new Set([
+      "dl", "DL", "rip", "Rip", "264", "265", "hevc", "HEVC",
+      "avc", "AVC", "ac3", "AC3", "aac", "AAC", "dts", "DTS",
+    ]);
+    if (!falsePositives.has(group)) return group;
+  }
+  return null;
+}
+
+/* ── Codec detection ── */
+
+const CODEC_MAP: Array<[RegExp, string]> = [
+  [/\b(x\.?265|h\.?265|hevc)\b/i, "h265"],
+  [/\b(x\.?264|h\.?264|avc)\b/i, "h264"],
+  [/\bav1\b/i, "av1"],
+  [/\bvp9\b/i, "vp9"],
+  [/\bxvid\b/i, "xvid"],
+  [/\bdivx\b/i, "divx"],
+  [/\bmpeg-?2\b/i, "mpeg2"],
+];
+
+export function detectCodec(title: string): string | null {
+  for (const [pattern, codec] of CODEC_MAP) {
+    if (pattern.test(title)) return codec;
+  }
+  return null;
+}
+
 /* Subtitle helpers */
 
 export const SUBTITLE_EXTENSIONS = new Set([

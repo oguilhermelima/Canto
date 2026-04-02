@@ -32,7 +32,8 @@ export function calculateConfidence(
   const lower = title.toLowerCase();
   let score = 0;
 
-  // Health (0–40) — log-scale seeders
+  // Health (0–40) — log-scale seeders, 0 seeders = dead torrent
+  if (seeders === 0) return 0;
   if (seeders >= 500) score += 40;
   else if (seeders >= 100) score += 35;
   else if (seeders >= 50) score += 30;
@@ -96,12 +97,11 @@ export function calculateConfidence(
 
   // Bonus (0–5)
   const lowerFlags = flags.map((f) => f.toLowerCase());
-  if (
-    lowerFlags.includes("freeleech") ||
-    lowerFlags.includes("freeleech75")
-  ) {
-    score += 5;
-  }
+  if (lowerFlags.includes("freeleech")) score += 5;
+  else if (lowerFlags.includes("freeleech75")) score += 4;
+  else if (lowerFlags.includes("halfleech")) score += 3;
+  else if (lowerFlags.includes("freeleech25")) score += 2;
+  if (lowerFlags.includes("doubleupload")) score += 2;
 
   // Penalties
   let isCam = false;
