@@ -18,6 +18,16 @@ import {
 
 // ─── Auth tables (better-auth compatible) ───
 
+// ─── Supported Languages ───
+
+export const supportedLanguage = pgTable("supported_language", {
+  code: varchar("code", { length: 10 }).primaryKey(), // "en-US", "pt-BR"
+  name: varchar("name", { length: 100 }).notNull(), // "English", "Portuguese (Brazil)"
+  nativeName: varchar("native_name", { length: 100 }).notNull(), // "English", "Português (Brasil)"
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const user = pgTable("user", {
   id: varchar("id", { length: 36 }).primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
@@ -25,6 +35,12 @@ export const user = pgTable("user", {
   emailVerified: boolean("email_verified").notNull().default(false),
   image: varchar("image", { length: 255 }),
   role: varchar("role", { length: 20 }).notNull().default("user"), // 'admin' | 'user'
+  language: varchar("language", { length: 10 })
+    .notNull()
+    .default("en-US")
+    .references(() => supportedLanguage.code),
+  recsVersion: integer("recs_version").notNull().default(0),
+  recsUpdatedAt: timestamp("recs_updated_at", { withTimezone: true }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -210,6 +226,9 @@ export const media = pgTable(
       { onDelete: "set null" },
     ),
 
+    // Processing pipeline status
+    processingStatus: varchar("processing_status", { length: 20 }).notNull().default("ready"),
+
     // Timestamps
     metadataUpdatedAt: timestamp("metadata_updated_at", {
       withTimezone: true,
@@ -284,6 +303,69 @@ export const episode = pgTable(
   },
   (table) => [
     uniqueIndex("idx_episode_season_number").on(table.seasonId, table.number),
+  ],
+);
+
+// ─── Translations (multi-language support) ───
+
+export const mediaTranslation = pgTable(
+  "media_translation",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    language: varchar("language", { length: 10 })
+      .notNull()
+      .references(() => supportedLanguage.code),
+    title: varchar("title", { length: 500 }),
+    overview: text("overview"),
+    tagline: varchar("tagline", { length: 500 }),
+    posterPath: varchar("poster_path", { length: 255 }),
+    logoPath: varchar("logo_path", { length: 255 }),
+    trailerKey: varchar("trailer_key", { length: 100 }),
+  },
+  (table) => [
+    uniqueIndex("idx_media_translation_unique").on(table.mediaId, table.language),
+    index("idx_media_translation_media").on(table.mediaId),
+  ],
+);
+
+export const seasonTranslation = pgTable(
+  "season_translation",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    seasonId: uuid("season_id")
+      .notNull()
+      .references(() => season.id, { onDelete: "cascade" }),
+    language: varchar("language", { length: 10 })
+      .notNull()
+      .references(() => supportedLanguage.code),
+    name: varchar("name", { length: 200 }),
+    overview: text("overview"),
+  },
+  (table) => [
+    uniqueIndex("idx_season_translation_unique").on(table.seasonId, table.language),
+    index("idx_season_translation_season").on(table.seasonId),
+  ],
+);
+
+export const episodeTranslation = pgTable(
+  "episode_translation",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    episodeId: uuid("episode_id")
+      .notNull()
+      .references(() => episode.id, { onDelete: "cascade" }),
+    language: varchar("language", { length: 10 })
+      .notNull()
+      .references(() => supportedLanguage.code),
+    title: varchar("title", { length: 500 }),
+    overview: text("overview"),
+  },
+  (table) => [
+    uniqueIndex("idx_episode_translation_unique").on(table.episodeId, table.language),
+    index("idx_episode_translation_episode").on(table.episodeId),
   ],
 );
 
@@ -423,40 +505,50 @@ export const qualityProfile = pgTable("quality_profile", {
     .defaultNow(),
 });
 
-// ─── Recommendation pool ───
+// ─── Media recommendations (junction table) ───
 
-export const recommendationPool = pgTable(
-  "recommendation_pool",
+export const mediaRecommendation = pgTable(
+  "media_recommendation",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    externalId: integer("external_id").notNull(),
-    provider: varchar("provider", { length: 20 }).notNull().default("tmdb"),
-    mediaType: varchar("media_type", { length: 10 }).notNull(),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
     sourceMediaId: uuid("source_media_id")
       .notNull()
       .references(() => media.id, { onDelete: "cascade" }),
-    title: varchar("title", { length: 500 }).notNull(),
-    overview: text("overview"),
-    posterPath: varchar("poster_path", { length: 255 }),
-    backdropPath: varchar("backdrop_path", { length: 255 }),
-    logoPath: varchar("logo_path", { length: 255 }),
-    trailerKey: varchar("trailer_key", { length: 100 }),
-    releaseDate: date("release_date"),
-    voteAverage: real("vote_average"),
-    score: real("score").notNull().default(0),
-    frequency: integer("frequency").notNull().default(1),
-    sourceType: varchar("source_type", { length: 20 }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
+    sourceType: varchar("source_type", { length: 20 }).notNull().default("recommendation"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("idx_media_rec_unique").on(table.mediaId, table.sourceMediaId),
+    index("idx_media_rec_source").on(table.sourceMediaId),
+    index("idx_media_rec_media").on(table.mediaId),
+  ],
+);
+
+// ─── User recommendations (per-user links to media) ───
+
+export const userRecommendation = pgTable(
+  "user_recommendation",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: varchar("user_id", { length: 36 })
       .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .references(() => user.id, { onDelete: "cascade" }),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    weight: real("weight").notNull().default(1.0),
+    version: integer("version").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (table) => [
-    index("idx_rec_pool_source").on(table.sourceMediaId),
-    index("idx_rec_pool_external").on(table.externalId, table.provider, table.mediaType),
-    index("idx_rec_pool_score").on(table.score),
+    uniqueIndex("idx_user_rec_user_media_ver").on(table.userId, table.mediaId, table.version),
+    index("idx_user_rec_user_active").on(table.userId, table.active),
   ],
 );
 
@@ -495,6 +587,7 @@ export const mediaVideo = pgTable(
     name: varchar("name", { length: 500 }).notNull(),
     type: varchar("type", { length: 50 }).notNull(),
     official: boolean("official").notNull().default(true),
+    language: varchar("language", { length: 10 }),
     publishedAt: timestamp("published_at", { withTimezone: true }),
   },
   (table) => [index("idx_video_media").on(table.mediaId)],
@@ -657,6 +750,7 @@ export const userRelations = relations(user, ({ many }) => ({
   preferences: many(userPreference),
   lists: many(list),
   downloadRequests: many(downloadRequest),
+  recommendations: many(userRecommendation),
 }));
 
 export const userPreferenceRelations = relations(userPreference, ({ one }) => ({
@@ -698,8 +792,10 @@ export const mediaRelations = relations(media, ({ many, one }) => ({
   credits: many(mediaCredit),
   videos: many(mediaVideo),
   watchProviders: many(mediaWatchProvider),
-  recommendations: many(recommendationPool),
+  recommendedBy: many(mediaRecommendation, { relationName: "recommendedMedia" }),
+  recommendationsFor: many(mediaRecommendation, { relationName: "sourceMedia" }),
   listItems: many(listItem),
+  translations: many(mediaTranslation),
 }));
 
 export const seasonRelations = relations(season, ({ one, many }) => ({
@@ -708,6 +804,7 @@ export const seasonRelations = relations(season, ({ one, many }) => ({
     references: [media.id],
   }),
   episodes: many(episode),
+  translations: many(seasonTranslation),
 }));
 
 export const episodeRelations = relations(episode, ({ one, many }) => ({
@@ -716,6 +813,28 @@ export const episodeRelations = relations(episode, ({ one, many }) => ({
     references: [season.id],
   }),
   files: many(mediaFile),
+  translations: many(episodeTranslation),
+}));
+
+export const mediaTranslationRelations = relations(mediaTranslation, ({ one }) => ({
+  media: one(media, {
+    fields: [mediaTranslation.mediaId],
+    references: [media.id],
+  }),
+}));
+
+export const seasonTranslationRelations = relations(seasonTranslation, ({ one }) => ({
+  season: one(season, {
+    fields: [seasonTranslation.seasonId],
+    references: [season.id],
+  }),
+}));
+
+export const episodeTranslationRelations = relations(episodeTranslation, ({ one }) => ({
+  episode: one(episode, {
+    fields: [episodeTranslation.episodeId],
+    references: [episode.id],
+  }),
 }));
 
 export const torrentRelations = relations(torrent, ({ many }) => ({
@@ -760,11 +879,31 @@ export const qualityProfileRelations = relations(qualityProfile, ({ many }) => (
   media: many(media),
 }));
 
-export const recommendationPoolRelations = relations(
-  recommendationPool,
+export const mediaRecommendationRelations = relations(
+  mediaRecommendation,
   ({ one }) => ({
+    media: one(media, {
+      fields: [mediaRecommendation.mediaId],
+      references: [media.id],
+      relationName: "recommendedMedia",
+    }),
     sourceMedia: one(media, {
-      fields: [recommendationPool.sourceMediaId],
+      fields: [mediaRecommendation.sourceMediaId],
+      references: [media.id],
+      relationName: "sourceMedia",
+    }),
+  }),
+);
+
+export const userRecommendationRelations = relations(
+  userRecommendation,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [userRecommendation.userId],
+      references: [user.id],
+    }),
+    media: one(media, {
+      fields: [userRecommendation.mediaId],
       references: [media.id],
     }),
   }),

@@ -44,6 +44,30 @@ export interface NormalizedEpisode {
   finaleType?: string;
 }
 
+export interface Translation {
+  language: string; // "pt-BR", "es-ES", etc.
+  title?: string;
+  overview?: string;
+  tagline?: string;
+  posterPath?: string;
+  logoPath?: string;
+}
+
+export interface SeasonTranslation {
+  seasonNumber: number;
+  language: string;
+  name?: string;
+  overview?: string;
+}
+
+export interface EpisodeTranslation {
+  seasonNumber: number;
+  episodeNumber: number;
+  language: string;
+  title?: string;
+  overview?: string;
+}
+
 export interface NormalizedMedia {
   externalId: number;
   provider: ProviderName;
@@ -84,6 +108,10 @@ export interface NormalizedMedia {
   // Shared
   productionCompanies?: { id: number; name: string; logoPath?: string }[];
   productionCountries?: string[];
+  // Translations
+  translations?: Translation[];
+  seasonTranslations?: SeasonTranslation[];
+  episodeTranslations?: EpisodeTranslation[];
 }
 
 export interface CastMember {
@@ -109,6 +137,7 @@ export interface Video {
   site: string;
   type: string;
   official: boolean;
+  language?: string;
 }
 
 export interface WatchProvider {
@@ -178,11 +207,16 @@ export interface DiscoverOpts {
   release_date_gte?: string;
 }
 
+export interface MetadataOpts {
+  supportedLanguages?: string[];
+}
+
 export interface MetadataProvider {
   name: ProviderName;
   getMetadata(
     externalId: number,
     type: MediaType,
+    opts?: MetadataOpts,
   ): Promise<NormalizedMedia>;
   search(
     query: string,

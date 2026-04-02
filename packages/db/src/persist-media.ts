@@ -1,9 +1,35 @@
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 
 import type { NormalizedMedia } from "@canto/providers";
 
-import { episode, media, season } from "./schema";
+import {
+  episode,
+  episodeTranslation,
+  media,
+  mediaTranslation,
+  season,
+  seasonTranslation,
+  supportedLanguage,
+} from "./schema";
 import type { Database } from "./client";
+
+/** Cache of supported language codes to avoid querying on every persist */
+let supportedLanguageCache: Set<string> | null = null;
+let supportedLanguageCacheTime = 0;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+export async function getSupportedLanguageCodes(db: Database): Promise<Set<string>> {
+  if (supportedLanguageCache && Date.now() - supportedLanguageCacheTime < CACHE_TTL_MS) {
+    return supportedLanguageCache;
+  }
+  const rows = await db.query.supportedLanguage.findMany({
+    where: eq(supportedLanguage.enabled, true),
+    columns: { code: true },
+  });
+  supportedLanguageCache = new Set(rows.map((r) => r.code));
+  supportedLanguageCacheTime = Date.now();
+  return supportedLanguageCache;
+}
 
 /**
  * Persist normalized media + seasons + episodes into the database.
@@ -89,32 +115,20 @@ export async function persistMedia(
   if (!inserted) throw new Error("Failed to insert media");
 
   await persistSeasons(db, inserted.id, normalized);
+  await persistTranslations(db, inserted.id, normalized);
   return inserted;
 }
 
-/** Update an existing media record with fresh normalized data. */
+/** Update an existing media record with fresh normalized data.
+ *  This is a pure update — it writes exactly what it receives.
+ *  Callers that switch providers (e.g. replace-provider) are responsible
+ *  for merging/preserving fields before calling this function.
+ */
 export async function updateMediaFromNormalized(
   db: Database,
   mediaId: string,
   normalized: NormalizedMedia,
 ): Promise<typeof media.$inferSelect> {
-  // When updating with TVDB data, preserve TMDB images (higher quality/consistency)
-  let posterPath = normalized.posterPath;
-  let backdropPath = normalized.backdropPath;
-  let logoPath = normalized.logoPath;
-
-  if (normalized.provider === "tvdb") {
-    const existing = await db.query.media.findFirst({
-      where: eq(media.id, mediaId),
-      columns: { posterPath: true, backdropPath: true, logoPath: true },
-    });
-    if (existing) {
-      posterPath = existing.posterPath ?? posterPath;
-      backdropPath = existing.backdropPath ?? backdropPath;
-      logoPath = existing.logoPath ?? logoPath;
-    }
-  }
-
   const [updated] = await db
     .update(media)
     .set({
@@ -137,9 +151,9 @@ export async function updateMediaFromNormalized(
       voteCount: normalized.voteCount,
       popularity: normalized.popularity,
       runtime: normalized.runtime,
-      posterPath,
-      backdropPath,
-      logoPath,
+      posterPath: normalized.posterPath,
+      backdropPath: normalized.backdropPath,
+      logoPath: normalized.logoPath,
       imdbId: normalized.imdbId,
       tvdbId: normalized.tvdbId,
       numberOfSeasons: normalized.numberOfSeasons,
@@ -166,10 +180,13 @@ export async function updateMediaFromNormalized(
     await persistSeasons(db, mediaId, normalized);
   }
 
+  // Upsert translations
+  await persistTranslations(db, mediaId, normalized);
+
   return updated;
 }
 
-async function persistSeasons(
+export async function persistSeasons(
   db: Database,
   mediaId: string,
   normalized: NormalizedMedia,
@@ -211,3 +228,134 @@ async function persistSeasons(
     }
   }
 }
+
+export async function persistTranslations(
+  db: Database,
+  mediaId: string,
+  normalized: NormalizedMedia,
+): Promise<void> {
+  const supported = await getSupportedLanguageCodes(db);
+
+  // ── Media translations (batch upsert) ──
+  if (normalized.translations && normalized.translations.length > 0) {
+    const mediaTransRows = normalized.translations
+      .filter((t) => !t.language.startsWith("en-") && supported.has(t.language) && (t.title || t.overview))
+      .map((t) => ({
+        mediaId,
+        language: t.language,
+        title: t.title ?? null,
+        overview: t.overview ?? null,
+        tagline: t.tagline ?? null,
+        posterPath: t.posterPath ?? null,
+        logoPath: t.logoPath ?? null,
+      }));
+
+    for (let i = 0; i < mediaTransRows.length; i += 500) {
+      await db
+        .insert(mediaTranslation)
+        .values(mediaTransRows.slice(i, i + 500))
+        .onConflictDoUpdate({
+          target: [mediaTranslation.mediaId, mediaTranslation.language],
+          set: {
+            title: sql`EXCLUDED.title`,
+            overview: sql`EXCLUDED.overview`,
+            tagline: sql`EXCLUDED.tagline`,
+            posterPath: sql`COALESCE(EXCLUDED.poster_path, ${mediaTranslation.posterPath})`,
+            logoPath: sql`COALESCE(EXCLUDED.logo_path, ${mediaTranslation.logoPath})`,
+          },
+        });
+    }
+  }
+
+  // ── Season + Episode translations need season ID lookup ──
+  const needSeasonLookup =
+    (normalized.seasonTranslations && normalized.seasonTranslations.length > 0) ||
+    (normalized.episodeTranslations && normalized.episodeTranslations.length > 0);
+
+  if (!needSeasonLookup) return;
+
+  const seasons = await db.query.season.findMany({
+    where: eq(season.mediaId, mediaId),
+    columns: { id: true, number: true },
+  });
+  const seasonIdByNumber = new Map(seasons.map((s) => [s.number, s.id]));
+
+  // ── Season translations (batch upsert) ──
+  if (normalized.seasonTranslations && normalized.seasonTranslations.length > 0) {
+    const seasonTransRows = normalized.seasonTranslations
+      .filter((t) => {
+        if (t.language.startsWith("en-") || !supported.has(t.language)) return false;
+        const sid = seasonIdByNumber.get(t.seasonNumber);
+        return !!sid && (t.name || t.overview);
+      })
+      .map((t) => ({
+        seasonId: seasonIdByNumber.get(t.seasonNumber)!,
+        language: t.language,
+        name: t.name ?? null,
+        overview: t.overview ?? null,
+      }));
+
+    for (let i = 0; i < seasonTransRows.length; i += 500) {
+      await db
+        .insert(seasonTranslation)
+        .values(seasonTransRows.slice(i, i + 500))
+        .onConflictDoUpdate({
+          target: [seasonTranslation.seasonId, seasonTranslation.language],
+          set: {
+            name: sql`EXCLUDED.name`,
+            overview: sql`EXCLUDED.overview`,
+          },
+        });
+    }
+  }
+
+  // ── Episode translations (batch upsert) ──
+  if (normalized.episodeTranslations && normalized.episodeTranslations.length > 0) {
+    const seasonIds = [...seasonIdByNumber.values()];
+    if (seasonIds.length === 0) return;
+
+    const allEpisodes = await db.query.episode.findMany({
+      where: inArray(episode.seasonId, seasonIds),
+      columns: { id: true, seasonId: true, number: true },
+    });
+
+    // Build reverse map: seasonId → seasonNumber
+    const seasonNumById = new Map<string, number>();
+    for (const [num, id] of seasonIdByNumber) seasonNumById.set(id, num);
+
+    // Build lookup: "seasonNum-episodeNum" → episodeId
+    const episodeLookup = new Map<string, string>();
+    for (const ep of allEpisodes) {
+      const sNum = seasonNumById.get(ep.seasonId);
+      if (sNum !== undefined) episodeLookup.set(`${sNum}-${ep.number}`, ep.id);
+    }
+
+    const epTransRows = normalized.episodeTranslations
+      .filter((t) => !t.language.startsWith("en-") && supported.has(t.language))
+      .map((t) => {
+        const epId = episodeLookup.get(`${t.seasonNumber}-${t.episodeNumber}`);
+        if (!epId || (!t.title && !t.overview)) return null;
+        return {
+          episodeId: epId,
+          language: t.language,
+          title: t.title ?? null,
+          overview: t.overview ?? null,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+
+    for (let i = 0; i < epTransRows.length; i += 500) {
+      await db
+        .insert(episodeTranslation)
+        .values(epTransRows.slice(i, i + 500))
+        .onConflictDoUpdate({
+          target: [episodeTranslation.episodeId, episodeTranslation.language],
+          set: {
+            title: sql`EXCLUDED.title`,
+            overview: sql`EXCLUDED.overview`,
+          },
+        });
+    }
+  }
+}
+

@@ -4,6 +4,7 @@ import type {
   DiscoverOpts,
   MediaExtras,
   MediaType,
+  MetadataOpts,
   MetadataProvider,
   NormalizedEpisode,
   NormalizedMedia,
@@ -122,10 +123,22 @@ function normalizeWatchProviders(
 export class TmdbProvider implements MetadataProvider {
   name = "tmdb" as const;
   private apiKey: string;
+  private language: string;
   private baseUrl = "https://api.themoviedb.org/3";
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, language = "en-US") {
     this.apiKey = apiKey;
+    this.language = language;
+  }
+
+  /** Build include_image_language param: all supported 2-letter codes + en + null */
+  private static buildImageLanguageParam(supportedLangs: string[]): string {
+    const codes = new Set<string>(["en", "null"]);
+    for (const lang of supportedLangs) {
+      const short = lang.split("-")[0];
+      if (short) codes.add(short);
+    }
+    return [...codes].join(",");
   }
 
   /* ── Generic fetcher ────────────────────────────────────────────────── */
@@ -134,6 +147,7 @@ export class TmdbProvider implements MetadataProvider {
     const url = new URL(`${this.baseUrl}${path}`);
     // v3 API key as query parameter
     url.searchParams.set("api_key", this.apiKey);
+    url.searchParams.set("language", this.language);
     if (params) {
       for (const [k, v] of Object.entries(params)) {
         url.searchParams.set(k, v);
@@ -184,37 +198,47 @@ export class TmdbProvider implements MetadataProvider {
 
   /* ── Full metadata ──────────────────────────────────────────────────── */
 
-  async getMetadata(externalId: number, type: MediaType): Promise<NormalizedMedia> {
+  async getMetadata(externalId: number, type: MediaType, opts?: MetadataOpts): Promise<NormalizedMedia> {
+    const supportedLangs = opts?.supportedLanguages ?? [];
     if (type === "movie") {
-      return this.getMovieMetadata(externalId);
+      return this.getMovieMetadata(externalId, supportedLangs);
     }
-    return this.getShowMetadata(externalId);
+    return this.getShowMetadata(externalId, supportedLangs);
   }
 
-  private async getMovieMetadata(movieId: number): Promise<NormalizedMedia> {
+  private async getMovieMetadata(movieId: number, supportedLangs: string[]): Promise<NormalizedMedia> {
+    const imgLangs = TmdbProvider.buildImageLanguageParam(supportedLangs);
     const data = await this.fetch<Record<string, unknown>>(
       `/movie/${movieId}`,
       {
-        append_to_response: "release_dates,external_ids,images",
-        include_image_language: "en,null",
+        language: "en-US", // Always fetch base in English
+        append_to_response: "release_dates,external_ids,images,translations",
+        include_image_language: imgLangs,
       },
     );
 
-    return this.normalizeMovie(data);
+    const normalized = this.normalizeMovie(data);
+    normalized.translations = this.parseTranslations(data);
+    this.enrichTranslationsWithImages(normalized.translations, data);
+    return normalized;
   }
 
-  private async getShowMetadata(showId: number): Promise<NormalizedMedia> {
+  private async getShowMetadata(showId: number, supportedLangs: string[]): Promise<NormalizedMedia> {
+    const imgLangs = TmdbProvider.buildImageLanguageParam(supportedLangs);
     const data = await this.fetch<Record<string, unknown>>(
       `/tv/${showId}`,
       {
-        append_to_response: "content_ratings,external_ids,images",
-        include_image_language: "en,null",
+        language: "en-US", // Always fetch base in English
+        append_to_response: "content_ratings,external_ids,images,translations",
+        include_image_language: imgLangs,
       },
     );
 
     const normalized = this.normalizeShow(data);
+    normalized.translations = this.parseTranslations(data);
+    this.enrichTranslationsWithImages(normalized.translations, data);
 
-    // Fetch full season details (including episodes) for each season
+    // Fetch full season details (including episodes + translations) for each season
     const rawSeasons = (data.seasons ?? []) as Array<{
       season_number: number;
       id: number;
@@ -225,14 +249,64 @@ export class TmdbProvider implements MetadataProvider {
       episode_count: number;
     }>;
 
+    const seasonTranslations: import("./types").SeasonTranslation[] = [];
+    const episodeTranslations: import("./types").EpisodeTranslation[] = [];
+
     const seasonPromises = rawSeasons.map(async (s) => {
       const seasonData = await this.fetch<Record<string, unknown>>(
         `/tv/${showId}/season/${s.season_number}`,
+        { language: "en-US", append_to_response: "translations" },
       );
+
+      // Parse season translations
+      const sTrans = this.parseTranslations(seasonData);
+      for (const t of sTrans) {
+        seasonTranslations.push({
+          seasonNumber: s.season_number,
+          language: t.language,
+          name: t.title,
+          overview: t.overview,
+        });
+      }
+
       return this.normalizeSeason(seasonData);
     });
 
     normalized.seasons = await Promise.all(seasonPromises);
+    if (seasonTranslations.length > 0) normalized.seasonTranslations = seasonTranslations;
+
+    // Fetch episode translations for supported languages (re-fetch each season per language)
+    const nonEnLangs = supportedLangs.filter((l) => !l.startsWith("en"));
+    const totalCalls = rawSeasons.length * nonEnLangs.length;
+    if (nonEnLangs.length > 0 && totalCalls <= 60) {
+      for (let i = 0; i < nonEnLangs.length; i += 3) {
+        const langBatch = nonEnLangs.slice(i, i + 3);
+        await Promise.allSettled(
+          langBatch.flatMap((lang) =>
+            rawSeasons.map(async (s) => {
+              try {
+                const data = await this.fetch<{ episodes?: Array<{ episode_number: number; name?: string; overview?: string }> }>(
+                  `/tv/${showId}/season/${s.season_number}`,
+                  { language: lang },
+                );
+                for (const ep of data.episodes ?? []) {
+                  if (ep.name || ep.overview) {
+                    episodeTranslations.push({
+                      seasonNumber: s.season_number,
+                      episodeNumber: ep.episode_number,
+                      language: lang,
+                      title: ep.name,
+                      overview: ep.overview,
+                    });
+                  }
+                }
+              } catch { /* skip failed language/season combo */ }
+            }),
+          ),
+        );
+      }
+    }
+    if (episodeTranslations.length > 0) normalized.episodeTranslations = episodeTranslations;
 
     return normalized;
   }
@@ -257,12 +331,17 @@ export class TmdbProvider implements MetadataProvider {
 
   /* ── Extras ─────────────────────────────────────────────────────────── */
 
-  async getExtras(externalId: number, type: MediaType): Promise<MediaExtras> {
+  async getExtras(externalId: number, type: MediaType, opts?: { supportedLanguages?: string[] }): Promise<MediaExtras> {
     const prefix = type === "movie" ? "/movie" : "/tv";
+    const videoLangs = opts?.supportedLanguages?.length
+      ? [...new Set(opts.supportedLanguages.map((l) => l.split("-")[0]))].join(",") + ",en,null"
+      : "en,null";
     const data = await this.fetch<Record<string, unknown>>(
       `${prefix}/${externalId}`,
       {
+        language: "en-US", // Always English for pool items (base language)
         append_to_response: "credits,similar,recommendations,videos,watch/providers",
+        include_video_language: videoLangs,
       },
     );
 
@@ -319,6 +398,7 @@ export class TmdbProvider implements MetadataProvider {
         site: vid.site as string,
         type: vid.type as string,
         official: (vid.official as boolean) ?? false,
+        language: (vid.iso_639_1 as string) ?? undefined,
       };
     });
 
@@ -778,6 +858,81 @@ export class TmdbProvider implements MetadataProvider {
     };
   }
 
+  private parseTranslations(data: Record<string, unknown>): import("./types").Translation[] {
+    const translationsData = data.translations as {
+      translations?: Array<{
+        iso_639_1: string;
+        iso_3166_1: string;
+        data: {
+          title?: string;
+          name?: string;
+          overview?: string;
+          tagline?: string;
+        };
+      }>;
+    } | undefined;
+
+    if (!translationsData?.translations) return [];
+
+    return translationsData.translations
+      .filter((t) => t.data.title || t.data.name || t.data.overview)
+      .map((t) => ({
+        language: `${t.iso_639_1}-${t.iso_3166_1}`,
+        title: t.data.title || t.data.name,
+        overview: t.data.overview,
+        tagline: t.data.tagline,
+      }));
+  }
+
+  /**
+   * Enrich Translation[] with per-language poster/logo paths from the images response.
+   * TMDB returns images with iso_639_1 tags — we pick the best (highest vote_average) per language.
+   */
+  private enrichTranslationsWithImages(
+    translations: import("./types").Translation[],
+    data: Record<string, unknown>,
+  ): void {
+    const imagesData = data.images as {
+      posters?: Array<{ file_path: string; iso_639_1: string | null; vote_average: number }>;
+      logos?: Array<{ file_path: string; iso_639_1: string | null; vote_average: number }>;
+    } | undefined;
+
+    if (!imagesData) return;
+
+    // Best poster per language (by vote_average)
+    const bestPoster = new Map<string, string>();
+    const bestPosterScore = new Map<string, number>();
+    for (const p of imagesData.posters ?? []) {
+      if (!p.iso_639_1 || p.iso_639_1 === "en") continue; // skip English (base)
+      const cur = bestPosterScore.get(p.iso_639_1) ?? -1;
+      if (p.vote_average > cur) {
+        bestPoster.set(p.iso_639_1, p.file_path);
+        bestPosterScore.set(p.iso_639_1, p.vote_average);
+      }
+    }
+
+    // Best logo per language (by vote_average)
+    const bestLogo = new Map<string, string>();
+    const bestLogoScore = new Map<string, number>();
+    for (const l of imagesData.logos ?? []) {
+      if (!l.iso_639_1 || l.iso_639_1 === "en") continue;
+      const cur = bestLogoScore.get(l.iso_639_1) ?? -1;
+      if (l.vote_average > cur) {
+        bestLogo.set(l.iso_639_1, l.file_path);
+        bestLogoScore.set(l.iso_639_1, l.vote_average);
+      }
+    }
+
+    // Match to translations by 2-letter prefix (e.g., "pt-BR" → "pt")
+    for (const t of translations) {
+      const short = t.language.split("-")[0]!;
+      const poster = bestPoster.get(short);
+      const logo = bestLogo.get(short);
+      if (poster) t.posterPath = poster;
+      if (logo) t.logoPath = logo;
+    }
+  }
+
   private normalizeSearchResult(raw: unknown, type: MediaType): SearchResult {
     const data = raw as Record<string, unknown>;
     const isMovie = type === "movie";
@@ -811,20 +966,42 @@ export class TmdbProvider implements MetadataProvider {
     };
   }
 
+  /** Fetch translations for a single item (used for pool items that aren't persisted as media) */
+  async getTranslations(
+    id: number,
+    type: "movie" | "tv",
+    supportedLanguages?: string[],
+  ): Promise<import("./types").Translation[]> {
+    const imgLangs = supportedLanguages?.length
+      ? TmdbProvider.buildImageLanguageParam(supportedLanguages)
+      : "en,null";
+    const data = await this.fetch<Record<string, unknown>>(
+      `/${type}/${id}`,
+      { language: "en-US", append_to_response: "translations,images", include_image_language: imgLangs },
+    );
+    const translations = this.parseTranslations(data);
+    this.enrichTranslationsWithImages(translations, data);
+    return translations;
+  }
+
   async getImages(
     id: number,
     type: "movie" | "tv",
   ): Promise<{ logos: Array<{ file_path: string; iso_639_1: string | null }> }> {
-    return this.fetch(`/${type}/${id}/images`, { include_image_language: "en,null" });
+    return this.fetch(`/${type}/${id}/images`, { include_image_language: `${this.language.split("-")[0]},en,null` });
   }
 
   async getVideos(
     id: number,
     type: "movie" | "tv",
-  ): Promise<Array<{ key: string; site: string; type: string }>> {
+    supportedLanguages?: string[],
+  ): Promise<Array<{ key: string; site: string; type: string; language?: string }>> {
+    const videoLangs = supportedLanguages?.length
+      ? [...new Set(supportedLanguages.map((l) => l.split("-")[0]))].join(",") + ",en,null"
+      : `${this.language.split("-")[0]},en,null`;
     const data = await this.fetch<{
-      results: Array<{ key: string; site: string; type: string }>;
-    }>(`/${type}/${id}/videos`);
-    return data.results ?? [];
+      results: Array<{ key: string; site: string; type: string; iso_639_1?: string }>;
+    }>(`/${type}/${id}/videos`, { include_video_language: videoLangs });
+    return (data.results ?? []).map((v) => ({ ...v, language: v.iso_639_1 }));
   }
 }
