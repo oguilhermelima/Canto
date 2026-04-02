@@ -14,12 +14,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@canto/ui/dialog";
+import { Popover, PopoverAnchor, PopoverContent } from "@canto/ui/popover";
 import {
+  ArrowUpDown,
   Bookmark,
+  ChevronDown,
+  EllipsisVertical,
   Eye,
   FolderOpen,
   Loader2,
   Plus,
+  RotateCcw,
+  Search,
   Server,
   Settings2,
   Trash2,
@@ -61,24 +67,19 @@ type Tab = "watchlist" | "collections" | "server";
 
 function FilterButton({
   active,
-  disabled,
   onClick,
 }: {
   active: boolean;
-  disabled?: boolean;
   onClick: () => void;
 }): React.JSX.Element {
   return (
     <button
       type="button"
-      disabled={disabled}
       className={cn(
         "flex h-[38px] w-[38px] items-center justify-center rounded-xl transition-all",
-        disabled
-          ? "cursor-not-allowed opacity-30"
-          : active
-            ? "bg-foreground text-background"
-            : "bg-muted/60 text-muted-foreground hover:text-foreground",
+        active
+          ? "bg-foreground text-background"
+          : "bg-muted/60 text-muted-foreground hover:text-foreground",
       )}
       onClick={onClick}
     >
@@ -178,9 +179,227 @@ function MediaListTab({
   return <MediaGrid items={items} isLoading={isLoading} compact={showFilters} />;
 }
 
+/* ─── Collection Filter Sidebar ─── */
+
+type CollectionSort = "name" | "date";
+
+export interface CollectionFilterState {
+  sortBy: CollectionSort;
+  sortOrder: "asc" | "desc";
+  searchQuery: string;
+}
+
+const DEFAULT_COLLECTION_FILTERS: CollectionFilterState = {
+  sortBy: "date",
+  sortOrder: "desc",
+  searchQuery: "",
+};
+
+const COLLECTION_SORT_OPTIONS = [
+  { value: "date", label: "Date Created" },
+  { value: "name", label: "Name" },
+];
+
+function CollectionFilterSection({
+  icon: Icon,
+  label,
+  defaultOpen = false,
+  children,
+  isLast = false,
+}: {
+  icon: React.ComponentType<{ size: number; className?: string }>;
+  label: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+  isLast?: boolean;
+}): React.JSX.Element {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <div className={cn("pb-5", !isLast && "mb-3 border-b border-border")}>
+      <button
+        type="button"
+        className="flex w-full items-center justify-between py-2"
+        onClick={() => setOpen(!open)}
+      >
+        <span className="flex items-center gap-2 text-[13px] font-medium text-foreground">
+          <Icon size={14} className="shrink-0" />
+          {label}
+        </span>
+        <ChevronDown
+          size={13}
+          className={cn(
+            "text-muted-foreground transition-transform duration-200",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+      {open && <div className="pt-2">{children}</div>}
+    </div>
+  );
+}
+
+function CollectionFilterSidebar({
+  filters,
+  onChange,
+  onReset,
+}: {
+  filters: CollectionFilterState;
+  onChange: (filters: CollectionFilterState) => void;
+  onReset: () => void;
+}): React.JSX.Element {
+  const update = (partial: Partial<CollectionFilterState>): void => {
+    onChange({ ...filters, ...partial });
+  };
+
+  return (
+    <div className="flex h-full w-full flex-col">
+      <div className="filter-sidebar min-h-0 flex-1 overflow-y-auto">
+        <div className="pb-2">
+          <div className="flex flex-col gap-0.5">
+            {/* Search */}
+            <CollectionFilterSection icon={Search} label="Search" defaultOpen>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50" />
+                <Input
+                  value={filters.searchQuery}
+                  onChange={(e) => update({ searchQuery: e.target.value })}
+                  placeholder="Search collections..."
+                  className="h-8 pl-8 text-xs"
+                />
+              </div>
+            </CollectionFilterSection>
+
+            {/* Sort */}
+            <CollectionFilterSection icon={ArrowUpDown} label="Sort By" defaultOpen isLast>
+              <div className="flex items-center gap-2">
+                <select
+                  value={filters.sortBy}
+                  onChange={(e) => update({ sortBy: e.target.value as CollectionSort })}
+                  className="h-8 flex-1 rounded-md border border-input bg-background px-3 text-xs text-muted-foreground outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {COLLECTION_SORT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => update({ sortOrder: filters.sortOrder === "asc" ? "desc" : "asc" })}
+                >
+                  <ArrowUpDown
+                    size={13}
+                    className={cn(
+                      "text-muted-foreground transition-transform duration-200",
+                      filters.sortOrder === "desc" && "rotate-180",
+                    )}
+                  />
+                </Button>
+              </div>
+            </CollectionFilterSection>
+          </div>
+        </div>
+      </div>
+
+      {/* Reset */}
+      <div className="shrink-0 border-t border-border pt-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-center gap-2 text-muted-foreground hover:text-foreground"
+          onClick={onReset}
+        >
+          <RotateCcw size={13} />
+          Reset filters
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Collections Tab ─── */
 
-function CollectionsTab(): React.JSX.Element {
+function CollectionEditPopover({
+  list,
+  onDelete,
+}: {
+  list: { id: string; name: string; description: string | null };
+  onDelete: (id: string, name: string) => void;
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const [editName, setEditName] = useState(list.name);
+  const [editDescription, setEditDescription] = useState(list.description ?? "");
+  const utils = trpc.useUtils();
+
+  const updateMutation = trpc.list.update.useMutation({
+    onSuccess: () => {
+      void utils.list.getAll.invalidate();
+      setOpen(false);
+      toast.success("Collection updated");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const handleSave = (): void => {
+    const trimmedName = editName.trim();
+    if (!trimmedName) return;
+    const changes: { id: string; name?: string; description?: string } = { id: list.id };
+    if (trimmedName !== list.name) changes.name = trimmedName;
+    const trimmedDesc = editDescription.trim();
+    if (trimmedDesc !== (list.description ?? "")) changes.description = trimmedDesc;
+    if (!changes.name && !changes.description) { setOpen(false); return; }
+    updateMutation.mutate(changes as { id: string; name?: string; description?: string });
+  };
+
+  return (
+    <Popover open={open} onOpenChange={(v) => { setOpen(v); if (v) { setEditName(list.name); setEditDescription(list.description ?? ""); } }}>
+      <PopoverAnchor asChild>
+        <button type="button" aria-label={`Edit ${list.name}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((v) => !v); }} className="absolute right-1.5 top-1.5 z-10 flex h-9 w-9 items-center justify-center rounded-xl text-white/80 transition-colors hover:bg-accent hover:text-white">
+          <EllipsisVertical className="h-5 w-5" />
+        </button>
+      </PopoverAnchor>
+      <PopoverContent align="end" sideOffset={8} className="w-72 p-3" onClick={(e) => e.stopPropagation()} onOpenAutoFocus={(e) => e.preventDefault()}>
+        <div className="flex flex-col">
+          <p className="px-1 pb-3 text-base font-bold">Edit Collection</p>
+
+          <div className="-mx-1 space-y-3 px-1">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Name</label>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-9 text-sm" onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Description</label>
+              <Input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} placeholder="Optional description" className="h-9 text-sm" onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }} />
+            </div>
+          </div>
+
+          <div className="mt-3 border-t border-border pt-3">
+            <Button className="w-full rounded-xl" onClick={handleSave} disabled={!editName.trim() || updateMutation.isPending}>
+              {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save changes
+            </Button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => { setOpen(false); onDelete(list.id, list.name); }}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete collection
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function CollectionsTab({
+  filters,
+}: {
+  filters: CollectionFilterState;
+}): React.JSX.Element {
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -238,7 +457,22 @@ function CollectionsTab(): React.JSX.Element {
   }, []);
 
   const visibleCount = showAll ? Infinity : cols * 2 - 1;
-  const customLists = lists?.filter((l) => l.type === "custom") ?? [];
+  const customLists = useMemo(() => {
+    let result = lists?.filter((l) => l.type === "custom") ?? [];
+
+    if (filters.searchQuery.trim()) {
+      const q = filters.searchQuery.toLowerCase();
+      result = result.filter((l) => l.name.toLowerCase().includes(q));
+    }
+
+    const dir = filters.sortOrder === "asc" ? 1 : -1;
+    result = [...result].sort((a, b) => {
+      if (filters.sortBy === "name") return dir * a.name.localeCompare(b.name);
+      return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    });
+
+    return result;
+  }, [lists, filters]);
 
   return (
     <>
@@ -248,7 +482,7 @@ function CollectionsTab(): React.JSX.Element {
             <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
           ))}
         </div>
-      ) : customLists.length === 0 && !showAll ? (
+      ) : (lists?.filter((l) => l.type === "custom") ?? []).length === 0 ? (
         <div className="flex min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-border/50">
           <div className="text-center">
             <Bookmark className="mx-auto mb-3 h-10 w-10 text-muted-foreground/20" />
@@ -295,9 +529,10 @@ function CollectionsTab(): React.JSX.Element {
                     <h3 className="truncate text-base font-semibold text-white">{l.name}</h3>
                     <p className="text-sm text-white/60">{l.itemCount} {l.itemCount === 1 ? "item" : "items"}</p>
                   </div>
-                  <button type="button" aria-label={`Delete ${l.name}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteTarget({ id: l.id, name: l.name }); }} className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/40 text-white/70 opacity-0 backdrop-blur-sm transition-all hover:bg-red-500/80 hover:text-white group-hover:opacity-100">
-                    <Trash2 className="h-3 w-3" />
-                  </button>
+                  <CollectionEditPopover
+                    list={l}
+                    onDelete={(id, n) => setDeleteTarget({ id, name: n })}
+                  />
                 </Link>
               );
             })}
@@ -373,6 +608,7 @@ export default function LibraryPage(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const [collectionFilters, setCollectionFilters] = useState<CollectionFilterState>(DEFAULT_COLLECTION_FILTERS);
 
   useEffect(() => {
     document.title = "Library — Canto";
@@ -381,10 +617,6 @@ export default function LibraryPage(): React.JSX.Element {
   const handleTabChange = (value: string): void => {
     const tab = value as Tab;
     setActiveTab(tab);
-    if (tab === "collections") {
-      setShowFilters(false);
-      setFilters(DEFAULT_FILTERS);
-    }
     const params = new URLSearchParams();
     if (tab !== "watchlist") params.set("tab", tab);
     router.replace(`/lists${params.size > 0 ? `?${params.toString()}` : ""}`, {
@@ -394,8 +626,8 @@ export default function LibraryPage(): React.JSX.Element {
 
   const handleFilterChange = useCallback((f: FilterState) => setFilters(f), []);
   const handleFilterReset = useCallback(() => setFilters(DEFAULT_FILTERS), []);
-
-  const hasFilters = activeTab === "watchlist" || activeTab === "server";
+  const handleCollectionFilterChange = useCallback((f: CollectionFilterState) => setCollectionFilters(f), []);
+  const handleCollectionFilterReset = useCallback(() => setCollectionFilters(DEFAULT_COLLECTION_FILTERS), []);
 
   return (
     <div className="w-full pb-12">
@@ -404,7 +636,7 @@ export default function LibraryPage(): React.JSX.Element {
         subtitle="Your watchlist, collections, and saved media."
         className={cn(
           "transition-[margin] duration-300 ease-in-out",
-          showFilters && hasFilters && "md:ml-[17rem] lg:ml-[19rem]",
+          showFilters && "md:ml-[17rem] lg:ml-[19rem]",
         )}
       />
 
@@ -412,7 +644,7 @@ export default function LibraryPage(): React.JSX.Element {
       <div
         className={cn(
           "px-4 pt-6 pb-8 transition-[margin] duration-300 ease-in-out md:px-8 lg:px-12 xl:px-16 2xl:px-24",
-          showFilters && hasFilters && "md:ml-[17rem] lg:ml-[19rem]",
+          showFilters && "md:ml-[17rem] lg:ml-[19rem]",
         )}
       >
         <TabBar
@@ -421,8 +653,7 @@ export default function LibraryPage(): React.JSX.Element {
           onChange={handleTabChange}
           leading={
             <FilterButton
-              active={showFilters && hasFilters}
-              disabled={!hasFilters}
+              active={showFilters}
               onClick={() => setShowFilters((v) => !v)}
             />
           }
@@ -431,30 +662,36 @@ export default function LibraryPage(): React.JSX.Element {
 
       <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {/* Filter Sidebar */}
-        {hasFilters && (
-          <div
-            className={cn(
-              "fixed top-16 z-[35] hidden transition-[left,opacity] duration-300 ease-in-out md:block",
-              showFilters
-                ? "left-4 opacity-100 md:left-8 lg:left-12 xl:left-16 2xl:left-24"
-                : "-left-72 opacity-0",
-            )}
-            style={{ width: "16rem", height: "calc(100vh - 5rem)", top: "5rem" }}
-          >
+        <div
+          className={cn(
+            "fixed top-16 z-[35] hidden transition-[left,opacity] duration-300 ease-in-out md:block",
+            showFilters
+              ? "left-4 opacity-100 md:left-8 lg:left-12 xl:left-16 2xl:left-24"
+              : "-left-72 opacity-0",
+          )}
+          style={{ width: "16rem", height: "calc(100vh - 5rem)", top: "5rem" }}
+        >
+          {activeTab === "collections" ? (
+            <CollectionFilterSidebar
+              filters={collectionFilters}
+              onChange={handleCollectionFilterChange}
+              onReset={handleCollectionFilterReset}
+            />
+          ) : (
             <MediaFilterSidebar
               mediaType="all"
               filters={filters}
               onChange={handleFilterChange}
               onReset={handleFilterReset}
             />
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Content — shifts right when sidebar is open */}
         <div
           className={cn(
             "transition-[margin] duration-300 ease-in-out",
-            showFilters && hasFilters && "md:ml-[17rem] lg:ml-[19rem]",
+            showFilters && "md:ml-[17rem] lg:ml-[19rem]",
           )}
         >
           {activeTab === "watchlist" && (
@@ -467,7 +704,7 @@ export default function LibraryPage(): React.JSX.Element {
               filters={filters}
             />
           )}
-          {activeTab === "collections" && <CollectionsTab />}
+          {activeTab === "collections" && <CollectionsTab filters={collectionFilters} />}
           {activeTab === "server" && (
             <MediaListTab
               slug="server-library"

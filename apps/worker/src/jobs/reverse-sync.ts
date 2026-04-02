@@ -486,67 +486,85 @@ async function processPendingImports(
           continue;
         }
 
-        // Check if already in library (always cross-reference by IMDB for dedup)
+        // Check if already in our DB (always cross-reference by IMDB for dedup)
         const existing = await findMediaByAnyReference(db, tmdbId, "tmdb", item.imdbId);
 
-        if (existing?.downloaded) {
-          status.skipped++;
-          const skippedSyncItem = await createSyncItem(db, {
-            ...syncItemBase(item),
-            tmdbId,
-            mediaId: existing.id,
-            result: "skipped",
-            reason: "Already in library",
-          });
+        let mediaId: string;
 
-          // Still fetch media info for skipped items (they exist on this server)
-          if (skippedSyncItem) {
-            try {
-              let mediaFiles: MediaFileInfo[] = [];
-              if (item.source === "jellyfin" && item.jellyfinItemId && jellyfinUrl && jellyfinKey) {
-                mediaFiles = await fetchJellyfinMediaInfo(jellyfinUrl, jellyfinKey, item.jellyfinItemId, item.type);
-              } else if (item.source === "plex" && item.plexRatingKey && plexUrl && plexToken) {
-                mediaFiles = await fetchPlexMediaInfo(plexUrl, plexToken, item.plexRatingKey, item.type);
-              }
-              if (mediaFiles.length > 0) {
-                await createSyncEpisodes(
-                  db,
-                  mediaFiles.map((f) => ({
-                    syncItemId: skippedSyncItem.id,
-                    seasonNumber: f.seasonNumber,
-                    episodeNumber: f.episodeNumber,
-                    serverEpisodeId: f.serverEpisodeId,
-                    resolution: f.resolution,
-                    videoCodec: f.videoCodec,
-                    audioCodec: f.audioCodec,
-                    container: f.container,
-                    fileSize: f.fileSize,
-                    filePath: f.filePath,
-                  })),
-                );
-              }
-            } catch (err) {
-              console.error(`[reverse-sync] Failed to fetch media info for ${item.title}:`, err);
-            }
+        if (existing) {
+          mediaId = existing.id;
+
+          // Idempotent: only update fields that the sync owns (downloaded, library, path)
+          // Never touch metadata, seasons, processing_status, or provider data
+          const updates: Record<string, unknown> = {};
+          if (!existing.downloaded) updates.downloaded = true;
+          if (!existing.libraryId && item.libraryId) updates.libraryId = item.libraryId;
+          if (!existing.libraryPath && item.path) updates.libraryPath = item.path;
+          if (!existing.addedAt) updates.addedAt = new Date();
+
+          if (Object.keys(updates).length > 0) {
+            await updateMedia(db, existing.id, updates);
           }
 
-          status.processed++;
-          await updateStatus(tag, status);
-          await sleep(ITEM_DELAY_MS);
-          continue;
-        }
+          // Only enrich if media has never been enriched (no metadata yet)
+          // Don't re-enrich already-ready media — that destroys TVDB data
+          if (!existing.metadataUpdatedAt) {
+            void dispatchEnrichMedia(existing.id, true).catch(logAndSwallow("reverse-sync dispatchEnrichMedia"));
+          }
 
-        let mediaId: string;
-        if (existing) {
-          await updateMedia(db, existing.id, { downloaded: true, libraryId: item.libraryId, libraryPath: item.path, addedAt: new Date() });
-          mediaId = existing.id;
+          if (existing.downloaded) {
+            status.skipped++;
+            const skippedSyncItem = await createSyncItem(db, {
+              ...syncItemBase(item),
+              tmdbId,
+              mediaId,
+              result: "skipped",
+              reason: "Already in library",
+            });
+
+            // Still fetch media info for skipped items (they exist on this server)
+            if (skippedSyncItem) {
+              try {
+                let mediaFiles: MediaFileInfo[] = [];
+                if (item.source === "jellyfin" && item.jellyfinItemId && jellyfinUrl && jellyfinKey) {
+                  mediaFiles = await fetchJellyfinMediaInfo(jellyfinUrl, jellyfinKey, item.jellyfinItemId, item.type);
+                } else if (item.source === "plex" && item.plexRatingKey && plexUrl && plexToken) {
+                  mediaFiles = await fetchPlexMediaInfo(plexUrl, plexToken, item.plexRatingKey, item.type);
+                }
+                if (mediaFiles.length > 0) {
+                  await createSyncEpisodes(
+                    db,
+                    mediaFiles.map((f) => ({
+                      syncItemId: skippedSyncItem.id,
+                      seasonNumber: f.seasonNumber,
+                      episodeNumber: f.episodeNumber,
+                      serverEpisodeId: f.serverEpisodeId,
+                      resolution: f.resolution,
+                      videoCodec: f.videoCodec,
+                      audioCodec: f.audioCodec,
+                      container: f.container,
+                      fileSize: f.fileSize,
+                      filePath: f.filePath,
+                    })),
+                  );
+                }
+              } catch (err) {
+                console.error(`[reverse-sync] Failed to fetch media info for ${item.title}:`, err);
+              }
+            }
+
+            status.processed++;
+            await updateStatus(tag, status);
+            await sleep(ITEM_DELAY_MS);
+            continue;
+          }
         } else {
+          // New media: persist from TMDB + enrich
           const supportedLangs = [...await getSupportedLanguageCodes(db)];
           const normalized = await tmdb.getMetadata(tmdbId, resolvedType, { supportedLanguages: supportedLangs });
           const inserted = await persistMedia(db, normalized, { crossRefLookup: tvdbEnabled });
           await updateMedia(db, inserted.id, { downloaded: true, libraryId: item.libraryId, libraryPath: item.path, addedAt: new Date() });
           mediaId = inserted.id;
-          // Unified enrichment pipeline: metadata + extras + TVDB reconcile
           void dispatchEnrichMedia(inserted.id, true).catch(logAndSwallow("reverse-sync dispatchEnrichMedia"));
         }
 

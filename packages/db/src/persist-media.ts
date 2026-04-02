@@ -174,10 +174,17 @@ export async function updateMediaFromNormalized(
 
   if (!updated) throw new Error("Failed to update media");
 
-  // Re-create seasons + episodes
+  // Upsert seasons + episodes (idempotent — never deletes existing data)
+  // Skip if show has TVDB-reconciled seasons (season_type = 'official') to avoid
+  // re-adding TMDB's flat season structure on top of TVDB's granular arcs.
   if (normalized.type === "show" && normalized.seasons) {
-    await db.delete(season).where(eq(season.mediaId, mediaId));
-    await persistSeasons(db, mediaId, normalized);
+    const hasTvdbSeasons = await db.query.season.findFirst({
+      where: and(eq(season.mediaId, mediaId), eq(season.seasonType, "official")),
+      columns: { id: true },
+    });
+    if (!hasTvdbSeasons) {
+      await upsertSeasons(db, mediaId, normalized);
+    }
   }
 
   // Upsert translations
@@ -225,6 +232,83 @@ export async function persistSeasons(
           finaleType: ep.finaleType,
         })),
       );
+    }
+  }
+}
+
+/**
+ * Idempotent season/episode upsert — updates existing rows, inserts missing ones.
+ * Never deletes seasons or episodes. Preserves TVDB reconciled data, episode
+ * translations, and any other data that the enrich pipeline previously built.
+ */
+async function upsertSeasons(
+  db: Database,
+  mediaId: string,
+  normalized: NormalizedMedia,
+): Promise<void> {
+  if (normalized.type !== "show" || !normalized.seasons) return;
+
+  for (const s of normalized.seasons) {
+    // Upsert season by (mediaId, number)
+    const [upserted] = await db
+      .insert(season)
+      .values({
+        mediaId,
+        number: s.number,
+        externalId: s.externalId,
+        name: s.name,
+        overview: s.overview,
+        airDate: s.airDate || null,
+        posterPath: s.posterPath,
+        episodeCount: s.episodeCount,
+        seasonType: s.seasonType,
+      })
+      .onConflictDoUpdate({
+        target: [season.mediaId, season.number],
+        set: {
+          externalId: sql`EXCLUDED.external_id`,
+          name: sql`EXCLUDED.name`,
+          overview: sql`EXCLUDED.overview`,
+          airDate: sql`EXCLUDED.air_date`,
+          posterPath: sql`COALESCE(EXCLUDED.poster_path, ${season.posterPath})`,
+          episodeCount: sql`EXCLUDED.episode_count`,
+          seasonType: sql`EXCLUDED.season_type`,
+        },
+      })
+      .returning();
+
+    if (upserted && s.episodes && s.episodes.length > 0) {
+      for (const ep of s.episodes) {
+        await db
+          .insert(episode)
+          .values({
+            seasonId: upserted.id,
+            number: ep.number,
+            externalId: ep.externalId,
+            title: ep.title,
+            overview: ep.overview,
+            airDate: ep.airDate || null,
+            runtime: ep.runtime,
+            stillPath: ep.stillPath,
+            voteAverage: ep.voteAverage,
+            absoluteNumber: ep.absoluteNumber,
+            finaleType: ep.finaleType,
+          })
+          .onConflictDoUpdate({
+            target: [episode.seasonId, episode.number],
+            set: {
+              externalId: sql`EXCLUDED.external_id`,
+              title: sql`COALESCE(EXCLUDED.title, ${episode.title})`,
+              overview: sql`COALESCE(EXCLUDED.overview, ${episode.overview})`,
+              airDate: sql`EXCLUDED.air_date`,
+              runtime: sql`EXCLUDED.runtime`,
+              stillPath: sql`COALESCE(EXCLUDED.still_path, ${episode.stillPath})`,
+              voteAverage: sql`EXCLUDED.vote_average`,
+              absoluteNumber: sql`EXCLUDED.absolute_number`,
+              finaleType: sql`EXCLUDED.finale_type`,
+            },
+          });
+      }
     }
   }
 }

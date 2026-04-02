@@ -177,15 +177,15 @@ export function SeasonTabs({
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-xl font-semibold tracking-tight">Seasons</h2>
         <div className="flex items-center gap-3 pr-5">
-          {/* Custom Download */}
+          {/* Advanced Download */}
           {mediaConfig?.onCustomSearch && (
             <button
               type="button"
               onClick={() => setCustomSearchOpen(true)}
               className="inline-flex h-8 items-center gap-1.5 rounded-xl bg-foreground px-3 text-xs font-medium text-background transition-colors hover:bg-foreground/90"
             >
-              <SearchIcon className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Custom Download</span>
+              <Download className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Advanced Download</span>
             </button>
           )}
           {/* Select All checkbox */}
@@ -435,55 +435,59 @@ function SeasonBlock({
                 <span>{year}</span>
               </>
             )}
-            {availableEpCount > 0 && (
-              <>
-                <span className="text-muted-foreground/30">·</span>
-                <span className="text-green-500">{availableEpCount}/{epCount}</span>
-              </>
-            )}
           </div>
         </div>
         <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
           {/* Server availability badges */}
-          {jellyfinEpCount > 0 && serverLinks?.jellyfin && (
-            <a
-              href={serverLinks.jellyfin.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden items-center gap-1.5 rounded-xl border border-[#a95ce0]/20 bg-gradient-to-r from-[#a95ce0]/10 to-[#4bb8e8]/10 px-2.5 py-1.5 transition-colors hover:from-[#a95ce0]/20 hover:to-[#4bb8e8]/20 sm:flex"
-            >
-              <span
-                className="inline-block h-3.5 w-3.5 shrink-0"
-                style={{
-                  background: "linear-gradient(135deg, #a95ce0, #4bb8e8)",
-                  mask: "url(/jellyfin-logo.svg) center/contain no-repeat",
-                  WebkitMask: "url(/jellyfin-logo.svg) center/contain no-repeat",
-                }}
-              />
-              <span className="bg-gradient-to-r from-[#a95ce0] to-[#4bb8e8] bg-clip-text text-[11px] font-medium text-transparent">
-                {jellyfinEpCount >= epCount ? "Available" : `${jellyfinEpCount}/${epCount}`}
-              </span>
-            </a>
-          )}
-          {plexEpCount > 0 && serverLinks?.plex && (
-            <a
-              href={serverLinks.plex.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden items-center gap-1.5 rounded-xl border border-[#e5a00d]/20 bg-[#e5a00d]/10 px-2.5 py-1.5 transition-colors hover:bg-[#e5a00d]/20 sm:flex"
-            >
-              <span
-                className="inline-block h-3.5 w-3.5 shrink-0 bg-[#e5a00d]"
-                style={{
-                  mask: "url(/plex-logo.svg) center/contain no-repeat",
-                  WebkitMask: "url(/plex-logo.svg) center/contain no-repeat",
-                }}
-              />
-              <span className="text-[11px] font-medium text-[#e5a00d]">
-                {plexEpCount >= epCount ? "Available" : `${plexEpCount}/${epCount}`}
-              </span>
-            </a>
-          )}
+          {jellyfinEpCount > 0 && serverLinks?.jellyfin && (() => {
+            const fullyAvailable = jellyfinEpCount >= epCount;
+            const label = fullyAvailable
+              ? "Fully available on Jellyfin"
+              : `Partially available on Jellyfin (${jellyfinEpCount}/${epCount})`;
+            return (
+              <a
+                href={serverLinks.jellyfin.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={label}
+                aria-label={label}
+                className="hidden h-7 w-7 items-center justify-center rounded-lg border border-[#a95ce0]/20 bg-gradient-to-r from-[#a95ce0]/10 to-[#4bb8e8]/10 transition-colors hover:from-[#a95ce0]/20 hover:to-[#4bb8e8]/20 sm:flex"
+              >
+                <span
+                  className="inline-block h-3.5 w-3.5 shrink-0"
+                  style={{
+                    background: "linear-gradient(135deg, #a95ce0, #4bb8e8)",
+                    mask: "url(/jellyfin-logo.svg) center/contain no-repeat",
+                    WebkitMask: "url(/jellyfin-logo.svg) center/contain no-repeat",
+                  }}
+                />
+              </a>
+            );
+          })()}
+          {plexEpCount > 0 && serverLinks?.plex && (() => {
+            const fullyAvailable = plexEpCount >= epCount;
+            const label = fullyAvailable
+              ? "Fully available on Plex"
+              : `Partially available on Plex (${plexEpCount}/${epCount})`;
+            return (
+              <a
+                href={serverLinks.plex.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={label}
+                aria-label={label}
+                className="hidden h-7 w-7 items-center justify-center rounded-lg border border-[#e5a00d]/20 bg-[#e5a00d]/10 transition-colors hover:bg-[#e5a00d]/20 sm:flex"
+              >
+                <span
+                  className="inline-block h-3.5 w-3.5 shrink-0 bg-[#e5a00d]"
+                  style={{
+                    mask: "url(/plex-logo.svg) center/contain no-repeat",
+                    WebkitMask: "url(/plex-logo.svg) center/contain no-repeat",
+                  }}
+                />
+              </a>
+            );
+          })()}
           {onDownload && (
             <button
               type="button"

@@ -21,11 +21,14 @@ export const SOURCE_HIERARCHY = [
 
 export function detectQuality(title: string): Quality {
   const lower = title.toLowerCase();
-  if (lower.includes("2160p") || lower.includes("4k") || lower.includes("uhd"))
-    return "uhd";
-  if (lower.includes("1080p") || lower.includes("fullhd")) return "fullhd";
+  // Explicit resolution patterns first (most reliable)
+  if (lower.includes("2160p")) return "uhd";
+  if (lower.includes("1080p")) return "fullhd";
   if (lower.includes("720p")) return "hd";
   if (lower.includes("480p") || lower.includes("360p")) return "sd";
+  // Word-boundary terms (less reliable, checked after explicit patterns)
+  if (/\b(4k|uhd|ultra[\s.-]?hd)\b/i.test(title)) return "uhd";
+  if (/\bfull[\s.-]?hd\b/i.test(title)) return "fullhd";
   return "unknown";
 }
 

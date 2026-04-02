@@ -36,6 +36,15 @@ import {
   Settings2,
   RefreshCw,
   Loader2,
+  Check,
+  X,
+  ArrowUp,
+  ArrowDown,
+  HardDrive,
+  Clock,
+  Monitor,
+  Film as FilmIcon,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
@@ -55,8 +64,8 @@ import { PreferencesModal } from "~/components/media/manage/preferences-modal";
 import {
   formatBytes,
   formatAge,
-  qualityBadge,
-  sourceBadge,
+  formatQualityLabel,
+  sourceLabel,
 } from "~/lib/torrent-utils";
 
 /* ─── Page ─── */
@@ -74,6 +83,7 @@ export default function MediaDetailPage({
   const { data: session } = authClient.useSession();
   const isAdmin = (session?.user as { role?: string } | undefined)?.role === "admin";
   const [torrentDialogOpen, setTorrentDialogOpen] = useState(false);
+  const [seasonsHighlight, setSeasonsHighlight] = useState(false);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [removeDeleteFiles, setRemoveDeleteFiles] = useState(false);
@@ -85,7 +95,7 @@ export default function MediaDetailPage({
   const [torrentSizeFilter, setTorrentSizeFilter] = useState<string>("all");
   const [torrentSort, setTorrentSort] = useState<"seeders" | "peers" | "size" | "age" | "confidence">("confidence");
   const [torrentSortDir, setTorrentSortDir] = useState<"asc" | "desc">("desc");
-  const TORRENTS_PER_PAGE = 20;
+  const TORRENTS_PER_PAGE = 30;
 
   const [torrentSearchContext, setTorrentSearchContext] = useState<{
     seasonNumber?: number;
@@ -234,6 +244,13 @@ export default function MediaDetailPage({
   const requestDownload = trpc.request.create.useMutation({
     onSuccess: () => {
       toast.success("Download requested");
+      void utils.request.list.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+  const cancelRequest = trpc.request.cancel.useMutation({
+    onSuccess: () => {
+      toast.success("Request cancelled");
       void utils.request.list.invalidate();
     },
     onError: (err) => toast.error(err.message),
@@ -454,6 +471,130 @@ export default function MediaDetailPage({
       >
         {/* All sections below hero info — unified spacing */}
         <div className="flex flex-col gap-12 pb-16 md:gap-16">
+
+          {/* Admin: Download & Manage */}
+          {isAdmin && media.id && (
+            <section className="flex items-center gap-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+              <div className="flex-1">
+                <h2 className="text-lg font-semibold tracking-tight">
+                  {media.downloaded ? "Download & Manage" : "Download"}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {media.downloaded
+                    ? "Download another version or manage library settings."
+                    : "Search for torrents to download this content."}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {media.processingStatus && media.processingStatus !== "ready" && (
+                  <div className="flex items-center gap-1.5 rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span className="hidden sm:inline">Refreshing metadata</span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (media.type === "show") {
+                      const el = document.getElementById("seasons-section");
+                      if (el) {
+                        el.scrollIntoView({ behavior: "smooth", block: "start" });
+                        setSeasonsHighlight(true);
+                        setTimeout(() => setSeasonsHighlight(false), 2000);
+                      }
+                    } else {
+                      openTorrentDialog();
+                    }
+                  }}
+                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-foreground text-background px-4 text-sm font-medium transition-colors hover:bg-foreground/90"
+                >
+                  <Download className="h-4 w-4" />
+                  {media.downloaded ? "Download Variant" : "Download"}
+                </button>
+                {media.downloaded && (
+                <Link
+                  href={`/media/${media.id}/manage`}
+                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-foreground/15 px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/25"
+                >
+                  <Settings2 className="h-4 w-4" />
+                  Manage
+                </Link>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* Request Download — non-admin users (above videos) */}
+          {!isAdmin && media.id && !media.downloaded && (() => {
+          const existing = existingRequest.data;
+          if (existing) {
+            const isPending = existing.status === "pending";
+            const isApproved = existing.status === "approved";
+            const isRejected = existing.status === "rejected";
+            return (
+              <section className="flex items-center gap-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+                <div className="flex-1">
+                  <h2 className="text-lg font-semibold tracking-tight">Want to watch this?</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {isPending && "Your request is pending admin approval."}
+                    {isApproved && "Approved — waiting for admin to download."}
+                    {isRejected && (existing.adminNote ?? "Your request was rejected.")}
+                  </p>
+                </div>
+                {isPending && (
+                  <div className="group/req relative">
+                    <button
+                      type="button"
+                      onClick={() => cancelRequest.mutate({ id: existing.id })}
+                      disabled={cancelRequest.isPending}
+                      className="inline-flex h-10 w-[120px] items-center justify-center gap-2 rounded-xl text-sm font-medium transition-all bg-green-500/20 text-green-500 hover:bg-red-500/20 hover:text-red-500"
+                    >
+                      <Check className="h-4 w-4 group-hover/req:hidden" />
+                      <X className="hidden h-4 w-4 group-hover/req:block" />
+                      <span className="group-hover/req:hidden">Requested</span>
+                      <span className="hidden group-hover/req:inline">Cancel</span>
+                    </button>
+                  </div>
+                )}
+                {isApproved && (
+                  <span className="inline-flex h-10 w-[120px] items-center justify-center gap-2 rounded-xl bg-blue-500/15 text-sm font-medium text-blue-500">
+                    <Check className="h-4 w-4" />
+                    Approved
+                  </span>
+                )}
+                {isRejected && (
+                  <span className="inline-flex h-10 w-[120px] items-center justify-center gap-2 rounded-xl bg-red-500/15 text-sm font-medium text-red-500">
+                    <X className="h-4 w-4" />
+                    Rejected
+                  </span>
+                )}
+              </section>
+            );
+          }
+          return (
+            <section className="flex items-center gap-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+              <div className="flex-1">
+                <h2 className="text-lg font-semibold tracking-tight">Want to watch this?</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Request the admin to download this content for you.
+                </p>
+              </div>
+              <Button
+                className="w-[120px] rounded-xl"
+                onClick={() => requestDownload.mutate({ mediaId: media.id })}
+                disabled={requestDownload.isPending}
+              >
+                {requestDownload.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                Request
+              </Button>
+            </section>
+          );
+        })()}
+
           {/* Videos — show skeletons while loading, fade in when ready */}
           {extras.isLoading ? (
             <VideoCarouselSkeleton />
@@ -465,132 +606,15 @@ export default function MediaDetailPage({
 
           <div className="flex flex-col gap-12 px-4 md:gap-16 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
 
-        {/* Request Download — non-admin users */}
-        {!isAdmin && media.id && !media.downloaded && (() => {
-          const existing = existingRequest.data;
-          if (existing) {
-            const statusLabels: Record<string, { text: string; className: string }> = {
-              pending: { text: "Download Requested — Pending approval", className: "bg-yellow-500/15 text-yellow-600" },
-              approved: { text: "Download Approved — Waiting for admin to download", className: "bg-blue-500/15 text-blue-600" },
-              rejected: { text: "Request Rejected", className: "bg-red-500/15 text-red-600" },
-              downloaded: { text: "Downloaded — Available on server", className: "bg-green-500/15 text-green-600" },
-            };
-            const info = statusLabels[existing.status];
-            if (!info) return null;
-            return (
-              <section className="flex flex-col gap-2">
-                <div className="flex items-center gap-3">
-                  <span className={cn("rounded-xl px-3 py-1.5 text-sm font-medium", info.className)}>
-                    {info.text}
-                  </span>
-                </div>
-                {existing.status === "rejected" && existing.adminNote && (
-                  <p className="text-sm text-muted-foreground italic">
-                    Admin: {existing.adminNote}
-                  </p>
-                )}
-              </section>
-            );
-          }
-          return (
-            <section className="flex items-center gap-4">
-              <div className="flex-1">
-                <h2 className="text-lg font-semibold tracking-tight">Want to watch this?</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Request the admin to download this content for you.
-                </p>
-              </div>
-              <Button
-                className="rounded-xl"
-                onClick={() => requestDownload.mutate({ mediaId: media.id })}
-                disabled={requestDownload.isPending}
-              >
-                {requestDownload.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="mr-2 h-4 w-4" />
-                )}
-                Request Download
-              </Button>
-            </section>
-          );
-        })()}
-
-        {/* Movie download management — admin only */}
-        {isAdmin && media.type === "movie" && (
-          <section>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-foreground">Download</h2>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => openTorrentDialog()}
-                  className="flex h-8 items-center gap-1.5 rounded-xl bg-muted/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  <Search className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Search Torrent</span>
-                </button>
-                <Link
-                  href={`/media/${media.id}/manage`}
-                  className="flex h-8 items-center gap-1.5 rounded-xl bg-muted/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  <Settings2 className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Manage</span>
-                </Link>
-                {media.processingStatus && media.processingStatus !== "ready" && (
-                  <div className="flex items-center gap-1.5 rounded-xl bg-amber-500/10 px-3 py-1.5 text-xs text-amber-400">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span className="hidden sm:inline">Refreshing metadata</span>
-                  </div>
-                )}
-              </div>
-            </div>
-            {!media.libraryId ? (
-              <div className="rounded-xl border border-border bg-card p-8 text-center">
-                <Settings2 className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">
-                  Assign a library first to enable downloads. Use the Settings button above.
-                </p>
-              </div>
-            ) : mediaTorrents && mediaTorrents.length > 0 ? (
-              <div className="divide-y divide-border rounded-xl border border-border bg-card">
-                {mediaTorrents.map((t) => {
-                  const qb = qualityBadge(t.quality);
-                  const sb = sourceBadge(t.source);
-                  const resolvedStatus = t.imported
-                    ? { label: "Imported", className: "bg-green-500/15 text-green-400 border-green-500/20" }
-                    : t.progress >= 1
-                      ? { label: "Downloaded", className: "bg-green-500/15 text-green-400 border-green-500/20" }
-                      : t.status === "downloading"
-                        ? { label: "Downloading", className: "bg-blue-500/15 text-blue-400 border-blue-500/20" }
-                        : t.status === "paused"
-                          ? { label: "Paused", className: "bg-yellow-500/15 text-yellow-400 border-yellow-500/20" }
-                          : { label: t.status, className: "bg-muted text-muted-foreground border-border" };
-                  return (
-                    <div key={t.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-3">
-                      <span className="min-w-0 flex-1 truncate text-sm text-foreground">{t.title}</span>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {qb && <Badge variant="outline" className={qb.className}>{qb.label}</Badge>}
-                        {sb && <Badge variant="outline" className={sb.className}>{sb.label}</Badge>}
-                        <Badge variant="outline" className={resolvedStatus.className}>{resolvedStatus.label}</Badge>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-border bg-card p-8 text-center">
-                <Download className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">
-                  No files downloaded yet. Use the search button to find torrents.
-                </p>
-              </div>
-            )}
-          </section>
-        )}
-
         {/* Seasons (TV Shows) */}
         {media.type === "show" && media.seasons && (
+          <div
+            id="seasons-section"
+            className={cn(
+              "scroll-mt-20 rounded-2xl transition-colors duration-700",
+              seasonsHighlight && "bg-foreground/5",
+            )}
+          >
           <SeasonTabs
             seasons={media.seasons.map((s) => ({
               id: s.id,
@@ -642,6 +666,7 @@ export default function MediaDetailPage({
             episodeAvailability={availability.data?.episodes}
             serverLinks={mediaServers.data}
           />
+          </div>
         )}
 
         {/* Cast */}
@@ -780,24 +805,19 @@ export default function MediaDetailPage({
 
       {/* Torrent search dialog */}
       <Dialog open={torrentDialogOpen} onOpenChange={setTorrentDialogOpen}>
-        <DialogContent className="max-h-[85vh] max-w-7xl gap-0 overflow-hidden rounded-2xl border-border bg-background p-0 [&>button:last-child]:hidden">
-          {/* Custom header */}
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+        <DialogContent className="flex h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-border bg-background p-0 md:h-auto md:max-h-[85vh] md:max-w-5xl md:rounded-[2rem] [&>button:last-child]:hidden">
+          {/* Header */}
+          <div className="flex shrink-0 items-center justify-between px-6 py-5">
             <div>
               <DialogTitle className="text-lg font-semibold">
                 {media.title}
                 {isSeasonPreselected && (
                   <span className="text-muted-foreground">
-                    {" "}
-                    — Season {String(torrentSearchContext!.seasonNumber).padStart(2, "0")}
+                    {" "}— S{String(torrentSearchContext!.seasonNumber).padStart(2, "0")}
                     {torrentSearchContext!.episodeNumbers &&
                       torrentSearchContext!.episodeNumbers.length > 0 && (
                         <span>
-                          {" "}
-                          E
-                          {torrentSearchContext!.episodeNumbers
-                            .map((n) => String(n).padStart(2, "0"))
-                            .join(", E")}
+                          E{torrentSearchContext!.episodeNumbers.map((n) => String(n).padStart(2, "0")).join(", E")}
                         </span>
                       )}
                   </span>
@@ -809,125 +829,132 @@ export default function MediaDetailPage({
             </div>
             <button
               onClick={() => setTorrentDialogOpen(false)}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-muted transition-colors hover:bg-muted/80"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
             >
-              <span className="text-lg leading-none text-foreground">×</span>
+              <X size={16} />
             </button>
           </div>
 
           {/* Filter toolbar */}
-          <div className="flex flex-wrap items-center gap-2 px-5 py-3">
-            {/* Text filter */}
-            <div className="relative min-w-[180px] flex-1">
+          <div className="shrink-0 border-b border-border px-6 py-4">
+            {/* Search */}
+            <div className="relative">
               <Search
-                size={14}
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                size={16}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
               />
               <Input
-                placeholder="Filter..."
+                placeholder="Filter results..."
                 value={torrentSearchQuery}
                 onChange={(e) => {
                   setTorrentSearchQuery(e.target.value);
                   setTorrentPage(0);
                 }}
-                className="h-9 pl-8 text-sm"
+                className="h-11 rounded-2xl bg-background pl-10 text-sm"
               />
             </div>
 
-            {/* Quality filter */}
-            <select
-              value={torrentQualityFilter}
-              onChange={(e) => {
-                setTorrentQualityFilter(e.target.value);
-                setTorrentPage(0);
-              }}
-              className="h-9 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none"
-            >
-              <option value="all">All Quality</option>
-              <option value="uhd">4K</option>
-              <option value="fullhd">1080p</option>
-              <option value="hd">720p</option>
-              <option value="sd">SD</option>
-            </select>
+            {/* Filters row */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Filters</span>
+              <select
+                value={torrentQualityFilter}
+                onChange={(e) => { setTorrentQualityFilter(e.target.value); setTorrentPage(0); }}
+                className="h-8 w-[100px] rounded-xl border border-border bg-background px-2.5 text-xs text-foreground outline-none"
+              >
+                <option value="all">Quality</option>
+                <option value="uhd">4K</option>
+                <option value="fullhd">1080p</option>
+                <option value="hd">720p</option>
+                <option value="sd">SD</option>
+              </select>
+              <select
+                value={torrentSourceFilter}
+                onChange={(e) => { setTorrentSourceFilter(e.target.value); setTorrentPage(0); }}
+                className="h-8 w-[100px] rounded-xl border border-border bg-background px-2.5 text-xs text-foreground outline-none"
+              >
+                <option value="all">Source</option>
+                <option value="remux">Remux</option>
+                <option value="bluray">Blu-Ray</option>
+                <option value="webdl">WEB-DL</option>
+                <option value="webrip">WEBRip</option>
+                <option value="hdtv">HDTV</option>
+              </select>
+              <select
+                value={torrentSizeFilter}
+                onChange={(e) => { setTorrentSizeFilter(e.target.value); setTorrentPage(0); }}
+                className="h-8 w-[100px] rounded-xl border border-border bg-background px-2.5 text-xs text-foreground outline-none"
+              >
+                <option value="all">Size</option>
+                <option value="small">&lt; 2 GB</option>
+                <option value="medium">2–10 GB</option>
+                <option value="large">&gt; 10 GB</option>
+              </select>
 
-            {/* Source filter */}
-            <select
-              value={torrentSourceFilter}
-              onChange={(e) => {
-                setTorrentSourceFilter(e.target.value);
-                setTorrentPage(0);
-              }}
-              className="h-9 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none"
-            >
-              <option value="all">All Sources</option>
-              <option value="remux">Remux</option>
-              <option value="bluray">Blu-Ray</option>
-              <option value="webdl">WEB-DL</option>
-              <option value="webrip">WEBRip</option>
-              <option value="hdtv">HDTV</option>
-            </select>
+              <div className="h-4 w-px bg-border" />
 
-            {/* Size filter */}
-            <select
-              value={torrentSizeFilter}
-              onChange={(e) => {
-                setTorrentSizeFilter(e.target.value);
-                setTorrentPage(0);
-              }}
-              className="h-9 rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none"
-            >
-              <option value="all">All Sizes</option>
-              <option value="small">&lt; 2 GB</option>
-              <option value="medium">2–10 GB</option>
-              <option value="large">&gt; 10 GB</option>
-            </select>
-
-            {/* Season pills — only when NOT pre-selected */}
-            {!isSeasonPreselected && media.type === "show" && media.seasons && (
-              <>
-                <div className="h-4 w-px bg-border" />
-                <div className="flex flex-wrap gap-1">
+              <span className="text-xs font-medium text-muted-foreground">Sort by</span>
+              <div className="flex items-center gap-1">
+                {(["confidence", "seeders", "size", "age"] as const).map((col) => (
                   <button
-                    className={`h-7 rounded-full px-2.5 text-xs font-medium transition-colors ${
+                    key={col}
+                    onClick={() => toggleSort(col)}
+                    className={cn(
+                      "inline-flex h-8 items-center gap-1 rounded-xl px-3 text-xs transition-colors",
+                      torrentSort === col
+                        ? "bg-foreground/10 font-medium text-foreground"
+                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                    )}
+                  >
+                    {{ confidence: "Score", seeders: "Seeds", size: "Size", age: "Age" }[col]}
+                    {torrentSort === col && (
+                      torrentSortDir === "desc" ? <ChevronDown size={12} /> : <ChevronUp size={12} />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Season pills */}
+            {!isSeasonPreselected && media.type === "show" && media.seasons && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground">Season</span>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    className={cn(
+                      "h-8 rounded-xl px-3 text-xs font-medium transition-colors",
                       torrentSearchContext?.seasonNumber === undefined
                         ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground hover:text-foreground"
-                    }`}
-                    onClick={() => {
-                      setTorrentSearchContext(null);
-                      setTorrentSearchQuery("");
-                      setTorrentPage(0);
-                    }}
+                        : "bg-background text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => { setTorrentSearchContext(null); setTorrentSearchQuery(""); setTorrentPage(0); }}
                   >
                     All
                   </button>
                   {media.seasons
                     .filter((s) => s.number > 0)
                     .sort((a, b) => a.number - b.number)
-                    .map((season) => (
+                    .map((s) => (
                       <button
-                        key={season.number}
-                        className={`h-7 rounded-full px-2.5 text-xs font-medium transition-colors ${
-                          torrentSearchContext?.seasonNumber === season.number
+                        key={s.number}
+                        className={cn(
+                          "h-8 rounded-xl px-3 text-xs font-medium transition-colors",
+                          torrentSearchContext?.seasonNumber === s.number
                             ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground hover:text-foreground"
-                        }`}
-                        onClick={() => {
-                          setTorrentSearchContext({ seasonNumber: season.number });
-                          setTorrentSearchQuery("");
-                          setTorrentPage(0);
-                        }}
+                            : "bg-background text-muted-foreground hover:text-foreground",
+                        )}
+                        onClick={() => { setTorrentSearchContext({ seasonNumber: s.number }); setTorrentSearchQuery(""); setTorrentPage(0); }}
                       >
-                        S{season.number.toString().padStart(2, "0")}
+                        S{s.number.toString().padStart(2, "0")}
                       </button>
                     ))}
                 </div>
-              </>
+              </div>
             )}
           </div>
 
           {/* Table results */}
-          <div className="max-h-[60vh] overflow-y-scroll">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {torrentSearch.isLoading ? (
               <div className="flex min-h-[300px] flex-col items-center justify-center gap-6 px-5 py-16">
                 {/* Animated radar/search rings */}
@@ -964,180 +991,96 @@ export default function MediaDetailPage({
                 </Button>
               </div>
             ) : paginatedTorrents.length > 0 ? (
-              <table className="w-full table-fixed text-sm">
-                <colgroup>
-                  <col />
-                  <col className="w-[96px]" />
-                  <col className="w-[80px]" />
-                  <col className="w-[80px]" />
-                  <col className="w-[72px]" />
-                  <col className="w-[70px]" />
-                  <col className="w-[70px]" />
-                  <col className="w-[60px]" />
-                  <col className="w-[100px]" />
-                  <col className="w-[52px]" />
-                </colgroup>
-                <thead className="sticky top-0 z-10 border-b border-border bg-background">
-                  <tr className="text-left text-xs text-muted-foreground">
-                    <th className="px-5 py-3 font-medium">Title</th>
-                    <th
-                      className="cursor-pointer px-3 py-3 font-medium transition-colors hover:text-foreground"
-                      onClick={() => toggleSort("size")}
+              <div className="flex flex-col gap-3 p-4">
+                {paginatedTorrents.map((t, i) => {
+                  const url = t.magnetUrl ?? t.downloadUrl;
+                  const qLabel = formatQualityLabel(t.quality);
+                  const sLabel = sourceLabel(t.source);
+                  const hasFreeleech = t.flags.some((f) => f.includes("freeleech"));
+                  return (
+                    <div
+                      key={`${t.guid}-${i}`}
+                      className="overflow-hidden rounded-xl bg-muted/40 transition-colors hover:bg-muted/60"
                     >
-                      <span className="inline-flex items-center gap-1">
-                        Size
-                        {torrentSort === "size" ? (
-                          torrentSortDir === "desc" ? <ChevronDown size={12} /> : <ChevronUp size={12} />
-                        ) : (
-                          <ArrowUpDown size={10} className="opacity-40" />
-                        )}
-                      </span>
-                    </th>
-                    <th className="px-3 py-3 font-medium">Quality</th>
-                    <th className="px-3 py-3 font-medium">Source</th>
-                    <th
-                      className="cursor-pointer px-3 py-3 font-medium transition-colors hover:text-foreground"
-                      onClick={() => toggleSort("confidence")}
-                    >
-                      <span className="inline-flex items-center gap-1">
-                        Score
-                        {torrentSort === "confidence" ? (
-                          torrentSortDir === "desc" ? <ChevronDown size={12} /> : <ChevronUp size={12} />
-                        ) : (
-                          <ArrowUpDown size={10} className="opacity-40" />
-                        )}
-                      </span>
-                    </th>
-                    <th
-                      className="cursor-pointer px-3 py-3 font-medium transition-colors hover:text-foreground"
-                      onClick={() => toggleSort("seeders")}
-                    >
-                      <span className="inline-flex items-center gap-1">
-                        Seeds
-                        {torrentSort === "seeders" ? (
-                          torrentSortDir === "desc" ? <ChevronDown size={12} /> : <ChevronUp size={12} />
-                        ) : (
-                          <ArrowUpDown size={10} className="opacity-40" />
-                        )}
-                      </span>
-                    </th>
-                    <th
-                      className="cursor-pointer px-3 py-3 font-medium transition-colors hover:text-foreground"
-                      onClick={() => toggleSort("peers")}
-                    >
-                      <span className="inline-flex items-center gap-1">
-                        Peers
-                        {torrentSort === "peers" ? (
-                          torrentSortDir === "desc" ? <ChevronDown size={12} /> : <ChevronUp size={12} />
-                        ) : (
-                          <ArrowUpDown size={10} className="opacity-40" />
-                        )}
-                      </span>
-                    </th>
-                    <th
-                      className="cursor-pointer px-3 py-3 font-medium transition-colors hover:text-foreground"
-                      onClick={() => toggleSort("age")}
-                    >
-                      <span className="inline-flex items-center gap-1">
-                        Age
-                        {torrentSort === "age" ? (
-                          torrentSortDir === "desc" ? <ChevronDown size={12} /> : <ChevronUp size={12} />
-                        ) : (
-                          <ArrowUpDown size={10} className="opacity-40" />
-                        )}
-                      </span>
-                    </th>
-                    <th className="px-3 py-3 font-medium">Indexer</th>
-                    <th className="px-3 py-3"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedTorrents.map((t, i) => {
-                    const url = t.magnetUrl ?? t.downloadUrl;
-                    const badge = qualityBadge(t.quality);
-                    const srcBdg = sourceBadge(t.source);
-                    return (
-                      <tr
-                        key={`${t.guid}-${i}`}
-                        className="border-b border-border last:border-0 transition-colors hover:bg-muted/50"
-                      >
-                        {/* Title */}
-                        <td className="overflow-hidden px-5 py-3">
-                          <p className="text-sm font-medium text-foreground">
+                      {/* Header: Indexer + Age */}
+                      <div className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground">
+                        <span>{t.indexer || "Unknown"}</span>
+                        <span className="flex items-center gap-1">
+                          <Clock size={11} />
+                          {formatAge(t.age)}
+                        </span>
+                      </div>
+
+                      {/* Body: Score + Title + Quality info + Download */}
+                      <div className="flex items-start gap-3 border-t border-border/50 px-4 py-3">
+                        {/* Confidence */}
+                        <div className={cn(
+                          "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold tabular-nums",
+                          t.confidence >= 70 ? "bg-green-500/10 text-green-400" :
+                          t.confidence >= 40 ? "bg-yellow-500/10 text-yellow-400" :
+                          "bg-muted text-muted-foreground",
+                        )}>
+                          {t.confidence}
+                        </div>
+
+                        {/* Content */}
+                        <div className="min-w-0 flex-1">
+                          <p className="line-clamp-2 text-sm font-medium leading-snug text-foreground">
                             {t.title}
                           </p>
-                        </td>
-                        {/* Size */}
-                        <td className="px-3 py-3 text-xs text-muted-foreground tabular-nums">
-                          {t.size > 0 ? formatBytes(t.size) : "—"}
-                        </td>
-                        {/* Quality */}
-                        <td className="px-3 py-3">
-                          {badge ? (
-                            <Badge
-                              variant="outline"
-                              className={`w-[56px] justify-center rounded-xl text-[10px] font-bold ${badge.className}`}
-                            >
-                              {badge.label}
-                            </Badge>
-                          ) : (
-                            <span className="inline-flex w-[56px] justify-center text-xs text-muted-foreground/40">—</span>
-                          )}
-                        </td>
-                        {/* Source */}
-                        <td className="px-3 py-3">
-                          {srcBdg ? (
-                            <Badge
-                              variant="outline"
-                              className={`w-[60px] justify-center rounded-xl text-[10px] font-bold ${srcBdg.className}`}
-                            >
-                              {srcBdg.label}
-                            </Badge>
-                          ) : (
-                            <span className="inline-flex w-[60px] justify-center text-xs text-muted-foreground/40">—</span>
-                          )}
-                        </td>
-                        {/* Confidence */}
-                        <td className="px-3 py-3 text-xs tabular-nums text-foreground">
-                          <span className={
-                            t.confidence >= 70 ? "text-green-400" :
-                            t.confidence >= 40 ? "text-yellow-400" :
-                            "text-muted-foreground"
-                          }>
-                            {t.confidence}
+                          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                            {qLabel && (
+                              <span className="flex items-center gap-1.5">
+                                <Monitor size={12} className="text-muted-foreground/50" />
+                                <span className="font-medium text-foreground/80">{qLabel}</span>
+                              </span>
+                            )}
+                            {sLabel && (
+                              <span className="flex items-center gap-1.5">
+                                <FilmIcon size={12} className="text-muted-foreground/50" />
+                                {sLabel}
+                              </span>
+                            )}
+                            {t.size > 0 && (
+                              <span className="flex items-center gap-1.5">
+                                <HardDrive size={12} className="text-muted-foreground/50" />
+                                {formatBytes(t.size)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Download button */}
+                        <button
+                          onClick={() => url && handleDownload(url, t.title)}
+                          disabled={!url || downloadTorrent.isPending}
+                          className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-all hover:scale-110 hover:text-foreground disabled:opacity-40"
+                        >
+                          <Download size={16} />
+                        </button>
+                      </div>
+
+                      {/* Footer: Seeds + Peers + Freeleech */}
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border/50 px-4 py-2 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1.5 text-foreground/70">
+                          <ArrowUp size={12} className="text-muted-foreground/50" />
+                          {t.seeders} seeders
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <ArrowDown size={12} className="text-muted-foreground/50" />
+                          {t.leechers} peers
+                        </span>
+                        {hasFreeleech && (
+                          <span className="flex items-center gap-1.5 font-medium text-blue-400">
+                            <Zap size={12} />
+                            Freeleech
                           </span>
-                        </td>
-                        {/* Seeders */}
-                        <td className="px-3 py-3 text-xs tabular-nums text-green-500">
-                          {t.seeders ?? 0}
-                        </td>
-                        {/* Leechers */}
-                        <td className="px-3 py-3 text-xs tabular-nums text-muted-foreground">
-                          {t.leechers ?? 0}
-                        </td>
-                        {/* Age */}
-                        <td className="px-3 py-3 text-xs text-muted-foreground tabular-nums">
-                          {formatAge(t.age)}
-                        </td>
-                        {/* Indexer */}
-                        <td className="overflow-hidden px-3 py-3 text-xs text-muted-foreground/60">
-                          <span className="block truncate">{t.indexer ?? "—"}</span>
-                        </td>
-                        {/* Download */}
-                        <td className="px-3 py-3">
-                          <button
-                            onClick={() => url && handleDownload(url, t.title)}
-                            disabled={!url || downloadTorrent.isPending}
-                            className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-80 disabled:opacity-40"
-                          >
-                            <Download size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
               <div className="px-5 py-12 text-center">
                 <p className="text-sm font-medium text-muted-foreground">
@@ -1152,7 +1095,7 @@ export default function MediaDetailPage({
 
           {/* Pagination footer */}
           {(torrentPage > 0 || hasMore) && (
-            <div className="flex items-center justify-between border-t border-border px-5 py-3">
+            <div className="flex shrink-0 items-center justify-between border-t border-border px-6 py-3">
               <span className="text-xs text-muted-foreground">
                 Page {torrentPage + 1}
                 {allFilteredTorrents.length > 0 && (

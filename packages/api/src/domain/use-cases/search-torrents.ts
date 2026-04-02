@@ -181,8 +181,9 @@ export async function searchTorrents(
     .filter((r) => r.confidence > 0)
     .sort((a, b) => b.confidence - a.confidence);
 
-  // If any indexer returned a full page, there's likely more
-  const hasMore = results.length >= pageSize;
+  // Truncate to pageSize and detect if there's more
+  const hasMore = scored.length > pageSize;
+  const truncated = scored.slice(0, pageSize);
 
-  return { results: scored, page, pageSize, hasMore };
+  return { results: truncated, page, pageSize, hasMore };
 }

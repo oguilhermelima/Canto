@@ -9,7 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@canto/ui/popover";
-import { ChevronRight, Film, Play, Settings2, Tv } from "lucide-react";
+import { ChevronRight, Film, Play, Tv } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { AddToListButton } from "~/components/media/add-to-list-button";
@@ -343,15 +343,6 @@ export function MediaDetailHero({
           {/* Action buttons */}
           <div className="flex flex-wrap items-center gap-2">
             <AddToListButton mediaId={id} title={title} size="lg" />
-            {isAdmin && (
-              <Link
-                href={`/media/${id}/manage`}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-foreground/15 px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/25"
-              >
-                <Settings2 className="h-4 w-4" />
-                Manage
-              </Link>
-            )}
           </div>
 
         </div>
