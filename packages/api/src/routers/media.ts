@@ -423,22 +423,19 @@ export const mediaRouter = createTRPCRouter({
     }),
 
   /**
-   * Replace the metadata provider for a media item (e.g. TMDB -> TVDB).
-   * Fetches full metadata from the target provider and updates the DB record.
+   * Sync season/episode structure from TVDB for a show.
+   * Keeps the media as TMDB provider — only replaces seasons and episodes.
    */
-  replaceProvider: adminProcedure
-    .input(z.object({
-      id: z.string().uuid(),
-      provider: z.enum(["tmdb", "tvdb"]),
-    }))
+  syncTvdbSeasons: adminProcedure
+    .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const [{ replaceMediaProvider }, tmdb, tvdb, { jobDispatcher }] = await Promise.all([
-        import("../domain/use-cases/replace-provider"),
+      const [{ reconcileShowStructure }, tmdb, tvdb, { jobDispatcher }] = await Promise.all([
+        import("../domain/use-cases/reconcile-show-structure"),
         getTmdbProvider(),
         getTvdbProvider(),
         import("../infrastructure/adapters/job-dispatcher.adapter"),
       ]);
-      return replaceMediaProvider(ctx.db, input.id, input.provider, {
+      await reconcileShowStructure(ctx.db, input.id, {
         tmdb,
         tvdb,
         dispatcher: jobDispatcher,

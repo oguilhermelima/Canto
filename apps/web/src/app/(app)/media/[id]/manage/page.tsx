@@ -152,11 +152,10 @@ export default function ManagePage({
     },
     onError: (err) => toast.error(err.message),
   });
-  const replaceProvider = trpc.media.replaceProvider.useMutation({
+  const syncTvdb = trpc.media.syncTvdbSeasons.useMutation({
     onSuccess: () => {
       invalidateMedia();
-      void utils.media.getExtras.invalidate();
-      toast.success("Provider replaced");
+      toast.success("TVDB seasons synced");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -382,37 +381,25 @@ export default function ManagePage({
                   {refreshMeta.isPending ? "Refreshing..." : "Refresh"}
                 </Button>
               </SettingsRow>
-              {mediaType === "show" &&
-                (media.provider === "tmdb" || media.provider === "tvdb") && (
+              {mediaType === "show" && (
                   <SettingsRow
-                    label={`Replace with ${media.provider === "tmdb" ? "TVDB" : "TMDB"}`}
-                    description={
-                      media.provider === "tmdb"
-                        ? "Use TVDB for accurate season splits and absolute episode numbering"
-                        : "Switch back to TMDB metadata"
-                    }
+                    label="Sync TVDB Seasons"
+                    description="Use TVDB for accurate season splits and absolute episode numbering"
                   >
                     <Button
                       variant="outline"
                       size="sm"
                       className="gap-2"
-                      onClick={() => {
-                        const target =
-                          media.provider === "tmdb" ? "tvdb" : "tmdb";
-                        replaceProvider.mutate({
-                          id,
-                          provider: target as "tmdb" | "tvdb",
-                        });
-                      }}
-                      disabled={replaceProvider.isPending}
+                      onClick={() => syncTvdb.mutate({ id })}
+                      disabled={syncTvdb.isPending}
                     >
                       <RefreshCw
                         className={cn(
                           "h-4 w-4",
-                          replaceProvider.isPending && "animate-spin",
+                          syncTvdb.isPending && "animate-spin",
                         )}
                       />
-                      {replaceProvider.isPending ? "Replacing..." : "Replace"}
+                      {syncTvdb.isPending ? "Syncing..." : "Sync"}
                     </Button>
                   </SettingsRow>
                 )}
