@@ -4,6 +4,7 @@ import { handleImportTorrents } from "./jobs/import-torrents";
 import { handleJellyfinSync, handlePlexSync } from "./jobs/reverse-sync";
 import { handleStallDetection } from "./jobs/stall-detection";
 import { handleRssSync } from "./jobs/rss-sync";
+import { handleBackfillExtras } from "./jobs/backfill-extras";
 import { enrichMedia } from "@canto/api/domain/use-cases/enrich-media";
 import { refreshExtras } from "@canto/api/domain/use-cases/refresh-extras";
 import { replaceShowWithTvdb } from "@canto/api/domain/use-cases/replace-show-with-tvdb";
@@ -14,12 +15,12 @@ import { findUsersForDailyRecsCheck } from "@canto/api/infrastructure/repositori
 import { dispatchRebuildUserRecs } from "@canto/api/infrastructure/queue/bullmq-dispatcher";
 import { jobDispatcher } from "@canto/api/infrastructure/adapters/job-dispatcher.adapter";
 import { db } from "@canto/db/client";
-import { seedGenres, seedLanguages } from "@canto/db";
+import { seedLanguages } from "@canto/db";
 import { getTmdbProvider } from "@canto/api/lib/tmdb-client";
 import { getTvdbProvider } from "@canto/api/lib/tvdb-client";
 
 /* -------------------------------------------------------------------------- */
-/*  Redis connection                                                          */
+/*  Redis                                                                     */
 /* -------------------------------------------------------------------------- */
 
 const redisConnection = {
@@ -29,78 +30,64 @@ const redisConnection = {
 };
 
 /* -------------------------------------------------------------------------- */
-/*  Queue definitions                                                         */
+/*  Queues                                                                    */
 /* -------------------------------------------------------------------------- */
 
-const importTorrentsQueue = new Queue("import-torrents", {
-  connection: redisConnection,
-});
-
-const jellyfinSyncQueue = new Queue("jellyfin-sync", {
-  connection: redisConnection,
-});
-
-const plexSyncQueue = new Queue("plex-sync", {
-  connection: redisConnection,
-});
-
-const stallDetectionQueue = new Queue("stall-detection", {
-  connection: redisConnection,
-});
-
-const rssSyncQueue = new Queue("rss-sync", {
-  connection: redisConnection,
-});
-
-const dailyRecsCheckQueue = new Queue("daily-recs-check", {
-  connection: redisConnection,
-});
+const queues = {
+  importTorrents: new Queue("import-torrents", { connection: redisConnection }),
+  jellyfinSync: new Queue("jellyfin-sync", { connection: redisConnection }),
+  plexSync: new Queue("plex-sync", { connection: redisConnection }),
+  stallDetection: new Queue("stall-detection", { connection: redisConnection }),
+  rssSync: new Queue("rss-sync", { connection: redisConnection }),
+  dailyRecsCheck: new Queue("daily-recs-check", { connection: redisConnection }),
+  backfillExtras: new Queue("backfill-extras", { connection: redisConnection }),
+};
 
 /* -------------------------------------------------------------------------- */
-/*  Repeatable jobs (cron-like schedules)                                     */
+/*  Schedules                                                                 */
 /* -------------------------------------------------------------------------- */
 
-async function setupRepeatableJobs(): Promise<void> {
-  // Import torrents: every 2 minutes
-  await importTorrentsQueue.upsertJobScheduler(
+async function setupSchedules(): Promise<void> {
+  await queues.importTorrents.upsertJobScheduler(
     "import-torrents-scheduler",
-    { every: 2 * 60 * 1000 },
+    { every: 2 * 60 * 1000 },          // 2 min
     { name: "import-torrents" },
   );
 
-  // Jellyfin sync: every 5 minutes
-  await jellyfinSyncQueue.upsertJobScheduler(
+  await queues.jellyfinSync.upsertJobScheduler(
     "jellyfin-sync-scheduler",
-    { every: 5 * 60 * 1000 },
+    { every: 5 * 60 * 1000 },          // 5 min
     { name: "jellyfin-sync" },
   );
 
-  // Plex sync: every 5 minutes (offset by 30s to avoid parallel TMDB calls)
-  await plexSyncQueue.upsertJobScheduler(
+  await queues.plexSync.upsertJobScheduler(
     "plex-sync-scheduler",
-    { every: 5 * 60 * 1000 },
+    { every: 5 * 60 * 1000 },          // 5 min
     { name: "plex-sync" },
   );
 
-  // Stall detection: every 30 minutes
-  await stallDetectionQueue.upsertJobScheduler(
+  await queues.stallDetection.upsertJobScheduler(
     "stall-detection-scheduler",
-    { every: 30 * 60 * 1000 },
+    { every: 30 * 60 * 1000 },         // 30 min
     { name: "stall-detection" },
   );
 
-  // RSS sync: every 15 minutes
-  await rssSyncQueue.upsertJobScheduler(
+  await queues.rssSync.upsertJobScheduler(
     "rss-sync-scheduler",
-    { every: 15 * 60 * 1000 },
+    { every: 15 * 60 * 1000 },         // 15 min
     { name: "rss-sync" },
   );
 
-  // Daily recs safety net: every hour, catches users with stale recommendations
-  await dailyRecsCheckQueue.upsertJobScheduler(
+  await queues.dailyRecsCheck.upsertJobScheduler(
     "daily-recs-check-scheduler",
-    { every: 60 * 60 * 1000 },
+    { every: 60 * 60 * 1000 },         // 1 hour
     { name: "daily-recs-check" },
+  );
+
+  await queues.backfillExtras.upsertJobScheduler(
+    "backfill-extras-scheduler",
+    { every: 60 * 60 * 1000 },         // 1 hour
+    { name: "backfill-extras" },
   );
 }
 
@@ -108,160 +95,97 @@ async function setupRepeatableJobs(): Promise<void> {
 /*  Workers                                                                   */
 /* -------------------------------------------------------------------------- */
 
-const importTorrentsWorker = new Worker(
-  "import-torrents",
-  async (job) => {
+const workers = [
+  // ── Scheduled (cron) ──
+
+  new Worker("import-torrents", async (job) => {
     console.log(`[import-torrents] Running job ${job.id}`);
     await handleImportTorrents();
-    console.log(`[import-torrents] Completed job ${job.id}`);
-  },
-  { connection: redisConnection, concurrency: 1 },
-);
+  }, { connection: redisConnection, concurrency: 1 }),
 
-const jellyfinSyncWorker = new Worker(
-  "jellyfin-sync",
-  async (job) => {
+  new Worker("jellyfin-sync", async (job) => {
     console.log(`[jellyfin-sync] Running job ${job.id}`);
     await handleJellyfinSync();
-    console.log(`[jellyfin-sync] Completed job ${job.id}`);
-  },
-  { connection: redisConnection, concurrency: 1 },
-);
+  }, { connection: redisConnection, concurrency: 1 }),
 
-const plexSyncWorker = new Worker(
-  "plex-sync",
-  async (job) => {
+  new Worker("plex-sync", async (job) => {
     console.log(`[plex-sync] Running job ${job.id}`);
     await handlePlexSync();
-    console.log(`[plex-sync] Completed job ${job.id}`);
-  },
-  { connection: redisConnection, concurrency: 1 },
-);
+  }, { connection: redisConnection, concurrency: 1 }),
 
-const enrichMediaWorker = new Worker(
-  "enrich-media",
-  async (job) => {
-    const { mediaId, full } = job.data as { mediaId: string; full?: boolean };
-    console.log(`[enrich-media] Running for media ${mediaId} (full=${full ?? true})`);
-    const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
-    await enrichMedia(db, mediaId, { tmdb, tvdb, dispatcher: jobDispatcher, full });
-    console.log(`[enrich-media] Completed for media ${mediaId}`);
-  },
-  { connection: redisConnection, concurrency: 3 },
-);
-
-const refreshExtrasWorker = new Worker(
-  "refresh-extras",
-  async (job) => {
-    const { mediaId } = job.data as { mediaId: string };
-    console.log(`[refresh-extras] Running for media ${mediaId}`);
-    const tmdb = await getTmdbProvider();
-    await refreshExtras(db, mediaId, { tmdb });
-    console.log(`[refresh-extras] Completed for media ${mediaId}`);
-  },
-  { connection: redisConnection, concurrency: 2 },
-);
-
-const replaceTvdbWorker = new Worker(
-  "replace-tvdb",
-  async (job) => {
-    const { mediaId } = job.data as { mediaId: string };
-    console.log(`[replace-tvdb] Running for media ${mediaId}`);
-    const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
-    await replaceShowWithTvdb(db, mediaId, { tmdb, tvdb, dispatcher: jobDispatcher });
-    console.log(`[replace-tvdb] Completed for media ${mediaId}`);
-  },
-  { connection: redisConnection, concurrency: 1 },
-);
-
-const rssSyncWorker = new Worker(
-  "rss-sync",
-  async (job) => {
-    console.log(`[rss-sync] Running job ${job.id}`);
-    await handleRssSync();
-    console.log(`[rss-sync] Completed job ${job.id}`);
-  },
-  { connection: redisConnection, concurrency: 1 },
-);
-
-const stallDetectionWorker = new Worker(
-  "stall-detection",
-  async (job) => {
+  new Worker("stall-detection", async (job) => {
     console.log(`[stall-detection] Running job ${job.id}`);
     await handleStallDetection();
-    console.log(`[stall-detection] Completed job ${job.id}`);
-  },
-  { connection: redisConnection, concurrency: 1 },
-);
+  }, { connection: redisConnection, concurrency: 1 }),
 
-const dailyRecsCheckWorker = new Worker(
-  "daily-recs-check",
-  async () => {
+  new Worker("rss-sync", async (job) => {
+    console.log(`[rss-sync] Running job ${job.id}`);
+    await handleRssSync();
+  }, { connection: redisConnection, concurrency: 1 }),
+
+  new Worker("daily-recs-check", async () => {
     const users = await findUsersForDailyRecsCheck(db);
     if (users.length > 0) {
       console.log(`[daily-recs-check] ${users.length} user(s) need recs refresh`);
-      for (const u of users) {
-        await dispatchRebuildUserRecs(u.id);
-      }
+      for (const u of users) await dispatchRebuildUserRecs(u.id);
     }
-  },
-  { connection: redisConnection, concurrency: 1 },
-);
+  }, { connection: redisConnection, concurrency: 1 }),
 
-const rebuildUserRecsWorker = new Worker(
-  "rebuild-user-recs",
-  async (job) => {
+  // Backfill: queries IDs with missing extras → dispatches to refresh-extras queue
+  new Worker("backfill-extras", async () => {
+    await handleBackfillExtras(db);
+  }, { connection: redisConnection, concurrency: 1 }),
+
+  // ── On-demand (dispatched by other code) ──
+
+  new Worker("enrich-media", async (job) => {
+    const { mediaId, full } = job.data as { mediaId: string; full?: boolean };
+    console.log(`[enrich-media] ${mediaId} (full=${full ?? true})`);
+    const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
+    await enrichMedia(db, mediaId, { tmdb, tvdb, dispatcher: jobDispatcher, full });
+  }, { connection: redisConnection, concurrency: 3 }),
+
+  new Worker("refresh-extras", async (job) => {
+    const { mediaId } = job.data as { mediaId: string };
+    console.log(`[refresh-extras] ${mediaId}`);
+    const tmdb = await getTmdbProvider();
+    await refreshExtras(db, mediaId, { tmdb });
+  }, { connection: redisConnection, concurrency: 2 }),
+
+  new Worker("replace-tvdb", async (job) => {
+    const { mediaId } = job.data as { mediaId: string };
+    console.log(`[replace-tvdb] ${mediaId}`);
+    const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
+    await replaceShowWithTvdb(db, mediaId, { tmdb, tvdb, dispatcher: jobDispatcher });
+  }, { connection: redisConnection, concurrency: 1 }),
+
+  new Worker("rebuild-user-recs", async (job) => {
     const { userId } = job.data as { userId: string };
-    console.log(`[rebuild-user-recs] Running for user ${userId}`);
+    console.log(`[rebuild-user-recs] ${userId}`);
     await rebuildUserRecs(db, userId);
-    console.log(`[rebuild-user-recs] Completed for user ${userId}`);
-  },
-  { connection: redisConnection, concurrency: 2 },
-);
+  }, { connection: redisConnection, concurrency: 2 }),
 
-const refreshAllLanguageWorker = new Worker(
-  "refresh-all-language",
-  async () => {
-    console.log("[refresh-all-language] Starting full language refresh...");
+  new Worker("refresh-all-language", async () => {
+    console.log("[refresh-all-language] Starting...");
     const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
     await refreshAllLanguage(db, { tmdb, tvdb });
-    console.log("[refresh-all-language] Completed.");
-  },
-  { connection: redisConnection, concurrency: 1 },
-);
+  }, { connection: redisConnection, concurrency: 1 }),
 
-const translateEpisodesWorker = new Worker(
-  "translate-episodes",
-  async (job) => {
+  new Worker("translate-episodes", async (job) => {
     const { mediaId, tvdbId, language } = job.data as { mediaId: string; tvdbId: number; language: string };
     const tvdb = await getTvdbProvider();
     await translateEpisodes(db, mediaId, tvdbId, language, tvdb);
-  },
-  { connection: redisConnection, concurrency: 3 },
-);
+  }, { connection: redisConnection, concurrency: 3 }),
+];
 
 /* -------------------------------------------------------------------------- */
 /*  Error handling                                                            */
 /* -------------------------------------------------------------------------- */
 
-for (const worker of [
-  importTorrentsWorker,
-  jellyfinSyncWorker,
-  plexSyncWorker,
-  rssSyncWorker,
-  stallDetectionWorker,
-  enrichMediaWorker,
-  refreshExtrasWorker,
-  replaceTvdbWorker,
-  dailyRecsCheckWorker,
-  rebuildUserRecsWorker,
-  refreshAllLanguageWorker,
-  translateEpisodesWorker,
-]) {
+for (const worker of workers) {
   worker.on("failed", (job, err) => {
     console.error(`[${worker.name}] Job ${job?.id} failed:`, err);
   });
-
   worker.on("error", (err) => {
     console.error(`[${worker.name}] Worker error:`, err);
   });
@@ -272,26 +196,10 @@ for (const worker of [
 /* -------------------------------------------------------------------------- */
 
 async function shutdown(): Promise<void> {
-  console.log("Shutting down workers...");
+  console.log("Shutting down...");
   await Promise.all([
-    importTorrentsWorker.close(),
-    jellyfinSyncWorker.close(),
-    plexSyncWorker.close(),
-    rssSyncWorker.close(),
-    stallDetectionWorker.close(),
-    enrichMediaWorker.close(),
-    refreshExtrasWorker.close(),
-    replaceTvdbWorker.close(),
-    dailyRecsCheckWorker.close(),
-    rebuildUserRecsWorker.close(),
-    refreshAllLanguageWorker.close(),
-    translateEpisodesWorker.close(),
-    importTorrentsQueue.close(),
-    jellyfinSyncQueue.close(),
-    plexSyncQueue.close(),
-    rssSyncQueue.close(),
-    stallDetectionQueue.close(),
-    dailyRecsCheckQueue.close(),
+    ...workers.map((w) => w.close()),
+    ...Object.values(queues).map((q) => q.close()),
   ]);
   console.log("All workers shut down.");
   process.exit(0);
@@ -305,9 +213,7 @@ process.on("SIGINT", shutdown);
 /* -------------------------------------------------------------------------- */
 
 async function main(): Promise<void> {
-  console.log("Setting up repeatable jobs...");
-  await setupRepeatableJobs();
-  await seedGenres(db);
+  await setupSchedules();
   await seedLanguages(db);
   console.log("Workers started. Waiting for jobs...");
 }
