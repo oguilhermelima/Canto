@@ -165,6 +165,7 @@ export const media = pgTable(
     // Classification
     status: varchar("status", { length: 50 }),
     genres: jsonb("genres").$type<string[]>().default([]),
+    genreIds: jsonb("genre_ids").$type<number[]>().default([]),
     contentRating: varchar("content_rating", { length: 20 }),
     originalLanguage: varchar("original_language", { length: 10 }),
     spokenLanguages: jsonb("spoken_languages").$type<string[]>(),
@@ -648,15 +649,6 @@ export const blocklist = pgTable(
   },
   (table) => [index("idx_blocklist_media").on(table.mediaId)],
 );
-
-// ─── Genres (unified provider-agnostic) ───
-
-export const genre = pgTable("genre", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: varchar("name", { length: 100 }).notNull().unique(),
-  tmdbQuery: varchar("tmdb_query", { length: 200 }),
-  tvdbQuery: varchar("tvdb_query", { length: 200 }),
-});
 
 // ─── Lists (per-user watchlist, custom lists, shared server library) ───
 
