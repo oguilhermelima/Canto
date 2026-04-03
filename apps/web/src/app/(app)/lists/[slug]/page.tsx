@@ -1,18 +1,15 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import {
-  Bookmark,
   Film,
-  List,
-  Server,
   Settings2,
   Tv,
 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { trpc } from "~/lib/trpc/client";
+import { StateMessage } from "~/components/layout/state-message";
 import { PageHeader } from "~/components/layout/page-header";
 import { TabBar } from "~/components/layout/tab-bar";
 import { MediaGrid } from "~/components/media/media-grid";
@@ -43,6 +40,7 @@ const DEFAULT_FILTERS: FilterState = {
 
 export default function ListDetailPage(): React.JSX.Element {
   const params = useParams<{ slug: string }>();
+  const router = useRouter();
   const slug = params.slug;
 
   const [typeFilter, setTypeFilter] = useState<"all" | "movie" | "show">("all");
@@ -105,30 +103,13 @@ export default function ListDetailPage(): React.JSX.Element {
     return filtered;
   }, [data, typeFilter, filters]);
 
-  const emptyIcon =
-    data?.list.type === "watchlist"
-      ? Bookmark
-      : data?.list.type === "server"
-        ? Server
-        : List;
-  const EmptyIcon = emptyIcon;
-
   if (error) {
     return (
-      <div className="flex min-h-[400px] w-full items-center justify-center">
-        <div className="text-center">
-          <List className="mx-auto mb-4 h-12 w-12 text-muted-foreground/20" />
-          <p className="text-lg font-medium text-muted-foreground">
-            List not found
-          </p>
-          <Link
-            href="/lists"
-            className="mt-4 inline-block rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Back to Library
-          </Link>
-        </div>
-      </div>
+      <StateMessage
+        preset="notFoundList"
+        action={{ label: "Back to Library", onClick: () => router.push("/lists") }}
+        minHeight="400px"
+      />
     );
   }
 
@@ -203,23 +184,10 @@ export default function ListDetailPage(): React.JSX.Element {
           )}
         >
           {!isLoading && items.length === 0 ? (
-            <div className="flex min-h-[300px] items-center justify-center">
-              <div className="text-center">
-                <EmptyIcon className="mx-auto mb-4 h-12 w-12 text-muted-foreground/20" />
-                <p className="text-lg font-medium text-muted-foreground">
-                  This list is empty
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground/70">
-                  Browse media and add items to get started.
-                </p>
-                <Link
-                  href="/"
-                  className="mt-4 inline-block rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                >
-                  Discover Media
-                </Link>
-              </div>
-            </div>
+            <StateMessage
+              preset="emptyList"
+              action={{ label: "Discover Media", onClick: () => router.push("/") }}
+            />
           ) : (
             <MediaGrid items={items} isLoading={isLoading} compact={showFilters} />
           )}

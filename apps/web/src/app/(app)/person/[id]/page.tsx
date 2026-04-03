@@ -15,6 +15,7 @@ import {
   User,
 } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
+import { StateMessage } from "~/components/layout/state-message";
 
 interface PersonPageProps {
   params: Promise<{ id: string }>;
@@ -26,7 +27,7 @@ export default function PersonPage({
   const { id } = use(params);
   const personId = parseInt(id, 10);
 
-  const { data: person, isLoading } = trpc.media.getPerson.useQuery(
+  const { data: person, isLoading, isError, refetch } = trpc.media.getPerson.useQuery(
     { personId },
     { enabled: !Number.isNaN(personId) },
   );
@@ -39,17 +40,18 @@ export default function PersonPage({
 
   if (isLoading) return <PersonPageSkeleton />;
 
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-background">
+        <StateMessage preset="error" onRetry={() => void refetch()} minHeight="60vh" />
+      </div>
+    );
+  }
+
   if (!person) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-background">
-        <div className="text-center">
-          <h2 className="mb-2 text-xl font-semibold text-foreground">
-            Person not found
-          </h2>
-          <p className="text-muted-foreground">
-            The person you&apos;re looking for doesn&apos;t exist.
-          </p>
-        </div>
+      <div className="min-h-screen bg-background">
+        <StateMessage preset="emptyPerson" minHeight="60vh" />
       </div>
     );
   }

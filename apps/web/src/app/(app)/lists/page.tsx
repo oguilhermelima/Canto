@@ -34,6 +34,7 @@ import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { PageHeader } from "~/components/layout/page-header";
+import { StateMessage } from "~/components/layout/state-message";
 import { TabBar } from "~/components/layout/tab-bar";
 import { MediaGrid } from "~/components/media/media-grid";
 import {
@@ -97,20 +98,17 @@ function FilterButton({
 
 function MediaListTab({
   slug,
-  emptyIcon: EmptyIcon,
-  emptyTitle,
-  emptyDescription,
+  preset,
   showFilters,
   filters,
 }: {
   slug: string;
-  emptyIcon: React.ElementType;
-  emptyTitle: string;
-  emptyDescription: string;
+  preset: "emptyWatchlist" | "emptyServerLibrary";
   showFilters: boolean;
   filters: FilterState;
 }): React.JSX.Element {
-  const { data, isLoading } = trpc.list.getBySlug.useQuery({
+  const router = useRouter();
+  const { data, isLoading, isError, refetch } = trpc.list.getBySlug.useQuery({
     slug,
     limit: 100,
   });
@@ -154,25 +152,16 @@ function MediaListTab({
     return filtered;
   }, [data, filters]);
 
+  if (isError) {
+    return <StateMessage preset="error" onRetry={() => void refetch()} />;
+  }
+
   if (!isLoading && items.length === 0) {
     return (
-      <div className="flex min-h-[300px] items-center justify-center">
-        <div className="text-center">
-          <EmptyIcon className="mx-auto mb-4 h-12 w-12 text-muted-foreground/20" />
-          <p className="text-lg font-medium text-muted-foreground">
-            {emptyTitle}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground/70">
-            {emptyDescription}
-          </p>
-          <Link
-            href="/"
-            className="mt-4 inline-block rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Discover Media
-          </Link>
-        </div>
-      </div>
+      <StateMessage
+        preset={preset}
+        action={{ label: "Discover Media", onClick: () => router.push("/") }}
+      />
     );
   }
 
@@ -411,7 +400,7 @@ function CollectionsTab({
 
   const router = useRouter();
   const utils = trpc.useUtils();
-  const { data: lists, isLoading } = trpc.list.getAll.useQuery();
+  const { data: lists, isLoading, isError, refetch } = trpc.list.getAll.useQuery();
 
   const createMutation = trpc.list.create.useMutation({
     onSuccess: (newList) => {
@@ -482,17 +471,13 @@ function CollectionsTab({
             <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
           ))}
         </div>
+      ) : isError ? (
+        <StateMessage preset="error" onRetry={() => void refetch()} />
       ) : (lists?.filter((l) => l.type === "custom") ?? []).length === 0 ? (
-        <div className="flex min-h-[200px] items-center justify-center rounded-2xl border border-dashed border-border/50">
-          <div className="text-center">
-            <Bookmark className="mx-auto mb-3 h-10 w-10 text-muted-foreground/20" />
-            <p className="text-sm text-muted-foreground">No collections yet</p>
-            <Button size="sm" variant="ghost" className="mt-3" onClick={() => setCreateOpen(true)}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              New Collection
-            </Button>
-          </div>
-        </div>
+        <StateMessage
+          preset="emptyCollections"
+          action={{ label: "New Collection", onClick: () => setCreateOpen(true) }}
+        />
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -545,12 +530,14 @@ function CollectionsTab({
               </button>
             )}
           </div>
-          {customLists.length > visibleCount && !showAll && (
+          {customLists.length > visibleCount && !showAll ? (
             <div className="mt-4 flex justify-center">
               <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => setShowAll(true)}>
                 See all collections ({customLists.length})
               </Button>
             </div>
+          ) : (
+            <StateMessage preset="endOfItems" inline />
           )}
         </>
       )}
@@ -697,9 +684,7 @@ export default function LibraryPage(): React.JSX.Element {
           {activeTab === "watchlist" && (
             <MediaListTab
               slug="watchlist"
-              emptyIcon={Bookmark}
-              emptyTitle="Your watchlist is empty"
-              emptyDescription="Browse media and save items to watch later."
+              preset="emptyWatchlist"
               showFilters={showFilters}
               filters={filters}
             />
@@ -708,9 +693,7 @@ export default function LibraryPage(): React.JSX.Element {
           {activeTab === "server" && (
             <MediaListTab
               slug="server-library"
-              emptyIcon={Server}
-              emptyTitle="Server library is empty"
-              emptyDescription="Media downloaded to the server will appear here."
+              preset="emptyServerLibrary"
               showFilters={showFilters}
               filters={filters}
             />

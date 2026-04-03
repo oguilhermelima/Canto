@@ -5,6 +5,7 @@ import { cn } from "@canto/ui/cn";
 import { Loader2, Settings2 } from "lucide-react";
 import { MediaGrid } from "~/components/media/media-grid";
 import { PageHeader } from "~/components/layout/page-header";
+import { StateMessage } from "~/components/layout/state-message";
 import {
   MediaFilterSidebar,
   type FilterState,
@@ -238,9 +239,7 @@ export function BrowseLayout({
             )}
 
             {!hasNextPage && gridItems.length > 0 && !isLoading && (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                No more results
-              </p>
+              <StateMessage preset="endOfItems" inline />
             )}
           </>
         )}

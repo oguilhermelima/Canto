@@ -17,7 +17,6 @@ import {
   DialogTitle,
 } from "@canto/ui/dialog";
 import {
-  Download,
   Pause,
   Play,
   Trash2,
@@ -29,6 +28,7 @@ import {
   Film,
   Tv,
 } from "lucide-react";
+import { StateMessage } from "~/components/layout/state-message";
 import { trpc } from "~/lib/trpc/client";
 import { authClient } from "~/lib/auth-client";
 import {
@@ -67,7 +67,7 @@ export default function DownloadsPage(): React.JSX.Element {
   }, []);
 
   const utils = trpc.useUtils();
-  const { data: torrents, isLoading } = trpc.torrent.listLive.useQuery(
+  const { data: torrents, isLoading, isError } = trpc.torrent.listLive.useQuery(
     undefined,
     { refetchInterval: 3000 },
   );
@@ -138,7 +138,9 @@ export default function DownloadsPage(): React.JSX.Element {
       </div>
 
       {/* Content */}
-      {isLoading ? (
+      {isError ? (
+        <StateMessage preset="error" onRetry={() => void utils.torrent.listLive.invalidate()} />
+      ) : isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="flex items-center gap-5 rounded-2xl bg-muted/40 p-4">
@@ -152,17 +154,7 @@ export default function DownloadsPage(): React.JSX.Element {
           ))}
         </div>
       ) : !filtered || filtered.length === 0 ? (
-        <div className="flex min-h-[400px] items-center justify-center">
-          <div className="text-center">
-            <Download className="mx-auto mb-4 h-16 w-16 text-muted-foreground/20" />
-            <h2 className="mb-2 text-lg font-medium text-foreground">
-              No downloads
-            </h2>
-            <p className="max-w-sm text-sm text-muted-foreground">
-              Downloads from media pages will appear here with real-time progress.
-            </p>
-          </div>
-        </div>
+        <StateMessage preset="emptyTorrents" />
       ) : (
         <div className="space-y-3">
           {filtered.map((t) => {
@@ -333,6 +325,7 @@ export default function DownloadsPage(): React.JSX.Element {
               </div>
             );
           })}
+          <StateMessage preset="endOfItems" inline />
         </div>
       )}
 

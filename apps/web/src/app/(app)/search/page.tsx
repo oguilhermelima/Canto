@@ -2,12 +2,12 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { cn } from "@canto/ui/cn";
 import { Input } from "@canto/ui/input";
 import { Search } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { BrowseLayout } from "~/components/layout/browse-layout";
 import { TabBar } from "~/components/layout/tab-bar";
+import { StateMessage } from "~/components/layout/state-message";
 
 const TYPE_OPTIONS = [
   { value: "multi", label: "All" },
@@ -69,6 +69,11 @@ export default function SearchPage(): React.JSX.Element {
     { enabled: query.length >= 2 && searchType === "multi", ...pageParam },
   );
 
+  const isError =
+    searchType === "multi"
+      ? multiMovieQuery.isError || multiShowQuery.isError
+      : singleQuery.isError;
+
   const isLoading =
     searchType === "multi"
       ? multiMovieQuery.isLoading || multiShowQuery.isLoading
@@ -113,6 +118,15 @@ export default function SearchPage(): React.JSX.Element {
     popularity: r.popularity,
     genreIds: r.genreIds as number[] | undefined,
   }));
+
+  const refetchAll = useCallback(() => {
+    if (searchType === "multi") {
+      void multiMovieQuery.refetch();
+      void multiShowQuery.refetch();
+    } else {
+      void singleQuery.refetch();
+    }
+  }, [searchType, singleQuery, multiMovieQuery, multiShowQuery]);
 
   const fetchNextPage = useCallback(() => {
     if (searchType === "multi") {
@@ -205,29 +219,16 @@ export default function SearchPage(): React.JSX.Element {
       }
       emptyState={
         query.length < 2 ? (
-          <div className="flex min-h-[400px] items-center justify-center">
-            <div className="text-center">
-              <Search className="mx-auto mb-4 h-12 w-12 text-muted-foreground/20" />
-              <p className="text-lg font-medium text-muted-foreground">
-                Search for movies and TV shows
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Type at least 2 characters to start searching
-              </p>
-            </div>
-          </div>
+          <StateMessage
+            icon={Search}
+            title="Scan the cosmos"
+            description="Type at least 2 characters to start scanning."
+            minHeight="400px"
+          />
+        ) : isError ? (
+          <StateMessage preset="errorSearch" onRetry={refetchAll} minHeight="400px" />
         ) : !isLoading && totalResults === 0 ? (
-          <div className="flex min-h-[400px] items-center justify-center">
-            <div className="text-center">
-              <Search className="mx-auto mb-4 h-12 w-12 text-muted-foreground/20" />
-              <p className="text-lg font-medium text-muted-foreground">
-                No results for &ldquo;{query}&rdquo;
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground/70">
-                Try different keywords or check the spelling
-              </p>
-            </div>
-          </div>
+          <StateMessage preset="emptySearch" minHeight="400px" />
         ) : undefined
       }
     />

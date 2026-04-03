@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { trpc } from "~/lib/trpc/client";
 import { BrowseLayout } from "~/components/layout/browse-layout";
+import { StateMessage } from "~/components/layout/state-message";
 
 interface Preset {
   title: string;
@@ -86,6 +87,22 @@ function RecommendedPage(): React.JSX.Element {
       void query.fetchNextPage();
   }, [query]);
 
+  if (query.isError) {
+    return (
+      <BrowseLayout
+        title="Recommended for you"
+        mediaType="all"
+        items={[]}
+        totalResults={0}
+        isLoading={false}
+        isFetchingNextPage={false}
+        hasNextPage={false}
+        onFetchNextPage={fetchNextPage}
+        emptyState={<StateMessage preset="error" onRetry={() => void query.refetch()} />}
+      />
+    );
+  }
+
   return (
     <BrowseLayout
       title="Recommended for you"
@@ -96,6 +113,7 @@ function RecommendedPage(): React.JSX.Element {
       isFetchingNextPage={query.isFetchingNextPage}
       hasNextPage={query.hasNextPage ?? false}
       onFetchNextPage={fetchNextPage}
+      emptyState={<StateMessage preset="emptyGrid" />}
     />
   );
 }
@@ -149,6 +167,22 @@ function DiscoverPresetPage({ presetKey }: { presetKey: string }): React.JSX.Ele
       void query.fetchNextPage();
   }, [query]);
 
+  if (query.isError) {
+    return (
+      <BrowseLayout
+        title={preset.title}
+        mediaType={preset.mediaType}
+        items={[]}
+        totalResults={0}
+        isLoading={false}
+        isFetchingNextPage={false}
+        hasNextPage={false}
+        onFetchNextPage={fetchNextPage}
+        emptyState={<StateMessage preset="error" onRetry={() => void query.refetch()} />}
+      />
+    );
+  }
+
   return (
     <BrowseLayout
       title={preset.title}
@@ -159,6 +193,7 @@ function DiscoverPresetPage({ presetKey }: { presetKey: string }): React.JSX.Ele
       isFetchingNextPage={query.isFetchingNextPage}
       hasNextPage={query.hasNextPage ?? false}
       onFetchNextPage={fetchNextPage}
+      emptyState={<StateMessage preset="emptyGrid" />}
     />
   );
 }

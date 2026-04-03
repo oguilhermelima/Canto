@@ -2,6 +2,7 @@
 
 import { cn } from "@canto/ui/cn";
 import { MediaCard, MediaCardSkeleton } from "./media-card";
+import { StateMessage } from "~/components/layout/state-message";
 
 interface MediaItem {
   id?: string;
@@ -46,25 +47,24 @@ export function MediaGrid({
   }
 
   if (items.length === 0) {
-    return (
-      <div className="flex min-h-[300px] items-center justify-center">
-        <p className="text-muted-foreground">No results found</p>
-      </div>
-    );
+    return <StateMessage preset="emptyGrid" minHeight="300px" />;
   }
 
   return (
-    <div className={cn("grid gap-6", cols, className)}>
-      {items.map((item, i) => (
-        <MediaCard
-          key={item.id ?? `${item.provider}-${item.externalId}-${i}`}
-          {...item}
-          showTypeBadge
-          showRating={false}
-          showYear={false}
-          showTitle={false}
-        />
-      ))}
-    </div>
+    <>
+      <div className={cn("grid gap-6", cols, className)}>
+        {items.map((item, i) => (
+          <MediaCard
+            key={item.id ?? `${item.provider}-${item.externalId}-${i}`}
+            {...item}
+            showTypeBadge
+            showRating={false}
+            showYear={false}
+            showTitle={false}
+          />
+        ))}
+      </div>
+      <StateMessage preset="endOfItems" inline />
+    </>
   );
 }

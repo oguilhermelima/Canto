@@ -19,6 +19,7 @@ import {
 import { trpc } from "~/lib/trpc/client";
 import { authClient } from "~/lib/auth-client";
 import { PageHeader } from "~/components/layout/page-header";
+import { StateMessage } from "~/components/layout/state-message";
 
 function getStatusBadgeClass(status: string): string {
   if (status === "downloading") return "bg-blue-100 text-blue-700";
@@ -31,10 +32,10 @@ export default function StatusPage(): React.JSX.Element {
   const { data: session } = authClient.useSession();
   const isAdmin = (session?.user as { role?: string } | undefined)?.role === "admin";
 
-  const { data: stats, isLoading: statsLoading } =
-    trpc.library.stats.useQuery();
-  const { data: torrents, isLoading: torrentsLoading } =
-    trpc.torrent.list.useQuery(undefined, { enabled: isAdmin });
+  const statsQuery = trpc.library.stats.useQuery();
+  const { data: stats, isLoading: statsLoading } = statsQuery;
+  const torrentsQuery = trpc.torrent.list.useQuery(undefined, { enabled: isAdmin });
+  const { data: torrents, isLoading: torrentsLoading } = torrentsQuery;
 
   const activeTorrents =
     torrents?.filter((t) => t.status === "downloading") ?? [];
@@ -51,6 +52,13 @@ export default function StatusPage(): React.JSX.Element {
       {/* System Status */}
       <section className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold">System Status</h2>
+        {statsQuery.isError ? (
+          <Card>
+            <CardContent className="p-0">
+              <StateMessage preset="error" onRetry={() => statsQuery.refetch()} minHeight="200px" />
+            </CardContent>
+          </Card>
+        ) : (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <Link href="/library?type=show">
             <Card className="cursor-pointer transition-colors hover:bg-muted/50">
@@ -134,6 +142,7 @@ export default function StatusPage(): React.JSX.Element {
             </CardContent>
           </Card>
         </div>
+        )}
 
         {/* Version & Settings */}
         <div className="grid gap-4 md:grid-cols-2">
@@ -191,7 +200,13 @@ export default function StatusPage(): React.JSX.Element {
             </div>
           </div>
 
-          {torrentsLoading ? (
+          {torrentsQuery.isError ? (
+            <Card>
+              <CardContent className="p-0">
+                <StateMessage preset="error" onRetry={() => torrentsQuery.refetch()} minHeight="200px" />
+              </CardContent>
+            </Card>
+          ) : torrentsLoading ? (
             <Card>
               <CardContent className="p-5">
                 <Skeleton className="h-20 w-full" />
@@ -244,14 +259,8 @@ export default function StatusPage(): React.JSX.Element {
             </Card>
           ) : (
             <Card>
-              <CardContent className="p-8 text-center">
-                <Download
-                  size={32}
-                  className="mx-auto mb-3 text-muted-foreground/50"
-                />
-                <p className="text-sm text-muted-foreground">
-                  No active downloads.
-                </p>
+              <CardContent className="p-0">
+                <StateMessage preset="emptyDownloads" minHeight="200px" />
               </CardContent>
             </Card>
           )}
