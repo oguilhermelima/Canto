@@ -56,7 +56,7 @@ export function TabBar({ tabs, value, onChange, leading, className }: TabBarProp
   }, [updateIndicator]);
 
   return (
-    <div className={cn("flex items-center gap-3 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]", className)}>
+    <div className={cn("flex items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]", className)}>
       {leading && <div className="shrink-0">{leading}</div>}
       <div
         ref={containerRef}
