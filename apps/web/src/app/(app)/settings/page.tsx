@@ -29,8 +29,10 @@ import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { authClient } from "~/lib/auth-client";
 import { PageHeader } from "~/components/layout/page-header";
+import { StateMessage } from "~/components/layout/state-message";
 import { SettingsSection } from "~/components/settings/shared";
 import { ServicesSection, MetadataSettingsSection } from "~/components/settings/services-section";
+import { SearchSection } from "~/components/settings/search-section";
 import { AboutSection } from "~/components/settings/about-section";
 
 const themeOptions = [
@@ -43,6 +45,7 @@ const ALL_NAV_ITEMS = [
   { key: "account", label: "Account", adminOnly: false },
   { key: "services", label: "Services", adminOnly: true },
   { key: "metadata", label: "Metadata", adminOnly: true },
+  { key: "search", label: "Search", adminOnly: true },
   { key: "libraries", label: "Libraries", adminOnly: true },
   { key: "about", label: "About", adminOnly: false },
 ] as const;
@@ -104,12 +107,13 @@ function SyncedItemsTable({ source }: { source?: "jellyfin" | "plex" }): React.J
 
   const utils = trpc.useUtils();
 
-  const { data, isLoading } = trpc.sync.listSyncedItems.useQuery({
+  const syncedItemsQuery = trpc.sync.listSyncedItems.useQuery({
     source,
     result: filter === "all" ? undefined : filter,
     page,
     pageSize: 20,
   });
+  const { data, isLoading } = syncedItemsQuery;
 
   const searchResults = trpc.sync.searchForSyncItem.useQuery(
     { query: searchQuery },
@@ -156,7 +160,9 @@ function SyncedItemsTable({ source }: { source?: "jellyfin" | "plex" }): React.J
       </div>
 
       {/* Table */}
-      {isLoading ? (
+      {syncedItemsQuery.isError ? (
+        <StateMessage preset="error" onRetry={() => syncedItemsQuery.refetch()} minHeight="120px" />
+      ) : isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full rounded-xl" />)}
         </div>
@@ -197,7 +203,7 @@ function SyncedItemsTable({ source }: { source?: "jellyfin" | "plex" }): React.J
           </div>
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground text-center py-6">No synced items found.</p>
+        <StateMessage preset="emptyGrid" minHeight="120px" />
       )}
 
       {/* Pagination */}
@@ -396,10 +402,15 @@ function ServerLibraryGroup({
           </div>
         </div>
       ) : (
-        <div className="px-5 py-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            {isSyncingLibraries ? "Scanning libraries..." : `No libraries found on ${server}.`}
-          </p>
+        <div className="px-5">
+          {isSyncingLibraries ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Scanning libraries...</p>
+          ) : (
+            <StateMessage
+              preset="emptyServerLibrary"
+              minHeight="120px"
+            />
+          )}
         </div>
       )}
 
@@ -456,7 +467,8 @@ function ServerLibraryGroup({
 
 function LibrariesSection(): React.JSX.Element {
   const utils = trpc.useUtils();
-  const { data: libraries, isLoading } = trpc.library.listLibraries.useQuery();
+  const librariesQuery = trpc.library.listLibraries.useQuery();
+  const { data: libraries, isLoading } = librariesQuery;
   const { data: enabledServices } = trpc.settings.getEnabledServices.useQuery();
 
   const jellyfinEnabled = enabledServices?.jellyfin === true;
@@ -509,7 +521,9 @@ function LibrariesSection(): React.JSX.Element {
   return (
     <div>
       <SettingsSection title="Libraries" description="Manage your media libraries. Enable 'Sync' to import existing content from your servers.">
-        {!anyServerEnabled ? (
+        {librariesQuery.isError ? (
+          <StateMessage preset="error" onRetry={() => librariesQuery.refetch()} minHeight="200px" />
+        ) : !anyServerEnabled ? (
           <div className="rounded-xl border border-dashed border-border/40 px-5 py-10 text-center">
             <p className="text-sm text-muted-foreground">Enable a media server in Services to manage libraries.</p>
           </div>
@@ -750,6 +764,7 @@ export default function SettingsPage(): React.JSX.Element {
         {activeNav === "account" && <AccountSection />}
         {activeNav === "services" && <ServicesSection />}
         {activeNav === "metadata" && <MetadataSettingsSection />}
+        {activeNav === "search" && <SearchSection />}
         {activeNav === "libraries" && <LibrariesSection />}
         {activeNav === "about" && <AboutSection />}
       </div>

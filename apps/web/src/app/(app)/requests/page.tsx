@@ -14,10 +14,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@canto/ui/dialog";
-import { Inbox, X, Check, Film, Tv, Search, Clock, User, ArrowUpDown } from "lucide-react";
+import { X, Check, Film, Tv, Search, Clock, User, ArrowUpDown } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "~/components/layout/page-header";
+import { StateMessage } from "~/components/layout/state-message";
 import { TabBar } from "~/components/layout/tab-bar";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
@@ -80,7 +81,7 @@ export default function RequestsPage(): React.JSX.Element {
   }, []);
 
   const utils = trpc.useUtils();
-  const { data: requests, isLoading } = trpc.request.list.useQuery();
+  const { data: requests, isLoading, isError } = trpc.request.list.useQuery();
 
   const cancelMutation = trpc.request.cancel.useMutation({
     onSuccess: () => {
@@ -207,7 +208,9 @@ export default function RequestsPage(): React.JSX.Element {
         </div>
 
         {/* Content */}
-        {isLoading ? (
+        {isError ? (
+          <StateMessage preset="error" onRetry={() => void utils.request.list.invalidate()} />
+        ) : isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="flex items-center gap-5 rounded-2xl bg-muted/40 p-5">
@@ -221,21 +224,11 @@ export default function RequestsPage(): React.JSX.Element {
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex min-h-[400px] items-center justify-center">
-            <div className="text-center">
-              <Inbox className="mx-auto mb-4 h-16 w-16 text-muted-foreground/20" />
-              <h2 className="mb-2 text-lg font-medium text-foreground">
-                {requests && requests.length > 0 ? "No matching requests" : "No requests"}
-              </h2>
-              <p className="max-w-sm text-sm text-muted-foreground">
-                {requests && requests.length > 0
-                  ? "Try adjusting your filters."
-                  : isAdmin
-                    ? "No download requests from users yet."
-                    : "You haven't made any download requests yet."}
-              </p>
-            </div>
-          </div>
+          requests && requests.length > 0 ? (
+            <StateMessage preset="emptyFiltered" />
+          ) : (
+            <StateMessage preset={isAdmin ? "emptyRequests" : "emptyRequestsUser"} />
+          )
         ) : (
           <div className="space-y-3 pb-8">
             {filtered.map((req) => {
@@ -354,6 +347,7 @@ export default function RequestsPage(): React.JSX.Element {
                 </div>
               );
             })}
+            <StateMessage preset="endOfItems" inline />
           </div>
         )}
       </div>
