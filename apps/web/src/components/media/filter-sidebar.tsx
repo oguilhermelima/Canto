@@ -80,6 +80,9 @@ const TV_CERTIFICATIONS = [
 
 type SectionId = "sort" | "genres" | "year" | "score" | "runtime" | "language" | "status" | "certification" | "watchProviders";
 
+/** URL param keys owned by FilterSidebar — everything else is preserved. */
+const FILTER_KEYS = ["genre", "genreMode", "sort", "language", "score", "yearMin", "yearMax", "runtimeMin", "runtimeMax", "certification", "status", "providers", "providerMode"] as const;
+
 /* ─── Sub-components ─── */
 
 function Section({
@@ -197,7 +200,6 @@ export function FilterSidebar({
   const pathname = usePathname();
 
   // Filter-owned param keys (everything else in the URL is preserved)
-  const FILTER_KEYS = ["genre", "genreMode", "sort", "language", "score", "yearMin", "yearMax", "runtimeMin", "runtimeMax", "certification", "status", "providers", "providerMode"] as const;
 
   const parseSet = (v: string | null): Set<number> =>
     new Set(v ? v.split(",").map(Number).filter(Boolean) : []);

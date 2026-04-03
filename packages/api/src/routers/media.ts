@@ -439,7 +439,7 @@ export const mediaRouter = createTRPCRouter({
         tmdb,
         tvdb,
         dispatcher: jobDispatcher,
-      });
+      }, { force: true });
     }),
 
   /**

@@ -22,7 +22,7 @@ export async function handleBackfillExtras(db: Database): Promise<void> {
     .innerJoin(media, sql`${media.id} = ${userRecommendation.mediaId}`)
     .where(
       sql`${userRecommendation.active} = true
-        AND (${media.extrasUpdatedAt} IS NULL OR ${media.extrasUpdatedAt} < now() - interval '${sql.raw(String(STALE_DAYS))} days')
+        AND (${media.extrasUpdatedAt} IS NULL OR ${media.extrasUpdatedAt} < now() - interval '1 day' * ${STALE_DAYS})
         AND (
           ${media.logoPath} IS NULL
           OR NOT EXISTS (SELECT 1 FROM ${mediaVideo} WHERE ${mediaVideo.mediaId} = ${media.id})

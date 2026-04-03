@@ -28,10 +28,13 @@ export async function reconcileShowStructure(
   db: Database,
   mediaId: string,
   deps: { tmdb: MediaProviderPort; tvdb: MediaProviderPort; dispatcher: JobDispatcherPort },
+  options?: { force?: boolean },
 ): Promise<void> {
-  const tvdbDefault =
-    (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
-  if (!tvdbDefault) return;
+  if (!options?.force) {
+    const tvdbDefault =
+      (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+    if (!tvdbDefault) return;
+  }
 
   const row = await findMediaById(db, mediaId);
   if (!row || row.type !== "show") return;

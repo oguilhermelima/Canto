@@ -89,9 +89,9 @@ export async function refreshExtras(
     ? await db.query.media.findMany({
         where: sql`(
           (${media.externalId} IN (${sql.join(recExternalIds.map((id) => sql`${id}`), sql`, `)}) AND ${media.provider} = 'tmdb')
-          OR (${media.provider} = 'tvdb' AND ${media.title} IN (${sql.join(recTitles.map((t) => sql`${t}`), sql`, `)}))
+          OR (${media.provider} = 'tvdb' AND ${media.type} = ${row.type} AND ${media.title} IN (${sql.join(recTitles.map((t) => sql`${t}`), sql`, `)}))
         )`,
-        columns: { id: true, externalId: true, title: true, provider: true, logoPath: true },
+        columns: { id: true, externalId: true, title: true, provider: true, type: true, logoPath: true },
       })
     : [];
   // Map by TMDB external ID; for tvdb-provider rows, build a title lookup fallback
