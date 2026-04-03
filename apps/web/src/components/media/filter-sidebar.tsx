@@ -6,6 +6,7 @@ import { Input } from "@canto/ui/input";
 import { Slider } from "@canto/ui/slider";
 import { ChevronDown, ArrowDown, ArrowUp, RotateCcw } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
+import { useWatchRegion } from "~/hooks/use-watch-region";
 
 /* ─── Output Type ─── */
 
@@ -203,7 +204,8 @@ export function FilterSidebar({
   const [certification, setCertification] = useState("");
   const [status, setStatus] = useState("");
   const [selectedProviders, setSelectedProviders] = useState<Set<number>>(new Set());
-  const [watchRegion] = useState("BR"); // TODO: detect from user settings or locale
+  const [providerMode, setProviderMode] = useState<"and" | "or">("or");
+  const { region: watchRegion } = useWatchRegion();
 
   // Watch providers for the region
   const { data: watchProvidersList } = trpc.provider.filterOptions.useQuery(
@@ -240,14 +242,14 @@ export function FilterSidebar({
       if (certification) f.certification = certification;
       if (status) f.status = status;
       if (selectedProviders.size > 0) {
-        f.watchProviders = [...selectedProviders].join(",");
+        f.watchProviders = [...selectedProviders].join(providerMode === "or" ? "|" : ",");
         f.watchRegion = watchRegion;
       }
       onFilterChange(f);
     }, 300);
 
     return () => { if (emitRef.current) clearTimeout(emitRef.current); };
-  }, [selectedGenres, genreMode, sortBy, language, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, watchRegion, onFilterChange]);
+  }, [selectedGenres, genreMode, sortBy, language, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion, onFilterChange]);
 
   // Handlers
   const toggleGenre = (id: number): void => {
@@ -273,6 +275,7 @@ export function FilterSidebar({
     setCertification("");
     setStatus("");
     setSelectedProviders(new Set());
+    setProviderMode("or");
     onFilterChange({});
   };
 
@@ -408,7 +411,7 @@ export function FilterSidebar({
 
         {/* Score */}
         {show("score") && (
-          <Section label="Score">
+          <Section label="Public Rating">
             <div className="flex flex-col gap-1 pb-4">
               <Slider
                 value={[scoreDisplay]}
@@ -431,7 +434,7 @@ export function FilterSidebar({
 
         {/* Runtime */}
         {show("runtime") && (
-          <Section label="Runtime">
+          <Section label="Duration">
             <div className="flex items-center gap-2">
               <Input
                 type="text"
@@ -504,37 +507,70 @@ export function FilterSidebar({
 
         {/* Watch Providers */}
         {show("watchProviders") && (
-          <Section label="Watch Providers">
+          <Section
+            label="Watch Providers"
+            trailing={(
+                <div className="flex items-center rounded-lg bg-muted/50 p-0.5">
+                  <button
+                    type="button"
+                    className={cn(
+                      "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                      providerMode === "or"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => setProviderMode("or")}
+                  >
+                    OR
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(
+                      "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                      providerMode === "and"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => setProviderMode("and")}
+                  >
+                    AND
+                  </button>
+                </div>
+            )}
+          >
             <div className="flex flex-wrap gap-2">
               {watchProvidersList && "providerId" in (watchProvidersList[0] ?? {}) ? (
                 (watchProvidersList as Array<{ providerId: number; providerName: string; logoPath: string; displayPriority: number }>)
                   .slice(0, 20)
                   .map((p) => (
-                    <button
-                      key={p.providerId}
-                      type="button"
-                      title={p.providerName}
-                      className={cn(
-                        "h-10 w-10 overflow-hidden rounded-xl border-2 transition-all",
-                        selectedProviders.has(p.providerId)
-                          ? "border-primary shadow-md scale-110"
-                          : "border-transparent opacity-60 hover:opacity-100",
-                      )}
-                      onClick={() => {
-                        setSelectedProviders((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(p.providerId)) next.delete(p.providerId);
-                          else next.add(p.providerId);
-                          return next;
-                        });
-                      }}
-                    >
-                      <img
-                        src={`https://image.tmdb.org/t/p/w92${p.logoPath}`}
-                        alt={p.providerName}
-                        className="h-full w-full object-cover"
-                      />
-                    </button>
+                    <div key={p.providerId} className="group relative">
+                      <button
+                        type="button"
+                        className={cn(
+                          "h-10 w-10 overflow-hidden rounded-xl border-2 transition-all",
+                          selectedProviders.has(p.providerId)
+                            ? "border-primary shadow-md scale-110"
+                            : "border-transparent opacity-60 hover:opacity-100",
+                        )}
+                        onClick={() => {
+                          setSelectedProviders((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(p.providerId)) next.delete(p.providerId);
+                            else next.add(p.providerId);
+                            return next;
+                          });
+                        }}
+                      >
+                        <img
+                          src={`https://image.tmdb.org/t/p/w92${p.logoPath}`}
+                          alt={p.providerName}
+                          className="h-full w-full object-cover"
+                        />
+                      </button>
+                      <span className="pointer-events-none absolute -bottom-7 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-0.5 text-[11px] font-medium text-background opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                        {p.providerName}
+                      </span>
+                    </div>
                   ))
               ) : (
                 <span className="text-xs text-muted-foreground">Loading...</span>
