@@ -45,6 +45,8 @@ import {
   Monitor,
   Film as FilmIcon,
   Zap,
+  Globe,
+  SlidersHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
@@ -78,6 +80,12 @@ export default function MediaDetailPage({
   params,
 }: MediaDetailPageProps): React.JSX.Element {
   const { id } = use(params);
+  // Key forces full remount when navigating between media pages,
+  // preventing stale state (search results, filters, dialogs) from persisting
+  return <MediaDetailContent key={id} id={id} />;
+}
+
+function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { data: session } = authClient.useSession();
@@ -101,6 +109,10 @@ export default function MediaDetailPage({
     seasonNumber?: number;
     episodeNumbers?: number[];
   } | null>(null);
+  const [advancedSearch, setAdvancedSearch] = useState(false);
+  const [advancedQuery, setAdvancedQuery] = useState("");
+  const [committedQuery, setCommittedQuery] = useState("");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const { region: watchRegion } = useWatchRegion();
   const { enabled: directSearchEnabled } = useDirectSearch();
@@ -176,15 +188,16 @@ export default function MediaDetailPage({
   const torrentSearch = trpc.torrent.search.useQuery(
     {
       mediaId: media?.id ?? "",
-      seasonNumber: torrentSearchContext?.seasonNumber,
-      episodeNumbers: torrentSearchContext?.episodeNumbers,
+      query: advancedSearch && committedQuery ? committedQuery : undefined,
+      seasonNumber: advancedSearch ? undefined : torrentSearchContext?.seasonNumber,
+      episodeNumbers: advancedSearch ? undefined : torrentSearchContext?.episodeNumbers,
       page: torrentPage,
       pageSize: TORRENTS_PER_PAGE,
     },
     {
-      enabled: torrentDialogOpen && !!media?.id,
+      enabled: torrentDialogOpen && !!media?.id && (!advancedSearch || committedQuery.length > 0),
       retry: 1,
-      placeholderData: keepPreviousData,
+      staleTime: 0,
     },
   );
 
@@ -427,8 +440,8 @@ export default function MediaDetailPage({
       if (torrentSort === "age") return (a.age - b.age) * dir;
       return (a.size - b.size) * dir;
     });
-  // Server-side pagination: no client-side slicing needed
-  const paginatedTorrents = allFilteredTorrents;
+  // Don't show stale results when advanced search is active but no query committed yet
+  const paginatedTorrents = (advancedSearch && !committedQuery) ? [] : allFilteredTorrents;
 
   const toggleSort = (col: "seeders" | "peers" | "size" | "age" | "confidence"): void => {
     if (torrentSort === col) {
@@ -442,6 +455,14 @@ export default function MediaDetailPage({
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Mobile logo */}
+      <div className="relative z-10 flex h-16 items-center px-4 md:hidden">
+        <Link href="/" className="flex items-center gap-2.5">
+          <img src="/room.png" alt="Canto" className="h-9 w-9 dark:invert" />
+          <span className="text-lg font-bold tracking-tight text-foreground">Canto</span>
+        </Link>
+      </div>
+
       {/* Hero */}
       <MediaDetailHero
         id={media.id}
@@ -465,6 +486,7 @@ export default function MediaDetailPage({
         watchProviderLinks={watchProviderLinks.data ?? {}}
         videos={videos}
         crew={extras.data?.credits?.crew?.map((c) => ({
+          personId: c.id,
           name: c.name,
           job: c.job,
         }))}
@@ -816,13 +838,20 @@ export default function MediaDetailPage({
           setTorrentSort("confidence");
           setTorrentSortDir("desc");
           setLastDownloadAttempt(null);
+          setAdvancedSearch(false);
+          setAdvancedQuery("");
+          setCommittedQuery("");
         }
       }}>
-        <DialogContent className="flex h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-border bg-background p-0 md:h-auto md:max-h-[85vh] md:max-w-5xl md:rounded-[2rem] [&>button:last-child]:hidden">
-          {/* Header */}
-          <div className="flex shrink-0 items-center justify-between px-6 py-5">
-            <div>
-              <DialogTitle className="text-lg font-semibold">
+        <DialogContent className="flex h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-border bg-background p-0 md:h-auto md:max-h-[70vh] md:max-w-5xl md:rounded-[2rem] [&>button:last-child]:hidden">
+          {/* Header — single row on desktop, title + toggle + close */}
+          <div className="flex shrink-0 items-center gap-3 px-5 pt-5 pb-3 md:px-6">
+            {/* Title / Input */}
+            <div className="relative min-w-0 flex-1" style={{ height: "1.75rem" }}>
+              <DialogTitle className={cn(
+                "absolute inset-0 flex items-center truncate text-lg font-semibold tracking-tight transition-all duration-300",
+                advancedSearch ? "pointer-events-none translate-y-1 opacity-0" : "translate-y-0 opacity-100",
+              )}>
                 {media.title}
                 {isSeasonPreselected && (
                   <span className="text-muted-foreground">
@@ -836,95 +865,183 @@ export default function MediaDetailPage({
                   </span>
                 )}
               </DialogTitle>
+              <div className={cn(
+                "absolute inset-0 flex items-center border-b transition-all duration-300",
+                advancedSearch ? "border-foreground/20 opacity-100 delay-150" : "pointer-events-none border-transparent opacity-0",
+              )}>
+                <input
+                  ref={(el) => { if (el && advancedSearch) el.focus(); }}
+                  value={advancedQuery}
+                  onChange={(e) => setAdvancedQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); setCommittedQuery(advancedQuery.trim()); setTorrentPage(0); }
+                    if (e.key === "Escape") { setAdvancedSearch(false); setAdvancedQuery(""); setCommittedQuery(""); setTorrentPage(0); }
+                  }}
+                  className="w-full bg-transparent text-lg font-semibold tracking-tight text-foreground caret-primary outline-none"
+                />
+              </div>
               <DialogDescription className="sr-only">
                 Search torrents for {media.title}
               </DialogDescription>
             </div>
+
+            {/* Search button — advanced only */}
+            {advancedSearch && (
+              <button
+                onClick={() => { setCommittedQuery(advancedQuery.trim()); setTorrentPage(0); }}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-foreground text-background transition-opacity hover:opacity-80"
+              >
+                <Search size={14} />
+              </button>
+            )}
+
+            {/* Advanced toggle — hidden on mobile, shown in toolbar instead */}
+            <label className="hidden shrink-0 cursor-pointer items-center gap-2 md:flex">
+              <span className="text-xs text-muted-foreground">Advanced Search</span>
+              <button
+                role="switch"
+                aria-checked={advancedSearch}
+                onClick={() => {
+                  if (advancedSearch) {
+                    setAdvancedSearch(false);
+                    setAdvancedQuery("");
+                    setCommittedQuery("");
+                    setTorrentPage(0);
+                  } else {
+                    setAdvancedSearch(true);
+                    setAdvancedQuery(media.title);
+                    setCommittedQuery("");
+                  }
+                }}
+                className={cn(
+                  "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
+                  advancedSearch ? "bg-primary" : "bg-muted",
+                )}
+              >
+                <span className={cn(
+                  "inline-block h-3.5 w-3.5 rounded-full bg-background shadow-sm transition-transform",
+                  advancedSearch ? "translate-x-[18px]" : "translate-x-[3px]",
+                )} />
+              </button>
+            </label>
+
+            {/* Close */}
             <button
               onClick={() => setTorrentDialogOpen(false)}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
             >
               <X size={16} />
             </button>
           </div>
 
           {/* Filter toolbar */}
-          <div className="shrink-0 border-b border-border px-6 py-4">
-            {/* Search */}
-            <div className="relative">
-              <Search
-                size={16}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-              />
-              <Input
-                placeholder="Filter results..."
-                value={torrentSearchQuery}
-                onChange={(e) => {
-                  setTorrentSearchQuery(e.target.value);
-                  setTorrentPage(0);
-                }}
-                className="h-11 rounded-2xl bg-background pl-10 text-sm"
-              />
+          <div className="shrink-0 border-b border-border px-5 pb-4 md:px-6">
+            {/* Mobile: unified filter shape */}
+            <div className="overflow-hidden rounded-2xl bg-muted/40 md:hidden">
+              {/* Header row: Filters toggle + Advanced toggle */}
+              <div className="flex items-center">
+                <button
+                  onClick={() => setMobileFiltersOpen((o) => !o)}
+                  className="flex flex-1 items-center gap-2 px-4 py-3 text-xs font-medium text-foreground/70"
+                >
+                  <SlidersHorizontal size={14} />
+                  Filters & Sort
+                  <ChevronDown size={12} className={cn("ml-auto transition-transform duration-300", mobileFiltersOpen && "rotate-180")} />
+                </button>
+                <div className="mr-3 h-5 w-px bg-border/30" />
+                <label className="mr-3 flex cursor-pointer items-center gap-2">
+                  <span className="text-xs text-foreground/70">Advanced Search</span>
+                  <button
+                    role="switch"
+                    aria-checked={advancedSearch}
+                    onClick={() => {
+                      if (advancedSearch) { setAdvancedSearch(false); setAdvancedQuery(""); setCommittedQuery(""); setTorrentPage(0); }
+                      else { setAdvancedSearch(true); setAdvancedQuery(media.title); setCommittedQuery(""); }
+                    }}
+                    className={cn("relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors", advancedSearch ? "bg-primary" : "bg-muted-foreground/30")}
+                  >
+                    <span className={cn("inline-block h-3 w-3 rounded-full bg-background shadow-sm transition-transform", advancedSearch ? "translate-x-[14px]" : "translate-x-[2px]")} />
+                  </button>
+                </label>
+              </div>
+
+              {/* Expandable panel — same container */}
+              <div className={cn(
+                "grid transition-all duration-300 ease-out",
+                mobileFiltersOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+              )}>
+                <div className="overflow-hidden">
+                  <div className="space-y-3 border-t border-border/30 px-4 pt-3 pb-4">
+                    {/* Search */}
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Filter results..."
+                        value={torrentSearchQuery}
+                        onChange={(e) => { setTorrentSearchQuery(e.target.value); setTorrentPage(0); }}
+                        className="h-10 w-full rounded-xl bg-background pl-9 text-sm border-0 focus-visible:ring-1"
+                      />
+                    </div>
+                    {/* Selects */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <select value={torrentQualityFilter} onChange={(e) => { setTorrentQualityFilter(e.target.value); setTorrentPage(0); }} className="h-9 rounded-xl bg-background px-3 text-xs text-foreground outline-none">
+                        <option value="all">Quality</option><option value="uhd">4K</option><option value="fullhd">1080p</option><option value="hd">720p</option><option value="sd">SD</option>
+                      </select>
+                      <select value={torrentSourceFilter} onChange={(e) => { setTorrentSourceFilter(e.target.value); setTorrentPage(0); }} className="h-9 rounded-xl bg-background px-3 text-xs text-foreground outline-none">
+                        <option value="all">Source</option><option value="remux">Remux</option><option value="bluray">Blu-Ray</option><option value="webdl">WEB-DL</option><option value="webrip">WEBRip</option><option value="hdtv">HDTV</option>
+                      </select>
+                      <select value={torrentSizeFilter} onChange={(e) => { setTorrentSizeFilter(e.target.value); setTorrentPage(0); }} className="h-9 rounded-xl bg-background px-3 text-xs text-foreground outline-none">
+                        <option value="all">Size</option><option value="small">&lt; 2 GB</option><option value="medium">2–10 GB</option><option value="large">&gt; 10 GB</option>
+                      </select>
+                    </div>
+                    {/* Sort */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="mr-0.5 text-xs text-foreground/50">Sort</span>
+                      {(["confidence", "seeders", "size", "age"] as const).map((col) => (
+                        <button key={col} onClick={() => toggleSort(col)} className={cn("inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-xl text-xs transition-colors", torrentSort === col ? "bg-background font-medium text-foreground" : "text-foreground/40")}>
+                          {{ confidence: "Score", seeders: "Seeds", size: "Size", age: "Age" }[col]}
+                          {torrentSort === col && (torrentSortDir === "desc" ? <ChevronDown size={10} /> : <ChevronUp size={10} />)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Filters row */}
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">Filters</span>
-              <select
-                value={torrentQualityFilter}
-                onChange={(e) => { setTorrentQualityFilter(e.target.value); setTorrentPage(0); }}
-                className="h-8 w-[100px] rounded-xl border border-border bg-background px-2.5 text-xs text-foreground outline-none"
-              >
-                <option value="all">Quality</option>
-                <option value="uhd">4K</option>
-                <option value="fullhd">1080p</option>
-                <option value="hd">720p</option>
-                <option value="sd">SD</option>
-              </select>
-              <select
-                value={torrentSourceFilter}
-                onChange={(e) => { setTorrentSourceFilter(e.target.value); setTorrentPage(0); }}
-                className="h-8 w-[100px] rounded-xl border border-border bg-background px-2.5 text-xs text-foreground outline-none"
-              >
-                <option value="all">Source</option>
-                <option value="remux">Remux</option>
-                <option value="bluray">Blu-Ray</option>
-                <option value="webdl">WEB-DL</option>
-                <option value="webrip">WEBRip</option>
-                <option value="hdtv">HDTV</option>
-              </select>
-              <select
-                value={torrentSizeFilter}
-                onChange={(e) => { setTorrentSizeFilter(e.target.value); setTorrentPage(0); }}
-                className="h-8 w-[100px] rounded-xl border border-border bg-background px-2.5 text-xs text-foreground outline-none"
-              >
-                <option value="all">Size</option>
-                <option value="small">&lt; 2 GB</option>
-                <option value="medium">2–10 GB</option>
-                <option value="large">&gt; 10 GB</option>
-              </select>
-
-              <div className="h-4 w-px bg-border" />
-
-              <span className="text-xs font-medium text-muted-foreground">Sort by</span>
-              <div className="flex items-center gap-1">
-                {(["confidence", "seeders", "size", "age"] as const).map((col) => (
-                  <button
-                    key={col}
-                    onClick={() => toggleSort(col)}
-                    className={cn(
-                      "inline-flex h-8 items-center gap-1 rounded-xl px-3 text-xs transition-colors",
-                      torrentSort === col
-                        ? "bg-foreground/10 font-medium text-foreground"
-                        : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
-                    )}
-                  >
-                    {{ confidence: "Score", seeders: "Seeds", size: "Size", age: "Age" }[col]}
-                    {torrentSort === col && (
-                      torrentSortDir === "desc" ? <ChevronDown size={12} /> : <ChevronUp size={12} />
-                    )}
-                  </button>
-                ))}
+            {/* Desktop: always visible filters */}
+            <div className="hidden md:block">
+              {/* Search */}
+              <div className="relative">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Filter results..."
+                  value={torrentSearchQuery}
+                  onChange={(e) => { setTorrentSearchQuery(e.target.value); setTorrentPage(0); }}
+                  className="h-10 rounded-xl bg-muted/40 pl-10 text-sm border-0 focus-visible:ring-1"
+                />
+              </div>
+              {/* Filters + Sort */}
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                <select value={torrentQualityFilter} onChange={(e) => { setTorrentQualityFilter(e.target.value); setTorrentPage(0); }} className="h-8 rounded-lg bg-muted/60 px-2.5 text-xs text-foreground outline-none">
+                  <option value="all">Quality</option><option value="uhd">4K</option><option value="fullhd">1080p</option><option value="hd">720p</option><option value="sd">SD</option>
+                </select>
+                <select value={torrentSourceFilter} onChange={(e) => { setTorrentSourceFilter(e.target.value); setTorrentPage(0); }} className="h-8 rounded-lg bg-muted/60 px-2.5 text-xs text-foreground outline-none">
+                  <option value="all">Source</option><option value="remux">Remux</option><option value="bluray">Blu-Ray</option><option value="webdl">WEB-DL</option><option value="webrip">WEBRip</option><option value="hdtv">HDTV</option>
+                </select>
+                <select value={torrentSizeFilter} onChange={(e) => { setTorrentSizeFilter(e.target.value); setTorrentPage(0); }} className="h-8 rounded-lg bg-muted/60 px-2.5 text-xs text-foreground outline-none">
+                  <option value="all">Size</option><option value="small">&lt; 2 GB</option><option value="medium">2–10 GB</option><option value="large">&gt; 10 GB</option>
+                </select>
+                <div className="mx-1 h-4 w-px bg-border/50" />
+                <span className="text-xs text-muted-foreground/60">Sort</span>
+                <div className="flex items-center gap-0.5">
+                  {(["confidence", "seeders", "size", "age"] as const).map((col) => (
+                    <button key={col} onClick={() => toggleSort(col)} className={cn("inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-xs transition-colors", torrentSort === col ? "bg-muted/60 font-medium text-foreground" : "text-muted-foreground/60 hover:text-muted-foreground")}>
+                      {{ confidence: "Score", seeders: "Seeds", size: "Size", age: "Age" }[col]}
+                      {torrentSort === col && (torrentSortDir === "desc" ? <ChevronDown size={10} /> : <ChevronUp size={10} />)}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -1015,9 +1132,14 @@ export default function MediaDetailPage({
                       key={`${t.guid}-${i}`}
                       className="overflow-hidden rounded-xl bg-muted/40 transition-colors hover:bg-muted/60"
                     >
-                      {/* Header: Indexer + Age */}
-                      <div className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground">
-                        <span>{t.indexer || "Unknown"}</span>
+                      {/* Header: Indexer (language) + Age */}
+                      <div className="flex items-center justify-between px-5 py-2.5 text-xs text-muted-foreground">
+                        <span>
+                          {t.indexer || "Unknown"}
+                          {t.indexerLanguage && (
+                            <span className="ml-1 text-muted-foreground/50">({t.indexerLanguage})</span>
+                          )}
+                        </span>
                         <span className="flex items-center gap-1">
                           <Clock size={11} />
                           {formatAge(t.age)}
@@ -1025,10 +1147,10 @@ export default function MediaDetailPage({
                       </div>
 
                       {/* Body: Score + Title + Quality info + Download */}
-                      <div className="flex items-start gap-3 border-t border-border/50 px-4 py-3">
+                      <div className="flex items-start gap-4 border-t border-border/50 px-5 py-4">
                         {/* Confidence */}
                         <div className={cn(
-                          "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold tabular-nums",
+                          "mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold tabular-nums",
                           t.confidence >= 70 ? "bg-green-500/10 text-green-400" :
                           t.confidence >= 40 ? "bg-yellow-500/10 text-yellow-400" :
                           "bg-muted text-muted-foreground",
@@ -1038,10 +1160,10 @@ export default function MediaDetailPage({
 
                         {/* Content */}
                         <div className="min-w-0 flex-1">
-                          <p className="line-clamp-2 text-sm font-medium leading-snug text-foreground">
+                          <p className="line-clamp-2 text-[13px] font-medium leading-snug text-foreground">
                             {t.title}
                           </p>
-                          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                          <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
                             {qLabel && (
                               <span className="flex items-center gap-1.5">
                                 <Monitor size={12} className="text-muted-foreground/50" />
@@ -1067,14 +1189,14 @@ export default function MediaDetailPage({
                         <button
                           onClick={() => url && handleDownload(url, t.title)}
                           disabled={!url || downloadTorrent.isPending}
-                          className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-all hover:scale-110 hover:text-foreground disabled:opacity-40"
+                          className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-all hover:scale-110 hover:text-foreground disabled:opacity-40"
                         >
                           <Download size={16} />
                         </button>
                       </div>
 
-                      {/* Footer: Seeds + Peers + Freeleech */}
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border/50 px-4 py-2 text-xs text-muted-foreground">
+                      {/* Footer: Seeds + Peers + Languages + Freeleech */}
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border/50 px-5 py-2.5 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1.5 text-foreground/70">
                           <ArrowUp size={12} className="text-muted-foreground/50" />
                           {t.seeders} seeders
@@ -1083,6 +1205,12 @@ export default function MediaDetailPage({
                           <ArrowDown size={12} className="text-muted-foreground/50" />
                           {t.leechers} peers
                         </span>
+                        {t.languages.length > 0 && (
+                          <span className="flex items-center gap-1.5">
+                            <Globe size={12} className="text-muted-foreground/50" />
+                            {t.languages.map((l) => l.toUpperCase()).join(", ")}
+                          </span>
+                        )}
                         {hasFreeleech && (
                           <span className="flex items-center gap-1.5 font-medium text-blue-400">
                             <Zap size={12} />
@@ -1095,13 +1223,27 @@ export default function MediaDetailPage({
                 })}
               </div>
             ) : (
-              <div className="px-5 py-12 text-center">
-                <p className="text-sm font-medium text-muted-foreground">
-                  No results found
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground/60">
-                  Check your indexer configuration in Prowlarr.
-                </p>
+              <div className="flex min-h-[200px] items-center justify-center px-5 py-12 text-center">
+                {advancedSearch && !committedQuery ? (
+                  <div>
+                    <Search className="mx-auto mb-3 h-8 w-8 text-muted-foreground/20" />
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Type a query and press Enter
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground/60">
+                      Search across all indexers with a custom query.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      No results found
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground/60">
+                      Check your indexer configuration in Prowlarr.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
