@@ -96,6 +96,8 @@ export async function findGlobalRecommendations(
     certification,
     status,
     sortBy,
+    watchProviders,
+    watchRegion,
   } = filters;
 
   const released = sql`${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL`;
@@ -127,6 +129,14 @@ export async function findGlobalRecommendations(
   const certCondition = certification ? eq(media.contentRating, certification) : undefined;
   const statusCondition = status ? eq(media.status, status) : undefined;
 
+  const wpCondition = watchProviders && watchRegion
+    ? sql`${media.id} IN (
+        SELECT media_id FROM media_watch_provider
+        WHERE provider_id IN (${sql.join(watchProviders.split(",").map(id => sql`${Number(id)}`), sql`, `)})
+        AND region = ${watchRegion}
+      )`
+    : undefined;
+
   const where = and(
     sql`${media.id} IN (SELECT media_id FROM media_recommendation)`,
     released,
@@ -142,6 +152,7 @@ export async function findGlobalRecommendations(
     ...(runtimeMaxCondition ? [runtimeMaxCondition] : []),
     ...(certCondition ? [certCondition] : []),
     ...(statusCondition ? [statusCondition] : []),
+    ...(wpCondition ? [wpCondition] : []),
   );
 
   // Map sortBy to orderBy

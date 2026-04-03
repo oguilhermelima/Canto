@@ -485,6 +485,8 @@ export const mediaRouter = createTRPCRouter({
       certification: z.string().optional(),
       status: z.string().optional(),
       sortBy: z.string().optional(),
+      watchProviders: z.string().optional(),
+      watchRegion: z.string().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
       const page = input?.cursor ?? 0;
@@ -504,6 +506,8 @@ export const mediaRouter = createTRPCRouter({
         certification: input?.certification,
         status: input?.status,
         sortBy: input?.sortBy,
+        watchProviders: input?.watchProviders,
+        watchRegion: input?.watchRegion,
       };
 
       // Get user's current recs version + language

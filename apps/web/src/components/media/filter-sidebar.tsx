@@ -202,6 +202,14 @@ export function FilterSidebar({
   const [runtimeMax, setRuntimeMax] = useState("");
   const [certification, setCertification] = useState("");
   const [status, setStatus] = useState("");
+  const [selectedProviders, setSelectedProviders] = useState<Set<number>>(new Set());
+  const [watchRegion] = useState("BR"); // TODO: detect from user settings or locale
+
+  // Watch providers for the region
+  const { data: watchProvidersList } = trpc.provider.filterOptions.useQuery(
+    { type: "watchProviders", mediaType: genreType, region: watchRegion },
+    { staleTime: Infinity, gcTime: 24 * 60 * 60 * 1000 },
+  );
 
   // Debounced emit
   const emitRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -231,11 +239,15 @@ export function FilterSidebar({
       if (runtimeMax) f.runtimeMax = Number(runtimeMax);
       if (certification) f.certification = certification;
       if (status) f.status = status;
+      if (selectedProviders.size > 0) {
+        f.watchProviders = [...selectedProviders].join(",");
+        f.watchRegion = watchRegion;
+      }
       onFilterChange(f);
     }, 300);
 
     return () => { if (emitRef.current) clearTimeout(emitRef.current); };
-  }, [selectedGenres, genreMode, sortBy, language, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, onFilterChange]);
+  }, [selectedGenres, genreMode, sortBy, language, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, watchRegion, onFilterChange]);
 
   // Handlers
   const toggleGenre = (id: number): void => {
@@ -260,6 +272,7 @@ export function FilterSidebar({
     setRuntimeMax("");
     setCertification("");
     setStatus("");
+    setSelectedProviders(new Set());
     onFilterChange({});
   };
 
@@ -489,10 +502,44 @@ export function FilterSidebar({
           </Section>
         )}
 
-        {/* Watch Providers — placeholder for future implementation */}
+        {/* Watch Providers */}
         {show("watchProviders") && (
           <Section label="Watch Providers">
-            <span className="text-xs text-muted-foreground">Coming soon</span>
+            <div className="flex flex-wrap gap-2">
+              {watchProvidersList && "providerId" in (watchProvidersList[0] ?? {}) ? (
+                (watchProvidersList as Array<{ providerId: number; providerName: string; logoPath: string; displayPriority: number }>)
+                  .slice(0, 20)
+                  .map((p) => (
+                    <button
+                      key={p.providerId}
+                      type="button"
+                      title={p.providerName}
+                      className={cn(
+                        "h-10 w-10 overflow-hidden rounded-xl border-2 transition-all",
+                        selectedProviders.has(p.providerId)
+                          ? "border-primary shadow-md scale-110"
+                          : "border-transparent opacity-60 hover:opacity-100",
+                      )}
+                      onClick={() => {
+                        setSelectedProviders((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(p.providerId)) next.delete(p.providerId);
+                          else next.add(p.providerId);
+                          return next;
+                        });
+                      }}
+                    >
+                      <img
+                        src={`https://image.tmdb.org/t/p/w92${p.logoPath}`}
+                        alt={p.providerName}
+                        className="h-full w-full object-cover"
+                      />
+                    </button>
+                  ))
+              ) : (
+                <span className="text-xs text-muted-foreground">Loading...</span>
+              )}
+            </div>
           </Section>
         )}
       </div>

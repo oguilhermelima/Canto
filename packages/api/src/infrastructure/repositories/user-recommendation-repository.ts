@@ -152,6 +152,8 @@ export interface RecsFilters {
   certification?: string;
   status?: string;
   sortBy?: string;
+  watchProviders?: string; // comma-separated provider IDs like "8,337"
+  watchRegion?: string;    // region code like "BR"
 }
 
 /**
@@ -202,6 +204,8 @@ export async function findUserRecommendations(
     certification,
     status,
     sortBy,
+    watchProviders,
+    watchRegion,
   } = filters;
 
   const excludeClause =
@@ -229,6 +233,14 @@ export async function findUserRecommendations(
   const runtimeMaxClause = runtimeMax != null ? sql`AND ${media.runtime} <= ${runtimeMax}` : sql``;
   const certClause = certification ? sql`AND ${media.contentRating} = ${certification}` : sql``;
   const statusClause = status ? sql`AND ${media.status} = ${status}` : sql``;
+
+  const wpClause = watchProviders && watchRegion
+    ? sql`AND ${media.id} IN (
+        SELECT media_id FROM media_watch_provider
+        WHERE provider_id IN (${sql.join(watchProviders.split(",").map(id => sql`${Number(id)}`), sql`, `)})
+        AND region = ${watchRegion}
+      )`
+    : sql``;
 
   const customSort = recsSortOrder(sortBy);
 
@@ -268,7 +280,8 @@ export async function findUserRecommendations(
         ${runtimeMinClause}
         ${runtimeMaxClause}
         ${certClause}
-        ${statusClause}`,
+        ${statusClause}
+        ${wpClause}`,
     )
     .groupBy(
       media.id,
