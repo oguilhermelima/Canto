@@ -8,6 +8,7 @@ import { StateMessage } from "~/components/layout/state-message";
 
 interface Preset {
   title: string;
+  subtitle: string;
   type: "movie" | "show";
   mode?: "trending" | "discover";
   genres?: string;
@@ -17,20 +18,24 @@ interface Preset {
 const PRESETS: Record<string, Preset> = {
   trending_shows: {
     title: "Trending TV Shows",
+    subtitle: "The most popular TV shows right now.",
     type: "show",
   },
   trending_movies: {
     title: "Trending Movies",
+    subtitle: "The most popular movies right now.",
     type: "movie",
   },
   trending_anime: {
     title: "Trending Anime",
+    subtitle: "The most popular anime series right now.",
     type: "show",
     genres: "16",
     language: "ja",
   },
   trending_anime_movies: {
     title: "Trending Anime Movies",
+    subtitle: "The most popular anime movies right now.",
     type: "movie",
     mode: "discover",
     genres: "16",
@@ -110,6 +115,7 @@ function RecommendedPage(): React.JSX.Element {
     return (
       <BrowseLayout
         title="Recommended for you"
+        subtitle="Handpicked based on your library and taste."
         items={[]}
         totalResults={0}
         isLoading={false}
@@ -127,6 +133,7 @@ function RecommendedPage(): React.JSX.Element {
   return (
     <BrowseLayout
       title="Recommended for you"
+      subtitle="Handpicked based on your library and taste."
       items={items}
       totalResults={totalResults}
       isLoading={query.isLoading}
@@ -211,6 +218,7 @@ function DiscoverPresetPage({ presetKey }: { presetKey: string }): React.JSX.Ele
     return (
       <BrowseLayout
         title={preset.title}
+        subtitle={preset.subtitle}
         items={[]}
         totalResults={0}
         isLoading={false}
@@ -220,6 +228,7 @@ function DiscoverPresetPage({ presetKey }: { presetKey: string }): React.JSX.Ele
         onFilterChange={setFilters}
         mediaType={mediaType}
         onMediaTypeChange={setMediaType}
+        allowedMediaTypes={[preset.type]}
         emptyState={<StateMessage preset="error" onRetry={() => void query.refetch()} />}
       />
     );
@@ -237,6 +246,7 @@ function DiscoverPresetPage({ presetKey }: { presetKey: string }): React.JSX.Ele
       onFilterChange={setFilters}
       mediaType={mediaType}
       onMediaTypeChange={setMediaType}
+      allowedMediaTypes={[preset.type]}
       emptyState={<StateMessage preset="emptyGrid" />}
     />
   );

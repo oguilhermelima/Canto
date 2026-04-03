@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { cn } from "@canto/ui/cn";
-import { Loader2, Settings2 } from "lucide-react";
+import { Film, Loader2, Settings2, Tv } from "lucide-react";
 import { MediaGrid } from "~/components/media/media-grid";
 import { PageHeader } from "~/components/layout/page-header";
 import { TabBar } from "~/components/layout/tab-bar";
@@ -13,8 +13,8 @@ export type { FilterOutput };
 
 const MEDIA_TYPE_TABS = [
   { value: "all", label: "All" },
-  { value: "movie", label: "Movies" },
-  { value: "show", label: "TV Shows" },
+  { value: "movie", label: "Movies", icon: Film },
+  { value: "show", label: "TV Shows", icon: Tv },
 ];
 
 interface MediaItem {
@@ -30,6 +30,7 @@ interface MediaItem {
 
 interface BrowseLayoutProps {
   title: string;
+  subtitle?: string;
   items: MediaItem[];
   totalResults: number;
   isLoading: boolean;
@@ -43,10 +44,13 @@ interface BrowseLayoutProps {
   hideTitle?: boolean;
   toolbar?: React.ReactNode;
   header?: React.ReactNode;
+  /** When set, only these media types appear in the tab bar. If ≤ 1 tab remains, the tab bar is hidden. */
+  allowedMediaTypes?: ("all" | "movie" | "show")[];
 }
 
 export function BrowseLayout({
   title,
+  subtitle,
   items,
   totalResults,
   isLoading,
@@ -60,6 +64,7 @@ export function BrowseLayout({
   hideTitle = false,
   toolbar,
   header,
+  allowedMediaTypes,
 }: BrowseLayoutProps): React.JSX.Element {
   const [showFilters, setShowFilters] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -102,9 +107,9 @@ export function BrowseLayout({
 
   return (
     <div className="w-full">
-      {!hideTitle && <PageHeader title={title} />}
+      {!hideTitle && <PageHeader title={title} subtitle={subtitle} />}
 
-      <div className="flex px-4 pt-4 md:px-8 md:pt-6 lg:px-12 xl:px-16 2xl:px-24">
+      <div className="flex px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {/* Sidebar */}
         <div
           className={cn(
@@ -125,50 +130,51 @@ export function BrowseLayout({
           {header}
 
           {/* Toolbar */}
-          <div className="mb-6 flex items-center justify-between py-3">
-            <div className="flex items-center gap-2">
-              {onMediaTypeChange ? (
-                <TabBar
-                  tabs={MEDIA_TYPE_TABS}
-                  value={mediaType}
-                  onChange={(v) => onMediaTypeChange(v as "movie" | "show" | "all")}
-                  leading={
-                    <button
-                      type="button"
-                      className={cn(
-                        "hidden h-[38px] w-[38px] items-center justify-center rounded-xl transition-all md:flex",
-                        showFilters
-                          ? "bg-foreground text-background"
-                          : "bg-muted/60 text-muted-foreground hover:text-foreground",
-                      )}
-                      onClick={() => setShowFilters(!showFilters)}
-                    >
-                      <Settings2 className={cn("h-4 w-4 transition-transform duration-300", showFilters && "rotate-90")} />
-                    </button>
-                  }
-                />
-              ) : (
-                <button
-                  type="button"
-                  className={cn(
-                    "hidden h-[38px] w-[38px] items-center justify-center rounded-xl transition-all md:flex",
-                    showFilters
-                      ? "bg-foreground text-background"
-                      : "bg-muted/60 text-muted-foreground hover:text-foreground",
-                  )}
-                  onClick={() => setShowFilters(!showFilters)}
-                >
-                  <Settings2 className={cn("h-4 w-4 transition-transform duration-300", showFilters && "rotate-90")} />
-                </button>
-              )}
-              {toolbar}
-            </div>
-            {totalResults > 0 && !isLoading && (
+          {(() => {
+            const visibleTabs = allowedMediaTypes
+              ? MEDIA_TYPE_TABS.filter((t) => allowedMediaTypes.includes(t.value as "all" | "movie" | "show"))
+              : MEDIA_TYPE_TABS;
+            const showTypeTabs = onMediaTypeChange && visibleTabs.length >= 1;
+
+            const filterButton = (
+              <button
+                type="button"
+                className={cn(
+                  "hidden h-[38px] w-[38px] items-center justify-center rounded-xl transition-all md:flex",
+                  showFilters
+                    ? "bg-foreground text-background"
+                    : "bg-muted/60 text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <Settings2 className={cn("h-4 w-4 transition-transform duration-300", showFilters && "rotate-90")} />
+              </button>
+            );
+
+            const resultsCount = totalResults > 0 && !isLoading ? (
               <span className="text-sm text-muted-foreground">
                 {totalResults.toLocaleString()} results
               </span>
-            )}
-          </div>
+            ) : undefined;
+
+            return showTypeTabs ? (
+              <TabBar
+                tabs={visibleTabs}
+                value={mediaType}
+                onChange={(v) => onMediaTypeChange!(v as "movie" | "show" | "all")}
+                leading={<div className="flex items-center gap-2">{filterButton}{toolbar}</div>}
+                trailing={resultsCount}
+              />
+            ) : (
+              <TabBar
+                tabs={[]}
+                value=""
+                onChange={() => {}}
+                leading={<div className="flex items-center gap-2">{filterButton}{toolbar}</div>}
+                trailing={resultsCount}
+              />
+            );
+          })()}
 
           {/* Content */}
           {!isLoading && items.length === 0 && emptyState ? (

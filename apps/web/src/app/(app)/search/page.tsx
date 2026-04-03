@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useDebounceCallback } from "usehooks-ts";
 import { Input } from "@canto/ui/input";
-import { Search } from "lucide-react";
+import { Film, Search, Tv } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { BrowseLayout } from "~/components/layout/browse-layout";
 import { TabBar } from "~/components/layout/tab-bar";
@@ -12,8 +12,8 @@ import { StateMessage } from "~/components/layout/state-message";
 
 const TYPE_OPTIONS = [
   { value: "multi", label: "All" },
-  { value: "movie", label: "Movies" },
-  { value: "show", label: "TV Shows" },
+  { value: "movie", label: "Movies", icon: Film },
+  { value: "show", label: "TV Shows", icon: Tv },
 ] as const;
 
 export default function SearchPage(): React.JSX.Element {
@@ -216,9 +216,10 @@ export default function SearchPage(): React.JSX.Element {
       onFetchNextPage={fetchNextPage}
       toolbar={
         <TabBar
-          tabs={TYPE_OPTIONS.map(({ value, label }) => ({ value, label }))}
+          tabs={TYPE_OPTIONS.map(({ value, label, icon }) => ({ value, label, icon }))}
           value={searchType}
           onChange={(v) => handleTypeChange(v as "multi" | "movie" | "show")}
+          className="mb-0 py-0"
         />
       }
       emptyState={

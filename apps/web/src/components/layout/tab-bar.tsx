@@ -17,10 +17,12 @@ export interface TabBarProps {
   onChange: (value: string) => void;
   /** Content rendered to the left of the tabs (e.g. filter button) */
   leading?: React.ReactNode;
+  /** Content rendered to the right of the tabs (e.g. result count) */
+  trailing?: React.ReactNode;
   className?: string;
 }
 
-export function TabBar({ tabs, value, onChange, leading, className }: TabBarProps): React.JSX.Element {
+export function TabBar({ tabs, value, onChange, leading, trailing, className }: TabBarProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const [indicator, setIndicator] = useState({ left: 0, width: 0 });
@@ -56,9 +58,9 @@ export function TabBar({ tabs, value, onChange, leading, className }: TabBarProp
   }, [updateIndicator]);
 
   return (
-    <div className={cn("flex items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]", className)}>
+    <div className={cn("mb-4 flex items-center gap-2 py-3 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]", className)}>
       {leading && <div className="shrink-0">{leading}</div>}
-      <div
+      {tabs.length > 0 && <div
         ref={containerRef}
         className="relative inline-flex items-center gap-0.5 overflow-x-auto rounded-2xl bg-muted/60 p-1 scrollbar-none"
       >
@@ -109,7 +111,8 @@ export function TabBar({ tabs, value, onChange, leading, className }: TabBarProp
             </button>
           );
         })}
-      </div>
+      </div>}
+      {trailing && <div className="ml-auto shrink-0">{trailing}</div>}
     </div>
   );
 }

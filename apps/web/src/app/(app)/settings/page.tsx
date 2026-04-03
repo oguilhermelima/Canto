@@ -752,15 +752,12 @@ export default function SettingsPage(): React.JSX.Element {
     <div className="w-full">
       <PageHeader title="Settings" subtitle="Manage your account settings and preferences" />
 
-      <div className="px-4 pt-6 pb-8 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+      <div className="px-4 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         <TabBar
           tabs={NAV_ITEMS.map((item) => ({ value: item.key, label: item.label }))}
           value={activeNav}
           onChange={setActiveNav}
         />
-      </div>
-
-      <div className="px-4 pt-6 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {activeNav === "account" && <AccountSection />}
         {activeNav === "services" && <ServicesSection />}
         {activeNav === "metadata" && <MetadataSettingsSection />}

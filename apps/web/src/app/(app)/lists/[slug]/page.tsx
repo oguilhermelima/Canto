@@ -89,13 +89,9 @@ export default function ListDetailPage(): React.JSX.Element {
       <PageHeader
         title={data?.list.name ?? "List"}
         subtitle={data?.list.description ?? undefined}
-        className={cn(
-          "transition-[margin] duration-300 ease-in-out",
-          showFilters && "md:ml-[17rem] lg:ml-[19rem]",
-        )}
       />
 
-      <div className="flex px-4 pt-4 md:px-8 md:pt-6 lg:px-12 xl:px-16 2xl:px-24">
+      <div className="flex px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {/* Sidebar */}
         <div
           className={cn(
@@ -114,32 +110,30 @@ export default function ListDetailPage(): React.JSX.Element {
         {/* Content */}
         <div className="min-w-0 flex-1">
           {/* Tab Bar */}
-          <div className="mb-6 py-3">
-            <TabBar
-              tabs={TYPE_OPTIONS}
-              value={typeFilter}
-              onChange={(v) => setTypeFilter(v as "all" | "movie" | "show")}
-              leading={
-                <button
-                  type="button"
+          <TabBar
+            tabs={TYPE_OPTIONS}
+            value={typeFilter}
+            onChange={(v) => setTypeFilter(v as "all" | "movie" | "show")}
+            leading={
+              <button
+                type="button"
+                className={cn(
+                  "flex h-[38px] w-[38px] items-center justify-center rounded-xl transition-all",
+                  showFilters
+                    ? "bg-foreground text-background"
+                    : "bg-muted/60 text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setShowFilters((v) => !v)}
+              >
+                <Settings2
                   className={cn(
-                    "flex h-[38px] w-[38px] items-center justify-center rounded-xl transition-all",
-                    showFilters
-                      ? "bg-foreground text-background"
-                      : "bg-muted/60 text-muted-foreground hover:text-foreground",
+                    "h-4 w-4 transition-transform duration-300",
+                    showFilters && "rotate-90",
                   )}
-                  onClick={() => setShowFilters((v) => !v)}
-                >
-                  <Settings2
-                    className={cn(
-                      "h-4 w-4 transition-transform duration-300",
-                      showFilters && "rotate-90",
-                    )}
-                  />
-                </button>
-              }
-            />
-          </div>
+                />
+              </button>
+            }
+          />
 
           {!isLoading && items.length === 0 ? (
             <StateMessage

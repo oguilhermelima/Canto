@@ -561,7 +561,7 @@ export default function LibraryPage(): React.JSX.Element {
         subtitle="Your watchlist, collections, and saved media."
       />
 
-      <div className="flex px-4 pt-4 md:px-8 md:pt-6 lg:px-12 xl:px-16 2xl:px-24">
+      <div className="flex px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {/* Sidebar */}
         <div
           className={cn(
@@ -588,19 +588,17 @@ export default function LibraryPage(): React.JSX.Element {
         {/* Content */}
         <div className="min-w-0 flex-1">
           {/* Tab Bar */}
-          <div className="mb-6 py-3">
-            <TabBar
-              tabs={TABS}
-              value={activeTab}
-              onChange={handleTabChange}
-              leading={
-                <FilterButton
-                  active={showFilters}
-                  onClick={() => setShowFilters((v) => !v)}
-                />
-              }
-            />
-          </div>
+          <TabBar
+            tabs={TABS}
+            value={activeTab}
+            onChange={handleTabChange}
+            leading={
+              <FilterButton
+                active={showFilters}
+                onClick={() => setShowFilters((v) => !v)}
+              />
+            }
+          />
           {activeTab === "watchlist" && (
             <MediaListTab
               slug="watchlist"

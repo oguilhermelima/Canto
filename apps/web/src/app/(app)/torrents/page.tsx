@@ -125,7 +125,6 @@ export default function DownloadsPage(): React.JSX.Element {
       <PageHeader title="Downloads" subtitle="Monitor and manage your active downloads." />
 
       <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-      <div className="pt-6 pb-8">
         <TabBar
           tabs={STATUS_TABS.map(({ value, label }) => ({
             value,
@@ -135,7 +134,6 @@ export default function DownloadsPage(): React.JSX.Element {
           value={statusFilter}
           onChange={setStatusFilter}
         />
-      </div>
 
       {/* Content */}
       {isError ? (

@@ -155,17 +155,15 @@ export default function RequestsPage(): React.JSX.Element {
 
       <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {/* Tabs */}
-        <div className="pb-6">
-          <TabBar
-            tabs={STATUS_TABS.map(({ value, label }) => ({
-              value,
-              label,
-              count: counts[value as keyof typeof counts],
-            }))}
-            value={statusFilter}
-            onChange={setStatusFilter}
-          />
-        </div>
+        <TabBar
+          tabs={STATUS_TABS.map(({ value, label }) => ({
+            value,
+            label,
+            count: counts[value as keyof typeof counts],
+          }))}
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
 
         {/* Filter bar */}
         <div className="mb-6 flex flex-wrap items-center gap-3">
@@ -214,7 +212,7 @@ export default function RequestsPage(): React.JSX.Element {
           <div className="space-y-3">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="flex items-center gap-5 rounded-2xl bg-muted/40 p-5">
-                <Skeleton className="h-20 w-14 shrink-0 rounded-xl" />
+                <Skeleton className="h-20 w-20 shrink-0 rounded-2xl" />
                 <div className="flex-1 space-y-3">
                   <Skeleton className="h-4 w-2/3" />
                   <Skeleton className="h-3 w-1/3" />
@@ -245,7 +243,7 @@ export default function RequestsPage(): React.JSX.Element {
                     {/* Poster */}
                     <Link
                       href={media?.id ? `/media/${media.id}` : "#"}
-                      className="relative aspect-[2/3] w-16 shrink-0 overflow-hidden rounded-xl bg-muted sm:w-20"
+                      className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-muted sm:h-24 sm:w-24"
                     >
                       {media?.posterPath ? (
                         <Image
