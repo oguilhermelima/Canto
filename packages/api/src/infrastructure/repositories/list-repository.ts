@@ -1,6 +1,7 @@
-import { and, eq, or, isNull, desc, count, sql } from "drizzle-orm";
+import { and, eq, or, isNull, desc, asc, count, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { list, listItem, media } from "@canto/db/schema";
+import type { RecsFilters } from "./user-recommendation-repository";
 
 // ── Lists ──
 
@@ -155,15 +156,64 @@ export async function ensureServerLibrary(db: Database) {
 export async function findListItems(
   db: Database,
   listId: string,
-  opts?: { limit?: number; offset?: number },
+  opts: { limit?: number; offset?: number } & RecsFilters = {},
 ) {
-  return db.query.listItem.findMany({
-    where: eq(listItem.listId, listId),
-    with: { media: true },
-    orderBy: [desc(listItem.addedAt)],
-    limit: opts?.limit ?? 50,
-    offset: opts?.offset ?? 0,
-  });
+  const {
+    limit: lim = 50, offset: off = 0,
+    genreIds, genreMode = "or", language, scoreMin,
+    yearMin, yearMax, runtimeMin, runtimeMax,
+    certification, status, sortBy, watchProviders, watchRegion,
+  } = opts;
+
+  const conditions = [eq(listItem.listId, listId)];
+
+  if (genreIds && genreIds.length > 0) {
+    if (genreMode === "and") {
+      conditions.push(sql`${media.genreIds}::jsonb @> ${JSON.stringify(genreIds)}::jsonb`);
+    } else {
+      conditions.push(sql`(${sql.join(genreIds.map((id) => sql`${media.genreIds}::jsonb @> ${JSON.stringify([id])}::jsonb`), sql` OR `)})`);
+    }
+  }
+  if (language) conditions.push(eq(media.originalLanguage, language));
+  if (scoreMin != null) conditions.push(sql`${media.voteAverage} >= ${scoreMin}`);
+  if (yearMin) conditions.push(sql`${media.releaseDate} >= ${yearMin + "-01-01"}`);
+  if (yearMax) conditions.push(sql`${media.releaseDate} <= ${yearMax + "-12-31"}`);
+  if (runtimeMin != null) conditions.push(sql`${media.runtime} >= ${runtimeMin}`);
+  if (runtimeMax != null) conditions.push(sql`${media.runtime} <= ${runtimeMax}`);
+  if (certification) conditions.push(eq(media.contentRating, certification));
+  if (status) conditions.push(eq(media.status, status));
+
+  const wpIds = watchProviders ? watchProviders.split(/[,|]/).map(Number) : [];
+  if (wpIds.length > 0 && watchRegion) {
+    conditions.push(sql`${media.id} IN (
+      SELECT media_id FROM media_watch_provider
+      WHERE provider_id IN (${sql.join(wpIds.map(id => sql`${id}`), sql`, `)})
+      AND region = ${watchRegion}
+    )`);
+  }
+
+  let orderByExpr;
+  switch (sortBy) {
+    case "vote_average.desc": orderByExpr = [desc(media.voteAverage)]; break;
+    case "vote_average.asc": orderByExpr = [asc(media.voteAverage)]; break;
+    case "primary_release_date.desc": orderByExpr = [desc(media.releaseDate)]; break;
+    case "primary_release_date.asc": orderByExpr = [asc(media.releaseDate)]; break;
+    case "title.asc": orderByExpr = [asc(media.title)]; break;
+    case "title.desc": orderByExpr = [desc(media.title)]; break;
+    default: orderByExpr = [desc(listItem.addedAt)];
+  }
+
+  return db
+    .select({
+      listItem: listItem,
+      media: media,
+    })
+    .from(listItem)
+    .innerJoin(media, eq(listItem.mediaId, media.id))
+    .where(and(...conditions))
+    .orderBy(...orderByExpr)
+    .limit(lim)
+    .offset(off);
 }
 
 export async function addListItem(

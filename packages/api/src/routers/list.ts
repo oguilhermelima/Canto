@@ -39,6 +39,20 @@ export const listRouter = createTRPCRouter({
         slug: z.string(),
         limit: z.number().int().min(1).max(100).default(50),
         offset: z.number().int().min(0).default(0),
+        // Filters
+        genreIds: z.array(z.number()).optional(),
+        genreMode: z.enum(["and", "or"]).default("or").optional(),
+        language: z.string().optional(),
+        scoreMin: z.number().optional(),
+        yearMin: z.string().optional(),
+        yearMax: z.string().optional(),
+        runtimeMin: z.number().optional(),
+        runtimeMax: z.number().optional(),
+        certification: z.string().optional(),
+        status: z.string().optional(),
+        sortBy: z.string().optional(),
+        watchProviders: z.string().optional(),
+        watchRegion: z.string().optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -53,6 +67,19 @@ export const listRouter = createTRPCRouter({
       const items = await findListItems(ctx.db, listRow.id, {
         limit: input.limit,
         offset: input.offset,
+        genreIds: input.genreIds,
+        genreMode: input.genreMode ?? "or",
+        language: input.language,
+        scoreMin: input.scoreMin,
+        yearMin: input.yearMin,
+        yearMax: input.yearMax,
+        runtimeMin: input.runtimeMin,
+        runtimeMax: input.runtimeMax,
+        certification: input.certification,
+        status: input.status,
+        sortBy: input.sortBy,
+        watchProviders: input.watchProviders,
+        watchRegion: input.watchRegion,
       });
       return { list: listRow, items };
     }),
