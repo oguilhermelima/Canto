@@ -3,13 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@canto/ui/cn";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@canto/ui/dropdown-menu";
+// Popover removed — user menu uses custom positioned panel
 import {
   Compass,
   Download,
@@ -149,14 +143,37 @@ const TopbarSearch = memo(function TopbarSearch(): React.JSX.Element {
 
 /* ─── User Menu ─── */
 
+interface MenuAction {
+  href?: string;
+  label: string;
+  icon: LucideIcon;
+  onClick?: () => void;
+}
+
 const UserMenu = memo(function UserMenu(): React.JSX.Element {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { data: session } = authClient.useSession();
   const [mounted, setMounted] = useState(false);
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { setMounted(true); }, []);
+
+  // Close on click outside
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    if (!open) return;
+    const handler = (e: MouseEvent): void => {
+      if (
+        menuRef.current && !menuRef.current.contains(e.target as Node) &&
+        triggerRef.current && !triggerRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
 
   if (!mounted) {
     return (
@@ -166,75 +183,91 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
     );
   }
 
+  const actions: MenuAction[] = [
+    { href: "/status", label: "Status", icon: LayoutDashboard },
+    { href: "/settings", label: "Settings", icon: Settings },
+    { href: "/notifications", label: "Notifications", icon: Bell },
+    {
+      label: theme === "dark" ? "Light Mode" : "Dark Mode",
+      icon: theme === "dark" ? Sun : Moon,
+      onClick: () => setTheme(theme === "dark" ? "light" : "dark"),
+    },
+    {
+      label: "Log Out",
+      icon: LogOut,
+      onClick: async () => {
+        await authClient.signOut();
+        router.push("/login");
+        router.refresh();
+      },
+    },
+  ];
+
   return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <button aria-label="User menu" className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted/60 transition-colors hover:bg-muted focus:outline-none">
-            {session?.user?.name ? (
-              <span className="text-xs font-medium">
-                {session.user.name.charAt(0).toUpperCase()}
-              </span>
-            ) : (
-              <User className="h-4 w-4" />
-            )}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        className="min-w-56 rounded-lg"
-        sideOffset={8}
+    <div className="relative">
+      <button
+        ref={triggerRef}
+        aria-label="User menu"
+        onClick={() => setOpen((o) => !o)}
+        className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted/60 transition-colors hover:bg-muted focus:outline-none"
       >
-        {session?.user && (
-          <>
-            <div className="px-2 py-1.5">
-              <p className="text-sm font-medium">{session.user.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {session.user.email}
-              </p>
-            </div>
-            <DropdownMenuSeparator />
-          </>
+        {session?.user?.name ? (
+          <span className="text-xs font-medium">
+            {session.user.name.charAt(0).toUpperCase()}
+          </span>
+        ) : (
+          <User className="h-4 w-4" />
         )}
-        <DropdownMenuItem asChild>
-          <Link href="/status">
-            <LayoutDashboard className="mr-2 h-4 w-4" />
-            Status
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/settings">
-            <Settings className="mr-2 h-4 w-4" />
-            Settings
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/notifications">
-            <Bell className="mr-2 h-4 w-4" />
-            Notifications
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        >
-          <Sun className="mr-2 h-4 w-4 dark:hidden" />
-          <Moon className="mr-2 hidden h-4 w-4 dark:block" />
-          <span className="dark:hidden">Dark mode</span>
-          <span className="hidden dark:inline">Light mode</span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={async () => {
-            await authClient.signOut();
-            router.push("/login");
-            router.refresh();
-          }}
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Log out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </button>
+
+      {/* Dropdown */}
+      <div
+        ref={menuRef}
+        className={cn(
+          "absolute right-0 top-full z-50 mt-4 overflow-hidden rounded-2xl border border-border/50 bg-background/80 shadow-xl backdrop-blur-xl transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]",
+          open
+            ? "pointer-events-auto translate-y-0 scale-100 opacity-100"
+            : "pointer-events-none -translate-y-3 scale-95 opacity-0",
+        )}
+      >
+        <div className="flex items-center gap-3 whitespace-nowrap px-4 py-2.5">
+          {/* User info */}
+          {session?.user && (
+            <div className="shrink-0 pr-2">
+              <p className="text-sm font-semibold">{session.user.name}</p>
+              <p className="text-xs text-muted-foreground">{session.user.email}</p>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center">
+            {actions.map((action) => {
+              const Icon = action.icon;
+              const content = (
+                <div className="flex flex-col items-center justify-center gap-1 rounded-xl px-3 py-2 text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground" style={{ minWidth: 56 }}>
+                  <Icon className="h-[18px] w-[18px]" />
+                  <span className="text-[10px] font-medium leading-none">{action.label}</span>
+                </div>
+              );
+
+              if (action.href) {
+                return (
+                  <Link key={action.label} href={action.href} onClick={() => setOpen(false)}>
+                    {content}
+                  </Link>
+                );
+              }
+
+              return (
+                <button key={action.label} onClick={() => { action.onClick?.(); setOpen(false); }} className="text-left">
+                  {content}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 });
 
@@ -256,7 +289,7 @@ export function Topbar(): React.JSX.Element {
     <header className="pointer-events-none fixed top-0 right-0 left-0 z-40 hidden justify-center pt-2 md:flex">
       <nav
         className={cn(
-          "pointer-events-auto flex w-full items-center rounded-2xl border py-2.5 transition-all duration-300 ease-out",
+          "pointer-events-auto flex w-full items-center overflow-visible rounded-2xl border py-2.5 transition-all duration-300 ease-out",
           scrolled
             ? "max-w-[80%] border-border/50 bg-background/80 px-6 backdrop-blur-xl xl:max-w-[60%]"
             : "max-w-full border-transparent px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24",

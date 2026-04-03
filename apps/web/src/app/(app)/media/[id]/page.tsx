@@ -804,7 +804,20 @@ export default function MediaDetailPage({
       </Dialog>
 
       {/* Torrent search dialog */}
-      <Dialog open={torrentDialogOpen} onOpenChange={setTorrentDialogOpen}>
+      <Dialog open={torrentDialogOpen} onOpenChange={(open) => {
+        setTorrentDialogOpen(open);
+        if (!open) {
+          setTorrentSearchContext(null);
+          setTorrentSearchQuery("");
+          setTorrentPage(0);
+          setTorrentQualityFilter("all");
+          setTorrentSourceFilter("all");
+          setTorrentSizeFilter("all");
+          setTorrentSort("confidence");
+          setTorrentSortDir("desc");
+          setLastDownloadAttempt(null);
+        }
+      }}>
         <DialogContent className="flex h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-border bg-background p-0 md:h-auto md:max-h-[85vh] md:max-w-5xl md:rounded-[2rem] [&>button:last-child]:hidden">
           {/* Header */}
           <div className="flex shrink-0 items-center justify-between px-6 py-5">

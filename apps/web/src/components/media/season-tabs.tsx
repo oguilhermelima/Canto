@@ -312,6 +312,9 @@ export function SeasonTabs({
                     }
                   }
                 }
+                // Reset selections after triggering download
+                setSelectedSeasons(new Set());
+                setSelectedEpisodes(new Set());
               }}
             >
               <Search size={14} />
