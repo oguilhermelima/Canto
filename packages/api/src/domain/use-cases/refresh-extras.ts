@@ -81,21 +81,34 @@ export async function refreshExtras(
     .where(eq(mediaRecommendation.sourceMediaId, mediaId));
 
   // Also look up existing media rows for the recommended items' external IDs
+  // Check both tmdb provider AND tvdb-provider rows (which store tvdb_id = external_id)
+  // to avoid creating cross-provider duplicates
   const recExternalIds = [...uniqueRecItems.values()].map((i) => i.result.externalId);
+  const recTitles = [...uniqueRecItems.values()].map((i) => i.result.title);
   const existingMedia = recExternalIds.length > 0
     ? await db.query.media.findMany({
-        where: sql`${media.externalId} IN (${sql.join(recExternalIds.map((id) => sql`${id}`), sql`, `)}) AND ${media.provider} = 'tmdb'`,
-        columns: { id: true, externalId: true, logoPath: true },
+        where: sql`(
+          (${media.externalId} IN (${sql.join(recExternalIds.map((id) => sql`${id}`), sql`, `)}) AND ${media.provider} = 'tmdb')
+          OR (${media.provider} = 'tvdb' AND ${media.title} IN (${sql.join(recTitles.map((t) => sql`${t}`), sql`, `)}))
+        )`,
+        columns: { id: true, externalId: true, title: true, provider: true, logoPath: true },
       })
     : [];
-  const existingMediaByExtId = new Map(existingMedia.map((m) => [m.externalId, m]));
+  // Map by TMDB external ID; for tvdb-provider rows, build a title lookup fallback
+  const existingMediaByExtId = new Map(
+    existingMedia.filter((m) => m.provider === "tmdb").map((m) => [m.externalId, m]),
+  );
+  const existingMediaByTitle = new Map(
+    existingMedia.filter((m) => m.provider === "tvdb").map((m) => [m.title, m]),
+  );
 
   const trailerMap = new Map<number, string>();
   const logoMap = new Map<number, string>();
 
   // Only fetch trailers + logos for items that don't already have them
   const itemsNeedingFetch = [...uniqueRecItems.values()].filter((item) => {
-    const existing = existingMediaByExtId.get(item.result.externalId);
+    const existing = existingMediaByExtId.get(item.result.externalId)
+      ?? existingMediaByTitle.get(item.result.title);
     return !existing?.logoPath;
   });
 
@@ -145,7 +158,8 @@ export async function refreshExtras(
   const mediaIdByExtKey = new Map<string, string>();
   for (const fields of newRecFields) {
     const key = `${fields.provider}-${fields.externalId}`;
-    const existing = existingMediaByExtId.get(fields.externalId);
+    const existing = existingMediaByExtId.get(fields.externalId)
+      ?? existingMediaByTitle.get(fields.title);
     if (existing) {
       mediaIdByExtKey.set(key, existing.id);
       // Update logoPath if we fetched a new one and existing doesn't have one
@@ -286,7 +300,6 @@ export async function refreshExtras(
     // ── Diff-based media_recommendation update ──
 
     // Delete junction entries for items no longer in the TMDB response
-    const existingRecMediaIds = new Set(existingRecs.map((r) => r.mediaId));
     const newRecMediaIds = new Set(mediaIdByExtKey.values());
     const toDelete = existingRecs
       .filter((r) => !newRecMediaIds.has(r.mediaId))
