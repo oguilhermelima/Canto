@@ -10,6 +10,7 @@ import { trpc } from "~/lib/trpc/client";
 import { MediaCarousel } from "~/components/media/media-carousel";
 import { FeaturedCarousel } from "~/components/media/featured-carousel";
 import { AddToListButton } from "~/components/media/add-to-list-button";
+import { StateMessage } from "~/components/layout/state-message";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -167,8 +168,16 @@ export default function DiscoverPage(): React.JSX.Element {
 
   return (
     <div className="min-h-screen">
+      {/* Mobile logo */}
+      <div className="relative z-10 flex h-16 items-center px-4 md:hidden">
+        <Link href="/" className="flex items-center gap-2.5">
+          <img src="/room.png" alt="Canto" className="h-9 w-9 dark:invert" />
+          <span className="text-lg font-bold tracking-tight text-foreground">Canto</span>
+        </Link>
+      </div>
+
       {/* Spotlight Hero — extends behind topbar */}
-      <div className="spotlight relative -mt-16 min-h-[90vh] w-full md:min-h-[80vh]">
+      <div className="spotlight relative -mt-16 min-h-[90vh] w-full xl:min-h-[80vh]">
         {/* Backdrop */}
         {currentItem?.backdropPath ? (
           <div
@@ -188,13 +197,15 @@ export default function DiscoverPage(): React.JSX.Element {
           </div>
         ) : loadingSpotlight ? (
           <div className="absolute inset-0 bg-gradient-to-b from-muted/20 to-background" />
+        ) : spotlightQuery.isError ? (
+          <div className="absolute inset-0 bg-gradient-to-b from-muted/20 to-background" />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-b from-muted/20 to-background" />
         )}
 
         {/* Content */}
         <div
-          className="relative mx-auto flex min-h-[90vh] w-full flex-col justify-end px-4 pb-16 pt-24 md:min-h-[80vh] md:px-8 lg:px-12 xl:px-16 2xl:px-24"
+          className="relative mx-auto flex min-h-[90vh] w-full flex-col justify-end px-4 pb-16 pt-24 md:px-8 lg:px-12 xl:min-h-[80vh] xl:px-16 2xl:px-24"
           tabIndex={0}
           onKeyDown={(e) => {
             if (e.key === "ArrowLeft") prevSpotlight();
@@ -228,6 +239,12 @@ export default function DiscoverPage(): React.JSX.Element {
                 <Skeleton className="h-10 w-10 rounded-full bg-foreground/10" />
               </div>
             </div>
+          ) : spotlightQuery.isError ? (
+            <StateMessage
+              preset="error"
+              onRetry={() => spotlightQuery.refetch()}
+              minHeight="0px"
+            />
           ) : currentItem ? (
             <div
               key={currentSpotlight}
@@ -240,20 +257,20 @@ export default function DiscoverPage(): React.JSX.Element {
                 <img
                   src={`${TMDB_IMAGE_BASE}/w500${currentItem.logoPath}`}
                   alt={currentItem.title}
-                  className="h-auto max-h-24 w-auto max-w-sm object-contain object-left md:max-h-36 md:max-w-md lg:max-h-44 lg:max-w-lg"
+                  className="h-auto max-h-12 w-auto max-w-[60vw] object-contain object-left sm:max-h-16 md:max-h-20 lg:max-h-24 xl:max-h-28 2xl:max-h-32"
                   style={{
                     filter:
                       "drop-shadow(0 2px 8px rgba(0,0,0,0.5)) drop-shadow(0 0 20px rgba(0,0,0,0.3))",
                   }}
                 />
               ) : (
-                <h1 className="text-3xl font-extrabold tracking-tight text-foreground drop-shadow-lg md:text-4xl lg:text-5xl">
+                <h1 className="text-2xl font-extrabold tracking-tight text-foreground drop-shadow-lg sm:text-3xl md:text-4xl xl:text-5xl">
                   {currentItem.title}
                 </h1>
               )}
 
               {/* Meta line */}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-foreground/70">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-foreground/70 sm:text-sm">
                 <span>{currentItem.type === "movie" ? "Movie" : "TV Show"}</span>
                 {currentItem.voteAverage != null && currentItem.voteAverage > 0 && (
                   <>
@@ -270,7 +287,7 @@ export default function DiscoverPage(): React.JSX.Element {
               </div>
 
               {currentItem.overview && (
-                <p className="line-clamp-3 text-sm leading-relaxed text-foreground/70 md:text-base">
+                <p className="line-clamp-2 text-xs leading-relaxed text-foreground/70 sm:line-clamp-3 sm:text-sm md:text-base">
                   {currentItem.overview}
                 </p>
               )}
@@ -341,21 +358,29 @@ export default function DiscoverPage(): React.JSX.Element {
 
       {/* Carousels */}
       <div className="relative -mt-4 flex w-full min-w-0 flex-1 flex-col gap-12 overflow-x-hidden pb-12">
-        {recentItems.length > 0 && (
+        {recentlyAdded.isError ? (
+          <section className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+            <h2 className="text-xl font-semibold text-foreground">Recently Added</h2>
+            <StateMessage preset="error" onRetry={() => recentlyAdded.refetch()} minHeight="200px" />
+          </section>
+        ) : recentItems.length > 0 ? (
           <MediaCarousel
             title="Recently Added"
             seeAllHref="/lists/server-library"
             items={recentItems}
             isLoading={recentlyAdded.isLoading}
           />
-        )}
+        ) : null}
 
-        {!recommendations.isLoading && (recommendations.data?.pages ?? []).flatMap((p) => p.items).length === 0 ? (
+        {recommendations.isError ? (
           <section className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
             <h2 className="text-xl font-semibold text-foreground">Recommended for you</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Add items to your watchlist to get personalized recommendations.
-            </p>
+            <StateMessage preset="error" onRetry={() => recommendations.refetch()} minHeight="200px" />
+          </section>
+        ) : !recommendations.isLoading && (recommendations.data?.pages ?? []).flatMap((p) => p.items).length === 0 ? (
+          <section className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+            <h2 className="text-xl font-semibold text-foreground">Recommended for you</h2>
+            <StateMessage preset="emptyWatchlist" minHeight="200px" />
           </section>
         ) : (
           <FeaturedCarousel
@@ -376,41 +401,69 @@ export default function DiscoverPage(): React.JSX.Element {
           />
         )}
 
-        <MediaCarousel
-          title="Trending TV Shows"
-          seeAllHref="/discover?preset=trending_shows"
-          items={showItems}
-          isLoading={trendingShows.isLoading}
-          isFetchingMore={trendingShows.isFetchingNextPage}
-          onLoadMore={trendingShows.hasNextPage ? () => void trendingShows.fetchNextPage() : undefined}
-        />
+        {trendingShows.isError ? (
+          <section className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+            <h2 className="text-xl font-semibold text-foreground">Trending TV Shows</h2>
+            <StateMessage preset="error" onRetry={() => trendingShows.refetch()} minHeight="200px" />
+          </section>
+        ) : (
+          <MediaCarousel
+            title="Trending TV Shows"
+            seeAllHref="/discover?preset=trending_shows"
+            items={showItems}
+            isLoading={trendingShows.isLoading}
+            isFetchingMore={trendingShows.isFetchingNextPage}
+            onLoadMore={trendingShows.hasNextPage ? () => void trendingShows.fetchNextPage() : undefined}
+          />
+        )}
 
-        <MediaCarousel
-          title="Trending Movies"
-          seeAllHref="/discover?preset=trending_movies"
-          items={movieItems}
-          isLoading={trendingMovies.isLoading}
-          isFetchingMore={trendingMovies.isFetchingNextPage}
-          onLoadMore={trendingMovies.hasNextPage ? () => void trendingMovies.fetchNextPage() : undefined}
-        />
+        {trendingMovies.isError ? (
+          <section className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+            <h2 className="text-xl font-semibold text-foreground">Trending Movies</h2>
+            <StateMessage preset="error" onRetry={() => trendingMovies.refetch()} minHeight="200px" />
+          </section>
+        ) : (
+          <MediaCarousel
+            title="Trending Movies"
+            seeAllHref="/discover?preset=trending_movies"
+            items={movieItems}
+            isLoading={trendingMovies.isLoading}
+            isFetchingMore={trendingMovies.isFetchingNextPage}
+            onLoadMore={trendingMovies.hasNextPage ? () => void trendingMovies.fetchNextPage() : undefined}
+          />
+        )}
 
-        <MediaCarousel
-          title="Trending Anime"
-          seeAllHref="/discover?preset=trending_anime"
-          items={animeItems}
-          isLoading={trendingAnime.isLoading}
-          isFetchingMore={trendingAnime.isFetchingNextPage}
-          onLoadMore={trendingAnime.hasNextPage ? () => void trendingAnime.fetchNextPage() : undefined}
-        />
+        {trendingAnime.isError ? (
+          <section className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+            <h2 className="text-xl font-semibold text-foreground">Trending Anime</h2>
+            <StateMessage preset="error" onRetry={() => trendingAnime.refetch()} minHeight="200px" />
+          </section>
+        ) : (
+          <MediaCarousel
+            title="Trending Anime"
+            seeAllHref="/discover?preset=trending_anime"
+            items={animeItems}
+            isLoading={trendingAnime.isLoading}
+            isFetchingMore={trendingAnime.isFetchingNextPage}
+            onLoadMore={trendingAnime.hasNextPage ? () => void trendingAnime.fetchNextPage() : undefined}
+          />
+        )}
 
-        <MediaCarousel
-          title="Trending Anime Movies"
-          seeAllHref="/discover?preset=trending_anime_movies"
-          items={animeMovieItems}
-          isLoading={animeMovies.isLoading}
-          isFetchingMore={animeMovies.isFetchingNextPage}
-          onLoadMore={animeMovies.hasNextPage ? () => void animeMovies.fetchNextPage() : undefined}
-        />
+        {animeMovies.isError ? (
+          <section className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+            <h2 className="text-xl font-semibold text-foreground">Trending Anime Movies</h2>
+            <StateMessage preset="error" onRetry={() => animeMovies.refetch()} minHeight="200px" />
+          </section>
+        ) : (
+          <MediaCarousel
+            title="Trending Anime Movies"
+            seeAllHref="/discover?preset=trending_anime_movies"
+            items={animeMovieItems}
+            isLoading={animeMovies.isLoading}
+            isFetchingMore={animeMovies.isFetchingNextPage}
+            onLoadMore={animeMovies.hasNextPage ? () => void animeMovies.fetchNextPage() : undefined}
+          />
+        )}
       </div>
     </div>
   );
