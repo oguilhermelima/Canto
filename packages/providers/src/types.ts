@@ -81,6 +81,7 @@ export interface NormalizedMedia {
   lastAirDate?: string;
   status?: string;
   genres: string[];
+  genreIds?: number[];
   contentRating?: string;
   originalLanguage?: string;
   spokenLanguages?: string[];
@@ -205,6 +206,17 @@ export interface DiscoverOpts {
   sort_by?: string;
   first_air_date_gte?: string;
   release_date_gte?: string;
+  with_keywords?: string;
+  vote_average_gte?: number;
+  with_runtime_lte?: number;
+  first_air_date_lte?: string;
+  release_date_lte?: string;
+  certification?: string;
+  certification_country?: string;
+  with_status?: string;
+  with_watch_providers?: string;
+  watch_region?: string;
+  with_runtime_gte?: number;
 }
 
 export interface MetadataOpts {

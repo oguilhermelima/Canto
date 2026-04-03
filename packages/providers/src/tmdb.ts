@@ -514,6 +514,17 @@ export class TmdbProvider implements MetadataProvider {
     if (type === "movie" && opts?.release_date_gte) {
       params["release_date.gte"] = opts.release_date_gte;
     }
+    if (opts?.with_keywords) params.with_keywords = opts.with_keywords;
+    if (opts?.vote_average_gte != null) params["vote_average.gte"] = String(opts.vote_average_gte);
+    if (opts?.with_runtime_lte != null) params["with_runtime.lte"] = String(opts.with_runtime_lte);
+    if (type === "show" && opts?.first_air_date_lte) params["first_air_date.lte"] = opts.first_air_date_lte;
+    if (type === "movie" && opts?.release_date_lte) params["release_date.lte"] = opts.release_date_lte;
+    if (opts?.certification) params.certification = opts.certification;
+    if (opts?.certification_country) params.certification_country = opts.certification_country;
+    if (opts?.with_status) params.with_status = opts.with_status;
+    if (opts?.with_watch_providers) params.with_watch_providers = opts.with_watch_providers;
+    if (opts?.watch_region) params.watch_region = opts.watch_region;
+    if (opts?.with_runtime_gte != null) params["with_runtime.gte"] = String(opts.with_runtime_gte);
 
     const data = await this.fetch<{
       results: unknown[];
@@ -526,6 +537,14 @@ export class TmdbProvider implements MetadataProvider {
       totalPages: data.total_pages,
       totalResults: data.total_results,
     };
+  }
+
+  /* ── Genres ───────────────────────────────────────────────────────── */
+
+  async getGenres(type: MediaType): Promise<Array<{ id: number; name: string }>> {
+    const endpoint = type === "movie" ? "/genre/movie/list" : "/genre/tv/list";
+    const data = await this.fetch<{ genres: Array<{ id: number; name: string }> }>(endpoint);
+    return data.genres;
   }
 
   /* ── Person detail ────────────────────────────────────────────────── */
@@ -609,7 +628,9 @@ export class TmdbProvider implements MetadataProvider {
   /* ── Private normalization ──────────────────────────────────────────── */
 
   private normalizeMovie(data: Record<string, unknown>): NormalizedMedia {
-    const genres = ((data.genres ?? []) as TmdbGenre[]).map((g) => g.name);
+    const rawGenres = (data.genres ?? []) as TmdbGenre[];
+    const genres = rawGenres.map((g) => g.name);
+    const genreIds = rawGenres.map((g) => g.id);
 
     // Extract content rating from release_dates (US certification)
     let contentRating: string | undefined;
@@ -691,6 +712,7 @@ export class TmdbProvider implements MetadataProvider {
       year: yearFromDate(releaseDate),
       status: (data.status as string) ?? undefined,
       genres,
+      genreIds,
       contentRating,
       originalLanguage: (data.original_language as string) ?? undefined,
       spokenLanguages,
@@ -713,7 +735,9 @@ export class TmdbProvider implements MetadataProvider {
   }
 
   private normalizeShow(data: Record<string, unknown>): NormalizedMedia {
-    const genres = ((data.genres ?? []) as TmdbGenre[]).map((g) => g.name);
+    const rawGenres = (data.genres ?? []) as TmdbGenre[];
+    const genres = rawGenres.map((g) => g.name);
+    const genreIds = rawGenres.map((g) => g.id);
 
     // Extract content rating (TV)
     let contentRating: string | undefined;
@@ -807,6 +831,7 @@ export class TmdbProvider implements MetadataProvider {
       lastAirDate,
       status: (data.status as string) ?? undefined,
       genres,
+      genreIds,
       contentRating,
       originalLanguage: (data.original_language as string) ?? undefined,
       spokenLanguages,
