@@ -16,6 +16,7 @@ export interface SearchContext {
 export interface IndexerResult {
   guid: string;
   title: string;
+  description: string | null;
   size: number;
   publishDate: string;
   downloadUrl: string | null;
@@ -26,6 +27,7 @@ export interface IndexerResult {
   leechers: number;
   age: number;
   indexerFlags: string[];
+  indexerLanguage: string | null;
   categories: Array<{ id: number; name: string }>;
 }
 

@@ -31,6 +31,7 @@ export interface SearchResult {
   confidence: number;
   categories: Array<{ id: number; name: string }>;
   languages: string[];
+  indexerLanguage: string | null;
   releaseGroup: string | null;
   codec: string | null;
 }
@@ -45,6 +46,7 @@ export interface PaginatedSearchResults {
 
 export interface SearchInput {
   mediaId: string;
+  query?: string;
   seasonNumber?: number;
   episodeNumbers?: number[] | null;
   page?: number;
@@ -68,19 +70,25 @@ export async function searchTorrents(
   const page = input.page ?? 0;
   const pageSize = input.pageSize ?? 50;
 
-  // Build text query
-  let query = row.title;
-  if (input.seasonNumber !== undefined) {
-    const paddedSeason = String(input.seasonNumber).padStart(2, "0");
-    if (
-      input.episodeNumbers &&
-      input.episodeNumbers.length === 1 &&
-      input.episodeNumbers[0] !== undefined
-    ) {
-      const paddedEp = String(input.episodeNumbers[0]).padStart(2, "0");
-      query += ` S${paddedSeason}E${paddedEp}`;
-    } else {
-      query += ` S${paddedSeason}`;
+  // Build text query — use custom query if provided (advanced search)
+  const isCustomQuery = !!input.query;
+  let query: string;
+  if (isCustomQuery) {
+    query = input.query!;
+  } else {
+    query = row.title;
+    if (input.seasonNumber !== undefined) {
+      const paddedSeason = String(input.seasonNumber).padStart(2, "0");
+      if (
+        input.episodeNumbers &&
+        input.episodeNumbers.length === 1 &&
+        input.episodeNumbers[0] !== undefined
+      ) {
+        const paddedEp = String(input.episodeNumbers[0]).padStart(2, "0");
+        query += ` S${paddedSeason}E${paddedEp}`;
+      } else {
+        query += ` S${paddedSeason}`;
+      }
     }
   }
 
@@ -89,16 +97,16 @@ export async function searchTorrents(
   }
 
   // Build structured search context with external IDs + pagination
-  // Each indexer gets `pageSize` results at the corresponding offset.
-  // We ask for pageSize+1 per indexer so we can detect hasMore after dedup.
+  // Custom queries use text-only search (no ID params) for maximum flexibility
   const ctx: SearchContext = {
     query,
     mediaType: row.type as "movie" | "show",
-    tmdbId: row.provider === "tmdb" ? row.externalId : undefined,
-    imdbId: row.imdbId ?? undefined,
-    tvdbId: row.tvdbId ?? undefined,
-    seasonNumber: input.seasonNumber,
-    episodeNumbers: input.episodeNumbers ?? undefined,
+    // Custom queries skip ID-based search — use text only
+    tmdbId: isCustomQuery ? undefined : (row.provider === "tmdb" ? row.externalId : undefined),
+    imdbId: isCustomQuery ? undefined : (row.imdbId ?? undefined),
+    tvdbId: isCustomQuery ? undefined : (row.tvdbId ?? undefined),
+    seasonNumber: isCustomQuery ? undefined : input.seasonNumber,
+    episodeNumbers: isCustomQuery ? undefined : (input.episodeNumbers ?? undefined),
     categories: row.type === "movie" ? [2000] : [5000],
     limit: pageSize,
     offset: page * pageSize,
@@ -174,6 +182,7 @@ export async function searchTorrents(
         confidence,
         categories: r.categories,
         languages: detectLanguages(r.title),
+        indexerLanguage: r.indexerLanguage ?? null,
         releaseGroup: detectReleaseGroup(r.title),
         codec: detectCodec(r.title),
       };

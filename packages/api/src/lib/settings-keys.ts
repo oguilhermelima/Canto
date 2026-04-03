@@ -25,6 +25,11 @@ export const SETTINGS = {
   JACKETT_URL: "jackett.url",
   JACKETT_API_KEY: "jackett.apiKey",
 
+  // Search
+  SEARCH_MAX_INDEXERS: "search.maxIndexers",
+  SEARCH_TIMEOUT: "search.timeout",
+  SEARCH_CONCURRENCY: "search.concurrency",
+
   // TMDB
   TMDB_API_KEY: "tmdb.apiKey",
 

@@ -8,6 +8,7 @@ import { parseTorznabXml } from "./torznab-parser";
 interface IndexerCapability {
   id: number;
   name: string;
+  language: string;
   tvSearch: boolean;
   tvSearchParams: string[];
   movieSearch: boolean;
@@ -47,6 +48,7 @@ export class ProwlarrClient {
     const indexers = (await response.json()) as Array<{
       id: number;
       name: string;
+      language: string;
       enable: boolean;
       capabilities: {
         tvSearchParams?: string[];
@@ -59,6 +61,7 @@ export class ProwlarrClient {
       .map((idx) => ({
         id: idx.id,
         name: idx.name ?? "unknown",
+        language: idx.language ?? "en-US",
         tvSearch: (idx.capabilities.tvSearchParams?.length ?? 0) > 0,
         tvSearchParams: idx.capabilities.tvSearchParams ?? [],
         movieSearch: (idx.capabilities.movieSearchParams?.length ?? 0) > 0,
@@ -76,35 +79,51 @@ export class ProwlarrClient {
 
   /* ── Per-indexer Newznab search ─────────────────────────────────────────── */
 
+  /** Defaults (overridden by settings) */
+  private static DEFAULT_TIMEOUT = 15_000;
+  private static DEFAULT_CONCURRENCY = 5;
+  private static DEFAULT_MAX_INDEXERS = 10;
+
   private async searchIndexer(
     indexer: IndexerCapability,
     params: Record<string, string>,
+    timeoutMs: number,
   ): Promise<IndexerResult[]> {
     const url = new URL(`${this.baseUrl}/api/v1/indexer/${indexer.id}/newznab`);
     url.searchParams.set("apikey", this.apiKey);
-    // limit/offset are passed via params from buildSearchParams
     if (!params.limit) url.searchParams.set("limit", "10000");
     for (const [k, v] of Object.entries(params)) {
       url.searchParams.set(k, v);
     }
 
-    const response = await fetch(url.toString(), {
-      headers: { "X-Api-Key": this.apiKey },
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-    if (!response.ok) {
-      console.warn(
-        `[prowlarr] Search on ${indexer.name} failed: ${response.status}`,
-      );
+    try {
+      const response = await fetch(url.toString(), {
+        headers: { "X-Api-Key": this.apiKey },
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        console.warn(`[prowlarr] ${indexer.name}: failed ${response.status}`);
+        return [];
+      }
+
+      const xml = await response.text();
+      const results = parseTorznabXml(xml, indexer.name, indexer.language);
+      console.log(`[prowlarr] ${indexer.name}: ${results.length} result(s)`);
+      return results;
+    } catch (err) {
+      if ((err as Error).name === "AbortError") {
+        console.warn(`[prowlarr] ${indexer.name}: timeout (${timeoutMs}ms)`);
+      } else {
+        console.warn(`[prowlarr] ${indexer.name}: ${(err as Error).message}`);
+      }
       return [];
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const xml = await response.text();
-    const results = parseTorznabXml(xml, indexer.name);
-    console.log(
-      `[prowlarr] ${indexer.name}: ${results.length} result(s) for ${JSON.stringify(params)}`,
-    );
-    return results;
   }
 
   /* ── Build per-indexer search params ────────────────────────────────────── */
@@ -178,13 +197,19 @@ export class ProwlarrClient {
     return params;
   }
 
-  /* ── Main search: parallel per-indexer ──────────────────────────────────── */
+  /* ── Main search: parallel per-indexer with concurrency limit ────────── */
 
   async search(ctx: SearchContext): Promise<IndexerResult[]> {
+    // Read configurable limits from settings
+    const [maxIndexers, timeoutMs, concurrency] = await Promise.all([
+      getSetting<number>(SETTINGS.SEARCH_MAX_INDEXERS).then((v) => v ?? ProwlarrClient.DEFAULT_MAX_INDEXERS),
+      getSetting<number>(SETTINGS.SEARCH_TIMEOUT).then((v) => v ?? ProwlarrClient.DEFAULT_TIMEOUT),
+      getSetting<number>(SETTINGS.SEARCH_CONCURRENCY).then((v) => v ?? ProwlarrClient.DEFAULT_CONCURRENCY),
+    ]);
+
     const indexers = await this.fetchIndexers();
 
-    // Filter to relevant indexers
-    const relevant =
+    let relevant =
       ctx.mediaType === "show"
         ? indexers.filter((i) => i.tvSearch)
         : indexers.filter((i) => i.movieSearch);
@@ -194,16 +219,26 @@ export class ProwlarrClient {
       return [];
     }
 
-    // Search all indexers in parallel
-    const searches = relevant.map((indexer) => {
-      const params = this.buildSearchParams(indexer, ctx);
-      return this.searchIndexer(indexer, params);
-    });
+    // Cap to max indexers setting
+    if (relevant.length > maxIndexers) {
+      relevant = relevant.slice(0, maxIndexers);
+    }
 
-    const settled = await Promise.allSettled(searches);
+    console.log(`[prowlarr] Searching ${relevant.length} indexer(s) (concurrency: ${concurrency}, timeout: ${timeoutMs}ms)`);
+
+    // Search in batches to avoid overwhelming Prowlarr
     const results: IndexerResult[] = [];
-    for (const s of settled) {
-      if (s.status === "fulfilled") results.push(...s.value);
+    for (let i = 0; i < relevant.length; i += concurrency) {
+      const batch = relevant.slice(i, i + concurrency);
+      const settled = await Promise.allSettled(
+        batch.map((indexer) => {
+          const params = this.buildSearchParams(indexer, ctx);
+          return this.searchIndexer(indexer, params, timeoutMs);
+        }),
+      );
+      for (const s of settled) {
+        if (s.status === "fulfilled") results.push(...s.value);
+      }
     }
 
     return results;
@@ -220,7 +255,7 @@ export class ProwlarrClient {
         t: "search",
         cat: categories.join(","),
         limit: "100",
-      }),
+      }, ProwlarrClient.DEFAULT_TIMEOUT),
     );
 
     const settled = await Promise.allSettled(fetches);

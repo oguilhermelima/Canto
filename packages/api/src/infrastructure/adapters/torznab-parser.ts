@@ -34,6 +34,7 @@ function text(value: unknown): string {
 export function parseTorznabXml(
   xml: string,
   fallbackIndexer = "Unknown",
+  indexerLanguage: string | null = null,
 ): IndexerResult[] {
   const parsed = xmlParser.parse(xml);
   const channel = parsed?.rss?.channel;
@@ -71,6 +72,8 @@ export function parseTorznabXml(
       const title = text(item.title);
       if (!title) continue;
 
+      const description = text(item.description);
+
       const sizeStr = text(item.size) || attrs.size || "0";
       const size = parseInt(sizeStr, 10);
       if (isNaN(size)) continue;
@@ -87,6 +90,7 @@ export function parseTorznabXml(
       results.push({
         guid,
         title,
+        description: description || null,
         size,
         publishDate: pubDate,
         downloadUrl: downloadUrl || null,
@@ -97,6 +101,7 @@ export function parseTorznabXml(
         leechers: Math.max(0, peers - seeders),
         age: Math.floor(ageMs / (1000 * 60 * 60 * 24)),
         indexerFlags: flags,
+        indexerLanguage: indexerLanguage,
         categories: parseCategories(item),
       });
     } catch {

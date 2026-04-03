@@ -58,6 +58,9 @@ const PLAINTEXT_KEYS = new Set([
   "autoMergeVersions",
   "sync.mediaImport.status",
   "cache.spotlight",
+  "search.maxIndexers",
+  "search.timeout",
+  "search.concurrency",
 ]);
 
 function isSensitive(key: string): boolean {

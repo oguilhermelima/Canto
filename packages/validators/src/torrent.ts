@@ -5,6 +5,7 @@ export const qualityType = z.enum(["uhd", "fullhd", "hd", "sd", "unknown"]);
 
 export const torrentSearchInput = z.object({
   mediaId: z.string().uuid(),
+  query: z.string().min(1).optional(),
   seasonNumber: z.number().int().nonnegative().optional(),
   episodeNumbers: z.array(z.number().int().positive()).nullish(),
   page: z.number().int().nonnegative().default(0),
