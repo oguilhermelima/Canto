@@ -23,6 +23,7 @@ interface WatchProvider {
 }
 
 interface CrewMember {
+  personId: number;
   name: string;
   job: string;
 }
@@ -170,30 +171,33 @@ export function MediaDetailHero({
             <img
               src={logoUrl}
               alt={title}
-              className="h-auto max-h-16 w-auto max-w-[70vw] object-contain object-left sm:max-h-20 md:max-h-28 lg:max-h-36"
+              className="h-auto max-h-10 w-auto max-w-[60vw] object-contain object-left sm:max-h-14 md:max-h-18 lg:max-h-22 xl:max-h-26 2xl:max-h-28"
               style={{
                 filter:
                   "drop-shadow(0 2px 8px rgba(0,0,0,0.5)) drop-shadow(0 0 20px rgba(0,0,0,0.3))",
               }}
             />
           ) : (
-            <h1 className="text-4xl font-extrabold tracking-tight text-foreground drop-shadow-lg lg:text-5xl">
+            <h1 className="text-2xl font-extrabold tracking-tight text-foreground drop-shadow-lg sm:text-3xl md:text-4xl xl:text-5xl">
               {title}
             </h1>
           )}
 
           {/* Director/Creator */}
           {director && (
-            <p className="text-sm text-foreground/60">
+            <p className="text-xs text-foreground/60 sm:text-sm">
               {director.job === "Director" ? "Directed by" : "Created by"}{" "}
-              <span className="font-medium text-foreground/80">
+              <Link
+                href={`/person/${director.personId}`}
+                className="font-medium text-foreground/80 transition-colors hover:text-foreground"
+              >
                 {director.name}
-              </span>
+              </Link>
             </p>
           )}
 
           {/* Meta line */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-foreground/60">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-foreground/60 sm:gap-x-3 sm:text-sm">
             <span>{type === "movie" ? "Movie" : "TV Show"}</span>
             {voteAverage != null && voteAverage > 0 && (
               <>
@@ -232,7 +236,7 @@ export function MediaDetailHero({
           {/* Overview */}
           {overview && (
             <div className="max-w-2xl">
-              <p className="line-clamp-3 text-sm leading-relaxed text-foreground/70">
+              <p className="line-clamp-2 text-xs leading-relaxed text-foreground/70 sm:line-clamp-3 sm:text-sm">
                 {overview}
               </p>
               {overview.length > 200 && (
