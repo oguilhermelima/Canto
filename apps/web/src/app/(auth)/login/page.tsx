@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@canto/ui/button";
@@ -17,6 +17,14 @@ import {
 import { authClient } from "~/lib/auth-client";
 
 export default function LoginPage(): React.JSX.Element {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent(): React.JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
