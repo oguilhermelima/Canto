@@ -124,7 +124,7 @@ export function SearchCommand({
                   <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded bg-muted">
                     {result.posterPath ? (
                       <Image
-                        src={result.posterPath.startsWith("http") ? result.posterPath : `https://image.tmdb.org/t/p/w500${result.posterPath}`}
+                        src={result.posterPath.startsWith("http") ? result.posterPath : `https://image.tmdb.org/t/p/w342${result.posterPath}`}
                         alt={result.title}
                         fill
                         className="object-cover"

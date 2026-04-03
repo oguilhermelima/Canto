@@ -1,18 +1,17 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
-import { Badge } from "@canto/ui/badge";
 import { Skeleton } from "@canto/ui/skeleton";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@canto/ui/popover";
-import { ChevronRight, Film, Play, Tv } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { AddToListButton } from "~/components/media/add-to-list-button";
+import { MediaLogo } from "~/components/media/media-logo";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -47,6 +46,7 @@ interface MediaDetailHeroProps {
   voteAverage?: number | null;
   voteCount?: number | null;
   genres?: string[];
+  genreIds?: number[];
   runtime?: number | null;
   contentRating?: string | null;
   status?: string | null;
@@ -82,6 +82,7 @@ export function MediaDetailHero({
   releaseDate,
   voteAverage,
   genres,
+  genreIds,
   runtime,
   contentRating,
   logoPath,
@@ -116,17 +117,12 @@ export function MediaDetailHero({
     }
   };
 
-  const logoUrl = logoPath ? resolveImage(logoPath, "w500") : null;
+  const logoUrl = logoPath ? resolveImage(logoPath, "w780") : null;
 
   // Director/Creator
   const director = (crew ?? []).find(
     (c) => c.job === "Director" || c.job === "Creator",
   );
-
-  // Meta line: "27 May 2022 | Action, Adventure, Science Fiction"
-  const metaParts: string[] = [];
-  if (releaseDate) metaParts.push(formatDate(releaseDate));
-  if (genres && genres.length > 0) metaParts.push(genres.join(", "));
 
   // Trailers (top 4)
   const trailers = (videos ?? []).slice(0, 4);
@@ -167,16 +163,7 @@ export function MediaDetailHero({
         <div className="max-w-3xl space-y-4">
           {/* Logo or Title */}
           {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={logoUrl}
-              alt={title}
-              className="h-auto max-h-10 w-auto max-w-[60vw] object-contain object-left sm:max-h-14 md:max-h-18 lg:max-h-22 xl:max-h-26 2xl:max-h-28"
-              style={{
-                filter:
-                  "drop-shadow(0 2px 8px rgba(0,0,0,0.5)) drop-shadow(0 0 20px rgba(0,0,0,0.3))",
-              }}
-            />
+            <MediaLogo src={logoUrl} alt={title} size="hero" className="max-w-[60vw]" />
           ) : (
             <h1 className="text-2xl font-extrabold tracking-tight text-foreground drop-shadow-lg sm:text-3xl md:text-4xl xl:text-5xl">
               {title}
@@ -228,7 +215,20 @@ export function MediaDetailHero({
             {genres && genres.length > 0 && (
               <>
                 <span className="text-foreground/20">|</span>
-                <span>{genres.join(", ")}</span>
+                {genres.map((genre, i) => {
+                  const gId = genreIds?.[i];
+                  return (
+                    <span key={genre} className="flex items-center gap-1.5">
+                      {i > 0 && <span className="text-foreground/20">,</span>}
+                      <Link
+                        href={`/search${gId ? `?genre=${gId}` : ""}`}
+                        className="transition-colors hover:text-foreground"
+                      >
+                        {genre}
+                      </Link>
+                    </span>
+                  );
+                })}
               </>
             )}
           </div>
@@ -236,24 +236,9 @@ export function MediaDetailHero({
           {/* Overview */}
           {overview && (
             <div className="max-w-2xl">
-              <p className="line-clamp-2 text-xs leading-relaxed text-foreground/70 sm:line-clamp-3 sm:text-sm">
+              <p className="text-xs leading-relaxed text-foreground/70 sm:text-sm">
                 {overview}
               </p>
-              {overview.length > 200 && (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <button className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-foreground/50 transition-colors hover:text-foreground/80">
-                      See more
-                      <ChevronRight className="h-3 w-3" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="max-h-[400px] w-[min(420px,90vw)] overflow-y-auto">
-                    <p className="text-sm leading-relaxed text-foreground/80">
-                      {overview}
-                    </p>
-                  </PopoverContent>
-                </Popover>
-              )}
             </div>
           )}
 
@@ -307,8 +292,8 @@ export function MediaDetailHero({
                 </a>
               )}
 
-              {/* Top streaming (first 3 flatrate) */}
-              {(flatrateProviders ?? []).slice(0, 3).map((p) => (
+              {/* Top streaming (first 2 flatrate) */}
+              {(flatrateProviders ?? []).slice(0, 2).map((p) => (
                 <a
                   key={p.providerId}
                   href={getProviderUrl(p.providerId)}
@@ -333,8 +318,8 @@ export function MediaDetailHero({
                 </a>
               ))}
 
-              {/* More button with popover */}
-              {allProviders.length > 3 && (
+              {/* All providers popover */}
+              {allProviders.length > 0 && (
                 <MoreProvidersPopover
                   flatrate={flatrateProviders ?? []}
                   rentBuy={rentBuyProviders ?? []}
@@ -377,7 +362,7 @@ function MoreProvidersPopover({
     <Popover>
       <PopoverTrigger asChild>
         <button className="flex h-10 items-center gap-1.5 rounded-xl bg-white/10 px-3 text-sm text-foreground/70 backdrop-blur-sm transition-colors hover:bg-white/15 hover:text-foreground">
-          More
+          All
           <ChevronRight className="h-3.5 w-3.5" />
         </button>
       </PopoverTrigger>

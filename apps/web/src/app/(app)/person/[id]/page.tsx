@@ -432,7 +432,7 @@ function PhotoGallery({
               className="relative h-[280px] w-[190px] shrink-0 overflow-hidden rounded-xl bg-muted md:h-[340px] md:w-[230px]"
             >
               <Image
-                src={`https://image.tmdb.org/t/p/w500${img.filePath}`}
+                src={`https://image.tmdb.org/t/p/w780${img.filePath}`}
                 alt={name}
                 fill
                 className="object-cover"

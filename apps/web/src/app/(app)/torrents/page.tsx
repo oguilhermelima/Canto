@@ -182,7 +182,7 @@ export default function DownloadsPage(): React.JSX.Element {
                   >
                     {t.media?.posterPath ? (
                       <Image
-                        src={`https://image.tmdb.org/t/p/w185${t.media.posterPath}`}
+                        src={`https://image.tmdb.org/t/p/w342${t.media.posterPath}`}
                         alt=""
                         fill
                         className="object-cover"

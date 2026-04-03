@@ -427,20 +427,20 @@ function CollectionsTab({
                   {posters.length >= 4 ? (
                     <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-0.5">
                       {posters.slice(0, 4).map((p, i) => (
-                        <Image key={i} src={`https://image.tmdb.org/t/p/w500${p}`} alt="" width={250} height={188} className="h-full w-full object-cover" />
+                        <Image key={i} src={`https://image.tmdb.org/t/p/w780${p}`} alt="" width={250} height={188} className="h-full w-full object-cover" />
                       ))}
                     </div>
                   ) : posters.length >= 2 ? (
                     <div className={cn("grid h-full w-full gap-0.5", posters.length === 2 && "grid-cols-2", posters.length === 3 && "grid-cols-2 grid-rows-2")}>
                       {posters.map((p, i) => (
-                        <Image key={i} src={`https://image.tmdb.org/t/p/w500${p}`} alt="" width={250} height={188} className={cn("h-full w-full object-cover", posters.length === 3 && i === 0 && "row-span-2")} />
+                        <Image key={i} src={`https://image.tmdb.org/t/p/w780${p}`} alt="" width={250} height={188} className={cn("h-full w-full object-cover", posters.length === 3 && i === 0 && "row-span-2")} />
                       ))}
                     </div>
                   ) : posters.length === 1 ? (
                     <div className="relative h-full w-full">
                       <Image src={`https://image.tmdb.org/t/p/w92${posters[0]}`} alt="" fill className="scale-110 object-cover blur-2xl brightness-50" />
                       <div className="relative flex h-full w-full items-center justify-center">
-                        <Image src={`https://image.tmdb.org/t/p/w500${posters[0]}`} alt="" width={120} height={180} className="h-[85%] w-auto rounded-md object-cover shadow-xl" />
+                        <Image src={`https://image.tmdb.org/t/p/w780${posters[0]}`} alt="" width={120} height={180} className="h-[85%] w-auto rounded-md object-cover shadow-xl" />
                       </div>
                     </div>
                   ) : (

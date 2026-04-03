@@ -247,7 +247,7 @@ export default function RequestsPage(): React.JSX.Element {
                     >
                       {media?.posterPath ? (
                         <Image
-                          src={`https://image.tmdb.org/t/p/w185${media.posterPath}`}
+                          src={`https://image.tmdb.org/t/p/w342${media.posterPath}`}
                           alt=""
                           fill
                           className="object-cover"

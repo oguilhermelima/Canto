@@ -7,6 +7,8 @@ import { cn } from "@canto/ui/cn";
 import { ChevronLeft, ChevronRight, Film, Tv, Volume2, VolumeOff } from "lucide-react";
 import { AddToListButton } from "~/components/media/add-to-list-button";
 import { Skeleton } from "@canto/ui/skeleton";
+import { tmdbPosterLoader, tmdbBackdropLoader } from "~/lib/tmdb-image";
+import { MediaLogo } from "~/components/media/media-logo";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -147,7 +149,7 @@ export function FeaturedCarousel({
             ? Array.from({ length: 12 }).map((_, i) => (
                 <Skeleton
                   key={i}
-                  className="shrink-0 rounded-xl h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px] w-[200px] sm:w-[220px] lg:w-[260px] 2xl:w-[300px]"
+                  className="shrink-0 rounded-xl h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px] w-[230px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]"
                 />
               ))
             : items.map((item, i) => (
@@ -163,7 +165,7 @@ export function FeaturedCarousel({
             Array.from({ length: 4 }).map((_, i) => (
               <Skeleton
                 key={`loading-${i}`}
-                className="shrink-0 rounded-xl h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px] w-[200px] sm:w-[220px] lg:w-[260px] 2xl:w-[300px]"
+                className="shrink-0 rounded-xl h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px] w-[230px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]"
               />
             ))}
           <div className="w-4 shrink-0 md:w-8 lg:w-12 xl:w-16 2xl:w-24" />
@@ -215,9 +217,8 @@ function FeaturedCard({
   }, [muted]);
 
   const href = `/media/ext?provider=${item.provider}&externalId=${item.externalId}&type=${item.type}`;
-  const imgUrl = (path: string, size: string) => path.startsWith("http") ? path : `${TMDB_IMAGE_BASE}/${size}${path}`;
-  const posterSrc = item.posterPath ? imgUrl(item.posterPath, "w500") : null;
-  const backdropSrc = item.backdropPath ? imgUrl(item.backdropPath, "w780") : null;
+  const posterSrc = item.posterPath ?? null;
+  const backdropSrc = item.backdropPath ?? null;
 
   return (
     <div
@@ -226,7 +227,7 @@ function FeaturedCard({
         "h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px]",
         isOpen
           ? "border border-border/40 w-[calc(360px*16/9)] sm:w-[calc(400px*16/9)] lg:w-[calc(440px*16/9)] 2xl:w-[calc(500px*16/9)]"
-          : "w-[200px] sm:w-[220px] lg:w-[260px] 2xl:w-[300px]",
+          : "w-[230px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]",
       )}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -241,12 +242,13 @@ function FeaturedCard({
       >
         {posterSrc ? (
           <Image
+            loader={tmdbPosterLoader}
             src={posterSrc}
             alt={item.title}
             fill
             className="object-cover"
             priority={index < 2}
-            sizes="200px"
+            sizes="(max-width: 640px) 230px, (max-width: 1024px) 250px, (max-width: 1536px) 280px, 320px"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-muted">
@@ -280,19 +282,21 @@ function FeaturedCard({
           </div>
         ) : backdropSrc ? (
           <Image
+            loader={tmdbBackdropLoader}
             src={backdropSrc}
             alt={item.title}
             fill
             className="object-cover"
-            sizes="750px"
+            sizes="(max-width: 640px) 100vw, 50vw"
           />
         ) : posterSrc ? (
           <Image
+            loader={tmdbPosterLoader}
             src={posterSrc}
             alt={item.title}
             fill
             className="object-cover blur-sm scale-110"
-            sizes="750px"
+            sizes="(max-width: 640px) 100vw, 50vw"
           />
         ) : null}
 
@@ -321,13 +325,7 @@ function FeaturedCard({
         <div className="absolute inset-x-0 bottom-0 flex flex-col gap-3 p-5">
           {/* Logo or title */}
           {item.logoPath ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={`${TMDB_IMAGE_BASE}/w500${item.logoPath}`}
-              alt={item.title}
-              className="h-auto max-h-20 w-auto max-w-[260px] object-contain object-left"
-              style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.5)) drop-shadow(0 0 20px rgba(0,0,0,0.3))" }}
-            />
+            <MediaLogo src={`${TMDB_IMAGE_BASE}/w780${item.logoPath}`} alt={item.title} size="carousel" />
           ) : (
             <h3 className="text-lg font-bold text-white drop-shadow-lg">{item.title}</h3>
           )}

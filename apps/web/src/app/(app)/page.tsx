@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Button } from "@canto/ui/button";
+import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
 import { ChevronLeft, ChevronRight, Info } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
@@ -11,6 +11,7 @@ import { MediaCarousel } from "~/components/media/media-carousel";
 import { FeaturedCarousel } from "~/components/media/featured-carousel";
 import { AddToListButton } from "~/components/media/add-to-list-button";
 import { StateMessage } from "~/components/layout/state-message";
+import { MediaLogo } from "~/components/media/media-logo";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -25,6 +26,31 @@ interface SpotlightItem {
   voteAverage: number | undefined;
   backdropPath: string;
   logoPath: string | null;
+  genres: string[];
+  genreIds: number[];
+}
+
+function SpotlightProgressFill({ slideKey }: { slideKey: number }): React.JSX.Element {
+  const [started, setStarted] = useState(false);
+
+  useEffect(() => {
+    setStarted(false);
+    // Trigger transition on next frame so the browser sees 0 → 1
+    const raf = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setStarted(true));
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [slideKey]);
+
+  return (
+    <div
+      className="absolute inset-0 origin-left rounded-full bg-foreground will-change-transform"
+      style={{
+        transform: `scaleX(${started ? 1 : 0})`,
+        transition: started ? "transform 10s linear" : "none",
+      }}
+    />
+  );
 }
 
 export default function DiscoverPage(): React.JSX.Element {
@@ -114,12 +140,12 @@ export default function DiscoverPage(): React.JSX.Element {
     document.title = "Discover — Canto";
   }, []);
 
-  // Auto-rotate spotlight (paused when popover/sheet is open)
+  // Auto-rotate spotlight — resets on manual slide change
   useEffect(() => {
     if (spotlightPaused || spotlightItems.length <= 1) return;
-    const interval = setInterval(nextSpotlight, 15000);
-    return () => clearInterval(interval);
-  }, [spotlightPaused, spotlightItems.length, nextSpotlight]);
+    const timeout = setTimeout(nextSpotlight, 10000);
+    return () => clearTimeout(timeout);
+  }, [spotlightPaused, spotlightItems.length, nextSpotlight, currentSpotlight]);
 
   const mapItems = useCallback(
     (results: typeof flatMovies) =>
@@ -177,7 +203,7 @@ export default function DiscoverPage(): React.JSX.Element {
       </div>
 
       {/* Spotlight Hero — extends behind topbar */}
-      <div className="spotlight relative -mt-16 min-h-[90vh] w-full xl:min-h-[80vh]">
+      <div className="group/spotlight spotlight relative -mt-16 min-h-[90vh] w-full xl:min-h-[80vh]">
         {/* Backdrop */}
         {currentItem?.backdropPath ? (
           <div
@@ -201,6 +227,26 @@ export default function DiscoverPage(): React.JSX.Element {
           <div className="absolute inset-0 bg-gradient-to-b from-muted/20 to-background" />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-b from-muted/20 to-background" />
+        )}
+
+        {/* Side arrows — visible on hover only */}
+        {spotlightItems.length > 1 && (
+          <>
+            <button
+              aria-label="Previous"
+              className="absolute left-4 top-1/2 z-20 hidden h-14 w-14 -translate-y-1/2 items-center justify-center rounded-full bg-background/20 text-foreground/60 opacity-0 backdrop-blur-sm transition-all hover:bg-background/40 hover:text-foreground group-hover/spotlight:opacity-100 md:flex lg:left-6"
+              onClick={prevSpotlight}
+            >
+              <ChevronLeft size={28} />
+            </button>
+            <button
+              aria-label="Next"
+              className="absolute right-4 top-1/2 z-20 hidden h-14 w-14 -translate-y-1/2 items-center justify-center rounded-full bg-background/20 text-foreground/60 opacity-0 backdrop-blur-sm transition-all hover:bg-background/40 hover:text-foreground group-hover/spotlight:opacity-100 md:flex lg:right-6"
+              onClick={nextSpotlight}
+            >
+              <ChevronRight size={28} />
+            </button>
+          </>
         )}
 
         {/* Content */}
@@ -253,16 +299,7 @@ export default function DiscoverPage(): React.JSX.Element {
               <Link href={getPreviewUrl(currentItem)} onMouseEnter={() => prefetchSpotlight(currentItem)} className="flex flex-col gap-5">
               {/* Logo or Title */}
               {currentItem.logoPath ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={`${TMDB_IMAGE_BASE}/w500${currentItem.logoPath}`}
-                  alt={currentItem.title}
-                  className="h-auto max-h-12 w-auto max-w-[60vw] object-contain object-left sm:max-h-16 md:max-h-20 lg:max-h-24 xl:max-h-28 2xl:max-h-32"
-                  style={{
-                    filter:
-                      "drop-shadow(0 2px 8px rgba(0,0,0,0.5)) drop-shadow(0 0 20px rgba(0,0,0,0.3))",
-                  }}
-                />
+                <MediaLogo src={`${TMDB_IMAGE_BASE}/w780${currentItem.logoPath}`} alt={currentItem.title} size="spotlight" className="max-w-[60vw]" />
               ) : (
                 <h1 className="text-2xl font-extrabold tracking-tight text-foreground drop-shadow-lg sm:text-3xl md:text-4xl xl:text-5xl">
                   {currentItem.title}
@@ -270,6 +307,7 @@ export default function DiscoverPage(): React.JSX.Element {
               )}
 
               {/* Meta line */}
+              </Link>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-foreground/70 sm:text-sm">
                 <span>{currentItem.type === "movie" ? "Movie" : "TV Show"}</span>
                 {currentItem.voteAverage != null && currentItem.voteAverage > 0 && (
@@ -284,15 +322,33 @@ export default function DiscoverPage(): React.JSX.Element {
                     <span>{currentItem.year}</span>
                   </>
                 )}
+                {currentItem.genres.length > 0 && (
+                  <>
+                    <span className="text-foreground/30">|</span>
+                    {currentItem.genres.map((genre, i) => {
+                      const genreId = currentItem.genreIds[i];
+                      return (
+                        <span key={genre} className="flex items-center gap-x-3">
+                          {i > 0 && <span className="text-foreground/30">·</span>}
+                          <Link
+                            href={`/search${genreId ? `?genre=${genreId}` : ""}`}
+                            className="transition-colors hover:text-foreground"
+                          >
+                            {genre}
+                          </Link>
+                        </span>
+                      );
+                    })}
+                  </>
+                )}
               </div>
-
               {currentItem.overview && (
-                <p className="line-clamp-2 text-xs leading-relaxed text-foreground/70 sm:line-clamp-3 sm:text-sm md:text-base">
-                  {currentItem.overview}
-                </p>
+                <Link href={getPreviewUrl(currentItem)} onMouseEnter={() => prefetchSpotlight(currentItem)}>
+                  <p className="line-clamp-2 text-xs leading-relaxed text-foreground/70 sm:line-clamp-3 sm:text-sm md:text-base">
+                    {currentItem.overview}
+                  </p>
+                </Link>
               )}
-
-              </Link>
 
               <div className="flex items-center gap-2 pt-1">
                 <AddToListButton
@@ -315,42 +371,49 @@ export default function DiscoverPage(): React.JSX.Element {
             </div>
           ) : null}
 
-          {/* Spotlight Navigation */}
+          {/* Progress indicators */}
           {spotlightItems.length > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-foreground/50 hover:text-foreground"
-                onClick={prevSpotlight}
+            <div className="mt-8 flex items-center justify-center gap-3">
+              <button
                 aria-label="Previous"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-foreground/40 transition-colors hover:text-foreground md:hidden"
+                onClick={prevSpotlight}
               >
                 <ChevronLeft size={20} />
-              </Button>
-              <div className="flex items-center gap-1.5">
-                {spotlightItems.map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    aria-label={`Go to slide ${i + 1}`}
-                    className={`h-1 rounded-full transition-all duration-300 ${
-                      i === currentSpotlight
-                        ? "w-6 bg-foreground"
-                        : "w-2 bg-foreground/30 hover:bg-foreground/50"
-                    }`}
-                    onClick={() => setCurrentSpotlight(i)}
-                  />
-                ))}
+              </button>
+              <div className="flex items-center gap-2">
+                {spotlightItems.map((_, i) => {
+                  const isActive = i === currentSpotlight;
+                  const isPast = i < currentSpotlight;
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      aria-label={`Go to slide ${i + 1}`}
+                      className={cn(
+                        "relative h-2 overflow-hidden rounded-full transition-[width] duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]",
+                        isActive
+                          ? "w-8 bg-foreground/30"
+                          : "w-2 bg-foreground/30 hover:bg-foreground/50",
+                      )}
+                      onClick={() => setCurrentSpotlight(i)}
+                    >
+                      {isActive ? (
+                        <SpotlightProgressFill slideKey={currentSpotlight} />
+                      ) : (
+                        <div className={cn("absolute inset-0 rounded-full bg-foreground", isPast ? "opacity-100" : "opacity-0")} />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-foreground/50 hover:text-foreground"
-                onClick={nextSpotlight}
+              <button
                 aria-label="Next"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-foreground/40 transition-colors hover:text-foreground md:hidden"
+                onClick={nextSpotlight}
               >
                 <ChevronRight size={20} />
-              </Button>
+              </button>
             </div>
           )}
         </div>
@@ -366,7 +429,7 @@ export default function DiscoverPage(): React.JSX.Element {
         ) : recentItems.length > 0 ? (
           <MediaCarousel
             title="Recently Added"
-            seeAllHref="/lists/server-library"
+            seeAllHref="/lists?tab=server"
             items={recentItems}
             isLoading={recentlyAdded.isLoading}
           />

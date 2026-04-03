@@ -113,7 +113,7 @@ function CastCard({
       <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-full bg-muted ring-2 ring-border/20 transition-[filter] duration-200 group-hover:brightness-110">
         {profilePath ? (
           <Image
-            src={`https://image.tmdb.org/t/p/w185${profilePath}`}
+            src={`https://image.tmdb.org/t/p/w342${profilePath}`}
             alt={name}
             fill
             className="object-cover"

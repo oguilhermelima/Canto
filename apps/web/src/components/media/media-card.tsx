@@ -7,6 +7,7 @@ import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
 import { Film, Tv } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
+import { tmdbPosterLoader } from "~/lib/tmdb-image";
 
 interface MediaCardProps {
   id?: string;
@@ -73,7 +74,8 @@ export function MediaCard({
       <div className="poster-frame relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-muted transition-shadow duration-300">
         {posterPath ? (
           <Image
-            src={posterPath.startsWith("http") ? posterPath : `https://image.tmdb.org/t/p/w500${posterPath}`}
+            loader={tmdbPosterLoader}
+            src={posterPath}
             alt={title}
             fill
             className="object-cover"
