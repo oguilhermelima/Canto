@@ -129,10 +129,11 @@ export async function findGlobalRecommendations(
   const certCondition = certification ? eq(media.contentRating, certification) : undefined;
   const statusCondition = status ? eq(media.status, status) : undefined;
 
-  const wpCondition = watchProviders && watchRegion
+  const wpIds = watchProviders ? watchProviders.split(/[,|]/).map(Number) : [];
+  const wpCondition = wpIds.length > 0 && watchRegion
     ? sql`${media.id} IN (
         SELECT media_id FROM media_watch_provider
-        WHERE provider_id IN (${sql.join(watchProviders.split(",").map(id => sql`${Number(id)}`), sql`, `)})
+        WHERE provider_id IN (${sql.join(wpIds.map(id => sql`${id}`), sql`, `)})
         AND region = ${watchRegion}
       )`
     : undefined;

@@ -234,10 +234,11 @@ export async function findUserRecommendations(
   const certClause = certification ? sql`AND ${media.contentRating} = ${certification}` : sql``;
   const statusClause = status ? sql`AND ${media.status} = ${status}` : sql``;
 
-  const wpClause = watchProviders && watchRegion
+  const wpIds = watchProviders ? watchProviders.split(/[,|]/).map(Number) : [];
+  const wpClause = wpIds.length > 0 && watchRegion
     ? sql`AND ${media.id} IN (
         SELECT media_id FROM media_watch_provider
-        WHERE provider_id IN (${sql.join(watchProviders.split(",").map(id => sql`${Number(id)}`), sql`, `)})
+        WHERE provider_id IN (${sql.join(wpIds.map(id => sql`${id}`), sql`, `)})
         AND region = ${watchRegion}
       )`
     : sql``;
