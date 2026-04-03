@@ -6,15 +6,15 @@ import { useDebounceCallback } from "usehooks-ts";
 import { Input } from "@canto/ui/input";
 import { Film, Search, Tv } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
-import { BrowseLayout } from "~/components/layout/browse-layout";
+import { BrowseLayout, type FilterOutput } from "~/components/layout/browse-layout";
 import { TabBar } from "~/components/layout/tab-bar";
 import { StateMessage } from "~/components/layout/state-message";
 
 const TYPE_OPTIONS = [
-  { value: "multi", label: "All" },
-  { value: "movie", label: "Movies", icon: Film },
-  { value: "show", label: "TV Shows", icon: Tv },
-] as const;
+  { value: "multi" as const, label: "All" },
+  { value: "movie" as const, label: "Movies", icon: Film },
+  { value: "show" as const, label: "TV Shows", icon: Tv },
+];
 
 export default function SearchPage(): React.JSX.Element {
   const searchParams = useSearchParams();
@@ -31,15 +31,17 @@ export default function SearchPage(): React.JSX.Element {
   const [searchType, setSearchType] = useState<"multi" | "movie" | "show">(
     initialType,
   );
+  const [filters, setFilters] = useState<FilterOutput>({});
 
   const searchTypeRef = useRef(searchType);
   searchTypeRef.current = searchType;
 
   const debouncedUpdateSearch = useDebounceCallback((value: string) => {
     setQuery(value);
-    const params = new URLSearchParams();
-    if (value) params.set("q", value);
-    if (searchTypeRef.current !== "multi") params.set("type", searchTypeRef.current);
+    // Preserve existing params (filter sidebar manages its own)
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set("q", value); else params.delete("q");
+    if (searchTypeRef.current !== "multi") params.set("type", searchTypeRef.current); else params.delete("type");
     router.replace(`/search?${params.toString()}`, { scroll: false });
   }, 300);
 
@@ -65,6 +67,8 @@ export default function SearchPage(): React.JSX.Element {
     document.title = query ? `"${query}" — Canto` : "Search — Canto";
   }, [query]);
 
+  const isSearching = query.length >= 2;
+
   const pageParam = {
     getNextPageParam: (
       lastPage: { totalPages: number },
@@ -78,46 +82,130 @@ export default function SearchPage(): React.JSX.Element {
     initialCursor: 1,
   };
 
+  /* ─── Search queries (when typing) ─── */
+
   const singleQuery = trpc.media.browse.useInfiniteQuery(
     { mode: "search", query, type: searchType === "multi" ? "movie" : searchType, provider: "tmdb" },
-    { enabled: query.length >= 2 && searchType !== "multi", ...pageParam },
+    { enabled: isSearching && searchType !== "multi", ...pageParam },
   );
 
   const multiMovieQuery = trpc.media.browse.useInfiniteQuery(
     { mode: "search", query, type: "movie", provider: "tmdb" },
-    { enabled: query.length >= 2 && searchType === "multi", ...pageParam },
+    { enabled: isSearching && searchType === "multi", ...pageParam },
   );
 
   const multiShowQuery = trpc.media.browse.useInfiniteQuery(
     { mode: "search", query, type: "show", provider: "tmdb" },
-    { enabled: query.length >= 2 && searchType === "multi", ...pageParam },
+    { enabled: isSearching && searchType === "multi", ...pageParam },
   );
 
-  const isError =
-    searchType === "multi"
+  /* ─── Trending/Discover queries (default, no search) ─── */
+
+  const hasFilters = Object.keys(filters).length > 0;
+  const browseMode = hasFilters ? "discover" as const : "trending" as const;
+
+  const trendingMovies = trpc.media.browse.useInfiniteQuery(
+    {
+      mode: browseMode, type: "movie",
+      genres: filters.genres,
+      language: filters.language,
+      sortBy: filters.sortBy,
+      scoreMin: filters.scoreMin,
+      runtimeMin: filters.runtimeMin,
+      runtimeMax: filters.runtimeMax,
+      certification: filters.certification,
+      status: filters.status,
+      watchProviders: filters.watchProviders,
+      watchRegion: filters.watchRegion,
+      dateFrom: filters.yearMin ? `${filters.yearMin}-01-01` : undefined,
+      dateTo: filters.yearMax ? `${filters.yearMax}-12-31` : undefined,
+    },
+    { enabled: !isSearching && searchType !== "show", staleTime: 10 * 60 * 1000, ...pageParam },
+  );
+
+  const trendingShows = trpc.media.browse.useInfiniteQuery(
+    {
+      mode: browseMode, type: "show",
+      genres: filters.genres,
+      language: filters.language,
+      sortBy: filters.sortBy,
+      scoreMin: filters.scoreMin,
+      runtimeMin: filters.runtimeMin,
+      runtimeMax: filters.runtimeMax,
+      certification: filters.certification,
+      status: filters.status,
+      watchProviders: filters.watchProviders,
+      watchRegion: filters.watchRegion,
+      dateFrom: filters.yearMin ? `${filters.yearMin}-01-01` : undefined,
+      dateTo: filters.yearMax ? `${filters.yearMax}-12-31` : undefined,
+    },
+    { enabled: !isSearching && searchType !== "movie", staleTime: 10 * 60 * 1000, ...pageParam },
+  );
+
+  /* ─── Derived state ─── */
+
+  const isError = isSearching
+    ? searchType === "multi"
       ? multiMovieQuery.isError || multiShowQuery.isError
-      : singleQuery.isError;
+      : singleQuery.isError
+    : searchType === "multi"
+      ? trendingMovies.isError || trendingShows.isError
+      : searchType === "movie"
+        ? trendingMovies.isError
+        : trendingShows.isError;
 
-  const isLoading =
-    searchType === "multi"
+  const isLoading = isSearching
+    ? searchType === "multi"
       ? multiMovieQuery.isLoading || multiShowQuery.isLoading
-      : singleQuery.isLoading;
+      : singleQuery.isLoading
+    : searchType === "multi"
+      ? trendingMovies.isLoading || trendingShows.isLoading
+      : searchType === "movie"
+        ? trendingMovies.isLoading
+        : trendingShows.isLoading;
 
-  const isFetchingNextPage =
-    searchType === "multi"
+  const isFetchingNextPage = isSearching
+    ? searchType === "multi"
       ? multiMovieQuery.isFetchingNextPage || multiShowQuery.isFetchingNextPage
-      : singleQuery.isFetchingNextPage;
+      : singleQuery.isFetchingNextPage
+    : searchType === "multi"
+      ? trendingMovies.isFetchingNextPage || trendingShows.isFetchingNextPage
+      : searchType === "movie"
+        ? trendingMovies.isFetchingNextPage
+        : trendingShows.isFetchingNextPage;
 
-  const hasNextPage =
-    searchType === "multi"
-      ? (multiMovieQuery.hasNextPage ?? false) ||
-        (multiShowQuery.hasNextPage ?? false)
-      : (singleQuery.hasNextPage ?? false);
+  const hasNextPage = isSearching
+    ? searchType === "multi"
+      ? (multiMovieQuery.hasNextPage ?? false) || (multiShowQuery.hasNextPage ?? false)
+      : (singleQuery.hasNextPage ?? false)
+    : searchType === "multi"
+      ? (trendingMovies.hasNextPage ?? false) || (trendingShows.hasNextPage ?? false)
+      : searchType === "movie"
+        ? (trendingMovies.hasNextPage ?? false)
+        : (trendingShows.hasNextPage ?? false);
 
   const { results, totalResults } = useMemo(() => {
+    if (isSearching) {
+      if (searchType === "multi") {
+        const moviePages = multiMovieQuery.data?.pages ?? [];
+        const showPages = multiShowQuery.data?.pages ?? [];
+        const merged = [
+          ...moviePages.flatMap((p) => p.results),
+          ...showPages.flatMap((p) => p.results),
+        ].sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
+        const movieTotal = moviePages[0]?.totalResults ?? 0;
+        const showTotal = showPages[0]?.totalResults ?? 0;
+        return { results: merged, totalResults: movieTotal + showTotal };
+      }
+      const pages = singleQuery.data?.pages ?? [];
+      const flat = pages.flatMap((p) => p.results);
+      return { results: flat, totalResults: pages[0]?.totalResults ?? 0 };
+    }
+
+    // Trending mode
     if (searchType === "multi") {
-      const moviePages = multiMovieQuery.data?.pages ?? [];
-      const showPages = multiShowQuery.data?.pages ?? [];
+      const moviePages = trendingMovies.data?.pages ?? [];
+      const showPages = trendingShows.data?.pages ?? [];
       const merged = [
         ...moviePages.flatMap((p) => p.results),
         ...showPages.flatMap((p) => p.results),
@@ -126,10 +214,11 @@ export default function SearchPage(): React.JSX.Element {
       const showTotal = showPages[0]?.totalResults ?? 0;
       return { results: merged, totalResults: movieTotal + showTotal };
     }
-    const pages = singleQuery.data?.pages ?? [];
+    const source = searchType === "movie" ? trendingMovies : trendingShows;
+    const pages = source.data?.pages ?? [];
     const flat = pages.flatMap((p) => p.results);
     return { results: flat, totalResults: pages[0]?.totalResults ?? 0 };
-  }, [searchType, singleQuery.data, multiMovieQuery.data, multiShowQuery.data]);
+  }, [isSearching, searchType, singleQuery.data, multiMovieQuery.data, multiShowQuery.data, trendingMovies.data, trendingShows.data]);
 
   const items = results.map((r) => ({
     externalId: r.externalId,
@@ -143,35 +232,47 @@ export default function SearchPage(): React.JSX.Element {
   }));
 
   const refetchAll = useCallback(() => {
-    if (searchType === "multi") {
-      void multiMovieQuery.refetch();
-      void multiShowQuery.refetch();
+    if (isSearching) {
+      if (searchType === "multi") {
+        void multiMovieQuery.refetch();
+        void multiShowQuery.refetch();
+      } else {
+        void singleQuery.refetch();
+      }
     } else {
-      void singleQuery.refetch();
+      void trendingMovies.refetch();
+      void trendingShows.refetch();
     }
-  }, [searchType, singleQuery, multiMovieQuery, multiShowQuery]);
+  }, [isSearching, searchType, singleQuery, multiMovieQuery, multiShowQuery, trendingMovies, trendingShows]);
 
   const fetchNextPage = useCallback(() => {
-    if (searchType === "multi") {
-      if (multiMovieQuery.hasNextPage && !multiMovieQuery.isFetchingNextPage)
-        void multiMovieQuery.fetchNextPage();
-      if (multiShowQuery.hasNextPage && !multiShowQuery.isFetchingNextPage)
-        void multiShowQuery.fetchNextPage();
+    if (isSearching) {
+      if (searchType === "multi") {
+        if (multiMovieQuery.hasNextPage && !multiMovieQuery.isFetchingNextPage)
+          void multiMovieQuery.fetchNextPage();
+        if (multiShowQuery.hasNextPage && !multiShowQuery.isFetchingNextPage)
+          void multiShowQuery.fetchNextPage();
+      } else {
+        if (singleQuery.hasNextPage && !singleQuery.isFetchingNextPage)
+          void singleQuery.fetchNextPage();
+      }
     } else {
-      if (singleQuery.hasNextPage && !singleQuery.isFetchingNextPage)
-        void singleQuery.fetchNextPage();
+      if (searchType !== "show" && trendingMovies.hasNextPage && !trendingMovies.isFetchingNextPage)
+        void trendingMovies.fetchNextPage();
+      if (searchType !== "movie" && trendingShows.hasNextPage && !trendingShows.isFetchingNextPage)
+        void trendingShows.fetchNextPage();
     }
-  }, [searchType, singleQuery, multiMovieQuery, multiShowQuery]);
+  }, [isSearching, searchType, singleQuery, multiMovieQuery, multiShowQuery, trendingMovies, trendingShows]);
 
   const handleTypeChange = useCallback(
     (type: "multi" | "movie" | "show") => {
       setSearchType(type);
-      const params = new URLSearchParams();
-      if (inputValue) params.set("q", inputValue);
-      if (type !== "multi") params.set("type", type);
+      const params = new URLSearchParams(searchParams.toString());
+      if (inputValue) params.set("q", inputValue); else params.delete("q");
+      if (type !== "multi") params.set("type", type); else params.delete("type");
       router.replace(`/search?${params.toString()}`, { scroll: false });
     },
-    [inputValue, router],
+    [inputValue, router, searchParams],
   );
 
   return (
@@ -194,6 +295,7 @@ export default function SearchPage(): React.JSX.Element {
       title="Search"
       hideTitle
       mediaType={searchType === "multi" ? "all" : searchType}
+      onFilterChange={setFilters}
       header={
         <div className="hidden pb-1 pt-4 md:block">
           <div className="relative">
@@ -223,16 +325,9 @@ export default function SearchPage(): React.JSX.Element {
         />
       }
       emptyState={
-        query.length < 2 ? (
-          <StateMessage
-            icon={Search}
-            title="Scan the cosmos"
-            description="Type at least 2 characters to start scanning."
-            minHeight="400px"
-          />
-        ) : isError ? (
+        isError ? (
           <StateMessage preset="errorSearch" onRetry={refetchAll} minHeight="400px" />
-        ) : !isLoading && totalResults === 0 ? (
+        ) : !isLoading && totalResults === 0 && isSearching ? (
           <StateMessage preset="emptySearch" minHeight="400px" />
         ) : undefined
       }

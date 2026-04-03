@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { cn } from "@canto/ui/cn";
 import { Input } from "@canto/ui/input";
 import { Slider } from "@canto/ui/slider";
@@ -190,21 +191,32 @@ export function FilterSidebar({
           });
         })();
 
-  // Local state
-  const [selectedGenres, setSelectedGenres] = useState<Set<number>>(new Set());
-  const [genreMode, setGenreMode] = useState<"and" | "or">("or");
-  const [sortBy, setSortBy] = useState("popularity.desc");
-  const [language, setLanguage] = useState("");
-  const [scoreMin, setScoreMin] = useState(0);
-  const [scoreDisplay, setScoreDisplay] = useState(0);
-  const [yearMin, setYearMin] = useState("");
-  const [yearMax, setYearMax] = useState("");
-  const [runtimeMin, setRuntimeMin] = useState("");
-  const [runtimeMax, setRuntimeMax] = useState("");
-  const [certification, setCertification] = useState("");
-  const [status, setStatus] = useState("");
-  const [selectedProviders, setSelectedProviders] = useState<Set<number>>(new Set());
-  const [providerMode, setProviderMode] = useState<"and" | "or">("or");
+  // ── URL ↔ State sync ──────────────────────────────────────────────
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Filter-owned param keys (everything else in the URL is preserved)
+  const FILTER_KEYS = ["genre", "genreMode", "sort", "language", "score", "yearMin", "yearMax", "runtimeMin", "runtimeMax", "certification", "status", "providers", "providerMode"] as const;
+
+  const parseSet = (v: string | null): Set<number> =>
+    new Set(v ? v.split(",").map(Number).filter(Boolean) : []);
+
+  // Local state — seeded from URL params
+  const [selectedGenres, setSelectedGenres] = useState<Set<number>>(() => parseSet(searchParams.get("genre")));
+  const [genreMode, setGenreMode] = useState<"and" | "or">((searchParams.get("genreMode") as "and" | "or") || "or");
+  const [sortBy, setSortBy] = useState(searchParams.get("sort") ?? "popularity.desc");
+  const [language, setLanguage] = useState(searchParams.get("language") ?? "");
+  const [scoreMin, setScoreMin] = useState(searchParams.get("score") ? Number(searchParams.get("score")) : 0);
+  const [scoreDisplay, setScoreDisplay] = useState(searchParams.get("score") ? Number(searchParams.get("score")) : 0);
+  const [yearMin, setYearMin] = useState(searchParams.get("yearMin") ?? "");
+  const [yearMax, setYearMax] = useState(searchParams.get("yearMax") ?? "");
+  const [runtimeMin, setRuntimeMin] = useState(searchParams.get("runtimeMin") ?? "");
+  const [runtimeMax, setRuntimeMax] = useState(searchParams.get("runtimeMax") ?? "");
+  const [certification, setCertification] = useState(searchParams.get("certification") ?? "");
+  const [status, setStatus] = useState(searchParams.get("status") ?? "");
+  const [selectedProviders, setSelectedProviders] = useState<Set<number>>(() => parseSet(searchParams.get("providers")));
+  const [providerMode, setProviderMode] = useState<"and" | "or">((searchParams.get("providerMode") as "and" | "or") || "or");
   const { region: watchRegion } = useWatchRegion();
 
   // Watch providers for the region
@@ -213,43 +225,79 @@ export function FilterSidebar({
     { staleTime: Infinity, gcTime: 24 * 60 * 60 * 1000 },
   );
 
-  // Debounced emit
+  // Build FilterOutput from current state
+  const buildOutput = useCallback((): FilterOutput => {
+    const f: FilterOutput = {};
+    if (selectedGenres.size > 0) {
+      const ids = [...selectedGenres];
+      f.genres = ids.join(genreMode === "or" ? "|" : ",");
+      f.genreMode = genreMode;
+      f.genreIds = ids;
+    }
+    if (sortBy !== "popularity.desc") f.sortBy = sortBy;
+    if (language) f.language = language;
+    if (scoreMin > 0) f.scoreMin = scoreMin;
+    if (yearMin) f.yearMin = yearMin;
+    if (yearMax) f.yearMax = yearMax;
+    if (runtimeMin) f.runtimeMin = Number(runtimeMin);
+    if (runtimeMax) f.runtimeMax = Number(runtimeMax);
+    if (certification) f.certification = certification;
+    if (status) f.status = status;
+    if (selectedProviders.size > 0) {
+      f.watchProviders = [...selectedProviders].join(providerMode === "or" ? "|" : ",");
+      f.watchRegion = watchRegion;
+    }
+    return f;
+  }, [selectedGenres, genreMode, sortBy, language, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion]);
+
+  // Sync state → URL + emit to parent
   const emitRef = useRef<ReturnType<typeof setTimeout>>(null);
   const firstRender = useRef(true);
 
   useEffect(() => {
+    const hasParams = selectedGenres.size > 0 || language || sortBy !== "popularity.desc" || yearMin || yearMax || scoreMin > 0 || runtimeMin || runtimeMax || certification || status || selectedProviders.size > 0;
+
     if (firstRender.current) {
       firstRender.current = false;
+      // On mount, emit if URL had filter params
+      if (hasParams) onFilterChange(buildOutput());
       return;
     }
 
     if (emitRef.current) clearTimeout(emitRef.current);
     emitRef.current = setTimeout(() => {
-      const f: FilterOutput = {};
-      if (selectedGenres.size > 0) {
-        const ids = [...selectedGenres];
-        f.genres = ids.join(genreMode === "or" ? "|" : ",");
-        f.genreMode = genreMode;
-        f.genreIds = ids;
+      // 1. Emit to parent
+      onFilterChange(buildOutput());
+
+      // 2. Update URL — preserve non-filter params
+      const params = new URLSearchParams();
+      for (const [key, value] of searchParams.entries()) {
+        if (!(FILTER_KEYS as readonly string[]).includes(key)) {
+          params.set(key, value);
+        }
       }
-      if (sortBy !== "popularity.desc") f.sortBy = sortBy;
-      if (language) f.language = language;
-      if (scoreMin > 0) f.scoreMin = scoreMin;
-      if (yearMin) f.yearMin = yearMin;
-      if (yearMax) f.yearMax = yearMax;
-      if (runtimeMin) f.runtimeMin = Number(runtimeMin);
-      if (runtimeMax) f.runtimeMax = Number(runtimeMax);
-      if (certification) f.certification = certification;
-      if (status) f.status = status;
-      if (selectedProviders.size > 0) {
-        f.watchProviders = [...selectedProviders].join(providerMode === "or" ? "|" : ",");
-        f.watchRegion = watchRegion;
-      }
-      onFilterChange(f);
+
+      // Set filter params
+      if (selectedGenres.size > 0) params.set("genre", [...selectedGenres].join(","));
+      if (genreMode !== "or") params.set("genreMode", genreMode);
+      if (sortBy !== "popularity.desc") params.set("sort", sortBy);
+      if (language) params.set("language", language);
+      if (scoreMin > 0) params.set("score", String(scoreMin));
+      if (yearMin) params.set("yearMin", yearMin);
+      if (yearMax) params.set("yearMax", yearMax);
+      if (runtimeMin) params.set("runtimeMin", runtimeMin);
+      if (runtimeMax) params.set("runtimeMax", runtimeMax);
+      if (certification) params.set("certification", certification);
+      if (status) params.set("status", status);
+      if (selectedProviders.size > 0) params.set("providers", [...selectedProviders].join(","));
+      if (providerMode !== "or") params.set("providerMode", providerMode);
+
+      const qs = params.toString();
+      router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
     }, 300);
 
     return () => { if (emitRef.current) clearTimeout(emitRef.current); };
-  }, [selectedGenres, genreMode, sortBy, language, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion, onFilterChange]);
+  }, [selectedGenres, genreMode, sortBy, language, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion, onFilterChange, buildOutput, searchParams, router, pathname]);
 
   // Handlers
   const toggleGenre = (id: number): void => {
@@ -276,7 +324,6 @@ export function FilterSidebar({
     setStatus("");
     setSelectedProviders(new Set());
     setProviderMode("or");
-    onFilterChange({});
   };
 
   const isDesc = sortBy.endsWith(".desc");
