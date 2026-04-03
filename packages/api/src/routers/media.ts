@@ -42,6 +42,7 @@ import {
 import {
   findUserRecommendations,
   countUserRecommendations,
+  type RecsFilters,
 } from "../infrastructure/repositories/user-recommendation-repository";
 
 /* -------------------------------------------------------------------------- */
@@ -79,6 +80,15 @@ export const mediaRouter = createTRPCRouter({
       language: z.string().optional(),
       sortBy: z.string().optional(),
       dateFrom: z.string().optional(),
+      keywords: z.string().optional(),      // TMDB keyword IDs
+      scoreMin: z.number().optional(),      // min vote average
+      runtimeMax: z.number().optional(),    // max runtime minutes
+      dateTo: z.string().optional(),        // year range max
+      certification: z.string().optional(),
+      status: z.string().optional(),
+      watchProviders: z.string().optional(),
+      watchRegion: z.string().optional(),
+      runtimeMin: z.number().optional(),
       page: z.number().int().min(1).default(1),
       cursor: z.number().int().positive().nullish(),
     }))
@@ -102,17 +112,33 @@ export const mediaRouter = createTRPCRouter({
       }
 
       const settingsLang = (await getSetting(SETTINGS.LANGUAGE)) ?? "en-US";
-      const cacheKey = `browse:${input.type}:${input.mode}:${input.genres ?? ""}:${input.language ?? ""}:${input.sortBy ?? ""}:${input.dateFrom ?? ""}:${page}:${settingsLang}`;
+      const cacheKey = `browse:${input.type}:${input.mode}:${input.genres ?? ""}:${input.language ?? ""}:${input.sortBy ?? ""}:${input.dateFrom ?? ""}:${input.dateTo ?? ""}:${input.keywords ?? ""}:${input.scoreMin ?? ""}:${input.runtimeMax ?? ""}:${input.certification ?? ""}:${input.status ?? ""}:${input.watchProviders ?? ""}:${input.watchRegion ?? ""}:${input.runtimeMin ?? ""}:${page}:${settingsLang}`;
 
       return cached(cacheKey, 300, async () => {
         const provider = await getTmdbProvider();
 
         if (input.mode === "trending") {
-          if (input.genres || input.language) {
-            return provider.getTrendingFiltered(input.type, {
+          const hasFilters = input.genres || input.language || input.keywords || input.scoreMin != null || input.runtimeMax != null || input.certification || input.status || input.watchProviders || input.runtimeMin != null;
+          if (hasFilters) {
+            // Use discover mode for proper server-side filtering
+            return provider.discover(input.type, {
               page,
-              genreIds: input.genres ? input.genres.split(",").map(Number) : undefined,
-              language: input.language,
+              with_genres: input.genres,
+              with_original_language: input.language,
+              with_keywords: input.keywords,
+              vote_average_gte: input.scoreMin,
+              with_runtime_lte: input.runtimeMax,
+              sort_by: input.sortBy ?? "popularity.desc",
+              first_air_date_gte: input.type === "show" ? input.dateFrom : undefined,
+              release_date_gte: input.type === "movie" ? input.dateFrom : undefined,
+              first_air_date_lte: input.type === "show" ? input.dateTo : undefined,
+              release_date_lte: input.type === "movie" ? input.dateTo : undefined,
+              certification: input.certification,
+              certification_country: input.certification ? "US" : undefined,
+              with_status: input.status,
+              with_watch_providers: input.watchProviders,
+              watch_region: input.watchRegion,
+              with_runtime_gte: input.runtimeMin,
             });
           }
           return provider.getTrending(input.type, { page });
@@ -123,9 +149,20 @@ export const mediaRouter = createTRPCRouter({
           page,
           with_genres: input.genres,
           with_original_language: input.language,
+          with_keywords: input.keywords,
+          vote_average_gte: input.scoreMin,
+          with_runtime_lte: input.runtimeMax,
           sort_by: input.sortBy ?? "popularity.desc",
           first_air_date_gte: input.type === "show" ? input.dateFrom : undefined,
           release_date_gte: input.type === "movie" ? input.dateFrom : undefined,
+          first_air_date_lte: input.type === "show" ? input.dateTo : undefined,
+          release_date_lte: input.type === "movie" ? input.dateTo : undefined,
+          certification: input.certification,
+          certification_country: input.certification ? "US" : undefined,
+          with_status: input.status,
+          with_watch_providers: input.watchProviders,
+          watch_region: input.watchRegion,
+          with_runtime_gte: input.runtimeMin,
         });
       });
     }),
@@ -437,12 +474,37 @@ export const mediaRouter = createTRPCRouter({
     .input(z.object({
       cursor: z.number().int().min(0).default(0),
       pageSize: z.number().int().min(1).max(20).default(10),
+      genreIds: z.array(z.number()).optional(),
+      genreMode: z.enum(["and", "or"]).default("or").optional(),
+      language: z.string().optional(),
+      scoreMin: z.number().optional(),
+      yearMin: z.string().optional(),
+      yearMax: z.string().optional(),
+      runtimeMin: z.number().optional(),
+      runtimeMax: z.number().optional(),
+      certification: z.string().optional(),
+      status: z.string().optional(),
+      sortBy: z.string().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
       const page = input?.cursor ?? 0;
       const pageSize = input?.pageSize ?? 10;
       const offset = page * pageSize;
       const userId = ctx.session.user.id;
+
+      const recsFilters: RecsFilters = {
+        genreIds: input?.genreIds,
+        genreMode: input?.genreMode ?? "or",
+        language: input?.language,
+        scoreMin: input?.scoreMin,
+        yearMin: input?.yearMin,
+        yearMax: input?.yearMax,
+        runtimeMin: input?.runtimeMin,
+        runtimeMax: input?.runtimeMax,
+        certification: input?.certification,
+        status: input?.status,
+        sortBy: input?.sortBy,
+      };
 
       // Get user's current recs version + language
       const userRow = await ctx.db.query.user.findFirst({
@@ -463,6 +525,7 @@ export const mediaRouter = createTRPCRouter({
           excludeItems,
           pageSize + 1, // fetch 1 extra to detect hasMore
           offset,
+          recsFilters,
         );
 
         const hasMore = rows.length > pageSize;
@@ -472,7 +535,7 @@ export const mediaRouter = createTRPCRouter({
       }
 
       // ── Path 2: Fallback to global pool ──
-      const poolItems = await findGlobalRecommendations(ctx.db, excludeItems, (pageSize + 1) * 3, offset);
+      const poolItems = await findGlobalRecommendations(ctx.db, excludeItems, (pageSize + 1) * 3, offset, recsFilters);
 
       if (poolItems.length > 0) {
         const seen = new Set<string>();

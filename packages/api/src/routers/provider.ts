@@ -1,11 +1,11 @@
 import { z } from "zod";
 
 import { db } from "@canto/db/client";
-import { genre } from "@canto/db/schema";
 import { getSetting, setSetting } from "@canto/db/settings";
 import { SETTINGS } from "../lib/settings-keys";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
+import { getTmdbProvider } from "../lib/tmdb-client";
 import { cached } from "../infrastructure/cache/redis";
 import { findRecommendedMediaWithBackdrops, findWatchProviderLinks } from "../infrastructure/repositories/extras-repository";
 import { findUserSpotlightItems } from "../infrastructure/repositories/user-recommendation-repository";
@@ -270,12 +270,13 @@ export const providerRouter = createTRPCRouter({
   /**
    * Get all unified genres (provider-agnostic).
    */
-  genres: publicProcedure.query(async () => {
-    const rows = await db.query.genre.findMany({
-      orderBy: (g, { asc }) => [asc(g.name)],
-    });
-    return rows;
-  }),
+  genres: publicProcedure
+    .input(z.object({ type: z.enum(["movie", "show"]).default("movie") }).optional())
+    .query(async ({ input }) => {
+      const type = input?.type ?? "movie";
+      const provider = await getTmdbProvider();
+      return provider.getGenres(type);
+    }),
 
   /**
    * Get watch provider search URL templates.

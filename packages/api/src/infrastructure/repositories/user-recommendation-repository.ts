@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, not, sql, count } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, not, sql, count } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
   user,
@@ -140,6 +140,43 @@ export async function upsertUserRecommendations(
   }
 }
 
+export interface RecsFilters {
+  genreIds?: number[];
+  genreMode?: "and" | "or";
+  language?: string;
+  scoreMin?: number;
+  yearMin?: string;
+  yearMax?: string;
+  runtimeMin?: number;
+  runtimeMax?: number;
+  certification?: string;
+  status?: string;
+  sortBy?: string;
+}
+
+/**
+ * Map a TMDB-style sort string to a Drizzle orderBy expression.
+ * Falls back to `null` (caller should use the default order).
+ */
+function recsSortOrder(sortBy: string | undefined) {
+  switch (sortBy) {
+    case "vote_average.desc":
+      return desc(media.voteAverage);
+    case "vote_average.asc":
+      return asc(media.voteAverage);
+    case "primary_release_date.desc":
+      return desc(media.releaseDate);
+    case "primary_release_date.asc":
+      return asc(media.releaseDate);
+    case "title.asc":
+      return asc(media.title);
+    case "title.desc":
+      return desc(media.title);
+    default:
+      return null;
+  }
+}
+
 /**
  * Per-user recommendation query.
  * Only reads active rows. JOINs with media,
@@ -151,7 +188,22 @@ export async function findUserRecommendations(
   excludeItems: Array<{ externalId: number; provider: string }>,
   limit: number,
   offset: number,
+  filters: RecsFilters = {},
 ) {
+  const {
+    genreIds,
+    genreMode = "or",
+    language,
+    scoreMin,
+    yearMin,
+    yearMax,
+    runtimeMin,
+    runtimeMax,
+    certification,
+    status,
+    sortBy,
+  } = filters;
+
   const excludeClause =
     excludeItems.length > 0
       ? sql`AND NOT (${sql.join(
@@ -161,6 +213,24 @@ export async function findUserRecommendations(
           sql` OR `,
         )})`
       : sql``;
+
+  const genreClause =
+    genreIds && genreIds.length > 0
+      ? genreMode === "and"
+        ? sql`AND ${media.genreIds}::jsonb @> ${JSON.stringify(genreIds)}::jsonb`
+        : sql`AND (${sql.join(genreIds.map((id) => sql`${media.genreIds}::jsonb @> ${JSON.stringify([id])}::jsonb`), sql` OR `)})`
+      : sql``;
+
+  const languageClause = language ? sql`AND ${media.originalLanguage} = ${language}` : sql``;
+  const scoreClause = scoreMin != null ? sql`AND ${media.voteAverage} >= ${scoreMin}` : sql``;
+  const yearMinClause = yearMin ? sql`AND ${media.releaseDate} >= ${yearMin + "-01-01"}` : sql``;
+  const yearMaxClause = yearMax ? sql`AND ${media.releaseDate} <= ${yearMax + "-12-31"}` : sql``;
+  const runtimeMinClause = runtimeMin != null ? sql`AND ${media.runtime} >= ${runtimeMin}` : sql``;
+  const runtimeMaxClause = runtimeMax != null ? sql`AND ${media.runtime} <= ${runtimeMax}` : sql``;
+  const certClause = certification ? sql`AND ${media.contentRating} = ${certification}` : sql``;
+  const statusClause = status ? sql`AND ${media.status} = ${status}` : sql``;
+
+  const customSort = recsSortOrder(sortBy);
 
   return db
     .select({
@@ -175,6 +245,8 @@ export async function findUserRecommendations(
       logoPath: media.logoPath,
       releaseDate: media.releaseDate,
       voteAverage: media.voteAverage,
+      genres: media.genres,
+      genreIds: media.genreIds,
       trailerKey: sql<string | null>`(SELECT ${mediaVideo.externalKey} FROM ${mediaVideo} WHERE ${mediaVideo.mediaId} = ${media.id} AND ${mediaVideo.type} = 'Trailer' AND ${mediaVideo.site} = 'YouTube' LIMIT 1)`,
       relevance: sql<number>`SUM(${userRecommendation.weight})`,
     })
@@ -187,7 +259,16 @@ export async function findUserRecommendations(
       sql`${userRecommendation.userId} = ${userId}
         AND ${userRecommendation.active} = true
         AND (${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL)
-        ${excludeClause}`,
+        ${excludeClause}
+        ${genreClause}
+        ${languageClause}
+        ${scoreClause}
+        ${yearMinClause}
+        ${yearMaxClause}
+        ${runtimeMinClause}
+        ${runtimeMaxClause}
+        ${certClause}
+        ${statusClause}`,
     )
     .groupBy(
       media.id,
@@ -201,11 +282,11 @@ export async function findUserRecommendations(
       media.logoPath,
       media.releaseDate,
       media.voteAverage,
+      media.genres,
+      media.genreIds,
     )
     .orderBy(
-      desc(
-        sql`SUM(${userRecommendation.weight})`,
-      ),
+      customSort ?? desc(sql`SUM(${userRecommendation.weight})`),
     )
     .limit(limit)
     .offset(offset);

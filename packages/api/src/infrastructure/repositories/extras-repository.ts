@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, isNotNull, not, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, isNotNull, not, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
   blocklist,
@@ -9,6 +9,7 @@ import {
   mediaWatchProvider,
   watchProviderLink,
 } from "@canto/db/schema";
+import type { RecsFilters } from "./user-recommendation-repository";
 
 // ── Credits ──
 
@@ -81,7 +82,22 @@ export async function findGlobalRecommendations(
   excludeItems: Array<{ externalId: number; provider: string }>,
   limit: number,
   offset: number,
+  filters: RecsFilters = {},
 ) {
+  const {
+    genreIds,
+    genreMode = "or",
+    language,
+    scoreMin,
+    yearMin,
+    yearMax,
+    runtimeMin,
+    runtimeMax,
+    certification,
+    status,
+    sortBy,
+  } = filters;
+
   const released = sql`${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL`;
 
   const excludeConditions =
@@ -95,17 +111,68 @@ export async function findGlobalRecommendations(
         )
       : [];
 
+  const genreCondition =
+    genreIds && genreIds.length > 0
+      ? genreMode === "and"
+        ? sql`${media.genreIds}::jsonb @> ${JSON.stringify(genreIds)}::jsonb`
+        : sql`(${sql.join(genreIds.map((id) => sql`${media.genreIds}::jsonb @> ${JSON.stringify([id])}::jsonb`), sql` OR `)})`
+      : undefined;
+
+  const languageCondition = language ? eq(media.originalLanguage, language) : undefined;
+  const scoreCondition = scoreMin != null ? sql`${media.voteAverage} >= ${scoreMin}` : undefined;
+  const yearMinCondition = yearMin ? sql`${media.releaseDate} >= ${yearMin + "-01-01"}` : undefined;
+  const yearMaxCondition = yearMax ? sql`${media.releaseDate} <= ${yearMax + "-12-31"}` : undefined;
+  const runtimeMinCondition = runtimeMin != null ? sql`${media.runtime} >= ${runtimeMin}` : undefined;
+  const runtimeMaxCondition = runtimeMax != null ? sql`${media.runtime} <= ${runtimeMax}` : undefined;
+  const certCondition = certification ? eq(media.contentRating, certification) : undefined;
+  const statusCondition = status ? eq(media.status, status) : undefined;
+
   const where = and(
     sql`${media.id} IN (SELECT media_id FROM media_recommendation)`,
     released,
     ...(excludeConditions.length > 0
       ? [not(sql`(${sql.join(excludeConditions, sql` OR `)})`)]
       : []),
+    ...(genreCondition ? [genreCondition] : []),
+    ...(languageCondition ? [languageCondition] : []),
+    ...(scoreCondition ? [scoreCondition] : []),
+    ...(yearMinCondition ? [yearMinCondition] : []),
+    ...(yearMaxCondition ? [yearMaxCondition] : []),
+    ...(runtimeMinCondition ? [runtimeMinCondition] : []),
+    ...(runtimeMaxCondition ? [runtimeMaxCondition] : []),
+    ...(certCondition ? [certCondition] : []),
+    ...(statusCondition ? [statusCondition] : []),
   );
+
+  // Map sortBy to orderBy
+  let orderBy;
+  switch (sortBy) {
+    case "vote_average.desc":
+      orderBy = [desc(media.voteAverage)];
+      break;
+    case "vote_average.asc":
+      orderBy = [asc(media.voteAverage)];
+      break;
+    case "primary_release_date.desc":
+      orderBy = [desc(media.releaseDate)];
+      break;
+    case "primary_release_date.asc":
+      orderBy = [asc(media.releaseDate)];
+      break;
+    case "title.asc":
+      orderBy = [asc(media.title)];
+      break;
+    case "title.desc":
+      orderBy = [desc(media.title)];
+      break;
+    default:
+      orderBy = [desc(media.voteAverage)];
+      break;
+  }
 
   return db.query.media.findMany({
     where,
-    orderBy: [desc(media.voteAverage)],
+    orderBy,
     limit,
     offset,
   });
