@@ -13,6 +13,8 @@ export function mapPoolItem(item: {
   trailerKey?: string | null;
   releaseDate?: string | Date | null;
   voteAverage?: number | null;
+  genres?: string[] | null;
+  genreIds?: number[] | null;
 }) {
   return {
     id: item.id ?? null,
@@ -29,5 +31,7 @@ export function mapPoolItem(item: {
       ? new Date(typeof item.releaseDate === "string" ? item.releaseDate : item.releaseDate).getFullYear()
       : undefined,
     voteAverage: item.voteAverage ?? undefined,
+    genres: item.genres ?? [],
+    genreIds: item.genreIds ?? [],
   };
 }

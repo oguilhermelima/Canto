@@ -252,7 +252,6 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
   });
 
   const deleteTorrentMutation = trpc.torrent.delete.useMutation();
-  const replaceProvider = trpc.media.replaceProvider.useMutation();
   const utils = trpc.useUtils();
   const requestDownload = trpc.request.create.useMutation({
     onSuccess: () => {
@@ -474,6 +473,7 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
         year={media.year}
         releaseDate={media.releaseDate}
         genres={media.genres ?? undefined}
+        genreIds={media.genreIds ?? undefined}
         runtime={media.runtime}
         contentRating={media.contentRating}
         logoPath={media.logoPath}

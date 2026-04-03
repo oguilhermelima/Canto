@@ -411,6 +411,8 @@ export async function findUserSpotlightItems(
       logoPath: media.logoPath,
       releaseDate: media.releaseDate,
       voteAverage: media.voteAverage,
+      genres: media.genres,
+      genreIds: media.genreIds,
       relevance: sql<number>`SUM(${userRecommendation.weight})`,
     })
     .from(userRecommendation)
@@ -436,6 +438,8 @@ export async function findUserSpotlightItems(
       media.logoPath,
       media.releaseDate,
       media.voteAverage,
+      media.genres,
+      media.genreIds,
     )
     .orderBy(
       desc(
