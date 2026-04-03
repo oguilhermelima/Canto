@@ -36,6 +36,19 @@ export default function ListDetailPage(): React.JSX.Element {
   const { data, isLoading, error } = trpc.list.getBySlug.useQuery({
     slug,
     limit: 100,
+    genreIds: filters.genreIds,
+    genreMode: filters.genreMode,
+    language: filters.language,
+    scoreMin: filters.scoreMin,
+    yearMin: filters.yearMin,
+    yearMax: filters.yearMax,
+    runtimeMin: filters.runtimeMin,
+    runtimeMax: filters.runtimeMax,
+    certification: filters.certification,
+    status: filters.status,
+    sortBy: filters.sortBy,
+    watchProviders: filters.watchProviders,
+    watchRegion: filters.watchRegion,
   });
 
   useEffect(() => {
@@ -57,24 +70,9 @@ export default function ListDetailPage(): React.JSX.Element {
         voteAverage: item.media.voteAverage ?? undefined,
       })) ?? [];
 
-    // Type filter
-    const typed = typeFilter === "all" ? all : all.filter((i) => i.type === typeFilter);
-
-    // Sidebar filters
-    const filtered = typed.filter((r) => {
-      if (r.year) {
-        const yearMin = filters.yearMin ? Number(filters.yearMin) : 0;
-        const yearMax = filters.yearMax ? Number(filters.yearMax) : 9999;
-        if (r.year < yearMin || r.year > yearMax) return false;
-      }
-      const minScore = filters.scoreMin ?? 0;
-      if (minScore > 0 && r.voteAverage != null && r.voteAverage < minScore)
-        return false;
-      return true;
-    });
-
-    return filtered;
-  }, [data, typeFilter, filters]);
+    // Type filter (client-side, tabs)
+    return typeFilter === "all" ? all : all.filter((i) => i.type === typeFilter);
+  }, [data, typeFilter]);
 
   if (error) {
     return (

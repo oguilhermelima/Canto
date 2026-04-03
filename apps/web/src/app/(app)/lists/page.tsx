@@ -99,34 +99,31 @@ function MediaListTab({
   const { data, isLoading, isError, refetch } = trpc.list.getBySlug.useQuery({
     slug,
     limit: 100,
+    genreIds: filters.genreIds,
+    genreMode: filters.genreMode,
+    language: filters.language,
+    scoreMin: filters.scoreMin,
+    yearMin: filters.yearMin,
+    yearMax: filters.yearMax,
+    runtimeMin: filters.runtimeMin,
+    runtimeMax: filters.runtimeMax,
+    certification: filters.certification,
+    status: filters.status,
+    sortBy: filters.sortBy,
+    watchProviders: filters.watchProviders,
+    watchRegion: filters.watchRegion,
   });
 
-  const items = useMemo(() => {
-    const all =
-      data?.items.map((item) => ({
-        id: item.media.id,
-        type: item.media.type as "movie" | "show",
-        title: item.media.title,
-        posterPath: item.media.posterPath,
-        year: item.media.year ?? undefined,
-        voteAverage: item.media.voteAverage ?? undefined,
-      })) ?? [];
-
-    // Filter
-    const filtered = all.filter((r) => {
-      if (r.year) {
-        const yearMin = filters.yearMin ? Number(filters.yearMin) : 0;
-        const yearMax = filters.yearMax ? Number(filters.yearMax) : 9999;
-        if (r.year < yearMin || r.year > yearMax) return false;
-      }
-      const minScore = filters.scoreMin ?? 0;
-      if (minScore > 0 && r.voteAverage != null && r.voteAverage < minScore)
-        return false;
-      return true;
-    });
-
-    return filtered;
-  }, [data, filters]);
+  const items = useMemo(() =>
+    data?.items.map((item) => ({
+      id: item.media.id,
+      type: item.media.type as "movie" | "show",
+      title: item.media.title,
+      posterPath: item.media.posterPath,
+      year: item.media.year ?? undefined,
+      voteAverage: item.media.voteAverage ?? undefined,
+    })) ?? [],
+  [data]);
 
   if (isError) {
     return <StateMessage preset="error" onRetry={() => void refetch()} />;

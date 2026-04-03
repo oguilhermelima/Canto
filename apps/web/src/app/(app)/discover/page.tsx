@@ -64,6 +64,8 @@ function RecommendedPage(): React.JSX.Element {
       certification: filters.certification,
       status: filters.status,
       sortBy: filters.sortBy,
+      watchProviders: filters.watchProviders,
+      watchRegion: filters.watchRegion,
     }),
     [filters],
   );
