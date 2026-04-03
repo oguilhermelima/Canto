@@ -224,48 +224,42 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
       <div
         ref={menuRef}
         className={cn(
-          "absolute right-0 top-full z-50 mt-4 overflow-hidden rounded-2xl border border-border/50 bg-background/80 shadow-xl backdrop-blur-xl transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]",
+          "absolute right-0 top-full z-50 mt-4 w-56 overflow-hidden rounded-xl border border-border/50 bg-background/80 py-1 shadow-xl backdrop-blur-xl transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]",
           open
             ? "pointer-events-auto translate-y-0 scale-100 opacity-100"
             : "pointer-events-none -translate-y-3 scale-95 opacity-0",
         )}
       >
-        <div className="flex items-center gap-3 whitespace-nowrap px-4 py-2.5">
-          {/* User info */}
-          {session?.user && (
-            <div className="shrink-0 pr-2">
+        {session?.user && (
+          <>
+            <div className="px-3 py-2">
               <p className="text-sm font-semibold">{session.user.name}</p>
               <p className="text-xs text-muted-foreground">{session.user.email}</p>
             </div>
-          )}
+            <div className="mx-2 my-1 h-px bg-border/50" />
+          </>
+        )}
+        {actions.map((action, i) => {
+          const Icon = action.icon;
+          const isLast = i === actions.length - 1;
+          const content = (
+            <div className="mx-1 flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-foreground/80 transition-colors hover:bg-foreground/5 hover:text-foreground">
+              <Icon className="h-4 w-4 text-muted-foreground" />
+              {action.label}
+            </div>
+          );
 
-          {/* Actions */}
-          <div className="flex items-center">
-            {actions.map((action) => {
-              const Icon = action.icon;
-              const content = (
-                <div className="flex flex-col items-center justify-center gap-1 rounded-xl px-3 py-2 text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground" style={{ minWidth: 56 }}>
-                  <Icon className="h-[18px] w-[18px]" />
-                  <span className="text-[10px] font-medium leading-none">{action.label}</span>
-                </div>
-              );
-
-              if (action.href) {
-                return (
-                  <Link key={action.label} href={action.href} onClick={() => setOpen(false)}>
-                    {content}
-                  </Link>
-                );
-              }
-
-              return (
-                <button key={action.label} onClick={() => { action.onClick?.(); setOpen(false); }} className="text-left">
-                  {content}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+          return (
+            <div key={action.label}>
+              {isLast && <div className="mx-2 my-1 h-px bg-border/50" />}
+              {action.href ? (
+                <Link href={action.href} onClick={() => setOpen(false)}>{content}</Link>
+              ) : (
+                <button onClick={() => { action.onClick?.(); setOpen(false); }} className="w-full text-left">{content}</button>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
