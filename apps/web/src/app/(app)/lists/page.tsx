@@ -16,6 +16,8 @@ import {
 } from "@canto/ui/dialog";
 import { Popover, PopoverAnchor, PopoverContent } from "@canto/ui/popover";
 import {
+  ArrowDown,
+  ArrowUp,
   ArrowUpDown,
   Bookmark,
   ChevronDown,
@@ -38,29 +40,15 @@ import { StateMessage } from "~/components/layout/state-message";
 import { TabBar } from "~/components/layout/tab-bar";
 import { MediaGrid } from "~/components/media/media-grid";
 import {
-  MediaFilterSidebar,
-  type FilterState,
-} from "~/components/media/media-filter-sidebar";
+  FilterSidebar,
+  type FilterOutput,
+} from "~/components/media/filter-sidebar";
 
 const TABS = [
   { value: "watchlist", label: "Watchlist", icon: Eye },
   { value: "collections", label: "Collections", icon: FolderOpen },
   { value: "server", label: "Server Library", icon: Server },
 ];
-
-const DEFAULT_FILTERS: FilterState = {
-  sortBy: "popularity",
-  sortOrder: "desc",
-  genres: new Set(),
-  yearMin: "",
-  yearMax: "",
-  status: "",
-  runtimeMax: "",
-  contentRating: "",
-  scoreMin: [0],
-  language: "",
-  provider: "",
-};
 
 type Tab = "watchlist" | "collections" | "server";
 
@@ -105,7 +93,7 @@ function MediaListTab({
   slug: string;
   preset: "emptyWatchlist" | "emptyServerLibrary";
   showFilters: boolean;
-  filters: FilterState;
+  filters: FilterOutput;
 }): React.JSX.Element {
   const router = useRouter();
   const { data, isLoading, isError, refetch } = trpc.list.getBySlug.useQuery({
@@ -131,23 +119,11 @@ function MediaListTab({
         const yearMax = filters.yearMax ? Number(filters.yearMax) : 9999;
         if (r.year < yearMin || r.year > yearMax) return false;
       }
-      const minScore = filters.scoreMin[0] ?? 0;
+      const minScore = filters.scoreMin ?? 0;
       if (minScore > 0 && r.voteAverage != null && r.voteAverage < minScore)
         return false;
       return true;
     });
-
-    // Sort
-    const { sortBy, sortOrder } = filters;
-    if (sortBy && sortBy !== "popularity") {
-      filtered.sort((a, b) => {
-        let cmp = 0;
-        if (sortBy === "name") cmp = a.title.localeCompare(b.title);
-        else if (sortBy === "year") cmp = (a.year ?? 0) - (b.year ?? 0);
-        else if (sortBy === "rating") cmp = (a.voteAverage ?? 0) - (b.voteAverage ?? 0);
-        return sortOrder === "desc" ? -cmp : cmp;
-      });
-    }
 
     return filtered;
   }, [data, filters]);
@@ -189,44 +165,6 @@ const COLLECTION_SORT_OPTIONS = [
   { value: "name", label: "Name" },
 ];
 
-function CollectionFilterSection({
-  icon: Icon,
-  label,
-  defaultOpen = false,
-  children,
-  isLast = false,
-}: {
-  icon: React.ComponentType<{ size: number; className?: string }>;
-  label: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-  isLast?: boolean;
-}): React.JSX.Element {
-  const [open, setOpen] = useState(defaultOpen);
-
-  return (
-    <div className={cn("pb-5", !isLast && "mb-3 border-b border-border")}>
-      <button
-        type="button"
-        className="flex w-full items-center justify-between py-2"
-        onClick={() => setOpen(!open)}
-      >
-        <span className="flex items-center gap-2 text-[13px] font-medium text-foreground">
-          <Icon size={14} className="shrink-0" />
-          {label}
-        </span>
-        <ChevronDown
-          size={13}
-          className={cn(
-            "text-muted-foreground transition-transform duration-200",
-            open && "rotate-180",
-          )}
-        />
-      </button>
-      {open && <div className="pt-2">{children}</div>}
-    </div>
-  );
-}
 
 function CollectionFilterSidebar({
   filters,
@@ -241,67 +179,71 @@ function CollectionFilterSidebar({
     onChange({ ...filters, ...partial });
   };
 
+  const isDesc = filters.sortOrder === "desc";
+  const SortIcon = isDesc ? ArrowDown : ArrowUp;
+
   return (
-    <div className="flex h-full w-full flex-col">
-      <div className="filter-sidebar min-h-0 flex-1 overflow-y-auto">
-        <div className="pb-2">
-          <div className="flex flex-col gap-0.5">
-            {/* Search */}
-            <CollectionFilterSection icon={Search} label="Search" defaultOpen>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50" />
-                <Input
-                  value={filters.searchQuery}
-                  onChange={(e) => update({ searchQuery: e.target.value })}
-                  placeholder="Search collections..."
-                  className="h-8 pl-8 text-xs"
-                />
-              </div>
-            </CollectionFilterSection>
-
-            {/* Sort */}
-            <CollectionFilterSection icon={ArrowUpDown} label="Sort By" defaultOpen isLast>
-              <div className="flex items-center gap-2">
-                <select
-                  value={filters.sortBy}
-                  onChange={(e) => update({ sortBy: e.target.value as CollectionSort })}
-                  className="h-8 flex-1 rounded-md border border-input bg-background px-3 text-xs text-muted-foreground outline-none focus:ring-2 focus:ring-ring"
-                >
-                  {COLLECTION_SORT_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 shrink-0"
-                  onClick={() => update({ sortOrder: filters.sortOrder === "asc" ? "desc" : "asc" })}
-                >
-                  <ArrowUpDown
-                    size={13}
-                    className={cn(
-                      "text-muted-foreground transition-transform duration-200",
-                      filters.sortOrder === "desc" && "rotate-180",
-                    )}
-                  />
-                </Button>
-              </div>
-            </CollectionFilterSection>
-          </div>
-        </div>
-      </div>
-
-      {/* Reset */}
-      <div className="shrink-0 border-t border-border pt-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-center gap-2 text-muted-foreground hover:text-foreground"
+    <div className="pt-2">
+      {/* Header */}
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-xl font-bold tracking-tight text-foreground">Filter</h2>
+        <button
+          type="button"
+          className="flex items-center gap-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
           onClick={onReset}
         >
           <RotateCcw size={13} />
-          Reset filters
-        </Button>
+          Clear
+        </button>
+      </div>
+
+      <div className="flex flex-col">
+        {/* Search */}
+        <div className="border-b border-border/40 py-4">
+          <button
+            type="button"
+            className="mb-4 flex w-full items-center justify-between"
+          >
+            <span className="text-[15px] font-semibold text-foreground">Search</span>
+          </button>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-foreground/30" />
+            <Input
+              value={filters.searchQuery}
+              onChange={(e) => update({ searchQuery: e.target.value })}
+              placeholder="Search collections..."
+              className="!h-9 !rounded-xl !border-0 !bg-accent !pl-9 !text-[13px] !font-medium !text-foreground/70 !placeholder:text-foreground/30"
+            />
+          </div>
+        </div>
+
+        {/* Sort */}
+        <div className="border-b border-border/40 py-4 last:border-b-0">
+          <button
+            type="button"
+            className="mb-4 flex w-full items-center justify-between"
+          >
+            <span className="text-[15px] font-semibold text-foreground">Sort By</span>
+          </button>
+          <div className="flex items-center gap-2">
+            <select
+              value={filters.sortBy}
+              onChange={(e) => update({ sortBy: e.target.value as CollectionSort })}
+              className="h-9 flex-1 appearance-none rounded-xl border-0 bg-accent px-3 text-[13px] text-foreground/70 outline-none"
+            >
+              {COLLECTION_SORT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-0 bg-accent text-muted-foreground transition-colors hover:text-foreground"
+              onClick={() => update({ sortOrder: isDesc ? "asc" : "desc" })}
+            >
+              <SortIcon size={14} />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -466,7 +408,7 @@ function CollectionsTab({
   return (
     <>
       {isLoading ? (
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
           ))}
@@ -480,7 +422,7 @@ function CollectionsTab({
         />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
             {customLists.slice(0, visibleCount).map((l) => {
               const posters = l.previewPosters ?? [];
               return (
@@ -536,9 +478,9 @@ function CollectionsTab({
                 See all collections ({customLists.length})
               </Button>
             </div>
-          ) : (
+          ) : customLists.length > 0 ? (
             <StateMessage preset="endOfItems" inline />
-          )}
+          ) : null}
         </>
       )}
 
@@ -594,7 +536,7 @@ export default function LibraryPage(): React.JSX.Element {
   const initialTab = (searchParams.get("tab") as Tab) || "watchlist";
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<FilterOutput>({});
   const [collectionFilters, setCollectionFilters] = useState<CollectionFilterState>(DEFAULT_COLLECTION_FILTERS);
 
   useEffect(() => {
@@ -611,8 +553,7 @@ export default function LibraryPage(): React.JSX.Element {
     });
   };
 
-  const handleFilterChange = useCallback((f: FilterState) => setFilters(f), []);
-  const handleFilterReset = useCallback(() => setFilters(DEFAULT_FILTERS), []);
+  const handleFilterChange = useCallback((f: FilterOutput) => setFilters(f), []);
   const handleCollectionFilterChange = useCallback((f: CollectionFilterState) => setCollectionFilters(f), []);
   const handleCollectionFilterReset = useCallback(() => setCollectionFilters(DEFAULT_COLLECTION_FILTERS), []);
 
@@ -621,42 +562,17 @@ export default function LibraryPage(): React.JSX.Element {
       <PageHeader
         title="Library"
         subtitle="Your watchlist, collections, and saved media."
-        className={cn(
-          "transition-[margin] duration-300 ease-in-out",
-          showFilters && "md:ml-[17rem] lg:ml-[19rem]",
-        )}
       />
 
-      {/* Tab Bar */}
-      <div
-        className={cn(
-          "px-4 pt-6 pb-8 transition-[margin] duration-300 ease-in-out md:px-8 lg:px-12 xl:px-16 2xl:px-24",
-          showFilters && "md:ml-[17rem] lg:ml-[19rem]",
-        )}
-      >
-        <TabBar
-          tabs={TABS}
-          value={activeTab}
-          onChange={handleTabChange}
-          leading={
-            <FilterButton
-              active={showFilters}
-              onClick={() => setShowFilters((v) => !v)}
-            />
-          }
-        />
-      </div>
-
-      <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        {/* Filter Sidebar */}
+      <div className="flex px-4 pt-4 md:px-8 md:pt-6 lg:px-12 xl:px-16 2xl:px-24">
+        {/* Sidebar */}
         <div
           className={cn(
-            "fixed top-16 z-[35] hidden transition-[left,opacity] duration-300 ease-in-out md:block",
+            "hidden w-[20rem] shrink-0 transition-[margin,opacity] duration-300 ease-in-out md:block",
             showFilters
-              ? "left-4 opacity-100 md:left-8 lg:left-12 xl:left-16 2xl:left-24"
-              : "-left-72 opacity-0",
+              ? "mr-4 opacity-100 lg:mr-8"
+              : "-ml-[20rem] mr-0 opacity-0",
           )}
-          style={{ width: "16rem", height: "calc(100vh - 5rem)", top: "5rem" }}
         >
           {activeTab === "collections" ? (
             <CollectionFilterSidebar
@@ -665,22 +581,29 @@ export default function LibraryPage(): React.JSX.Element {
               onReset={handleCollectionFilterReset}
             />
           ) : (
-            <MediaFilterSidebar
+            <FilterSidebar
               mediaType="all"
-              filters={filters}
-              onChange={handleFilterChange}
-              onReset={handleFilterReset}
+              onFilterChange={handleFilterChange}
             />
           )}
         </div>
 
-        {/* Content — shifts right when sidebar is open */}
-        <div
-          className={cn(
-            "transition-[margin] duration-300 ease-in-out",
-            showFilters && "md:ml-[17rem] lg:ml-[19rem]",
-          )}
-        >
+        {/* Content */}
+        <div className="min-w-0 flex-1">
+          {/* Tab Bar */}
+          <div className="mb-6 py-3">
+            <TabBar
+              tabs={TABS}
+              value={activeTab}
+              onChange={handleTabChange}
+              leading={
+                <FilterButton
+                  active={showFilters}
+                  onClick={() => setShowFilters((v) => !v)}
+                />
+              }
+            />
+          </div>
           {activeTab === "watchlist" && (
             <MediaListTab
               slug="watchlist"

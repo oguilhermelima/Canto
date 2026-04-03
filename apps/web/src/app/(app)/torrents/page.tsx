@@ -325,7 +325,7 @@ export default function DownloadsPage(): React.JSX.Element {
               </div>
             );
           })}
-          <StateMessage preset="endOfItems" inline />
+          {filtered && filtered.length > 0 && <StateMessage preset="endOfItems" inline />}
         </div>
       )}
 

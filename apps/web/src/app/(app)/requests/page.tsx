@@ -347,7 +347,7 @@ export default function RequestsPage(): React.JSX.Element {
                 </div>
               );
             })}
-            <StateMessage preset="endOfItems" inline />
+            {filtered.length > 0 && <StateMessage preset="endOfItems" inline />}
           </div>
         )}
       </div>
