@@ -70,13 +70,13 @@ export function CastSection({
         )}
       </div>
 
-      <div className="relative">
+      <div className="relative" style={{ minHeight: COLLAPSED_HEIGHT }}>
         <div
           ref={contentRef}
           className="-m-2 grid grid-cols-4 justify-items-center gap-x-2 gap-y-4 overflow-hidden p-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8"
           style={{
-            maxHeight: showAll ? fullHeight : COLLAPSED_HEIGHT,
-            transition: "max-height 400ms cubic-bezier(0.4, 0, 0.2, 1)",
+            height: showAll ? fullHeight : COLLAPSED_HEIGHT,
+            transition: fullHeight ? "height 400ms cubic-bezier(0.4, 0, 0.2, 1)" : "none",
           }}
         >
           {isLoading

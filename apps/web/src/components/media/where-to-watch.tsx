@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 // Icons replaced with SVG masks from public/
 
 export interface WatchProviderItem {
@@ -110,8 +112,7 @@ export function WhereToWatch({
                   className="shrink-0 overflow-hidden rounded-xl transition-transform hover:scale-110"
                 >
                   {wp.logoPath ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={`https://image.tmdb.org/t/p/w92${wp.logoPath}`} alt={wp.providerName} className="h-12 w-12 rounded-xl object-cover" />
+                    <Image src={`https://image.tmdb.org/t/p/w92${wp.logoPath}`} alt={wp.providerName} width={48} height={48} className="h-12 w-12 rounded-xl" />
                   ) : (
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-[10px] font-bold text-muted-foreground">{wp.providerName.slice(0, 2)}</div>
                   )}
@@ -138,8 +139,7 @@ export function WhereToWatch({
                   className="shrink-0 overflow-hidden rounded-xl transition-transform hover:scale-110"
                 >
                   {wp.logoPath ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={`https://image.tmdb.org/t/p/w92${wp.logoPath}`} alt={wp.providerName} className="h-12 w-12 rounded-xl object-cover" />
+                    <Image src={`https://image.tmdb.org/t/p/w92${wp.logoPath}`} alt={wp.providerName} width={48} height={48} className="h-12 w-12 rounded-xl" />
                   ) : (
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-[10px] font-bold text-muted-foreground">{wp.providerName.slice(0, 2)}</div>
                   )}

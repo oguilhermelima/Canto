@@ -85,7 +85,7 @@ const NavLinks = memo(function NavLinks({ role, scrolled }: { role?: string; scr
           "absolute top-1 bottom-1 rounded-xl shadow-sm",
           ready
             ? "transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
-            : "opacity-0",
+            : "invisible",
           "bg-foreground",
         )}
         style={{ left: indicator.left, width: indicator.width }}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
 import {
@@ -257,9 +258,11 @@ export function AddToListButton({
             >
               <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
                 {thumb ? (
-                  <img
+                  <Image
                     src={thumb}
                     alt=""
+                    width={40}
+                    height={40}
                     className="h-full w-full object-cover"
                   />
                 ) : (

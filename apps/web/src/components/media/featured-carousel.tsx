@@ -84,7 +84,17 @@ export function FeaturedCarousel({
         left: direction === "left" ? -el.clientWidth * 0.6 : el.clientWidth * 0.6,
         behavior: "smooth",
       });
-      setTimeout(updateScrollButtons, 350);
+      // Use rAF loop to update buttons as the smooth scroll progresses,
+      // instead of a fixed setTimeout that may fire too early or too late.
+      let lastScrollLeft = el.scrollLeft;
+      const tick = (): void => {
+        updateScrollButtons();
+        if (el.scrollLeft !== lastScrollLeft) {
+          lastScrollLeft = el.scrollLeft;
+          requestAnimationFrame(tick);
+        }
+      };
+      requestAnimationFrame(tick);
     },
     [updateScrollButtons],
   );
@@ -144,6 +154,7 @@ export function FeaturedCarousel({
                 <FeaturedCard
                   key={`${item.provider}-${item.externalId}-${i}`}
                   item={item}
+                  index={i}
                   isOpen={hoveredIndex === i}
                   onHover={() => handleCardHover(i)}
                 />
@@ -164,10 +175,12 @@ export function FeaturedCarousel({
 
 function FeaturedCard({
   item,
+  index,
   isOpen,
   onHover,
 }: {
   item: FeaturedItem;
+  index: number;
   isOpen: boolean;
   onHover: () => void;
 }): React.JSX.Element {
@@ -232,7 +245,7 @@ function FeaturedCard({
             alt={item.title}
             fill
             className="object-cover"
-            loading="lazy"
+            priority={index < 2}
             sizes="200px"
           />
         ) : (

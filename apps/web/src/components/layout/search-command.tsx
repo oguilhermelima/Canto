@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
+import { useDebounceValue } from "usehooks-ts";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
@@ -25,19 +26,20 @@ export function SearchCommand({
 }: SearchCommandProps): React.JSX.Element {
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [debouncedQuery] = useDebounceValue(query, 300);
 
   const movieSearch = trpc.media.browse.useQuery(
-    { mode: "search", query, type: "movie", provider: "tmdb" },
+    { mode: "search", query: debouncedQuery, type: "movie", provider: "tmdb" },
     {
-      enabled: query.length >= 2,
+      enabled: debouncedQuery.length >= 2,
       placeholderData: keepPreviousData,
     },
   );
 
   const showSearch = trpc.media.browse.useQuery(
-    { mode: "search", query, type: "show", provider: "tmdb" },
+    { mode: "search", query: debouncedQuery, type: "show", provider: "tmdb" },
     {
-      enabled: query.length >= 2,
+      enabled: debouncedQuery.length >= 2,
       placeholderData: keepPreviousData,
     },
   );

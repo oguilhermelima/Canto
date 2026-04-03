@@ -548,6 +548,17 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
 
           {/* Request Download — non-admin users (above videos) */}
           {!isAdmin && media.id && !media.downloaded && (() => {
+          if (existingRequest.isLoading) {
+            return (
+              <section className="flex items-center gap-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+                <div className="flex-1">
+                  <Skeleton className="h-6 w-48" />
+                  <Skeleton className="mt-2 h-4 w-72" />
+                </div>
+                <Skeleton className="h-10 w-[120px] rounded-xl" />
+              </section>
+            );
+          }
           const existing = existingRequest.data;
           if (existing) {
             const isPending = existing.status === "pending";
@@ -1369,6 +1380,8 @@ function VideoCarousel({ videos }: { videos: Video[] }): React.JSX.Element {
               <img
                 src={`https://img.youtube.com/vi/${video.key}/hqdefault.jpg`}
                 alt={video.name ?? "Video"}
+                width={480}
+                height={360}
                 className="h-full w-full object-cover transition-transform group-hover:scale-105"
               />
               <div className="absolute inset-0 flex items-center justify-center bg-black/30 transition-colors group-hover:bg-black/20">
