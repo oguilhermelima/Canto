@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { useDebounceCallback } from "usehooks-ts";
 import { Input } from "@canto/ui/input";
 import { Search } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
@@ -25,15 +26,38 @@ export default function SearchPage(): React.JSX.Element {
     | "movie"
     | "show";
 
+  const [inputValue, setInputValue] = useState(initialQuery);
   const [query, setQuery] = useState(initialQuery);
   const [searchType, setSearchType] = useState<"multi" | "movie" | "show">(
     initialType,
   );
 
+  const searchTypeRef = useRef(searchType);
+  searchTypeRef.current = searchType;
+
+  const debouncedUpdateSearch = useDebounceCallback((value: string) => {
+    setQuery(value);
+    const params = new URLSearchParams();
+    if (value) params.set("q", value);
+    if (searchTypeRef.current !== "multi") params.set("type", searchTypeRef.current);
+    router.replace(`/search?${params.toString()}`, { scroll: false });
+  }, 300);
+
+  const handleInputChange = useCallback(
+    (value: string) => {
+      setInputValue(value);
+      debouncedUpdateSearch(value);
+    },
+    [debouncedUpdateSearch],
+  );
+
   // Sync query state with URL search params (topbar updates the URL)
   useEffect(() => {
     const q = searchParams.get("q") ?? "";
-    if (q !== query) setQuery(q);
+    if (q !== query) {
+      setQuery(q);
+      setInputValue(q);
+    }
   }, [searchParams]);
 
   // Set page title
@@ -116,7 +140,6 @@ export default function SearchPage(): React.JSX.Element {
     year: r.year,
     voteAverage: r.voteAverage,
     popularity: r.popularity,
-    genreIds: r.genreIds as number[] | undefined,
   }));
 
   const refetchAll = useCallback(() => {
@@ -144,19 +167,12 @@ export default function SearchPage(): React.JSX.Element {
     (type: "multi" | "movie" | "show") => {
       setSearchType(type);
       const params = new URLSearchParams();
-      if (query) params.set("q", query);
+      if (inputValue) params.set("q", inputValue);
       if (type !== "multi") params.set("type", type);
       router.replace(`/search?${params.toString()}`, { scroll: false });
     },
-    [query, router],
+    [inputValue, router],
   );
-
-  const mediaType =
-    searchType === "multi"
-      ? "all"
-      : searchType === "movie"
-        ? "movie"
-        : "show";
 
   return (
     <>
@@ -165,14 +181,8 @@ export default function SearchPage(): React.JSX.Element {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              const params = new URLSearchParams();
-              if (e.target.value) params.set("q", e.target.value);
-              if (searchType !== "multi") params.set("type", searchType);
-              router.replace(`/search?${params.toString()}`, { scroll: false });
-            }}
+            value={inputValue}
+            onChange={(e) => handleInputChange(e.target.value)}
             placeholder="Search movies and shows..."
             className="h-9 rounded-none border-x-0 border-t-0 border-b-border bg-transparent pl-9 text-sm focus-visible:border-b-ring focus-visible:ring-0 focus-visible:ring-offset-0"
             autoFocus
@@ -183,20 +193,14 @@ export default function SearchPage(): React.JSX.Element {
     <BrowseLayout
       title="Search"
       hideTitle
-      mediaType={mediaType as "all" | "movie" | "show"}
+      mediaType={searchType === "multi" ? "all" : searchType}
       header={
         <div className="hidden pb-1 pt-4 md:block">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
             <Input
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                const params = new URLSearchParams();
-                if (e.target.value) params.set("q", e.target.value);
-                if (searchType !== "multi") params.set("type", searchType);
-                router.replace(`/search?${params.toString()}`, { scroll: false });
-              }}
+              value={inputValue}
+              onChange={(e) => handleInputChange(e.target.value)}
               placeholder="Search movies and shows..."
               className="h-12 rounded-none border-x-0 border-t-0 border-b-border bg-transparent pl-10 text-lg focus-visible:border-b-ring focus-visible:ring-0 focus-visible:ring-offset-0"
               autoFocus
