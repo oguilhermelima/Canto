@@ -613,158 +613,179 @@ function LibrariesSection(): React.JSX.Element {
     }
   }, [isLoading, libraries, jellyfinEnabled, plexEnabled, jellyfinLibs.length, plexLibs.length, syncJellyfin, syncPlex]);
 
+  const allLibs = libraries ?? [];
+  const missingPaths = allLibs.some((l) => !l.libraryPath);
+
   return (
     <div>
-      <SettingsSection title="Quick Setup" description="Set a root path to auto-fill all library paths at once. You can customize each library individually below.">
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1">
-              <HardDrive className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/40" />
-              <Input
-                value={rootPath}
-                onChange={(e) => { setRootPath(e.target.value); setRootDirty(true); }}
-                placeholder="/data"
-                className="pl-10"
-              />
-            </div>
-            {rootDirty && (
-              <Button
-                size="sm"
-                onClick={() => setRootPathMutation.mutate({ path: rootPath })}
-                disabled={setRootPathMutation.isPending}
-              >
-                {setRootPathMutation.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
-                Apply to all
-              </Button>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Sets download paths to <code className="text-[10px] bg-muted/60 rounded px-1">{rootPath || "/data"}/torrents/{'{'}&lt;category&gt;{'}'}</code> and library paths to <code className="text-[10px] bg-muted/60 rounded px-1">{rootPath || "/data"}/media/{'{'}&lt;name&gt;{'}'}</code> for all libraries. Optional — you can skip this and configure each library manually.
-          </p>
-        </div>
-      </SettingsSection>
+      {/* ── Step 1: Your Libraries ─────────────────────────────────────── */}
 
-      <SettingsSection title="Import Method" description="How media files are organized after download completes.">
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() => { setImportMethod("local"); setSeedDirty(true); }}
-            className={cn(
-              "flex flex-col gap-2 rounded-xl border p-4 text-left transition-all",
-              importMethod === "local"
-                ? "border-primary/50 bg-primary/5"
-                : "border-border/40 bg-muted/20 hover:bg-muted/40",
-            )}
-          >
-            <div className="flex items-center gap-2">
-              <HardDrive className={cn("h-4 w-4", importMethod === "local" ? "text-primary" : "text-muted-foreground/40")} />
-              <span className="text-sm font-medium">Local (hardlinks)</span>
-            </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Canto runs on the same machine as the download client.
-              Uses hardlinks for zero-cost imports. Seeding continues from the original file.
-            </p>
-          </button>
-          <button
-            type="button"
-            onClick={() => { setImportMethod("remote"); setSeedDirty(true); }}
-            className={cn(
-              "flex flex-col gap-2 rounded-xl border p-4 text-left transition-all",
-              importMethod === "remote"
-                ? "border-primary/50 bg-primary/5"
-                : "border-border/40 bg-muted/20 hover:bg-muted/40",
-            )}
-          >
-            <div className="flex items-center gap-2">
-              <FolderDown className={cn("h-4 w-4", importMethod === "remote" ? "text-primary" : "text-muted-foreground/40")} />
-              <span className="text-sm font-medium">Remote (API)</span>
-            </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Canto runs on a different machine. Moves and renames files via the download client API.
-              Seeding stops after import.
-            </p>
-          </button>
-        </div>
-      </SettingsSection>
-
-      <SettingsSection title="Library Paths" description="Configure where downloaded files are saved and where your organized media library lives. Both paths are required for imports to work.">
+      <SettingsSection
+        title="Your Libraries"
+        description="Each library maps a media type to two folders: where your torrent client downloads files, and where your organized media lives."
+      >
         <div className="space-y-3">
           {isLoading ? (
             <div className="space-y-3">
-              {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+              {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}
             </div>
-          ) : (libraries ?? []).length === 0 ? (
+          ) : allLibs.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border/40 px-5 py-10 text-center">
-              <p className="text-sm text-muted-foreground">No libraries configured. Seed defaults or connect a media server.</p>
+              <p className="text-sm text-muted-foreground">
+                {jellyfinEnabled || plexEnabled
+                  ? "Scanning your media server for libraries..."
+                  : "Connect a media server in Services, or seed default libraries to get started."}
+              </p>
             </div>
           ) : (
-            <>{(libraries ?? []).some((l) => !l.libraryPath) && (
-              <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Some libraries don't have paths configured yet. Imports won't work until you set at least the <strong>library path</strong> for each library. Use Quick Setup above or expand each library to configure individually.
-                </p>
-              </div>
-            )}
-              {(libraries ?? []).map((lib) => (
-                <LibraryPathCard
-                  key={lib.id}
-                  lib={lib}
-                  expanded={expandedLib === lib.id}
-                  onToggle={() => setExpandedLib(expandedLib === lib.id ? null : lib.id)}
-                  onSave={(dl, lp) => updatePaths.mutate({ id: lib.id, downloadPath: dl, libraryPath: lp })}
-                  isSaving={updatePaths.isPending}
-                />
-              ))}
+            <>
+              {missingPaths && (
+                <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Some libraries are missing paths. Downloads won't import until you configure at least the <strong>library path</strong> for each one.
+                  </p>
+                </div>
+              )}
+
+              {allLibs.map((lib) => {
+                const server = lib.jellyfinLibraryId ? "Jellyfin" : lib.plexLibraryId ? "Plex" : null;
+                return (
+                  <LibraryCard
+                    key={lib.id}
+                    lib={lib}
+                    server={server}
+                    expanded={expandedLib === lib.id}
+                    onToggle={() => setExpandedLib(expandedLib === lib.id ? null : lib.id)}
+                    onSavePaths={(dl, lp) => updatePaths.mutate({ id: lib.id, downloadPath: dl, libraryPath: lp })}
+                    onToggleSync={(syncEnabled) => toggleSync.mutate({ id: lib.id, syncEnabled })}
+                    isSaving={updatePaths.isPending}
+                  />
+                );
+              })}
+
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => testPaths.mutate()}
                 disabled={testPaths.isPending}
-                className="mt-2"
               >
                 {testPaths.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Check className="mr-1.5 h-4 w-4" />}
                 Test all paths
               </Button>
             </>
           )}
+
+          {/* Quick fill shortcut */}
+          {allLibs.length > 0 && (
+            <div className="flex items-center gap-3 rounded-xl border border-border/30 bg-muted/10 px-4 py-3">
+              <div className="relative flex-1">
+                <Input
+                  value={rootPath}
+                  onChange={(e) => { setRootPath(e.target.value); setRootDirty(true); }}
+                  placeholder="Root path (e.g. /data)"
+                  className="h-8 text-xs"
+                />
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 text-xs shrink-0"
+                onClick={() => setRootPathMutation.mutate({ path: rootPath })}
+                disabled={setRootPathMutation.isPending || !rootDirty}
+              >
+                {setRootPathMutation.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                Fill all paths
+              </Button>
+              <p className="text-[10px] text-muted-foreground/60 shrink-0 hidden lg:block">
+                Sets /torrents and /media subdirs
+              </p>
+            </div>
+          )}
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Seed Management" description="Automatically remove torrents from the download client after seeding thresholds are met.">
+      {/* ── Step 2: Import & Seeding ───────────────────────────────────── */}
+
+      <SettingsSection
+        title="Import & Seeding"
+        description="How completed downloads get organized into your library, and when to stop seeding."
+      >
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">Ratio limit</label>
-              <Input
-                type="number"
-                step="0.1"
-                min="0"
-                value={seedRatio}
-                onChange={(e) => { setSeedRatio(e.target.value); setSeedDirty(true); }}
-                placeholder="No limit"
-              />
-              <p className="mt-1 text-xs text-muted-foreground">Stop seeding after reaching this upload ratio</p>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">Time limit (hours)</label>
-              <Input
-                type="number"
-                step="1"
-                min="0"
-                value={seedTime}
-                onChange={(e) => { setSeedTime(e.target.value); setSeedDirty(true); }}
-                placeholder="No limit"
-              />
-              <p className="mt-1 text-xs text-muted-foreground">Stop seeding after this many hours</p>
+          {/* Import method */}
+          <div>
+            <p className="mb-2 text-xs font-medium text-muted-foreground">Import method</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => { setImportMethod("local"); setSeedDirty(true); }}
+                className={cn(
+                  "flex flex-col gap-1.5 rounded-xl border p-3.5 text-left transition-all",
+                  importMethod === "local"
+                    ? "border-primary/50 bg-primary/5"
+                    : "border-border/40 bg-muted/20 hover:bg-muted/40",
+                )}
+              >
+                <span className="text-sm font-medium">Local (hardlinks)</span>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Canto and torrent client on the same machine. Zero-cost imports, seeding preserved.
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setImportMethod("remote"); setSeedDirty(true); }}
+                className={cn(
+                  "flex flex-col gap-1.5 rounded-xl border p-3.5 text-left transition-all",
+                  importMethod === "remote"
+                    ? "border-primary/50 bg-primary/5"
+                    : "border-border/40 bg-muted/20 hover:bg-muted/40",
+                )}
+              >
+                <span className="text-sm font-medium">Remote (API)</span>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Canto on a different machine. Files moved via torrent client API. Seeding stops after import.
+                </p>
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card px-5 py-4">
+          {/* Seed limits */}
+          <div>
+            <p className="mb-2 text-xs font-medium text-muted-foreground">Seed limits</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={seedRatio}
+                  onChange={(e) => { setSeedRatio(e.target.value); setSeedDirty(true); }}
+                  placeholder="No ratio limit"
+                  className="h-9 text-sm"
+                />
+                <p className="mt-1 text-[10px] text-muted-foreground">Upload ratio before stopping</p>
+              </div>
+              <div>
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={seedTime}
+                  onChange={(e) => { setSeedTime(e.target.value); setSeedDirty(true); }}
+                  placeholder="No time limit"
+                  className="h-9 text-sm"
+                />
+                <p className="mt-1 text-[10px] text-muted-foreground">Hours before stopping</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Cleanup toggle */}
+          <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card px-4 py-3">
             <div>
-              <p className="text-sm font-medium text-foreground">Clean up download files</p>
-              <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
-                Delete source files from the downloads folder after seeding. Safe when hardlinks are used — library copies are preserved.
+              <p className="text-sm font-medium text-foreground">Clean up after seeding</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground leading-relaxed">
+                Delete torrent files after seed limits are met. Safe with hardlinks — library copies stay.
               </p>
             </div>
             <Switch checked={seedCleanup} onCheckedChange={(v) => { setSeedCleanup(v); setSeedDirty(true); }} />
@@ -788,30 +809,13 @@ function LibrariesSection(): React.JSX.Element {
         </div>
       </SettingsSection>
 
-      {hasLegacyPaths && (
-        <SettingsSection title="Migration" description="Migrate existing media files from the legacy folder layout to the new structure.">
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-5 py-4">
-            <p className="text-sm font-medium text-foreground">Legacy paths detected</p>
-            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              Some libraries still use the old path model. Run migration to move your existing media files
-              to the new structure and update all path references.
-            </p>
-            <Button
-              size="sm"
-              variant="outline"
-              className="mt-3"
-              onClick={() => migrateMutation.mutate({ rootPath })}
-              disabled={migrateMutation.isPending}
-            >
-              {migrateMutation.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
-              {migrateMutation.isPending ? "Migrating..." : "Migrate to new structure"}
-            </Button>
-          </div>
-        </SettingsSection>
-      )}
+      {/* ── Step 3: Media Server Sync ──────────────────────────────────── */}
 
       {(jellyfinEnabled || plexEnabled) && (
-        <SettingsSection title="Media Servers" description="Libraries discovered from your connected media servers.">
+        <SettingsSection
+          title="Media Server Sync"
+          description="Import existing content from Jellyfin or Plex into your Canto library."
+        >
           <div className="space-y-4">
             <ServerLibraryGroup
               server="Jellyfin"
@@ -837,37 +841,67 @@ function LibrariesSection(): React.JSX.Element {
         </SettingsSection>
       )}
 
-      <SettingsSection title="Post-import" description="Automatic actions that run after media files are downloaded and imported.">
-        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card px-5 py-4">
+      {/* ── Post-import ────────────────────────────────────────────────── */}
+
+      <SettingsSection title="Post-import" description="Automatic actions after media files are imported.">
+        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card px-4 py-3">
           <div>
             <p className="text-sm font-medium text-foreground">Auto-merge versions</p>
-            <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
+            <p className="mt-0.5 text-[11px] text-muted-foreground leading-relaxed">
               When you download a second quality version, Jellyfin will automatically merge them.
             </p>
           </div>
           <Switch checked={autoMergeVersions === true} onCheckedChange={(checked) => setPreference.mutate({ key: "autoMergeVersions", value: checked })} />
         </div>
       </SettingsSection>
+
+      {/* ── Migration (only if legacy paths detected) ──────────────────── */}
+
+      {hasLegacyPaths && (
+        <SettingsSection title="Migration" description="Move existing files to the new folder structure.">
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-5 py-4">
+            <p className="text-sm font-medium text-foreground">Legacy paths detected</p>
+            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+              Some libraries use the old path layout. Migrate to reorganize your existing files.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-3"
+              onClick={() => migrateMutation.mutate({ rootPath })}
+              disabled={migrateMutation.isPending}
+            >
+              {migrateMutation.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
+              {migrateMutation.isPending ? "Migrating..." : "Migrate to new structure"}
+            </Button>
+          </div>
+        </SettingsSection>
+      )}
     </div>
   );
 }
 
-function LibraryPathCard({
+function LibraryCard({
   lib,
+  server,
   expanded,
   onToggle,
-  onSave,
+  onSavePaths,
+  onToggleSync,
   isSaving,
 }: {
-  lib: { id: string; name: string; type: string; downloadPath: string | null; libraryPath: string | null; qbitCategory: string | null };
+  lib: { id: string; name: string; type: string; downloadPath: string | null; libraryPath: string | null; qbitCategory: string | null; syncEnabled: boolean };
+  server: "Jellyfin" | "Plex" | null;
   expanded: boolean;
   onToggle: () => void;
-  onSave: (downloadPath: string, libraryPath: string) => void;
+  onSavePaths: (downloadPath: string, libraryPath: string) => void;
+  onToggleSync: (syncEnabled: boolean) => void;
   isSaving: boolean;
 }): React.JSX.Element {
   const [dlPath, setDlPath] = useState(lib.downloadPath ?? "");
   const [libPath, setLibPath] = useState(lib.libraryPath ?? "");
   const dirty = dlPath !== (lib.downloadPath ?? "") || libPath !== (lib.libraryPath ?? "");
+  const configured = !!lib.libraryPath;
 
   useEffect(() => {
     setDlPath(lib.downloadPath ?? "");
@@ -875,18 +909,36 @@ function LibraryPathCard({
   }, [lib.downloadPath, lib.libraryPath]);
 
   return (
-    <div className="rounded-xl border border-border/40 overflow-hidden">
+    <div className={cn(
+      "rounded-xl border overflow-hidden transition-colors",
+      !configured ? "border-amber-500/30" : "border-border/40",
+    )}>
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-muted/20"
+        className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-muted/20"
       >
         <div className="flex items-center gap-3">
-          <Folder className={cn("h-5 w-5", expanded ? "text-primary" : "text-muted-foreground/40")} />
+          <Folder className={cn("h-5 w-5", configured ? "text-primary" : "text-amber-500/60")} />
           <div>
-            <p className="text-sm font-medium text-foreground">{lib.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {lib.qbitCategory ? `Category: ${lib.qbitCategory}` : lib.type}
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-foreground">{lib.name}</p>
+              {server && (
+                <span className={cn(
+                  "rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none",
+                  server === "Jellyfin" ? "bg-purple-500/10 text-purple-400" : "bg-amber-500/10 text-amber-400",
+                )}>
+                  {server}
+                </span>
+              )}
+              {!configured && (
+                <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-amber-400">
+                  Not configured
+                </span>
+              )}
+            </div>
+            <p className="mt-0.5 text-[11px] text-muted-foreground/60 truncate max-w-xs">
+              {lib.libraryPath ?? "No library path set"}
             </p>
           </div>
         </div>
@@ -894,39 +946,55 @@ function LibraryPathCard({
       </button>
 
       <AnimatedCollapse open={expanded}>
-        <div className="space-y-3 border-t border-border/30 px-5 py-4">
-          <div>
-            <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <FolderDown className="h-3.5 w-3.5" />
-              Download path
-            </label>
-            <Input
-              value={dlPath}
-              onChange={(e) => setDlPath(e.target.value)}
-              placeholder="/data/torrents/movies"
-              className="text-sm"
-            />
-          </div>
+        <div className="space-y-3 border-t border-border/30 px-4 py-4">
           <div>
             <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <FolderOpen className="h-3.5 w-3.5" />
               Library path
+              <span className="text-muted-foreground/40">— where your organized media lives{server ? ` (auto-filled from ${server})` : ""}</span>
             </label>
             <Input
               value={libPath}
               onChange={(e) => setLibPath(e.target.value)}
-              placeholder="/data/media/movies"
+              placeholder={server ? "Auto-detected from media server" : "/mnt/media/movies"}
               className="text-sm"
             />
           </div>
+          <div>
+            <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <FolderDown className="h-3.5 w-3.5" />
+              Download path
+              <span className="text-muted-foreground/40">— where the torrent client saves files</span>
+            </label>
+            <Input
+              value={dlPath}
+              onChange={(e) => setDlPath(e.target.value)}
+              placeholder="/mnt/torrents/movies"
+              className="text-sm"
+            />
+          </div>
+
+          {server && (
+            <div className="flex items-center justify-between rounded-lg border border-border/30 bg-muted/10 px-3 py-2.5">
+              <div>
+                <p className="text-xs font-medium text-foreground">Sync from {server}</p>
+                <p className="text-[10px] text-muted-foreground">Periodically import existing media from your server</p>
+              </div>
+              <Switch
+                checked={lib.syncEnabled}
+                onCheckedChange={(checked) => onToggleSync(checked)}
+              />
+            </div>
+          )}
+
           {dirty && (
             <Button
               size="sm"
-              onClick={() => onSave(dlPath, libPath)}
+              onClick={() => onSavePaths(dlPath, libPath)}
               disabled={isSaving}
             >
               {isSaving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
-              Save paths
+              Save
             </Button>
           )}
         </div>
