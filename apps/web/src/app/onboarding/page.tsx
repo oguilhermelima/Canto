@@ -17,7 +17,6 @@ import {
   Search,
   Server,
   Folder,
-  Rocket,
 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
@@ -59,12 +58,10 @@ function StepDots({ current, total }: { current: number; total: number }): React
 function WelcomeStep({ onNext }: { onNext: () => void }): React.JSX.Element {
   return (
     <div className="flex flex-col items-center gap-6 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-        <Rocket className="h-8 w-8 text-primary" />
-      </div>
+      <img src="/room.png" alt="Canto" className="h-14 w-14 dark:invert" />
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold text-foreground">Welcome to Canto</h1>
-        <p className="mx-auto max-w-md text-sm text-muted-foreground leading-relaxed">
+        <p className="mx-auto max-w-lg text-base text-muted-foreground leading-relaxed">
           Let's set up your media server in a few steps. You'll connect your services,
           configure your libraries, and be ready to start downloading.
         </p>
@@ -95,7 +92,7 @@ function TmdbStep({ onNext }: { onNext: () => void }): React.JSX.Element {
     <div className="flex flex-col items-center gap-6 text-center">
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold text-foreground">TMDB API Key</h1>
-        <p className="mx-auto max-w-md text-sm text-muted-foreground leading-relaxed">
+        <p className="mx-auto max-w-lg text-base text-muted-foreground leading-relaxed">
           Canto uses TMDB for all movie and TV show metadata. Get a free API key at{" "}
           <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer" className="text-primary underline">
             themoviedb.org
@@ -174,7 +171,7 @@ function DownloadClientStep({ onNext }: { onNext: () => void }): React.JSX.Eleme
       </div>
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold text-foreground">Download Client</h1>
-        <p className="mx-auto max-w-md text-sm text-muted-foreground leading-relaxed">
+        <p className="mx-auto max-w-lg text-base text-muted-foreground leading-relaxed">
           Connect your torrent client. Canto will send downloads and manage imports automatically.
         </p>
       </div>
@@ -245,7 +242,7 @@ function IndexerStep({ onNext }: { onNext: () => void }): React.JSX.Element {
       </div>
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold text-foreground">Indexer</h1>
-        <p className="mx-auto max-w-md text-sm text-muted-foreground leading-relaxed">
+        <p className="mx-auto max-w-lg text-base text-muted-foreground leading-relaxed">
           Connect Prowlarr to search across your trackers. Find the API key in Prowlarr under Settings &gt; General.
         </p>
       </div>
@@ -322,7 +319,7 @@ function MediaServerStep({ onNext }: { onNext: () => void }): React.JSX.Element 
       </div>
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold text-foreground">Media Server</h1>
-        <p className="mx-auto max-w-md text-sm text-muted-foreground leading-relaxed">
+        <p className="mx-auto max-w-lg text-base text-muted-foreground leading-relaxed">
           Connect Jellyfin or Plex to auto-detect library paths and sync your existing media. This is optional.
         </p>
       </div>
@@ -456,7 +453,7 @@ function LibrariesStep({ onNext }: { onNext: () => void }): React.JSX.Element {
       </div>
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold text-foreground">Your Libraries</h1>
-        <p className="mx-auto max-w-md text-sm text-muted-foreground leading-relaxed">
+        <p className="mx-auto max-w-lg text-base text-muted-foreground leading-relaxed">
           Choose what types of media you want to manage, then set where the files live.
           {hasServer && " Paths from your media server are pre-filled."}
         </p>
@@ -546,7 +543,7 @@ function ReadyStep({ onFinish }: { onFinish: () => void }): React.JSX.Element {
       </div>
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold text-foreground">You're all set</h1>
-        <p className="mx-auto max-w-md text-sm text-muted-foreground leading-relaxed">
+        <p className="mx-auto max-w-lg text-base text-muted-foreground leading-relaxed">
           Everything is configured. You can always change these settings later. Start exploring and downloading media.
         </p>
       </div>
