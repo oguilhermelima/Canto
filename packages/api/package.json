@@ -52,6 +52,10 @@
       "types": "./src/infrastructure/adapters/qbittorrent.ts",
       "default": "./src/infrastructure/adapters/qbittorrent.ts"
     },
+    "./infrastructure/adapters/download-client-factory": {
+      "types": "./src/infrastructure/adapters/download-client-factory.ts",
+      "default": "./src/infrastructure/adapters/download-client-factory.ts"
+    },
     "./infrastructure/adapters/jackett": {
       "types": "./src/infrastructure/adapters/jackett.ts",
       "default": "./src/infrastructure/adapters/jackett.ts"

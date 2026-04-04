@@ -7,6 +7,7 @@ import { getSetting } from "@canto/db/settings";
 
 import { createTRPCRouter, adminProcedure } from "../trpc";
 import { SETTINGS } from "../lib/settings-keys";
+import { getDownloadClient } from "../infrastructure/adapters/download-client-factory";
 import { getQBClient } from "../infrastructure/adapters/qbittorrent";
 import { getJackettClient } from "../infrastructure/adapters/jackett";
 import { getProwlarrClient } from "../infrastructure/adapters/prowlarr";
@@ -63,7 +64,7 @@ export const torrentRouter = createTRPCRouter({
   download: adminProcedure
     .input(torrentDownloadInput)
     .mutation(async ({ ctx, input }) => {
-      const qb = await getQBClient();
+      const qb = await getDownloadClient();
       return downloadTorrent(ctx.db, input, qb);
     }),
 
@@ -84,7 +85,7 @@ export const torrentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const qb = await getQBClient();
+      const qb = await getDownloadClient();
       return replaceTorrent(ctx.db, input, qb);
     }),
 
@@ -113,7 +114,7 @@ export const torrentRouter = createTRPCRouter({
         retryCategory = lib?.qbitCategory ?? mediaType;
       }
 
-      const qb = await getQBClient();
+      const qb = await getDownloadClient();
       await qb.addTorrent(url, retryCategory);
 
       let newHash = row.hash;
@@ -139,7 +140,7 @@ export const torrentRouter = createTRPCRouter({
    */
   listLive: adminProcedure.query(async ({ ctx }) => {
     const dbRows = await findAllTorrents(ctx.db);
-    const qb = await getQBClient();
+    const qb = await getDownloadClient();
     const merged = await mergeLiveData(ctx.db, dbRows, qb);
 
     // Batch-fetch linked media info
@@ -165,7 +166,7 @@ export const torrentRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const dbRows = await findTorrentsByMediaId(ctx.db, input.mediaId);
       if (dbRows.length === 0) return [];
-      const qb = await getQBClient();
+      const qb = await getDownloadClient();
       const merged = await mergeLiveData(ctx.db, dbRows, qb);
       return merged.map((item) => ({ ...item.row, live: item.live }));
     }),
@@ -178,7 +179,7 @@ export const torrentRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const row = await findTorrentById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
-      if (row.hash) { const qb = await getQBClient(); await qb.pauseTorrent(row.hash); }
+      if (row.hash) { const qb = await getDownloadClient(); await qb.pauseTorrent(row.hash); }
       return updateTorrent(ctx.db, input.id, { status: "paused" });
     }),
 
@@ -187,7 +188,7 @@ export const torrentRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const row = await findTorrentById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
-      if (row.hash) { const qb = await getQBClient(); await qb.resumeTorrent(row.hash); }
+      if (row.hash) { const qb = await getDownloadClient(); await qb.resumeTorrent(row.hash); }
       return updateTorrent(ctx.db, input.id, { status: "downloading" });
     }),
 
@@ -197,7 +198,7 @@ export const torrentRouter = createTRPCRouter({
       const row = await findTorrentById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
       if (row.hash) {
-        try { const qb = await getQBClient(); await qb.deleteTorrent(row.hash, false); }
+        try { const qb = await getDownloadClient(); await qb.deleteTorrent(row.hash, false); }
         catch { /* qBit may not have it */ }
       }
       return updateTorrent(ctx.db, input.id, { status: "cancelled" });
@@ -222,7 +223,7 @@ export const torrentRouter = createTRPCRouter({
       if (!claimed) return { success: true, message: "Import already in progress" };
 
       try {
-        const qb = await getQBClient();
+        const qb = await getDownloadClient();
         await autoImportTorrent(ctx.db, claimed, qb);
         return { success: true };
       } catch (err) {
@@ -248,7 +249,7 @@ export const torrentRouter = createTRPCRouter({
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
 
       if (input.removeTorrent && row.hash) {
-        try { const qb = await getQBClient(); await qb.deleteTorrent(row.hash, input.deleteFiles); }
+        try { const qb = await getDownloadClient(); await qb.deleteTorrent(row.hash, input.deleteFiles); }
         catch { /* qBit may not have it */ }
       }
 

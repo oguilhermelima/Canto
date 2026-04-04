@@ -114,9 +114,13 @@ export const library = pgTable("library", {
   name: varchar("name", { length: 100 }).notNull(),
   /** "movies" | "shows" | "animes" */
   type: varchar("type", { length: 20 }).notNull(),
-  /** Organized media destination on host, e.g. "/home/user/Medias/Movies" */
+  /** Where the download client saves files, e.g. "/data/torrents/movies" */
+  downloadPath: varchar("download_path", { length: 500 }),
+  /** Where organized media lives (library root), e.g. "/data/media/movies" */
+  libraryPath: varchar("library_path", { length: 500 }),
+  /** @deprecated Use libraryPath instead. Host path, e.g. "/home/user/Medias/Movies" */
   mediaPath: varchar("media_path", { length: 500 }),
-  /** Same path as seen from qBit container, e.g. "/medias/Movies" */
+  /** @deprecated Use downloadPath instead. Container path, e.g. "/medias/Movies" */
   containerMediaPath: varchar("container_media_path", { length: 500 }),
   /** qBittorrent category name, e.g. "movies" */
   qbitCategory: varchar("qbit_category", { length: 100 }),

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { library, userPreference } from "@canto/db/schema";
 
@@ -48,9 +48,9 @@ export async function seedDefaultLibraries(db: Database) {
   return db
     .insert(library)
     .values([
-      { name: "Movies", type: "movies", jellyfinPath: "/media/Movies", qbitCategory: "movies", isDefault: true },
-      { name: "Shows", type: "shows", jellyfinPath: "/media/Shows", qbitCategory: "shows", isDefault: true },
-      { name: "Animes", type: "animes", jellyfinPath: "/media/Animes", qbitCategory: "animes", isDefault: true },
+      { name: "Movies", type: "movies", qbitCategory: "movies", isDefault: true },
+      { name: "Shows", type: "shows", qbitCategory: "shows", isDefault: true },
+      { name: "Animes", type: "animes", qbitCategory: "animes", isDefault: true },
     ])
     .returning();
 }
@@ -120,4 +120,34 @@ export async function findEnabledSyncLibraries(db: Database) {
   return db.query.library.findMany({
     where: and(eq(library.enabled, true), eq(library.syncEnabled, true)),
   });
+}
+
+/**
+ * Backfill downloadPath/libraryPath for existing libraries that only have the
+ * legacy mediaPath/containerMediaPath columns populated.
+ * Only sets libraryPath from existing legacy columns — does NOT invent paths.
+ * downloadPath is left null until the user explicitly configures it.
+ */
+export async function migrateLibraryPaths(db: Database): Promise<number> {
+  const rows = await db.query.library.findMany({
+    where: isNull(library.libraryPath),
+  });
+
+  let migrated = 0;
+  for (const row of rows) {
+    // Derive libraryPath from legacy columns if available
+    const libPath = row.mediaPath ?? row.containerMediaPath ?? row.jellyfinPath ?? null;
+    if (!libPath) continue;
+
+    await db
+      .update(library)
+      .set({
+        libraryPath: libPath,
+        updatedAt: new Date(),
+      })
+      .where(eq(library.id, row.id));
+    migrated++;
+  }
+
+  return migrated;
 }

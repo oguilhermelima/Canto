@@ -1,7 +1,7 @@
 import { db } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
 import { SETTINGS } from "@canto/api/lib/settings-keys";
-import { getQBClient } from "@canto/api/infrastructure/adapters/qbittorrent";
+import { getDownloadClient } from "@canto/api/infrastructure/adapters/download-client-factory";
 import { getProwlarrClient } from "@canto/api/infrastructure/adapters/prowlarr";
 import { getJackettClient } from "@canto/api/infrastructure/adapters/jackett";
 import { searchTorrents } from "@canto/api/domain/use-cases/search-torrents";
@@ -27,7 +27,7 @@ const STALL_THRESHOLD_MS = 60 * 60 * 1000; // 60 minutes
  * 3. It was created more than STALL_THRESHOLD_MS ago
  */
 export async function handleStallDetection(): Promise<void> {
-  const qb = await getQBClient();
+  const qb = await getDownloadClient();
 
   let liveTorrents: Array<{ hash: string; state: string; progress: number }>;
   try {
@@ -117,7 +117,7 @@ async function autoRetryStalled(
   }
 
   // Remove stalled torrent from qBit
-  const qb = await getQBClient();
+  const qb = await getDownloadClient();
   try {
     const stalledRow = await db.query.torrent.findFirst({
       where: (t, { eq }) => eq(t.id, row.id),

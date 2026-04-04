@@ -7,7 +7,7 @@ import { downloadTorrent } from "@canto/api/domain/use-cases/download-torrent";
 import { detectQuality, detectSource } from "@canto/api/domain/rules/quality";
 import { calculateConfidence } from "@canto/api/domain/rules/scoring";
 import { parseSeasons, parseEpisodes } from "@canto/api/domain/rules/parsing";
-import { getQBClient } from "@canto/api/infrastructure/adapters/qbittorrent";
+import { getDownloadClient } from "@canto/api/infrastructure/adapters/download-client-factory";
 import { getProwlarrClient } from "@canto/api/infrastructure/adapters/prowlarr";
 import {
   findBlocklistByMediaId,
@@ -150,7 +150,7 @@ export async function handleRssSync(): Promise<void> {
         `[rss-sync] Downloading "${item.title}" for ${matchedShow.title} (${missingEpisodes.length} missing ep(s))`,
       );
 
-      const qb = await getQBClient();
+      const qb = await getDownloadClient();
       await downloadTorrent(
         db,
         {

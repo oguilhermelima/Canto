@@ -7,7 +7,7 @@ import { logAndSwallow } from "../../lib/log-error";
 import { resolveDownloadUrl } from "../../lib/follow-redirects";
 import { detectQuality, detectSource } from "../rules/quality";
 import { parseSeasons, parseEpisodes } from "../rules/parsing";
-import type { TorrentClientPort } from "../ports/torrent-client";
+import type { DownloadClientPort } from "../ports/download-client";
 import {
   findMediaByIdWithSeasons,
   findLibraryById,
@@ -40,21 +40,23 @@ interface ReplaceInput extends DownloadInput {
 }
 
 /**
- * Resolve the qBittorrent category from the media's library assignment,
- * falling back to the default library for the media type.
+ * Resolve the download client category and download path from the media's
+ * library assignment, falling back to the default library for the media type.
  */
-async function resolveQBCategory(
+async function resolveDownloadConfig(
   db: Database,
   mediaRow: { type: string; libraryId: string | null },
-): Promise<string> {
-  if (mediaRow.libraryId) {
-    const assignedLib = await findLibraryById(db, mediaRow.libraryId);
-    return assignedLib?.qbitCategory ?? (mediaRow.type === "show" ? "shows" : "movies");
-  }
-
+): Promise<{ category: string; downloadPath: string | undefined }> {
   const mediaType = mediaRow.type === "show" ? "shows" : "movies";
-  const defaultLib = await findDefaultLibrary(db, mediaType);
-  return defaultLib?.qbitCategory ?? mediaType;
+
+  const lib = mediaRow.libraryId
+    ? await findLibraryById(db, mediaRow.libraryId)
+    : await findDefaultLibrary(db, mediaType);
+
+  return {
+    category: lib?.qbitCategory ?? mediaType,
+    downloadPath: lib?.downloadPath ?? undefined,
+  };
 }
 
 /**
@@ -131,7 +133,7 @@ async function coreDownload(
   db: Database,
   input: DownloadInput,
   opts: { skipDedup: boolean },
-  qbClient: TorrentClientPort,
+  qbClient: DownloadClientPort,
 ): Promise<TorrentRow> {
   const magnetOrUrl = input.magnetUrl ?? input.torrentUrl;
 
@@ -150,9 +152,9 @@ async function coreDownload(
     throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
   }
 
-  // ── Resolve qBittorrent category from library assignment ──
+  // ── Resolve download client category + path from library assignment ──
 
-  const qbCategory = await resolveQBCategory(db, mediaRow);
+  const { category: qbCategory, downloadPath } = await resolveDownloadConfig(db, mediaRow);
 
   // ── Blocklist check: reject previously failed downloads ──
 
@@ -337,8 +339,8 @@ async function coreDownload(
   // ── Add to qBittorrent ──
 
   try {
-    // Ensure category exists before adding torrent
-    await qbClient.ensureCategory(qbCategory);
+    // Ensure category exists with correct save path
+    await qbClient.ensureCategory(qbCategory, downloadPath);
 
     // Snapshot existing hashes before adding
     let existingHashes: Set<string>;
@@ -411,7 +413,7 @@ async function coreDownload(
 export async function downloadTorrent(
   db: Database,
   input: DownloadInput,
-  qbClient: TorrentClientPort,
+  qbClient: DownloadClientPort,
 ): Promise<TorrentRow> {
   return coreDownload(db, input, { skipDedup: false }, qbClient);
 }
@@ -424,7 +426,7 @@ export async function downloadTorrent(
 export async function replaceTorrent(
   db: Database,
   input: ReplaceInput,
-  qbClient: TorrentClientPort,
+  qbClient: DownloadClientPort,
 ): Promise<TorrentRow> {
   // Delete old media_file records
   for (const fileId of input.replaceFileIds) {

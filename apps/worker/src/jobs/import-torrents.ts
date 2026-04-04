@@ -4,7 +4,7 @@ import { SETTINGS } from "@canto/api/lib/settings-keys";
 import { searchTorrents } from "@canto/api/domain/use-cases/search-torrents";
 import { downloadTorrent } from "@canto/api/domain/use-cases/download-torrent";
 import { autoImportTorrent } from "@canto/api/domain/use-cases/import-torrent";
-import { getQBClient } from "@canto/api/infrastructure/adapters/qbittorrent";
+import { getDownloadClient } from "@canto/api/infrastructure/adapters/download-client-factory";
 import { getJackettClient } from "@canto/api/infrastructure/adapters/jackett";
 import { getProwlarrClient } from "@canto/api/infrastructure/adapters/prowlarr";
 import type { IndexerPort } from "@canto/api/domain/ports";
@@ -79,7 +79,7 @@ export async function handleImportTorrents(): Promise<void> {
 
   for (const row of toImport) {
     try {
-      const qbClient = await getQBClient();
+      const qbClient = await getDownloadClient();
       await autoImportTorrent(db, row, qbClient);
 
       // Re-read row to check if import succeeded
@@ -175,7 +175,7 @@ async function tryContinuousDownload(
     const best = results[0]!;
     console.log(`[continuous-download] Auto-downloading "${best.title}" (confidence: ${best.confidence})`);
 
-    const qbClient = await getQBClient();
+    const qbClient = await getDownloadClient();
     await downloadTorrent(db, {
       mediaId: mediaRow.id,
       title: best.title,
@@ -199,7 +199,7 @@ export async function importSingleTorrent(torrentId: string): Promise<boolean> {
   if (row.imported) return true;
 
   try {
-    const qbClient = await getQBClient();
+    const qbClient = await getDownloadClient();
     await autoImportTorrent(db, row, qbClient);
 
     // Re-read row to check if import succeeded

@@ -1,7 +1,8 @@
 import { getSetting } from "@canto/db/settings";
 import { SETTINGS } from "../../lib/settings-keys";
+import type { DownloadClientPort, TorrentInfo, TorrentFileInfo } from "../../domain/ports/download-client";
 
-export class QBittorrentClient {
+export class QBittorrentClient implements DownloadClientPort {
   private baseUrl: string;
   private username: string;
   private password: string;
@@ -89,50 +90,12 @@ export class QBittorrentClient {
     }
   }
 
-  async listTorrents(): Promise<
-    Array<{
-      hash: string;
-      name: string;
-      state: string;
-      progress: number;
-      size: number;
-      dlspeed: number;
-      upspeed: number;
-      eta: number;
-      save_path: string;
-      category: string;
-      content_path: string;
-      num_seeds: number;
-      num_leechs: number;
-      added_on: number;
-      completion_on: number;
-      ratio: number;
-    }>
-  > {
+  async listTorrents(): Promise<TorrentInfo[]> {
     const response = await this.request("/api/v2/torrents/info");
     if (!response.ok) {
       throw new Error(`qBittorrent list failed: ${response.status}`);
     }
-    return response.json() as Promise<
-      Array<{
-        hash: string;
-        name: string;
-        state: string;
-        progress: number;
-        size: number;
-        dlspeed: number;
-        upspeed: number;
-        eta: number;
-        save_path: string;
-        category: string;
-        content_path: string;
-        num_seeds: number;
-        num_leechs: number;
-        added_on: number;
-        completion_on: number;
-        ratio: number;
-      }>
-    >;
+    return response.json() as Promise<TorrentInfo[]>;
   }
 
   async pauseTorrent(hash: string): Promise<void> {
@@ -183,10 +146,10 @@ export class QBittorrentClient {
     });
   }
 
-  async getTorrentFiles(hash: string): Promise<Array<{ index: number; name: string; size: number; progress: number }>> {
+  async getTorrentFiles(hash: string): Promise<TorrentFileInfo[]> {
     const response = await this.request(`/api/v2/torrents/files?hash=${hash}`);
     if (!response.ok) return [];
-    return response.json() as Promise<Array<{ index: number; name: string; size: number; progress: number }>>;
+    return response.json() as Promise<TorrentFileInfo[]>;
   }
 
   async setLocation(hash: string, location: string): Promise<void> {
@@ -250,6 +213,15 @@ export class QBittorrentClient {
     } catch {
       // Category likely already exists — ignore
     }
+  }
+
+  async testConnection(): Promise<{ name: string; version: string }> {
+    const response = await this.request("/api/v2/app/version");
+    if (!response.ok) {
+      throw new Error(`qBittorrent connection test failed: ${response.status}`);
+    }
+    const version = await response.text();
+    return { name: "qBittorrent", version: version.trim() };
   }
 }
 

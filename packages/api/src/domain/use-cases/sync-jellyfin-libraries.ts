@@ -48,12 +48,15 @@ export async function syncJellyfinLibraries(
         name: folder.Name,
         jellyfinPath: folder.Locations[0] ?? null,
         jellyfinLibraryId: folder.Id,
+        // Set libraryPath from Jellyfin's reported path if not yet configured
+        ...(!existing.libraryPath ? { libraryPath: folder.Locations[0] ?? null } : {}),
       });
       synced.push({ id: existing.id, name: folder.Name, action: "updated" });
     } else {
       const row = await createLibrary(db, {
         name: folder.Name,
         type,
+        libraryPath: folder.Locations[0] ?? null,
         jellyfinPath: folder.Locations[0] ?? null,
         jellyfinLibraryId: folder.Id,
         qbitCategory: defaultCategory,

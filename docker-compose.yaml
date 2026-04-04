@@ -44,7 +44,7 @@ services:
       WEBUI_PORT: 8080
     volumes:
       - qbittorrent_config:/config
-      - ./data/downloads:/downloads
+      - ./data:/data
 
   prowlarr:
     image: lscr.io/linuxserver/prowlarr:latest

@@ -1,0 +1,105 @@
+import { unlink, stat } from "node:fs/promises";
+import path from "node:path";
+
+import { db } from "@canto/db/client";
+import { getSetting } from "@canto/db/settings";
+import { SETTINGS } from "@canto/api/lib/settings-keys";
+import { getDownloadClient } from "@canto/api/infrastructure/adapters/download-client-factory";
+import {
+  findTorrentByHash,
+  updateTorrent,
+} from "@canto/api/infrastructure/repositories";
+
+/**
+ * Seed management: removes torrents from the download client once they've
+ * exceeded the configured ratio or time limits. Optionally cleans up the
+ * source files in the downloads folder (safe when hardlinks are used).
+ */
+export async function handleSeedManagement(): Promise<void> {
+  const [ratioLimit, timeLimitHours, cleanupFiles] = await Promise.all([
+    getSetting<number>(SETTINGS.SEED_RATIO_LIMIT),
+    getSetting<number>(SETTINGS.SEED_TIME_LIMIT_HOURS),
+    getSetting<boolean>(SETTINGS.SEED_CLEANUP_FILES),
+  ]);
+
+  // No limits configured — nothing to do
+  if (ratioLimit == null && timeLimitHours == null) return;
+
+  let client;
+  try {
+    client = await getDownloadClient();
+  } catch {
+    return; // Client not configured
+  }
+
+  const liveTorrents = await client.listTorrents();
+  const now = Math.floor(Date.now() / 1000);
+  let removed = 0;
+
+  for (const torrent of liveTorrents) {
+    // Only process completed torrents (uploading/seeding states)
+    if (torrent.progress < 1) continue;
+
+    // Check if this torrent is tracked, imported, and not currently being imported
+    const dbRow = await findTorrentByHash(db, torrent.hash);
+    if (!dbRow || !dbRow.imported || dbRow.importing) continue;
+
+    let shouldRemove = false;
+
+    // Check ratio limit
+    if (ratioLimit != null && torrent.ratio >= ratioLimit) {
+      shouldRemove = true;
+    }
+
+    // Check time limit
+    if (timeLimitHours != null && torrent.completion_on > 0) {
+      const seededSeconds = now - torrent.completion_on;
+      if (seededSeconds >= timeLimitHours * 3600) {
+        shouldRemove = true;
+      }
+    }
+
+    if (!shouldRemove) continue;
+
+    try {
+      // Remove torrent from client (keep files for now)
+      await client.deleteTorrent(torrent.hash, false);
+
+      // Update DB status
+      await updateTorrent(db, dbRow.id, { status: "completed" });
+
+      console.log(
+        `[seed-management] Removed "${torrent.name}" (ratio: ${torrent.ratio.toFixed(2)}, seeded: ${torrent.completion_on > 0 ? Math.round((now - torrent.completion_on) / 3600) : "?"}h)`,
+      );
+
+      // Optionally clean up source files
+      if (cleanupFiles) {
+        try {
+          const files = await client.getTorrentFiles(torrent.hash).catch(() => []);
+          // If we already deleted the torrent, files may not be available.
+          // Instead, try to clean up the save_path directory directly.
+          const contentPath = torrent.content_path || path.join(torrent.save_path, torrent.name);
+          const stats = await stat(contentPath).catch(() => null);
+          if (stats?.isFile()) {
+            await unlink(contentPath);
+            console.log(`[seed-management] Cleaned up file: ${contentPath}`);
+          }
+          // For directories we skip automatic cleanup to avoid accidental deletions
+        } catch (err) {
+          console.warn(`[seed-management] Cleanup failed for "${torrent.name}":`, err);
+        }
+      }
+
+      removed++;
+    } catch (err) {
+      console.error(
+        `[seed-management] Failed to remove "${torrent.name}":`,
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
+  if (removed > 0) {
+    console.log(`[seed-management] Removed ${removed} torrent(s) that exceeded seed limits`);
+  }
+}

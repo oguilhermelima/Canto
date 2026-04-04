@@ -1,5 +1,5 @@
 import type { Database } from "@canto/db/client";
-import type { TorrentClientPort } from "../ports/torrent-client";
+import type { DownloadClientPort } from "../ports/download-client";
 import type { LiveData } from "../types/torrent";
 import { autoImportTorrent } from "./import-torrent";
 import {
@@ -14,7 +14,7 @@ type TorrentRow = Awaited<ReturnType<Database["query"]["torrent"]["findMany"]>>[
 export async function mergeLiveData(
   db: Database,
   dbRows: TorrentRow[],
-  qbClient: TorrentClientPort,
+  qbClient: DownloadClientPort,
 ): Promise<Array<{ row: TorrentRow; live: LiveData | null }>> {
   let liveTorrents: Array<{
     hash: string;

@@ -34,18 +34,24 @@ export async function syncPlexLibraries(
       existing = allOfType.find((l) => !l.plexLibraryId) ?? undefined;
     }
 
+    const defaultCategory = type === "movies" ? "movies" : type === "animes" ? "animes" : "shows";
+    const plexPath = section.Location[0]?.path ?? null;
+
     if (existing) {
       await updateLibrary(db, existing.id, {
         plexLibraryId: section.key,
+        // Set libraryPath from Plex's reported path if not yet configured
+        ...(!existing.libraryPath ? { libraryPath: plexPath } : {}),
       });
       synced.push({ id: existing.id, name: section.title, action: "updated" });
     } else {
       const row = await createLibrary(db, {
         name: section.title,
         type,
-        mediaPath: section.Location[0]?.path ?? null,
-        containerMediaPath: section.Location[0]?.path ?? null,
-        qbitCategory: type === "movies" ? "movies" : type === "animes" ? "animes" : "shows",
+        libraryPath: plexPath,
+        mediaPath: plexPath,
+        containerMediaPath: plexPath,
+        qbitCategory: defaultCategory,
         plexLibraryId: section.key,
         isDefault: false,
         enabled: true,

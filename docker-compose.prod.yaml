@@ -85,6 +85,8 @@ services:
       REDIS_URL: redis://redis:6379
       REDIS_HOST: redis
       REDIS_PORT: "6379"
+    volumes:
+      - ./data:/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -108,7 +110,7 @@ services:
       WEBUI_PORT: 8080
     volumes:
       - qbittorrent_config:/config
-      - ./data/downloads:/downloads
+      - ./data:/data
 
   prowlarr:
     image: lscr.io/linuxserver/prowlarr:latest

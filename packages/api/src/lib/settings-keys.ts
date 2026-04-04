@@ -50,6 +50,14 @@ export const SETTINGS = {
   REDIS_HOST: "redis.host",
   REDIS_PORT: "redis.port",
 
+  // Downloads & Paths
+  ROOT_DATA_PATH: "paths.rootDataPath",
+  /** "local" (hardlinks, requires filesystem access) or "remote" (qBit API, no filesystem needed) */
+  IMPORT_METHOD: "download.importMethod",
+  SEED_RATIO_LIMIT: "download.seedRatioLimit",
+  SEED_TIME_LIMIT_HOURS: "download.seedTimeLimitHours",
+  SEED_CLEANUP_FILES: "download.seedCleanupFiles",
+
   // Cache
   CACHE_SPOTLIGHT: "cache.spotlight",
 } as const;
