@@ -14,18 +14,11 @@ export default function AppLayout({
 }): React.JSX.Element | null {
   const router = useRouter();
   const pathname = usePathname();
-  const { data: isOnboarded, isLoading } = trpc.settings.isOnboardingCompleted.useQuery();
-
-  useEffect(() => {
-    if (!isLoading && isOnboarded === false) {
-      router.replace("/onboarding");
-    }
-  }, [isOnboarded, isLoading, router]);
-
-  // Don't flash app chrome while checking onboarding
-  if (isLoading || isOnboarded === false) {
-    return null;
-  }
+  // TODO: re-enable onboarding redirect when onboarding flow is finalized
+  // const { data: isOnboarded, isLoading } = trpc.settings.isOnboardingCompleted.useQuery();
+  // useEffect(() => {
+  //   if (!isLoading && isOnboarded === false) router.replace("/onboarding");
+  // }, [isOnboarded, isLoading, router]);
 
   return (
     <div className="min-h-screen bg-background">
