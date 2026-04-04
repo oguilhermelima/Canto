@@ -58,6 +58,9 @@ export const SETTINGS = {
   SEED_TIME_LIMIT_HOURS: "download.seedTimeLimitHours",
   SEED_CLEANUP_FILES: "download.seedCleanupFiles",
 
+  // Onboarding
+  ONBOARDING_COMPLETED: "onboarding.completed",
+
   // Cache
   CACHE_SPOTLIGHT: "cache.spotlight",
 } as const;

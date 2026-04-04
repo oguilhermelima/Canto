@@ -270,6 +270,16 @@ export const settingsRouter = createTRPCRouter({
     }),
 
   /** Get enabled state for all services */
+  isOnboardingCompleted: publicProcedure.query(async () => {
+    const val = await getSetting<boolean>(SETTINGS.ONBOARDING_COMPLETED);
+    return val === true;
+  }),
+
+  completeOnboarding: adminProcedure.mutation(async () => {
+    await setSetting(SETTINGS.ONBOARDING_COMPLETED, true);
+    return { success: true };
+  }),
+
   getEnabledServices: publicProcedure.query(async () => {
     const result: Record<string, boolean> = {};
     for (const s of ALL_SERVICES) {

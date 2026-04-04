@@ -21,6 +21,11 @@ export function middleware(request: NextRequest): NextResponse {
     return NextResponse.redirect(loginUrl);
   }
 
+  // Onboarding is always accessible when authenticated
+  if (pathname.startsWith("/onboarding")) {
+    return NextResponse.next();
+  }
+
   return NextResponse.next();
 }
 
