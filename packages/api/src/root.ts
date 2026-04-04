@@ -1,5 +1,6 @@
 import { createCallerFactory, createTRPCRouter } from "./trpc";
 import { authRouter } from "./routers/auth";
+import { folderRouter } from "./routers/folder";
 import { jellyfinRouter } from "./routers/jellyfin";
 import { libraryRouter } from "./routers/library";
 import { listRouter } from "./routers/list";
@@ -13,6 +14,7 @@ import { torrentRouter } from "./routers/torrent";
 
 export const appRouter = createTRPCRouter({
   auth: authRouter,
+  folder: folderRouter,
   jellyfin: jellyfinRouter,
   list: listRouter,
   media: mediaRouter,
