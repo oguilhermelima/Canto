@@ -1,67 +1,85 @@
 import type { Database } from "@canto/db/client";
 
 import {
-  findLibraryByPlexId,
-  findLibrariesByType,
-  updateLibrary,
-  createLibrary,
+  findAllFolders,
+  createFolder,
+  findServerLink,
+  upsertServerLink,
 } from "../../infrastructure/repositories";
-import { autoElectDefaults } from "./sync-library-helpers";
+import { autoElectDefault } from "./sync-library-helpers";
 
 type PlexSection = { key: string; title: string; type: string; Location: Array<{ path: string }> };
 
+/**
+ * Sync Plex server sections → folder_server_link junction.
+ * For each Plex section, find or create a matching download folder and link it.
+ */
 export async function syncPlexLibraries(
   db: Database,
   url: string,
   token: string,
   getSections: (url: string, token: string) => Promise<PlexSection[]>,
-): Promise<Array<{ id: string; name: string; action: "created" | "updated" }>> {
+): Promise<Array<{ id: string; name: string; action: "linked" | "created" }>> {
   const sections = await getSections(url, token);
-  const synced: Array<{ id: string; name: string; action: "created" | "updated" }> = [];
+  const synced: Array<{ id: string; name: string; action: "linked" | "created" }> = [];
 
   for (const section of sections) {
     if (!["movie", "show"].includes(section.type)) continue;
 
-    let type = "movies";
-    if (section.type === "show") {
-      type = /anime/i.test(section.title) ? "animes" : "shows";
-    }
+    const serverPath = section.Location[0]?.path ?? null;
 
-    let existing = await findLibraryByPlexId(db, section.key);
-
-    if (!existing) {
-      const allOfType = await findLibrariesByType(db, type);
-      existing = allOfType.find((l) => !l.plexLibraryId) ?? undefined;
-    }
-
-    const defaultCategory = type === "movies" ? "movies" : type === "animes" ? "animes" : "shows";
-    const plexPath = section.Location[0]?.path ?? null;
-
-    if (existing) {
-      await updateLibrary(db, existing.id, {
-        plexLibraryId: section.key,
-        // Set libraryPath from Plex's reported path if not yet configured
-        ...(!existing.libraryPath ? { libraryPath: plexPath } : {}),
+    // Check if already linked
+    const existingLink = await findServerLink(db, "plex", section.key);
+    if (existingLink) {
+      await upsertServerLink(db, {
+        folderId: existingLink.folderId,
+        serverType: "plex",
+        serverLibraryId: section.key,
+        serverLibraryName: section.title,
+        serverPath,
       });
-      synced.push({ id: existing.id, name: section.title, action: "updated" });
+      synced.push({ id: existingLink.folderId, name: section.title, action: "linked" });
+      continue;
+    }
+
+    // Try to find a matching download folder by name
+    const allFolders = await findAllFolders(db);
+    const match = allFolders.find((f) => f.name.toLowerCase() === section.title.toLowerCase());
+
+    if (match) {
+      await upsertServerLink(db, {
+        folderId: match.id,
+        serverType: "plex",
+        serverLibraryId: section.key,
+        serverLibraryName: section.title,
+        serverPath,
+      });
+      synced.push({ id: match.id, name: section.title, action: "linked" });
     } else {
-      const row = await createLibrary(db, {
+      const isAnime = /anime/i.test(section.title);
+      const qbitCategory = section.type === "movie" ? "movies" : isAnime ? "animes" : "shows";
+
+      const newFolder = await createFolder(db, {
         name: section.title,
-        type,
-        libraryPath: plexPath,
-        mediaPath: plexPath,
-        containerMediaPath: plexPath,
-        qbitCategory: defaultCategory,
-        plexLibraryId: section.key,
+        libraryPath: serverPath,
+        qbitCategory,
         isDefault: false,
         enabled: true,
       });
-      if (row) {
-        synced.push({ id: row.id, name: section.title, action: "created" });
+
+      if (newFolder) {
+        await upsertServerLink(db, {
+          folderId: newFolder.id,
+          serverType: "plex",
+          serverLibraryId: section.key,
+          serverLibraryName: section.title,
+          serverPath,
+        });
+        synced.push({ id: newFolder.id, name: section.title, action: "created" });
       }
     }
   }
 
-  await autoElectDefaults(db);
+  await autoElectDefault(db);
   return synced;
 }

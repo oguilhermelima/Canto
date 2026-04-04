@@ -1,21 +1,25 @@
 import type { Database } from "@canto/db/client";
 
 import {
-  findLibraryByJellyfinId,
-  findLibrariesByType,
-  updateLibrary,
-  createLibrary,
+  findAllFolders,
+  createFolder,
+  findServerLink,
+  upsertServerLink,
 } from "../../infrastructure/repositories";
-import { autoElectDefaults } from "./sync-library-helpers";
+import { autoElectDefault } from "./sync-library-helpers";
 
 type JellyfinFolder = { Id: string; Name: string; CollectionType: string; Locations: string[] };
 
+/**
+ * Sync Jellyfin server libraries → folder_server_link junction.
+ * For each Jellyfin library, find or create a matching download folder and link it.
+ */
 export async function syncJellyfinLibraries(
   db: Database,
   url: string,
   apiKey: string,
   getLibraryFolders: (url: string, apiKey: string) => Promise<JellyfinFolder[]>,
-): Promise<Array<{ id: string; name: string; action: "created" | "updated" }>> {
+): Promise<Array<{ id: string; name: string; action: "linked" | "created" }>> {
   let folders: JellyfinFolder[];
   try {
     folders = await getLibraryFolders(url, apiKey);
@@ -23,52 +27,68 @@ export async function syncJellyfinLibraries(
     return [];
   }
 
-  const synced: Array<{ id: string; name: string; action: "created" | "updated" }> = [];
+  const synced: Array<{ id: string; name: string; action: "linked" | "created" }> = [];
 
   for (const folder of folders) {
     if (!["movies", "tvshows"].includes(folder.CollectionType)) continue;
 
-    let type = "movies";
-    if (folder.CollectionType === "tvshows") {
-      type = /anime/i.test(folder.Name) ? "animes" : "shows";
-    }
+    const serverPath = folder.Locations[0] ?? null;
 
-    const defaultCategory =
-      type === "movies" ? "movies" : type === "animes" ? "animes" : "shows";
-
-    let existing = await findLibraryByJellyfinId(db, folder.Id);
-
-    if (!existing) {
-      const allOfType = await findLibrariesByType(db, type);
-      existing = allOfType.find((l) => !l.jellyfinLibraryId) ?? undefined;
-    }
-
-    if (existing) {
-      await updateLibrary(db, existing.id, {
-        name: folder.Name,
-        jellyfinPath: folder.Locations[0] ?? null,
-        jellyfinLibraryId: folder.Id,
-        // Set libraryPath from Jellyfin's reported path if not yet configured
-        ...(!existing.libraryPath ? { libraryPath: folder.Locations[0] ?? null } : {}),
+    // Check if already linked
+    const existingLink = await findServerLink(db, "jellyfin", folder.Id);
+    if (existingLink) {
+      // Update name/path
+      await upsertServerLink(db, {
+        folderId: existingLink.folderId,
+        serverType: "jellyfin",
+        serverLibraryId: folder.Id,
+        serverLibraryName: folder.Name,
+        serverPath,
       });
-      synced.push({ id: existing.id, name: folder.Name, action: "updated" });
+      synced.push({ id: existingLink.folderId, name: folder.Name, action: "linked" });
+      continue;
+    }
+
+    // Try to find a matching download folder by name
+    const allFolders = await findAllFolders(db);
+    const match = allFolders.find((f) => f.name.toLowerCase() === folder.Name.toLowerCase());
+
+    if (match) {
+      // Link to existing folder
+      await upsertServerLink(db, {
+        folderId: match.id,
+        serverType: "jellyfin",
+        serverLibraryId: folder.Id,
+        serverLibraryName: folder.Name,
+        serverPath,
+      });
+      synced.push({ id: match.id, name: folder.Name, action: "linked" });
     } else {
-      const row = await createLibrary(db, {
+      // Create new folder + link
+      const isAnime = /anime/i.test(folder.Name);
+      const qbitCategory = folder.CollectionType === "movies" ? "movies" : isAnime ? "animes" : "shows";
+
+      const newFolder = await createFolder(db, {
         name: folder.Name,
-        type,
-        libraryPath: folder.Locations[0] ?? null,
-        jellyfinPath: folder.Locations[0] ?? null,
-        jellyfinLibraryId: folder.Id,
-        qbitCategory: defaultCategory,
+        libraryPath: serverPath,
+        qbitCategory,
         isDefault: false,
         enabled: true,
       });
-      if (row) {
-        synced.push({ id: row.id, name: folder.Name, action: "created" });
+
+      if (newFolder) {
+        await upsertServerLink(db, {
+          folderId: newFolder.id,
+          serverType: "jellyfin",
+          serverLibraryId: folder.Id,
+          serverLibraryName: folder.Name,
+          serverPath,
+        });
+        synced.push({ id: newFolder.id, name: folder.Name, action: "created" });
       }
     }
   }
 
-  await autoElectDefaults(db);
+  await autoElectDefault(db);
   return synced;
 }

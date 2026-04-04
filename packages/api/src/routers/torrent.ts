@@ -25,7 +25,7 @@ import {
   claimTorrentForImport,
 } from "../infrastructure/repositories/torrent-repository";
 import { findMediaById } from "../infrastructure/repositories/media-repository";
-import { findDefaultLibrary, findLibraryById } from "../infrastructure/repositories/library-repository";
+import { findFolderById, findDefaultFolder } from "../infrastructure/repositories/folder-repository";
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                   */
@@ -106,12 +106,11 @@ export const torrentRouter = createTRPCRouter({
       const linkedMedia = row.mediaId ? await findMediaById(ctx.db, row.mediaId) : null;
       let retryCategory: string;
       if (linkedMedia?.libraryId) {
-        const lib = await findLibraryById(ctx.db, linkedMedia.libraryId);
-        retryCategory = lib?.qbitCategory ?? (linkedMedia.type === "show" ? "shows" : "movies");
+        const folder = await findFolderById(ctx.db, linkedMedia.libraryId);
+        retryCategory = folder?.qbitCategory ?? "default";
       } else {
-        const mediaType = linkedMedia?.type === "show" ? "shows" : "movies";
-        const lib = await findDefaultLibrary(ctx.db, mediaType);
-        retryCategory = lib?.qbitCategory ?? mediaType;
+        const folder = await findDefaultFolder(ctx.db);
+        retryCategory = folder?.qbitCategory ?? "default";
       }
 
       const qb = await getDownloadClient();

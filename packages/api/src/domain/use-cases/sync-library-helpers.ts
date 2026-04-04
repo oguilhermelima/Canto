@@ -1,17 +1,22 @@
 import type { Database } from "@canto/db/client";
-import {
-  findLibrariesByType,
-  updateLibrary,
-} from "../../infrastructure/repositories";
+import { findAllFolders, updateFolder } from "../../infrastructure/repositories";
 
-export async function autoElectDefaults(db: Database): Promise<void> {
-  for (const t of ["movies", "shows", "animes"]) {
-    const ofType = await findLibrariesByType(db, t);
-    if (ofType.length > 0 && !ofType.some((l) => l.isDefault)) {
-      const first = ofType.find((l) => l.enabled) ?? ofType[0];
-      if (first) {
-        await updateLibrary(db, first.id, { isDefault: true });
-      }
-    }
+/**
+ * Ensure at least one download folder is marked as default.
+ * If none is default, pick the first enabled folder.
+ */
+export async function autoElectDefault(db: Database): Promise<void> {
+  const folders = await findAllFolders(db);
+  if (folders.length === 0) return;
+
+  const hasDefault = folders.some((f) => f.isDefault);
+  if (hasDefault) return;
+
+  const first = folders.find((f) => f.enabled) ?? folders[0];
+  if (first) {
+    await updateFolder(db, first.id, { isDefault: true });
   }
 }
+
+/** @deprecated Use autoElectDefault */
+export const autoElectDefaults = autoElectDefault;

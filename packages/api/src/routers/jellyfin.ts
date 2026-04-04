@@ -10,7 +10,7 @@ import {
   mergeJellyfinVersions,
   getJellyfinLibraryFolders,
 } from "../infrastructure/adapters/jellyfin";
-import { updateLibrary } from "../infrastructure/repositories/library-repository";
+import { updateFolder } from "../infrastructure/repositories/folder-repository";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                    */
@@ -45,7 +45,7 @@ export const jellyfinRouter = createTRPCRouter({
 
   toggleLibrary: adminProcedure
     .input(z.object({ id: z.string().uuid(), enabled: z.boolean() }))
-    .mutation(({ ctx, input }) => updateLibrary(ctx.db, input.id, { enabled: input.enabled })),
+    .mutation(({ ctx, input }) => updateFolder(ctx.db, input.id, { enabled: input.enabled })),
 
   scan: adminProcedure.mutation(async () => {
     const creds = await getJellyfinCredentials();

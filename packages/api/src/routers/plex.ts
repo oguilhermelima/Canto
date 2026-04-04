@@ -5,7 +5,7 @@ import { getPlexCredentials } from "../lib/server-credentials";
 import { createTRPCRouter, adminProcedure } from "../trpc";
 import { syncPlexLibraries } from "../domain/use-cases/sync-plex-libraries";
 import { testPlexConnection, scanPlexLibrary, getPlexSections } from "../infrastructure/adapters/plex";
-import { findAllLibraries, updateLibrary } from "../infrastructure/repositories/library-repository";
+import { updateFolder, findAllServerLinks } from "../infrastructure/repositories/folder-repository";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                    */
@@ -42,13 +42,13 @@ export const plexRouter = createTRPCRouter({
     const creds = await getPlexCredentials();
     if (!creds) throw new TRPCError({ code: "BAD_REQUEST", message: "Plex not configured" });
 
-    const libs = await findAllLibraries(ctx.db);
-    const sectionIds = libs.filter((l) => l.plexLibraryId).map((l) => l.plexLibraryId!);
+    const plexLinks = await findAllServerLinks(ctx.db, "plex");
+    const sectionIds = plexLinks.map((l) => l.serverLibraryId);
     await scanPlexLibrary(creds.url, creds.token, sectionIds.length > 0 ? sectionIds : undefined);
     return { success: true };
   }),
 
   toggleLibrary: adminProcedure
     .input(z.object({ id: z.string().uuid(), enabled: z.boolean() }))
-    .mutation(({ ctx, input }) => updateLibrary(ctx.db, input.id, { enabled: input.enabled })),
+    .mutation(({ ctx, input }) => updateFolder(ctx.db, input.id, { enabled: input.enabled })),
 });

@@ -12,7 +12,7 @@ const ruleCondition = z.discriminatedUnion("field", [
   z.object({ field: z.literal("provider"), op: z.literal("eq"), value: z.enum(["tmdb", "anilist", "tvdb"]) }),
 ]);
 
-type RuleGroupInput = {
+export type RuleGroupInput = {
   operator: "AND" | "OR";
   conditions: Array<z.infer<typeof ruleCondition> | RuleGroupInput>;
 };

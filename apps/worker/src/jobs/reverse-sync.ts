@@ -3,7 +3,7 @@ import { getSetting, setSetting } from "@canto/db/settings";
 import { persistMedia, getSupportedLanguageCodes } from "@canto/db/persist-media";
 import { TmdbProvider } from "@canto/providers";
 import {
-  findEnabledSyncLibraries,
+  findEnabledSyncLinks,
   findMediaByExternalId,
   findMediaByAnyReference,
   updateMedia,
@@ -726,10 +726,10 @@ export async function handleJellyfinSync(): Promise<void> {
     return;
   }
 
-  const jellyfinLibs = await findEnabledSyncLibraries(db);
-  const linked = jellyfinLibs
-    .filter((l) => l.jellyfinLibraryId)
-    .map((l) => ({ id: l.id, jellyfinLibraryId: l.jellyfinLibraryId!, type: l.type }));
+  const syncLinks = await findEnabledSyncLinks(db);
+  const linked = syncLinks
+    .filter((l) => l.serverType === "jellyfin")
+    .map((l) => ({ id: l.folderId, jellyfinLibraryId: l.serverLibraryId, type: "mixed" as string }));
 
   if (linked.length === 0) {
     console.log("[jellyfin-sync] No linked Jellyfin libraries");
@@ -751,10 +751,10 @@ export async function handlePlexSync(): Promise<void> {
     return;
   }
 
-  const plexLibs = await findEnabledSyncLibraries(db);
-  const linked = plexLibs
-    .filter((l) => l.plexLibraryId)
-    .map((l) => ({ id: l.id, plexLibraryId: l.plexLibraryId!, type: l.type }));
+  const plexSyncLinks = await findEnabledSyncLinks(db);
+  const linked = plexSyncLinks
+    .filter((l) => l.serverType === "plex")
+    .map((l) => ({ id: l.folderId, plexLibraryId: l.serverLibraryId, type: "mixed" as string }));
 
   if (linked.length === 0) {
     console.log("[plex-sync] No linked Plex libraries");
