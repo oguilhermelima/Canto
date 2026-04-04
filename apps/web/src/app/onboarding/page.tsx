@@ -476,6 +476,8 @@ function MediaServerStep({ onNext }: { onNext: () => void }): React.JSX.Element 
   const testService = trpc.settings.testService.useMutation();
   const authPlex = trpc.settings.authenticatePlex.useMutation();
   const createPlexPin = trpc.settings.plexPinCreate.useMutation();
+  const syncJellyfin = trpc.jellyfin.syncLibraries.useMutation();
+  const syncPlex = trpc.plex.syncLibraries.useMutation();
   const plexPinCheck = trpc.settings.plexPinCheck.useQuery(
     { pinId: plexPinData?.pinId ?? 0, clientId: plexPinData?.clientId ?? "", serverUrl: plexUrl || undefined },
     { enabled: plexPolling && plexPinData !== null, refetchInterval: 2000 },
@@ -486,7 +488,7 @@ function MediaServerStep({ onNext }: { onNext: () => void }): React.JSX.Element 
       setPlexPolling(false);
       setPlexPinData(null);
       setPlexConnected(true);
-      void setMany.mutateAsync({ settings: [{ key: "plex.enabled", value: true }] });
+      void setMany.mutateAsync({ settings: [{ key: "plex.enabled", value: true }] }).then(() => syncPlex.mutateAsync());
       toast.success(plexPinCheck.data.serverName ? `Connected to ${plexPinCheck.data.serverName}` : "Plex connected");
     }
     if (plexPinCheck.data?.expired) {
@@ -505,6 +507,7 @@ function MediaServerStep({ onNext }: { onNext: () => void }): React.JSX.Element 
           await setMany.mutateAsync({ settings: [{ key: "jellyfin.enabled", value: true }] });
           setJellyfinConnected(true);
           toast.success(`Connected to ${result.serverName || "Jellyfin"}`);
+          void syncJellyfin.mutateAsync();
         } else {
           toast.error(result.error ?? "Authentication failed");
         }
@@ -523,6 +526,7 @@ function MediaServerStep({ onNext }: { onNext: () => void }): React.JSX.Element 
         if (result.connected) {
           setJellyfinConnected(true);
           toast.success("Jellyfin connected");
+          void syncJellyfin.mutateAsync();
         } else {
           toast.error("Connection failed. Check your URL and API key.");
         }
@@ -560,6 +564,7 @@ function MediaServerStep({ onNext }: { onNext: () => void }): React.JSX.Element 
         await setMany.mutateAsync({ settings: [{ key: "plex.enabled", value: true }] });
         setPlexConnected(true);
         toast.success(`Connected to ${result.serverName || "Plex"}`);
+        void syncPlex.mutateAsync();
       } else {
         toast.error(result.error ?? "Connection failed");
       }
@@ -705,17 +710,25 @@ function LibrariesStep({ onNext }: { onNext: () => void }): React.JSX.Element {
   const seedLibraries = trpc.library.seed.useMutation();
   const updatePaths = trpc.library.updatePaths.useMutation();
 
+  // Pre-fill paths and auto-select types from synced libraries
+  const [initialized, setInitialized] = useState(false);
   useEffect(() => {
-    if (!libraries) return;
+    if (!libraries || libraries.length === 0) return;
     const lp: Record<string, string> = {};
     const dp: Record<string, string> = {};
+    const types = new Set<string>();
     for (const lib of libraries) {
       if (lib.libraryPath) lp[lib.type] = lib.libraryPath;
       if (lib.downloadPath) dp[lib.type] = lib.downloadPath;
+      types.add(lib.type);
     }
     setLibraryPaths((prev) => ({ ...lp, ...prev }));
     setDownloadPaths((prev) => ({ ...dp, ...prev }));
-  }, [libraries]);
+    if (!initialized && types.size > 0) {
+      setSelected(types);
+      setInitialized(true);
+    }
+  }, [libraries, initialized]);
 
   const toggleType = (key: string): void => {
     setSelected((prev) => {
@@ -782,21 +795,24 @@ function LibrariesStep({ onNext }: { onNext: () => void }): React.JSX.Element {
 
       <div className="w-full max-w-md space-y-4 text-left">
         {MEDIA_TYPES.filter(({ key }) => selected.has(key)).map(({ key, label }) => {
-          const detectedLib = libraries?.find((l) => l.type === key);
-          const serverName = detectedLib?.jellyfinLibraryId ? "Jellyfin" : detectedLib?.plexLibraryId ? "Plex" : null;
+          const matchingLibs = libraries?.filter((l) => l.type === key) ?? [];
+          const servers: string[] = [];
+          if (matchingLibs.some((l) => l.jellyfinLibraryId)) servers.push("Jellyfin");
+          if (matchingLibs.some((l) => l.plexLibraryId)) servers.push("Plex");
+          const sourceLabel = servers.length > 0 ? servers.join(" & ") : null;
 
           return (
             <div key={key} className="space-y-3 rounded-xl border border-border/60 p-4">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-foreground">{label}</span>
-                {serverName && (
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">{serverName}</span>
-                )}
+                {servers.map((s) => (
+                  <span key={s} className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">{s}</span>
+                ))}
               </div>
               <div className="space-y-2">
                 <div>
                   <label className="mb-1 block text-xs text-muted-foreground">
-                    Library path {serverName && <span className="text-muted-foreground/50">from {serverName}</span>}
+                    Library path {sourceLabel && <span className="text-muted-foreground/50">from {sourceLabel}</span>}
                   </label>
                   <Input
                     value={libraryPaths[key] ?? ""}
