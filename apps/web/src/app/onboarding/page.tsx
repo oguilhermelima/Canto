@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
-import { Switch } from "@canto/ui/switch";
 import {
   Loader2,
   Film,
@@ -13,26 +12,30 @@ import {
   Check,
   ArrowRight,
   ArrowLeft,
-  Download,
-  Search,
-  Server,
   Folder,
+  Search,
+  Download,
 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
-import { authClient } from "~/lib/auth-client";
 
 /* -------------------------------------------------------------------------- */
-/*  Types                                                                      */
+/*  Constants                                                                  */
 /* -------------------------------------------------------------------------- */
 
 type Step = "welcome" | "tmdb" | "download-client" | "indexer" | "media-server" | "libraries" | "ready";
 
 const STEPS: Step[] = ["welcome", "tmdb", "download-client", "indexer", "media-server", "libraries", "ready"];
 
+/** Shared input className — bg-accent, rounded-xl, no ring */
+const inputCn = "bg-accent rounded-xl border-none ring-0 focus-visible:ring-0 focus-visible:ring-offset-0";
+
+/** Shared primary button className */
+const btnCn = "rounded-xl min-w-[200px]";
+
 /* -------------------------------------------------------------------------- */
-/*  Step indicator dots                                                        */
+/*  Step dots                                                                  */
 /* -------------------------------------------------------------------------- */
 
 function StepDots({ current, total }: { current: number; total: number }): React.JSX.Element {
@@ -52,21 +55,29 @@ function StepDots({ current, total }: { current: number; total: number }): React
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Service logo helper                                                        */
+/* -------------------------------------------------------------------------- */
+
+function ServiceLogo({ src, alt, size = 48 }: { src: string; alt: string; size?: number }): React.JSX.Element {
+  return <img src={src} alt={alt} width={size} height={size} className="shrink-0" />;
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Step: Welcome                                                              */
 /* -------------------------------------------------------------------------- */
 
 function WelcomeStep({ onNext }: { onNext: () => void }): React.JSX.Element {
   return (
     <div className="flex flex-col items-center gap-6 text-center">
-      <img src="/room.png" alt="Canto" className="h-14 w-14 dark:invert" />
-      <div className="space-y-2">
+      <img src="/room.png" alt="Canto" className="h-16 w-16 dark:invert" />
+      <div className="space-y-3">
         <h1 className="text-2xl font-semibold text-foreground">Welcome to Canto</h1>
         <p className="mx-auto max-w-lg text-base text-muted-foreground leading-relaxed">
           Let's set up your media server in a few steps. You'll connect your services,
           configure your libraries, and be ready to start downloading.
         </p>
       </div>
-      <Button onClick={onNext} size="lg" className="mt-4 min-w-[200px]">
+      <Button onClick={onNext} size="lg" className={cn(btnCn, "mt-4")}>
         Get started
         <ArrowRight className="ml-2 h-4 w-4" />
       </Button>
@@ -81,16 +92,14 @@ function WelcomeStep({ onNext }: { onNext: () => void }): React.JSX.Element {
 function TmdbStep({ onNext }: { onNext: () => void }): React.JSX.Element {
   const [apiKey, setApiKey] = useState("");
   const setSetting = trpc.settings.set.useMutation({
-    onSuccess: () => {
-      toast.success("TMDB connected");
-      onNext();
-    },
+    onSuccess: () => { toast.success("TMDB connected"); onNext(); },
     onError: () => toast.error("Failed to save TMDB key"),
   });
 
   return (
     <div className="flex flex-col items-center gap-6 text-center">
-      <div className="space-y-2">
+      <ServiceLogo src="/tmdb.svg" alt="TMDB" />
+      <div className="space-y-3">
         <h1 className="text-2xl font-semibold text-foreground">TMDB API Key</h1>
         <p className="mx-auto max-w-lg text-base text-muted-foreground leading-relaxed">
           Canto uses TMDB for all movie and TV show metadata. Get a free API key at{" "}
@@ -100,12 +109,13 @@ function TmdbStep({ onNext }: { onNext: () => void }): React.JSX.Element {
         </p>
       </div>
 
-      <div className="w-full max-w-sm space-y-3">
+      <div className="w-full max-w-sm">
         <Input
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
           placeholder="Enter your TMDB API key (v3 auth)"
           type="password"
+          className={inputCn}
         />
       </div>
 
@@ -113,7 +123,7 @@ function TmdbStep({ onNext }: { onNext: () => void }): React.JSX.Element {
         onClick={() => setSetting.mutate({ key: "tmdb.apiKey", value: apiKey })}
         disabled={!apiKey || setSetting.isPending}
         size="lg"
-        className="min-w-[200px]"
+        className={btnCn}
       >
         {setSetting.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
         Continue
@@ -166,10 +176,8 @@ function DownloadClientStep({ onNext }: { onNext: () => void }): React.JSX.Eleme
 
   return (
     <div className="flex flex-col items-center gap-6 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-        <Download className="h-8 w-8 text-primary" />
-      </div>
-      <div className="space-y-2">
+      <ServiceLogo src="/qbitorrent.svg" alt="qBittorrent" />
+      <div className="space-y-3">
         <h1 className="text-2xl font-semibold text-foreground">Download Client</h1>
         <p className="mx-auto max-w-lg text-base text-muted-foreground leading-relaxed">
           Connect your torrent client. Canto will send downloads and manage imports automatically.
@@ -177,17 +185,12 @@ function DownloadClientStep({ onNext }: { onNext: () => void }): React.JSX.Eleme
       </div>
 
       <div className="w-full max-w-sm space-y-3">
-        <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="WebUI URL (e.g. http://localhost:8080)" />
-        <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" />
-        <Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" />
+        <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="WebUI URL (e.g. http://localhost:8080)" className={inputCn} />
+        <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" className={inputCn} />
+        <Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" className={inputCn} />
       </div>
 
-      <Button
-        onClick={handleSave}
-        disabled={!url || testing}
-        size="lg"
-        className="min-w-[200px]"
-      >
+      <Button onClick={handleSave} disabled={!url || testing} size="lg" className={btnCn}>
         {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
         Connect & continue
         <ArrowRight className="ml-2 h-4 w-4" />
@@ -237,10 +240,8 @@ function IndexerStep({ onNext }: { onNext: () => void }): React.JSX.Element {
 
   return (
     <div className="flex flex-col items-center gap-6 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-        <Search className="h-8 w-8 text-primary" />
-      </div>
-      <div className="space-y-2">
+      <ServiceLogo src="/prowlarr.svg" alt="Prowlarr" />
+      <div className="space-y-3">
         <h1 className="text-2xl font-semibold text-foreground">Indexer</h1>
         <p className="mx-auto max-w-lg text-base text-muted-foreground leading-relaxed">
           Connect Prowlarr to search across your trackers. Find the API key in Prowlarr under Settings &gt; General.
@@ -248,16 +249,11 @@ function IndexerStep({ onNext }: { onNext: () => void }): React.JSX.Element {
       </div>
 
       <div className="w-full max-w-sm space-y-3">
-        <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Prowlarr URL (e.g. http://localhost:9696)" />
-        <Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key" type="password" />
+        <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Prowlarr URL (e.g. http://localhost:9696)" className={inputCn} />
+        <Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key" type="password" className={inputCn} />
       </div>
 
-      <Button
-        onClick={handleSave}
-        disabled={!url || !apiKey || testing}
-        size="lg"
-        className="min-w-[200px]"
-      >
+      <Button onClick={handleSave} disabled={!url || !apiKey || testing} size="lg" className={btnCn}>
         {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
         Connect & continue
         <ArrowRight className="ml-2 h-4 w-4" />
@@ -314,10 +310,17 @@ function MediaServerStep({ onNext }: { onNext: () => void }): React.JSX.Element 
 
   return (
     <div className="flex flex-col items-center gap-6 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-        <Server className="h-8 w-8 text-primary" />
-      </div>
-      <div className="space-y-2">
+      {choice === "jellyfin" ? (
+        <ServiceLogo src="/jellyfin-logo.svg" alt="Jellyfin" />
+      ) : choice === "plex" ? (
+        <ServiceLogo src="/plex-logo.svg" alt="Plex" />
+      ) : (
+        <div className="flex gap-3">
+          <ServiceLogo src="/jellyfin-logo.svg" alt="Jellyfin" size={36} />
+          <ServiceLogo src="/plex-logo.svg" alt="Plex" size={36} />
+        </div>
+      )}
+      <div className="space-y-3">
         <h1 className="text-2xl font-semibold text-foreground">Media Server</h1>
         <p className="mx-auto max-w-lg text-base text-muted-foreground leading-relaxed">
           Connect Jellyfin or Plex to auto-detect library paths and sync your existing media. This is optional.
@@ -327,30 +330,32 @@ function MediaServerStep({ onNext }: { onNext: () => void }): React.JSX.Element 
       <div className="flex w-full max-w-sm gap-3">
         <button
           type="button"
-          onClick={() => setChoice(choice === "jellyfin" ? null : "jellyfin")}
+          onClick={() => { setChoice(choice === "jellyfin" ? null : "jellyfin"); setUrl(""); setApiKey(""); }}
           className={cn(
-            "flex flex-1 flex-col items-center gap-2 rounded-xl border p-4 transition-all",
-            choice === "jellyfin" ? "border-primary/50 bg-primary/5" : "border-border hover:bg-muted/20",
+            "flex flex-1 flex-col items-center gap-3 rounded-xl border p-4 transition-all",
+            choice === "jellyfin" ? "border-primary/50 bg-primary/5" : "border-border hover:bg-accent/50",
           )}
         >
+          <img src="/jellyfin-logo.svg" alt="" className="h-8 w-8" />
           <span className="text-sm font-medium">Jellyfin</span>
         </button>
         <button
           type="button"
-          onClick={() => setChoice(choice === "plex" ? null : "plex")}
+          onClick={() => { setChoice(choice === "plex" ? null : "plex"); setUrl(""); setApiKey(""); }}
           className={cn(
-            "flex flex-1 flex-col items-center gap-2 rounded-xl border p-4 transition-all",
-            choice === "plex" ? "border-primary/50 bg-primary/5" : "border-border hover:bg-muted/20",
+            "flex flex-1 flex-col items-center gap-3 rounded-xl border p-4 transition-all",
+            choice === "plex" ? "border-primary/50 bg-primary/5" : "border-border hover:bg-accent/50",
           )}
         >
+          <img src="/plex-logo.svg" alt="" className="h-8 w-8" />
           <span className="text-sm font-medium">Plex</span>
         </button>
       </div>
 
       {choice && (
         <div className="w-full max-w-sm space-y-3">
-          <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={`${choice === "jellyfin" ? "Jellyfin" : "Plex"} URL (e.g. http://192.168.1.100:${choice === "jellyfin" ? "8096" : "32400"})`} />
-          <Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={choice === "jellyfin" ? "API Key" : "X-Plex-Token"} type="password" />
+          <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={`${choice === "jellyfin" ? "Jellyfin" : "Plex"} URL (e.g. http://192.168.1.100:${choice === "jellyfin" ? "8096" : "32400"})`} className={inputCn} />
+          <Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={choice === "jellyfin" ? "API Key" : "X-Plex-Token"} type="password" className={inputCn} />
         </div>
       )}
 
@@ -359,14 +364,14 @@ function MediaServerStep({ onNext }: { onNext: () => void }): React.JSX.Element 
           onClick={handleSave}
           disabled={testing || (choice !== null && (!url || !apiKey))}
           size="lg"
-          className="min-w-[200px]"
+          className={btnCn}
         >
           {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           {choice ? "Connect & continue" : "Skip for now"}
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
         {choice && (
-          <button type="button" onClick={() => { setChoice(null); }} className="text-xs text-muted-foreground hover:text-foreground">
+          <button type="button" onClick={() => setChoice(null)} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             Skip this step
           </button>
         )}
@@ -395,7 +400,6 @@ function LibrariesStep({ onNext }: { onNext: () => void }): React.JSX.Element {
   const seedLibraries = trpc.library.seed.useMutation();
   const updatePaths = trpc.library.updatePaths.useMutation();
 
-  // Pre-fill from detected Jellyfin/Plex libraries
   useEffect(() => {
     if (!libraries) return;
     const lp: Record<string, string> = {};
@@ -418,12 +422,9 @@ function LibrariesStep({ onNext }: { onNext: () => void }): React.JSX.Element {
   };
 
   const handleSave = async (): Promise<void> => {
-    // Seed default libraries if none exist
     if (!libraries || libraries.length === 0) {
       await seedLibraries.mutateAsync();
     }
-
-    // Update paths for each selected type
     const libs = libraries ?? (await seedLibraries.mutateAsync());
     for (const lib of libs) {
       if (!selected.has(lib.type)) continue;
@@ -437,21 +438,18 @@ function LibrariesStep({ onNext }: { onNext: () => void }): React.JSX.Element {
         });
       }
     }
-
     toast.success("Libraries configured");
     onNext();
   };
 
-  const jellyfinConnected = enabledServices?.jellyfin === true;
-  const plexConnected = enabledServices?.plex === true;
-  const hasServer = jellyfinConnected || plexConnected;
+  const hasServer = enabledServices?.jellyfin === true || enabledServices?.plex === true;
 
   return (
     <div className="flex flex-col items-center gap-6 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
         <Folder className="h-8 w-8 text-primary" />
       </div>
-      <div className="space-y-2">
+      <div className="space-y-3">
         <h1 className="text-2xl font-semibold text-foreground">Your Libraries</h1>
         <p className="mx-auto max-w-lg text-base text-muted-foreground leading-relaxed">
           Choose what types of media you want to manage, then set where the files live.
@@ -459,7 +457,6 @@ function LibrariesStep({ onNext }: { onNext: () => void }): React.JSX.Element {
         </p>
       </div>
 
-      {/* Media type selection */}
       <div className="flex w-full max-w-md gap-3">
         {MEDIA_TYPES.map(({ key, label, icon: Icon }) => (
           <button
@@ -468,31 +465,26 @@ function LibrariesStep({ onNext }: { onNext: () => void }): React.JSX.Element {
             onClick={() => toggleType(key)}
             className={cn(
               "flex flex-1 flex-col items-center gap-2 rounded-xl border p-4 transition-all",
-              selected.has(key) ? "border-primary/50 bg-primary/5" : "border-border hover:bg-muted/20",
+              selected.has(key) ? "border-primary/50 bg-primary/5" : "border-border hover:bg-accent/50",
             )}
           >
             <Icon className={cn("h-5 w-5", selected.has(key) ? "text-primary" : "text-muted-foreground/40")} />
-            <span className={cn("text-sm font-medium", selected.has(key) ? "text-foreground" : "text-muted-foreground")}>
-              {label}
-            </span>
+            <span className={cn("text-sm font-medium", selected.has(key) ? "text-foreground" : "text-muted-foreground")}>{label}</span>
           </button>
         ))}
       </div>
 
-      {/* Path config per selected type */}
       <div className="w-full max-w-md space-y-4 text-left">
         {MEDIA_TYPES.filter(({ key }) => selected.has(key)).map(({ key, label }) => {
           const detectedLib = libraries?.find((l) => l.type === key);
           const serverName = detectedLib?.jellyfinLibraryId ? "Jellyfin" : detectedLib?.plexLibraryId ? "Plex" : null;
 
           return (
-            <div key={key} className="space-y-2 rounded-xl border border-border/60 p-4">
+            <div key={key} className="space-y-3 rounded-xl border border-border/60 p-4">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-foreground">{label}</span>
                 {serverName && (
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                    {serverName}
-                  </span>
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">{serverName}</span>
                 )}
               </div>
               <div className="space-y-2">
@@ -504,7 +496,7 @@ function LibrariesStep({ onNext }: { onNext: () => void }): React.JSX.Element {
                     value={libraryPaths[key] ?? ""}
                     onChange={(e) => setLibraryPaths((prev) => ({ ...prev, [key]: e.target.value }))}
                     placeholder={`e.g. /media/${label.toLowerCase()}`}
-                    className="text-sm"
+                    className={cn(inputCn, "text-sm")}
                   />
                 </div>
                 <div>
@@ -513,7 +505,7 @@ function LibrariesStep({ onNext }: { onNext: () => void }): React.JSX.Element {
                     value={downloadPaths[key] ?? ""}
                     onChange={(e) => setDownloadPaths((prev) => ({ ...prev, [key]: e.target.value }))}
                     placeholder={`e.g. /downloads/${key}`}
-                    className="text-sm"
+                    className={cn(inputCn, "text-sm")}
                   />
                 </div>
               </div>
@@ -522,7 +514,7 @@ function LibrariesStep({ onNext }: { onNext: () => void }): React.JSX.Element {
         })}
       </div>
 
-      <Button onClick={handleSave} disabled={selected.size === 0 || updatePaths.isPending} size="lg" className="min-w-[200px]">
+      <Button onClick={handleSave} disabled={selected.size === 0 || updatePaths.isPending} size="lg" className={btnCn}>
         {updatePaths.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
         Continue
         <ArrowRight className="ml-2 h-4 w-4" />
@@ -541,10 +533,11 @@ function ReadyStep({ onFinish }: { onFinish: () => void }): React.JSX.Element {
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/10">
         <Check className="h-8 w-8 text-emerald-500" />
       </div>
-      <div className="space-y-2">
+      <div className="space-y-3">
         <h1 className="text-2xl font-semibold text-foreground">You're all set</h1>
         <p className="mx-auto max-w-lg text-base text-muted-foreground leading-relaxed">
-          Everything is configured. You can always change these settings later. Start exploring and downloading media.
+          Everything is configured. You can always change these settings later.
+          Start exploring and downloading media.
         </p>
       </div>
 
@@ -552,21 +545,21 @@ function ReadyStep({ onFinish }: { onFinish: () => void }): React.JSX.Element {
         <div className="flex flex-col gap-2 rounded-xl border border-border/60 p-4">
           <Search className="h-5 w-5 text-muted-foreground" />
           <p className="text-xs font-medium text-foreground">Discover</p>
-          <p className="text-[10px] text-muted-foreground leading-relaxed">Browse trending movies and shows</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">Browse trending movies and shows</p>
         </div>
         <div className="flex flex-col gap-2 rounded-xl border border-border/60 p-4">
           <Download className="h-5 w-5 text-muted-foreground" />
           <p className="text-xs font-medium text-foreground">Download</p>
-          <p className="text-[10px] text-muted-foreground leading-relaxed">Search and grab torrents with one click</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">Search and grab torrents with one click</p>
         </div>
         <div className="flex flex-col gap-2 rounded-xl border border-border/60 p-4">
           <Folder className="h-5 w-5 text-muted-foreground" />
           <p className="text-xs font-medium text-foreground">Organize</p>
-          <p className="text-[10px] text-muted-foreground leading-relaxed">Files auto-import into your library</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">Files auto-import into your library</p>
         </div>
       </div>
 
-      <Button onClick={onFinish} size="lg" className="mt-4 min-w-[200px]">
+      <Button onClick={onFinish} size="lg" className={cn(btnCn, "mt-4")}>
         Open Canto
         <ArrowRight className="ml-2 h-4 w-4" />
       </Button>
@@ -586,7 +579,6 @@ export default function OnboardingPage(): React.JSX.Element {
   const { data: isCompleted, isLoading } = trpc.settings.isOnboardingCompleted.useQuery();
   const completeOnboarding = trpc.settings.completeOnboarding.useMutation();
 
-  // Redirect if already completed
   useEffect(() => {
     if (isCompleted === true) router.replace("/");
   }, [isCompleted, router]);
@@ -614,7 +606,6 @@ export default function OnboardingPage(): React.JSX.Element {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Content area — centered */}
       <div className="flex flex-1 items-center justify-center px-6">
         <div className="w-full max-w-xl">
           {step === "welcome" && <WelcomeStep onNext={next} />}
@@ -627,7 +618,6 @@ export default function OnboardingPage(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Footer — step dots + back button */}
       <div className="flex items-center justify-between px-8 py-6">
         <div>
           {currentStep > 0 && step !== "ready" && (
@@ -638,7 +628,7 @@ export default function OnboardingPage(): React.JSX.Element {
           )}
         </div>
         <StepDots current={currentStep} total={STEPS.length} />
-        <div className="w-16" /> {/* Spacer for centering */}
+        <div className="w-16" />
       </div>
     </div>
   );
