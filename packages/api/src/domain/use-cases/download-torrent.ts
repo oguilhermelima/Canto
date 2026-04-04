@@ -10,8 +10,9 @@ import { parseSeasons, parseEpisodes } from "../rules/parsing";
 import type { DownloadClientPort } from "../ports/download-client";
 import {
   findMediaByIdWithSeasons,
-  findLibraryById,
-  findDefaultLibrary,
+  findFolderById,
+  findAllFolders,
+  findDefaultFolder,
   findTorrentByTitle,
   findTorrentByHash,
   createTorrent,
@@ -24,6 +25,9 @@ import {
   findDuplicateEpisodeFile,
   findBlocklistEntry,
 } from "../../infrastructure/repositories";
+import { resolveFolder } from "../rules/folder-routing";
+import type { RoutableMedia } from "../rules/folder-routing";
+import { updateMedia } from "../../infrastructure/repositories/media-repository";
 import { createNotification } from "./create-notification";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -40,22 +44,78 @@ interface ReplaceInput extends DownloadInput {
 }
 
 /**
- * Resolve the download client category and download path from the media's
- * library assignment, falling back to the default library for the media type.
+ * Resolve download folder via:
+ * 1. Explicit folderId from input
+ * 2. Existing media.libraryId assignment
+ * 3. Auto-resolve via rule engine
+ * Persists the resolved folderId onto media for future reference.
  */
 async function resolveDownloadConfig(
   db: Database,
-  mediaRow: { type: string; libraryId: string | null },
-): Promise<{ category: string; downloadPath: string | undefined }> {
-  const mediaType = mediaRow.type === "show" ? "shows" : "movies";
+  mediaRow: {
+    id: string;
+    type: string;
+    libraryId: string | null;
+    genres: string[] | null;
+    genreIds: number[] | null;
+    originCountry: string[] | null;
+    originalLanguage: string | null;
+    contentRating: string | null;
+    provider: string;
+  },
+  inputFolderId?: string,
+): Promise<{ category: string; downloadPath: string | undefined; folderId: string | undefined }> {
+  // 1. Explicit folder from input
+  if (inputFolderId) {
+    const folder = await findFolderById(db, inputFolderId);
+    if (folder) {
+      // Persist assignment
+      if (mediaRow.libraryId !== folder.id) {
+        await updateMedia(db, mediaRow.id, { libraryId: folder.id });
+      }
+      return {
+        category: folder.qbitCategory ?? "default",
+        downloadPath: folder.downloadPath ?? undefined,
+        folderId: folder.id,
+      };
+    }
+  }
 
-  const lib = mediaRow.libraryId
-    ? await findLibraryById(db, mediaRow.libraryId)
-    : await findDefaultLibrary(db, mediaType);
+  // 2. Existing assignment
+  if (mediaRow.libraryId) {
+    const folder = await findFolderById(db, mediaRow.libraryId);
+    if (folder) {
+      return {
+        category: folder.qbitCategory ?? "default",
+        downloadPath: folder.downloadPath ?? undefined,
+        folderId: folder.id,
+      };
+    }
+  }
+
+  // 3. Auto-resolve via rules
+  const folders = await findAllFolders(db);
+  const routable: RoutableMedia = {
+    type: mediaRow.type,
+    genres: mediaRow.genres,
+    genreIds: mediaRow.genreIds,
+    originCountry: mediaRow.originCountry,
+    originalLanguage: mediaRow.originalLanguage,
+    contentRating: mediaRow.contentRating,
+    provider: mediaRow.provider,
+  };
+  const resolvedId = resolveFolder(folders, routable);
+  const resolved = resolvedId ? folders.find((f) => f.id === resolvedId) : null;
+
+  // Persist resolved assignment
+  if (resolved && mediaRow.libraryId !== resolved.id) {
+    await updateMedia(db, mediaRow.id, { libraryId: resolved.id });
+  }
 
   return {
-    category: lib?.qbitCategory ?? mediaType,
-    downloadPath: lib?.downloadPath ?? undefined,
+    category: resolved?.qbitCategory ?? "default",
+    downloadPath: resolved?.downloadPath ?? undefined,
+    folderId: resolved?.id,
   };
 }
 
@@ -152,9 +212,9 @@ async function coreDownload(
     throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
   }
 
-  // ── Resolve download client category + path from library assignment ──
+  // ── Resolve download folder (explicit, assigned, or auto via rules) ──
 
-  const { category: qbCategory, downloadPath } = await resolveDownloadConfig(db, mediaRow);
+  const { category: qbCategory, downloadPath } = await resolveDownloadConfig(db, mediaRow, input.folderId);
 
   // ── Blocklist check: reject previously failed downloads ──
 
