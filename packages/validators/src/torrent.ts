@@ -20,5 +20,7 @@ export const torrentDownloadInput = z.object({
   title: z.string().min(1),
   seasonNumber: z.number().int().nonnegative().optional(),
   episodeNumbers: z.array(z.number().int().positive()).optional(),
+  /** Explicit download folder override. If omitted, auto-resolved via rules. */
+  folderId: z.string().uuid().optional(),
 });
 export type TorrentDownloadInput = z.infer<typeof torrentDownloadInput>;

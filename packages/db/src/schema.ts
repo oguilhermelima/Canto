@@ -107,35 +107,25 @@ export const systemSetting = pgTable("system_setting", {
     .defaultNow(),
 });
 
-// ─── Library tables ───
+// ─── Download folder tables ───
 
-export const library = pgTable("library", {
+export const downloadFolder = pgTable("download_folder", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 100 }).notNull(),
-  /** "movies" | "shows" | "animes" */
-  type: varchar("type", { length: 20 }).notNull(),
-  /** Where the download client saves files, e.g. "/data/torrents/movies" */
+  /** Where the download client saves files, e.g. "/downloads/anime" */
   downloadPath: varchar("download_path", { length: 500 }),
-  /** Where organized media lives (library root), e.g. "/data/media/movies" */
+  /** Where organized media lives, e.g. "/media/anime" */
   libraryPath: varchar("library_path", { length: 500 }),
-  /** @deprecated Use libraryPath instead. Host path, e.g. "/home/user/Medias/Movies" */
-  mediaPath: varchar("media_path", { length: 500 }),
-  /** @deprecated Use downloadPath instead. Container path, e.g. "/medias/Movies" */
-  containerMediaPath: varchar("container_media_path", { length: 500 }),
-  /** qBittorrent category name, e.g. "movies" */
+  /** qBittorrent category name */
   qbitCategory: varchar("qbit_category", { length: 100 }),
-  /** Jellyfin library ID (unique per server) */
-  jellyfinLibraryId: varchar("jellyfin_library_id", { length: 100 }).unique(),
-  /** Path inside Jellyfin container, e.g. "/media/Movies" */
-  jellyfinPath: varchar("jellyfin_path", { length: 500 }),
-  /** Plex library section ID */
-  plexLibraryId: varchar("plex_library_id", { length: 100 }),
-  /** Whether this is the default library for its type */
+  /** Auto-routing rules — evaluated against media metadata to auto-select this folder */
+  rules: jsonb("rules").$type<RuleGroup | null>(),
+  /** Evaluation order (lower = checked first). More specific rules should have lower priority. */
+  priority: integer("priority").notNull().default(0),
+  /** Fallback folder when no rules match */
   isDefault: boolean("is_default").notNull().default(false),
-  /** Whether this library is enabled for downloads */
+  /** Whether this folder accepts downloads */
   enabled: boolean("enabled").notNull().default(true),
-  /** Whether to import media from this library during sync */
-  syncEnabled: boolean("sync_enabled").notNull().default(false),
 
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -144,6 +134,56 @@ export const library = pgTable("library", {
     .notNull()
     .defaultNow(),
 });
+
+export const folderServerLink = pgTable(
+  "folder_server_link",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    folderId: uuid("folder_id")
+      .notNull()
+      .references(() => downloadFolder.id, { onDelete: "cascade" }),
+    /** "jellyfin" | "plex" */
+    serverType: varchar("server_type", { length: 20 }).notNull(),
+    /** Jellyfin folder ID or Plex section key */
+    serverLibraryId: varchar("server_library_id", { length: 100 }).notNull(),
+    /** Display name from server */
+    serverLibraryName: varchar("server_library_name", { length: 200 }),
+    /** Path reported by the server */
+    serverPath: varchar("server_path", { length: 500 }),
+    /** Whether to import existing media from this link */
+    syncEnabled: boolean("sync_enabled").notNull().default(false),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("uq_folder_server_link").on(
+      table.folderId,
+      table.serverType,
+      table.serverLibraryId,
+    ),
+  ],
+);
+
+// ─── Rule types (used by downloadFolder.rules JSONB) ───
+
+export type RuleCondition =
+  | { field: "type"; op: "eq"; value: "movie" | "show" }
+  | { field: "genre"; op: "contains_any" | "contains_all"; value: string[] }
+  | { field: "genreId"; op: "contains_any" | "contains_all"; value: number[] }
+  | { field: "originCountry"; op: "contains_any" | "not_contains_any"; value: string[] }
+  | { field: "originalLanguage"; op: "eq" | "neq"; value: string }
+  | { field: "contentRating"; op: "eq" | "in"; value: string | string[] }
+  | { field: "provider"; op: "eq"; value: "tmdb" | "anilist" | "tvdb" };
+
+export type RuleGroup = {
+  operator: "AND" | "OR";
+  conditions: Array<RuleCondition | RuleGroup>;
+};
+
+/** @deprecated Alias for backward compatibility — use downloadFolder */
+export const library = downloadFolder;
 
 // ─── Media tables ───
 
@@ -770,9 +810,20 @@ export const accountRelations = relations(account, ({ one }) => ({
   }),
 }));
 
-export const libraryRelations = relations(library, ({ many }) => ({
+export const downloadFolderRelations = relations(downloadFolder, ({ many }) => ({
   media: many(media),
+  serverLinks: many(folderServerLink),
 }));
+
+export const folderServerLinkRelations = relations(folderServerLink, ({ one }) => ({
+  folder: one(downloadFolder, {
+    fields: [folderServerLink.folderId],
+    references: [downloadFolder.id],
+  }),
+}));
+
+/** @deprecated Use downloadFolderRelations */
+export const libraryRelations = downloadFolderRelations;
 
 export const mediaRelations = relations(media, ({ many, one }) => ({
   library: one(library, {
