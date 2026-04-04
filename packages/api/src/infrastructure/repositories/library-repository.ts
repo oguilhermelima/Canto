@@ -1,73 +1,11 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { library, userPreference } from "@canto/db/schema";
+import { userPreference } from "@canto/db/schema";
 
-type LibraryInsert = typeof library.$inferInsert;
-
-export async function findLibraryById(db: Database, id: string) {
-  return db.query.library.findFirst({
-    where: eq(library.id, id),
-  });
-}
-
-export async function findDefaultLibrary(db: Database, type: string) {
-  return db.query.library.findFirst({
-    where: and(eq(library.type, type), eq(library.isDefault, true)),
-  });
-}
-
-export async function findAllLibraries(db: Database) {
-  return db.query.library.findMany({
-    orderBy: (l, { asc: a }) => [a(l.type), a(l.name)],
-  });
-}
-
-export async function findDefaultLibraries(db: Database) {
-  return db.query.library.findMany({
-    where: eq(library.isDefault, true),
-  });
-}
-
-export async function updateLibrary(
-  db: Database,
-  id: string,
-  data: Partial<typeof library.$inferInsert>,
-) {
-  const [updated] = await db
-    .update(library)
-    .set({ ...data, updatedAt: new Date() })
-    .where(eq(library.id, id))
-    .returning();
-  return updated;
-}
-
-export async function seedDefaultLibraries(db: Database) {
-  const existing = await db.query.library.findMany();
-  if (existing.length > 0) return existing;
-
-  return db
-    .insert(library)
-    .values([
-      { name: "Movies", type: "movies", qbitCategory: "movies", isDefault: true },
-      { name: "Shows", type: "shows", qbitCategory: "shows", isDefault: true },
-      { name: "Animes", type: "animes", qbitCategory: "animes", isDefault: true },
-    ])
-    .returning();
-}
-
-export async function setDefaultLibrary(db: Database, id: string, type: string) {
-  await db
-    .update(library)
-    .set({ isDefault: false, updatedAt: new Date() })
-    .where(eq(library.type, type));
-
-  const [updated] = await db
-    .update(library)
-    .set({ isDefault: true, updatedAt: new Date() })
-    .where(eq(library.id, id))
-    .returning();
-  return updated;
-}
+/**
+ * @deprecated Library functions moved to folder-repository.ts.
+ * This file only retains user preference functions.
+ */
 
 export async function findUserPreferences(db: Database, userId: string) {
   const rows = await db.query.userPreference.findMany({
@@ -91,63 +29,4 @@ export async function upsertUserPreference(
       target: [userPreference.userId, userPreference.key],
       set: { value },
     });
-}
-
-export async function findLibraryByJellyfinId(db: Database, jellyfinId: string) {
-  return db.query.library.findFirst({
-    where: eq(library.jellyfinLibraryId, jellyfinId),
-  });
-}
-
-export async function findLibraryByPlexId(db: Database, plexId: string) {
-  return db.query.library.findFirst({
-    where: eq(library.plexLibraryId, plexId),
-  });
-}
-
-export async function findLibrariesByType(db: Database, type: string) {
-  return db.query.library.findMany({
-    where: eq(library.type, type),
-  });
-}
-
-export async function createLibrary(db: Database, data: LibraryInsert) {
-  const [row] = await db.insert(library).values(data).returning();
-  return row;
-}
-
-export async function findEnabledSyncLibraries(db: Database) {
-  return db.query.library.findMany({
-    where: and(eq(library.enabled, true), eq(library.syncEnabled, true)),
-  });
-}
-
-/**
- * Backfill downloadPath/libraryPath for existing libraries that only have the
- * legacy mediaPath/containerMediaPath columns populated.
- * Only sets libraryPath from existing legacy columns — does NOT invent paths.
- * downloadPath is left null until the user explicitly configures it.
- */
-export async function migrateLibraryPaths(db: Database): Promise<number> {
-  const rows = await db.query.library.findMany({
-    where: isNull(library.libraryPath),
-  });
-
-  let migrated = 0;
-  for (const row of rows) {
-    // Derive libraryPath from legacy columns if available
-    const libPath = row.mediaPath ?? row.containerMediaPath ?? row.jellyfinPath ?? null;
-    if (!libPath) continue;
-
-    await db
-      .update(library)
-      .set({
-        libraryPath: libPath,
-        updatedAt: new Date(),
-      })
-      .where(eq(library.id, row.id));
-    migrated++;
-  }
-
-  return migrated;
 }

@@ -11,8 +11,8 @@ import { SETTINGS } from "../../lib/settings-keys";
 import { createNotification } from "./create-notification";
 import {
   findMediaByIdWithSeasons,
-  findLibraryById,
-  findDefaultLibrary,
+  findFolderById,
+  findDefaultFolder,
   findMediaFilesByTorrentId,
   updateMediaFile,
   createMediaFileNoConflict,
@@ -213,7 +213,7 @@ async function importRemoteVideoFiles(
   client: DownloadClientPort,
   hash: string,
   targetLocation: string,
-  libRow: { mediaPath: string | null; containerMediaPath: string | null } | null,
+  libRow: { libraryPath: string | null } | null,
   placeholders: Array<{ id: string; episodeId: string | null }>,
   db: Database,
   mediaRow: { id: string },
@@ -254,10 +254,7 @@ async function importRemoteVideoFiles(
       }
 
       // Compute host path (translate container → host if mapping exists)
-      const hostTargetLocation = (libRow?.mediaPath && libRow?.containerMediaPath)
-        ? targetLocation.replace(libRow.containerMediaPath, libRow.mediaPath)
-        : targetLocation;
-      const finalPath = `${hostTargetLocation}/${pf.targetFilename}`;
+      const finalPath = `${targetLocation}/${pf.targetFilename}`;
 
       importedCount += await upsertMediaFile(db, pf, finalPath, placeholders, mediaRow, torrentRow);
     } catch (err) {
@@ -401,8 +398,8 @@ export async function autoImportTorrent(
   // ── Resolve library ──
 
   const libRow = mediaRow.libraryId
-    ? await findLibraryById(db, mediaRow.libraryId)
-    : await findDefaultLibrary(db, mediaRow.type === "show" ? "shows" : "movies");
+    ? await findFolderById(db, mediaRow.libraryId)
+    : await findDefaultFolder(db);
 
   // ── Get files from download client ──
 
@@ -502,7 +499,7 @@ export async function autoImportTorrent(
     contentPath = targetDir;
   } else {
     // Remote: move + rename via download client API (no filesystem access needed)
-    const containerBasePath = libRow?.containerMediaPath ?? libRow?.libraryPath;
+    const containerBasePath = libRow?.libraryPath;
     if (!containerBasePath) {
       console.error(`[auto-import] No library path configured for "${mediaRow.title}" — configure paths in Settings > Downloads`);
       await createNotification(db, {
@@ -525,11 +522,7 @@ export async function autoImportTorrent(
       subtitleFiles, client, torrentRow.hash, mediaRow, mediaNaming, torrentRow, primarySeasonNumber,
     );
 
-    // Resolve host path for DB storage
-    const hostTargetLocation = (libRow?.mediaPath && libRow?.containerMediaPath)
-      ? targetLocation.replace(libRow.containerMediaPath, libRow.mediaPath)
-      : targetLocation;
-    contentPath = hostTargetLocation;
+    contentPath = targetLocation;
   }
 
   // ── Finalize ──

@@ -12,7 +12,7 @@ import {
   findUnimportedTorrents,
   findTorrentById,
   findMediaById,
-  findLibraryById,
+  findServerLinksByFolder,
   ensureServerLibrary,
   addListItem,
   updateRequestStatus,
@@ -20,36 +20,39 @@ import {
 import { logAndSwallow } from "@canto/api/lib/log-error";
 
 /* -------------------------------------------------------------------------- */
-/*  Media server scan trigger                                                  */
+/*  Media server scan trigger (via folder_server_link junction)                */
 /* -------------------------------------------------------------------------- */
 
-async function triggerMediaServerScans(libraryId?: string): Promise<void> {
-  // Jellyfin
+async function triggerMediaServerScans(folderId?: string): Promise<void> {
+  if (!folderId) return;
+
+  const links = await findServerLinksByFolder(db, folderId);
+  if (links.length === 0) return;
+
   const jellyfinUrl = await getSetting(SETTINGS.JELLYFIN_URL);
   const jellyfinKey = await getSetting(SETTINGS.JELLYFIN_API_KEY);
-  if (jellyfinUrl && jellyfinKey) {
-    try {
-      await fetch(`${jellyfinUrl}/Library/Refresh`, {
-        method: "POST",
-        headers: { "X-Emby-Token": jellyfinKey },
-      });
-      console.log("[import-torrents] Triggered Jellyfin library scan");
-    } catch (err) {
-      console.warn("[import-torrents] Failed to trigger Jellyfin scan:", err);
-    }
-  }
-
-  // Plex
   const plexUrl = await getSetting(SETTINGS.PLEX_URL);
   const plexToken = await getSetting(SETTINGS.PLEX_TOKEN);
-  if (plexUrl && plexToken && libraryId) {
-    const lib = await findLibraryById(db, libraryId);
-    if (lib?.plexLibraryId) {
+
+  for (const link of links) {
+    if (link.serverType === "jellyfin" && jellyfinUrl && jellyfinKey) {
+      try {
+        await fetch(`${jellyfinUrl}/Library/Refresh`, {
+          method: "POST",
+          headers: { "X-Emby-Token": jellyfinKey },
+        });
+        console.log("[import-torrents] Triggered Jellyfin library scan");
+      } catch (err) {
+        console.warn("[import-torrents] Failed to trigger Jellyfin scan:", err);
+      }
+    }
+
+    if (link.serverType === "plex" && plexUrl && plexToken) {
       try {
         await fetch(
-          `${plexUrl}/library/sections/${lib.plexLibraryId}/refresh?X-Plex-Token=${plexToken}`,
+          `${plexUrl}/library/sections/${link.serverLibraryId}/refresh?X-Plex-Token=${plexToken}`,
         );
-        console.log("[import-torrents] Triggered Plex library scan");
+        console.log(`[import-torrents] Triggered Plex scan for section ${link.serverLibraryId}`);
       } catch (err) {
         console.warn("[import-torrents] Failed to trigger Plex scan:", err);
       }
