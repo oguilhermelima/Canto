@@ -5,6 +5,7 @@ import { Skeleton } from "@canto/ui/skeleton";
 import { ShieldCheck } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { SettingsSection } from "~/components/settings/shared";
+import { StateMessage } from "~/components/layout/state-message";
 
 function formatDate(date: Date | string): string {
   return new Intl.DateTimeFormat("en-US", {
@@ -60,7 +61,7 @@ export function UsersTab(): React.JSX.Element {
             </div>
           ))}
           {(users ?? []).length === 0 && (
-            <p className="text-sm text-muted-foreground/50 py-8 text-center">No users found.</p>
+            <StateMessage preset="emptyGrid" minHeight="200px" />
           )}
         </div>
       )}

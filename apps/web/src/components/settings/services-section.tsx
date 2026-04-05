@@ -120,6 +120,13 @@ function OrDivider(): React.JSX.Element {
   );
 }
 
+function formatConnectionError(error: string): string {
+  if (/40[13]/.test(error)) return "Authentication failed. Check your API key/token.";
+  if (/ECONNREFUSED/.test(error)) return "Could not connect. Check the URL and ensure the server is running.";
+  if (/timeout/i.test(error) || /abort/i.test(error)) return "Connection timed out. Check the URL and network.";
+  return error;
+}
+
 function showTestResult(data: { connected: boolean; error?: string; serverName?: string; version?: string } | undefined): void {
   if (!data) return;
   if (data.connected) {
@@ -128,7 +135,7 @@ function showTestResult(data: { connected: boolean; error?: string; serverName?:
       : "Connection successful";
     toast.success(msg);
   } else {
-    toast.error(data.error ?? "Connection failed");
+    toast.error(formatConnectionError(data.error ?? "Connection failed"));
   }
 }
 

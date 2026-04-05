@@ -302,10 +302,31 @@ function OverviewStep({ onNext }: { onNext: () => void }): React.JSX.Element {
 
 function TmdbStep({ onNext, settings }: { onNext: () => void; settings?: Settings }): React.JSX.Element {
   const [apiKey, setApiKey] = useState(str(settings, "tmdb.apiKey"));
-  const setSetting = trpc.settings.set.useMutation({
-    onSuccess: () => { toast.success("TMDB connected"); onNext(); },
-    onError: () => toast.error("Failed to save TMDB key"),
-  });
+  const [testing, setTesting] = useState(false);
+
+  const setSetting = trpc.settings.set.useMutation();
+  const testService = trpc.settings.testService.useMutation();
+
+  const handleSave = async (): Promise<void> => {
+    setTesting(true);
+    try {
+      await setSetting.mutateAsync({ key: "tmdb.apiKey", value: apiKey });
+      const result = await testService.mutateAsync({
+        service: "tmdb",
+        values: { "tmdb.apiKey": apiKey },
+      });
+      if (result.connected) {
+        toast.success("TMDB connected");
+        onNext();
+      } else {
+        toast.error("Invalid API key. Check your TMDB key and try again.");
+      }
+    } catch {
+      toast.error("Failed to validate TMDB key");
+    } finally {
+      setTesting(false);
+    }
+  };
 
   return (
     <div className="flex flex-col items-center gap-8 text-center">
@@ -332,12 +353,12 @@ function TmdbStep({ onNext, settings }: { onNext: () => void; settings?: Setting
 
       <div className="flex flex-col items-center gap-3">
         <Button
-          onClick={() => setSetting.mutate({ key: "tmdb.apiKey", value: apiKey })}
-          disabled={!apiKey || setSetting.isPending}
+          onClick={handleSave}
+          disabled={!apiKey || testing}
           size="lg"
           className={btnCn}
         >
-          {setSetting.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           Continue
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
@@ -1059,13 +1080,30 @@ function DownloadFoldersStep({ onNext }: { onNext: () => void }): React.JSX.Elem
         <DownloadFolders mode="onboarding" importMethod={importMethod} />
       </div>
 
-      <div className="flex flex-col items-center gap-3">
-        <Button onClick={onNext} size="lg" className={btnCn}>
-          Continue
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
-        <SkipButton onClick={onNext} />
-      </div>
+      <FolderGate onNext={onNext} />
+    </div>
+  );
+}
+
+/** Shows Continue when at least one folder with both paths exists, otherwise warns. */
+function FolderGate({ onNext }: { onNext: () => void }): React.JSX.Element {
+  const { data: folders } = trpc.folder.list.useQuery();
+  const hasFolders = (folders ?? []).some((f) => f.downloadPath && f.libraryPath);
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      {!hasFolders && folders !== undefined && (
+        <p className="text-sm text-amber-400/80 text-center max-w-md">
+          No folders with both paths configured yet. Downloads won't work until you add at least one folder.
+        </p>
+      )}
+      <Button onClick={onNext} size="lg" className={btnCn} disabled={folders === undefined || !hasFolders}>
+        Continue
+        <ArrowRight className="ml-2 h-4 w-4" />
+      </Button>
+      <button type="button" onClick={onNext} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+        Skip — configure later in Settings
+      </button>
     </div>
   );
 }
