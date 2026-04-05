@@ -22,6 +22,7 @@ import { trpc } from "~/lib/trpc/client";
 import { useWatchRegion } from "~/hooks/use-watch-region";
 import { useDirectSearch } from "~/hooks/use-direct-search";
 import { PageHeader } from "~/components/layout/page-header";
+import { SettingsSection } from "~/components/settings/shared";
 
 /* -------------------------------------------------------------------------- */
 /*  Constants                                                                  */
@@ -34,30 +35,6 @@ const themeOptions = [
   { value: "dark", label: "Dark", description: "Easy on the eyes", icon: Moon },
   { value: "system", label: "System", description: "Follow your OS setting", icon: Monitor },
 ] as const;
-
-/* -------------------------------------------------------------------------- */
-/*  Section wrapper                                                            */
-/* -------------------------------------------------------------------------- */
-
-function Section({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}): React.JSX.Element {
-  return (
-    <div className="rounded-2xl border border-border/40 bg-background">
-      <div className="border-b border-border/40 px-6 py-5">
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground leading-relaxed">{description}</p>
-      </div>
-      <div className="px-6 py-6">{children}</div>
-    </div>
-  );
-}
 
 /* -------------------------------------------------------------------------- */
 /*  Profile section                                                            */
@@ -96,7 +73,7 @@ function ProfileSection(): React.JSX.Element {
   };
 
   return (
-    <Section title="Profile" description="Your account information and display name.">
+    <SettingsSection title="Profile" description="Your account information and display name.">
       <div className="space-y-6">
         <div className="flex items-center gap-4">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground">
@@ -147,7 +124,7 @@ function ProfileSection(): React.JSX.Element {
           </Button>
         )}
       </div>
-    </Section>
+    </SettingsSection>
   );
 }
 
@@ -176,7 +153,7 @@ function PasswordSection(): React.JSX.Element {
   };
 
   return (
-    <Section title="Password" description="Update your account password to keep it secure.">
+    <SettingsSection title="Password" description="Update your account password to keep it secure.">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <label htmlFor="account-current-password" className="text-sm font-medium text-muted-foreground">
@@ -216,7 +193,7 @@ function PasswordSection(): React.JSX.Element {
           Change password
         </Button>
       </div>
-    </Section>
+    </SettingsSection>
   );
 }
 
@@ -230,7 +207,7 @@ function AppearanceSection(): React.JSX.Element {
   useEffect(() => setMounted(true), []);
 
   return (
-    <Section title="Appearance" description="Choose a theme for the interface.">
+    <SettingsSection title="Appearance" description="Choose a theme for the interface.">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {themeOptions.map(({ value, label, description: desc, icon: Icon }) => (
           <button
@@ -252,7 +229,7 @@ function AppearanceSection(): React.JSX.Element {
           </button>
         ))}
       </div>
-    </Section>
+    </SettingsSection>
   );
 }
 
@@ -317,7 +294,7 @@ function PreferencesSection(): React.JSX.Element {
   const { enabled: directSearchEnabled, setEnabled: setDirectSearch } = useDirectSearch();
 
   return (
-    <Section title="Preferences" description="Language, streaming region, and playback behavior.">
+    <SettingsSection title="Preferences" description="Language, streaming region, and playback behavior.">
       <div className="space-y-8">
         {/* Language */}
         <div className="space-y-3">
@@ -427,7 +404,7 @@ function PreferencesSection(): React.JSX.Element {
           />
         </div>
       </div>
-    </Section>
+    </SettingsSection>
   );
 }
 
@@ -457,7 +434,7 @@ export default function AccountPage(): React.JSX.Element {
     <div className="w-full">
       <PageHeader title="Account" subtitle="Manage your profile, appearance, and preferences" />
 
-      <div className="space-y-6 px-4 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+      <div className="px-4 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         <ProfileSection />
         <PasswordSection />
         <AppearanceSection />
