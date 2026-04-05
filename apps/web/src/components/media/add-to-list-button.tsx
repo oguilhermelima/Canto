@@ -77,7 +77,7 @@ export function AddToListButton({
   const getByExternal = trpc.media.getByExternal.useQuery(
     {
       externalId: Number(externalId),
-      provider: (provider ?? "tmdb") as "tmdb" | "anilist" | "tvdb",
+      provider: (provider ?? "tmdb") as "tmdb" | "tvdb",
       type: (type ?? "movie") as "movie" | "show",
     },
     { enabled: false }, // manual trigger only

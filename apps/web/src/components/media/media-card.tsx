@@ -54,7 +54,7 @@ export function MediaCard({
       void utils.media.getExtras.prefetch({ id });
     } else if (externalId && provider && type) {
       void utils.media.getByExternal.prefetch({
-        provider: provider as "tmdb" | "anilist" | "tvdb",
+        provider: provider as "tmdb" | "tvdb",
         externalId: parseInt(externalId, 10),
         type: type as "movie" | "show",
       });

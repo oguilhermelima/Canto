@@ -50,7 +50,7 @@ export function SettingsTab({
   const [removeDeleteTorrent, setRemoveDeleteTorrent] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  const { data: libraries } = trpc.library.listLibraries.useQuery(undefined, {
+  const { data: libraries } = trpc.folder.list.useQuery(undefined, {
     staleTime: Infinity,
     enabled: drawerOpen,
   });

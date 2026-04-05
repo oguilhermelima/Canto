@@ -23,6 +23,7 @@ import {
 } from "@canto/ui/dropdown-menu";
 import {
   AlertTriangle,
+  Check,
   ChevronDown,
   ChevronRight,
   Download,
@@ -94,7 +95,7 @@ export default function ManagePage({
 
   // ── Queries ──
   const { data: media, isLoading } = trpc.media.getById.useQuery({ id });
-  const { data: libraries } = trpc.library.listLibraries.useQuery(undefined, {
+  const { data: libraries } = trpc.folder.list.useQuery(undefined, {
     staleTime: Infinity,
   });
   const { data: availability } = trpc.sync.mediaAvailability.useQuery(
@@ -180,6 +181,14 @@ export default function ManagePage({
       void utils.library.list.invalidate();
       toast.success("Removed from server");
       router.push(`/media/${id}`);
+    },
+    onError: (err: { message: string }) => toast.error(err.message),
+  });
+  const markDownloaded = trpc.media.markDownloaded.useMutation({
+    onSuccess: () => {
+      invalidateMedia();
+      void utils.library.list.invalidate();
+      toast.success("Marked as in library");
     },
     onError: (err: { message: string }) => toast.error(err.message),
   });
@@ -531,6 +540,30 @@ export default function ManagePage({
           {/* ── Danger Zone ── */}
           {activeTab === "danger" && (
             <div className="space-y-6">
+              {!media.downloaded && (
+                <>
+                  <SettingsRow
+                    label="Mark as in library"
+                    description="Mark this media as downloaded and add to server library"
+                  >
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      disabled={markDownloaded.isPending}
+                      onClick={() => markDownloaded.mutate({ id })}
+                    >
+                      {markDownloaded.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Check className="h-4 w-4" />
+                      )}
+                      Mark as in library
+                    </Button>
+                  </SettingsRow>
+                  <Separator />
+                </>
+              )}
               <SettingsRow
                 label="Remove from server"
                 description="Un-mark this media as downloaded and remove from server library"

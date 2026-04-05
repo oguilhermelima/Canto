@@ -44,7 +44,7 @@ function SpotlightProgressFill({ slideKey }: { slideKey: number }): React.JSX.El
 
   return (
     <div
-      className="absolute inset-0 origin-left rounded-full bg-foreground will-change-transform"
+      className="absolute inset-0 origin-left rounded-full bg-foreground/70 will-change-transform"
       style={{
         transform: `scaleX(${started ? 1 : 0})`,
         transition: started ? "transform 10s linear" : "none",
@@ -184,7 +184,7 @@ export default function DiscoverPage(): React.JSX.Element {
   const prefetchSpotlight = useCallback(
     (item: SpotlightItem) => {
       void utils.media.getByExternal.prefetch({
-        provider: item.provider as "tmdb" | "anilist" | "tvdb",
+        provider: item.provider as "tmdb" | "tvdb",
         externalId: item.externalId,
         type: item.type,
       });
@@ -391,17 +391,17 @@ export default function DiscoverPage(): React.JSX.Element {
                       type="button"
                       aria-label={`Go to slide ${i + 1}`}
                       className={cn(
-                        "relative h-2 overflow-hidden rounded-full transition-[width] duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]",
+                        "relative h-1.5 overflow-hidden rounded-full transition-[width] duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]",
                         isActive
-                          ? "w-8 bg-foreground/30"
-                          : "w-2 bg-foreground/30 hover:bg-foreground/50",
+                          ? "w-8 bg-foreground/15"
+                          : "w-2 bg-foreground/15 hover:bg-foreground/30",
                       )}
                       onClick={() => setCurrentSpotlight(i)}
                     >
                       {isActive ? (
                         <SpotlightProgressFill slideKey={currentSpotlight} />
                       ) : (
-                        <div className={cn("absolute inset-0 rounded-full bg-foreground", isPast ? "opacity-100" : "opacity-0")} />
+                        <div className={cn("absolute inset-0 rounded-full bg-foreground/70", isPast ? "opacity-100" : "opacity-0")} />
                       )}
                     </button>
                   );

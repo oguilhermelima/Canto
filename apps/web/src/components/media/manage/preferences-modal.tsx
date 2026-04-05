@@ -113,7 +113,7 @@ export function PreferencesModal({
     { id: mediaId },
     { staleTime: Infinity, enabled: open },
   );
-  const { data: libraries } = trpc.library.listLibraries.useQuery(undefined, {
+  const { data: libraries } = trpc.folder.list.useQuery(undefined, {
     staleTime: Infinity,
     enabled: open,
   });
