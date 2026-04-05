@@ -258,6 +258,7 @@ export const media = pgTable(
     libraryId: uuid("library_id").references(() => library.id, {
       onDelete: "set null",
     }),
+    inLibrary: boolean("in_library").notNull().default(false),
     downloaded: boolean("downloaded").notNull().default(false),
     libraryPath: varchar("library_path", { length: 500 }),
     addedAt: timestamp("added_at", { withTimezone: true }),
@@ -288,6 +289,7 @@ export const media = pgTable(
   (table) => [
     uniqueIndex("idx_media_external").on(table.externalId, table.provider),
     index("idx_media_type").on(table.type),
+    index("idx_media_in_library").on(table.inLibrary),
     index("idx_media_downloaded").on(table.downloaded),
     index("idx_media_provider").on(table.provider, table.externalId),
   ],
