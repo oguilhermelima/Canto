@@ -19,7 +19,6 @@ export const plexRouter = createTRPCRouter({
 
     try {
       const info = await testPlexConnection(creds.url, creds.token);
-      await syncPlexLibraries(ctx.db, creds.url, creds.token, getPlexSections);
       return { connected: true, serverName: info.serverName, version: info.version };
     } catch (err) {
       return { connected: false, error: err instanceof Error ? err.message : "Unknown error" };

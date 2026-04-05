@@ -24,6 +24,8 @@ import { logAndSwallow } from "@canto/api/lib/log-error";
 const BATCH_SIZE = 10;
 const BATCH_DELAY_MS = 2_000;
 const ITEM_DELAY_MS = 250;
+const TMDB_DELAY_MS = 300;
+const TMDB_MAX_RETRIES = 3;
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -62,6 +64,26 @@ const STATUS_KEY_PREFIX = "sync.mediaImport.status";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function tmdbCall<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; attempt <= TMDB_MAX_RETRIES; attempt++) {
+    try {
+      const result = await fn();
+      await sleep(TMDB_DELAY_MS);
+      return result;
+    } catch (err) {
+      const is429 = err instanceof Error && err.message.includes("429");
+      if (is429 && attempt < TMDB_MAX_RETRIES) {
+        const backoff = 2_000 * Math.pow(2, attempt);
+        console.warn(`[reverse-sync] TMDB rate limited, retrying in ${backoff}ms (attempt ${attempt + 1}/${TMDB_MAX_RETRIES})`);
+        await sleep(backoff);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("TMDB call failed after retries");
 }
 
 async function updateStatus(tag: string, status: SyncStatus): Promise<void> {
@@ -106,41 +128,49 @@ async function scanJellyfin(
     let startIndex = 0;
     const pageSize = 500;
 
-    while (true) {
-      const res = await fetch(
-        `${url}/Items?ParentId=${lib.jellyfinLibraryId}&IncludeItemTypes=${includeTypes}&Fields=ProviderIds,Path,ProductionYear&Recursive=true&StartIndex=${startIndex}&Limit=${pageSize}`,
-        { headers: { "X-Emby-Token": apiKey } },
-      );
-      if (!res.ok) break;
+    try {
+      while (true) {
+        const res = await fetch(
+          `${url}/Items?ParentId=${lib.jellyfinLibraryId}&IncludeItemTypes=${includeTypes}&Fields=ProviderIds,Path,ProductionYear&Recursive=true&StartIndex=${startIndex}&Limit=${pageSize}`,
+          { headers: { "X-Emby-Token": apiKey }, signal: AbortSignal.timeout(30_000) },
+        );
+        if (!res.ok) {
+          throw new Error(`Jellyfin API returned HTTP ${res.status} at offset ${startIndex}`);
+        }
 
-      const data = await res.json() as {
-        Items: Array<{
-          Id: string;
-          Name: string;
-          ProductionYear?: number;
-          Path?: string;
-          ProviderIds?: { Tmdb?: string; Imdb?: string };
-        }>;
-        TotalRecordCount: number;
-      };
+        const data = await res.json() as {
+          Items: Array<{
+            Id: string;
+            Name: string;
+            ProductionYear?: number;
+            Path?: string;
+            ProviderIds?: { Tmdb?: string; Imdb?: string };
+          }>;
+          TotalRecordCount: number;
+        };
 
-      for (const item of data.Items) {
-        const tmdbStr = item.ProviderIds?.Tmdb;
-        items.push({
-          tmdbId: tmdbStr ? parseInt(tmdbStr, 10) : undefined,
-          imdbId: item.ProviderIds?.Imdb,
-          title: item.Name,
-          year: item.ProductionYear,
-          type: mediaType,
-          libraryId: lib.id,
-          path: item.Path,
-          source: "jellyfin",
-          jellyfinItemId: item.Id,
-        });
+        for (const item of data.Items) {
+          const tmdbStr = item.ProviderIds?.Tmdb;
+          items.push({
+            tmdbId: tmdbStr ? parseInt(tmdbStr, 10) : undefined,
+            imdbId: item.ProviderIds?.Imdb,
+            title: item.Name,
+            year: item.ProductionYear,
+            type: mediaType,
+            libraryId: lib.id,
+            path: item.Path,
+            source: "jellyfin",
+            jellyfinItemId: item.Id,
+          });
+        }
+
+        startIndex += pageSize;
+        if (startIndex >= data.TotalRecordCount) break;
       }
-
-      startIndex += pageSize;
-      if (startIndex >= data.TotalRecordCount) break;
+    } catch (err) {
+      console.warn(
+        `[jellyfin-scan] Partial sync for library ${lib.jellyfinLibraryId}: ${err instanceof Error ? err.message : err}. Returning ${items.length} items fetched so far.`,
+      );
     }
   }
 
@@ -160,46 +190,57 @@ async function scanPlex(
 
   for (const lib of libs) {
     const mediaType = lib.type === "movies" ? "movie" : "show";
+    const plexPageSize = 100;
+    let offset = 0;
 
-    const res = await fetch(
-      `${url}/library/sections/${lib.plexLibraryId}/all?X-Plex-Token=${token}&includeGuids=1`,
-      { headers: { Accept: "application/json" } },
-    );
-    if (!res.ok) continue;
+    while (true) {
+      const res = await fetch(
+        `${url}/library/sections/${lib.plexLibraryId}/all?X-Plex-Token=${token}&includeGuids=1&X-Plex-Container-Start=${offset}&X-Plex-Container-Size=${plexPageSize}`,
+        { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(30_000) },
+      );
+      if (!res.ok) break;
 
-    const data = await res.json() as {
-      MediaContainer: {
-        Metadata?: Array<{
-          ratingKey: string;
-          title: string;
-          year?: number;
-          Guid?: Array<{ id: string }>;
-        }>;
+      const data = await res.json() as {
+        MediaContainer: {
+          totalSize?: number;
+          size?: number;
+          Metadata?: Array<{
+            ratingKey: string;
+            title: string;
+            year?: number;
+            Guid?: Array<{ id: string }>;
+          }>;
+        };
       };
-    };
 
-    for (const item of data.MediaContainer.Metadata ?? []) {
-      let tmdbId: number | undefined;
-      let imdbId: string | undefined;
+      const metadata = data.MediaContainer.Metadata ?? [];
+      for (const item of metadata) {
+        let tmdbId: number | undefined;
+        let imdbId: string | undefined;
 
-      for (const guid of item.Guid ?? []) {
-        if (guid.id.startsWith("tmdb://")) {
-          tmdbId = parseInt(guid.id.replace("tmdb://", ""), 10);
-        } else if (guid.id.startsWith("imdb://")) {
-          imdbId = guid.id.replace("imdb://", "");
+        for (const guid of item.Guid ?? []) {
+          if (guid.id.startsWith("tmdb://")) {
+            tmdbId = parseInt(guid.id.replace("tmdb://", ""), 10);
+          } else if (guid.id.startsWith("imdb://")) {
+            imdbId = guid.id.replace("imdb://", "");
+          }
         }
+
+        items.push({
+          tmdbId,
+          imdbId,
+          title: item.title,
+          year: item.year,
+          type: mediaType,
+          libraryId: lib.id,
+          source: "plex",
+          plexRatingKey: item.ratingKey,
+        });
       }
 
-      items.push({
-        tmdbId,
-        imdbId,
-        title: item.title,
-        year: item.year,
-        type: mediaType,
-        libraryId: lib.id,
-        source: "plex",
-        plexRatingKey: item.ratingKey,
-      });
+      offset += plexPageSize;
+      const totalSize = data.MediaContainer.totalSize ?? 0;
+      if (metadata.length < plexPageSize || offset >= totalSize) break;
     }
   }
 
@@ -455,7 +496,7 @@ async function processPendingImports(
         let resolvedType = item.type;
 
         if (!tmdbId && item.imdbId) {
-          const results = await tmdb.findByImdbId(item.imdbId);
+          const results = await tmdbCall(() => tmdb.findByImdbId(item.imdbId!));
           const match = results.find((r) => r.type === item.type) ?? results[0];
           if (match) {
             tmdbId = match.externalId;
@@ -465,7 +506,7 @@ async function processPendingImports(
 
         if (!tmdbId) {
           const query = item.year ? `${item.title} ${item.year}` : item.title;
-          const searchResult = await tmdb.search(query, item.type);
+          const searchResult = await tmdbCall(() => tmdb.search(query, item.type));
           if (searchResult.results.length === 1) {
             tmdbId = searchResult.results[0]!.externalId;
             resolvedType = searchResult.results[0]!.type as "movie" | "show";
@@ -494,9 +535,10 @@ async function processPendingImports(
         if (existing) {
           mediaId = existing.id;
 
-          // Idempotent: only update fields that the sync owns (downloaded, library, path)
+          // Idempotent: only update fields that the sync owns (inLibrary, downloaded, library, path)
           // Never touch metadata, seasons, processing_status, or provider data
           const updates: Record<string, unknown> = {};
+          if (!existing.inLibrary) updates.inLibrary = true;
           if (!existing.downloaded) updates.downloaded = true;
           if (!existing.libraryId && item.libraryId) updates.libraryId = item.libraryId;
           if (!existing.libraryPath && item.path) updates.libraryPath = item.path;
@@ -512,7 +554,7 @@ async function processPendingImports(
             void dispatchEnrichMedia(existing.id, true).catch(logAndSwallow("reverse-sync dispatchEnrichMedia"));
           }
 
-          if (existing.downloaded) {
+          if (existing.inLibrary) {
             status.skipped++;
             const skippedSyncItem = await createSyncItem(db, {
               ...syncItemBase(item),
@@ -561,9 +603,9 @@ async function processPendingImports(
         } else {
           // New media: persist from TMDB + enrich
           const supportedLangs = [...await getSupportedLanguageCodes(db)];
-          const normalized = await tmdb.getMetadata(tmdbId, resolvedType, { supportedLanguages: supportedLangs });
+          const normalized = await tmdbCall(() => tmdb.getMetadata(tmdbId!, resolvedType, { supportedLanguages: supportedLangs }));
           const inserted = await persistMedia(db, normalized, { crossRefLookup: tvdbEnabled });
-          await updateMedia(db, inserted.id, { downloaded: true, libraryId: item.libraryId, libraryPath: item.path, addedAt: new Date() });
+          await updateMedia(db, inserted.id, { inLibrary: true, downloaded: true, libraryId: item.libraryId, libraryPath: item.path, addedAt: new Date() });
           mediaId = inserted.id;
           void dispatchEnrichMedia(inserted.id, true).catch(logAndSwallow("reverse-sync dispatchEnrichMedia"));
         }

@@ -13,6 +13,7 @@ export async function plexFetch<T>(
 ): Promise<T> {
   const res = await fetch(`${url}${endpoint}?X-Plex-Token=${token}`, {
     headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) {
     throw new Error(`Plex API error: ${res.status}`);
@@ -63,13 +64,15 @@ export async function scanPlexLibrary(
   if (!sectionIds || sectionIds.length === 0) {
     await fetch(
       `${url}/library/sections/all/refresh?X-Plex-Token=${token}`,
+      { signal: AbortSignal.timeout(10_000) },
     );
   } else {
     await Promise.all(
       sectionIds.map((id) =>
         fetch(
           `${url}/library/sections/${id}/refresh?X-Plex-Token=${token}`,
-        ).catch(() => {}),
+          { signal: AbortSignal.timeout(10_000) },
+        ).catch((err) => console.error("[plex] Section refresh failed:", err instanceof Error ? err.message : err)),
       ),
     );
   }

@@ -24,7 +24,6 @@ export const jellyfinRouter = createTRPCRouter({
 
     try {
       const info = await testJellyfinConnection(creds.url, creds.apiKey);
-      await syncJellyfinLibraries(ctx.db, creds.url, creds.apiKey, getJellyfinLibraryFolders);
       return { connected: true, serverName: info.serverName, version: info.version };
     } catch (err) {
       return { connected: false, error: err instanceof Error ? err.message : "Unknown error" };

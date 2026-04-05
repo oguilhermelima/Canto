@@ -20,12 +20,7 @@ export async function syncJellyfinLibraries(
   apiKey: string,
   getLibraryFolders: (url: string, apiKey: string) => Promise<JellyfinFolder[]>,
 ): Promise<Array<{ id: string; name: string; action: "linked" | "created" }>> {
-  let folders: JellyfinFolder[];
-  try {
-    folders = await getLibraryFolders(url, apiKey);
-  } catch {
-    return [];
-  }
+  const folders = await getLibraryFolders(url, apiKey);
 
   const synced: Array<{ id: string; name: string; action: "linked" | "created" }> = [];
 
