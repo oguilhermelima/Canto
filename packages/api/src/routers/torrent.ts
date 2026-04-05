@@ -267,7 +267,7 @@ export const torrentRouter = createTRPCRouter({
       if (!row.hash) throw new TRPCError({ code: "BAD_REQUEST", message: "Torrent has no hash" });
 
       const qb = await getQBClient();
-      const files = await qb.listTorrentFiles(row.hash);
+      const files = await qb.getTorrentFiles(row.hash);
       if (files.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No files in torrent" });
 
       const mainFile = files.reduce((a, b) => (a.size > b.size ? a : b));

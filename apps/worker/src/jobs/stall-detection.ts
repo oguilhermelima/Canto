@@ -50,7 +50,7 @@ export async function handleStallDetection(): Promise<void> {
     if (!live) continue;
 
     // Only flag if qBit reports stalledDL
-    if (!live.state.includes("stalled") || !live.state.includes("DL")) continue;
+    if (live.state !== "stalledDL") continue;
 
     // Check age — don't stall-flag very recent torrents
     const createdAt = row.createdAt ? new Date(row.createdAt).getTime() : 0;

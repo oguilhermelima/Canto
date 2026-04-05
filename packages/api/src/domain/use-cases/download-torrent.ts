@@ -65,10 +65,10 @@ async function resolveDownloadConfig(
   },
   inputFolderId?: string,
 ): Promise<{ category: string; downloadPath: string | undefined; folderId: string | undefined }> {
-  // 1. Explicit folder from input
+  // 1. Explicit folder from input (must be enabled)
   if (inputFolderId) {
     const folder = await findFolderById(db, inputFolderId);
-    if (folder) {
+    if (folder?.enabled) {
       // Persist assignment
       if (mediaRow.libraryId !== folder.id) {
         await updateMedia(db, mediaRow.id, { libraryId: folder.id });
@@ -81,10 +81,10 @@ async function resolveDownloadConfig(
     }
   }
 
-  // 2. Existing assignment
+  // 2. Existing assignment (must be enabled)
   if (mediaRow.libraryId) {
     const folder = await findFolderById(db, mediaRow.libraryId);
-    if (folder) {
+    if (folder?.enabled) {
       return {
         category: folder.qbitCategory ?? "default",
         downloadPath: folder.downloadPath ?? undefined,
@@ -424,9 +424,17 @@ async function coreDownload(
 
     await qbClient.addTorrent(resolvedUrl, qbCategory);
 
+    // Mark media as "in library" the moment the torrent is accepted
+    if (!mediaRow.inLibrary) {
+      await updateMedia(db, mediaRow.id, {
+        inLibrary: true,
+        addedAt: mediaRow.addedAt ?? new Date(),
+      });
+    }
+
     // If no hash from magnet/URL, poll qBittorrent to find the new torrent
     if (!extractedHash) {
-      for (let attempt = 0; attempt < 5; attempt++) {
+      for (let attempt = 0; attempt < 15; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
         try {
           const current = await qbClient.listTorrents();
@@ -441,7 +449,7 @@ async function coreDownload(
         }
       }
       if (!extractedHash) {
-        console.warn(`[download] Could not detect hash for "${torrentRow.title}" after 5 attempts`);
+        console.warn(`[download] Could not detect hash for "${torrentRow.title}" after 15 attempts`);
       }
     }
   } catch (qbErr) {

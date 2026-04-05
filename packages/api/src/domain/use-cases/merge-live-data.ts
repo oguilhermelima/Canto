@@ -67,10 +67,19 @@ export async function mergeLiveData(
 
   for (const row of dbRows) {
     const live = row.hash ? liveMap.get(row.hash) : undefined;
-    if (live && live.progress >= 1 && row.status !== "completed") {
-      statusUpdates.set(row.id, "completed");
+    if (live) {
+      if (live.progress >= 1 && row.status !== "completed") {
+        statusUpdates.set(row.id, "completed");
+      } else if (live.state === "error" || live.state === "missingFiles") {
+        if (row.status !== "error") statusUpdates.set(row.id, "error");
+      } else if (live.state === "pausedDL") {
+        if (row.status !== "paused") statusUpdates.set(row.id, "paused");
+      } else if (live.state === "pausedUP") {
+        if (row.status !== "completed") statusUpdates.set(row.id, "completed");
+      } else if (live.state === "metaDL") {
+        if (row.status !== "downloading") statusUpdates.set(row.id, "downloading");
+      }
     } else if (
-      !live &&
       row.hash &&
       qbReachable &&
       (row.status === "downloading" || row.status === "paused")

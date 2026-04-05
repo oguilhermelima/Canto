@@ -23,6 +23,7 @@ export class QBittorrentClient implements DownloadClientPort {
       method: "POST",
       body,
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!response.ok) {
@@ -53,6 +54,7 @@ export class QBittorrentClient implements DownloadClientPort {
         ...(opts.headers as Record<string, string> | undefined),
         ...(this.cookie ? { Cookie: this.cookie } : {}),
       },
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (response.status === 403) {
@@ -63,6 +65,7 @@ export class QBittorrentClient implements DownloadClientPort {
           ...(opts.headers as Record<string, string> | undefined),
           ...(this.cookie ? { Cookie: this.cookie } : {}),
         },
+        signal: AbortSignal.timeout(15_000),
       });
     }
 
@@ -155,7 +158,9 @@ export class QBittorrentClient implements DownloadClientPort {
 
   async getTorrentFiles(hash: string): Promise<TorrentFileInfo[]> {
     const response = await this.request(`/api/v2/torrents/files?hash=${hash}`);
-    if (!response.ok) return [];
+    if (!response.ok) {
+      throw new Error(`qBittorrent listFiles failed: ${response.status}`);
+    }
     return response.json() as Promise<TorrentFileInfo[]>;
   }
 
@@ -169,14 +174,6 @@ export class QBittorrentClient implements DownloadClientPort {
     if (!response.ok) {
       throw new Error(`qBittorrent setLocation failed: ${response.status}`);
     }
-  }
-
-  async listTorrentFiles(hash: string): Promise<Array<{ name: string; size: number }>> {
-    const response = await this.request(`/api/v2/torrents/files?hash=${hash}`);
-    if (!response.ok) {
-      throw new Error(`qBittorrent listFiles failed: ${response.status}`);
-    }
-    return response.json() as Promise<Array<{ name: string; size: number }>>;
   }
 
   async renameFolder(hash: string, oldPath: string, newPath: string): Promise<void> {
@@ -216,11 +213,14 @@ export class QBittorrentClient implements DownloadClientPort {
 
   async editCategory(category: string, savePath: string): Promise<void> {
     const body = new URLSearchParams({ category, savePath });
-    await this.request("/api/v2/torrents/editCategory", {
+    const response = await this.request("/api/v2/torrents/editCategory", {
       method: "POST",
       body,
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
+    if (!response.ok) {
+      throw new Error(`qBittorrent editCategory failed: HTTP ${response.status}`);
+    }
   }
 
   async ensureCategory(category: string, savePath?: string): Promise<void> {
@@ -230,16 +230,11 @@ export class QBittorrentClient implements DownloadClientPort {
       // Category likely already exists — ignore creation error
     }
 
-    // Always update the save path so it stays in sync with folder settings
+    // Always update the save path so it stays in sync with folder settings.
+    // This MUST succeed — a wrong savePath means torrents land in the wrong
+    // directory and import will fail.
     if (savePath) {
-      try {
-        await this.editCategory(category, savePath);
-      } catch (err) {
-        console.warn(
-          `[qBittorrent] Failed to update save path for category "${category}":`,
-          err,
-        );
-      }
+      await this.editCategory(category, savePath);
     }
   }
 
@@ -279,6 +274,11 @@ export async function getQBClient(): Promise<QBittorrentClient> {
   return qbClient;
 }
 
+/**
+ * Reset the singleton so the next `getQBClient()` re-reads settings.
+ * MUST be called whenever QBITTORRENT_URL, QBITTORRENT_USERNAME, or
+ * QBITTORRENT_PASSWORD settings are saved (see settings router `set`/`setMany`).
+ */
 export function resetQBClient(): void {
   qbClient = null;
 }
