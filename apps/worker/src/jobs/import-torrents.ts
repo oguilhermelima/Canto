@@ -17,7 +17,9 @@ import {
   addListItem,
   updateRequestStatus,
   claimTorrentForImport,
+  resetStaleImports,
   updateTorrent,
+  updateMedia,
 } from "@canto/api/infrastructure/repositories";
 import { logAndSwallow } from "@canto/api/lib/log-error";
 
@@ -75,6 +77,9 @@ async function triggerMediaServerScans(folderId?: string): Promise<void> {
 /* -------------------------------------------------------------------------- */
 
 export async function handleImportTorrents(): Promise<void> {
+  // Reset torrents stuck with importing=true for over 30 minutes (e.g., worker crash)
+  await resetStaleImports(db);
+
   const rows = await findUnimportedTorrents(db);
 
   const toImport = rows.filter(
@@ -122,12 +127,20 @@ export async function handleImportTorrents(): Promise<void> {
             err instanceof Error ? err.message : err,
           );
         }
-        // Get the library ID from the linked media
+        // Get the library ID from the linked media and mark as downloaded
         const mediaRow = updated.mediaId
           ? await findMediaById(db, updated.mediaId)
           : null;
-        if (mediaRow?.libraryId) {
-          importedFolderIds.add(mediaRow.libraryId);
+        if (mediaRow) {
+          if (!mediaRow.downloaded) {
+            await updateMedia(db, mediaRow.id, {
+              downloaded: true,
+              addedAt: mediaRow.addedAt ?? new Date(),
+            });
+          }
+          if (mediaRow.libraryId) {
+            importedFolderIds.add(mediaRow.libraryId);
+          }
         }
 
         // Add to Server Library list
@@ -143,7 +156,7 @@ export async function handleImportTorrents(): Promise<void> {
           } catch { /* no pending requests */ }
         }
 
-        // Continuous download: try to grab next episode
+        // Continuous download: try to grab next episode (matching quality)
         if (updated.mediaId && mediaRow) {
           void tryContinuousDownload(
             {
@@ -154,6 +167,7 @@ export async function handleImportTorrents(): Promise<void> {
             },
             row.seasonNumber,
             row.episodeNumbers,
+            { quality: row.quality, source: row.source },
           ).catch(logAndSwallow("import-torrents tryContinuousDownload"));
         }
       }
@@ -192,6 +206,7 @@ async function tryContinuousDownload(
   mediaRow: { id: string; type: string; continuousDownload: boolean; title: string },
   importedSeasonNumber: number | null,
   importedEpisodeNumbers: number[] | null,
+  preferredQuality?: { quality: string; source: string },
 ): Promise<void> {
   if (mediaRow.type !== "show" || !mediaRow.continuousDownload) return;
   if (!importedEpisodeNumbers?.length || !importedSeasonNumber) return;
@@ -214,7 +229,14 @@ async function tryContinuousDownload(
       return;
     }
 
-    const best = results[0]!;
+    // Prefer results matching the quality/source of the previously imported episode
+    let best = results[0]!;
+    if (preferredQuality && preferredQuality.quality !== "unknown") {
+      const matching = results.find(
+        (r) => r.quality === preferredQuality.quality && (preferredQuality.source === "unknown" || r.source === preferredQuality.source),
+      );
+      if (matching) best = matching;
+    }
     console.log(`[continuous-download] Auto-downloading "${best.title}" (confidence: ${best.confidence})`);
 
     const qbClient = await getDownloadClient();
@@ -276,6 +298,12 @@ export async function importSingleTorrent(torrentId: string): Promise<boolean> {
       const linkedMedia = updated.mediaId
         ? await findMediaById(db, updated.mediaId)
         : null;
+      if (linkedMedia && !linkedMedia.downloaded) {
+        await updateMedia(db, linkedMedia.id, {
+          downloaded: true,
+          addedAt: linkedMedia.addedAt ?? new Date(),
+        });
+      }
       await triggerMediaServerScans(linkedMedia?.libraryId ?? undefined);
       return true;
     }

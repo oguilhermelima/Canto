@@ -7,6 +7,7 @@ import { handleRssSync } from "./jobs/rss-sync";
 import { handleBackfillExtras } from "./jobs/backfill-extras";
 import { handleSeedManagement } from "./jobs/seed-management";
 import { handleFolderScan } from "./jobs/folder-scan";
+import { handleValidateDownloads } from "./jobs/validate-downloads";
 import { enrichMedia } from "@canto/api/domain/use-cases/enrich-media";
 import { refreshExtras } from "@canto/api/domain/use-cases/refresh-extras";
 import { replaceShowWithTvdb } from "@canto/api/domain/use-cases/replace-show-with-tvdb";
@@ -45,6 +46,7 @@ const queues = {
   backfillExtras: new Queue("backfill-extras", { connection: redisConnection }),
   seedManagement: new Queue("seed-management", { connection: redisConnection }),
   folderScan: new Queue("folder-scan", { connection: redisConnection }),
+  validateDownloads: new Queue("validate-downloads", { connection: redisConnection }),
 };
 
 /* -------------------------------------------------------------------------- */
@@ -105,6 +107,12 @@ async function setupSchedules(): Promise<void> {
     { every: 30 * 60 * 1000 },         // 30 min
     { name: "folder-scan" },
   );
+
+  await queues.validateDownloads.upsertJobScheduler(
+    "validate-downloads-scheduler",
+    { every: 6 * 60 * 60 * 1000 },    // 6 hours
+    { name: "validate-downloads" },
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -160,6 +168,11 @@ const workers = [
   new Worker("folder-scan", async (job) => {
     console.log(`[folder-scan] Running job ${job.id}`);
     await handleFolderScan();
+  }, { connection: redisConnection, concurrency: 1 }),
+
+  new Worker("validate-downloads", async (job) => {
+    console.log(`[validate-downloads] Running job ${job.id}`);
+    await handleValidateDownloads();
   }, { connection: redisConnection, concurrency: 1 }),
 
   // ── On-demand (dispatched by other code) ──

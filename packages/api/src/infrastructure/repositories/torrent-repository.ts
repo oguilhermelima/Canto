@@ -81,6 +81,22 @@ export async function claimTorrentForImport(db: Database, id: string) {
   return claimed;
 }
 
+export async function resetStaleImports(db: Database) {
+  const result = await db
+    .update(torrent)
+    .set({ importing: false, updatedAt: new Date() })
+    .where(
+      and(
+        eq(torrent.importing, true),
+        lt(torrent.updatedAt, sql`NOW() - INTERVAL '30 minutes'`),
+      ),
+    )
+    .returning({ id: torrent.id });
+  if (result.length > 0) {
+    console.log(`[import-torrents] Reset ${result.length} stale importing torrent(s)`);
+  }
+}
+
 export async function findUnimportedTorrents(db: Database) {
   return db.query.torrent.findMany({
     where: and(

@@ -68,6 +68,7 @@ async function findVideosByDirectory(
 /* -------------------------------------------------------------------------- */
 
 const ITEM_DELAY_MS = 250;
+const scanningFolders = new Set<string>();
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -78,6 +79,13 @@ export async function scanFolderForMedia(
   folderPath: string,
   libraryId: string,
 ): Promise<{ imported: number; skipped: number; failed: number }> {
+  if (scanningFolders.has(folderPath)) {
+    console.log(`[folder-scan] Already scanning ${folderPath} — skipping`);
+    return { imported: 0, skipped: 0, failed: 0 };
+  }
+
+  scanningFolders.add(folderPath);
+  try {
   // Verify folder exists
   try {
     const s = await stat(folderPath);
@@ -155,8 +163,9 @@ export async function scanFolderForMedia(
       const existing = await findMediaByAnyReference(db, tmdbId, "tmdb", parsed.imdbId);
 
       if (existing) {
-        // Update if not yet marked as downloaded
+        // Update if not yet marked as in library / downloaded
         const updates: Record<string, unknown> = {};
+        if (!existing.inLibrary) updates.inLibrary = true;
         if (!existing.downloaded) updates.downloaded = true;
         if (!existing.libraryId) updates.libraryId = libraryId;
         if (!existing.libraryPath) updates.libraryPath = dirPath;
@@ -166,10 +175,10 @@ export async function scanFolderForMedia(
           await updateMedia(db, existing.id, updates);
         }
 
-        if (existing.downloaded) {
+        if (existing.inLibrary) {
           skipped++;
         } else {
-          // Was in DB but not marked downloaded — now it is
+          // Was in DB but not in library — now it is
           try {
             const serverLib = await ensureServerLibrary(db);
             await addListItem(db, { listId: serverLib.id, mediaId: existing.id });
@@ -185,6 +194,7 @@ export async function scanFolderForMedia(
         const normalized = await tmdb.getMetadata(tmdbId, resolvedType, { supportedLanguages: supportedLangs });
         const inserted = await persistMedia(db, normalized);
         await updateMedia(db, inserted.id, {
+          inLibrary: true,
           downloaded: true,
           libraryId,
           libraryPath: dirPath,
@@ -211,4 +221,7 @@ export async function scanFolderForMedia(
 
   console.log(`[folder-scan] Done: ${imported} imported, ${skipped} skipped, ${failed} failed`);
   return { imported, skipped, failed };
+  } finally {
+    scanningFolders.delete(folderPath);
+  }
 }
