@@ -184,6 +184,7 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
   }
 
   const actions: MenuAction[] = [
+    { href: "/account", label: "Account", icon: User },
     { href: "/manage", label: "Manage", icon: Settings },
     { href: "/notifications", label: "Notifications", icon: Bell },
     {
