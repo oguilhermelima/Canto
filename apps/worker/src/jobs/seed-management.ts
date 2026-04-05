@@ -1,4 +1,4 @@
-import { unlink, stat } from "node:fs/promises";
+import { unlink, rmdir } from "node:fs/promises";
 import path from "node:path";
 
 import { db } from "@canto/db/client";
@@ -62,6 +62,21 @@ export async function handleSeedManagement(): Promise<void> {
     if (!shouldRemove) continue;
 
     try {
+      const shouldCleanup = cleanupFiles && dbRow.importMethod !== "remote";
+
+      if (cleanupFiles && dbRow.importMethod === "remote") {
+        console.log(
+          `[seed-management] Skipping file cleanup for "${torrent.name}" — imported via remote mode (files are in the library path)`,
+        );
+      }
+
+      // Fetch file list BEFORE deleting the torrent (it won't be available after)
+      let filePaths: string[] = [];
+      if (shouldCleanup) {
+        const files = await client.getTorrentFiles(torrent.hash).catch(() => []);
+        filePaths = files.map((f) => path.join(torrent.save_path, f.name));
+      }
+
       // Remove torrent from client (keep files for now)
       await client.deleteTorrent(torrent.hash, false);
 
@@ -72,19 +87,24 @@ export async function handleSeedManagement(): Promise<void> {
         `[seed-management] Removed "${torrent.name}" (ratio: ${torrent.ratio.toFixed(2)}, seeded: ${torrent.completion_on > 0 ? Math.round((now - torrent.completion_on) / 3600) : "?"}h)`,
       );
 
-      // Optionally clean up source files
-      if (cleanupFiles) {
+      // Clean up source files in the downloads folder
+      if (shouldCleanup) {
         try {
-          const files = await client.getTorrentFiles(torrent.hash).catch(() => []);
-          // If we already deleted the torrent, files may not be available.
-          // Instead, try to clean up the save_path directory directly.
-          const contentPath = torrent.content_path || path.join(torrent.save_path, torrent.name);
-          const stats = await stat(contentPath).catch(() => null);
-          if (stats?.isFile()) {
-            await unlink(contentPath);
-            console.log(`[seed-management] Cleaned up file: ${contentPath}`);
+          const parentDirs = new Set<string>();
+
+          for (const filePath of filePaths) {
+            await unlink(filePath).catch(() => {});
+            console.log(`[seed-management] Cleaned up file: ${filePath}`);
+            parentDirs.add(path.dirname(filePath));
           }
-          // For directories we skip automatic cleanup to avoid accidental deletions
+
+          // Try to remove parent directories (only succeeds if empty)
+          for (const dir of parentDirs) {
+            // Don't try to remove the save_path root itself
+            if (dir !== torrent.save_path) {
+              await rmdir(dir).catch(() => {});
+            }
+          }
         } catch (err) {
           console.warn(`[seed-management] Cleanup failed for "${torrent.name}":`, err);
         }

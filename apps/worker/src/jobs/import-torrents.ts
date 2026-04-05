@@ -16,6 +16,8 @@ import {
   ensureServerLibrary,
   addListItem,
   updateRequestStatus,
+  claimTorrentForImport,
+  updateTorrent,
 } from "@canto/api/infrastructure/repositories";
 import { logAndSwallow } from "@canto/api/lib/log-error";
 
@@ -37,11 +39,19 @@ async function triggerMediaServerScans(folderId?: string): Promise<void> {
   for (const link of links) {
     if (link.serverType === "jellyfin" && jellyfinUrl && jellyfinKey) {
       try {
-        await fetch(`${jellyfinUrl}/Library/Refresh`, {
-          method: "POST",
-          headers: { "X-Emby-Token": jellyfinKey },
-        });
-        console.log("[import-torrents] Triggered Jellyfin library scan");
+        if (link.serverLibraryId) {
+          await fetch(`${jellyfinUrl}/Library/${link.serverLibraryId}/Refresh`, {
+            method: "POST",
+            headers: { "X-Emby-Token": jellyfinKey },
+          });
+          console.log(`[import-torrents] Triggered Jellyfin scan for library ${link.serverLibraryId}`);
+        } else {
+          await fetch(`${jellyfinUrl}/Library/Refresh`, {
+            method: "POST",
+            headers: { "X-Emby-Token": jellyfinKey },
+          });
+          console.log("[import-torrents] Triggered Jellyfin full library scan");
+        }
       } catch (err) {
         console.warn("[import-torrents] Failed to trigger Jellyfin scan:", err);
       }
@@ -77,24 +87,48 @@ export async function handleImportTorrents(): Promise<void> {
     `[import-torrents] Found ${toImport.length} completed torrent(s) to import`,
   );
 
-  let importedAny = false;
-  let lastLibraryId: string | undefined;
+  const importedFolderIds = new Set<string>();
 
   for (const row of toImport) {
     try {
+      // Atomically claim the torrent to prevent race conditions with merge-live-data
+      const claimed = await claimTorrentForImport(db, row.id);
+      if (!claimed) {
+        console.log(`[import-torrents] Skipping "${row.title}" — already being imported`);
+        continue;
+      }
+
       const qbClient = await getDownloadClient();
-      await autoImportTorrent(db, row, qbClient);
+      await autoImportTorrent(db, claimed, qbClient);
 
       // Re-read row to check if import succeeded
       const updated = await findTorrentById(db, row.id);
 
       if (updated?.imported) {
-        importedAny = true;
+        // Mark the torrent as imported in qBittorrent by updating its category
+        try {
+          const [torrentInfo] = await qbClient.listTorrents({ hashes: [row.hash!] });
+          if (torrentInfo) {
+            const importedCategory = torrentInfo.category
+              ? `${torrentInfo.category}-imported`
+              : "imported";
+            await qbClient.ensureCategory(importedCategory);
+            await qbClient.setCategory(row.hash!, importedCategory);
+            console.log(`[import-torrents] Set qBit category to "${importedCategory}" for "${row.title}"`);
+          }
+        } catch (err) {
+          console.warn(
+            `[import-torrents] Failed to update qBit category for "${row.title}":`,
+            err instanceof Error ? err.message : err,
+          );
+        }
         // Get the library ID from the linked media
         const mediaRow = updated.mediaId
           ? await findMediaById(db, updated.mediaId)
           : null;
-        lastLibraryId = mediaRow?.libraryId ?? undefined;
+        if (mediaRow?.libraryId) {
+          importedFolderIds.add(mediaRow.libraryId);
+        }
 
         // Add to Server Library list
         if (updated.mediaId) {
@@ -128,11 +162,16 @@ export async function handleImportTorrents(): Promise<void> {
         `[import-torrents] Error importing "${row.title}":`,
         err instanceof Error ? err.message : err,
       );
+      // Reset importing flag so the torrent can be retried on next cycle
+      await updateTorrent(db, row.id, { importing: false }).catch(
+        logAndSwallow("import-torrents reset importing flag"),
+      );
     }
   }
 
-  if (importedAny) {
-    await triggerMediaServerScans(lastLibraryId);
+  // Trigger media server scans for ALL folders that had successful imports
+  for (const folderId of importedFolderIds) {
+    await triggerMediaServerScans(folderId);
   }
 }
 
@@ -202,13 +241,38 @@ export async function importSingleTorrent(torrentId: string): Promise<boolean> {
   if (row.imported) return true;
 
   try {
+    // Atomically claim the torrent to prevent race conditions with the worker
+    const claimed = await claimTorrentForImport(db, row.id);
+    if (!claimed) {
+      console.log(`[import-torrents] Skipping "${row.title}" — already being imported`);
+      return false;
+    }
+
     const qbClient = await getDownloadClient();
-    await autoImportTorrent(db, row, qbClient);
+    await autoImportTorrent(db, claimed, qbClient);
 
     // Re-read row to check if import succeeded
     const updated = await findTorrentById(db, row.id);
 
     if (updated?.imported) {
+      // Mark the torrent as imported in qBittorrent by updating its category
+      try {
+        const [torrentInfo] = await qbClient.listTorrents({ hashes: [row.hash!] });
+        if (torrentInfo) {
+          const importedCategory = torrentInfo.category
+            ? `${torrentInfo.category}-imported`
+            : "imported";
+          await qbClient.ensureCategory(importedCategory);
+          await qbClient.setCategory(row.hash!, importedCategory);
+          console.log(`[import-torrents] Set qBit category to "${importedCategory}" for "${row.title}"`);
+        }
+      } catch (err) {
+        console.warn(
+          `[import-torrents] Failed to update qBit category for "${row.title}":`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+
       const linkedMedia = updated.mediaId
         ? await findMediaById(db, updated.mediaId)
         : null;
@@ -220,6 +284,10 @@ export async function importSingleTorrent(torrentId: string): Promise<boolean> {
     console.error(
       `[import-torrents] Error importing "${row.title}":`,
       err instanceof Error ? err.message : err,
+    );
+    // Reset importing flag so the torrent can be retried
+    await updateTorrent(db, row.id, { importing: false }).catch(
+      logAndSwallow("importSingleTorrent reset importing flag"),
     );
     return false;
   }

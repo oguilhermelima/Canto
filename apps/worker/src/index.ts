@@ -6,6 +6,7 @@ import { handleStallDetection } from "./jobs/stall-detection";
 import { handleRssSync } from "./jobs/rss-sync";
 import { handleBackfillExtras } from "./jobs/backfill-extras";
 import { handleSeedManagement } from "./jobs/seed-management";
+import { handleFolderScan } from "./jobs/folder-scan";
 import { enrichMedia } from "@canto/api/domain/use-cases/enrich-media";
 import { refreshExtras } from "@canto/api/domain/use-cases/refresh-extras";
 import { replaceShowWithTvdb } from "@canto/api/domain/use-cases/replace-show-with-tvdb";
@@ -43,6 +44,7 @@ const queues = {
   dailyRecsCheck: new Queue("daily-recs-check", { connection: redisConnection }),
   backfillExtras: new Queue("backfill-extras", { connection: redisConnection }),
   seedManagement: new Queue("seed-management", { connection: redisConnection }),
+  folderScan: new Queue("folder-scan", { connection: redisConnection }),
 };
 
 /* -------------------------------------------------------------------------- */
@@ -97,6 +99,12 @@ async function setupSchedules(): Promise<void> {
     { every: 15 * 60 * 1000 },         // 15 min
     { name: "seed-management" },
   );
+
+  await queues.folderScan.upsertJobScheduler(
+    "folder-scan-scheduler",
+    { every: 30 * 60 * 1000 },         // 30 min
+    { name: "folder-scan" },
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -147,6 +155,11 @@ const workers = [
   new Worker("seed-management", async (job) => {
     console.log(`[seed-management] Running job ${job.id}`);
     await handleSeedManagement();
+  }, { connection: redisConnection, concurrency: 1 }),
+
+  new Worker("folder-scan", async (job) => {
+    console.log(`[folder-scan] Running job ${job.id}`);
+    await handleFolderScan();
   }, { connection: redisConnection, concurrency: 1 }),
 
   // ── On-demand (dispatched by other code) ──
