@@ -276,14 +276,6 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
   const { data: allLibraries } = trpc.folder.list.useQuery(undefined, {
     staleTime: 30 * 60 * 1000,
   });
-  const markDownloaded = trpc.media.markDownloaded.useMutation({
-    onSuccess: () => {
-      void utils.media.getById.invalidate({ id: media?.id });
-      void utils.media.getByExternal.invalidate();
-      toast.success("Marked as in library");
-    },
-    onError: (err) => toast.error(err.message),
-  });
   const setContinuousDownload = trpc.library.setContinuousDownload.useMutation({
     onSuccess: () => {
       void utils.media.getById.invalidate({ id: media?.id });
@@ -541,21 +533,6 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
                   <Download className="h-4 w-4" />
                   {media.downloaded ? "Download Variant" : "Download"}
                 </button>
-                {!media.downloaded && (
-                  <Button
-                    variant="outline"
-                    className="h-10 gap-2 rounded-xl"
-                    disabled={markDownloaded.isPending}
-                    onClick={() => markDownloaded.mutate({ id: media.id })}
-                  >
-                    {markDownloaded.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Check className="h-4 w-4" />
-                    )}
-                    Mark as in library
-                  </Button>
-                )}
                 {media.downloaded && (
                 <Link
                   href={`/media/${media.id}/manage`}
