@@ -1,0 +1,204 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Button } from "@canto/ui/button";
+import { Input } from "@canto/ui/input";
+import { Switch } from "@canto/ui/switch";
+import { Save, Loader2 } from "lucide-react";
+import { cn } from "@canto/ui/cn";
+import { toast } from "sonner";
+import { trpc } from "~/lib/trpc/client";
+import { SettingsSection } from "~/components/settings/shared";
+
+export function AutoMergeSection(): React.JSX.Element {
+  const utils = trpc.useUtils();
+  const { data: preferences } = trpc.library.getPreferences.useQuery(undefined, { retry: false });
+  const setPreference = trpc.library.setPreference.useMutation({
+    onSuccess: () => { void utils.library.getPreferences.invalidate(); },
+  });
+  const autoMergeVersions = (preferences as Record<string, unknown> | undefined)?.autoMergeVersions ?? true;
+
+  return (
+    <SettingsSection title="Post-import" description="Automatic actions after media files are imported.">
+      <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card px-4 py-3">
+        <div>
+          <p className="text-sm font-medium text-foreground">Auto-merge versions</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground leading-relaxed">
+            When you download a second quality version, the media server will automatically merge them.
+          </p>
+        </div>
+        <Switch checked={autoMergeVersions === true} onCheckedChange={(checked) => setPreference.mutate({ key: "autoMergeVersions", value: checked })} />
+      </div>
+    </SettingsSection>
+  );
+}
+
+export function ImportMethodSection(): React.JSX.Element {
+  const utils = trpc.useUtils();
+  const dlSettingsQuery = trpc.library.getDownloadSettings.useQuery();
+  const [importMethod, setImportMethod] = useState<"local" | "remote">("local");
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (dlSettingsQuery.data && !dirty) {
+      setImportMethod(dlSettingsQuery.data.importMethod);
+    }
+  }, [dlSettingsQuery.data, dirty]);
+
+  const setDlSettings = trpc.library.setDownloadSettings.useMutation({
+    onSuccess: () => {
+      toast.success("Import method saved");
+      setDirty(false);
+      void utils.library.getDownloadSettings.invalidate();
+    },
+    onError: () => toast.error("Failed to save"),
+  });
+
+  const handleSave = (): void => {
+    setDlSettings.mutate({
+      importMethod,
+      seedRatioLimit: dlSettingsQuery.data?.seedRatioLimit ?? null,
+      seedTimeLimitHours: dlSettingsQuery.data?.seedTimeLimitHours ?? null,
+      seedCleanupFiles: dlSettingsQuery.data?.seedCleanupFiles ?? false,
+    });
+  };
+
+  return (
+    <SettingsSection
+      title="Import Method"
+      description="How Canto moves completed downloads into your media library."
+    >
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => { setImportMethod("local"); setDirty(true); }}
+            className={cn(
+              "flex flex-col gap-1.5 rounded-xl border p-4 text-left transition-all",
+              importMethod === "local"
+                ? "border-primary/50 bg-primary/5"
+                : "border-border/40 bg-muted/20 hover:bg-muted/40",
+            )}
+          >
+            <span className="text-sm font-semibold">Hardlink</span>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Same machine — file appears in both folders with zero extra disk space. Seeding never interrupted.
+            </p>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setImportMethod("remote"); setDirty(true); }}
+            className={cn(
+              "flex flex-col gap-1.5 rounded-xl border p-4 text-left transition-all",
+              importMethod === "remote"
+                ? "border-primary/50 bg-primary/5"
+                : "border-border/40 bg-muted/20 hover:bg-muted/40",
+            )}
+          >
+            <span className="text-sm font-semibold">qBittorrent API</span>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Different machines — qBittorrent moves files via API. No shared filesystem needed.
+            </p>
+          </button>
+        </div>
+        {dirty && (
+          <Button size="sm" onClick={handleSave} disabled={setDlSettings.isPending} className="rounded-xl gap-2">
+            {setDlSettings.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Save
+          </Button>
+        )}
+      </div>
+    </SettingsSection>
+  );
+}
+
+export function SeedingSection(): React.JSX.Element {
+  const utils = trpc.useUtils();
+  const dlSettingsQuery = trpc.library.getDownloadSettings.useQuery();
+  const [seedRatio, setSeedRatio] = useState<string>("");
+  const [seedTime, setSeedTime] = useState<string>("");
+  const [seedCleanup, setSeedCleanup] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (dlSettingsQuery.data && !dirty) {
+      setSeedRatio(dlSettingsQuery.data.seedRatioLimit?.toString() ?? "");
+      setSeedTime(dlSettingsQuery.data.seedTimeLimitHours?.toString() ?? "");
+      setSeedCleanup(dlSettingsQuery.data.seedCleanupFiles);
+    }
+  }, [dlSettingsQuery.data, dirty]);
+
+  const setDlSettings = trpc.library.setDownloadSettings.useMutation({
+    onSuccess: () => {
+      toast.success("Seeding settings saved");
+      setDirty(false);
+      void utils.library.getDownloadSettings.invalidate();
+    },
+    onError: () => toast.error("Failed to save"),
+  });
+
+  const handleSave = (): void => {
+    setDlSettings.mutate({
+      importMethod: dlSettingsQuery.data?.importMethod ?? "local",
+      seedRatioLimit: seedRatio ? parseFloat(seedRatio) : null,
+      seedTimeLimitHours: seedTime ? parseFloat(seedTime) : null,
+      seedCleanupFiles: seedCleanup,
+    });
+  };
+
+  return (
+    <SettingsSection
+      title="Seeding"
+      description="When to stop seeding and whether to clean up download files afterward."
+    >
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-foreground/80">Ratio limit</label>
+            <Input
+              type="number"
+              step="0.1"
+              min="0"
+              value={seedRatio}
+              onChange={(e) => { setSeedRatio(e.target.value); setDirty(true); }}
+              placeholder="No limit"
+              className="h-10 bg-accent rounded-xl border-none text-sm"
+            />
+            <p className="text-xs text-muted-foreground">Stop seeding after reaching this upload ratio.</p>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-foreground/80">Time limit (hours)</label>
+            <Input
+              type="number"
+              step="1"
+              min="0"
+              value={seedTime}
+              onChange={(e) => { setSeedTime(e.target.value); setDirty(true); }}
+              placeholder="No limit"
+              className="h-10 bg-accent rounded-xl border-none text-sm"
+            />
+            <p className="text-xs text-muted-foreground">Stop seeding after this many hours.</p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between rounded-xl border border-border/40 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">Clean up after seeding</p>
+            <p className="text-xs text-muted-foreground">
+              Delete download files after seed limits are met. Safe with hardlinks — library copies stay intact.
+            </p>
+          </div>
+          <Switch checked={seedCleanup} onCheckedChange={(v) => { setSeedCleanup(v); setDirty(true); }} />
+        </div>
+
+        {dirty && (
+          <Button size="sm" onClick={handleSave} disabled={setDlSettings.isPending} className="rounded-xl gap-2">
+            {setDlSettings.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Save
+          </Button>
+        )}
+      </div>
+    </SettingsSection>
+  );
+}
+

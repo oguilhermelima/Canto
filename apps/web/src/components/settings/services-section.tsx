@@ -22,6 +22,7 @@ import {
   CheckCircle,
   XCircle,
   ExternalLink,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
@@ -212,18 +213,27 @@ function ServiceRow({
   const [values, setValues] = useState<Record<string, string>>({});
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [dirty, setDirty] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (allSettings && fields) {
       const v: Record<string, string> = {};
-      for (const f of fields) v[f.key] = (allSettings[f.key] as string) ?? "";
+      let hasValues = false;
+      for (const f of fields) {
+        v[f.key] = (allSettings[f.key] as string) ?? "";
+        if (v[f.key]) hasValues = true;
+      }
       setValues(v);
       setDirty(false);
+      // Auto-expand if enabled but not yet configured
+      if (isEnabled && !hasValues) setExpanded(true);
     }
-  }, [allSettings, fields]);
+  }, [allSettings, fields, isEnabled]);
 
   const handleToggle = (): void => {
     toggleService.mutate({ service: serviceKey, enabled: !isEnabled });
+    // Auto-expand when enabling
+    if (!isEnabled) setExpanded(true);
   };
 
   if (isLoading) return <div className="px-5 py-5"><Skeleton className="h-10 w-full" /></div>;
@@ -232,22 +242,22 @@ function ServiceRow({
 
   return (
     <div className={cn(!isLast && "border-b border-border/30")}>
-      {/* Header */}
+      {/* Header — click to expand/collapse */}
       <div
         role="button"
         tabIndex={0}
-        onClick={handleToggle}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleToggle(); } }}
+        onClick={() => setExpanded((p) => !p)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded((p) => !p); } }}
         className={cn("flex w-full items-center justify-between px-5 py-3.5 text-left cursor-pointer bg-gradient-to-r", BRAND_GRADIENT[serviceKey] ?? "")}
       >
-        <div>
-          <div className="flex items-center gap-2.5">
-            <BrandLogo serviceKey={serviceKey} />
-            <p className="text-base font-semibold text-foreground">{title}</p>
-            {testService.data?.connected && <CheckCircle className="h-3.5 w-3.5 text-green-500" />}
-          </div>
-          {info?.subtitle && (
-            <p className="mt-1 text-sm text-muted-foreground">{info.subtitle}</p>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform duration-300", expanded && "rotate-180")} />
+          <BrandLogo serviceKey={serviceKey} />
+          <p className="text-base font-semibold text-foreground">{title}</p>
+          {isEnabled ? (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-green-500/10 text-green-500 border-green-500/20">Connected</Badge>
+          ) : (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Disconnected</Badge>
           )}
         </div>
         <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
@@ -289,9 +299,12 @@ function ServiceRow({
         </div>
       </div>
 
-      {/* Content */}
-      <AnimatedCollapse open={isEnabled}>
+      {/* Content — collapsible */}
+      <AnimatedCollapse open={expanded}>
         <div className="px-5 py-5 space-y-4">
+          {info?.subtitle && (
+            <p className="text-sm text-muted-foreground">{info.subtitle}</p>
+          )}
           {info?.link && (
             <a href={info.link.href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
               <ExternalLink className="h-3.5 w-3.5" />
@@ -369,14 +382,17 @@ function MediaServerRow({
   const [loginValues, setLoginValues] = useState<Record<string, string>>({});
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [dirty, setDirty] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (allSettings) {
       setUrl((allSettings[urlField.key] as string) ?? "");
       setApiKey((allSettings[apiKeyField.key] as string) ?? "");
       setDirty(false);
+      // Auto-expand if enabled but not yet configured
+      if (isEnabled && !allSettings[urlField.key]) setExpanded(true);
     }
-  }, [allSettings, urlField.key, apiKeyField.key]);
+  }, [allSettings, urlField.key, apiKeyField.key, isEnabled]);
 
   const isConnected = allSettings?.[urlField.key];
   const authMutation = serviceKey === "jellyfin" ? authJellyfin : loginPlex;
@@ -405,7 +421,11 @@ function MediaServerRow({
     }
   };
 
-  const handleToggle = (): void => { toggleService.mutate({ service: serviceKey, enabled: !isEnabled }); };
+  const handleToggle = (): void => {
+    toggleService.mutate({ service: serviceKey, enabled: !isEnabled });
+    // Auto-expand when enabling
+    if (!isEnabled) setExpanded(true);
+  };
 
   if (isLoading) return <div className="px-5 py-5"><Skeleton className="h-10 w-full" /></div>;
 
@@ -418,22 +438,22 @@ function MediaServerRow({
 
   return (
     <div className={cn(!isLast && "border-b border-border/30")}>
-      {/* Header */}
+      {/* Header — click to expand/collapse */}
       <div
         role="button"
         tabIndex={0}
-        onClick={handleToggle}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleToggle(); } }}
+        onClick={() => setExpanded((p) => !p)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded((p) => !p); } }}
         className={cn("flex w-full items-center justify-between px-5 py-3.5 text-left cursor-pointer bg-gradient-to-r", brandGradient)}
       >
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="inline-block h-5 w-5 shrink-0" style={logoStyle} />
-            <p className="text-base font-semibold text-foreground">{title}</p>
-            {!!isConnected && <CheckCircle className="h-3.5 w-3.5 text-green-500" />}
-          </div>
-          {info?.subtitle && (
-            <p className="mt-1 text-sm text-muted-foreground">{info.subtitle}</p>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform duration-300", expanded && "rotate-180")} />
+          <span className="inline-block h-5 w-5 shrink-0" style={logoStyle} />
+          <p className="text-base font-semibold text-foreground">{title}</p>
+          {isEnabled ? (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-green-500/10 text-green-500 border-green-500/20">Connected</Badge>
+          ) : (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Disconnected</Badge>
           )}
         </div>
         <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
@@ -467,9 +487,12 @@ function MediaServerRow({
         </div>
       </div>
 
-      {/* Content */}
-      <AnimatedCollapse open={isEnabled}>
+      {/* Content — collapsible */}
+      <AnimatedCollapse open={expanded}>
         <div className="px-5 py-5 space-y-5">
+          {info?.subtitle && (
+            <p className="text-sm text-muted-foreground">{info.subtitle}</p>
+          )}
           {info?.link && (
             <a href={info.link.href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
               <ExternalLink className="h-3.5 w-3.5" />
@@ -642,64 +665,82 @@ function TmdbSection(): React.JSX.Element {
   const [tmdbKey, setTmdbKey] = useState("");
   const [dirty, setDirty] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (allSettings?.["tmdb.apiKey"]) {
       setTmdbKey(allSettings["tmdb.apiKey"] as string);
       setDirty(false);
+    } else if (allSettings) {
+      // Auto-expand when no key is configured
+      setExpanded(true);
     }
   }, [allSettings]);
 
   if (isLoading) return <div className="px-5 py-5"><Skeleton className="h-10 w-full" /></div>;
 
+  const hasKey = !!allSettings?.["tmdb.apiKey"];
+
   return (
     <div>
-      {/* Header */}
-      <div className={cn("flex items-center justify-between px-5 py-3.5 bg-gradient-to-r", BRAND_GRADIENT.tmdb)}>
-        <div>
-          <div className="flex items-center gap-2.5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/tmdb.svg" alt="" className="h-5 w-5 shrink-0" />
-            <p className="text-base font-semibold text-foreground">TMDB</p>
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Required</Badge>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">Provides all movie and TV metadata.</p>
+      {/* Header — click to expand/collapse */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setExpanded((p) => !p)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded((p) => !p); } }}
+        className={cn("flex items-center justify-between px-5 py-3.5 cursor-pointer bg-gradient-to-r", BRAND_GRADIENT.tmdb)}
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform duration-300", expanded && "rotate-180")} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/tmdb.svg" alt="" className="h-5 w-5 shrink-0" />
+          <p className="text-base font-semibold text-foreground">TMDB</p>
+          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Required</Badge>
+          {hasKey && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-green-500/10 text-green-500 border-green-500/20">Connected</Badge>
+          )}
         </div>
-        {dirty && (
-          <Button
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => setSettings.mutate({ "tmdb.apiKey": tmdbKey, "tmdb.enabled": true }, { onSuccess: () => { setDirty(false); toast.success("Saved"); } })}
-            disabled={setSettings.isPending}
-          >
-            {setSettings.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
-            Save
-          </Button>
-        )}
+        <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+          {dirty && (
+            <Button
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => setSettings.mutate({ "tmdb.apiKey": tmdbKey, "tmdb.enabled": true }, { onSuccess: () => { setDirty(false); toast.success("Saved"); } })}
+              disabled={setSettings.isPending}
+            >
+              {setSettings.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
+              Save
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Content */}
-      <div className="px-5 py-5 space-y-4">
-        <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
-          <ExternalLink className="h-3.5 w-3.5" />
-          Get your free API key
-        </a>
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-muted-foreground">API Key (v3 auth)</label>
-          <div className="relative">
-            <Input
-              type={showKey ? "text" : "password"}
-              value={tmdbKey}
-              placeholder="Enter your TMDB API key"
-              onChange={(e) => { setTmdbKey(e.target.value); setDirty(true); }}
-              className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
-            />
-            <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors" onClick={() => setShowKey((p) => !p)}>
-              {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
+      {/* Content — collapsible */}
+      <AnimatedCollapse open={expanded}>
+        <div className="px-5 py-5 space-y-4">
+          <p className="text-sm text-muted-foreground">Provides all movie and TV metadata.</p>
+          <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
+            <ExternalLink className="h-3.5 w-3.5" />
+            Get your free API key
+          </a>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-muted-foreground">API Key (v3 auth)</label>
+            <div className="relative">
+              <Input
+                type={showKey ? "text" : "password"}
+                value={tmdbKey}
+                placeholder="Enter your TMDB API key"
+                onChange={(e) => { setTmdbKey(e.target.value); setDirty(true); }}
+                className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+              />
+              <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors" onClick={() => setShowKey((p) => !p)}>
+                {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </AnimatedCollapse>
     </div>
   );
 }
@@ -719,11 +760,14 @@ function TvdbApiKeySection(): React.JSX.Element {
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (allSettings) {
       setApiKey((allSettings["tvdb.apiKey"] as string) ?? "");
       setDirty(false);
+      // Auto-expand if no key configured
+      if (!allSettings["tvdb.apiKey"]) setExpanded(true);
     }
   }, [allSettings]);
 
@@ -750,55 +794,68 @@ function TvdbApiKeySection(): React.JSX.Element {
   if (isLoading) return <div className="px-5 py-5"><Skeleton className="h-10 w-full" /></div>;
 
   const isPending = testService.isPending || setMany.isPending;
+  const hasKey = !!allSettings?.["tvdb.apiKey"];
 
   return (
     <div>
-      {/* Header — matches TMDB style */}
-      <div className={cn("flex items-center justify-between px-5 py-3.5 bg-gradient-to-r", BRAND_GRADIENT.tvdb)}>
-        <div>
-          <div className="flex items-center gap-2.5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/tvdb.svg" alt="" className="h-5 w-5 shrink-0" />
-            <p className="text-base font-semibold text-foreground">TVDB</p>
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Optional</Badge>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">Better TV show seasons and anime episode numbering.</p>
+      {/* Header — click to expand/collapse */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setExpanded((p) => !p)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded((p) => !p); } }}
+        className={cn("flex items-center justify-between px-5 py-3.5 cursor-pointer bg-gradient-to-r", BRAND_GRADIENT.tvdb)}
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform duration-300", expanded && "rotate-180")} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/tvdb.svg" alt="" className="h-5 w-5 shrink-0" />
+          <p className="text-base font-semibold text-foreground">TVDB</p>
+          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Optional</Badge>
+          {hasKey && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-green-500/10 text-green-500 border-green-500/20">Connected</Badge>
+          )}
         </div>
-        {dirty && (
-          <Button
-            size="sm"
-            className="h-7 text-xs"
-            onClick={handleSave}
-            disabled={isPending}
-          >
-            {isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
-            Save & Test
-          </Button>
-        )}
+        <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+          {dirty && (
+            <Button
+              size="sm"
+              className="h-7 text-xs"
+              onClick={handleSave}
+              disabled={isPending}
+            >
+              {isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
+              Save & Test
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Content */}
-      <div className="px-5 py-5 space-y-4">
-        <a href="https://thetvdb.com/api-information" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
-          <ExternalLink className="h-3.5 w-3.5" />
-          Get your free API key
-        </a>
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-muted-foreground">API Key</label>
-          <div className="relative">
-            <Input
-              type={showKey ? "text" : "password"}
-              value={apiKey}
-              placeholder="Enter your TVDB API key"
-              onChange={(e) => { setApiKey(e.target.value); setDirty(true); }}
-              className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
-            />
-            <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors" onClick={() => setShowKey((p) => !p)}>
-              {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
+      {/* Content — collapsible */}
+      <AnimatedCollapse open={expanded}>
+        <div className="px-5 py-5 space-y-4">
+          <p className="text-sm text-muted-foreground">Better TV show seasons and anime episode numbering.</p>
+          <a href="https://thetvdb.com/api-information" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
+            <ExternalLink className="h-3.5 w-3.5" />
+            Get your free API key
+          </a>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-muted-foreground">API Key</label>
+            <div className="relative">
+              <Input
+                type={showKey ? "text" : "password"}
+                value={apiKey}
+                placeholder="Enter your TVDB API key"
+                onChange={(e) => { setApiKey(e.target.value); setDirty(true); }}
+                className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+              />
+              <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors" onClick={() => setShowKey((p) => !p)}>
+                {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </AnimatedCollapse>
     </div>
   );
 }
@@ -877,10 +934,65 @@ function WatchRegionSection(): React.JSX.Element {
 /*  ServicesSection                                                             */
 /* -------------------------------------------------------------------------- */
 
-export function ServicesSection(): React.JSX.Element {
+/* -------------------------------------------------------------------------- */
+/*  TVDB Default Toggle (used in Services tab)                                 */
+/* -------------------------------------------------------------------------- */
+
+function TvdbDefaultToggle(): React.JSX.Element {
+  const utils = trpc.useUtils();
+  const { data: allSettings } = trpc.settings.getAll.useQuery();
+  const setMany = trpc.settings.setMany.useMutation({
+    onSuccess: () => void utils.settings.getAll.invalidate(),
+  });
+
+  const isConnected = !!allSettings?.["tvdb.token"];
+  const defaultShows = allSettings?.["tvdb.defaultShows"] === true;
+
+  const handleToggleDefault = (checked: boolean): void => {
+    setMany.mutate(
+      { "tvdb.defaultShows": checked },
+      {
+        onSuccess: () => toast.success(checked ? "TVDB set as default for TV shows" : "TMDB restored as default"),
+        onError: () => toast.error("Failed to update preference"),
+      },
+    );
+  };
+
+  return (
+    <div className="flex items-start justify-between gap-6">
+      <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+        <p>
+          When enabled, Canto uses <strong className="text-foreground">TVDB</strong> to validate and correct the
+          <strong className="text-foreground"> season and episode organization</strong> of TV shows and anime.
+          All other metadata (titles, images, ratings, translations) stays from TMDB.
+        </p>
+
+        <p className="font-medium text-foreground">What changes with TVDB enabled:</p>
+        <ul className="list-disc pl-5 space-y-1.5">
+          <li><strong className="text-foreground">Accurate season splits</strong> for anime and multi-season shows</li>
+          <li><strong className="text-foreground">Absolute episode numbering</strong> for anime</li>
+          <li><strong className="text-foreground">Correct episode counts</strong> (specials separated)</li>
+        </ul>
+
+        {!isConnected && (
+          <p className="mt-2 rounded-xl bg-yellow-500/10 px-3 py-2 text-yellow-500">
+            Connect your TVDB API key above before enabling this.
+          </p>
+        )}
+      </div>
+      <Switch checked={defaultShows} onCheckedChange={handleToggleDefault} disabled={!isConnected} className="mt-1 shrink-0" />
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  MetadataProvidersSection (Services tab)                                    */
+/* -------------------------------------------------------------------------- */
+
+export function MetadataProvidersSection(): React.JSX.Element {
   return (
     <div>
-      <SettingsSection title="Metadata" description="Configure your metadata provider API keys.">
+      <SettingsSection title="Metadata Providers" description="Configure your metadata provider API keys.">
         <SectionCard title="TMDB">
           <TmdbSection />
         </SectionCard>
@@ -889,75 +1001,148 @@ export function ServicesSection(): React.JSX.Element {
         </SectionCard>
       </SettingsSection>
 
-      <SettingsSection title="Download Client" description="Torrent client for downloading and managing media files.">
-        <SectionCard title="qBittorrent">
-          <ServiceRow
-            title="qBittorrent"
-            serviceKey="qbittorrent"
-            fields={[
-              { key: "qbittorrent.url", label: "WebUI URL", placeholder: "http://localhost:8080" },
-              { key: "qbittorrent.username", label: "Username", placeholder: "admin" },
-              { key: "qbittorrent.password", label: "Password", placeholder: "Password", secret: true },
-            ]}
-            isLast
-          />
-        </SectionCard>
-      </SettingsSection>
-
-      <SettingsSection title="Indexers" description="Search aggregators for finding torrents across multiple trackers.">
-        <SectionCard title="Prowlarr">
-          <ServiceRow
-            title="Prowlarr"
-            serviceKey="prowlarr"
-            fields={[
-              { key: "prowlarr.url", label: "URL", placeholder: "http://localhost:9696" },
-              { key: "prowlarr.apiKey", label: "API Key", placeholder: "Your Prowlarr API key", secret: true },
-            ]}
-            isLast
-          />
-        </SectionCard>
-        <SectionCard title="Jackett">
-          <ServiceRow
-            title="Jackett"
-            serviceKey="jackett"
-            fields={[
-              { key: "jackett.url", label: "URL", placeholder: "http://localhost:9117" },
-              { key: "jackett.apiKey", label: "API Key", placeholder: "Your Jackett API key", secret: true },
-            ]}
-            isLast
-          />
-        </SectionCard>
-      </SettingsSection>
-
-      <SettingsSection title="Media Servers" description="Connect media servers to sync libraries and trigger scans after downloads.">
-        <SectionCard title="Jellyfin">
-          <MediaServerRow
-            title="Jellyfin"
-            serviceKey="jellyfin"
-            urlField={{ key: "jellyfin.url", label: "Server URL", placeholder: "http://192.168.1.100:8096" }}
-            apiKeyField={{ key: "jellyfin.apiKey", label: "API Key", placeholder: "Your Jellyfin API key", secret: true }}
-            loginFields={[
-              { key: "username", label: "Username", placeholder: "admin" },
-              { key: "password", label: "Password", placeholder: "Password", secret: true },
-            ]}
-            isLast
-          />
-        </SectionCard>
-        <SectionCard title="Plex">
-          <MediaServerRow
-            title="Plex"
-            serviceKey="plex"
-            urlField={{ key: "plex.url", label: "Server URL", placeholder: "http://192.168.1.100:32400" }}
-            apiKeyField={{ key: "plex.token", label: "X-Plex-Token", placeholder: "Your Plex authentication token", secret: true }}
-            loginFields={[
-              { key: "email", label: "Email", placeholder: "your@email.com" },
-              { key: "password", label: "Password", placeholder: "Password", secret: true },
-            ]}
-            isLast
-          />
-        </SectionCard>
+      <SettingsSection title="Use TVDB for season/episode structure" description="Validate and fix the season and episode structure using TVDB data.">
+        <TvdbDefaultToggle />
       </SettingsSection>
     </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  DownloadClientSection (Downloads tab)                                      */
+/* -------------------------------------------------------------------------- */
+
+export function DownloadClientSection(): React.JSX.Element {
+  return (
+    <SettingsSection title="Download Client" description="Torrent client for downloading and managing media files.">
+      <SectionCard title="qBittorrent">
+        <ServiceRow
+          title="qBittorrent"
+          serviceKey="qbittorrent"
+          fields={[
+            { key: "qbittorrent.url", label: "WebUI URL", placeholder: "http://localhost:8080" },
+            { key: "qbittorrent.username", label: "Username", placeholder: "admin" },
+            { key: "qbittorrent.password", label: "Password", placeholder: "Password", secret: true },
+          ]}
+          isLast
+        />
+      </SectionCard>
+    </SettingsSection>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  IndexersSection (Search tab)                                               */
+/* -------------------------------------------------------------------------- */
+
+export function IndexersSection(): React.JSX.Element {
+  return (
+    <SettingsSection title="Indexers" description="Search aggregators for finding torrents across multiple trackers.">
+      <SectionCard title="Prowlarr">
+        <ServiceRow
+          title="Prowlarr"
+          serviceKey="prowlarr"
+          fields={[
+            { key: "prowlarr.url", label: "URL", placeholder: "http://localhost:9696" },
+            { key: "prowlarr.apiKey", label: "API Key", placeholder: "Your Prowlarr API key", secret: true },
+          ]}
+          isLast
+        />
+      </SectionCard>
+      <SectionCard title="Jackett">
+        <ServiceRow
+          title="Jackett"
+          serviceKey="jackett"
+          fields={[
+            { key: "jackett.url", label: "URL", placeholder: "http://localhost:9117" },
+            { key: "jackett.apiKey", label: "API Key", placeholder: "Your Jackett API key", secret: true },
+          ]}
+          isLast
+        />
+      </SectionCard>
+    </SettingsSection>
+  );
+}
+
+/* Keep backward-compatible alias */
+export function ServicesSection(): React.JSX.Element {
+  return <MetadataProvidersSection />;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Media Server Connection (separate tab)                                     */
+/* -------------------------------------------------------------------------- */
+
+export function MediaServerConnectionSection(): React.JSX.Element {
+  return (
+    <SettingsSection title="Connection" description="Connect media servers to sync libraries and trigger scans after downloads.">
+      <SectionCard title="Jellyfin">
+        <MediaServerRow
+          title="Jellyfin"
+          serviceKey="jellyfin"
+          urlField={{ key: "jellyfin.url", label: "Server URL", placeholder: "http://192.168.1.100:8096" }}
+          apiKeyField={{ key: "jellyfin.apiKey", label: "API Key", placeholder: "Your Jellyfin API key", secret: true }}
+          loginFields={[
+            { key: "username", label: "Username", placeholder: "admin" },
+            { key: "password", label: "Password", placeholder: "Password", secret: true },
+          ]}
+          isLast
+        />
+      </SectionCard>
+      <SectionCard title="Plex">
+        <MediaServerRow
+          title="Plex"
+          serviceKey="plex"
+          urlField={{ key: "plex.url", label: "Server URL", placeholder: "http://192.168.1.100:32400" }}
+          apiKeyField={{ key: "plex.token", label: "X-Plex-Token", placeholder: "Your Plex authentication token", secret: true }}
+          loginFields={[
+            { key: "email", label: "Email", placeholder: "your@email.com" },
+            { key: "password", label: "Password", placeholder: "Password", secret: true },
+          ]}
+          isLast
+        />
+      </SectionCard>
+    </SettingsSection>
+  );
+}
+
+export function JellyfinConnectionSection(): React.JSX.Element {
+  return (
+    <SettingsSection title="Connection" description="Connect Jellyfin to sync libraries and trigger scans after downloads.">
+      <SectionCard title="Jellyfin">
+        <MediaServerRow
+          title="Jellyfin"
+          serviceKey="jellyfin"
+          urlField={{ key: "jellyfin.url", label: "Server URL", placeholder: "http://192.168.1.100:8096" }}
+          apiKeyField={{ key: "jellyfin.apiKey", label: "API Key", placeholder: "Your Jellyfin API key", secret: true }}
+          loginFields={[
+            { key: "username", label: "Username", placeholder: "admin" },
+            { key: "password", label: "Password", placeholder: "Password", secret: true },
+          ]}
+          isLast
+        />
+      </SectionCard>
+    </SettingsSection>
+  );
+}
+
+export function PlexConnectionSection(): React.JSX.Element {
+  return (
+    <SettingsSection title="Connection" description="Connect Plex to sync libraries and trigger scans after downloads.">
+      <SectionCard title="Plex">
+        <MediaServerRow
+          title="Plex"
+          serviceKey="plex"
+          urlField={{ key: "plex.url", label: "Server URL", placeholder: "http://192.168.1.100:32400" }}
+          apiKeyField={{ key: "plex.token", label: "X-Plex-Token", placeholder: "Your Plex authentication token", secret: true }}
+          loginFields={[
+            { key: "email", label: "Email", placeholder: "your@email.com" },
+            { key: "password", label: "Password", placeholder: "Password", secret: true },
+          ]}
+          isLast
+        />
+      </SectionCard>
+    </SettingsSection>
   );
 }
 
