@@ -35,7 +35,7 @@ export function SimilarSection({
   }
 
   return (
-    <div className={cn("flex flex-col gap-16 md:gap-20", className)}>
+    <div className={cn("flex flex-col gap-12 md:gap-16", className)}>
       {hasRecommendations && (
         <MediaCarousel
           title="Recommended"
