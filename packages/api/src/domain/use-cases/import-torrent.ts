@@ -6,7 +6,7 @@ import type { torrent as torrentSchema } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
 import type { DownloadClientPort, TorrentFileInfo } from "../ports/download-client";
 import { isVideoFile, sanitizeName, buildMediaDir, buildFileName } from "../rules/naming";
-import { EP_PATTERN, BARE_EP_PATTERN, isSubtitleFile, parseSubtitleLanguage } from "../rules/parsing";
+import { EP_PATTERN, BARE_EP_PATTERN, parseFileEpisodes, isSubtitleFile, parseSubtitleLanguage } from "../rules/parsing";
 import { SETTINGS } from "../../lib/settings-keys";
 import { createNotification } from "./create-notification";
 import {
@@ -17,6 +17,7 @@ import {
   updateMediaFile,
   createMediaFileNoConflict,
   updateTorrent,
+  findNotificationByTypeAndMedia,
 } from "../../infrastructure/repositories";
 
 export interface ImportHooks {
@@ -102,60 +103,67 @@ function parseVideoFiles(
   const results: ParsedFile[] = [];
 
   for (const vf of videoFiles) {
-    let seasonNumber = primarySeasonNumber;
-    let episodeId: string | undefined;
     const ext = vf.name.substring(vf.name.lastIndexOf("."));
 
-    let epNum: number | undefined;
     if (mediaRow.type === "show") {
-      const match = EP_PATTERN.exec(vf.name);
-      if (match) {
-        seasonNumber = parseInt(match[1]!, 10);
-        epNum = parseInt(match[2]!, 10);
-      } else {
-        const bareMatch = BARE_EP_PATTERN.exec(vf.name);
-        if (bareMatch) {
-          epNum = parseInt(bareMatch[1]!, 10);
+      const parsed = parseFileEpisodes(vf.name);
+      const seasonNumber = parsed.season ?? primarySeasonNumber;
+
+      if (parsed.episodes.length > 0) {
+        // For each episode in the file, create a ParsedFile entry.
+        // All entries share the same physical file but target different episode IDs.
+        // Use the first episode number for the filename (e.g., S01E01-E03 style).
+        const firstEp = parsed.episodes[0]!;
+        const matchedSeason = seasonNumber !== undefined ? mediaRow.seasons?.find((s) => s.number === seasonNumber) : undefined;
+
+        for (const epNum of parsed.episodes) {
+          const matchedEp = matchedSeason?.episodes?.find((e) => e.number === epNum);
+
+          if (!matchedEp) {
+            console.warn(`[auto-import] Skipping S${String(seasonNumber ?? 0).padStart(2, "0")}E${String(epNum).padStart(2, "0")} — episode not found in database`);
+            continue;
+          }
+
+          // Only the first episode gets the actual filename; others share the same file
+          const targetFilename = buildFileName(mediaNaming, {
+            seasonNumber,
+            episodeNumber: firstEp,
+            episodeTitle: matchedSeason?.episodes?.find((e) => e.number === firstEp)?.title ?? undefined,
+            quality: torrentRow.quality,
+            source: torrentRow.source,
+            torrentTitle: torrentRow.title,
+            extension: ext,
+          });
+
+          results.push({
+            file: vf,
+            seasonNumber,
+            episodeNumber: epNum,
+            episodeId: matchedEp.id,
+            targetFilename,
+            extension: ext,
+          });
         }
+      } else {
+        // No episode number detected — skip to avoid orphaned media_file
+        console.warn(`[auto-import] Skipping "${vf.name}" — no episode number detected for show`);
       }
-      if (epNum !== undefined && seasonNumber !== undefined) {
-        const matchedSeason = mediaRow.seasons?.find((s) => s.number === seasonNumber);
-        const matchedEp = matchedSeason?.episodes?.find((e) => e.number === epNum);
-        if (matchedEp) episodeId = matchedEp.id;
-      }
-    }
-
-    // Resolve episode title from DB metadata
-    let episodeTitle: string | undefined;
-    if (epNum !== undefined && seasonNumber !== undefined) {
-      const matchedSeason = mediaRow.seasons?.find((s) => s.number === seasonNumber);
-      const matchedEp = matchedSeason?.episodes?.find((e) => e.number === epNum);
-      if (matchedEp?.title) episodeTitle = matchedEp.title;
-    }
-
-    let targetFilename: string;
-    if (epNum !== undefined || mediaRow.type === "movie") {
-      targetFilename = buildFileName(mediaNaming, {
-        seasonNumber,
-        episodeNumber: epNum,
-        episodeTitle,
-        quality: torrentRow.quality,
-        source: torrentRow.source,
-        torrentTitle: torrentRow.title,
+    } else {
+      // Movie
+      results.push({
+        file: vf,
+        seasonNumber: undefined,
+        episodeNumber: undefined,
+        episodeId: undefined,
+        targetFilename: buildFileName(mediaNaming, {
+          quality: torrentRow.quality,
+          source: torrentRow.source,
+          torrentTitle: torrentRow.title,
+          extension: ext,
+        }),
         extension: ext,
       });
-    } else {
-      targetFilename = sanitizeName(vf.name.substring(vf.name.lastIndexOf("/") + 1));
     }
-
-    results.push({
-      file: vf,
-      seasonNumber,
-      episodeNumber: epNum,
-      episodeId,
-      targetFilename,
-      extension: ext,
-    });
   }
 
   return results;
@@ -177,6 +185,8 @@ async function importLocalVideoFiles(
   torrentRow: { id: string; quality: string; source: string },
 ): Promise<number> {
   let importedCount = 0;
+  const linkedPaths = new Set<string>();
+  let crossFsNotified = false;
 
   for (const pf of parsedFiles) {
     try {
@@ -190,8 +200,24 @@ async function importLocalVideoFiles(
       const sourcePath = path.join(savePath, pf.file.name);
       const targetPath = path.join(fileTargetDir, pf.targetFilename);
 
-      const method = await hardlinkOrCopy(sourcePath, targetPath);
-      console.log(`[auto-import] ${method}: ${sourcePath} → ${targetPath}`);
+      if (!linkedPaths.has(targetPath)) {
+        const method = await hardlinkOrCopy(sourcePath, targetPath);
+        console.log(`[auto-import] ${method}: ${sourcePath} → ${targetPath}`);
+        linkedPaths.add(targetPath);
+
+        if (method === "copy" && !crossFsNotified) {
+          crossFsNotified = true;
+          const existing = await findNotificationByTypeAndMedia(db, "cross_filesystem_warning", mediaRow.id);
+          if (!existing) {
+            await createNotification(db, {
+              title: "Cross-filesystem copy",
+              message: `Files are being copied instead of hardlinked (different filesystems). This uses double disk space.`,
+              type: "cross_filesystem_warning",
+              mediaId: mediaRow.id,
+            });
+          }
+        }
+      }
 
       importedCount += await upsertMediaFile(db, pf, targetPath, placeholders, alreadyImported, mediaRow, torrentRow);
     } catch (err) {
@@ -206,6 +232,7 @@ async function importLocalSubtitleFiles(
   subtitleFiles: Array<{ name: string; size: number }>,
   savePath: string,
   targetDir: string,
+  libraryPath: string,
   mediaRow: { type: string },
   mediaNaming: { title: string; year: number | null; externalId: number; provider: string; type: string },
   torrentRow: { title: string; quality: string; source: string },
@@ -215,8 +242,22 @@ async function importLocalSubtitleFiles(
     try {
       const targetSubName = buildSubtitleName(sf.name, mediaRow, mediaNaming, torrentRow, primarySeasonNumber);
       if (targetSubName) {
+        // Determine correct directory for multi-season subtitle files
+        let fileTargetDir = targetDir;
+        if (mediaRow.type === "show") {
+          const epMatch = EP_PATTERN.exec(sf.name);
+          if (epMatch) {
+            const subSeasonNum = parseInt(epMatch[1]!, 10);
+            if (subSeasonNum !== primarySeasonNumber) {
+              const altMediaDir = buildMediaDir(mediaNaming, subSeasonNum);
+              fileTargetDir = path.join(libraryPath, altMediaDir);
+              await mkdir(fileTargetDir, { recursive: true });
+            }
+          }
+        }
+
         const sourcePath = path.join(savePath, sf.name);
-        const targetPath = path.join(targetDir, targetSubName);
+        const targetPath = path.join(fileTargetDir, targetSubName);
         const method = await hardlinkOrCopy(sourcePath, targetPath);
         console.log(`[auto-import] Subtitle ${method}: ${sf.name} → ${targetSubName}`);
       }
@@ -250,21 +291,26 @@ async function importRemoteVideoFiles(
     return 0;
   }
 
-  // Poll until the client has finished moving files to the new location
-  let movedFiles: TorrentFileInfo[] = [];
-  for (let attempt = 0; attempt < 10; attempt++) {
+  // Poll until qBittorrent has finished moving files to the new location.
+  // We check the torrent's save_path (not file names, which are relative and don't change).
+  let moved = false;
+  for (let attempt = 0; attempt < 15; attempt++) {
     await new Promise((r) => setTimeout(r, 2000));
-    movedFiles = await client.getTorrentFiles(hash);
-    if (movedFiles.length > 0 && movedFiles[0]?.name !== originalFiles[0]?.name) break;
+    const torrents = await client.listTorrents({ hashes: [hash] });
+    const info = torrents[0];
+    if (info && path.normalize(info.save_path).startsWith(path.normalize(targetLocation))) {
+      moved = true;
+      break;
+    }
   }
 
-  // Verify files actually moved — if polling exhausted without detecting a change,
-  // the file paths will be wrong and we should not proceed.
-  const filesMoved = movedFiles.length > 0 && movedFiles[0]?.name !== originalFiles[0]?.name;
-  if (!filesMoved) {
+  if (!moved) {
     console.error(`[auto-import] Remote move did not complete after polling — files may not have moved to "${targetLocation}"`);
     return 0;
   }
+
+  // Re-fetch file list after confirmed move
+  let movedFiles = await client.getTorrentFiles(hash);
 
   let importedCount = 0;
 
@@ -311,6 +357,12 @@ async function importRemoteVideoFiles(
           console.warn(`[auto-import] renameFile failed for "${movedFile.name}", skipping rename`);
           // Use the actual filename on disk since rename failed
           actualFilename = movedFile.name.substring(movedFile.name.lastIndexOf("/") + 1);
+          await createNotification(db, {
+            title: "File rename failed",
+            message: `Could not rename "${actualFilename}" during import. The file is using its original name.`,
+            type: "import_warning",
+            mediaId: mediaRow.id,
+          });
         }
       }
 
@@ -542,6 +594,13 @@ export async function autoImportTorrent(
   // ── Parse all video files (shared between modes) ──
 
   const parsedFiles = parseVideoFiles(videoFiles, mediaRow, mediaNaming, torrentRow, primarySeasonNumber);
+
+  if (parsedFiles.length === 0) {
+    console.warn(`[auto-import] No valid files to import for "${mediaRow.title}" — all episodes unresolvable`);
+    await updateTorrent(db, torrentRow.id, { importing: false });
+    return;
+  }
+
   const mediaDir = buildMediaDir(mediaNaming, primarySeasonNumber);
 
   // ── Import based on method ──
@@ -588,7 +647,7 @@ export async function autoImportTorrent(
     );
 
     await importLocalSubtitleFiles(
-      subtitleFiles, savePath, targetDir, mediaRow, mediaNaming, torrentRow, primarySeasonNumber,
+      subtitleFiles, savePath, targetDir, libraryPath, mediaRow, mediaNaming, torrentRow, primarySeasonNumber,
     );
 
     contentPath = targetDir;
@@ -651,17 +710,27 @@ export async function autoImportTorrent(
   } else {
     // Partial import — leave imported=false so the worker retries on next cycle.
     // Increment importAttempts for linear backoff (10min * attempts).
+    const newAttempts = (torrentRow.importAttempts ?? 0) + 1;
     await updateTorrent(db, torrentRow.id, {
       importing: false,
       importMethod,
       contentPath,
-      importAttempts: (torrentRow.importAttempts ?? 0) + 1,
+      importAttempts: newAttempts,
     });
 
     console.warn(
-      `[auto-import] [${importMethod}] Partial import: ${importedCount}/${totalExpected} file(s) for "${mediaRow.title}" — will retry`,
+      `[auto-import] [${importMethod}] Partial import: ${importedCount}/${totalExpected} file(s) for "${mediaRow.title}" — will retry (attempt ${newAttempts}/5)`,
     );
-    if (importedCount > 0) {
+
+    if (newAttempts >= 5) {
+      // Max retries reached — notify the user and give up
+      await createNotification(db, {
+        title: "Import failed",
+        message: `Failed to import "${mediaRow.title}" after ${newAttempts} attempts. Check your library paths in Settings > Downloads or try importing manually.`,
+        type: "import_failed",
+        mediaId: mediaRow.id,
+      });
+    } else if (importedCount > 0) {
       await createNotification(db, {
         title: "Partial import",
         message: `Imported ${importedCount} of ${totalExpected} file(s) for "${mediaRow.title}". Will retry remaining files.`,

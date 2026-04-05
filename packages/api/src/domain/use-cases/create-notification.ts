@@ -4,6 +4,8 @@ import { insertNotification } from "../../infrastructure/repositories";
 type NotificationType =
   | "import_success"
   | "import_failed"
+  | "import_warning"
+  | "cross_filesystem_warning"
   | "download_failed"
   | "download_stalled"
   | "blocklist_added"
