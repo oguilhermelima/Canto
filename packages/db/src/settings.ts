@@ -61,6 +61,7 @@ const PLAINTEXT_KEYS = new Set([
   "search.maxIndexers",
   "search.timeout",
   "search.concurrency",
+  "sync.folderScan.enabled",
 ]);
 
 function isSensitive(key: string): boolean {

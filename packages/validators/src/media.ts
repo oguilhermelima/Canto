@@ -3,7 +3,7 @@ import { z } from "zod";
 export const mediaType = z.enum(["movie", "show"]);
 export type MediaType = z.infer<typeof mediaType>;
 
-export const providerType = z.enum(["tmdb", "anilist", "tvdb"]);
+export const providerType = z.enum(["tmdb", "tvdb"]);
 export type ProviderType = z.infer<typeof providerType>;
 
 export const searchInput = z.object({

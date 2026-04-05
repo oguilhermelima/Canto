@@ -175,7 +175,7 @@ export type RuleCondition =
   | { field: "originCountry"; op: "contains_any" | "not_contains_any"; value: string[] }
   | { field: "originalLanguage"; op: "eq" | "neq"; value: string }
   | { field: "contentRating"; op: "eq" | "in"; value: string | string[] }
-  | { field: "provider"; op: "eq"; value: "tmdb" | "anilist" | "tvdb" };
+  | { field: "provider"; op: "eq"; value: "tmdb" | "tvdb" };
 
 export type RuleGroup = {
   operator: "AND" | "OR";
@@ -193,7 +193,7 @@ export const media = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     type: varchar("type", { length: 10 }).notNull(), // 'movie' | 'show'
     externalId: integer("external_id").notNull(),
-    provider: varchar("provider", { length: 20 }).notNull(), // 'tmdb' | 'anilist' | 'tvdb'
+    provider: varchar("provider", { length: 20 }).notNull(), // 'tmdb' | 'tvdb'
 
     // Identity
     title: varchar("title", { length: 500 }).notNull(),
@@ -228,8 +228,6 @@ export const media = pgTable(
 
     // External IDs
     imdbId: varchar("imdb_id", { length: 20 }),
-    anilistId: integer("anilist_id"),
-    anilistScore: real("anilist_score"),
     tvdbId: integer("tvdb_id"),
 
     // TV-specific
@@ -433,6 +431,8 @@ export const torrent = pgTable("torrent", {
   downloadUrl: text("download_url"),
   imported: boolean("imported").notNull().default(false),
   importing: boolean("importing").notNull().default(false),
+  importAttempts: integer("import_attempts").notNull().default(0),
+  importMethod: varchar("import_method", { length: 10 }),
   usenet: boolean("usenet").notNull().default(false),
 
   createdAt: timestamp("created_at", { withTimezone: true })

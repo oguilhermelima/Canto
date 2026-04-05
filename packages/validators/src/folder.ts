@@ -9,7 +9,7 @@ const ruleCondition = z.discriminatedUnion("field", [
   z.object({ field: z.literal("originCountry"), op: z.enum(["contains_any", "not_contains_any"]), value: z.array(z.string()) }),
   z.object({ field: z.literal("originalLanguage"), op: z.enum(["eq", "neq"]), value: z.string() }),
   z.object({ field: z.literal("contentRating"), op: z.enum(["eq", "in"]), value: z.union([z.string(), z.array(z.string())]) }),
-  z.object({ field: z.literal("provider"), op: z.literal("eq"), value: z.enum(["tmdb", "anilist", "tvdb"]) }),
+  z.object({ field: z.literal("provider"), op: z.literal("eq"), value: z.enum(["tmdb", "tvdb"]) }),
 ]);
 
 export type RuleGroupInput = {
