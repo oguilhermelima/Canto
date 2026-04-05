@@ -1087,8 +1087,20 @@ function DownloadFoldersStep({ onNext }: { onNext: () => void }): React.JSX.Elem
 
 /** Shows Continue when at least one folder with both paths exists, otherwise warns. */
 function FolderGate({ onNext }: { onNext: () => void }): React.JSX.Element {
-  const { data: folders } = trpc.folder.list.useQuery();
+  const { data: folders, isError } = trpc.folder.list.useQuery(undefined, { retry: false });
   const hasFolders = (folders ?? []).some((f) => f.downloadPath && f.libraryPath);
+
+  // If query fails (e.g. permission issue), allow continuing
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center gap-3">
+        <Button onClick={onNext} size="lg" className={btnCn}>
+          Continue
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center gap-3">
