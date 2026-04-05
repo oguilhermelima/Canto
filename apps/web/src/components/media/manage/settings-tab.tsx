@@ -107,7 +107,7 @@ export function SettingsTab({
     },
   });
 
-  const removeFromLibrary = trpc.media.unmarkDownloaded.useMutation({
+  const removeFromLibrary = trpc.media.removeFromLibrary.useMutation({
     onSuccess: () => {
       invalidateAll();
       toast.success(`Removed "${mediaTitle}" from server`);

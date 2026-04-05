@@ -47,6 +47,7 @@ import {
   Zap,
   Globe,
   SlidersHorizontal,
+  Folder,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
@@ -71,6 +72,49 @@ import {
 } from "~/lib/torrent-utils";
 
 /* ─── Page ─── */
+
+/* -------------------------------------------------------------------------- */
+/*  Folder selector for download dialog                                       */
+/* -------------------------------------------------------------------------- */
+
+function FolderSelector({
+  mediaId,
+  selectedFolderId,
+  onSelect,
+}: {
+  mediaId: string;
+  selectedFolderId: string | undefined;
+  onSelect: (id: string | undefined) => void;
+}): React.JSX.Element {
+  const { data: folders } = trpc.folder.list.useQuery();
+  const { data: resolved } = trpc.folder.resolve.useQuery({ mediaId });
+
+  const enabledFolders = (folders ?? []).filter((f) => f.enabled);
+  if (enabledFolders.length === 0) return <></>;
+
+  const autoLabel = resolved?.folderName ? `Auto (${resolved.folderName})` : "Auto";
+
+  return (
+    <div className="flex items-center gap-2 px-5 pb-3 md:px-6">
+      <Folder size={14} className="shrink-0 text-muted-foreground" />
+      <span className="text-xs text-muted-foreground">Library</span>
+      <select
+        value={selectedFolderId ?? ""}
+        onChange={(e) => onSelect(e.target.value || undefined)}
+        className="h-7 rounded-lg bg-muted/50 px-2 text-xs text-foreground border-none outline-none cursor-pointer"
+      >
+        <option value="">{autoLabel}</option>
+        {enabledFolders.map((f) => (
+          <option key={f.id} value={f.id}>{f.name}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Page component                                                             */
+/* -------------------------------------------------------------------------- */
 
 interface MediaDetailPageProps {
   params: Promise<{ id: string }>;
@@ -109,6 +153,7 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
     seasonNumber?: number;
     episodeNumbers?: number[];
   } | null>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | undefined>(undefined);
   const [advancedSearch, setAdvancedSearch] = useState(false);
   const [advancedQuery, setAdvancedQuery] = useState("");
   const [committedQuery, setCommittedQuery] = useState("");
@@ -303,6 +348,7 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
       title,
       seasonNumber: torrentSearchContext?.seasonNumber,
       episodeNumbers: torrentSearchContext?.episodeNumbers ?? undefined,
+      folderId: selectedFolderId,
     });
   };
 
@@ -499,10 +545,10 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
             <section className="flex items-center gap-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
               <div className="flex-1">
                 <h2 className="text-lg font-semibold tracking-tight">
-                  {media.downloaded ? "Download & Manage" : "Download"}
+                  {media.inLibrary ? "Download & Manage" : "Download"}
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {media.downloaded
+                  {media.inLibrary
                     ? "Download another version or manage library settings."
                     : "Search for torrents to download this content."}
                 </p>
@@ -531,9 +577,9 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
                   className="inline-flex h-10 items-center gap-2 rounded-xl bg-foreground text-background px-4 text-sm font-medium transition-colors hover:bg-foreground/90"
                 >
                   <Download className="h-4 w-4" />
-                  {media.downloaded ? "Download Variant" : "Download"}
+                  {media.inLibrary ? "Download Variant" : "Download"}
                 </button>
-                {media.downloaded && (
+                {media.inLibrary && (
                 <Link
                   href={`/media/${media.id}/manage`}
                   className="inline-flex h-10 items-center gap-2 rounded-xl bg-foreground/15 px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/25"
@@ -547,7 +593,7 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
           )}
 
           {/* Request Download — non-admin users (above videos) */}
-          {!isAdmin && media.id && !media.downloaded && (() => {
+          {!isAdmin && media.id && !media.inLibrary && (() => {
           if (existingRequest.isLoading) {
             return (
               <section className="flex items-center gap-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
@@ -944,6 +990,11 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
               <X size={16} />
             </button>
           </div>
+
+          {/* Folder selector */}
+          {isAdmin && (
+            <FolderSelector mediaId={media.id} selectedFolderId={selectedFolderId} onSelect={setSelectedFolderId} />
+          )}
 
           {/* Filter toolbar */}
           <div className="shrink-0 border-b border-border px-5 pb-4 md:px-6">

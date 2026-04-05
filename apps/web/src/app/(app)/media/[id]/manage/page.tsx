@@ -175,7 +175,7 @@ export default function ManagePage({
     },
     onError: (err) => toast.error(err.message),
   });
-  const removeFromServer = trpc.media.unmarkDownloaded.useMutation({
+  const removeFromServer = trpc.media.removeFromLibrary.useMutation({
     onSuccess: () => {
       invalidateMedia();
       void utils.library.list.invalidate();
@@ -184,11 +184,19 @@ export default function ManagePage({
     },
     onError: (err: { message: string }) => toast.error(err.message),
   });
+  const addToLibrary = trpc.media.addToLibrary.useMutation({
+    onSuccess: () => {
+      invalidateMedia();
+      void utils.library.list.invalidate();
+      toast.success("Added to library");
+    },
+    onError: (err: { message: string }) => toast.error(err.message),
+  });
   const markDownloaded = trpc.media.markDownloaded.useMutation({
     onSuccess: () => {
       invalidateMedia();
       void utils.library.list.invalidate();
-      toast.success("Marked as in library");
+      toast.success("Marked as downloaded");
     },
     onError: (err: { message: string }) => toast.error(err.message),
   });
@@ -540,11 +548,35 @@ export default function ManagePage({
           {/* ── Danger Zone ── */}
           {activeTab === "danger" && (
             <div className="space-y-6">
-              {!media.downloaded && (
+              {!media.inLibrary && (
                 <>
                   <SettingsRow
-                    label="Mark as in library"
-                    description="Mark this media as downloaded and add to server library"
+                    label="Add to library"
+                    description="Track this media in your library"
+                  >
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      disabled={addToLibrary.isPending}
+                      onClick={() => addToLibrary.mutate({ id })}
+                    >
+                      {addToLibrary.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Check className="h-4 w-4" />
+                      )}
+                      Add to library
+                    </Button>
+                  </SettingsRow>
+                  <Separator />
+                </>
+              )}
+              {!media.downloaded && media.inLibrary && (
+                <>
+                  <SettingsRow
+                    label="Mark as downloaded"
+                    description="Confirm that files exist on disk for this media"
                   >
                     <Button
                       variant="outline"
@@ -558,15 +590,15 @@ export default function ManagePage({
                       ) : (
                         <Check className="h-4 w-4" />
                       )}
-                      Mark as in library
+                      Mark as downloaded
                     </Button>
                   </SettingsRow>
                   <Separator />
                 </>
               )}
               <SettingsRow
-                label="Remove from server"
-                description="Un-mark this media as downloaded and remove from server library"
+                label="Remove from library"
+                description="Remove this media from your library and untrack it"
               />
               <div className="space-y-3 rounded-xl border border-border/60 p-4">
                 <label className="flex cursor-pointer items-start gap-3">

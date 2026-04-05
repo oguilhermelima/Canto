@@ -125,15 +125,15 @@ export const syncRouter = createTRPCRouter({
       let mediaId: string;
       if (existing) {
         mediaId = existing.id;
-        if (!existing.downloaded) {
+        if (!existing.inLibrary || !existing.downloaded) {
           await updateMedia(db, existing.id, {
-            downloaded: true, libraryId: item.libraryId, libraryPath: item.serverItemPath, addedAt: new Date(),
+            inLibrary: true, downloaded: true, libraryId: item.libraryId, libraryPath: item.serverItemPath, addedAt: existing.addedAt ?? new Date(),
           });
         }
       } else {
         const inserted = await persistMedia(db, normalized);
         await updateMedia(db, inserted.id, {
-          downloaded: true, libraryId: item.libraryId, libraryPath: item.serverItemPath, addedAt: new Date(),
+          inLibrary: true, downloaded: true, libraryId: item.libraryId, libraryPath: item.serverItemPath, addedAt: new Date(),
         });
         mediaId = inserted.id;
       }

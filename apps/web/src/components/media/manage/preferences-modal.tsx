@@ -168,7 +168,7 @@ export function PreferencesModal({
     onSuccess: () => { invalidateMedia(); toast.success("Metadata refreshed"); },
     onError: (err) => toast.error(err.message),
   });
-  const removeFromLibrary = trpc.media.unmarkDownloaded.useMutation({
+  const removeFromLibrary = trpc.media.removeFromLibrary.useMutation({
     onSuccess: () => {
       invalidateMedia();
       void utils.library.list.invalidate();

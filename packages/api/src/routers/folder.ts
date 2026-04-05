@@ -158,6 +158,9 @@ export const folderRouter = createTRPCRouter({
   // ── Path management ──
 
   testPaths: adminProcedure.mutation(async ({ ctx }) => {
+    const { getSetting } = await import("@canto/db/settings");
+    const importMethod = (await getSetting<string>("download.importMethod")) ?? "local";
+
     const folders = await findAllFolders(ctx.db);
     const results: Array<{
       name: string;
@@ -166,9 +169,22 @@ export const folderRouter = createTRPCRouter({
     }> = [];
 
     for (const folder of folders) {
-      const dl = await testPath(folder.downloadPath);
-      const lib = await testPath(folder.libraryPath);
-      results.push({ name: folder.name, downloadPath: dl, libraryPath: lib });
+      if (importMethod === "remote") {
+        // Remote mode — paths are from qBittorrent's perspective, can't verify locally
+        results.push({
+          name: folder.name,
+          downloadPath: folder.downloadPath
+            ? { ok: true, error: "Remote mode — path is from qBittorrent's perspective" }
+            : { ok: false, error: "Not configured" },
+          libraryPath: folder.libraryPath
+            ? { ok: true, error: "Remote mode — path is from qBittorrent's perspective" }
+            : { ok: false, error: "Not configured" },
+        });
+      } else {
+        const dl = await testPath(folder.downloadPath);
+        const lib = await testPath(folder.libraryPath);
+        results.push({ name: folder.name, downloadPath: dl, libraryPath: lib });
+      }
     }
 
     return results;

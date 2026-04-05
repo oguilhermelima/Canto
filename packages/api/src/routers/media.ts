@@ -387,17 +387,17 @@ export const mediaRouter = createTRPCRouter({
     }),
 
   /**
-   * Admin: mark media as downloaded and add to server library.
+   * Admin: add media to library (marks as tracked).
    */
-  markDownloaded: adminProcedure
+  addToLibrary: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const existing = await findMediaById(ctx.db, input.id);
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
-      if (existing.downloaded) return existing;
+      if (existing.inLibrary) return existing;
       const updated = await updateMedia(ctx.db, input.id, {
-        downloaded: true,
-        addedAt: new Date(),
+        inLibrary: true,
+        addedAt: existing.addedAt ?? new Date(),
       });
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
       // Add to server library list
@@ -410,12 +410,36 @@ export const mediaRouter = createTRPCRouter({
     }),
 
   /**
-   * Admin: mark media as no longer downloaded (removes from server library).
+   * Admin: mark media as downloaded (files confirmed on disk).
    */
-  unmarkDownloaded: adminProcedure
+  markDownloaded: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const updated = await updateMedia(ctx.db, input.id, { downloaded: false });
+      const existing = await findMediaById(ctx.db, input.id);
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
+      if (existing.downloaded) return existing;
+      const updated = await updateMedia(ctx.db, input.id, {
+        inLibrary: true,
+        downloaded: true,
+        addedAt: existing.addedAt ?? new Date(),
+      });
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
+      // Add to server library list
+      const { ensureServerLibrary, addListItem } = await import(
+        "../infrastructure/repositories/list-repository"
+      );
+      const serverLib = await ensureServerLibrary(ctx.db);
+      await addListItem(ctx.db, { listId: serverLib.id, mediaId: input.id });
+      return updated;
+    }),
+
+  /**
+   * Admin: remove media from library (untrack + unmark downloaded).
+   */
+  removeFromLibrary: adminProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const updated = await updateMedia(ctx.db, input.id, { inLibrary: false, downloaded: false });
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
       // Remove from server library list
       const { findServerLibrary, removeListItem } = await import(

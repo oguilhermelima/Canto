@@ -135,7 +135,7 @@ export async function rebuildUserRecs(
       .selectDistinct({ sourceMediaId: mediaRecommendation.sourceMediaId })
       .from(mediaRecommendation)
       .innerJoin(media, eq(mediaRecommendation.sourceMediaId, media.id))
-      .where(eq(media.downloaded, true))
+      .where(eq(media.inLibrary, true))
       .limit(MAX_SERVER_SOURCES);
 
     serverSourceCount = serverSources.length;

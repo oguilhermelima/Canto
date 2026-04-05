@@ -31,6 +31,7 @@ const serviceEnum = z.enum([
   "prowlarr",
   "jackett",
   "tvdb",
+  "tmdb",
 ]);
 
 const ALL_SERVICES = serviceEnum.options;
@@ -42,6 +43,7 @@ const SERVICE_ENABLED_KEY: Record<z.infer<typeof serviceEnum>, string> = {
   prowlarr: SETTINGS.PROWLARR_ENABLED,
   jackett: SETTINGS.JACKETT_ENABLED,
   tvdb: SETTINGS.TVDB_ENABLED,
+  tmdb: SETTINGS.TMDB_API_KEY, // TMDB uses API key presence as "enabled"
 };
 
 export const settingsRouter = createTRPCRouter({
@@ -213,6 +215,20 @@ export const settingsRouter = createTRPCRouter({
               SETTINGS.TVDB_TOKEN_EXPIRES,
               new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString(),
             );
+            return { connected: true };
+          } catch (err) {
+            return { connected: false, error: err instanceof Error ? err.message : "Connection failed" };
+          }
+        }
+
+        case "tmdb": {
+          const apiKey = v[SETTINGS.TMDB_API_KEY];
+          if (!apiKey) {
+            return { connected: false, error: "API key not configured" };
+          }
+          try {
+            const res = await fetch(`https://api.themoviedb.org/3/configuration?api_key=${apiKey}`);
+            if (!res.ok) return { connected: false, error: `Invalid API key (HTTP ${res.status})` };
             return { connected: true };
           } catch (err) {
             return { connected: false, error: err instanceof Error ? err.message : "Connection failed" };
