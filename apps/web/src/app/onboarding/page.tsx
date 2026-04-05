@@ -4,29 +4,48 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
+import { Switch } from "@canto/ui/switch";
 import {
   Loader2,
-  Film,
-  Tv,
-  Star,
   Check,
   ArrowRight,
   ArrowLeft,
   Folder,
   Search,
   Download,
+  Eye,
+  EyeOff,
+  Clapperboard,
+  FolderSync,
+  Plug,
+  Tv,
+  Link2,
+  MonitorSmartphone,
+  ShieldCheck,
+  ShieldAlert,
 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
+import { authClient } from "~/lib/auth-client";
+import { DownloadFolders } from "~/components/settings/download-folders";
 
 /* -------------------------------------------------------------------------- */
 /*  Constants                                                                  */
 /* -------------------------------------------------------------------------- */
 
-type Step = "welcome" | "tmdb" | "tvdb" | "download-client" | "indexer" | "media-server" | "libraries" | "ready";
+type Step = "welcome" | "overview" | "tmdb" | "tvdb" | "download-client" | "libraries" | "indexer" | "jellyfin" | "plex" | "ready";
 
-const STEPS: Step[] = ["welcome", "tmdb", "tvdb", "download-client", "indexer", "media-server", "libraries", "ready"];
+function buildSteps(torrentConnected: boolean): Step[] {
+  const steps: Step[] = ["welcome", "overview", "tmdb", "tvdb", "download-client"];
+  if (torrentConnected) steps.push("libraries");
+  steps.push("indexer", "jellyfin", "plex", "ready");
+  return steps;
+}
+
+type Settings = Record<string, unknown>;
+const str = (s: Settings | undefined, key: string): string => (s?.[key] as string) ?? "";
+const bool = (s: Settings | undefined, key: string): boolean => (s?.[key] as boolean) ?? false;
 
 /** Shared input className — bg-accent, rounded-xl, no ring */
 const inputCn = "bg-accent rounded-xl border-none ring-0 focus-visible:ring-0 focus-visible:ring-offset-0";
@@ -35,23 +54,54 @@ const inputCn = "bg-accent rounded-xl border-none ring-0 focus-visible:ring-0 fo
 const btnCn = "rounded-xl min-w-[200px]";
 
 /* -------------------------------------------------------------------------- */
+/*  Password input with reveal toggle                                          */
+/* -------------------------------------------------------------------------- */
+
+function PasswordInput({ className, ...props }: React.ComponentProps<typeof Input>): React.JSX.Element {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="relative">
+      <Input {...props} type={visible ? "text" : "password"} className={cn(className, "pr-10")} />
+      <button
+        type="button"
+        tabIndex={-1}
+        onClick={() => setVisible((v) => !v)}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+      >
+        {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Animated collapse                                                          */
 /* -------------------------------------------------------------------------- */
 
 function AnimatedCollapse({ open, children }: { open: boolean; children: React.ReactNode }): React.JSX.Element {
-  const ref = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(0);
 
   useEffect(() => {
-    if (ref.current) setHeight(ref.current.scrollHeight);
-  }, [open, children]);
+    if (!contentRef.current) return;
+    if (open) {
+      setHeight(contentRef.current.scrollHeight);
+      const observer = new ResizeObserver(() => {
+        if (contentRef.current) setHeight(contentRef.current.scrollHeight);
+      });
+      observer.observe(contentRef.current);
+      return () => observer.disconnect();
+    } else {
+      setHeight(0);
+    }
+  }, [open]);
 
   return (
     <div
       className="w-full overflow-hidden transition-all duration-300 ease-in-out"
       style={{ maxHeight: open ? height : 0, opacity: open ? 1 : 0 }}
     >
-      <div ref={ref}>{children}</div>
+      <div ref={contentRef}>{children}</div>
     </div>
   );
 }
@@ -111,6 +161,7 @@ const SERVICE_BRAND: Record<string, { background: string; mask: string }> = {
   jellyfin: { background: "linear-gradient(135deg, #a95ce0, #4bb8e8)", mask: "url(/jellyfin-logo.svg)" },
   plex: { background: "#e5a00d", mask: "url(/plex-logo.svg)" },
   jackett: { background: "#c23c2a", mask: "url(/jackett.svg)" },
+  qbittorrent: { background: "#4c8eda", mask: "url(/qbitorrent.svg)" },
 };
 
 function ServiceLogo({ src, brand, alt, size = 48 }: { src?: string; brand?: string; alt: string; size?: number }): React.JSX.Element {
@@ -132,17 +183,113 @@ function ServiceLogo({ src, brand, alt, size = 48 }: { src?: string; brand?: str
 
 function WelcomeStep({ onNext }: { onNext: () => void }): React.JSX.Element {
   return (
-    <div className="flex flex-col items-center gap-6 text-center">
+    <div className="flex flex-col items-center gap-8 text-center">
       <img src="/room.png" alt="Canto" className="h-16 w-16 dark:invert" />
       <div className="space-y-3">
         <h1 className="text-2xl font-semibold text-foreground">Welcome to Canto</h1>
-        <p className="mx-auto max-w-lg text-base text-foreground/70 leading-relaxed">
-          Canto helps you discover, download, and organize movies, shows, and anime — all in one place.
-          We just need to connect a few services to get everything running.
+        <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
+          Your all-in-one media manager. Search for movies, shows, and anime across multiple
+          torrent indexers, download them with one click, and automatically organize everything
+          into your media library — ready for Jellyfin or Plex to pick up.
         </p>
       </div>
-      <Button onClick={onNext} size="lg" className={cn(btnCn, "mt-4")}>
-        Get started
+      <div className="flex flex-col items-center gap-3">
+        <Button onClick={onNext} size="lg" className={cn(btnCn, "mt-4")}>
+          Get started
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+        <button
+          type="button"
+          onClick={() => authClient.signOut().then(() => window.location.replace("/login"))}
+          className="text-sm text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+        >
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Step: Overview                                                             */
+/* -------------------------------------------------------------------------- */
+
+function OverviewStep({ onNext }: { onNext: () => void }): React.JSX.Element {
+  return (
+    <div className="flex flex-col items-center gap-8 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+        <Plug className="h-8 w-8 text-primary" />
+      </div>
+      <div className="space-y-3">
+        <h1 className="text-2xl font-semibold text-foreground">How Canto works</h1>
+        <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
+          Canto connects a few services together so everything runs automatically.
+          Here's what each piece does and what we'll configure next.
+        </p>
+      </div>
+
+      {/* What Canto does */}
+      <div className="mx-auto grid w-full max-w-2xl grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border/40 p-5">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+            <Search className="h-5 w-5 text-primary" />
+          </div>
+          <p className="text-sm font-semibold text-foreground">Discover</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">Browse trending, search by name, and find torrents across all your indexers.</p>
+        </div>
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border/40 p-5">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+            <Download className="h-5 w-5 text-primary" />
+          </div>
+          <p className="text-sm font-semibold text-foreground">Download</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">Send torrents to qBittorrent and track progress — all from a single interface.</p>
+        </div>
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border/40 p-5">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+            <FolderSync className="h-5 w-5 text-primary" />
+          </div>
+          <p className="text-sm font-semibold text-foreground">Organize</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">Files are renamed, sorted, and hardlinked into your library automatically.</p>
+        </div>
+      </div>
+
+      {/* What we need */}
+      <div className="mx-auto w-full max-w-2xl rounded-2xl border border-border/40 bg-muted/5 p-5 space-y-4">
+        <p className="text-sm font-semibold text-foreground">What we'll connect</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+          <div className="flex items-start gap-3">
+            <Clapperboard className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-foreground">TMDB & TVDB</p>
+              <p className="text-sm text-muted-foreground">Metadata, posters, and episode info</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <Download className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-foreground">Torrent client</p>
+              <p className="text-sm text-muted-foreground">qBittorrent for downloading</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-foreground">Indexer</p>
+              <p className="text-sm text-muted-foreground">Prowlarr or Jackett for torrent search</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <Tv className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-foreground">Media server</p>
+              <p className="text-sm text-muted-foreground">Jellyfin or Plex (optional)</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <Button onClick={onNext} size="lg" className={btnCn}>
+        Let's go
         <ArrowRight className="ml-2 h-4 w-4" />
       </Button>
     </div>
@@ -153,19 +300,19 @@ function WelcomeStep({ onNext }: { onNext: () => void }): React.JSX.Element {
 /*  Step: TMDB                                                                 */
 /* -------------------------------------------------------------------------- */
 
-function TmdbStep({ onNext }: { onNext: () => void }): React.JSX.Element {
-  const [apiKey, setApiKey] = useState("");
+function TmdbStep({ onNext, settings }: { onNext: () => void; settings?: Settings }): React.JSX.Element {
+  const [apiKey, setApiKey] = useState(str(settings, "tmdb.apiKey"));
   const setSetting = trpc.settings.set.useMutation({
     onSuccess: () => { toast.success("TMDB connected"); onNext(); },
     onError: () => toast.error("Failed to save TMDB key"),
   });
 
   return (
-    <div className="flex flex-col items-center gap-6 text-center">
+    <div className="flex flex-col items-center gap-8 text-center">
       <ServiceLogo src="/tmdb.svg" alt="TMDB" />
       <div className="space-y-3">
         <h1 className="text-2xl font-semibold text-foreground">TMDB API Key</h1>
-        <p className="mx-auto max-w-lg text-base text-foreground/70 leading-relaxed">
+        <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
           Every poster, synopsis, rating, and recommendation in Canto comes from TMDB.
           You'll need a free API key to get started — it takes less than a minute to create one at{" "}
           <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer" className="text-primary underline">
@@ -174,26 +321,27 @@ function TmdbStep({ onNext }: { onNext: () => void }): React.JSX.Element {
         </p>
       </div>
 
-      <div className="w-full max-w-sm">
-        <Input
+      <div className="w-full max-w-md">
+        <PasswordInput
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
           placeholder="Enter your TMDB API key (v3 auth)"
-          type="password"
           className={inputCn}
         />
       </div>
 
-      <Button
-        onClick={() => setSetting.mutate({ key: "tmdb.apiKey", value: apiKey })}
-        disabled={!apiKey || setSetting.isPending}
-        size="lg"
-        className={btnCn}
-      >
-        {setSetting.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-        Continue
-        <ArrowRight className="ml-2 h-4 w-4" />
-      </Button>
+      <div className="flex flex-col items-center gap-3">
+        <Button
+          onClick={() => setSetting.mutate({ key: "tmdb.apiKey", value: apiKey })}
+          disabled={!apiKey || setSetting.isPending}
+          size="lg"
+          className={btnCn}
+        >
+          {setSetting.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Continue
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -202,25 +350,25 @@ function TmdbStep({ onNext }: { onNext: () => void }): React.JSX.Element {
 /*  Step: TVDB                                                                 */
 /* -------------------------------------------------------------------------- */
 
-function TvdbStep({ onNext }: { onNext: () => void }): React.JSX.Element {
-  const [apiKey, setApiKey] = useState("");
+function TvdbStep({ onNext, settings }: { onNext: () => void; settings?: Settings }): React.JSX.Element {
+  const [apiKey, setApiKey] = useState(str(settings, "tvdb.apiKey"));
   const setMany = trpc.settings.setMany.useMutation({
     onSuccess: () => { toast.success("TVDB connected"); onNext(); },
     onError: () => toast.error("Failed to save TVDB key"),
   });
 
   return (
-    <div className="flex flex-col items-center gap-6 text-center">
+    <div className="flex flex-col items-center gap-8 text-center">
       <img src="/tvdb.svg" alt="TVDB" width={48} height={48} className="shrink-0 dark:invert" />
       <div className="space-y-3">
         <h1 className="text-2xl font-semibold text-foreground">TVDB API Key</h1>
-        <p className="mx-auto max-w-lg text-base text-foreground/70 leading-relaxed">
+        <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
           TMDB doesn't always get season and episode numbering right — especially for anime,
           specials, and shows that air differently across regions. TVDB fixes that by providing
           the correct episode structure, while Canto keeps using TMDB for everything else
           (posters, descriptions, ratings).
         </p>
-        <p className="mx-auto max-w-lg text-sm text-foreground/40 leading-relaxed">
+        <p className="mx-auto max-w-2xl text-sm text-foreground/40 leading-relaxed">
           Recommended if you watch anime or multi-season shows. Get a free key at{" "}
           <a href="https://thetvdb.com/api-information" target="_blank" rel="noopener noreferrer" className="text-primary underline">
             thetvdb.com
@@ -228,12 +376,11 @@ function TvdbStep({ onNext }: { onNext: () => void }): React.JSX.Element {
         </p>
       </div>
 
-      <div className="w-full max-w-sm">
-        <Input
+      <div className="w-full max-w-md">
+        <PasswordInput
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
           placeholder="Enter your TVDB API key"
-          type="password"
           className={inputCn}
         />
       </div>
@@ -264,10 +411,10 @@ function TvdbStep({ onNext }: { onNext: () => void }): React.JSX.Element {
 /*  Step: Download Client (qBittorrent)                                        */
 /* -------------------------------------------------------------------------- */
 
-function DownloadClientStep({ onNext }: { onNext: () => void }): React.JSX.Element {
-  const [url, setUrl] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+function DownloadClientStep({ onNext, onSkip, settings }: { onNext: () => void; onSkip: () => void; settings?: Settings }): React.JSX.Element {
+  const [url, setUrl] = useState(str(settings, "qbittorrent.url"));
+  const [username, setUsername] = useState(str(settings, "qbittorrent.username"));
+  const [password, setPassword] = useState(str(settings, "qbittorrent.password"));
   const [testing, setTesting] = useState(false);
 
   const setMany = trpc.settings.setMany.useMutation();
@@ -302,11 +449,11 @@ function DownloadClientStep({ onNext }: { onNext: () => void }): React.JSX.Eleme
   };
 
   return (
-    <div className="flex flex-col items-center gap-6 text-center">
-      <ServiceLogo src="/qbitorrent.svg" alt="qBittorrent" />
+    <div className="flex flex-col items-center gap-8 text-center">
+      <ServiceLogo brand="qbittorrent" alt="qBittorrent" />
       <div className="space-y-3">
         <h1 className="text-2xl font-semibold text-foreground">Download Client</h1>
-        <p className="mx-auto max-w-lg text-base text-foreground/70 leading-relaxed">
+        <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
           When you pick something to download, Canto sends it to your torrent client and
           automatically organizes the files once they're done. Just point us to the WebUI.
         </p>
@@ -315,10 +462,10 @@ function DownloadClientStep({ onNext }: { onNext: () => void }): React.JSX.Eleme
         </p>
       </div>
 
-      <div className="w-full max-w-sm space-y-3">
+      <div className="w-full max-w-md space-y-3">
         <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="WebUI URL (e.g. http://localhost:8080)" className={inputCn} />
         <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" className={inputCn} />
-        <Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" className={inputCn} />
+        <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className={inputCn} />
       </div>
 
       <div className="flex flex-col items-center gap-3">
@@ -327,7 +474,7 @@ function DownloadClientStep({ onNext }: { onNext: () => void }): React.JSX.Eleme
           Connect & continue
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
-        <SkipButton onClick={onNext} />
+        <SkipButton onClick={onSkip} />
       </div>
     </div>
   );
@@ -337,10 +484,13 @@ function DownloadClientStep({ onNext }: { onNext: () => void }): React.JSX.Eleme
 /*  Step: Indexer (Prowlarr)                                                   */
 /* -------------------------------------------------------------------------- */
 
-function IndexerStep({ onNext }: { onNext: () => void }): React.JSX.Element {
-  const [choice, setChoice] = useState<"prowlarr" | "jackett" | null>(null);
-  const [url, setUrl] = useState("");
-  const [apiKey, setApiKey] = useState("");
+function IndexerStep({ onNext, settings }: { onNext: () => void; settings?: Settings }): React.JSX.Element {
+  const hasProwlarr = bool(settings, "prowlarr.enabled");
+  const hasJackett = bool(settings, "jackett.enabled");
+  const defaultChoice = hasProwlarr ? "prowlarr" as const : hasJackett ? "jackett" as const : null;
+  const [choice, setChoice] = useState<"prowlarr" | "jackett" | null>(defaultChoice);
+  const [url, setUrl] = useState(defaultChoice ? str(settings, `${defaultChoice}.url`) : "");
+  const [apiKey, setApiKey] = useState(defaultChoice ? str(settings, `${defaultChoice}.apiKey`) : "");
   const [testing, setTesting] = useState(false);
 
   const setMany = trpc.settings.setMany.useMutation();
@@ -376,21 +526,21 @@ function IndexerStep({ onNext }: { onNext: () => void }): React.JSX.Element {
   };
 
   return (
-    <div className="flex flex-col items-center gap-6 text-center">
+    <div className="flex flex-col items-center gap-8 text-center">
       <div className="flex gap-3">
         <ServiceLogo src="/prowlarr.svg" alt="Prowlarr" size={36} />
         <ServiceLogo brand="jackett" alt="Jackett" size={36} />
       </div>
       <div className="space-y-3">
         <h1 className="text-2xl font-semibold text-foreground">Torrent Search</h1>
-        <p className="mx-auto max-w-lg text-base text-foreground/70 leading-relaxed">
+        <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
           Canto needs a way to search for torrents across your trackers. Connect Prowlarr
           or Jackett — both aggregate multiple trackers into a single search.
           You can configure both later if you want.
         </p>
       </div>
 
-      <div className="flex w-full max-w-sm gap-3">
+      <div className="flex w-full max-w-md gap-3">
         <button
           type="button"
           onClick={() => { setChoice(choice === "prowlarr" ? null : "prowlarr"); setUrl(""); setApiKey(""); }}
@@ -415,7 +565,7 @@ function IndexerStep({ onNext }: { onNext: () => void }): React.JSX.Element {
         </button>
       </div>
 
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-md">
         <AnimatedCollapse open={choice !== null}>
           <div className="space-y-3 pt-1">
             <Input
@@ -424,7 +574,7 @@ function IndexerStep({ onNext }: { onNext: () => void }): React.JSX.Element {
               placeholder={`${choice === "prowlarr" ? "Prowlarr" : "Jackett"} URL (e.g. http://localhost:${choice === "prowlarr" ? "9696" : "9117"})`}
               className={inputCn}
             />
-            <Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key" type="password" className={inputCn} />
+            <PasswordInput value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key" className={inputCn} />
           </div>
         </AnimatedCollapse>
       </div>
@@ -442,70 +592,43 @@ function IndexerStep({ onNext }: { onNext: () => void }): React.JSX.Element {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Step: Media Server (Jellyfin/Plex) — Optional                              */
+/*  Step: Jellyfin — Optional                                                  */
 /* -------------------------------------------------------------------------- */
 
-function MediaServerStep({ onNext }: { onNext: () => void }): React.JSX.Element {
-  const [expanded, setExpanded] = useState<Set<"jellyfin" | "plex">>(new Set());
-  // Jellyfin
-  const [jellyfinUrl, setJellyfinUrl] = useState("");
-  const [jellyfinAuthMode, setJellyfinAuthMode] = useState<"credentials" | "apikey">("credentials");
-  const [jellyfinUsername, setJellyfinUsername] = useState("");
-  const [jellyfinPassword, setJellyfinPassword] = useState("");
-  const [jellyfinApiKey, setJellyfinApiKey] = useState("");
-  const [jellyfinConnected, setJellyfinConnected] = useState(false);
-  // Plex
-  const [plexUrl, setPlexUrl] = useState("");
-  const [plexAuthMode, setPlexAuthMode] = useState<"oauth" | "token">("oauth");
-  const [plexToken, setPlexToken] = useState("");
-  const [plexPolling, setPlexPolling] = useState(false);
-  const [plexPinData, setPlexPinData] = useState<{ pinId: number; clientId: string } | null>(null);
-  const [plexConnected, setPlexConnected] = useState(false);
+function JellyfinStep({ onNext, settings }: { onNext: () => void; settings?: Settings }): React.JSX.Element {
+  const jellyfinSaved = bool(settings, "jellyfin.enabled");
+  const [url, setUrl] = useState(str(settings, "jellyfin.url"));
+  const hasApiKey = !!str(settings, "jellyfin.apiKey");
+  const [authMode, setAuthMode] = useState<"credentials" | "apikey">(hasApiKey ? "apikey" : "credentials");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [apiKey, setApiKey] = useState(str(settings, "jellyfin.apiKey"));
+  const [connected, setConnected] = useState(jellyfinSaved);
+  const [syncEnabled, setSyncEnabled] = useState(false);
   const [testing, setTesting] = useState(false);
-
-  const toggleExpanded = (key: "jellyfin" | "plex"): void => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
-  };
 
   const authJellyfin = trpc.settings.authenticateJellyfin.useMutation();
   const setMany = trpc.settings.setMany.useMutation();
   const testService = trpc.settings.testService.useMutation();
-  const authPlex = trpc.settings.authenticatePlex.useMutation();
-  const createPlexPin = trpc.settings.plexPinCreate.useMutation();
   const syncJellyfin = trpc.jellyfin.syncLibraries.useMutation();
-  const syncPlex = trpc.plex.syncLibraries.useMutation();
-  const plexPinCheck = trpc.settings.plexPinCheck.useQuery(
-    { pinId: plexPinData?.pinId ?? 0, clientId: plexPinData?.clientId ?? "", serverUrl: plexUrl || undefined },
-    { enabled: plexPolling && plexPinData !== null, refetchInterval: 2000 },
-  );
+  const allServerLinks = trpc.folder.listAllServerLinks.useQuery(undefined, { enabled: connected });
+  const updateServerLink = trpc.folder.updateServerLink.useMutation();
 
-  useEffect(() => {
-    if (plexPinCheck.data?.authenticated) {
-      setPlexPolling(false);
-      setPlexPinData(null);
-      setPlexConnected(true);
-      void setMany.mutateAsync({ settings: [{ key: "plex.enabled", value: true }] }).then(() => syncPlex.mutateAsync());
-      toast.success(plexPinCheck.data.serverName ? `Connected to ${plexPinCheck.data.serverName}` : "Plex connected");
+  const toggleSync = (enabled: boolean): void => {
+    const links = (allServerLinks.data ?? []).filter((l) => l.serverType === "jellyfin");
+    for (const link of links) {
+      updateServerLink.mutate({ id: link.id, syncEnabled: enabled });
     }
-    if (plexPinCheck.data?.expired) {
-      setPlexPolling(false);
-      setPlexPinData(null);
-      toast.error("Authentication expired. Please try again.");
-    }
-  }, [plexPinCheck.data, setMany]);
+  };
 
-  const handleJellyfin = async (): Promise<void> => {
+  const handleConnect = async (): Promise<void> => {
     setTesting(true);
     try {
-      if (jellyfinAuthMode === "credentials") {
-        const result = await authJellyfin.mutateAsync({ url: jellyfinUrl, username: jellyfinUsername, password: jellyfinPassword });
+      if (authMode === "credentials") {
+        const result = await authJellyfin.mutateAsync({ url, username, password });
         if (result.success) {
           await setMany.mutateAsync({ settings: [{ key: "jellyfin.enabled", value: true }] });
-          setJellyfinConnected(true);
+          setConnected(true);
           toast.success(`Connected to ${result.serverName || "Jellyfin"}`);
           void syncJellyfin.mutateAsync();
         } else {
@@ -514,17 +637,17 @@ function MediaServerStep({ onNext }: { onNext: () => void }): React.JSX.Element 
       } else {
         await setMany.mutateAsync({
           settings: [
-            { key: "jellyfin.url", value: jellyfinUrl },
-            { key: "jellyfin.apiKey", value: jellyfinApiKey },
+            { key: "jellyfin.url", value: url },
+            { key: "jellyfin.apiKey", value: apiKey },
             { key: "jellyfin.enabled", value: true },
           ],
         });
         const result = await testService.mutateAsync({
           service: "jellyfin",
-          values: { "jellyfin.url": jellyfinUrl, "jellyfin.apiKey": jellyfinApiKey },
+          values: { "jellyfin.url": url, "jellyfin.apiKey": apiKey },
         });
         if (result.connected) {
-          setJellyfinConnected(true);
+          setConnected(true);
           toast.success("Jellyfin connected");
           void syncJellyfin.mutateAsync();
         } else {
@@ -538,11 +661,127 @@ function MediaServerStep({ onNext }: { onNext: () => void }): React.JSX.Element 
     }
   };
 
-  const handlePlexOAuth = (): void => {
+  const canSubmit = url && (authMode === "credentials" ? username : apiKey);
+
+  return (
+    <div className="flex flex-col items-center gap-8 text-center">
+      <ServiceLogo brand="jellyfin" alt="Jellyfin" />
+      <div className="space-y-3">
+        <h1 className="text-2xl font-semibold text-foreground">Jellyfin</h1>
+        <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
+          Jellyfin is a free, open-source media server that streams your movies and shows to any device.
+          Connecting it lets Canto detect your library folders automatically and trigger scans after
+          downloads finish.
+        </p>
+      </div>
+
+      <div className="w-full max-w-md space-y-3">
+        <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Server URL (e.g. http://192.168.1.100:8096)" className={inputCn} />
+        <div className="flex rounded-xl bg-accent p-1">
+          <button type="button" onClick={() => setAuthMode("credentials")} className={cn("flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors", authMode === "credentials" ? "bg-background text-foreground" : "text-muted-foreground")}>
+            Username & Password
+          </button>
+          <button type="button" onClick={() => setAuthMode("apikey")} className={cn("flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors", authMode === "apikey" ? "bg-background text-foreground" : "text-muted-foreground")}>
+            API Key
+          </button>
+        </div>
+        {authMode === "credentials" ? (
+          <>
+            <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" className={inputCn} />
+            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className={inputCn} />
+          </>
+        ) : (
+          <PasswordInput value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key" className={inputCn} />
+        )}
+        {connected && (
+          <div className="flex items-center justify-between rounded-xl bg-muted/30 px-4 py-3 text-left">
+            <div>
+              <p className="text-sm font-medium text-foreground">Import existing library</p>
+              <p className="text-xs text-muted-foreground">Sync movies and shows already in Jellyfin into Canto</p>
+            </div>
+            <Switch
+              checked={syncEnabled}
+              onCheckedChange={(checked) => {
+                setSyncEnabled(checked);
+                toggleSync(checked);
+              }}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col items-center gap-3">
+        {connected ? (
+          <Button onClick={onNext} size="lg" className={btnCn}>
+            Continue
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        ) : (
+          <Button onClick={handleConnect} disabled={testing || !canSubmit} size="lg" className={btnCn}>
+            {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Connect & continue
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        )}
+        <SkipButton onClick={onNext} />
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Step: Plex — Optional                                                      */
+/* -------------------------------------------------------------------------- */
+
+function PlexStep({ onNext, settings }: { onNext: () => void; settings?: Settings }): React.JSX.Element {
+  const plexSaved = bool(settings, "plex.enabled");
+  const [url, setUrl] = useState(str(settings, "plex.url"));
+  const [authMode, setAuthMode] = useState<"oauth" | "token">("oauth");
+  const [token, setToken] = useState(str(settings, "plex.token"));
+  const [polling, setPolling] = useState(false);
+  const [pinData, setPinData] = useState<{ pinId: number; clientId: string } | null>(null);
+  const [connected, setConnected] = useState(plexSaved);
+  const [syncEnabled, setSyncEnabled] = useState(false);
+  const [testing, setTesting] = useState(false);
+
+  const setMany = trpc.settings.setMany.useMutation();
+  const authPlex = trpc.settings.authenticatePlex.useMutation();
+  const createPlexPin = trpc.settings.plexPinCreate.useMutation();
+  const syncPlex = trpc.plex.syncLibraries.useMutation();
+  const allServerLinks = trpc.folder.listAllServerLinks.useQuery(undefined, { enabled: connected });
+  const updateServerLink = trpc.folder.updateServerLink.useMutation();
+  const plexPinCheck = trpc.settings.plexPinCheck.useQuery(
+    { pinId: pinData?.pinId ?? 0, clientId: pinData?.clientId ?? "", serverUrl: url || undefined },
+    { enabled: polling && pinData !== null, refetchInterval: 2000 },
+  );
+
+  useEffect(() => {
+    if (plexPinCheck.data?.authenticated) {
+      setPolling(false);
+      setPinData(null);
+      setConnected(true);
+      void setMany.mutateAsync({ settings: [{ key: "plex.enabled", value: true }] }).then(() => syncPlex.mutateAsync());
+      toast.success(plexPinCheck.data.serverName ? `Connected to ${plexPinCheck.data.serverName}` : "Plex connected");
+    }
+    if (plexPinCheck.data?.expired) {
+      setPolling(false);
+      setPinData(null);
+      toast.error("Authentication expired. Please try again.");
+    }
+  }, [plexPinCheck.data, setMany]);
+
+  const toggleSync = (enabled: boolean): void => {
+    const links = (allServerLinks.data ?? []).filter((l) => l.serverType === "plex");
+    for (const link of links) {
+      updateServerLink.mutate({ id: link.id, syncEnabled: enabled });
+    }
+  };
+
+  const handleOAuth = (): void => {
     createPlexPin.mutate(undefined, {
       onSuccess: (data) => {
-        setPlexPinData({ pinId: data.pinId, clientId: data.clientId });
-        setPlexPolling(true);
+        setPinData({ pinId: data.pinId, clientId: data.clientId });
+        setPolling(true);
         const w = 600, h = 700;
         const left = window.screenX + (window.outerWidth - w) / 2;
         const top = window.screenY + (window.outerHeight - h) / 2;
@@ -556,13 +795,13 @@ function MediaServerStep({ onNext }: { onNext: () => void }): React.JSX.Element 
     });
   };
 
-  const handlePlexToken = async (): Promise<void> => {
+  const handleToken = async (): Promise<void> => {
     setTesting(true);
     try {
-      const result = await authPlex.mutateAsync({ url: plexUrl, token: plexToken });
+      const result = await authPlex.mutateAsync({ url, token });
       if (result.success) {
         await setMany.mutateAsync({ settings: [{ key: "plex.enabled", value: true }] });
-        setPlexConnected(true);
+        setConnected(true);
         toast.success(`Connected to ${result.serverName || "Plex"}`);
         void syncPlex.mutateAsync();
       } else {
@@ -575,270 +814,253 @@ function MediaServerStep({ onNext }: { onNext: () => void }): React.JSX.Element 
     }
   };
 
-  const canSubmitJellyfin = jellyfinUrl && (jellyfinAuthMode === "credentials" ? jellyfinUsername : jellyfinApiKey);
-  const canSubmitPlex = plexAuthMode === "oauth" ? !!plexUrl : plexUrl && plexToken;
-  const anyConnected = jellyfinConnected || plexConnected;
+  const canSubmitToken = url && token;
 
   return (
-    <div className="flex flex-col items-center gap-6 text-center">
-      <div className="flex gap-3">
-        <ServiceLogo brand="jellyfin" alt="Jellyfin" size={36} />
-        <ServiceLogo brand="plex" alt="Plex" size={36} />
-      </div>
+    <div className="flex flex-col items-center gap-8 text-center">
+      <ServiceLogo brand="plex" alt="Plex" />
       <div className="space-y-3">
-        <h1 className="text-2xl font-semibold text-foreground">Media Server</h1>
-        <p className="mx-auto max-w-lg text-base text-foreground/70 leading-relaxed">
-          If you use Jellyfin or Plex, connecting them lets Canto detect your library folders
-          automatically and trigger scans after downloads finish. You can connect both.
+        <h1 className="text-2xl font-semibold text-foreground">Plex</h1>
+        <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
+          Plex organizes and streams your media collection to all your devices.
+          Connecting it lets Canto detect your library folders automatically and trigger scans after
+          downloads finish.
         </p>
       </div>
 
-      <div className="w-full max-w-sm space-y-3">
-        {/* Jellyfin card */}
-        <div className={cn("rounded-xl border overflow-hidden transition-all", jellyfinConnected ? "border-green-500/40" : expanded.has("jellyfin") ? "border-primary/50" : "border-border")}>
-          <button
-            type="button"
-            onClick={() => toggleExpanded("jellyfin")}
-            className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-accent/30 transition-colors"
-          >
-            <ServiceLogo brand="jellyfin" alt="" size={24} />
-            <span className="flex-1 text-sm font-medium">Jellyfin</span>
-            {jellyfinConnected && <Check className="h-4 w-4 text-green-500" />}
+      <div className="w-full max-w-md space-y-3">
+        <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Server URL (e.g. http://192.168.1.100:32400)" className={inputCn} />
+        <div className="flex rounded-xl bg-accent p-1">
+          <button type="button" onClick={() => setAuthMode("oauth")} className={cn("flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors", authMode === "oauth" ? "bg-background text-foreground" : "text-muted-foreground")}>
+            Sign in with Plex
           </button>
-          <AnimatedCollapse open={expanded.has("jellyfin") && !jellyfinConnected}>
-            <div className="space-y-3 border-t border-border/40 px-4 py-3">
-              <Input value={jellyfinUrl} onChange={(e) => setJellyfinUrl(e.target.value)} placeholder="Server URL (e.g. http://192.168.1.100:8096)" className={inputCn} />
-              <div className="flex rounded-xl bg-accent p-1">
-                <button type="button" onClick={() => setJellyfinAuthMode("credentials")} className={cn("flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors", jellyfinAuthMode === "credentials" ? "bg-background text-foreground" : "text-muted-foreground")}>
-                  Username & Password
-                </button>
-                <button type="button" onClick={() => setJellyfinAuthMode("apikey")} className={cn("flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors", jellyfinAuthMode === "apikey" ? "bg-background text-foreground" : "text-muted-foreground")}>
-                  API Key
-                </button>
-              </div>
-              {jellyfinAuthMode === "credentials" ? (
-                <>
-                  <Input value={jellyfinUsername} onChange={(e) => setJellyfinUsername(e.target.value)} placeholder="Username" className={inputCn} />
-                  <Input value={jellyfinPassword} onChange={(e) => setJellyfinPassword(e.target.value)} placeholder="Password" type="password" className={inputCn} />
-                </>
-              ) : (
-                <Input value={jellyfinApiKey} onChange={(e) => setJellyfinApiKey(e.target.value)} placeholder="API Key" type="password" className={inputCn} />
-              )}
-              <Button onClick={handleJellyfin} disabled={testing || !canSubmitJellyfin} className="w-full rounded-xl">
-                {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Connect Jellyfin
-              </Button>
-            </div>
-          </AnimatedCollapse>
-        </div>
-
-        {/* Plex card */}
-        <div className={cn("rounded-xl border overflow-hidden transition-all", plexConnected ? "border-green-500/40" : expanded.has("plex") ? "border-primary/50" : "border-border")}>
-          <button
-            type="button"
-            onClick={() => toggleExpanded("plex")}
-            className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-accent/30 transition-colors"
-          >
-            <ServiceLogo brand="plex" alt="" size={24} />
-            <span className="flex-1 text-sm font-medium">Plex</span>
-            {plexConnected && <Check className="h-4 w-4 text-green-500" />}
+          <button type="button" onClick={() => setAuthMode("token")} className={cn("flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors", authMode === "token" ? "bg-background text-foreground" : "text-muted-foreground")}>
+            Manual Token
           </button>
-          <AnimatedCollapse open={expanded.has("plex") && !plexConnected}>
-            <div className="space-y-3 border-t border-border/40 px-4 py-3">
-              <Input value={plexUrl} onChange={(e) => setPlexUrl(e.target.value)} placeholder="Server URL (e.g. http://192.168.1.100:32400)" className={inputCn} />
-              <div className="flex rounded-xl bg-accent p-1">
-                <button type="button" onClick={() => setPlexAuthMode("oauth")} className={cn("flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors", plexAuthMode === "oauth" ? "bg-background text-foreground" : "text-muted-foreground")}>
-                  Sign in with Plex
-                </button>
-                <button type="button" onClick={() => setPlexAuthMode("token")} className={cn("flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors", plexAuthMode === "token" ? "bg-background text-foreground" : "text-muted-foreground")}>
-                  Manual Token
-                </button>
-              </div>
-              {plexAuthMode === "oauth" ? (
-                <Button
-                  variant="outline"
-                  onClick={handlePlexOAuth}
-                  disabled={!plexUrl || plexPolling || createPlexPin.isPending}
-                  className="w-full rounded-xl gap-2"
-                >
-                  {(plexPolling || createPlexPin.isPending) ? <Loader2 className="h-4 w-4 animate-spin" /> : <ServiceLogo brand="plex" alt="" size={16} />}
-                  {plexPolling ? "Waiting for Plex..." : "Sign in with Plex"}
-                </Button>
-              ) : (
-                <>
-                  <Input value={plexToken} onChange={(e) => setPlexToken(e.target.value)} placeholder="X-Plex-Token" type="password" className={inputCn} />
-                  <Button onClick={handlePlexToken} disabled={testing || !canSubmitPlex} className="w-full rounded-xl">
-                    {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Connect Plex
-                  </Button>
-                </>
-              )}
-            </div>
-          </AnimatedCollapse>
         </div>
+        {authMode === "oauth" ? (
+          <Button
+            variant="outline"
+            onClick={handleOAuth}
+            disabled={!url || polling || createPlexPin.isPending}
+            className="w-full rounded-xl gap-2"
+          >
+            {(polling || createPlexPin.isPending) ? <Loader2 className="h-4 w-4 animate-spin" /> : <ServiceLogo brand="plex" alt="" size={16} />}
+            {polling ? "Waiting for Plex..." : "Sign in with Plex"}
+          </Button>
+        ) : (
+          <PasswordInput value={token} onChange={(e) => setToken(e.target.value)} placeholder="X-Plex-Token" className={inputCn} />
+        )}
+        {connected && (
+          <div className="flex items-center justify-between rounded-xl bg-muted/30 px-4 py-3 text-left">
+            <div>
+              <p className="text-sm font-medium text-foreground">Import existing library</p>
+              <p className="text-xs text-muted-foreground">Sync movies and shows already in Plex into Canto</p>
+            </div>
+            <Switch
+              checked={syncEnabled}
+              onCheckedChange={(checked) => {
+                setSyncEnabled(checked);
+                toggleSync(checked);
+              }}
+            />
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col items-center gap-3">
-        <Button onClick={onNext} size="lg" className={btnCn}>
-          {anyConnected ? "Continue" : "Skip for now"}
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
-        {anyConnected && <SkipButton onClick={onNext} />}
-        {!anyConnected && <SkipButton onClick={onNext} />}
+        {connected ? (
+          <Button onClick={onNext} size="lg" className={btnCn}>
+            Continue
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        ) : authMode === "oauth" ? (
+          <Button onClick={onNext} size="lg" className={btnCn}>
+            Skip for now
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        ) : (
+          <Button onClick={handleToken} disabled={testing || !canSubmitToken} size="lg" className={btnCn}>
+            {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Connect & continue
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        )}
+        <SkipButton onClick={onNext} />
       </div>
     </div>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Step: Libraries                                                            */
+/*  Step: Download Folders                                                     */
 /* -------------------------------------------------------------------------- */
 
-const MEDIA_TYPES = [
-  { key: "movies", label: "Movies", icon: Film },
-  { key: "shows", label: "Shows", icon: Tv },
-  { key: "animes", label: "Anime", icon: Star },
-] as const;
+function DownloadFoldersStep({ onNext }: { onNext: () => void }): React.JSX.Element {
+  const [substep, setSubstep] = useState<"import-method" | "folders">("import-method");
+  const [importMethod, setImportMethod] = useState<"local" | "remote">("local");
+  const setDownloadSettings = trpc.library.setDownloadSettings.useMutation();
 
-function LibrariesStep({ onNext }: { onNext: () => void }): React.JSX.Element {
-  const [selected, setSelected] = useState<Set<string>>(new Set(["movies", "shows"]));
-  const [libraryPaths, setLibraryPaths] = useState<Record<string, string>>({});
-  const [downloadPaths, setDownloadPaths] = useState<Record<string, string>>({});
-
-  const { data: libraries } = trpc.library.listLibraries.useQuery();
-  const { data: enabledServices } = trpc.settings.getEnabledServices.useQuery();
-  const seedLibraries = trpc.library.seed.useMutation();
-  const updatePaths = trpc.library.updatePaths.useMutation();
-
-  // Pre-fill paths and auto-select types from synced libraries
-  const [initialized, setInitialized] = useState(false);
-  useEffect(() => {
-    if (!libraries || libraries.length === 0) return;
-    const lp: Record<string, string> = {};
-    const dp: Record<string, string> = {};
-    const types = new Set<string>();
-    for (const lib of libraries) {
-      if (lib.libraryPath) lp[lib.type] = lib.libraryPath;
-      if (lib.downloadPath) dp[lib.type] = lib.downloadPath;
-      types.add(lib.type);
-    }
-    setLibraryPaths((prev) => ({ ...lp, ...prev }));
-    setDownloadPaths((prev) => ({ ...dp, ...prev }));
-    if (!initialized && types.size > 0) {
-      setSelected(types);
-      setInitialized(true);
-    }
-  }, [libraries, initialized]);
-
-  const toggleType = (key: string): void => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
+  const handleMethodChosen = (): void => {
+    setDownloadSettings.mutate({
+      importMethod,
+      seedRatioLimit: null,
+      seedTimeLimitHours: null,
+      seedCleanupFiles: false,
     });
+    setSubstep("folders");
   };
 
-  const handleSave = async (): Promise<void> => {
-    if (!libraries || libraries.length === 0) {
-      await seedLibraries.mutateAsync();
-    }
-    const libs = libraries ?? (await seedLibraries.mutateAsync());
-    for (const lib of libs) {
-      if (!selected.has(lib.type)) continue;
-      const lp = libraryPaths[lib.type];
-      const dp = downloadPaths[lib.type];
-      if (lp || dp) {
-        await updatePaths.mutateAsync({
-          id: lib.id,
-          ...(lp ? { libraryPath: lp } : {}),
-          ...(dp ? { downloadPath: dp } : {}),
-        });
-      }
-    }
-    toast.success("Libraries configured");
-    onNext();
-  };
+  if (substep === "import-method") {
+    return (
+      <div className="flex flex-col items-center gap-8 text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+          <Folder className="h-8 w-8 text-primary" />
+        </div>
+        <div className="space-y-3">
+          <h1 className="text-2xl font-semibold text-foreground">How should Canto handle files?</h1>
+          <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
+            After a download finishes, Canto needs to organize the files into your media library.
+            Choose how Canto should do this based on your setup.
+          </p>
+        </div>
 
-  const hasServer = enabledServices?.jellyfin === true || enabledServices?.plex === true;
+        <div className="mx-auto grid w-full max-w-2xl grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+          {/* Hardlink option */}
+          <button
+            type="button"
+            onClick={() => setImportMethod("local")}
+            className={cn(
+              "flex flex-col rounded-2xl border p-5 text-left transition-all",
+              importMethod === "local"
+                ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
+                : "border-border/40 hover:border-border hover:bg-muted/10",
+            )}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10">
+                <Link2 className="h-5 w-5 text-blue-400" />
+              </div>
+              <div>
+                <p className="text-base font-semibold text-foreground">Hardlink</p>
+                <p className="text-xs text-primary font-medium">Recommended</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+              The file appears in both your download and library folders but takes <strong>zero extra space</strong> — same
+              data, two names. Deleting the torrent only removes the download copy; your library stays intact.
+            </p>
+
+            <div className="space-y-2 pt-3 border-t border-border/20">
+              <div className="flex items-start gap-2 text-sm">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
+                <span className="text-foreground/80">No extra disk space</span>
+              </div>
+              <div className="flex items-start gap-2 text-sm">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
+                <span className="text-foreground/80">Seeding never interrupted</span>
+              </div>
+              <div className="flex items-start gap-2 text-sm">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
+                <span className="text-foreground/80">Safe for private trackers</span>
+              </div>
+              <div className="flex items-start gap-2 text-sm">
+                <ShieldAlert className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+                <span className="text-foreground/60">Canto and qBittorrent must share the same filesystem</span>
+              </div>
+              <div className="flex items-start gap-2 text-sm">
+                <ShieldAlert className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+                <span className="text-foreground/60">Both paths must be on the same disk/partition</span>
+              </div>
+            </div>
+          </button>
+
+          {/* API option */}
+          <button
+            type="button"
+            onClick={() => setImportMethod("remote")}
+            className={cn(
+              "flex flex-col rounded-2xl border p-5 text-left transition-all",
+              importMethod === "remote"
+                ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
+                : "border-border/40 hover:border-border hover:bg-muted/10",
+            )}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10">
+                <MonitorSmartphone className="h-5 w-5 text-violet-400" />
+              </div>
+              <div>
+                <p className="text-base font-semibold text-foreground">qBittorrent API</p>
+                <p className="text-xs text-muted-foreground font-medium">For remote setups</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+              Canto tells qBittorrent to <strong>move and rename</strong> files via its API. Works when services run
+              on different machines — no shared storage needed. Only one copy exists at a time.
+            </p>
+
+            <div className="space-y-2 pt-3 border-t border-border/20">
+              <div className="flex items-start gap-2 text-sm">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
+                <span className="text-foreground/80">Works across different servers</span>
+              </div>
+              <div className="flex items-start gap-2 text-sm">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
+                <span className="text-foreground/80">No shared filesystem needed</span>
+              </div>
+              <div className="flex items-start gap-2 text-sm">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
+                <span className="text-foreground/80">Zero extra disk space — files are moved, not copied</span>
+              </div>
+              <div className="flex items-start gap-2 text-sm">
+                <ShieldAlert className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+                <span className="text-foreground/60">Removing a torrent also removes the file from your library</span>
+              </div>
+              <div className="flex items-start gap-2 text-sm">
+                <ShieldAlert className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+                <span className="text-foreground/60">File renaming may break seeding on some trackers</span>
+              </div>
+              <div className="flex items-start gap-2 text-sm">
+                <ShieldAlert className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
+                <span className="text-foreground/60">Automatic seed cleanup must be configured carefully</span>
+              </div>
+            </div>
+          </button>
+        </div>
+
+        <Button onClick={handleMethodChosen} size="lg" className={btnCn} disabled={setDownloadSettings.isPending}>
+          {setDownloadSettings.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Continue
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col items-center gap-6 text-center">
+    <div className="flex flex-col items-center gap-8 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
         <Folder className="h-8 w-8 text-primary" />
       </div>
       <div className="space-y-3">
-        <h1 className="text-2xl font-semibold text-foreground">Your Libraries</h1>
-        <p className="mx-auto max-w-lg text-base text-foreground/70 leading-relaxed">
-          Pick the types of media you want to manage. For each one, tell Canto where your
-          organized media lives (library path) and where your torrent client saves downloads.
-          {hasServer && " We've pre-filled paths from your media server."}
+        <h1 className="text-2xl font-semibold text-foreground">Download Folders</h1>
+        <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
+          {importMethod === "local"
+            ? <>Tell Canto where to put things. Each folder needs a <strong>download path</strong> (where your torrent client saves files while downloading and seeding) and a <strong>library path</strong> (where Canto organizes them with clean names so your media server can pick them up).</>
+            : <>Tell Canto where qBittorrent stores your files. Each folder needs a <strong>download path</strong> (where qBittorrent saves files initially) and a <strong>media path</strong> (where qBittorrent moves them after import). Both paths are from qBittorrent's perspective.</>
+          }
         </p>
       </div>
 
-      <div className="flex w-full max-w-md gap-3">
-        {MEDIA_TYPES.map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => toggleType(key)}
-            className={cn(
-              "flex flex-1 flex-col items-center gap-2 rounded-xl border p-4 transition-all",
-              selected.has(key) ? "border-primary/50 bg-primary/5" : "border-border hover:bg-accent/50",
-            )}
-          >
-            <Icon className={cn("h-5 w-5", selected.has(key) ? "text-primary" : "text-muted-foreground/40")} />
-            <span className={cn("text-sm font-medium", selected.has(key) ? "text-foreground" : "text-muted-foreground")}>{label}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="w-full max-w-md space-y-4 text-left">
-        {MEDIA_TYPES.filter(({ key }) => selected.has(key)).map(({ key, label }) => {
-          const matchingLibs = libraries?.filter((l) => l.type === key) ?? [];
-          const servers: string[] = [];
-          if (matchingLibs.some((l) => l.jellyfinLibraryId)) servers.push("Jellyfin");
-          if (matchingLibs.some((l) => l.plexLibraryId)) servers.push("Plex");
-          const sourceLabel = servers.length > 0 ? servers.join(" & ") : null;
-
-          return (
-            <div key={key} className="space-y-3 rounded-xl border border-border/60 p-4">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-foreground">{label}</span>
-                {servers.map((s) => (
-                  <span key={s} className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">{s}</span>
-                ))}
-              </div>
-              <div className="space-y-2">
-                <div>
-                  <label className="mb-1 block text-xs text-muted-foreground">
-                    Library path {sourceLabel && <span className="text-muted-foreground/50">from {sourceLabel}</span>}
-                  </label>
-                  <Input
-                    value={libraryPaths[key] ?? ""}
-                    onChange={(e) => setLibraryPaths((prev) => ({ ...prev, [key]: e.target.value }))}
-                    placeholder={`e.g. /media/${label.toLowerCase()}`}
-                    className={cn(inputCn, "text-sm")}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-muted-foreground">Download path</label>
-                  <Input
-                    value={downloadPaths[key] ?? ""}
-                    onChange={(e) => setDownloadPaths((prev) => ({ ...prev, [key]: e.target.value }))}
-                    placeholder={`e.g. /downloads/${key}`}
-                    className={cn(inputCn, "text-sm")}
-                  />
-                </div>
-              </div>
-            </div>
-          );
-        })}
+      <div className="w-full max-w-2xl text-left">
+        <DownloadFolders mode="onboarding" importMethod={importMethod} />
       </div>
 
       <div className="flex flex-col items-center gap-3">
-        <Button onClick={handleSave} disabled={selected.size === 0 || updatePaths.isPending} size="lg" className={btnCn}>
-          {updatePaths.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        <Button onClick={onNext} size="lg" className={btnCn}>
           Continue
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
@@ -854,33 +1076,40 @@ function LibrariesStep({ onNext }: { onNext: () => void }): React.JSX.Element {
 
 function ReadyStep({ onFinish }: { onFinish: () => void }): React.JSX.Element {
   return (
-    <div className="flex flex-col items-center gap-6 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/10">
-        <Check className="h-8 w-8 text-emerald-500" />
+    <div className="flex flex-col items-center gap-8 text-center">
+      <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-500/10">
+        <Check className="h-10 w-10 text-emerald-500" />
       </div>
       <div className="space-y-3">
-        <h1 className="text-2xl font-semibold text-foreground">You're all set</h1>
-        <p className="mx-auto max-w-lg text-base text-foreground/70 leading-relaxed">
-          Canto is ready to go. Browse what's trending, search for something specific,
-          or just start downloading. You can tweak all of this later in Settings.
+        <h1 className="text-3xl font-bold text-foreground">You're all set</h1>
+        <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
+          Everything is connected and ready to go. Start exploring — search for a movie,
+          browse what's trending, or dive straight into downloading. All your settings
+          can be adjusted anytime from the Settings page.
         </p>
       </div>
 
-      <div className="mx-auto grid w-full max-w-lg grid-cols-3 gap-3">
-        <div className="flex flex-col gap-2 rounded-xl border border-border/60 p-4">
-          <Search className="h-5 w-5 text-muted-foreground" />
-          <p className="text-xs font-medium text-foreground">Discover</p>
-          <p className="text-[11px] text-muted-foreground leading-relaxed">Browse trending movies and shows</p>
+      <div className="mx-auto grid w-full max-w-2xl grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border/40 p-6">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+            <Search className="h-6 w-6 text-primary" />
+          </div>
+          <p className="text-sm font-semibold text-foreground">Discover</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">Browse trending movies, shows, and anime across all your sources.</p>
         </div>
-        <div className="flex flex-col gap-2 rounded-xl border border-border/60 p-4">
-          <Download className="h-5 w-5 text-muted-foreground" />
-          <p className="text-xs font-medium text-foreground">Download</p>
-          <p className="text-[11px] text-muted-foreground leading-relaxed">Search and grab torrents with one click</p>
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border/40 p-6">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+            <Download className="h-6 w-6 text-primary" />
+          </div>
+          <p className="text-sm font-semibold text-foreground">Download</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">Search across your indexers and send torrents to qBittorrent with one click.</p>
         </div>
-        <div className="flex flex-col gap-2 rounded-xl border border-border/60 p-4">
-          <Folder className="h-5 w-5 text-muted-foreground" />
-          <p className="text-xs font-medium text-foreground">Organize</p>
-          <p className="text-[11px] text-muted-foreground leading-relaxed">Files auto-import into your library</p>
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border/40 p-6">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+            <FolderSync className="h-6 w-6 text-primary" />
+          </div>
+          <p className="text-sm font-semibold text-foreground">Organize</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">Files are renamed, sorted, and imported into your media library automatically.</p>
         </div>
       </div>
 
@@ -899,18 +1128,29 @@ function ReadyStep({ onFinish }: { onFinish: () => void }): React.JSX.Element {
 export default function OnboardingPage(): React.JSX.Element {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
-  const step = STEPS[currentStep]!;
+  const [torrentConnected, setTorrentConnected] = useState(false);
 
   const { data: isCompleted, isLoading } = trpc.settings.isOnboardingCompleted.useQuery();
+  const { data: allSettings, isLoading: settingsLoading } = trpc.settings.getAll.useQuery();
   const completeOnboarding = trpc.settings.completeOnboarding.useMutation();
+
+  // Detect if torrent client was already configured before onboarding
+  useEffect(() => {
+    if (allSettings && (allSettings["qbittorrent.enabled"] === true)) {
+      setTorrentConnected(true);
+    }
+  }, [allSettings]);
+
+  const steps = buildSteps(torrentConnected);
+  const step = steps[currentStep]!;
 
   useEffect(() => {
     if (isCompleted === true) router.replace("/");
   }, [isCompleted, router]);
 
   const next = useCallback(() => {
-    setCurrentStep((prev) => Math.min(prev + 1, STEPS.length - 1));
-  }, []);
+    setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1));
+  }, [steps.length]);
 
   const back = useCallback(() => {
     setCurrentStep((prev) => Math.max(prev - 1, 0));
@@ -921,7 +1161,7 @@ export default function OnboardingPage(): React.JSX.Element {
     router.replace("/");
   }, [completeOnboarding, router]);
 
-  if (isLoading) {
+  if (isLoading || settingsLoading) {
     return (
       <div className="flex h-full items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -931,16 +1171,24 @@ export default function OnboardingPage(): React.JSX.Element {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex flex-1 items-center justify-center px-6">
-        <div className="flex w-full max-w-xl flex-col items-center justify-center" style={{ minHeight: 480 }}>
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6">
+        <div className="mx-auto flex w-full max-w-2xl flex-col items-center justify-center py-12" style={{ minHeight: "calc(100vh - 120px)" }}>
           <FadeIn key={step}>
             {step === "welcome" && <WelcomeStep onNext={next} />}
-            {step === "tmdb" && <TmdbStep onNext={next} />}
-            {step === "tvdb" && <TvdbStep onNext={next} />}
-            {step === "download-client" && <DownloadClientStep onNext={next} />}
-            {step === "indexer" && <IndexerStep onNext={next} />}
-            {step === "media-server" && <MediaServerStep onNext={next} />}
-            {step === "libraries" && <LibrariesStep onNext={next} />}
+            {step === "overview" && <OverviewStep onNext={next} />}
+            {step === "tmdb" && <TmdbStep onNext={next} settings={allSettings} />}
+            {step === "tvdb" && <TvdbStep onNext={next} settings={allSettings} />}
+            {step === "download-client" && (
+              <DownloadClientStep
+                onNext={() => { setTorrentConnected(true); next(); }}
+                onSkip={next}
+                settings={allSettings}
+              />
+            )}
+            {step === "libraries" && <DownloadFoldersStep onNext={next} />}
+            {step === "indexer" && <IndexerStep onNext={next} settings={allSettings} />}
+            {step === "jellyfin" && <JellyfinStep onNext={next} settings={allSettings} />}
+            {step === "plex" && <PlexStep onNext={next} settings={allSettings} />}
             {step === "ready" && <ReadyStep onFinish={finish} />}
           </FadeIn>
         </div>
@@ -958,7 +1206,7 @@ export default function OnboardingPage(): React.JSX.Element {
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <StepDots current={currentStep} total={STEPS.length} />
+        <StepDots current={currentStep} total={steps.length} />
         <div className="w-9" />
       </div>
     </div>
