@@ -898,6 +898,7 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
           setAdvancedSearch(false);
           setAdvancedQuery("");
           setCommittedQuery("");
+          setSelectedFolderId(undefined);
         }
       }}>
         <DialogContent className="flex h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-border bg-background p-0 md:h-auto md:max-h-[70vh] md:max-w-5xl md:rounded-[2rem] [&>button:last-child]:hidden">
@@ -1195,11 +1196,11 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
                       className="overflow-hidden rounded-xl bg-muted/40 transition-colors hover:bg-muted/60"
                     >
                       {/* Header: Indexer (language) + Age */}
-                      <div className="flex items-center justify-between px-5 py-2.5 text-xs text-muted-foreground">
+                      <div className="flex items-center justify-between px-5 py-2.5 text-xs font-medium text-muted-foreground">
                         <span>
                           {t.indexer || "Unknown"}
                           {t.indexerLanguage && (
-                            <span className="ml-1 text-muted-foreground/50">({t.indexerLanguage})</span>
+                            <span className="ml-1 text-muted-foreground/60">({t.indexerLanguage})</span>
                           )}
                         </span>
                         <span className="flex items-center gap-1">
@@ -1222,24 +1223,24 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
 
                         {/* Content */}
                         <div className="min-w-0 flex-1">
-                          <p className="line-clamp-2 text-[13px] font-medium leading-snug text-foreground">
+                          <p className="line-clamp-2 text-[13px] font-semibold leading-snug text-foreground">
                             {t.title}
                           </p>
-                          <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
+                          <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-muted-foreground">
                             {qLabel && (
-                              <span className="flex items-center gap-1.5">
+                              <span className="flex items-center gap-1.5 font-medium text-foreground/80">
                                 <Monitor size={12} className="text-muted-foreground/50" />
-                                <span className="font-medium text-foreground/80">{qLabel}</span>
+                                {qLabel}
                               </span>
                             )}
                             {sLabel && (
-                              <span className="flex items-center gap-1.5">
+                              <span className="flex items-center gap-1.5 font-medium text-foreground/70">
                                 <FilmIcon size={12} className="text-muted-foreground/50" />
                                 {sLabel}
                               </span>
                             )}
                             {t.size > 0 && (
-                              <span className="flex items-center gap-1.5">
+                              <span className="flex items-center gap-1.5 font-medium text-foreground/70">
                                 <HardDrive size={12} className="text-muted-foreground/50" />
                                 {formatBytes(t.size)}
                               </span>
@@ -1258,17 +1259,17 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
                       </div>
 
                       {/* Footer: Seeds + Peers + Languages + Freeleech */}
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border/50 px-5 py-2.5 text-xs text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border/50 px-5 py-2.5 text-xs font-medium text-muted-foreground">
                         <span className="flex items-center gap-1.5 text-foreground/70">
                           <ArrowUp size={12} className="text-muted-foreground/50" />
                           {t.seeders} seeders
                         </span>
-                        <span className="flex items-center gap-1.5">
+                        <span className="flex items-center gap-1.5 text-foreground/60">
                           <ArrowDown size={12} className="text-muted-foreground/50" />
                           {t.leechers} peers
                         </span>
                         {t.languages.length > 0 && (
-                          <span className="flex items-center gap-1.5">
+                          <span className="flex items-center gap-1.5 text-foreground/60">
                             <Globe size={12} className="text-muted-foreground/50" />
                             {t.languages.map((l) => l.toUpperCase()).join(", ")}
                           </span>
