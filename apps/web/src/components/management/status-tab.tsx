@@ -13,12 +13,10 @@ import {
   CheckCircle2,
   AlertCircle,
   Plus,
-  Settings,
   Search,
 } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { authClient } from "~/lib/auth-client";
-import { PageHeader } from "~/components/layout/page-header";
 import { StateMessage } from "~/components/layout/state-message";
 
 function getStatusBadgeClass(status: string): string {
@@ -28,7 +26,7 @@ function getStatusBadgeClass(status: string): string {
   return "bg-muted text-muted-foreground";
 }
 
-export default function StatusPage(): React.JSX.Element {
+export function StatusTab(): React.JSX.Element {
   const { data: session } = authClient.useSession();
   const isAdmin = (session?.user as { role?: string } | undefined)?.role === "admin";
 
@@ -44,11 +42,7 @@ export default function StatusPage(): React.JSX.Element {
   const errorTorrents = torrents?.filter((t) => t.status === "error") ?? [];
 
   return (
-    <div className="w-full">
-      <PageHeader title="Status" subtitle="System overview and administration." />
-
-      <div className="flex flex-col gap-8 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24 pb-8">
-
+    <div className="flex flex-col gap-8">
       {/* System Status */}
       <section className="flex flex-col gap-4">
         <h2 className="text-lg font-semibold">System Status</h2>
@@ -59,121 +53,103 @@ export default function StatusPage(): React.JSX.Element {
             </CardContent>
           </Card>
         ) : (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <Link href="/library?type=show">
-            <Card className="cursor-pointer transition-colors hover:bg-muted/50">
-              <CardContent className="flex flex-col gap-3 p-5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                  <Tv size={20} className="text-primary" />
-                </div>
-                <div>
-                  {statsLoading ? (
-                    <Skeleton className="mb-1 h-8 w-16" />
-                  ) : (
-                    <p className="text-3xl font-bold">
-                      {stats?.shows ?? 0}
-                    </p>
-                  )}
-                  <p className="text-sm text-muted-foreground">Total Shows</p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <Link href="/library?type=show">
+              <Card className="cursor-pointer transition-colors hover:bg-muted/50">
+                <CardContent className="flex flex-col gap-3 p-5">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                    <Tv size={20} className="text-primary" />
+                  </div>
+                  <div>
+                    {statsLoading ? (
+                      <Skeleton className="mb-1 h-8 w-16" />
+                    ) : (
+                      <p className="text-3xl font-bold">
+                        {stats?.shows ?? 0}
+                      </p>
+                    )}
+                    <p className="text-sm text-muted-foreground">Total Shows</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
 
-          <Link href="/library?type=movie">
-            <Card className="cursor-pointer transition-colors hover:bg-muted/50">
-              <CardContent className="flex flex-col gap-3 p-5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                  <Film size={20} className="text-primary" />
-                </div>
-                <div>
-                  {statsLoading ? (
-                    <Skeleton className="mb-1 h-8 w-16" />
-                  ) : (
-                    <p className="text-3xl font-bold">
-                      {stats?.movies ?? 0}
-                    </p>
-                  )}
-                  <p className="text-sm text-muted-foreground">Total Movies</p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+            <Link href="/library?type=movie">
+              <Card className="cursor-pointer transition-colors hover:bg-muted/50">
+                <CardContent className="flex flex-col gap-3 p-5">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                    <Film size={20} className="text-primary" />
+                  </div>
+                  <div>
+                    {statsLoading ? (
+                      <Skeleton className="mb-1 h-8 w-16" />
+                    ) : (
+                      <p className="text-3xl font-bold">
+                        {stats?.movies ?? 0}
+                      </p>
+                    )}
+                    <p className="text-sm text-muted-foreground">Total Movies</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
 
-          {isAdmin && (
+            {isAdmin && (
+              <Card>
+                <CardContent className="flex flex-col gap-3 p-5">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                    <HardDrive size={20} className="text-primary" />
+                  </div>
+                  <div>
+                    {torrentsLoading ? (
+                      <Skeleton className="mb-1 h-8 w-16" />
+                    ) : (
+                      <p className="text-3xl font-bold">
+                        {torrents?.length ?? 0}
+                      </p>
+                    )}
+                    <p className="text-sm text-muted-foreground">
+                      Total Torrents
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardContent className="flex flex-col gap-3 p-5">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                  <HardDrive size={20} className="text-primary" />
+                  <Activity size={20} className="text-primary" />
                 </div>
                 <div>
-                  {torrentsLoading ? (
+                  {statsLoading ? (
                     <Skeleton className="mb-1 h-8 w-16" />
                   ) : (
                     <p className="text-3xl font-bold">
-                      {torrents?.length ?? 0}
+                      {stats?.total ?? 0}
                     </p>
                   )}
                   <p className="text-sm text-muted-foreground">
-                    Total Torrents
+                    Total Library
                   </p>
                 </div>
               </CardContent>
             </Card>
-          )}
-
-          <Card>
-            <CardContent className="flex flex-col gap-3 p-5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                <Activity size={20} className="text-primary" />
-              </div>
-              <div>
-                {statsLoading ? (
-                  <Skeleton className="mb-1 h-8 w-16" />
-                ) : (
-                  <p className="text-3xl font-bold">
-                    {stats?.total ?? 0}
-                  </p>
-                )}
-                <p className="text-sm text-muted-foreground">
-                  Total Library
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+          </div>
         )}
 
-        {/* Version & Settings */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardContent className="flex items-center gap-4 p-5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-muted">
-                <Activity size={22} className="text-muted-foreground" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium">Canto</p>
-                <p className="text-sm text-muted-foreground">Version 0.1.0</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Link href="/manage">
-            <Card className="cursor-pointer transition-colors hover:bg-muted/50">
-              <CardContent className="flex items-center gap-4 p-5">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-muted">
-                  <Settings size={22} className="text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="font-medium">Settings</p>
-                  <p className="text-sm text-muted-foreground">
-                    Configure your instance
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
+        {/* Version */}
+        <Card>
+          <CardContent className="flex items-center gap-4 p-5">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-muted">
+              <Activity size={22} className="text-muted-foreground" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium">Canto</p>
+              <p className="text-sm text-muted-foreground">Version 0.1.0</p>
+            </div>
+          </CardContent>
+        </Card>
       </section>
 
       {/* Active Downloads — admin only */}
@@ -383,7 +359,6 @@ export default function StatusPage(): React.JSX.Element {
           </Link>
         </div>
       </section>
-      </div>
     </div>
   );
 }

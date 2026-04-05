@@ -184,8 +184,7 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
   }
 
   const actions: MenuAction[] = [
-    { href: "/status", label: "Status", icon: LayoutDashboard },
-    { href: "/settings", label: "Settings", icon: Settings },
+    { href: "/manage", label: "Manage", icon: Settings },
     { href: "/notifications", label: "Notifications", icon: Bell },
     {
       label: theme === "dark" ? "Light Mode" : "Dark Mode",
