@@ -79,7 +79,7 @@ export function formatSourceLabel(source: Source): string {
     case "remux":
       return "Remux";
     case "bluray":
-      return "Blu-Ray";
+      return "Bluray";
     case "webdl":
       return "WEB-DL";
     case "webrip":

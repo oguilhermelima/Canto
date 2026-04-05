@@ -1,5 +1,5 @@
 import { formatQualityLabel, formatSourceLabel } from "./quality";
-import { detectCodec, detectReleaseGroup } from "./parsing";
+import { detectCodec, detectAudioCodec, detectAudioChannels, detectHdrFormat, detectEdition, detectReleaseGroup } from "./parsing";
 
 export const VIDEO_EXTENSIONS = new Set([
   ".mkv",
@@ -36,10 +36,12 @@ export interface MediaNamingInfo {
 export interface FileNameOptions {
   seasonNumber?: number;
   episodeNumber?: number;
+  /** End of episode range — when present, formats as S01E01-E03 */
+  episodeEndNumber?: number;
   episodeTitle?: string;
   quality?: string;
   source?: string;
-  /** Original torrent title — used to detect codec and release group */
+  /** Original torrent title — used to detect codec, audio codec, edition, and release group */
   torrentTitle?: string;
   extension: string;
 }
@@ -47,7 +49,8 @@ export interface FileNameOptions {
 export function buildVersionTag(quality: string, source: string): string {
   const qLabel = formatQualityLabel(quality as Parameters<typeof formatQualityLabel>[0]);
   const sLabel = formatSourceLabel(source as Parameters<typeof formatSourceLabel>[0]);
-  return [qLabel, sLabel].filter(Boolean).join(" ");
+  // TRaSH format: Source-Quality (e.g. "WEB-DL-1080p", "Bluray-1080p", "Remux-2160p")
+  return [sLabel, qLabel].filter(Boolean).join("-");
 }
 
 export function buildMediaDir(
@@ -70,8 +73,8 @@ export function buildMediaDir(
 /**
  * Build a quality/codec/group suffix following TRaSH Guides naming.
  *
- * Pattern: `[{Quality} {Source}][{Codec}]{-ReleaseGroup}`
- * Examples: `[1080p WEB-DL][h265]-FLUX`, `[4K Remux][h265]`
+ * Pattern: `[{Source}-{Quality} {AudioCodec}][{VideoCodec}]{-ReleaseGroup}`
+ * Examples: `[WEB-DL-1080p DTS][h265]-FLUX`, `[Remux-2160p TrueHD Atmos][h265]`
  */
 function buildQualitySuffix(
   quality: string,
@@ -79,12 +82,22 @@ function buildQualitySuffix(
   torrentTitle?: string,
 ): string {
   const versionTag = buildVersionTag(quality, source);
-  const codec = torrentTitle ? detectCodec(torrentTitle) : null;
+  const audioCodec = torrentTitle ? detectAudioCodec(torrentTitle) : null;
+  const audioChannels = torrentTitle ? detectAudioChannels(torrentTitle) : null;
+  const videoCodec = torrentTitle ? detectCodec(torrentTitle) : null;
+  const hdrFormat = torrentTitle ? detectHdrFormat(torrentTitle) : null;
   const releaseGroup = torrentTitle ? detectReleaseGroup(torrentTitle) : null;
 
+  // Audio label: "DTS 5.1", "TrueHD Atmos 7.1", or just "DTS"
+  const audioLabel = [audioCodec, audioChannels].filter(Boolean).join(" ");
+
   let suffix = "";
-  if (versionTag) suffix += `[${versionTag}]`;
-  if (codec) suffix += `[${codec}]`;
+  // Quality bracket: [Source-Quality AudioCodec Channels]
+  const qualityParts = [versionTag, audioLabel].filter(Boolean).join(" ");
+  if (qualityParts) suffix += `[${qualityParts}]`;
+  // Video bracket: [h265 HDR10] or [h265]
+  const videoParts = [videoCodec, hdrFormat].filter(Boolean).join(" ");
+  if (videoParts) suffix += `[${videoParts}]`;
   if (releaseGroup) suffix += `-${releaseGroup}`;
 
   return suffix;
@@ -96,6 +109,8 @@ export function buildFileName(
 ): string {
   const safeTitle = sanitizeName(media.title);
   const yearSuffix = media.year ? ` (${media.year})` : "";
+  const edition = opts.torrentTitle ? detectEdition(opts.torrentTitle) : null;
+  const editionTag = edition ? ` {edition-${edition}}` : "";
   const qualitySuffix = buildQualitySuffix(
     opts.quality ?? "unknown",
     opts.source ?? "unknown",
@@ -105,11 +120,14 @@ export function buildFileName(
   if (media.type === "show" && opts.seasonNumber != null && opts.episodeNumber != null) {
     const sn = String(opts.seasonNumber).padStart(2, "0");
     const en = String(opts.episodeNumber).padStart(2, "0");
+    const epRange = opts.episodeEndNumber != null && opts.episodeEndNumber > opts.episodeNumber
+      ? `-E${String(opts.episodeEndNumber).padStart(2, "0")}`
+      : "";
     const epTitle = opts.episodeTitle ? ` - ${sanitizeName(opts.episodeTitle)}` : "";
     const qs = qualitySuffix ? ` ${qualitySuffix}` : "";
-    return `${safeTitle}${yearSuffix} - S${sn}E${en}${epTitle}${qs}${opts.extension}`;
+    return `${safeTitle}${yearSuffix} - S${sn}E${en}${epRange}${epTitle}${qs}${opts.extension}`;
   }
 
   const qs = qualitySuffix ? ` ${qualitySuffix}` : "";
-  return `${safeTitle}${yearSuffix}${qs}${opts.extension}`;
+  return `${safeTitle}${yearSuffix}${editionTag}${qs}${opts.extension}`;
 }
