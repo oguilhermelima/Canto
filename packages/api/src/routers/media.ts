@@ -53,14 +53,11 @@ import {
 /*  Router                                                                    */
 /* -------------------------------------------------------------------------- */
 
-async function getProviderWithKey(name: "tmdb" | "anilist" | "tvdb"): ReturnType<typeof getProvider> {
+async function getProviderWithKey(name: "tmdb" | "tvdb"): ReturnType<typeof getProvider> {
   if (name === "tmdb") {
     return getTmdbProvider();
   }
-  if (name === "tvdb") {
-    return getTvdbProvider();
-  }
-  return getProvider(name);
+  return getTvdbProvider();
 }
 
 export const mediaRouter = createTRPCRouter({
@@ -75,7 +72,7 @@ export const mediaRouter = createTRPCRouter({
       mode: z.enum(["search", "trending", "discover"]).default("trending"),
       type: z.enum(["movie", "show"]),
       query: z.string().optional(), // required when mode = "search"
-      provider: z.enum(["tmdb", "anilist", "tvdb"]).default("tmdb"),
+      provider: z.enum(["tmdb", "tvdb"]).default("tmdb"),
       genres: z.string().optional(),
       language: z.string().optional(),
       sortBy: z.string().optional(),
@@ -383,10 +380,33 @@ export const mediaRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const row = await findMediaById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
-      const provider = await getProviderWithKey(row.provider as "tmdb" | "anilist" | "tvdb");
+      const provider = await getProviderWithKey(row.provider as "tmdb" | "tvdb");
       const langs = [...await getSupportedLanguageCodes(ctx.db)];
       const normalized = await provider.getMetadata(row.externalId, row.type as "movie" | "show", { supportedLanguages: langs });
       return updateMediaFromNormalized(ctx.db, input.id, normalized);
+    }),
+
+  /**
+   * Admin: mark media as downloaded and add to server library.
+   */
+  markDownloaded: adminProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const existing = await findMediaById(ctx.db, input.id);
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
+      if (existing.downloaded) return existing;
+      const updated = await updateMedia(ctx.db, input.id, {
+        downloaded: true,
+        addedAt: new Date(),
+      });
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
+      // Add to server library list
+      const { ensureServerLibrary, addListItem } = await import(
+        "../infrastructure/repositories/list-repository"
+      );
+      const serverLib = await ensureServerLibrary(ctx.db);
+      await addListItem(ctx.db, { listId: serverLib.id, mediaId: input.id });
+      return updated;
     }),
 
   /**

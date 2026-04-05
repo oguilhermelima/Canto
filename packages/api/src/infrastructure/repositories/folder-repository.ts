@@ -90,7 +90,6 @@ const DEFAULT_RULES: Record<string, { rules: RuleGroup; priority: number }> = {
           conditions: [
             { field: "originCountry", op: "contains_any", value: ["JP"] },
             { field: "genre", op: "contains_any", value: ["Animation"] },
-            { field: "provider", op: "eq", value: "anilist" },
           ],
         },
       ],
@@ -154,6 +153,19 @@ export async function upsertServerLink(db: Database, data: FolderServerLinkInser
     })
     .returning();
   return row;
+}
+
+export async function updateServerLink(
+  db: Database,
+  id: string,
+  data: Partial<Pick<FolderServerLinkInsert, "syncEnabled">>,
+) {
+  const [updated] = await db
+    .update(folderServerLink)
+    .set(data)
+    .where(eq(folderServerLink.id, id))
+    .returning();
+  return updated;
 }
 
 export async function removeServerLink(db: Database, id: string) {

@@ -1,6 +1,6 @@
 export interface DownloadClientPort {
   addTorrent(url: string, category?: string): Promise<void>;
-  listTorrents(): Promise<TorrentInfo[]>;
+  listTorrents(filter?: { hashes?: string[] }): Promise<TorrentInfo[]>;
   getTorrentFiles(hash: string): Promise<TorrentFileInfo[]>;
   pauseTorrent(hash: string): Promise<void>;
   resumeTorrent(hash: string): Promise<void>;
@@ -8,6 +8,11 @@ export interface DownloadClientPort {
   ensureCategory(category: string, savePath?: string): Promise<void>;
   setCategory(hash: string, category: string): Promise<void>;
   testConnection(): Promise<{ name: string; version: string }>;
+
+  /** List all configured categories with their save paths. */
+  listCategories(): Promise<Record<string, { name: string; savePath: string }>>;
+  /** Get the default save path configured in the download client. */
+  getDefaultSavePath(): Promise<string>;
 
   /** Move torrent data to a new location (used in remote import mode). */
   setLocation(hash: string, location: string): Promise<void>;

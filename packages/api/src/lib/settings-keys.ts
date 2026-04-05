@@ -45,6 +45,7 @@ export const SETTINGS = {
 
   // Sync
   SYNC_MEDIA_IMPORT_STATUS: "sync.mediaImport.status",
+  SYNC_FOLDER_SCAN_ENABLED: "sync.folderScan.enabled",
 
   // Redis
   REDIS_HOST: "redis.host",

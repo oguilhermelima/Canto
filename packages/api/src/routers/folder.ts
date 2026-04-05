@@ -1,4 +1,4 @@
-import { access, constants } from "node:fs/promises";
+import { access, constants, readdir } from "node:fs/promises";
 import nodePath from "node:path";
 
 import { TRPCError } from "@trpc/server";
@@ -7,6 +7,7 @@ import { z } from "zod";
 import { createFolderInput, updateFolderInput, addServerLinkInput, removeServerLinkInput } from "@canto/validators";
 
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
+import { getDownloadClient } from "../infrastructure/adapters/download-client-factory";
 import { resolveFolder } from "../domain/rules/folder-routing";
 import type { RoutableMedia } from "../domain/rules/folder-routing";
 import {
@@ -21,6 +22,7 @@ import {
   seedDefaultFolders,
   findServerLinksByFolder,
   upsertServerLink,
+  updateServerLink,
   removeServerLink,
   findAllServerLinks,
 } from "../infrastructure/repositories/folder-repository";
@@ -119,6 +121,40 @@ export const folderRouter = createTRPCRouter({
       };
     }),
 
+  // ── Filesystem browsing ──
+
+  browse: adminProcedure
+    .input(z.object({ path: z.string().default("/") }))
+    .query(async ({ input }) => {
+      const normalized = nodePath.resolve(input.path);
+      try {
+        const entries = await readdir(normalized, { withFileTypes: true });
+        const dirs = entries
+          .filter((e) => e.isDirectory() && !e.name.startsWith("."))
+          .map((e) => ({ name: e.name, path: nodePath.join(normalized, e.name) }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        return { path: normalized, parent: nodePath.dirname(normalized), dirs };
+      } catch {
+        return { path: normalized, parent: nodePath.dirname(normalized), dirs: [] };
+      }
+    }),
+
+  // ── qBittorrent categories ──
+
+  /** Fetch existing categories and default save path from qBittorrent */
+  qbitCategories: adminProcedure.query(async () => {
+    try {
+      const client = await getDownloadClient();
+      const [categories, defaultSavePath] = await Promise.all([
+        client.listCategories(),
+        client.getDefaultSavePath(),
+      ]);
+      return { categories, defaultSavePath };
+    } catch {
+      return { categories: {} as Record<string, { name: string; savePath: string }>, defaultSavePath: "" };
+    }
+  }),
+
   // ── Path management ──
 
   testPaths: adminProcedure.mutation(async ({ ctx }) => {
@@ -151,6 +187,10 @@ export const folderRouter = createTRPCRouter({
   addServerLink: adminProcedure
     .input(addServerLinkInput)
     .mutation(({ ctx, input }) => upsertServerLink(ctx.db, input)),
+
+  updateServerLink: adminProcedure
+    .input(z.object({ id: z.string().uuid(), syncEnabled: z.boolean() }))
+    .mutation(({ ctx, input }) => updateServerLink(ctx.db, input.id, { syncEnabled: input.syncEnabled })),
 
   removeServerLink: adminProcedure
     .input(removeServerLinkInput)

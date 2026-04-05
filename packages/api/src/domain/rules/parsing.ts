@@ -1,3 +1,61 @@
+/* ── Directory name parsing (folder scan) ── */
+
+/**
+ * Parse a media directory name to extract title, year, and external IDs.
+ *
+ * Supports patterns like:
+ * - `Movie Name (2024) [tmdbid-12345]`
+ * - `Show Name (2020) [tmdb-67890]`
+ * - `Movie Name (2024) {imdb-tt1234567}`
+ * - `Movie Name (2024)`
+ */
+export function parseFolderMediaInfo(dirName: string): {
+  title: string;
+  year?: number;
+  tmdbId?: number;
+  imdbId?: string;
+} | null {
+  let tmdbId: number | undefined;
+  let imdbId: string | undefined;
+
+  // Match [tmdbid-123] or [tmdb-123]
+  const tmdbMatch = /\[tmdb(?:id)?-(\d+)\]/i.exec(dirName);
+  if (tmdbMatch) {
+    tmdbId = parseInt(tmdbMatch[1]!, 10);
+  }
+
+  // Match {imdb-tt1234567} or [imdbid-tt1234567]
+  const imdbMatch = /[{[]imdb(?:id)?-(tt\d+)[}\]]/i.exec(dirName);
+  if (imdbMatch) {
+    imdbId = imdbMatch[1]!;
+  }
+
+  // Match title (year)
+  const titleYearMatch = /^(.+?)\s*\((\d{4})\)/.exec(dirName);
+  if (titleYearMatch) {
+    return {
+      title: titleYearMatch[1]!.trim(),
+      year: parseInt(titleYearMatch[2]!, 10),
+      tmdbId,
+      imdbId,
+    };
+  }
+
+  // If we have an external ID but no title+year pattern, try to use the whole name as title
+  if (tmdbId || imdbId) {
+    // Strip known tags to get the title
+    const cleaned = dirName
+      .replace(/\[tmdb(?:id)?-\d+\]/gi, "")
+      .replace(/[{[]imdb(?:id)?-tt\d+[}\]]/gi, "")
+      .trim();
+    if (cleaned.length > 0) {
+      return { title: cleaned, tmdbId, imdbId };
+    }
+  }
+
+  return null;
+}
+
 /** Matches S01E01, s1e5, etc. */
 export const EP_PATTERN = /[Ss](\d{1,2})[Ee](\d{1,3})/;
 

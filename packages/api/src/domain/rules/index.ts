@@ -17,6 +17,7 @@ export {
   parseEpisodes,
   isSubtitleFile,
   parseSubtitleLanguage,
+  parseFolderMediaInfo,
 } from "./parsing";
 export {
   VIDEO_EXTENSIONS,

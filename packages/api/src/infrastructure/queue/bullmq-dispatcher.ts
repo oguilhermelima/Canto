@@ -22,6 +22,7 @@ const getRefreshAllLangQueue = createQueueGetter("refresh-all-language");
 const getTranslateEpisodesQueue = createQueueGetter("translate-episodes");
 const getJellyfinSyncQueue = createQueueGetter("jellyfin-sync");
 const getPlexSyncQueue = createQueueGetter("plex-sync");
+const getFolderScanQueue = createQueueGetter("folder-scan");
 
 export async function dispatchEnrichMedia(mediaId: string, full = false): Promise<void> {
   const q = await getEnrichMediaQueue();
@@ -87,6 +88,12 @@ export async function dispatchJellyfinSync(): Promise<boolean> {
 export async function dispatchPlexSync(): Promise<boolean> {
   const q = await getPlexSyncQueue();
   return dispatchUniqueJob(q, "plex-sync-run");
+}
+
+/** Dispatch an on-demand folder scan job (deduplicates active/waiting jobs). */
+export async function dispatchFolderScan(): Promise<boolean> {
+  const q = await getFolderScanQueue();
+  return dispatchUniqueJob(q, "folder-scan-run");
 }
 
 /** Add a job only if no active/waiting job with the same ID exists. */

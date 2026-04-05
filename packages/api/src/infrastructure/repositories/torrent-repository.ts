@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, lt, or, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { torrent } from "@canto/db/schema";
 
@@ -83,6 +83,20 @@ export async function claimTorrentForImport(db: Database, id: string) {
 
 export async function findUnimportedTorrents(db: Database) {
   return db.query.torrent.findMany({
-    where: eq(torrent.imported, false),
+    where: and(
+      eq(torrent.imported, false),
+      eq(torrent.importing, false),
+      // Max 5 retries before giving up on stuck torrents.
+      lt(torrent.importAttempts, 5),
+      // First attempt (importAttempts === 0) is always eligible.
+      // Subsequent attempts use linear backoff: 10min * importAttempts.
+      or(
+        eq(torrent.importAttempts, 0),
+        lt(
+          torrent.updatedAt,
+          sql`NOW() - INTERVAL '10 minutes' * ${torrent.importAttempts}`,
+        ),
+      ),
+    ),
   });
 }

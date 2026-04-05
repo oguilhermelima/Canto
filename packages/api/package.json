@@ -119,6 +119,10 @@
     "./domain/rules/parsing": {
       "types": "./src/domain/rules/parsing.ts",
       "default": "./src/domain/rules/parsing.ts"
+    },
+    "./domain/use-cases/scan-folder-for-media": {
+      "types": "./src/domain/use-cases/scan-folder-for-media.ts",
+      "default": "./src/domain/use-cases/scan-folder-for-media.ts"
     }
   },
   "scripts": {

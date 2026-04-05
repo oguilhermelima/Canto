@@ -1,11 +1,9 @@
 import type { Database } from "@canto/db/client";
 import type { DownloadClientPort } from "../ports/download-client";
 import type { LiveData } from "../types/torrent";
-import { autoImportTorrent } from "./import-torrent";
 import {
   updateTorrent,
   updateTorrentBatch,
-  claimTorrentForImport,
 } from "../../infrastructure/repositories";
 import { logAndSwallow } from "../../lib/log-error";
 
@@ -92,29 +90,6 @@ export async function mergeLiveData(
   }
   for (const [status, ids] of byStatus) {
     void updateTorrentBatch(db, ids, { status }).catch(logAndSwallow("merge-live-data updateTorrentBatch"));
-  }
-
-  // 3. Auto-import newly completed torrents
-  const newlyCompleted = [...statusUpdates.entries()]
-    .filter(([, s]) => s === "completed")
-    .map(([id]) => id);
-
-  if (newlyCompleted.length > 0) {
-    const toImport = dbRows.filter(
-      (r) => newlyCompleted.includes(r.id) && !r.imported && !r.importing && r.hash && r.mediaId,
-    );
-    for (const row of toImport) {
-      void (async () => {
-        try {
-          const claimed = await claimTorrentForImport(db, row.id);
-          if (!claimed) return;
-          await autoImportTorrent(db, claimed, qbClient);
-        } catch (err) {
-          console.error(`[auto-import] Failed for "${row.title}":`, err instanceof Error ? err.message : err);
-          await updateTorrent(db, row.id, { importing: false }).catch(logAndSwallow("merge-live-data reset importing flag"));
-        }
-      })();
-    }
   }
 
   // Update in-memory statuses

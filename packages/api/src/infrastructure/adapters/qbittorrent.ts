@@ -72,11 +72,9 @@ export class QBittorrentClient implements DownloadClientPort {
   async addTorrent(
     magnetOrUrl: string,
     category?: string,
-    savePath?: string,
   ): Promise<void> {
     const body = new URLSearchParams({ urls: magnetOrUrl });
     if (category) body.set("category", category);
-    if (savePath) body.set("savepath", savePath);
 
     const response = await this.request("/api/v2/torrents/add", {
       method: "POST",
@@ -90,8 +88,14 @@ export class QBittorrentClient implements DownloadClientPort {
     }
   }
 
-  async listTorrents(): Promise<TorrentInfo[]> {
-    const response = await this.request("/api/v2/torrents/info");
+  async listTorrents(filter?: { hashes?: string[] }): Promise<TorrentInfo[]> {
+    const params = new URLSearchParams();
+    if (filter?.hashes?.length) {
+      params.set("hashes", filter.hashes.join("|"));
+    }
+    const qs = params.toString();
+    const url = qs ? `/api/v2/torrents/info?${qs}` : "/api/v2/torrents/info";
+    const response = await this.request(url);
     if (!response.ok) {
       throw new Error(`qBittorrent list failed: ${response.status}`);
     }
@@ -139,11 +143,14 @@ export class QBittorrentClient implements DownloadClientPort {
 
   async setCategory(hash: string, category: string): Promise<void> {
     const body = new URLSearchParams({ hashes: hash, category });
-    await this.request("/api/v2/torrents/setCategory", {
+    const response = await this.request("/api/v2/torrents/setCategory", {
       method: "POST",
       body,
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
+    if (!response.ok) {
+      throw new Error(`qBittorrent setCategory failed: ${response.status}`);
+    }
   }
 
   async getTorrentFiles(hash: string): Promise<TorrentFileInfo[]> {
@@ -207,12 +214,45 @@ export class QBittorrentClient implements DownloadClientPort {
     // 409 = category already exists, which is fine
   }
 
+  async editCategory(category: string, savePath: string): Promise<void> {
+    const body = new URLSearchParams({ category, savePath });
+    await this.request("/api/v2/torrents/editCategory", {
+      method: "POST",
+      body,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+  }
+
   async ensureCategory(category: string, savePath?: string): Promise<void> {
     try {
       await this.createCategory(category, savePath);
     } catch {
-      // Category likely already exists — ignore
+      // Category likely already exists — ignore creation error
     }
+
+    // Always update the save path so it stays in sync with folder settings
+    if (savePath) {
+      try {
+        await this.editCategory(category, savePath);
+      } catch (err) {
+        console.warn(
+          `[qBittorrent] Failed to update save path for category "${category}":`,
+          err,
+        );
+      }
+    }
+  }
+
+  async listCategories(): Promise<Record<string, { name: string; savePath: string }>> {
+    const response = await this.request("/api/v2/torrents/categories");
+    if (!response.ok) return {};
+    return response.json() as Promise<Record<string, { name: string; savePath: string }>>;
+  }
+
+  async getDefaultSavePath(): Promise<string> {
+    const response = await this.request("/api/v2/app/defaultSavePath");
+    if (!response.ok) return "";
+    return (await response.text()).trim();
   }
 
   async testConnection(): Promise<{ name: string; version: string }> {

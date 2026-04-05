@@ -15,7 +15,7 @@ import {
   updateSyncItem,
 } from "../infrastructure/repositories/sync-repository";
 import { findMediaByAnyReference, updateMedia } from "../infrastructure/repositories/media-repository";
-import { dispatchJellyfinSync, dispatchPlexSync } from "../infrastructure/queue/bullmq-dispatcher";
+import { dispatchJellyfinSync, dispatchPlexSync, dispatchFolderScan } from "../infrastructure/queue/bullmq-dispatcher";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                     */
@@ -237,4 +237,12 @@ export const syncRouter = createTRPCRouter({
 
       return { sources, episodes: episodeMap };
     }),
+
+  /**
+   * Trigger an on-demand folder scan (scan library paths for existing media).
+   */
+  scanFolders: adminProcedure.mutation(async () => {
+    const started = await dispatchFolderScan();
+    return { started };
+  }),
 });
