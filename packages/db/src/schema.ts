@@ -39,6 +39,8 @@ export const user = pgTable("user", {
     .notNull()
     .default("en-US")
     .references(() => supportedLanguage.code),
+  watchRegion: varchar("watch_region", { length: 10 }),
+  directSearchEnabled: boolean("direct_search_enabled").notNull().default(true),
   recsVersion: integer("recs_version").notNull().default(0),
   recsUpdatedAt: timestamp("recs_updated_at", { withTimezone: true }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
