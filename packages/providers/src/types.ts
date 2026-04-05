@@ -1,5 +1,5 @@
 export type MediaType = "movie" | "show";
-export type ProviderName = "tmdb" | "anilist" | "tvdb";
+export type ProviderName = "tmdb" | "tvdb";
 
 export interface SearchResult {
   externalId: number;
