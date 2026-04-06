@@ -47,7 +47,7 @@ export function ImportMethodSection(): React.JSX.Element {
 
   const setDlSettings = trpc.library.setDownloadSettings.useMutation({
     onSuccess: () => {
-      toast.success("Import method saved");
+      toast.success("Transfer mode saved");
       setDirty(false);
       void utils.library.getDownloadSettings.invalidate();
     },
@@ -65,8 +65,8 @@ export function ImportMethodSection(): React.JSX.Element {
 
   return (
     <SettingsSection
-      title="Import Method"
-      description="How Canto moves completed downloads into your media library."
+      title="Transfer Mode"
+      description="How completed downloads are moved from the download path to the storage path."
     >
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -80,9 +80,9 @@ export function ImportMethodSection(): React.JSX.Element {
                 : "border-border/40 bg-muted/20 hover:bg-muted/40",
             )}
           >
-            <span className="text-sm font-semibold">Hardlink</span>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Same machine — file appears in both folders with zero extra disk space. Seeding never interrupted.
+            <span className="text-sm font-semibold">Hardlink (local)</span>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Canto and qBittorrent share the same filesystem. Files are hardlinked to the storage path — zero extra disk space, and seeding continues uninterrupted.
             </p>
           </button>
           <button
@@ -95,17 +95,22 @@ export function ImportMethodSection(): React.JSX.Element {
                 : "border-border/40 bg-muted/20 hover:bg-muted/40",
             )}
           >
-            <span className="text-sm font-semibold">qBittorrent API</span>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Different machines — qBittorrent moves files via API. No shared filesystem needed.
+            <span className="text-sm font-semibold">qBittorrent API (remote)</span>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              qBittorrent runs on a different machine. Canto tells qBittorrent to move files to the storage path via its API. No shared filesystem needed.
             </p>
           </button>
         </div>
         {dirty && (
-          <Button size="sm" onClick={handleSave} disabled={setDlSettings.isPending} className="rounded-xl gap-2">
-            {setDlSettings.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Save
-          </Button>
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={() => { setImportMethod(dlSettingsQuery.data?.importMethod ?? "local"); setDirty(false); }} className="rounded-xl">
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleSave} disabled={setDlSettings.isPending} className="rounded-xl gap-2">
+              {setDlSettings.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Save
+            </Button>
+          </div>
         )}
       </div>
     </SettingsSection>
@@ -192,10 +197,20 @@ export function SeedingSection(): React.JSX.Element {
         </div>
 
         {dirty && (
-          <Button size="sm" onClick={handleSave} disabled={setDlSettings.isPending} className="rounded-xl gap-2">
-            {setDlSettings.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Save
-          </Button>
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={() => {
+              setSeedRatio(dlSettingsQuery.data?.seedRatioLimit?.toString() ?? "");
+              setSeedTime(dlSettingsQuery.data?.seedTimeLimitHours?.toString() ?? "");
+              setSeedCleanup(dlSettingsQuery.data?.seedCleanupFiles ?? false);
+              setDirty(false);
+            }} className="rounded-xl">
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleSave} disabled={setDlSettings.isPending} className="rounded-xl gap-2">
+              {setDlSettings.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Save
+            </Button>
+          </div>
         )}
       </div>
     </SettingsSection>
