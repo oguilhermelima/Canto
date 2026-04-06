@@ -1139,54 +1139,44 @@ function FolderCard({
         "rounded-2xl border transition-colors overflow-hidden",
         needsConfig ? "border-amber-500/30 bg-amber-500/[0.02]" : "border-border/40",
       )}>
-        {/* Collapsed header — always visible */}
-        <button
-          type="button"
-          onClick={onToggle}
-          className="flex w-full items-center gap-3 px-4 sm:px-5 py-4 text-left hover:bg-muted/10 transition-colors"
-        >
-          <Folder className={cn("h-5 w-5 shrink-0", needsConfig ? "text-amber-500/60" : "text-primary")} />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-base font-semibold text-foreground">{folder.name}</p>
-              {folder.qbitCategory && (
-                <span className="text-sm text-muted-foreground">{folder.qbitCategory}</span>
-              )}
-              {folder.isDefault && (
-                <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">Fallback</span>
-              )}
-              {folder.rules && (
-                <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">Auto-routing</span>
-              )}
-              {needsConfig && (
-                <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-400">Needs paths</span>
-              )}
-              {!folder.enabled && (
-                <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">Disabled</span>
-              )}
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-5 mt-1.5">
-              <span className="flex items-center gap-1.5 text-sm text-muted-foreground truncate">
-                <FolderDown className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-                {folder.downloadPath || <span className="italic text-muted-foreground/40">No download path</span>}
-              </span>
-              <span className="flex items-center gap-1.5 text-sm text-muted-foreground truncate">
-                <FolderOpen className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
-                {folder.libraryPath || <span className="italic text-muted-foreground/40">{isLocal ? "No library path" : "No media path"}</span>}
-              </span>
-            </div>
-          </div>
-          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform duration-300", expanded && "rotate-180")} />
-        </button>
+        {/* Header — always visible */}
+        <div className="flex w-full items-center gap-3 px-4 sm:px-5 py-4">
+          <button
+            type="button"
+            onClick={onToggle}
+            className="flex flex-1 items-center gap-3 min-w-0 text-left hover:opacity-80 transition-opacity"
+          >
+            <Folder className={cn("h-5 w-5 shrink-0", needsConfig ? "text-amber-500/60" : "text-primary")} />
+            {expanded ? (
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                className="h-auto border-none bg-transparent p-0 text-base font-semibold text-foreground shadow-none ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 caret-primary"
+              />
+            ) : (
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <p className="text-base font-semibold text-foreground truncate">{folder.name}</p>
+                {needsConfig && (
+                  <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-400 shrink-0">Needs paths</span>
+                )}
+                {!folder.enabled && (
+                  <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground shrink-0">Disabled</span>
+                )}
+              </div>
+            )}
+          </button>
+          {expanded && (
+            <Pencil className="h-3.5 w-3.5 shrink-0 text-muted-foreground/30" />
+          )}
+          <button type="button" onClick={onToggle} className="shrink-0">
+            <ChevronDown className={cn("h-4 w-4 text-muted-foreground/50 transition-transform duration-300", expanded && "rotate-180")} />
+          </button>
+        </div>
 
         {/* Expanded editor */}
         <AnimatedCollapse open={expanded}>
           <div className="border-t border-border/30 px-4 sm:px-5 py-5">
-            {/* Name */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground/80">Folder name</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} className={cn(cardInputCn, "font-semibold text-base")} />
-            </div>
 
             {/* ── Download ── */}
             <div className="mt-6 flex items-center gap-3">
