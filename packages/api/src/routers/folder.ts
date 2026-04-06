@@ -4,7 +4,7 @@ import nodePath from "node:path";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { createFolderInput, updateFolderInput, addServerLinkInput, removeServerLinkInput } from "@canto/validators";
+import { createFolderInput, updateFolderInput, addServerLinkInput, removeServerLinkInput, addMediaPathInput, removeMediaPathInput } from "@canto/validators";
 
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
 import { getDownloadClient } from "../infrastructure/adapters/download-client-factory";
@@ -25,6 +25,9 @@ import {
   updateServerLink,
   removeServerLink,
   findAllServerLinks,
+  findMediaPathsByFolder,
+  addMediaPath,
+  removeMediaPath,
 } from "../infrastructure/repositories/folder-repository";
 import { findMediaById } from "../infrastructure/repositories/media-repository";
 
@@ -205,13 +208,47 @@ export const folderRouter = createTRPCRouter({
     .mutation(({ ctx, input }) => upsertServerLink(ctx.db, input)),
 
   updateServerLink: adminProcedure
-    .input(z.object({ id: z.string().uuid(), syncEnabled: z.boolean() }))
-    .mutation(({ ctx, input }) => updateServerLink(ctx.db, input.id, { syncEnabled: input.syncEnabled })),
+    .input(z.object({
+      id: z.string().uuid(),
+      syncEnabled: z.boolean().optional(),
+      folderId: z.string().uuid().nullable().optional(),
+    }))
+    .mutation(({ ctx, input }) => {
+      const data: Record<string, unknown> = {};
+      if (input.syncEnabled !== undefined) data.syncEnabled = input.syncEnabled;
+      if (input.folderId !== undefined) data.folderId = input.folderId;
+      return updateServerLink(ctx.db, input.id, data);
+    }),
 
   removeServerLink: adminProcedure
     .input(removeServerLinkInput)
     .mutation(async ({ ctx, input }) => {
       await removeServerLink(ctx.db, input.id);
+      return { success: true };
+    }),
+
+  // ── Media Paths ──
+
+  listMediaPaths: adminProcedure
+    .input(z.object({ folderId: z.string().uuid() }))
+    .query(({ ctx, input }) => findMediaPathsByFolder(ctx.db, input.folderId)),
+
+  addMediaPath: adminProcedure
+    .input(addMediaPathInput)
+    .mutation(async ({ ctx, input }) => {
+      const normalized = validatePath(input.path);
+      return addMediaPath(ctx.db, {
+        folderId: input.folderId,
+        path: normalized,
+        label: input.label,
+        source: input.source,
+      });
+    }),
+
+  removeMediaPath: adminProcedure
+    .input(removeMediaPathInput)
+    .mutation(async ({ ctx, input }) => {
+      await removeMediaPath(ctx.db, input.id);
       return { success: true };
     }),
 });

@@ -130,15 +130,19 @@ export const syncRouter = createTRPCRouter({
       if (existing) {
         mediaId = existing.id;
         if (!existing.inLibrary || !existing.downloaded) {
-          await updateMedia(db, existing.id, {
-            inLibrary: true, downloaded: true, libraryId: item.libraryId, libraryPath: item.serverItemPath, addedAt: existing.addedAt ?? new Date(),
-          });
+          const updates: Record<string, unknown> = {
+            inLibrary: true, downloaded: true, libraryPath: item.serverItemPath, addedAt: existing.addedAt ?? new Date(),
+          };
+          if (item.libraryId) updates.libraryId = item.libraryId;
+          await updateMedia(db, existing.id, updates);
         }
       } else {
         const inserted = await persistMedia(db, normalized);
-        await updateMedia(db, inserted.id, {
-          inLibrary: true, downloaded: true, libraryId: item.libraryId, libraryPath: item.serverItemPath, addedAt: new Date(),
-        });
+        const updates: Record<string, unknown> = {
+          inLibrary: true, downloaded: true, libraryPath: item.serverItemPath, addedAt: new Date(),
+        };
+        if (item.libraryId) updates.libraryId = item.libraryId;
+        await updateMedia(db, inserted.id, updates);
         mediaId = inserted.id;
       }
 
@@ -266,7 +270,7 @@ export const syncRouter = createTRPCRouter({
         contentType: string;
         serverPath: string | null;
         linkId?: string;
-        linkedFolderId?: string;
+        linkedFolderId?: string | null;
         linkedFolderName?: string;
         syncEnabled: boolean;
         lastSyncedAt: Date | null;
@@ -308,7 +312,7 @@ export const syncRouter = createTRPCRouter({
 
       const result: DiscoveredLibrary[] = serverLibraries.map((lib) => {
         const link = linkMap.get(lib.id);
-        const folder = link ? folderMap.get(link.folderId) : undefined;
+        const folder = link?.folderId ? folderMap.get(link.folderId) : undefined;
         return {
           serverType,
           serverLibraryId: lib.id,
@@ -316,7 +320,7 @@ export const syncRouter = createTRPCRouter({
           contentType: link?.contentType ?? lib.contentType,
           serverPath: lib.path,
           linkId: link?.id,
-          linkedFolderId: link?.folderId,
+          linkedFolderId: link?.folderId ?? null,
           linkedFolderName: folder?.name,
           syncEnabled: link?.syncEnabled ?? false,
           lastSyncedAt: link?.lastSyncedAt ?? null,
