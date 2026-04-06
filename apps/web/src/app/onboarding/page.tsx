@@ -697,12 +697,7 @@ function JellyfinStep({ onNext, settings }: { onNext: () => void; settings?: Set
       <div className="space-y-3">
         <h1 className="text-2xl font-semibold text-foreground">Jellyfin</h1>
         <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
-          Connect your Jellyfin server to import your existing collection into Canto.
-        </p>
-      </div>
-      <div className="w-full max-w-lg rounded-xl border border-border/40 bg-muted/5 px-5 py-4 text-left">
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Only needed if you already have a Jellyfin library. If you're starting fresh with Canto, your downloads will be synced automatically — you can skip this step.
+          Connect Jellyfin to open content directly in your media server and import your existing library into Canto.
         </p>
       </div>
 
@@ -883,12 +878,7 @@ function PlexStep({ onNext, settings }: { onNext: () => void; settings?: Setting
       <div className="space-y-3">
         <h1 className="text-2xl font-semibold text-foreground">Plex</h1>
         <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
-          Connect your Plex server to import your existing collection into Canto.
-        </p>
-      </div>
-      <div className="w-full max-w-lg rounded-xl border border-border/40 bg-muted/5 px-5 py-4 text-left">
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Only needed if you already have a Plex library. If you're starting fresh with Canto, your downloads will be synced automatically — you can skip this step.
+          Connect Plex to open content directly in your media server and import your existing library into Canto.
         </p>
       </div>
 
