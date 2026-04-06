@@ -70,6 +70,15 @@ function DownloadsSection(): React.JSX.Element {
         title="Libraries"
         description="Each library defines where files are downloaded, where your media is stored, and how new downloads are routed."
       >
+        <div className="mb-4 rounded-xl border border-border/30 bg-muted/5 px-4 py-3">
+          <p className="text-sm text-muted-foreground">
+            Canto renames and organizes files in the storage path so media servers can recognize them:
+          </p>
+          <p className="mt-1.5 font-mono text-xs text-muted-foreground leading-relaxed">
+            Movie Title (2024) [tmdbid-12345]/<br />
+            <span className="pl-4">Movie Title (2024) [Bluray-1080p][h265].mkv</span>
+          </p>
+        </div>
         <DownloadFolders mode="settings" />
       </SettingsSection>
       <SeedingSection />
