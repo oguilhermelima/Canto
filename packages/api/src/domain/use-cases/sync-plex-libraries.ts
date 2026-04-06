@@ -27,6 +27,7 @@ export async function syncPlexLibraries(
     if (!["movie", "show"].includes(section.type)) continue;
 
     const serverPath = section.Location[0]?.path ?? null;
+    const contentType = section.type === "movie" ? "movies" : "shows";
 
     // Check if already linked
     const existingLink = await findServerLink(db, "plex", section.key);
@@ -37,6 +38,7 @@ export async function syncPlexLibraries(
         serverLibraryId: section.key,
         serverLibraryName: section.title,
         serverPath,
+        contentType,
       });
       synced.push({ id: existingLink.folderId, name: section.title, action: "linked" });
       continue;
@@ -53,6 +55,7 @@ export async function syncPlexLibraries(
         serverLibraryId: section.key,
         serverLibraryName: section.title,
         serverPath,
+        contentType,
       });
       synced.push({ id: match.id, name: section.title, action: "linked" });
     } else {
@@ -74,6 +77,7 @@ export async function syncPlexLibraries(
           serverLibraryId: section.key,
           serverLibraryName: section.title,
           serverPath,
+          contentType,
         });
         synced.push({ id: newFolder.id, name: section.title, action: "created" });
       }

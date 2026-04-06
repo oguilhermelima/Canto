@@ -28,6 +28,7 @@ export async function syncJellyfinLibraries(
     if (!["movies", "tvshows"].includes(folder.CollectionType)) continue;
 
     const serverPath = folder.Locations[0] ?? null;
+    const contentType = folder.CollectionType === "movies" ? "movies" : "shows";
 
     // Check if already linked
     const existingLink = await findServerLink(db, "jellyfin", folder.Id);
@@ -39,6 +40,7 @@ export async function syncJellyfinLibraries(
         serverLibraryId: folder.Id,
         serverLibraryName: folder.Name,
         serverPath,
+        contentType,
       });
       synced.push({ id: existingLink.folderId, name: folder.Name, action: "linked" });
       continue;
@@ -56,6 +58,7 @@ export async function syncJellyfinLibraries(
         serverLibraryId: folder.Id,
         serverLibraryName: folder.Name,
         serverPath,
+        contentType,
       });
       synced.push({ id: match.id, name: folder.Name, action: "linked" });
     } else {
@@ -78,6 +81,7 @@ export async function syncJellyfinLibraries(
           serverLibraryId: folder.Id,
           serverLibraryName: folder.Name,
           serverPath,
+          contentType,
         });
         synced.push({ id: newFolder.id, name: folder.Name, action: "created" });
       }
