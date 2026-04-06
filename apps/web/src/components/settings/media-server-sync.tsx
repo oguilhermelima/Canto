@@ -6,13 +6,6 @@ import { Switch } from "@canto/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@canto/ui/dialog";
 import { Input } from "@canto/ui/input";
 import { Skeleton } from "@canto/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@canto/ui/select";
 import { Badge } from "@canto/ui/badge";
 import {
   Loader2,
@@ -25,8 +18,6 @@ import {
   FolderSearch,
   Film,
   Tv,
-  Link2,
-  Unlink,
 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
@@ -301,7 +292,14 @@ function LibraryLinkingSection({ source }: { source: "jellyfin" | "plex" }): Rea
   const utils = trpc.useUtils();
 
   const libraries = trpc.sync.discoverServerLibraries.useQuery({ serverType: source });
-  const folders = trpc.folder.list.useQuery();
+  const addLink = trpc.folder.addServerLink.useMutation({
+    onSuccess: () => {
+      void utils.sync.discoverServerLibraries.invalidate();
+      void utils.folder.listWithLinks.invalidate();
+      toast.success("Sync enabled");
+    },
+    onError: () => toast.error("Failed to enable sync"),
+  });
 
   const updateLink = trpc.folder.updateServerLink.useMutation({
     onSuccess: () => {
@@ -310,9 +308,6 @@ function LibraryLinkingSection({ source }: { source: "jellyfin" | "plex" }): Rea
     },
     onError: () => toast.error("Failed to update library"),
   });
-
-  // Track selected folder per library for linking
-  const [selectedFolders, setSelectedFolders] = useState<Record<string, string>>({});
 
   if (libraries.isLoading) {
     return (
@@ -342,30 +337,10 @@ function LibraryLinkingSection({ source }: { source: "jellyfin" | "plex" }): Rea
     );
   }
 
-  const folderList = folders.data ?? [];
-
   return (
-    <div className="divide-y divide-border/30">
-      {/* Section header */}
-      <div className="flex items-center justify-between px-5 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
-          Server Libraries
-        </p>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 text-xs"
-          onClick={() => void utils.sync.discoverServerLibraries.invalidate()}
-        >
-          <RefreshCw className="mr-1 h-3 w-3" />
-          Refresh
-        </Button>
-      </div>
-
+    <div className="divide-y divide-border/30 rounded-xl border border-border/40 overflow-hidden">
       {items.map((lib) => {
         const hasLink = !!lib.linkId;
-        const hasFolderLink = hasLink && !!lib.linkedFolderName;
-        const selectedFolder = selectedFolders[lib.serverLibraryId];
 
         return (
           <div
@@ -400,89 +375,28 @@ function LibraryLinkingSection({ source }: { source: "jellyfin" | "plex" }): Rea
                 </div>
               </div>
 
-              {/* Right: sync toggle (always visible when link exists) */}
+              {/* Right: sync toggle — always visible */}
               <div className="flex items-center gap-2 shrink-0 sm:ml-4">
-                {hasLink && (
-                  <Switch
-                    checked={lib.syncEnabled}
-                    onCheckedChange={(checked) => {
-                      if (lib.linkId) updateLink.mutate({ id: lib.linkId, syncEnabled: checked });
-                    }}
-                    disabled={updateLink.isPending}
-                  />
-                )}
+                <Switch
+                  checked={lib.syncEnabled}
+                  onCheckedChange={(checked) => {
+                    if (hasLink && lib.linkId) {
+                      updateLink.mutate({ id: lib.linkId, syncEnabled: checked });
+                    } else if (checked) {
+                      addLink.mutate({
+                        serverType: source,
+                        serverLibraryId: lib.serverLibraryId,
+                        serverLibraryName: lib.serverLibraryName,
+                        contentType: lib.contentType as "movies" | "shows",
+                        serverPath: lib.serverPath ?? undefined,
+                        syncEnabled: true,
+                      });
+                    }
+                  }}
+                  disabled={updateLink.isPending || addLink.isPending}
+                />
               </div>
             </div>
-
-            {/* Folder linking row — shown when link exists */}
-            {hasLink && (
-              <div className="flex items-center gap-2 pl-7">
-                {hasFolderLink ? (
-                  <>
-                    <span className="text-xs text-muted-foreground truncate max-w-[200px]">
-                      <Link2 className="mr-1 inline h-3 w-3" />
-                      {lib.linkedFolderName}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-6 text-xs text-muted-foreground hover:text-destructive"
-                      onClick={() => {
-                        if (lib.linkId) {
-                          updateLink.mutate({ id: lib.linkId, folderId: null });
-                          toast.success("Folder unlinked — sync continues without folder organization");
-                        }
-                      }}
-                      disabled={updateLink.isPending}
-                    >
-                      <Unlink className="mr-1 h-3 w-3" />
-                      Unlink
-                    </Button>
-                  </>
-                ) : folderList.length > 0 ? (
-                  <>
-                    <Select
-                      value={selectedFolder}
-                      onValueChange={(val) =>
-                        setSelectedFolders((prev) => ({ ...prev, [lib.serverLibraryId]: val }))
-                      }
-                    >
-                      <SelectTrigger className="h-7 w-[160px] text-xs rounded-lg">
-                        <SelectValue placeholder="No folder" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {folderList.map((f) => (
-                          <SelectItem key={f.id} value={f.id} className="text-xs">
-                            {f.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-6 text-xs"
-                      disabled={!selectedFolder || updateLink.isPending}
-                      onClick={() => {
-                        if (selectedFolder && lib.linkId) {
-                          updateLink.mutate({ id: lib.linkId, folderId: selectedFolder });
-                          toast.success("Library linked to folder");
-                        }
-                      }}
-                    >
-                      {updateLink.isPending ? (
-                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                      ) : (
-                        <Link2 className="mr-1 h-3 w-3" />
-                      )}
-                      Link
-                    </Button>
-                  </>
-                ) : (
-                  <span className="text-xs text-muted-foreground/40">No folder — syncs without organization</span>
-                )}
-              </div>
-            )}
           </div>
         );
       })}
@@ -495,13 +409,11 @@ function LibraryLinkingSection({ source }: { source: "jellyfin" | "plex" }): Rea
 /* -------------------------------------------------------------------------- */
 
 function ServerLibraryGroup({
-  server,
   source,
   enabled,
   isSyncingLibraries,
   onSyncLibraries,
 }: {
-  server: string;
   source: "jellyfin" | "plex";
   enabled: boolean;
   isSyncingLibraries: boolean;
@@ -516,77 +428,65 @@ function ServerLibraryGroup({
     onError: () => toast.error("Failed to start sync"),
   });
 
+  const [showHistory, setShowHistory] = useState(false);
+
   if (!enabled) return null;
 
   return (
-    <div className="rounded-xl border border-border/40 overflow-hidden">
-      {/* Header */}
-      <div className={cn(
-        "flex items-center justify-between px-5 py-3.5 bg-gradient-to-r",
-        source === "jellyfin"
-          ? "from-[#a95ce0]/15 via-[#4bb8e8]/10 to-transparent"
-          : "from-[#e5a00d]/15 via-[#e5a00d]/5 to-transparent",
-      )}>
-        <div className="flex items-center gap-2.5">
-          <span
-            className="inline-block h-5 w-5 shrink-0"
-            style={source === "jellyfin"
-              ? { background: "linear-gradient(135deg, #a95ce0, #4bb8e8)", mask: "url(/jellyfin-logo.svg) center/contain no-repeat", WebkitMask: "url(/jellyfin-logo.svg) center/contain no-repeat" }
-              : { background: "#e5a00d", mask: "url(/plex-logo.svg) center/contain no-repeat", WebkitMask: "url(/plex-logo.svg) center/contain no-repeat" }
-            }
-          />
-          <p className="text-base font-semibold text-foreground">{server}</p>
-        </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={onSyncLibraries}
-          disabled={isSyncingLibraries}
-        >
-          {isSyncingLibraries ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
-          {isSyncingLibraries ? "Scanning..." : "Scan libraries"}
-        </Button>
-      </div>
-
-      {/* Library Linking */}
-      <div className="border-t border-border/30">
+    <SettingsSection
+      title="Reverse Sync"
+      description="Import your existing collection from the server into Canto. Enabled libraries are scanned every 5 minutes for new content."
+    >
+      <div className="space-y-4">
+        {/* Libraries */}
         <LibraryLinkingSection source={source} />
-      </div>
 
-      {/* Synced Items */}
-      <div className="border-t border-border/30">
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setShowSyncedItems((p) => !p)}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowSyncedItems((p) => !p); } }}
-          className="flex w-full cursor-pointer items-center justify-between px-5 py-3.5 text-left transition-colors hover:bg-muted/20"
-        >
-          <div>
-            <p className="text-sm font-medium text-foreground">Synced items</p>
-            <p className="text-xs text-muted-foreground">Runs every 5 minutes</p>
-          </div>
-          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => importMedia.mutate()}
-              disabled={importMedia.isPending}
-            >
-              {importMedia.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
-              Sync now
-            </Button>
-            <ChevronRight size={16} className={cn("text-muted-foreground/50 transition-transform duration-200", showSyncedItems && "rotate-90")} />
-          </div>
+        {/* Rescan hint */}
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={onSyncLibraries}
+            disabled={isSyncingLibraries}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {isSyncingLibraries ? (
+              <><Loader2 className="mr-1.5 inline h-3.5 w-3.5 animate-spin" />Scanning...</>
+            ) : (
+              "Not seeing a library? Rescan server"
+            )}
+          </button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => importMedia.mutate()}
+            disabled={importMedia.isPending}
+          >
+            {importMedia.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
+            Sync now
+          </Button>
         </div>
 
-        <AnimatedCollapse open={showSyncedItems}>
-          <div className="px-5 pb-5">
-            <SyncedItemsTable source={source} />
-          </div>
-        </AnimatedCollapse>
+        {/* Sync History — collapsible */}
+        <div className="rounded-xl border border-border/40 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowHistory((p) => !p)}
+            className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-muted/10"
+          >
+            <div>
+              <p className="text-sm font-medium text-foreground">Sync History</p>
+              <p className="text-sm text-muted-foreground">Results from the latest sync. Fix failed matches here.</p>
+            </div>
+            <ChevronRight size={16} className={cn("text-muted-foreground transition-transform duration-200", showHistory && "rotate-90")} />
+          </button>
+          <AnimatedCollapse open={showHistory}>
+            <div className="border-t border-border/30 px-4 pb-4">
+              <SyncedItemsTable source={source} />
+            </div>
+          </AnimatedCollapse>
+        </div>
       </div>
-    </div>
+    </SettingsSection>
   );
 }
 
@@ -627,10 +527,10 @@ function FolderScanSection(): React.JSX.Element {
             <div className="flex items-center gap-3 min-w-0">
               <FolderSearch className="h-5 w-5 shrink-0 text-primary" />
               <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">Scan library folders for existing media</p>
+                <p className="text-sm font-medium text-foreground">Scan libraries for existing media</p>
                 <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
-                  Periodically scan your download folder library paths and match existing files to TMDB.
-                  Detected media will be marked as in your library.
+                  Periodically scan your library storage paths and match existing files to TMDB.
+                  Detected media will be added to your library.
                 </p>
               </div>
             </div>
@@ -695,32 +595,21 @@ export function MediaServerSyncSection({ serverType }: { serverType?: "jellyfin"
 
   return (
     <>
-      {hasMediaServer && (
-        <SettingsSection
-          title="Media Server Sync"
-          description={`Import existing content from ${serverType === "jellyfin" ? "Jellyfin" : serverType === "plex" ? "Plex" : "Jellyfin or Plex"} into your Canto library.`}
-        >
-          <div className="space-y-4">
-            {showJellyfin && (
-              <ServerLibraryGroup
-                server="Jellyfin"
-                source="jellyfin"
-                enabled={jellyfinEnabled}
-                isSyncingLibraries={syncJellyfin.isPending}
-                onSyncLibraries={() => syncJellyfin.mutate()}
-              />
-            )}
-            {showPlex && (
-              <ServerLibraryGroup
-                server="Plex"
-                source="plex"
-                enabled={plexEnabled}
-                isSyncingLibraries={syncPlex.isPending}
-                onSyncLibraries={() => syncPlex.mutate()}
-              />
-            )}
-          </div>
-        </SettingsSection>
+      {showJellyfin && (
+        <ServerLibraryGroup
+          source="jellyfin"
+          enabled={jellyfinEnabled}
+          isSyncingLibraries={syncJellyfin.isPending}
+          onSyncLibraries={() => syncJellyfin.mutate()}
+        />
+      )}
+      {showPlex && (
+        <ServerLibraryGroup
+          source="plex"
+          enabled={plexEnabled}
+          isSyncingLibraries={syncPlex.isPending}
+          onSyncLibraries={() => syncPlex.mutate()}
+        />
       )}
       {!serverType && <FolderScanSection />}
     </>
