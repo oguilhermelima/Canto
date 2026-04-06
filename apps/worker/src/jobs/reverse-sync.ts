@@ -4,12 +4,13 @@ import { persistMedia, getSupportedLanguageCodes } from "@canto/db/persist-media
 import { TmdbProvider } from "@canto/providers";
 import {
   findEnabledSyncLinks,
-  findMediaByExternalId,
   findMediaByAnyReference,
   updateMedia,
-  deleteSyncItemsByLibraryIds,
-  createSyncItem,
   createSyncEpisodes,
+  upsertSyncItemByServerKey,
+  pruneOldSyncItems,
+  deleteSyncEpisodesBySyncItemId,
+  updateServerLink,
   ensureServerLibrary,
   addListItem,
 } from "@canto/api/infrastructure/repositories";
@@ -122,55 +123,58 @@ async function scanJellyfin(
   const items: PendingImport[] = [];
 
   for (const lib of libs) {
-    const mediaType = lib.type === "movies" ? "movie" : "show";
-    const includeTypes = lib.type === "movies" ? "Movie" : "Series";
+    const typesToScan = lib.type === "mixed"
+      ? [{ mediaType: "movie" as const, includeTypes: "Movie" }, { mediaType: "show" as const, includeTypes: "Series" }]
+      : [{ mediaType: (lib.type === "movies" ? "movie" : "show") as "movie" | "show", includeTypes: lib.type === "movies" ? "Movie" : "Series" }];
 
-    let startIndex = 0;
-    const pageSize = 500;
+    for (const { mediaType, includeTypes } of typesToScan) {
+      let startIndex = 0;
+      const pageSize = 500;
 
-    try {
-      while (true) {
-        const res = await fetch(
-          `${url}/Items?ParentId=${lib.jellyfinLibraryId}&IncludeItemTypes=${includeTypes}&Fields=ProviderIds,Path,ProductionYear&Recursive=true&StartIndex=${startIndex}&Limit=${pageSize}`,
-          { headers: { "X-Emby-Token": apiKey }, signal: AbortSignal.timeout(30_000) },
+      try {
+        while (true) {
+          const res = await fetch(
+            `${url}/Items?ParentId=${lib.jellyfinLibraryId}&IncludeItemTypes=${includeTypes}&Fields=ProviderIds,Path,ProductionYear&Recursive=true&StartIndex=${startIndex}&Limit=${pageSize}`,
+            { headers: { "X-Emby-Token": apiKey }, signal: AbortSignal.timeout(30_000) },
+          );
+          if (!res.ok) {
+            throw new Error(`Jellyfin API returned HTTP ${res.status} at offset ${startIndex}`);
+          }
+
+          const data = await res.json() as {
+            Items: Array<{
+              Id: string;
+              Name: string;
+              ProductionYear?: number;
+              Path?: string;
+              ProviderIds?: { Tmdb?: string; Imdb?: string };
+            }>;
+            TotalRecordCount: number;
+          };
+
+          for (const item of data.Items) {
+            const tmdbStr = item.ProviderIds?.Tmdb;
+            items.push({
+              tmdbId: tmdbStr ? parseInt(tmdbStr, 10) : undefined,
+              imdbId: item.ProviderIds?.Imdb,
+              title: item.Name,
+              year: item.ProductionYear,
+              type: mediaType,
+              libraryId: lib.id,
+              path: item.Path,
+              source: "jellyfin",
+              jellyfinItemId: item.Id,
+            });
+          }
+
+          startIndex += pageSize;
+          if (startIndex >= data.TotalRecordCount) break;
+        }
+      } catch (err) {
+        console.warn(
+          `[jellyfin-scan] Partial sync for library ${lib.jellyfinLibraryId} (${includeTypes}): ${err instanceof Error ? err.message : err}. Returning ${items.length} items fetched so far.`,
         );
-        if (!res.ok) {
-          throw new Error(`Jellyfin API returned HTTP ${res.status} at offset ${startIndex}`);
-        }
-
-        const data = await res.json() as {
-          Items: Array<{
-            Id: string;
-            Name: string;
-            ProductionYear?: number;
-            Path?: string;
-            ProviderIds?: { Tmdb?: string; Imdb?: string };
-          }>;
-          TotalRecordCount: number;
-        };
-
-        for (const item of data.Items) {
-          const tmdbStr = item.ProviderIds?.Tmdb;
-          items.push({
-            tmdbId: tmdbStr ? parseInt(tmdbStr, 10) : undefined,
-            imdbId: item.ProviderIds?.Imdb,
-            title: item.Name,
-            year: item.ProductionYear,
-            type: mediaType,
-            libraryId: lib.id,
-            path: item.Path,
-            source: "jellyfin",
-            jellyfinItemId: item.Id,
-          });
-        }
-
-        startIndex += pageSize;
-        if (startIndex >= data.TotalRecordCount) break;
       }
-    } catch (err) {
-      console.warn(
-        `[jellyfin-scan] Partial sync for library ${lib.jellyfinLibraryId}: ${err instanceof Error ? err.message : err}. Returning ${items.length} items fetched so far.`,
-      );
     }
   }
 
@@ -189,7 +193,6 @@ async function scanPlex(
   const items: PendingImport[] = [];
 
   for (const lib of libs) {
-    const mediaType = lib.type === "movies" ? "movie" : "show";
     const plexPageSize = 100;
     let offset = 0;
 
@@ -208,6 +211,7 @@ async function scanPlex(
             ratingKey: string;
             title: string;
             year?: number;
+            type?: string;
             Guid?: Array<{ id: string }>;
           }>;
         };
@@ -224,6 +228,14 @@ async function scanPlex(
           } else if (guid.id.startsWith("imdb://")) {
             imdbId = guid.id.replace("imdb://", "");
           }
+        }
+
+        // Determine media type: use link's contentType, fall back to item's type from Plex
+        let mediaType: "movie" | "show";
+        if (lib.type === "mixed") {
+          mediaType = item.type === "movie" ? "movie" : "show";
+        } else {
+          mediaType = lib.type === "movies" ? "movie" : "show";
         }
 
         items.push({
@@ -439,11 +451,14 @@ async function fetchPlexMediaInfo(
 async function processPendingImports(
   pending: PendingImport[],
   tag: string,
+  linkIdsByLibrary?: Map<string, string>,
 ): Promise<void> {
   if (pending.length === 0) {
     console.log(`[${tag}] No items to process`);
     return;
   }
+
+  const syncRunStart = new Date();
 
   const tmdbApiKey = await getSetting<string>("tmdb.apiKey");
   if (!tmdbApiKey) throw new Error("TMDB API key not configured");
@@ -457,10 +472,8 @@ async function processPendingImports(
   const plexUrl = await getSetting<string>("plex.url");
   const plexToken = await getSetting<string>("plex.token");
 
-  // Clear previous sync items for libraries being synced (scoped to this source only)
   const syncedLibraryIds = [...new Set(pending.map((i) => i.libraryId))];
   const source = pending[0]?.source;
-  await deleteSyncItemsByLibraryIds(db, syncedLibraryIds, source);
 
   // Deduplicate for processing (don't fetch TMDB twice for same item)
   // But we still record sync_items for all libraries
@@ -516,10 +529,11 @@ async function processPendingImports(
         if (!tmdbId) {
           console.log(`[reverse-sync] Could not resolve: ${item.title} (${item.year})`);
           status.failed++;
-          await createSyncItem(db, {
+          await upsertSyncItemByServerKey(db, {
             ...syncItemBase(item),
             result: "failed",
             reason: "Could not find on TMDB",
+            syncedAt: syncRunStart,
           });
           status.processed++;
           await updateStatus(tag, status);
@@ -556,17 +570,19 @@ async function processPendingImports(
 
           if (existing.inLibrary) {
             status.skipped++;
-            const skippedSyncItem = await createSyncItem(db, {
+            const skippedSyncItem = await upsertSyncItemByServerKey(db, {
               ...syncItemBase(item),
               tmdbId,
               mediaId,
               result: "skipped",
               reason: "Already in library",
+              syncedAt: syncRunStart,
             });
 
             // Still fetch media info for skipped items (they exist on this server)
             if (skippedSyncItem) {
               try {
+                await deleteSyncEpisodesBySyncItemId(db, skippedSyncItem.id);
                 let mediaFiles: MediaFileInfo[] = [];
                 if (item.source === "jellyfin" && item.jellyfinItemId && jellyfinUrl && jellyfinKey) {
                   mediaFiles = await fetchJellyfinMediaInfo(jellyfinUrl, jellyfinKey, item.jellyfinItemId, item.type);
@@ -617,16 +633,18 @@ async function processPendingImports(
         } catch { /* already in server library */ }
 
         status.imported++;
-        const insertedSyncItem = await createSyncItem(db, {
+        const insertedSyncItem = await upsertSyncItemByServerKey(db, {
           ...syncItemBase(item),
           tmdbId,
           mediaId,
           result: "imported",
+          syncedAt: syncRunStart,
         });
 
         // Fetch media file info (resolution, codec, etc.)
         if (insertedSyncItem) {
           try {
+            await deleteSyncEpisodesBySyncItemId(db, insertedSyncItem.id);
             let mediaFiles: MediaFileInfo[] = [];
             if (item.source === "jellyfin" && item.jellyfinItemId && jellyfinUrl && jellyfinKey) {
               mediaFiles = await fetchJellyfinMediaInfo(jellyfinUrl, jellyfinKey, item.jellyfinItemId, item.type);
@@ -660,11 +678,12 @@ async function processPendingImports(
         const msg = err instanceof Error ? err.message : "Unknown error";
         console.error(`[reverse-sync] Error processing ${item.title}:`, msg);
         status.failed++;
-        await createSyncItem(db, {
+        await upsertSyncItemByServerKey(db, {
           ...syncItemBase(item),
           tmdbId: item.tmdbId,
           result: "failed",
           reason: msg.slice(0, 500),
+          syncedAt: syncRunStart,
         });
       }
 
@@ -699,13 +718,26 @@ async function processPendingImports(
       mediaId = existing?.id;
     }
 
-    await createSyncItem(db, {
+    await upsertSyncItemByServerKey(db, {
       ...syncItemBase(item),
       tmdbId: item.tmdbId,
       mediaId: mediaId ?? null,
       result: mediaId ? "skipped" : "failed",
       reason: mediaId ? "Already in library" : "Could not resolve",
+      syncedAt: syncRunStart,
     });
+  }
+
+  // Prune sync items no longer present on the server
+  if (source) {
+    await pruneOldSyncItems(db, syncedLibraryIds, source, syncRunStart);
+  }
+
+  // Update lastSyncedAt per link
+  if (linkIdsByLibrary) {
+    for (const [, linkId] of linkIdsByLibrary) {
+      await updateServerLink(db, linkId, { lastSyncedAt: new Date() });
+    }
   }
 
   // Reconcile Server Library — ensure it matches what's actually on servers
@@ -771,16 +803,23 @@ export async function handleJellyfinSync(): Promise<void> {
   const syncLinks = await findEnabledSyncLinks(db);
   const linked = syncLinks
     .filter((l) => l.serverType === "jellyfin")
-    .map((l) => ({ id: l.folderId, jellyfinLibraryId: l.serverLibraryId, type: "mixed" as string }));
+    .map((l) => ({
+      id: l.folderId,
+      jellyfinLibraryId: l.serverLibraryId,
+      type: l.contentType ?? "mixed",
+      linkId: l.id,
+    }));
 
   if (linked.length === 0) {
     console.log("[jellyfin-sync] No linked Jellyfin libraries");
     return;
   }
 
+  const linkIdsByLibrary = new Map(linked.map((l) => [l.id, l.linkId]));
+
   console.log(`[jellyfin-sync] Scanning ${linked.length} Jellyfin libraries...`);
   const items = await scanJellyfin(jellyfinUrl, jellyfinKey, linked);
-  await processPendingImports(items, "jellyfin-sync");
+  await processPendingImports(items, "jellyfin-sync", linkIdsByLibrary);
 }
 
 export async function handlePlexSync(): Promise<void> {
@@ -796,16 +835,23 @@ export async function handlePlexSync(): Promise<void> {
   const plexSyncLinks = await findEnabledSyncLinks(db);
   const linked = plexSyncLinks
     .filter((l) => l.serverType === "plex")
-    .map((l) => ({ id: l.folderId, plexLibraryId: l.serverLibraryId, type: "mixed" as string }));
+    .map((l) => ({
+      id: l.folderId,
+      plexLibraryId: l.serverLibraryId,
+      type: l.contentType ?? "mixed",
+      linkId: l.id,
+    }));
 
   if (linked.length === 0) {
     console.log("[plex-sync] No linked Plex libraries");
     return;
   }
 
+  const linkIdsByLibrary = new Map(linked.map((l) => [l.id, l.linkId]));
+
   console.log(`[plex-sync] Scanning ${linked.length} Plex libraries...`);
   const items = await scanPlex(plexUrl, plexToken, linked);
-  await processPendingImports(items, "plex-sync");
+  await processPendingImports(items, "plex-sync", linkIdsByLibrary);
 }
 
 /* -------------------------------------------------------------------------- */
