@@ -57,6 +57,7 @@ export const addServerLinkInput = z.object({
   serverLibraryName: z.string().optional(),
   serverPath: z.string().optional(),
   syncEnabled: z.boolean().default(false),
+  contentType: z.enum(["movies", "shows"]).optional(),
 });
 
 export const removeServerLinkInput = z.object({

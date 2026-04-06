@@ -154,6 +154,9 @@ export const folderServerLink = pgTable(
     serverPath: varchar("server_path", { length: 500 }),
     /** Whether to import existing media from this link */
     syncEnabled: boolean("sync_enabled").notNull().default(false),
+    /** "movies" | "shows" */
+    contentType: varchar("content_type", { length: 20 }),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
