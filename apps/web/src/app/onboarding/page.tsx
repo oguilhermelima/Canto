@@ -983,105 +983,6 @@ function PlexStep({ onNext, settings }: { onNext: () => void; settings?: Setting
 /*  Unlinked libraries bridge (shown in download folders step)                 */
 /* -------------------------------------------------------------------------- */
 
-function UnlinkedLibrariesBridge(): React.JSX.Element | null {
-  const utils = trpc.useUtils();
-  const jellyfinLibs = trpc.sync.discoverServerLibraries.useQuery({ serverType: "jellyfin" });
-  const plexLibs = trpc.sync.discoverServerLibraries.useQuery({ serverType: "plex" });
-  const folders = trpc.folder.list.useQuery();
-
-  const updateServerLink = trpc.folder.updateServerLink.useMutation({
-    onSuccess: () => {
-      void utils.sync.discoverServerLibraries.invalidate();
-      toast.success("Library linked to folder");
-    },
-    onError: () => toast.error("Failed to link library"),
-  });
-
-  const [selectedFolders, setSelectedFolders] = useState<Record<string, string>>({});
-
-  const allLibraries = [...(jellyfinLibs.data ?? []), ...(plexLibs.data ?? [])];
-  const unlinked = allLibraries.filter((lib) => lib.linkId && !lib.linkedFolderName);
-  const folderList = folders.data ?? [];
-
-  if (jellyfinLibs.isLoading || plexLibs.isLoading || folders.isLoading) return null;
-  if (unlinked.length === 0 || folderList.length === 0) return null;
-
-  return (
-    <div className="w-full max-w-2xl rounded-2xl border border-border/40 bg-muted/5 p-5 space-y-4 text-left">
-      <div className="space-y-1">
-        <p className="text-sm font-semibold text-foreground">Link server libraries</p>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          You connected Jellyfin/Plex earlier. Link their libraries to organize synced content.
-        </p>
-      </div>
-      <div className="space-y-2">
-        {unlinked.map((lib) => {
-          const selected = selectedFolders[lib.serverLibraryId];
-          return (
-            <div
-              key={lib.serverLibraryId}
-              className="flex flex-col gap-2 rounded-xl bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                {lib.contentType === "movies" ? (
-                  <Film className="h-4 w-4 shrink-0 text-blue-400" />
-                ) : (
-                  <Tv className="h-4 w-4 shrink-0 text-purple-400" />
-                )}
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-foreground truncate">{lib.serverLibraryName}</p>
-                    <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0">
-                      {lib.contentType === "movies" ? "Movies" : "Shows"}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <Select
-                  value={selected}
-                  onValueChange={(val) =>
-                    setSelectedFolders((prev) => ({ ...prev, [lib.serverLibraryId]: val }))
-                  }
-                >
-                  <SelectTrigger className="h-8 w-[160px] text-xs rounded-lg">
-                    <SelectValue placeholder="Select folder" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {folderList.map((f) => (
-                      <SelectItem key={f.id} value={f.id} className="text-xs">
-                        {f.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 text-xs"
-                  disabled={!selected || updateServerLink.isPending}
-                  onClick={() => {
-                    if (selected && lib.linkId) {
-                      updateServerLink.mutate({ id: lib.linkId, folderId: selected });
-                    }
-                  }}
-                >
-                  {updateServerLink.isPending ? (
-                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                  ) : (
-                    <Link2 className="mr-1 h-3 w-3" />
-                  )}
-                  Link
-                </Button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 /* -------------------------------------------------------------------------- */
 /*  Step: Download Folders                                                     */
 /* -------------------------------------------------------------------------- */
@@ -1249,7 +1150,6 @@ function DownloadFoldersStep({ onNext }: { onNext: () => void }): React.JSX.Elem
         <DownloadFolders mode="onboarding" importMethod={importMethod} />
       </div>
 
-      <UnlinkedLibrariesBridge />
 
       <FolderGate onNext={onNext} />
     </div>
