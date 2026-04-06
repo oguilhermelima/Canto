@@ -1086,12 +1086,16 @@ function FolderCard({
   const [libPath, setLibPath] = useState(folder.libraryPath ?? "");
   const [qbitCat, setQbitCat] = useState(folder.qbitCategory ?? "");
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [editingDlPath, setEditingDlPath] = useState(!!folder.downloadPath);
+  const [editingLibPath, setEditingLibPath] = useState(!!folder.libraryPath);
 
   useEffect(() => {
     setName(folder.name);
     setDlPath(folder.downloadPath ?? "");
     setLibPath(folder.libraryPath ?? "");
     setQbitCat(folder.qbitCategory ?? "");
+    setEditingDlPath(!!folder.downloadPath);
+    setEditingLibPath(!!folder.libraryPath);
   }, [folder]);
 
   const dirty =
@@ -1177,7 +1181,7 @@ function FolderCard({
 
         {/* Expanded editor */}
         <AnimatedCollapse open={expanded}>
-          <div className="border-t border-border/30 px-4 sm:px-5 py-5 space-y-5">
+          <div className="border-t border-border/30 px-4 sm:px-5 py-5">
             {/* Name */}
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground/80">Folder name</label>
@@ -1185,75 +1189,90 @@ function FolderCard({
             </div>
 
             {/* ── Download ── */}
-            <div className="rounded-xl border border-border/30 bg-muted/5 p-4 space-y-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Download className="h-4 w-4 text-blue-400" />
-                  <p className="text-sm font-semibold text-foreground">Download</p>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Controls where your torrent client saves files and how downloads are categorized.
-                </p>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex-1 space-y-1.5">
-                  <label className="text-xs font-medium text-foreground/60">Download path</label>
-                  {isLocal ? (
+            <div className="mt-6 flex items-center gap-3">
+              <Download className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">Download</p>
+              <div className="h-px flex-1 bg-border/30" />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Controls where your torrent client saves files and how downloads are categorized.
+            </p>
+            <div className="mt-3 flex flex-col sm:flex-row gap-3">
+              <div className="flex-1 space-y-1.5">
+                <label className="text-xs font-medium text-foreground/60">Download path</label>
+                {editingDlPath ? (
+                  isLocal ? (
                     <PathInput value={dlPath} onChange={setDlPath} placeholder="/data/downloads/movies" className={cardInputCn} />
                   ) : (
                     <ComboInput value={dlPath} onChange={setDlPath} placeholder="/downloads/movies" className={cardInputCn} suggestions={qbitPaths ?? []} />
-                  )}
-                </div>
-                <div className="sm:w-40 space-y-1.5">
-                  <label className="text-xs font-medium text-foreground/60">qBit category</label>
-                  <Input value={qbitCat} onChange={(e) => setQbitCat(e.target.value)} placeholder="e.g. movies" className={cardInputCn} />
-                </div>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setEditingDlPath(true)}
+                    className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border/40 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Set download path
+                  </button>
+                )}
+              </div>
+              <div className="sm:w-40 space-y-1.5">
+                <label className="text-xs font-medium text-foreground/60">qBit category</label>
+                <Input value={qbitCat} onChange={(e) => setQbitCat(e.target.value)} placeholder="e.g. movies" className={cardInputCn} />
               </div>
             </div>
 
             {/* ── Media ── */}
-            <div className="rounded-xl border border-border/30 bg-muted/5 p-4 space-y-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <FolderOpen className="h-4 w-4 text-emerald-400" />
-                  <p className="text-sm font-semibold text-foreground">Media</p>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {isLocal
-                    ? "Where Canto organizes imported files. Add extra paths if your media lives in multiple locations (Jellyfin, Plex, NAS)."
-                    : "Where files end up after download. Your media server should point to these paths. Add more if media is spread across multiple locations."}
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground/60">
-                  {isLocal ? "Primary library path" : "Primary media path"}
-                </label>
-                {isLocal ? (
+            <div className="mt-6 flex items-center gap-3">
+              <FolderOpen className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">Media</p>
+              <div className="h-px flex-1 bg-border/30" />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {isLocal
+                ? "Where Canto organizes imported files. Add extra paths if your media lives in multiple locations (Jellyfin, Plex, NAS)."
+                : "Where files end up after download. Your media server should point to these paths."}
+            </p>
+            <div className="mt-3 space-y-1.5">
+              <label className="text-xs font-medium text-foreground/60">
+                {isLocal ? "Primary library path" : "Primary media path"}
+              </label>
+              {editingLibPath ? (
+                isLocal ? (
                   <PathInput value={libPath} onChange={setLibPath} placeholder="/data/media/movies" className={cardInputCn} />
                 ) : (
                   <ComboInput value={libPath} onChange={setLibPath} placeholder="/media/movies" className={cardInputCn} suggestions={qbitPaths ?? []} />
-                )}
-              </div>
+                )
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setEditingLibPath(true)}
+                  className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border/40 text-sm text-muted-foreground transition-colors hover:border-emerald-400/40 hover:text-emerald-400"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Set media path
+                </button>
+              )}
+            </div>
+            <div className="mt-3">
               <MediaPathsSection folderId={folder.id} isLocal={isLocal} />
             </div>
 
             {/* ── Routing ── */}
-            <div className="rounded-xl border border-border/30 bg-muted/5 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Wand2 className="h-4 w-4 text-primary" />
-                    <p className="text-sm font-semibold text-foreground">Routing</p>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Auto-select this folder for downloads that match certain criteria.
-                  </p>
-                </div>
-                <Button size="sm" variant="outline" className="rounded-lg gap-1.5 text-xs" onClick={() => setRulesOpen(true)}>
-                  <Pencil className="h-3.5 w-3.5" />
-                  Edit rules
-                </Button>
-              </div>
+            <div className="mt-6 flex items-center gap-3">
+              <Wand2 className="h-3.5 w-3.5 text-primary shrink-0" />
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">Routing</p>
+              <div className="h-px flex-1 bg-border/30" />
+              <Button size="sm" variant="outline" className="rounded-lg gap-1.5 text-xs h-7" onClick={() => setRulesOpen(true)}>
+                <Pencil className="h-3 w-3" />
+                Edit rules
+              </Button>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Auto-select this folder for downloads that match certain criteria.
+            </p>
+            <div className="mt-3">
               {folder.rules ? (
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   Matches when: <span className="text-foreground/80">{describeGroup(folder.rules)}</span>
@@ -1263,7 +1282,7 @@ function FolderCard({
                   No rules — this folder can only be selected manually when downloading.
                 </p>
               )}
-              <div className="flex items-center justify-between pt-1 border-t border-border/20">
+              <div className="mt-3 flex items-center justify-between">
                 <div className="space-y-0.5">
                   <p className="text-sm font-medium text-foreground/80">Fallback folder</p>
                   <p className="text-xs text-muted-foreground">Use this folder when no routing rules match a download.</p>
@@ -1277,7 +1296,7 @@ function FolderCard({
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-between pt-1">
+            <div className="mt-6 flex items-center justify-between border-t border-border/20 pt-4">
               <button type="button" onClick={() => deleteFolder.mutate({ id: folder.id })} disabled={deleteFolder.isPending} className="text-sm text-muted-foreground/60 hover:text-destructive transition-colors flex items-center gap-1.5">
                 <Trash2 className="h-3.5 w-3.5" />
                 Delete folder
