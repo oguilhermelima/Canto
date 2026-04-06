@@ -8,6 +8,13 @@ import { Switch } from "@canto/ui/switch";
 import { Badge } from "@canto/ui/badge";
 import { Skeleton } from "@canto/ui/skeleton";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@canto/ui/select";
+import {
   Loader2,
   Check,
   ArrowRight,
@@ -40,9 +47,9 @@ import { DownloadFolders } from "~/components/settings/download-folders";
 type Step = "welcome" | "overview" | "tmdb" | "tvdb" | "download-client" | "libraries" | "indexer" | "jellyfin" | "plex" | "ready";
 
 function buildSteps(torrentConnected: boolean): Step[] {
-  const steps: Step[] = ["welcome", "overview", "tmdb", "tvdb", "download-client"];
+  const steps: Step[] = ["welcome", "overview", "tmdb", "tvdb", "jellyfin", "plex", "download-client"];
   if (torrentConnected) steps.push("libraries");
-  steps.push("indexer", "jellyfin", "plex", "ready");
+  steps.push("indexer", "ready");
   return steps;
 }
 
@@ -691,8 +698,7 @@ function JellyfinStep({ onNext, settings }: { onNext: () => void; settings?: Set
         <h1 className="text-2xl font-semibold text-foreground">Jellyfin</h1>
         <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
           Jellyfin is a free, open-source media server that streams your movies and shows to any device.
-          Connecting it lets Canto detect your library folders automatically and trigger scans after
-          downloads finish.
+          Connecting it lets Canto import your existing collection — no downloads needed.
         </p>
       </div>
 
@@ -716,7 +722,9 @@ function JellyfinStep({ onNext, settings }: { onNext: () => void; settings?: Set
         )}
         {connected && (
           <div className="space-y-2 text-left">
-            <p className="text-xs font-semibold text-muted-foreground px-1">Import existing libraries</p>
+            <p className="text-xs font-semibold text-muted-foreground px-1">
+              We found these libraries on your server. Toggle sync to import your collection into Canto.
+            </p>
             {syncJellyfin.isPending || discoveredLibraries.isLoading ? (
               <div className="space-y-2">
                 {Array.from({ length: 2 }).map((_, i) => (
@@ -742,9 +750,6 @@ function JellyfinStep({ onNext, settings }: { onNext: () => void; settings?: Set
                           {lib.contentType === "movies" ? "Movies" : "Shows"}
                         </Badge>
                       </div>
-                      {lib.linkedFolderName && (
-                        <p className="text-xs text-muted-foreground truncate">{lib.linkedFolderName}</p>
-                      )}
                     </div>
                   </div>
                   <Switch
@@ -875,8 +880,7 @@ function PlexStep({ onNext, settings }: { onNext: () => void; settings?: Setting
         <h1 className="text-2xl font-semibold text-foreground">Plex</h1>
         <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
           Plex organizes and streams your media collection to all your devices.
-          Connecting it lets Canto detect your library folders automatically and trigger scans after
-          downloads finish.
+          Connecting it lets Canto import your existing collection — no downloads needed.
         </p>
       </div>
 
@@ -905,7 +909,9 @@ function PlexStep({ onNext, settings }: { onNext: () => void; settings?: Setting
         )}
         {connected && (
           <div className="space-y-2 text-left">
-            <p className="text-xs font-semibold text-muted-foreground px-1">Import existing libraries</p>
+            <p className="text-xs font-semibold text-muted-foreground px-1">
+              We found these libraries on your server. Toggle sync to import your collection into Canto.
+            </p>
             {syncPlex.isPending || discoveredLibraries.isLoading ? (
               <div className="space-y-2">
                 {Array.from({ length: 2 }).map((_, i) => (
@@ -931,9 +937,6 @@ function PlexStep({ onNext, settings }: { onNext: () => void; settings?: Setting
                           {lib.contentType === "movies" ? "Movies" : "Shows"}
                         </Badge>
                       </div>
-                      {lib.linkedFolderName && (
-                        <p className="text-xs text-muted-foreground truncate">{lib.linkedFolderName}</p>
-                      )}
                     </div>
                   </div>
                   <Switch
@@ -973,6 +976,109 @@ function PlexStep({ onNext, settings }: { onNext: () => void; settings?: Setting
           </Button>
         )}
         <SkipButton onClick={onNext} />
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Unlinked libraries bridge (shown in download folders step)                 */
+/* -------------------------------------------------------------------------- */
+
+function UnlinkedLibrariesBridge(): React.JSX.Element | null {
+  const utils = trpc.useUtils();
+  const jellyfinLibs = trpc.sync.discoverServerLibraries.useQuery({ serverType: "jellyfin" });
+  const plexLibs = trpc.sync.discoverServerLibraries.useQuery({ serverType: "plex" });
+  const folders = trpc.folder.list.useQuery();
+
+  const updateServerLink = trpc.folder.updateServerLink.useMutation({
+    onSuccess: () => {
+      void utils.sync.discoverServerLibraries.invalidate();
+      toast.success("Library linked to folder");
+    },
+    onError: () => toast.error("Failed to link library"),
+  });
+
+  const [selectedFolders, setSelectedFolders] = useState<Record<string, string>>({});
+
+  const allLibraries = [...(jellyfinLibs.data ?? []), ...(plexLibs.data ?? [])];
+  const unlinked = allLibraries.filter((lib) => lib.linkId && !lib.linkedFolderName);
+  const folderList = folders.data ?? [];
+
+  if (jellyfinLibs.isLoading || plexLibs.isLoading || folders.isLoading) return null;
+  if (unlinked.length === 0 || folderList.length === 0) return null;
+
+  return (
+    <div className="w-full max-w-2xl rounded-2xl border border-border/40 bg-muted/5 p-5 space-y-4 text-left">
+      <div className="space-y-1">
+        <p className="text-sm font-semibold text-foreground">Link server libraries to folders</p>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          You connected Jellyfin/Plex earlier. Link their libraries to your download folders to organize synced content.
+        </p>
+      </div>
+      <div className="space-y-2">
+        {unlinked.map((lib) => {
+          const selected = selectedFolders[lib.serverLibraryId];
+          return (
+            <div
+              key={lib.serverLibraryId}
+              className="flex flex-col gap-2 rounded-xl bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                {lib.contentType === "movies" ? (
+                  <Film className="h-4 w-4 shrink-0 text-blue-400" />
+                ) : (
+                  <Tv className="h-4 w-4 shrink-0 text-purple-400" />
+                )}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-foreground truncate">{lib.serverLibraryName}</p>
+                    <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0">
+                      {lib.contentType === "movies" ? "Movies" : "Shows"}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Select
+                  value={selected}
+                  onValueChange={(val) =>
+                    setSelectedFolders((prev) => ({ ...prev, [lib.serverLibraryId]: val }))
+                  }
+                >
+                  <SelectTrigger className="h-8 w-[160px] text-xs rounded-lg">
+                    <SelectValue placeholder="Select folder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {folderList.map((f) => (
+                      <SelectItem key={f.id} value={f.id} className="text-xs">
+                        {f.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  disabled={!selected || updateServerLink.isPending}
+                  onClick={() => {
+                    if (selected && lib.linkId) {
+                      updateServerLink.mutate({ id: lib.linkId, folderId: selected });
+                    }
+                  }}
+                >
+                  {updateServerLink.isPending ? (
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  ) : (
+                    <Link2 className="mr-1 h-3 w-3" />
+                  )}
+                  Link
+                </Button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1145,6 +1251,8 @@ function DownloadFoldersStep({ onNext }: { onNext: () => void }): React.JSX.Elem
         <DownloadFolders mode="onboarding" importMethod={importMethod} />
       </div>
 
+      <UnlinkedLibrariesBridge />
+
       <FolderGate onNext={onNext} />
     </div>
   );
@@ -1293,6 +1401,8 @@ export default function OnboardingPage(): React.JSX.Element {
             {step === "overview" && <OverviewStep onNext={next} />}
             {step === "tmdb" && <TmdbStep onNext={next} settings={allSettings} />}
             {step === "tvdb" && <TvdbStep onNext={next} settings={allSettings} />}
+            {step === "jellyfin" && <JellyfinStep onNext={next} settings={allSettings} />}
+            {step === "plex" && <PlexStep onNext={next} settings={allSettings} />}
             {step === "download-client" && (
               <DownloadClientStep
                 onNext={() => { setTorrentConnected(true); next(); }}
@@ -1302,8 +1412,6 @@ export default function OnboardingPage(): React.JSX.Element {
             )}
             {step === "libraries" && <DownloadFoldersStep onNext={next} />}
             {step === "indexer" && <IndexerStep onNext={next} settings={allSettings} />}
-            {step === "jellyfin" && <JellyfinStep onNext={next} settings={allSettings} />}
-            {step === "plex" && <PlexStep onNext={next} settings={allSettings} />}
             {step === "ready" && <ReadyStep onFinish={finish} />}
           </FadeIn>
         </div>
