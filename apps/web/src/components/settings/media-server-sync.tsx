@@ -303,32 +303,15 @@ function LibraryLinkingSection({ source }: { source: "jellyfin" | "plex" }): Rea
   const libraries = trpc.sync.discoverServerLibraries.useQuery({ serverType: source });
   const folders = trpc.folder.list.useQuery();
 
-  const linkLibrary = trpc.folder.addServerLink.useMutation({
+  const updateLink = trpc.folder.updateServerLink.useMutation({
     onSuccess: () => {
       void utils.sync.discoverServerLibraries.invalidate();
       void utils.folder.listWithLinks.invalidate();
-      toast.success("Library linked");
     },
-    onError: () => toast.error("Failed to link library"),
+    onError: () => toast.error("Failed to update library"),
   });
 
-  const unlinkLibrary = trpc.folder.removeServerLink.useMutation({
-    onSuccess: () => {
-      void utils.sync.discoverServerLibraries.invalidate();
-      void utils.folder.listWithLinks.invalidate();
-      toast.success("Library unlinked");
-    },
-    onError: () => toast.error("Failed to unlink library"),
-  });
-
-  const toggleSync = trpc.folder.updateServerLink.useMutation({
-    onSuccess: () => {
-      void utils.sync.discoverServerLibraries.invalidate();
-    },
-    onError: () => toast.error("Failed to update sync setting"),
-  });
-
-  // Track selected folder per unlinked library
+  // Track selected folder per library for linking
   const [selectedFolders, setSelectedFolders] = useState<Record<string, string>>({});
 
   if (libraries.isLoading) {
@@ -351,18 +334,6 @@ function LibraryLinkingSection({ source }: { source: "jellyfin" | "plex" }): Rea
 
   const items = libraries.data ?? [];
 
-  const handleLink = (lib: (typeof items)[number], folderId: string): void => {
-    linkLibrary.mutate({
-      folderId,
-      serverType: source,
-      serverLibraryId: lib.serverLibraryId,
-      serverLibraryName: lib.serverLibraryName,
-      serverPath: lib.serverPath ?? undefined,
-      syncEnabled: true,
-      contentType: lib.contentType as "movies" | "shows",
-    });
-  };
-
   if (items.length === 0) {
     return (
       <div className="px-5 py-4">
@@ -371,7 +342,7 @@ function LibraryLinkingSection({ source }: { source: "jellyfin" | "plex" }): Rea
     );
   }
 
-  const hasFolders = (folders.data ?? []).length > 0;
+  const folderList = folders.data ?? [];
 
   return (
     <div className="divide-y divide-border/30">
@@ -392,113 +363,126 @@ function LibraryLinkingSection({ source }: { source: "jellyfin" | "plex" }): Rea
       </div>
 
       {items.map((lib) => {
-        const isLinked = !!lib.linkId;
+        const hasLink = !!lib.linkId;
+        const hasFolderLink = hasLink && !!lib.linkedFolderName;
         const selectedFolder = selectedFolders[lib.serverLibraryId];
 
         return (
           <div
             key={lib.serverLibraryId}
-            className={cn(
-              "flex flex-col gap-2 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between",
-              !isLinked && "opacity-70",
-            )}
+            className="flex flex-col gap-2 px-5 py-3.5"
           >
-            {/* Left: name + info */}
-            <div className="flex items-start gap-3 min-w-0 flex-1">
-              <div className="mt-0.5 shrink-0">
-                {lib.contentType === "movies" ? (
-                  <Film className="h-4 w-4 text-blue-400" />
-                ) : (
-                  <Tv className="h-4 w-4 text-purple-400" />
-                )}
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-foreground truncate">{lib.serverLibraryName}</p>
-                  <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0">
-                    {lib.contentType === "movies" ? "Movies" : "Shows"}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  {lib.serverPath && (
-                    <p className="text-xs text-muted-foreground/50 truncate">{lib.serverPath}</p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              {/* Left: name + info */}
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                <div className="mt-0.5 shrink-0">
+                  {lib.contentType === "movies" ? (
+                    <Film className="h-4 w-4 text-blue-400" />
+                  ) : (
+                    <Tv className="h-4 w-4 text-purple-400" />
                   )}
-                  <span className="text-xs text-muted-foreground/40">
-                    {isLinked ? `Last sync: ${timeAgo(lib.lastSyncedAt)}` : "Not linked"}
-                  </span>
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-foreground truncate">{lib.serverLibraryName}</p>
+                    <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0">
+                      {lib.contentType === "movies" ? "Movies" : "Shows"}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {lib.serverPath && (
+                      <p className="text-xs text-muted-foreground/50 truncate">{lib.serverPath}</p>
+                    )}
+                    <span className="text-xs text-muted-foreground/40">
+                      {hasLink ? `Last sync: ${timeAgo(lib.lastSyncedAt)}` : "Not synced"}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Right: folder select + actions */}
-            <div className="flex items-center gap-2 shrink-0 sm:ml-4">
-              {isLinked ? (
-                <>
-                  <span className="text-xs text-muted-foreground truncate max-w-[140px]">
-                    {lib.linkedFolderName ?? "Unknown folder"}
-                  </span>
+              {/* Right: sync toggle (always visible when link exists) */}
+              <div className="flex items-center gap-2 shrink-0 sm:ml-4">
+                {hasLink && (
                   <Switch
                     checked={lib.syncEnabled}
                     onCheckedChange={(checked) => {
-                      if (lib.linkId) toggleSync.mutate({ id: lib.linkId, syncEnabled: checked });
+                      if (lib.linkId) updateLink.mutate({ id: lib.linkId, syncEnabled: checked });
                     }}
-                    disabled={toggleSync.isPending}
+                    disabled={updateLink.isPending}
                   />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 text-xs text-muted-foreground hover:text-destructive"
-                    onClick={() => {
-                      if (lib.linkId) unlinkLibrary.mutate({ id: lib.linkId });
-                    }}
-                    disabled={unlinkLibrary.isPending}
-                  >
-                    <Unlink className="mr-1 h-3 w-3" />
-                    Unlink
-                  </Button>
-                </>
-              ) : hasFolders ? (
-                <>
-                  <Select
-                    value={selectedFolder}
-                    onValueChange={(val) =>
-                      setSelectedFolders((prev) => ({ ...prev, [lib.serverLibraryId]: val }))
-                    }
-                  >
-                    <SelectTrigger className="h-8 w-[160px] text-xs rounded-lg">
-                      <SelectValue placeholder="Select folder" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(folders.data ?? []).map((f) => (
-                        <SelectItem key={f.id} value={f.id} className="text-xs">
-                          {f.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 text-xs"
-                    disabled={!selectedFolder || linkLibrary.isPending}
-                    onClick={() => {
-                      if (selectedFolder) handleLink(lib, selectedFolder);
-                    }}
-                  >
-                    {linkLibrary.isPending ? (
-                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                    ) : (
-                      <Link2 className="mr-1 h-3 w-3" />
-                    )}
-                    Link
-                  </Button>
-                </>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Create a folder in Downloads first
-                </p>
-              )}
+                )}
+              </div>
             </div>
+
+            {/* Folder linking row — shown when link exists */}
+            {hasLink && (
+              <div className="flex items-center gap-2 pl-7">
+                {hasFolderLink ? (
+                  <>
+                    <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                      <Link2 className="mr-1 inline h-3 w-3" />
+                      {lib.linkedFolderName}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-xs text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        if (lib.linkId) {
+                          updateLink.mutate({ id: lib.linkId, folderId: null });
+                          toast.success("Folder unlinked — sync continues without folder organization");
+                        }
+                      }}
+                      disabled={updateLink.isPending}
+                    >
+                      <Unlink className="mr-1 h-3 w-3" />
+                      Unlink
+                    </Button>
+                  </>
+                ) : folderList.length > 0 ? (
+                  <>
+                    <Select
+                      value={selectedFolder}
+                      onValueChange={(val) =>
+                        setSelectedFolders((prev) => ({ ...prev, [lib.serverLibraryId]: val }))
+                      }
+                    >
+                      <SelectTrigger className="h-7 w-[160px] text-xs rounded-lg">
+                        <SelectValue placeholder="No folder" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {folderList.map((f) => (
+                          <SelectItem key={f.id} value={f.id} className="text-xs">
+                            {f.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-xs"
+                      disabled={!selectedFolder || updateLink.isPending}
+                      onClick={() => {
+                        if (selectedFolder && lib.linkId) {
+                          updateLink.mutate({ id: lib.linkId, folderId: selectedFolder });
+                          toast.success("Library linked to folder");
+                        }
+                      }}
+                    >
+                      {updateLink.isPending ? (
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      ) : (
+                        <Link2 className="mr-1 h-3 w-3" />
+                      )}
+                      Link
+                    </Button>
+                  </>
+                ) : (
+                  <span className="text-xs text-muted-foreground/40">No folder — syncs without organization</span>
+                )}
+              </div>
+            )}
           </div>
         );
       })}
