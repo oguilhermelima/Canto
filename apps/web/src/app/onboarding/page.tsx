@@ -47,9 +47,9 @@ import { DownloadFolders } from "~/components/settings/download-folders";
 type Step = "welcome" | "overview" | "tmdb" | "tvdb" | "download-client" | "libraries" | "indexer" | "jellyfin" | "plex" | "ready";
 
 function buildSteps(torrentConnected: boolean): Step[] {
-  const steps: Step[] = ["welcome", "overview", "tmdb", "tvdb", "jellyfin", "plex", "download-client"];
+  const steps: Step[] = ["welcome", "overview", "tmdb", "tvdb", "download-client"];
   if (torrentConnected) steps.push("libraries");
-  steps.push("indexer", "ready");
+  steps.push("indexer", "jellyfin", "plex", "ready");
   return steps;
 }
 
@@ -697,8 +697,12 @@ function JellyfinStep({ onNext, settings }: { onNext: () => void; settings?: Set
       <div className="space-y-3">
         <h1 className="text-2xl font-semibold text-foreground">Jellyfin</h1>
         <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
-          Jellyfin is a free, open-source media server that streams your movies and shows to any device.
-          Connecting it lets Canto import your existing collection — no downloads needed.
+          Connect your Jellyfin server to import your existing collection into Canto.
+        </p>
+      </div>
+      <div className="w-full max-w-lg rounded-xl border border-border/40 bg-muted/5 px-5 py-4 text-left">
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Only needed if you already have a Jellyfin library. If you're starting fresh with Canto, your downloads will be synced automatically — you can skip this step.
         </p>
       </div>
 
@@ -879,8 +883,12 @@ function PlexStep({ onNext, settings }: { onNext: () => void; settings?: Setting
       <div className="space-y-3">
         <h1 className="text-2xl font-semibold text-foreground">Plex</h1>
         <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
-          Plex organizes and streams your media collection to all your devices.
-          Connecting it lets Canto import your existing collection — no downloads needed.
+          Connect your Plex server to import your existing collection into Canto.
+        </p>
+      </div>
+      <div className="w-full max-w-lg rounded-xl border border-border/40 bg-muted/5 px-5 py-4 text-left">
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Only needed if you already have a Plex library. If you're starting fresh with Canto, your downloads will be synced automatically — you can skip this step.
         </p>
       </div>
 
@@ -1011,9 +1019,9 @@ function UnlinkedLibrariesBridge(): React.JSX.Element | null {
   return (
     <div className="w-full max-w-2xl rounded-2xl border border-border/40 bg-muted/5 p-5 space-y-4 text-left">
       <div className="space-y-1">
-        <p className="text-sm font-semibold text-foreground">Link server libraries to folders</p>
+        <p className="text-sm font-semibold text-foreground">Link server libraries</p>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          You connected Jellyfin/Plex earlier. Link their libraries to your download folders to organize synced content.
+          You connected Jellyfin/Plex earlier. Link their libraries to organize synced content.
         </p>
       </div>
       <div className="space-y-2">
@@ -1238,11 +1246,11 @@ function DownloadFoldersStep({ onNext }: { onNext: () => void }): React.JSX.Elem
         <Folder className="h-8 w-8 text-primary" />
       </div>
       <div className="space-y-3">
-        <h1 className="text-2xl font-semibold text-foreground">Download Folders</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Libraries</h1>
         <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
           {importMethod === "local"
-            ? <>Tell Canto where to put things. Each folder needs a <strong>download path</strong> (where your torrent client saves files while downloading and seeding) and a <strong>library path</strong> (where Canto organizes them with clean names so your media server can pick them up).</>
-            : <>Tell Canto where qBittorrent stores your files. Each folder needs a <strong>download path</strong> (where qBittorrent saves files initially) and a <strong>media path</strong> (where qBittorrent moves them after import). Both paths are from qBittorrent's perspective.</>
+            ? <>Set up your libraries. Each one needs a <strong>download path</strong> (where your torrent client saves files) and a <strong>storage path</strong> (where Canto organizes them for your media server).</>
+            : <>Set up your libraries. Each one needs a <strong>download path</strong> (where qBittorrent saves files) and a <strong>storage path</strong> (where qBittorrent moves them after import). Both paths are from qBittorrent's perspective.</>
           }
         </p>
       </div>
@@ -1401,8 +1409,6 @@ export default function OnboardingPage(): React.JSX.Element {
             {step === "overview" && <OverviewStep onNext={next} />}
             {step === "tmdb" && <TmdbStep onNext={next} settings={allSettings} />}
             {step === "tvdb" && <TvdbStep onNext={next} settings={allSettings} />}
-            {step === "jellyfin" && <JellyfinStep onNext={next} settings={allSettings} />}
-            {step === "plex" && <PlexStep onNext={next} settings={allSettings} />}
             {step === "download-client" && (
               <DownloadClientStep
                 onNext={() => { setTorrentConnected(true); next(); }}
@@ -1412,6 +1418,8 @@ export default function OnboardingPage(): React.JSX.Element {
             )}
             {step === "libraries" && <DownloadFoldersStep onNext={next} />}
             {step === "indexer" && <IndexerStep onNext={next} settings={allSettings} />}
+            {step === "jellyfin" && <JellyfinStep onNext={next} settings={allSettings} />}
+            {step === "plex" && <PlexStep onNext={next} settings={allSettings} />}
             {step === "ready" && <ReadyStep onFinish={finish} />}
           </FadeIn>
         </div>
