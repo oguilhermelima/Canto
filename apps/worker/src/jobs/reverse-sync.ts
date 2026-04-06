@@ -38,7 +38,8 @@ interface PendingImport {
   title: string;
   year?: number;
   type: "movie" | "show";
-  libraryId: string;
+  libraryId: string | null;
+  serverLinkId: string;
   path?: string;
   source: "jellyfin" | "plex";
   jellyfinItemId?: string;
@@ -92,7 +93,8 @@ async function updateStatus(tag: string, status: SyncStatus): Promise<void> {
 }
 
 function syncItemBase(item: PendingImport): {
-  libraryId: string;
+  libraryId: string | null;
+  serverLinkId: string;
   serverItemTitle: string;
   serverItemPath: string | undefined;
   serverItemYear: number | undefined;
@@ -102,6 +104,7 @@ function syncItemBase(item: PendingImport): {
 } {
   return {
     libraryId: item.libraryId,
+    serverLinkId: item.serverLinkId,
     serverItemTitle: item.title,
     serverItemPath: item.path,
     serverItemYear: item.year,
@@ -118,7 +121,7 @@ function syncItemBase(item: PendingImport): {
 async function scanJellyfin(
   url: string,
   apiKey: string,
-  libs: Array<{ id: string; jellyfinLibraryId: string; type: string }>,
+  libs: Array<{ folderId: string | null; jellyfinLibraryId: string; type: string; linkId: string }>,
 ): Promise<PendingImport[]> {
   const items: PendingImport[] = [];
 
@@ -160,7 +163,8 @@ async function scanJellyfin(
               title: item.Name,
               year: item.ProductionYear,
               type: mediaType,
-              libraryId: lib.id,
+              libraryId: lib.folderId,
+              serverLinkId: lib.linkId,
               path: item.Path,
               source: "jellyfin",
               jellyfinItemId: item.Id,
@@ -188,7 +192,7 @@ async function scanJellyfin(
 async function scanPlex(
   url: string,
   token: string,
-  libs: Array<{ id: string; plexLibraryId: string; type: string }>,
+  libs: Array<{ folderId: string | null; plexLibraryId: string; type: string; linkId: string }>,
 ): Promise<PendingImport[]> {
   const items: PendingImport[] = [];
 
@@ -244,7 +248,8 @@ async function scanPlex(
           title: item.title,
           year: item.year,
           type: mediaType,
-          libraryId: lib.id,
+          libraryId: lib.folderId,
+          serverLinkId: lib.linkId,
           source: "plex",
           plexRatingKey: item.ratingKey,
         });
@@ -451,7 +456,6 @@ async function fetchPlexMediaInfo(
 async function processPendingImports(
   pending: PendingImport[],
   tag: string,
-  linkIdsByLibrary?: Map<string, string>,
 ): Promise<void> {
   if (pending.length === 0) {
     console.log(`[${tag}] No items to process`);
@@ -472,7 +476,8 @@ async function processPendingImports(
   const plexUrl = await getSetting<string>("plex.url");
   const plexToken = await getSetting<string>("plex.token");
 
-  const syncedLibraryIds = [...new Set(pending.map((i) => i.libraryId))];
+  const syncedLibraryIds = [...new Set(pending.map((i) => i.libraryId).filter((id): id is string => id != null))];
+  const syncedLinkIds = [...new Set(pending.map((i) => i.serverLinkId))];
   const source = pending[0]?.source;
 
   // Deduplicate for processing (don't fetch TMDB twice for same item)
@@ -557,6 +562,7 @@ async function processPendingImports(
           if (!existing.libraryId && item.libraryId) updates.libraryId = item.libraryId;
           if (!existing.libraryPath && item.path) updates.libraryPath = item.path;
           if (!existing.addedAt) updates.addedAt = new Date();
+          // Note: when libraryId is null (unlinked sync), we still mark inLibrary/downloaded but skip libraryId
 
           if (Object.keys(updates).length > 0) {
             await updateMedia(db, existing.id, updates);
@@ -621,7 +627,9 @@ async function processPendingImports(
           const supportedLangs = [...await getSupportedLanguageCodes(db)];
           const normalized = await tmdbCall(() => tmdb.getMetadata(tmdbId!, resolvedType, { supportedLanguages: supportedLangs }));
           const inserted = await persistMedia(db, normalized, { crossRefLookup: tvdbEnabled });
-          await updateMedia(db, inserted.id, { inLibrary: true, downloaded: true, libraryId: item.libraryId, libraryPath: item.path, addedAt: new Date() });
+          const mediaUpdates: Record<string, unknown> = { inLibrary: true, downloaded: true, libraryPath: item.path, addedAt: new Date() };
+          if (item.libraryId) mediaUpdates.libraryId = item.libraryId;
+          await updateMedia(db, inserted.id, mediaUpdates);
           mediaId = inserted.id;
           void dispatchEnrichMedia(inserted.id, true).catch(logAndSwallow("reverse-sync dispatchEnrichMedia"));
         }
@@ -730,14 +738,12 @@ async function processPendingImports(
 
   // Prune sync items no longer present on the server
   if (source) {
-    await pruneOldSyncItems(db, syncedLibraryIds, source, syncRunStart);
+    await pruneOldSyncItems(db, syncedLibraryIds, source, syncRunStart, syncedLinkIds);
   }
 
   // Update lastSyncedAt per link
-  if (linkIdsByLibrary) {
-    for (const [, linkId] of linkIdsByLibrary) {
-      await updateServerLink(db, linkId, { lastSyncedAt: new Date() });
-    }
+  for (const linkId of syncedLinkIds) {
+    await updateServerLink(db, linkId, { lastSyncedAt: new Date() });
   }
 
   // Reconcile Server Library — ensure it matches what's actually on servers
@@ -804,7 +810,7 @@ export async function handleJellyfinSync(): Promise<void> {
   const linked = syncLinks
     .filter((l) => l.serverType === "jellyfin")
     .map((l) => ({
-      id: l.folderId,
+      folderId: l.folderId ?? null,
       jellyfinLibraryId: l.serverLibraryId,
       type: l.contentType ?? "mixed",
       linkId: l.id,
@@ -815,11 +821,9 @@ export async function handleJellyfinSync(): Promise<void> {
     return;
   }
 
-  const linkIdsByLibrary = new Map(linked.map((l) => [l.id, l.linkId]));
-
   console.log(`[jellyfin-sync] Scanning ${linked.length} Jellyfin libraries...`);
   const items = await scanJellyfin(jellyfinUrl, jellyfinKey, linked);
-  await processPendingImports(items, "jellyfin-sync", linkIdsByLibrary);
+  await processPendingImports(items, "jellyfin-sync");
 }
 
 export async function handlePlexSync(): Promise<void> {
@@ -836,7 +840,7 @@ export async function handlePlexSync(): Promise<void> {
   const linked = plexSyncLinks
     .filter((l) => l.serverType === "plex")
     .map((l) => ({
-      id: l.folderId,
+      folderId: l.folderId ?? null,
       plexLibraryId: l.serverLibraryId,
       type: l.contentType ?? "mixed",
       linkId: l.id,
@@ -847,11 +851,9 @@ export async function handlePlexSync(): Promise<void> {
     return;
   }
 
-  const linkIdsByLibrary = new Map(linked.map((l) => [l.id, l.linkId]));
-
   console.log(`[plex-sync] Scanning ${linked.length} Plex libraries...`);
   const items = await scanPlex(plexUrl, plexToken, linked);
-  await processPendingImports(items, "plex-sync", linkIdsByLibrary);
+  await processPendingImports(items, "plex-sync");
 }
 
 /* -------------------------------------------------------------------------- */
