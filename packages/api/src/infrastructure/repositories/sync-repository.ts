@@ -91,14 +91,16 @@ export async function createSyncEpisodes(db: Database, episodes: Array<typeof sy
 export async function findSyncItemByServerKey(
   db: Database,
   source: string,
-  libraryId: string,
+  libraryId: string | null | undefined,
   jellyfinItemId?: string,
   plexRatingKey?: string,
+  serverLinkId?: string,
 ) {
   const conditions = [
     eq(syncItem.source, source),
-    eq(syncItem.libraryId, libraryId),
   ];
+  if (libraryId) conditions.push(eq(syncItem.libraryId, libraryId));
+  if (serverLinkId) conditions.push(eq(syncItem.serverLinkId, serverLinkId));
   if (jellyfinItemId) conditions.push(eq(syncItem.jellyfinItemId, jellyfinItemId));
   if (plexRatingKey) conditions.push(eq(syncItem.plexRatingKey, plexRatingKey));
 
@@ -117,6 +119,7 @@ export async function upsertSyncItemByServerKey(
     data.libraryId,
     data.jellyfinItemId ?? undefined,
     data.plexRatingKey ?? undefined,
+    data.serverLinkId ?? undefined,
   );
 
   if (existing) {
@@ -131,6 +134,7 @@ export async function upsertSyncItemByServerKey(
         result: data.result,
         reason: data.reason,
         syncedAt: data.syncedAt,
+        serverLinkId: data.serverLinkId,
       })
       .where(eq(syncItem.id, existing.id));
     return existing;
@@ -145,17 +149,36 @@ export async function pruneOldSyncItems(
   libraryIds: string[],
   source: string,
   cutoffDate: Date,
+  serverLinkIds?: string[],
 ) {
-  if (libraryIds.length === 0) return;
-  await db
-    .delete(syncItem)
-    .where(
-      and(
-        inArray(syncItem.libraryId, libraryIds),
-        eq(syncItem.source, source),
-        lt(syncItem.syncedAt, cutoffDate),
-      ),
-    );
+  const sourceCondition = eq(syncItem.source, source);
+  const cutoffCondition = lt(syncItem.syncedAt, cutoffDate);
+
+  // Prune by libraryIds (legacy path)
+  if (libraryIds.length > 0) {
+    await db
+      .delete(syncItem)
+      .where(
+        and(
+          inArray(syncItem.libraryId, libraryIds),
+          sourceCondition,
+          cutoffCondition,
+        ),
+      );
+  }
+
+  // Prune by serverLinkIds (new path, for unlinked links with no folder)
+  if (serverLinkIds && serverLinkIds.length > 0) {
+    await db
+      .delete(syncItem)
+      .where(
+        and(
+          inArray(syncItem.serverLinkId, serverLinkIds),
+          sourceCondition,
+          cutoffCondition,
+        ),
+      );
+  }
 }
 
 export async function deleteSyncEpisodesBySyncItemId(db: Database, syncItemId: string) {

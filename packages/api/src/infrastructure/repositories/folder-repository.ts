@@ -1,9 +1,10 @@
 import { and, eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { downloadFolder, folderServerLink, type RuleGroup } from "@canto/db/schema";
+import { downloadFolder, folderServerLink, folderMediaPath, type RuleGroup } from "@canto/db/schema";
 
 type FolderInsert = typeof downloadFolder.$inferInsert;
 type FolderServerLinkInsert = typeof folderServerLink.$inferInsert;
+type FolderMediaPathInsert = typeof folderMediaPath.$inferInsert;
 
 // ── Folder CRUD ──
 
@@ -28,7 +29,7 @@ export async function findAllFolders(db: Database) {
 export async function findAllFoldersWithLinks(db: Database) {
   return db.query.downloadFolder.findMany({
     orderBy: (f, { asc }) => [asc(f.priority), asc(f.name)],
-    with: { serverLinks: true },
+    with: { serverLinks: true, mediaPaths: true },
   });
 }
 
@@ -145,8 +146,9 @@ export async function upsertServerLink(db: Database, data: FolderServerLinkInser
     .insert(folderServerLink)
     .values(data)
     .onConflictDoUpdate({
-      target: [folderServerLink.folderId, folderServerLink.serverType, folderServerLink.serverLibraryId],
+      target: [folderServerLink.serverType, folderServerLink.serverLibraryId],
       set: {
+        folderId: data.folderId,
         serverLibraryName: data.serverLibraryName,
         serverPath: data.serverPath,
         contentType: data.contentType,
@@ -159,7 +161,7 @@ export async function upsertServerLink(db: Database, data: FolderServerLinkInser
 export async function updateServerLink(
   db: Database,
   id: string,
-  data: Partial<Pick<FolderServerLinkInsert, "syncEnabled" | "contentType" | "lastSyncedAt">>,
+  data: Partial<Pick<FolderServerLinkInsert, "syncEnabled" | "contentType" | "lastSyncedAt" | "folderId">>,
 ) {
   const [updated] = await db
     .update(folderServerLink)
@@ -181,4 +183,31 @@ export async function findAllServerLinks(db: Database, serverType?: string) {
     });
   }
   return db.query.folderServerLink.findMany({ with: { folder: true } });
+}
+
+// ── Media Paths ──
+
+export async function findMediaPathsByFolder(db: Database, folderId: string) {
+  return db.query.folderMediaPath.findMany({
+    where: eq(folderMediaPath.folderId, folderId),
+  });
+}
+
+export async function findAllMediaPaths(db: Database) {
+  return db.query.folderMediaPath.findMany();
+}
+
+export async function addMediaPath(db: Database, data: FolderMediaPathInsert) {
+  const [row] = await db
+    .insert(folderMediaPath)
+    .values(data)
+    .onConflictDoNothing({
+      target: [folderMediaPath.folderId, folderMediaPath.path],
+    })
+    .returning();
+  return row;
+}
+
+export async function removeMediaPath(db: Database, id: string) {
+  await db.delete(folderMediaPath).where(eq(folderMediaPath.id, id));
 }
