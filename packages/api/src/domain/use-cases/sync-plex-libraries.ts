@@ -2,9 +2,9 @@ import type { Database } from "@canto/db/client";
 
 import {
   findAllFolders,
-  createFolder,
   findServerLink,
   upsertServerLink,
+  addMediaPath,
 } from "../../infrastructure/repositories";
 import { autoElectDefault } from "./sync-library-helpers";
 
@@ -12,16 +12,18 @@ type PlexSection = { key: string; title: string; type: string; Location: Array<{
 
 /**
  * Sync Plex server sections → folder_server_link junction.
- * For each Plex section, find or create a matching download folder and link it.
+ * For each Plex section, find or create a matching link.
+ * When no folder matches by name, create an unlinked link (folderId: null).
+ * When a folder IS linked, auto-add server path as a media path.
  */
 export async function syncPlexLibraries(
   db: Database,
   url: string,
   token: string,
   getSections: (url: string, token: string) => Promise<PlexSection[]>,
-): Promise<Array<{ id: string; name: string; action: "linked" | "created" }>> {
+): Promise<Array<{ id: string; name: string; action: "linked" | "created" | "unlinked" }>> {
   const sections = await getSections(url, token);
-  const synced: Array<{ id: string; name: string; action: "linked" | "created" }> = [];
+  const synced: Array<{ id: string; name: string; action: "linked" | "created" | "unlinked" }> = [];
 
   for (const section of sections) {
     if (!["movie", "show"].includes(section.type)) continue;
@@ -40,7 +42,18 @@ export async function syncPlexLibraries(
         serverPath,
         contentType,
       });
-      synced.push({ id: existingLink.folderId, name: section.title, action: "linked" });
+
+      // Auto-add server path to media paths when folder is linked
+      if (existingLink.folderId && serverPath) {
+        await addMediaPath(db, {
+          folderId: existingLink.folderId,
+          path: serverPath,
+          label: "Plex",
+          source: "plex",
+        });
+      }
+
+      synced.push({ id: existingLink.id, name: section.title, action: "linked" });
       continue;
     }
 
@@ -49,7 +62,7 @@ export async function syncPlexLibraries(
     const match = allFolders.find((f) => f.name.toLowerCase() === section.title.toLowerCase());
 
     if (match) {
-      await upsertServerLink(db, {
+      const link = await upsertServerLink(db, {
         folderId: match.id,
         serverType: "plex",
         serverLibraryId: section.key,
@@ -57,30 +70,29 @@ export async function syncPlexLibraries(
         serverPath,
         contentType,
       });
-      synced.push({ id: match.id, name: section.title, action: "linked" });
-    } else {
-      const isAnime = /anime/i.test(section.title);
-      const qbitCategory = section.type === "movie" ? "movies" : isAnime ? "animes" : "shows";
 
-      const newFolder = await createFolder(db, {
-        name: section.title,
-        libraryPath: serverPath,
-        qbitCategory,
-        isDefault: false,
-        enabled: true,
-      });
-
-      if (newFolder) {
-        await upsertServerLink(db, {
-          folderId: newFolder.id,
-          serverType: "plex",
-          serverLibraryId: section.key,
-          serverLibraryName: section.title,
-          serverPath,
-          contentType,
+      // Auto-add server path as a media path
+      if (serverPath) {
+        await addMediaPath(db, {
+          folderId: match.id,
+          path: serverPath,
+          label: "Plex",
+          source: "plex",
         });
-        synced.push({ id: newFolder.id, name: section.title, action: "created" });
       }
+
+      synced.push({ id: link!.id, name: section.title, action: "linked" });
+    } else {
+      // No matching folder — create unlinked link (folderId: null)
+      const link = await upsertServerLink(db, {
+        folderId: null,
+        serverType: "plex",
+        serverLibraryId: section.key,
+        serverLibraryName: section.title,
+        serverPath,
+        contentType,
+      });
+      synced.push({ id: link!.id, name: section.title, action: "unlinked" });
     }
   }
 
