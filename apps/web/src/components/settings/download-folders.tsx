@@ -1296,8 +1296,8 @@ function FolderCard({
             </div>
             <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
               {isLocal
-                ? "After importing, Canto moves and renames files into this path. Point your media server (Jellyfin, Plex) to the same path so it picks up new content automatically."
-                : "After downloading, qBittorrent moves files to this path. Point your media server (Jellyfin, Plex) here so it picks up new content."}
+                ? "After importing, Canto moves files here and renames them following naming conventions. Point your media server (Jellyfin, Plex) to the same path so it picks up new content automatically."
+                : "After downloading, qBittorrent moves files here and Canto renames them following naming conventions. Point your media server (Jellyfin, Plex) to this path so it picks up new content."}
             </p>
             <div className="mt-3">
               <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-4">
