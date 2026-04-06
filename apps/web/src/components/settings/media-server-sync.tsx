@@ -7,6 +7,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@canto/ui/dial
 import { Input } from "@canto/ui/input";
 import { Skeleton } from "@canto/ui/skeleton";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@canto/ui/select";
+import { Badge } from "@canto/ui/badge";
+import {
   Loader2,
   CheckCircle,
   ChevronLeft,
@@ -15,6 +23,10 @@ import {
   AlertCircle,
   SkipForward,
   FolderSearch,
+  Film,
+  Tv,
+  Link2,
+  Unlink,
 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
@@ -266,6 +278,235 @@ function SyncedItemsTable({ source }: { source?: "jellyfin" | "plex" }): React.J
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Relative time helper                                                       */
+/* -------------------------------------------------------------------------- */
+
+function timeAgo(dateStr: string | Date | null): string {
+  if (!dateStr) return "Never";
+  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (seconds < 60) return "Just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Library linking section                                                    */
+/* -------------------------------------------------------------------------- */
+
+function LibraryLinkingSection({ source }: { source: "jellyfin" | "plex" }): React.JSX.Element {
+  const utils = trpc.useUtils();
+
+  const libraries = trpc.sync.discoverServerLibraries.useQuery({ serverType: source });
+  const folders = trpc.folder.list.useQuery();
+
+  const linkLibrary = trpc.folder.addServerLink.useMutation({
+    onSuccess: () => {
+      void utils.sync.discoverServerLibraries.invalidate();
+      void utils.folder.listWithLinks.invalidate();
+      toast.success("Library linked");
+    },
+    onError: () => toast.error("Failed to link library"),
+  });
+
+  const unlinkLibrary = trpc.folder.removeServerLink.useMutation({
+    onSuccess: () => {
+      void utils.sync.discoverServerLibraries.invalidate();
+      void utils.folder.listWithLinks.invalidate();
+      toast.success("Library unlinked");
+    },
+    onError: () => toast.error("Failed to unlink library"),
+  });
+
+  const toggleSync = trpc.folder.updateServerLink.useMutation({
+    onSuccess: () => {
+      void utils.sync.discoverServerLibraries.invalidate();
+    },
+    onError: () => toast.error("Failed to update sync setting"),
+  });
+
+  // Track selected folder per unlinked library
+  const [selectedFolders, setSelectedFolders] = useState<Record<string, string>>({});
+
+  if (libraries.isLoading) {
+    return (
+      <div className="space-y-2 px-5 py-4">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Skeleton key={i} className="h-16 w-full rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
+  if (libraries.isError) {
+    return (
+      <div className="px-5 py-4">
+        <StateMessage preset="error" onRetry={() => libraries.refetch()} minHeight="100px" />
+      </div>
+    );
+  }
+
+  const items = libraries.data ?? [];
+
+  const handleLink = (lib: (typeof items)[number], folderId: string): void => {
+    linkLibrary.mutate({
+      folderId,
+      serverType: source,
+      serverLibraryId: lib.serverLibraryId,
+      serverLibraryName: lib.serverLibraryName,
+      serverPath: lib.serverPath ?? undefined,
+      syncEnabled: true,
+      contentType: lib.contentType as "movies" | "shows",
+    });
+  };
+
+  if (items.length === 0) {
+    return (
+      <div className="px-5 py-4">
+        <StateMessage preset="emptyGrid" title="No libraries found" description="Scan libraries to discover server folders" minHeight="100px" />
+      </div>
+    );
+  }
+
+  const hasFolders = (folders.data ?? []).length > 0;
+
+  return (
+    <div className="divide-y divide-border/30">
+      {/* Section header */}
+      <div className="flex items-center justify-between px-5 py-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">
+          Server Libraries
+        </p>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 text-xs"
+          onClick={() => void utils.sync.discoverServerLibraries.invalidate()}
+        >
+          <RefreshCw className="mr-1 h-3 w-3" />
+          Refresh
+        </Button>
+      </div>
+
+      {items.map((lib) => {
+        const isLinked = !!lib.linkId;
+        const selectedFolder = selectedFolders[lib.serverLibraryId];
+
+        return (
+          <div
+            key={lib.serverLibraryId}
+            className={cn(
+              "flex flex-col gap-2 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between",
+              !isLinked && "opacity-70",
+            )}
+          >
+            {/* Left: name + info */}
+            <div className="flex items-start gap-3 min-w-0 flex-1">
+              <div className="mt-0.5 shrink-0">
+                {lib.contentType === "movies" ? (
+                  <Film className="h-4 w-4 text-blue-400" />
+                ) : (
+                  <Tv className="h-4 w-4 text-purple-400" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-foreground truncate">{lib.serverLibraryName}</p>
+                  <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0">
+                    {lib.contentType === "movies" ? "Movies" : "Shows"}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  {lib.serverPath && (
+                    <p className="text-xs text-muted-foreground/50 truncate">{lib.serverPath}</p>
+                  )}
+                  <span className="text-xs text-muted-foreground/40">
+                    {isLinked ? `Last sync: ${timeAgo(lib.lastSyncedAt)}` : "Not linked"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: folder select + actions */}
+            <div className="flex items-center gap-2 shrink-0 sm:ml-4">
+              {isLinked ? (
+                <>
+                  <span className="text-xs text-muted-foreground truncate max-w-[140px]">
+                    {lib.linkedFolderName ?? "Unknown folder"}
+                  </span>
+                  <Switch
+                    checked={lib.syncEnabled}
+                    onCheckedChange={(checked) => {
+                      if (lib.linkId) toggleSync.mutate({ id: lib.linkId, syncEnabled: checked });
+                    }}
+                    disabled={toggleSync.isPending}
+                  />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                    onClick={() => {
+                      if (lib.linkId) unlinkLibrary.mutate({ id: lib.linkId });
+                    }}
+                    disabled={unlinkLibrary.isPending}
+                  >
+                    <Unlink className="mr-1 h-3 w-3" />
+                    Unlink
+                  </Button>
+                </>
+              ) : hasFolders ? (
+                <>
+                  <Select
+                    value={selectedFolder}
+                    onValueChange={(val) =>
+                      setSelectedFolders((prev) => ({ ...prev, [lib.serverLibraryId]: val }))
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-[160px] text-xs rounded-lg">
+                      <SelectValue placeholder="Select folder" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(folders.data ?? []).map((f) => (
+                        <SelectItem key={f.id} value={f.id} className="text-xs">
+                          {f.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs"
+                    disabled={!selectedFolder || linkLibrary.isPending}
+                    onClick={() => {
+                      if (selectedFolder) handleLink(lib, selectedFolder);
+                    }}
+                  >
+                    {linkLibrary.isPending ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : (
+                      <Link2 className="mr-1 h-3 w-3" />
+                    )}
+                    Link
+                  </Button>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Create a folder in Downloads first
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Server library group                                                       */
 /* -------------------------------------------------------------------------- */
 
@@ -321,6 +562,11 @@ function ServerLibraryGroup({
           {isSyncingLibraries ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
           {isSyncingLibraries ? "Scanning..." : "Scan libraries"}
         </Button>
+      </div>
+
+      {/* Library Linking */}
+      <div className="border-t border-border/30">
+        <LibraryLinkingSection source={source} />
       </div>
 
       {/* Synced Items */}
@@ -445,6 +691,7 @@ export function MediaServerSyncSection({ serverType }: { serverType?: "jellyfin"
   const syncJellyfin = trpc.jellyfin.syncLibraries.useMutation({
     onSuccess: (data) => {
       void utils.folder.listWithLinks.invalidate();
+      void utils.sync.discoverServerLibraries.invalidate();
       toast.success(`Synced ${data.length} Jellyfin libraries`);
     },
     onError: () => toast.error("Failed to sync Jellyfin libraries"),
@@ -452,6 +699,7 @@ export function MediaServerSyncSection({ serverType }: { serverType?: "jellyfin"
   const syncPlex = trpc.plex.syncLibraries.useMutation({
     onSuccess: (data) => {
       void utils.folder.listWithLinks.invalidate();
+      void utils.sync.discoverServerLibraries.invalidate();
       toast.success(`Synced ${data.length} Plex libraries`);
     },
     onError: () => toast.error("Failed to sync Plex libraries"),
