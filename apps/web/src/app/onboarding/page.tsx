@@ -1144,6 +1144,14 @@ function DownloadFoldersStep({ onNext }: { onNext: () => void }): React.JSX.Elem
             : <>Set up your libraries. Each one needs a <strong>download path</strong> (where qBittorrent saves files) and a <strong>storage path</strong> (where qBittorrent moves them after import). Both paths are from qBittorrent's perspective.</>
           }
         </p>
+        <div className="mx-auto max-w-md rounded-lg bg-muted/30 px-4 py-3">
+          <p className="text-sm text-muted-foreground mb-1">Canto renames files so your media server can recognize them:</p>
+          <p className="font-mono text-xs text-muted-foreground leading-relaxed">
+            Movie Title (2024) [tmdbid-12345]/
+            <br />
+            <span className="pl-4">Movie Title (2024) [Bluray-1080p][h265].mkv</span>
+          </p>
+        </div>
       </div>
 
       <div className="w-full max-w-2xl text-left">

@@ -1296,9 +1296,16 @@ function FolderCard({
             </div>
             <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
               {isLocal
-                ? "After importing, Canto moves files here and renames them following naming conventions. Point your media server (Jellyfin, Plex) to the same path so it picks up new content automatically."
-                : "After downloading, qBittorrent moves files here and Canto renames them following naming conventions. Point your media server (Jellyfin, Plex) to this path so it picks up new content."}
+                ? "After importing, Canto moves files here and renames them so media servers like Jellyfin and Plex can recognize them. Point your media server to this path."
+                : "After downloading, qBittorrent moves files here and Canto renames them so media servers like Jellyfin and Plex can recognize them. Point your media server to this path."}
             </p>
+            <div className="mt-2 rounded-lg bg-muted/30 px-3 py-2">
+              <p className="font-mono text-xs text-muted-foreground leading-relaxed">
+                Movie Title (2024) [tmdbid-12345]/
+                <br />
+                <span className="pl-4">Movie Title (2024) [Bluray-1080p][h265].mkv</span>
+              </p>
+            </div>
             <div className="mt-3">
               <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-4">
                 <label className="text-sm font-medium text-muted-foreground sm:w-28 sm:shrink-0 sm:text-right">Storage path</label>
