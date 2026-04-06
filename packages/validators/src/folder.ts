@@ -48,10 +48,23 @@ export const updateFolderInput = z.object({
   enabled: z.boolean().optional(),
 });
 
+// ── Media path inputs ──
+
+export const addMediaPathInput = z.object({
+  folderId: z.string().uuid(),
+  path: z.string().min(1),
+  label: z.string().max(100).optional(),
+  source: z.string().max(20).optional(),
+});
+
+export const removeMediaPathInput = z.object({
+  id: z.string().uuid(),
+});
+
 // ── Server link inputs ──
 
 export const addServerLinkInput = z.object({
-  folderId: z.string().uuid(),
+  folderId: z.string().uuid().optional(),
   serverType: z.enum(["jellyfin", "plex"]),
   serverLibraryId: z.string().min(1),
   serverLibraryName: z.string().optional(),

@@ -137,13 +137,32 @@ export const downloadFolder = pgTable("download_folder", {
     .defaultNow(),
 });
 
-export const folderServerLink = pgTable(
-  "folder_server_link",
+export const folderMediaPath = pgTable(
+  "folder_media_path",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     folderId: uuid("folder_id")
       .notNull()
       .references(() => downloadFolder.id, { onDelete: "cascade" }),
+    path: varchar("path", { length: 500 }).notNull(),
+    label: varchar("label", { length: 100 }),
+    source: varchar("source", { length: 20 }).default("manual"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("uq_folder_media_path").on(table.folderId, table.path),
+    index("idx_folder_media_path_folder").on(table.folderId),
+  ],
+);
+
+export const folderServerLink = pgTable(
+  "folder_server_link",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    folderId: uuid("folder_id")
+      .references(() => downloadFolder.id, { onDelete: "set null" }),
     /** "jellyfin" | "plex" */
     serverType: varchar("server_type", { length: 20 }).notNull(),
     /** Jellyfin folder ID or Plex section key */
@@ -163,8 +182,7 @@ export const folderServerLink = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex("uq_folder_server_link").on(
-      table.folderId,
+    uniqueIndex("uq_server_link_library").on(
       table.serverType,
       table.serverLibraryId,
     ),
@@ -489,8 +507,9 @@ export const syncItem = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     libraryId: uuid("library_id")
-      .notNull()
-      .references(() => library.id, { onDelete: "cascade" }),
+      .references(() => library.id, { onDelete: "set null" }),
+    serverLinkId: uuid("server_link_id")
+      .references(() => folderServerLink.id, { onDelete: "set null" }),
     serverItemTitle: varchar("server_item_title", { length: 500 }).notNull(),
     serverItemPath: varchar("server_item_path", { length: 1000 }),
     serverItemYear: integer("server_item_year"),
@@ -509,6 +528,7 @@ export const syncItem = pgTable(
   (table) => [
     index("idx_sync_item_library").on(table.libraryId),
     index("idx_sync_item_result").on(table.result),
+    index("idx_sync_item_server_link").on(table.serverLinkId),
   ],
 );
 
@@ -820,6 +840,14 @@ export const accountRelations = relations(account, ({ one }) => ({
 export const downloadFolderRelations = relations(downloadFolder, ({ many }) => ({
   media: many(media),
   serverLinks: many(folderServerLink),
+  mediaPaths: many(folderMediaPath),
+}));
+
+export const folderMediaPathRelations = relations(folderMediaPath, ({ one }) => ({
+  folder: one(downloadFolder, {
+    fields: [folderMediaPath.folderId],
+    references: [downloadFolder.id],
+  }),
 }));
 
 export const folderServerLinkRelations = relations(folderServerLink, ({ one }) => ({
@@ -914,6 +942,10 @@ export const syncItemRelations = relations(syncItem, ({ one, many }) => ({
   library: one(library, {
     fields: [syncItem.libraryId],
     references: [library.id],
+  }),
+  serverLink: one(folderServerLink, {
+    fields: [syncItem.serverLinkId],
+    references: [folderServerLink.id],
   }),
   media: one(media, {
     fields: [syncItem.mediaId],
