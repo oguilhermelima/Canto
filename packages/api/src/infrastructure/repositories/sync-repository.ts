@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray, lt } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { syncItem, syncEpisode } from "@canto/db/schema";
 
@@ -86,4 +86,78 @@ export async function createSyncItem(db: Database, data: typeof syncItem.$inferI
 export async function createSyncEpisodes(db: Database, episodes: Array<typeof syncEpisode.$inferInsert>) {
   if (episodes.length === 0) return;
   await db.insert(syncEpisode).values(episodes);
+}
+
+export async function findSyncItemByServerKey(
+  db: Database,
+  source: string,
+  libraryId: string,
+  jellyfinItemId?: string,
+  plexRatingKey?: string,
+) {
+  const conditions = [
+    eq(syncItem.source, source),
+    eq(syncItem.libraryId, libraryId),
+  ];
+  if (jellyfinItemId) conditions.push(eq(syncItem.jellyfinItemId, jellyfinItemId));
+  if (plexRatingKey) conditions.push(eq(syncItem.plexRatingKey, plexRatingKey));
+
+  return db.query.syncItem.findFirst({
+    where: and(...conditions),
+  });
+}
+
+export async function upsertSyncItemByServerKey(
+  db: Database,
+  data: typeof syncItem.$inferInsert,
+) {
+  const existing = await findSyncItemByServerKey(
+    db,
+    data.source!,
+    data.libraryId,
+    data.jellyfinItemId ?? undefined,
+    data.plexRatingKey ?? undefined,
+  );
+
+  if (existing) {
+    await db
+      .update(syncItem)
+      .set({
+        serverItemTitle: data.serverItemTitle,
+        serverItemPath: data.serverItemPath,
+        serverItemYear: data.serverItemYear,
+        tmdbId: data.tmdbId,
+        mediaId: data.mediaId,
+        result: data.result,
+        reason: data.reason,
+        syncedAt: data.syncedAt,
+      })
+      .where(eq(syncItem.id, existing.id));
+    return existing;
+  }
+
+  const [row] = await db.insert(syncItem).values(data).returning();
+  return row;
+}
+
+export async function pruneOldSyncItems(
+  db: Database,
+  libraryIds: string[],
+  source: string,
+  cutoffDate: Date,
+) {
+  if (libraryIds.length === 0) return;
+  await db
+    .delete(syncItem)
+    .where(
+      and(
+        inArray(syncItem.libraryId, libraryIds),
+        eq(syncItem.source, source),
+        lt(syncItem.syncedAt, cutoffDate),
+      ),
+    );
+}
+
+export async function deleteSyncEpisodesBySyncItemId(db: Database, syncItemId: string) {
+  await db.delete(syncEpisode).where(eq(syncEpisode.syncItemId, syncItemId));
 }

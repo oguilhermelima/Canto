@@ -149,6 +149,7 @@ export async function upsertServerLink(db: Database, data: FolderServerLinkInser
       set: {
         serverLibraryName: data.serverLibraryName,
         serverPath: data.serverPath,
+        contentType: data.contentType,
       },
     })
     .returning();
@@ -158,7 +159,7 @@ export async function upsertServerLink(db: Database, data: FolderServerLinkInser
 export async function updateServerLink(
   db: Database,
   id: string,
-  data: Partial<Pick<FolderServerLinkInsert, "syncEnabled">>,
+  data: Partial<Pick<FolderServerLinkInsert, "syncEnabled" | "contentType" | "lastSyncedAt">>,
 ) {
   const [updated] = await db
     .update(folderServerLink)
