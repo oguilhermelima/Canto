@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { TabBar } from "~/components/layout/tab-bar";
 import { authClient } from "~/lib/auth-client";
@@ -13,13 +13,55 @@ import { DownloadFolders } from "~/components/settings/download-folders";
 import { ImportMethodSection, SeedingSection, AutoMergeSection } from "~/components/settings/import-seeding";
 import { MediaServerSyncSection } from "~/components/settings/media-server-sync";
 import { StatusTab } from "~/components/management/status-tab";
+import { Info, X } from "lucide-react";
+
+function ServerSyncBanner({ server }: { server: string }): React.JSX.Element {
+  const storageKey = `canto:dismiss-sync-banner:${server.toLowerCase()}`;
+  const [dismissed, setDismissed] = useState(true); // default hidden to avoid hydration mismatch
+
+  useEffect(() => {
+    setDismissed(localStorage.getItem(storageKey) === "1");
+  }, [storageKey]);
+
+  const handleDismiss = (): void => {
+    localStorage.setItem(storageKey, "1");
+    setDismissed(true);
+  };
+
+  if (dismissed) return <></>;
+  return (
+    <div className="mb-6 rounded-2xl border border-border/40 bg-muted/5 px-6 py-5">
+      <div className="flex items-start gap-4">
+        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+          <Info className="h-5 w-5 text-primary" />
+        </div>
+        <div className="flex-1 space-y-1">
+          <p className="text-sm font-semibold text-foreground">
+            Already have a {server} library?
+          </p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Connect your {server} server to import your existing collection into Canto.
+            If you started fresh with Canto, your downloads are already organized automatically — no setup needed here.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleDismiss}
+          className="mt-0.5 shrink-0 rounded-lg p-1 text-muted-foreground/40 transition-colors hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
 import { UsersTab } from "~/components/management/users-tab";
 
 const NAV_ITEMS = [
   { key: "status", label: "Status" },
   { key: "users", label: "Users" },
   { key: "metadata", label: "Metadata" },
-  { key: "downloads", label: "Downloads" },
+  { key: "downloads", label: "Libraries" },
   { key: "search", label: "Search" },
   { key: "jellyfin", label: "Jellyfin" },
   { key: "plex", label: "Plex" },
@@ -35,6 +77,7 @@ type NavKey = (typeof NAV_ITEMS)[number]["key"];
 function JellyfinSection(): React.JSX.Element {
   return (
     <div>
+      <ServerSyncBanner server="Jellyfin" />
       <JellyfinConnectionSection />
       <MediaServerSyncSection serverType="jellyfin" />
       <AutoMergeSection />
@@ -49,6 +92,7 @@ function JellyfinSection(): React.JSX.Element {
 function PlexSection(): React.JSX.Element {
   return (
     <div>
+      <ServerSyncBanner server="Plex" />
       <PlexConnectionSection />
       <MediaServerSyncSection serverType="plex" />
       <AutoMergeSection />
@@ -66,8 +110,8 @@ function DownloadsSection(): React.JSX.Element {
       <DownloadClientSection />
       <ImportMethodSection />
       <SettingsSection
-        title="Download Folders"
-        description="Each folder defines where files are downloaded and where your organized media lives. Rules auto-route new downloads to the right folder."
+        title="Libraries"
+        description="Each library defines where files are downloaded, where your media is stored, and how new downloads are routed."
       >
         <DownloadFolders mode="settings" />
       </SettingsSection>
