@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
 import { Switch } from "@canto/ui/switch";
+import { Badge } from "@canto/ui/badge";
+import { Skeleton } from "@canto/ui/skeleton";
 import {
   Loader2,
   Check,
@@ -16,6 +18,7 @@ import {
   Eye,
   EyeOff,
   Clapperboard,
+  Film,
   FolderSync,
   Plug,
   Tv,
@@ -625,22 +628,19 @@ function JellyfinStep({ onNext, settings }: { onNext: () => void; settings?: Set
   const [password, setPassword] = useState("");
   const [apiKey, setApiKey] = useState(str(settings, "jellyfin.apiKey"));
   const [connected, setConnected] = useState(jellyfinSaved);
-  const [syncEnabled, setSyncEnabled] = useState(false);
   const [testing, setTesting] = useState(false);
 
   const authJellyfin = trpc.settings.authenticateJellyfin.useMutation();
   const setMany = trpc.settings.setMany.useMutation();
   const testService = trpc.settings.testService.useMutation();
   const syncJellyfin = trpc.jellyfin.syncLibraries.useMutation();
-  const allServerLinks = trpc.folder.listAllServerLinks.useQuery(undefined, { enabled: connected });
-  const updateServerLink = trpc.folder.updateServerLink.useMutation();
-
-  const toggleSync = (enabled: boolean): void => {
-    const links = (allServerLinks.data ?? []).filter((l) => l.serverType === "jellyfin");
-    for (const link of links) {
-      updateServerLink.mutate({ id: link.id, syncEnabled: enabled });
-    }
-  };
+  const discoveredLibraries = trpc.sync.discoverServerLibraries.useQuery(
+    { serverType: "jellyfin" },
+    { enabled: connected && !syncJellyfin.isPending },
+  );
+  const updateServerLink = trpc.folder.updateServerLink.useMutation({
+    onSuccess: () => void discoveredLibraries.refetch(),
+  });
 
   const handleConnect = async (): Promise<void> => {
     setTesting(true);
@@ -715,18 +715,52 @@ function JellyfinStep({ onNext, settings }: { onNext: () => void; settings?: Set
           <PasswordInput value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key" className={inputCn} />
         )}
         {connected && (
-          <div className="flex items-center justify-between rounded-xl bg-muted/30 px-4 py-3 text-left">
-            <div>
-              <p className="text-sm font-medium text-foreground">Import existing library</p>
-              <p className="text-xs text-muted-foreground">Sync movies and shows already in Jellyfin into Canto</p>
-            </div>
-            <Switch
-              checked={syncEnabled}
-              onCheckedChange={(checked) => {
-                setSyncEnabled(checked);
-                toggleSync(checked);
-              }}
-            />
+          <div className="space-y-2 text-left">
+            <p className="text-xs font-semibold text-muted-foreground px-1">Import existing libraries</p>
+            {syncJellyfin.isPending || discoveredLibraries.isLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full rounded-xl" />
+                ))}
+              </div>
+            ) : discoveredLibraries.data && discoveredLibraries.data.length > 0 ? (
+              discoveredLibraries.data.map((lib) => (
+                <div
+                  key={lib.serverLibraryId}
+                  className="flex items-center justify-between rounded-xl bg-muted/30 px-4 py-3"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {lib.contentType === "movies" ? (
+                      <Film className="h-4 w-4 shrink-0 text-blue-400" />
+                    ) : (
+                      <Tv className="h-4 w-4 shrink-0 text-purple-400" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-foreground truncate">{lib.serverLibraryName}</p>
+                        <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0">
+                          {lib.contentType === "movies" ? "Movies" : "Shows"}
+                        </Badge>
+                      </div>
+                      {lib.linkedFolderName && (
+                        <p className="text-xs text-muted-foreground truncate">{lib.linkedFolderName}</p>
+                      )}
+                    </div>
+                  </div>
+                  <Switch
+                    checked={lib.syncEnabled}
+                    onCheckedChange={(checked) => {
+                      if (lib.linkId) updateServerLink.mutate({ id: lib.linkId, syncEnabled: checked });
+                    }}
+                    disabled={!lib.linkId || updateServerLink.isPending}
+                  />
+                </div>
+              ))
+            ) : (
+              <div className="rounded-xl bg-muted/30 px-4 py-3">
+                <p className="text-xs text-muted-foreground">No libraries discovered yet</p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -762,15 +796,19 @@ function PlexStep({ onNext, settings }: { onNext: () => void; settings?: Setting
   const [polling, setPolling] = useState(false);
   const [pinData, setPinData] = useState<{ pinId: number; clientId: string } | null>(null);
   const [connected, setConnected] = useState(plexSaved);
-  const [syncEnabled, setSyncEnabled] = useState(false);
   const [testing, setTesting] = useState(false);
 
   const setMany = trpc.settings.setMany.useMutation();
   const authPlex = trpc.settings.authenticatePlex.useMutation();
   const createPlexPin = trpc.settings.plexPinCreate.useMutation();
   const syncPlex = trpc.plex.syncLibraries.useMutation();
-  const allServerLinks = trpc.folder.listAllServerLinks.useQuery(undefined, { enabled: connected });
-  const updateServerLink = trpc.folder.updateServerLink.useMutation();
+  const discoveredLibraries = trpc.sync.discoverServerLibraries.useQuery(
+    { serverType: "plex" },
+    { enabled: connected && !syncPlex.isPending },
+  );
+  const updateServerLink = trpc.folder.updateServerLink.useMutation({
+    onSuccess: () => void discoveredLibraries.refetch(),
+  });
   const plexPinCheck = trpc.settings.plexPinCheck.useQuery(
     { pinId: pinData?.pinId ?? 0, clientId: pinData?.clientId ?? "", serverUrl: url || undefined },
     { enabled: polling && pinData !== null, refetchInterval: 2000 },
@@ -790,13 +828,6 @@ function PlexStep({ onNext, settings }: { onNext: () => void; settings?: Setting
       toast.error("Authentication expired. Please try again.");
     }
   }, [plexPinCheck.data, setMany]);
-
-  const toggleSync = (enabled: boolean): void => {
-    const links = (allServerLinks.data ?? []).filter((l) => l.serverType === "plex");
-    for (const link of links) {
-      updateServerLink.mutate({ id: link.id, syncEnabled: enabled });
-    }
-  };
 
   const handleOAuth = (): void => {
     createPlexPin.mutate(undefined, {
@@ -873,18 +904,52 @@ function PlexStep({ onNext, settings }: { onNext: () => void; settings?: Setting
           <PasswordInput value={token} onChange={(e) => setToken(e.target.value)} placeholder="X-Plex-Token" className={inputCn} />
         )}
         {connected && (
-          <div className="flex items-center justify-between rounded-xl bg-muted/30 px-4 py-3 text-left">
-            <div>
-              <p className="text-sm font-medium text-foreground">Import existing library</p>
-              <p className="text-xs text-muted-foreground">Sync movies and shows already in Plex into Canto</p>
-            </div>
-            <Switch
-              checked={syncEnabled}
-              onCheckedChange={(checked) => {
-                setSyncEnabled(checked);
-                toggleSync(checked);
-              }}
-            />
+          <div className="space-y-2 text-left">
+            <p className="text-xs font-semibold text-muted-foreground px-1">Import existing libraries</p>
+            {syncPlex.isPending || discoveredLibraries.isLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full rounded-xl" />
+                ))}
+              </div>
+            ) : discoveredLibraries.data && discoveredLibraries.data.length > 0 ? (
+              discoveredLibraries.data.map((lib) => (
+                <div
+                  key={lib.serverLibraryId}
+                  className="flex items-center justify-between rounded-xl bg-muted/30 px-4 py-3"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {lib.contentType === "movies" ? (
+                      <Film className="h-4 w-4 shrink-0 text-blue-400" />
+                    ) : (
+                      <Tv className="h-4 w-4 shrink-0 text-purple-400" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-foreground truncate">{lib.serverLibraryName}</p>
+                        <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0">
+                          {lib.contentType === "movies" ? "Movies" : "Shows"}
+                        </Badge>
+                      </div>
+                      {lib.linkedFolderName && (
+                        <p className="text-xs text-muted-foreground truncate">{lib.linkedFolderName}</p>
+                      )}
+                    </div>
+                  </div>
+                  <Switch
+                    checked={lib.syncEnabled}
+                    onCheckedChange={(checked) => {
+                      if (lib.linkId) updateServerLink.mutate({ id: lib.linkId, syncEnabled: checked });
+                    }}
+                    disabled={!lib.linkId || updateServerLink.isPending}
+                  />
+                </div>
+              ))
+            ) : (
+              <div className="rounded-xl bg-muted/30 px-4 py-3">
+                <p className="text-xs text-muted-foreground">No libraries discovered yet</p>
+              </div>
+            )}
           </div>
         )}
       </div>
