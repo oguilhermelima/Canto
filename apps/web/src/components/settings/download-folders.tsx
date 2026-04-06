@@ -737,24 +737,23 @@ function MediaPathsSection({ folderId, isLocal }: { folderId: string; isLocal: b
   const paths = mediaPaths.data ?? [];
 
   return (
-    <div className="rounded-xl border border-border/30 bg-muted/5 overflow-hidden">
+    <div className="overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((p) => !p)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-muted/10 transition-colors"
+        className="flex w-full items-center justify-between py-1 text-left transition-colors"
       >
         <div className="flex items-center gap-2">
-          <FolderOpen className="h-4 w-4 text-emerald-400" />
-          <p className="text-sm font-medium text-foreground">Media Paths</p>
-          {open && paths.length > 0 && (
-            <span className="text-xs text-muted-foreground/50">{paths.length}</span>
+          <p className="text-xs font-medium text-foreground/60">Additional paths</p>
+          {paths.length > 0 && (
+            <span className="text-xs text-muted-foreground/40">{paths.length}</span>
           )}
         </div>
-        <ChevronDown className={cn("h-4 w-4 text-muted-foreground/50 transition-transform duration-200", open && "rotate-180")} />
+        <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground/40 transition-transform duration-200", open && "rotate-180")} />
       </button>
 
       <AnimatedCollapse open={open}>
-        <div className="border-t border-border/30 px-4 py-3 space-y-2">
+        <div className="pt-2 space-y-2">
           {mediaPaths.isLoading ? (
             <div className="space-y-2">
               {Array.from({ length: 2 }).map((_, i) => (
@@ -1178,61 +1177,77 @@ function FolderCard({
 
         {/* Expanded editor */}
         <AnimatedCollapse open={expanded}>
-          <div className="border-t border-border/30 px-4 sm:px-5 py-5 space-y-4">
-            {/* Name + category */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-start gap-3">
-              <div className="flex-1 space-y-1.5">
-                <label className="text-sm font-medium text-foreground/80">Folder name</label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} className={cn(cardInputCn, "font-semibold text-base")} />
+          <div className="border-t border-border/30 px-4 sm:px-5 py-5 space-y-5">
+            {/* Name */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground/80">Folder name</label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} className={cn(cardInputCn, "font-semibold text-base")} />
+            </div>
+
+            {/* ── Download ── */}
+            <div className="rounded-xl border border-border/30 bg-muted/5 p-4 space-y-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Download className="h-4 w-4 text-blue-400" />
+                  <p className="text-sm font-semibold text-foreground">Download</p>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Controls where your torrent client saves files and how downloads are categorized.
+                </p>
               </div>
-              <div className="sm:w-36 space-y-1.5">
-                <label className="text-sm font-medium text-foreground/80">qBit category</label>
-                <Input value={qbitCat} onChange={(e) => setQbitCat(e.target.value)} placeholder="e.g. movies" className={cardInputCn} />
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1 space-y-1.5">
+                  <label className="text-xs font-medium text-foreground/60">Download path</label>
+                  {isLocal ? (
+                    <PathInput value={dlPath} onChange={setDlPath} placeholder="/data/downloads/movies" className={cardInputCn} />
+                  ) : (
+                    <ComboInput value={dlPath} onChange={setDlPath} placeholder="/downloads/movies" className={cardInputCn} suggestions={qbitPaths ?? []} />
+                  )}
+                </div>
+                <div className="sm:w-40 space-y-1.5">
+                  <label className="text-xs font-medium text-foreground/60">qBit category</label>
+                  <Input value={qbitCat} onChange={(e) => setQbitCat(e.target.value)} placeholder="e.g. movies" className={cardInputCn} />
+                </div>
               </div>
             </div>
 
-            {/* Paths */}
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <label className="flex items-center gap-2 text-sm font-medium text-foreground/80">
-                  <FolderDown className="h-4 w-4 text-blue-400" />
-                  Download path
-                </label>
-                <p className="text-sm text-muted-foreground -mt-0.5">
+            {/* ── Media ── */}
+            <div className="rounded-xl border border-border/30 bg-muted/5 p-4 space-y-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <FolderOpen className="h-4 w-4 text-emerald-400" />
+                  <p className="text-sm font-semibold text-foreground">Media</p>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
                   {isLocal
-                    ? "Where your torrent client saves files while they download and seed."
-                    : "Configured in qBittorrent — the save path for this category."}
+                    ? "Where Canto organizes imported files. Add extra paths if your media lives in multiple locations (Jellyfin, Plex, NAS)."
+                    : "Where files end up after download. Your media server should point to these paths. Add more if media is spread across multiple locations."}
                 </p>
-                {isLocal ? (
-                  <PathInput value={dlPath} onChange={setDlPath} placeholder="/data/downloads/movies" className={cardInputCn} />
-                ) : (
-                  <ComboInput value={dlPath} onChange={setDlPath} placeholder="/downloads/movies" className={cardInputCn} suggestions={qbitPaths ?? []} />
-                )}
               </div>
               <div className="space-y-1.5">
-                <label className="flex items-center gap-2 text-sm font-medium text-foreground/80">
-                  <FolderOpen className="h-4 w-4 text-emerald-400" />
-                  {isLocal ? "Library path" : "Media path"}
+                <label className="text-xs font-medium text-foreground/60">
+                  {isLocal ? "Primary library path" : "Primary media path"}
                 </label>
-                <p className="text-sm text-muted-foreground -mt-0.5">
-                  {isLocal
-                    ? "Where Canto organizes files after import — should match your media server library folder."
-                    : "Where qBittorrent moves files after download. Your media server should scan this folder. Type a new path or pick an existing one."}
-                </p>
                 {isLocal ? (
                   <PathInput value={libPath} onChange={setLibPath} placeholder="/data/media/movies" className={cardInputCn} />
                 ) : (
                   <ComboInput value={libPath} onChange={setLibPath} placeholder="/media/movies" className={cardInputCn} suggestions={qbitPaths ?? []} />
                 )}
               </div>
+              <MediaPathsSection folderId={folder.id} isLocal={isLocal} />
             </div>
 
-            {/* Auto-routing */}
+            {/* ── Routing ── */}
             <div className="rounded-xl border border-border/30 bg-muted/5 p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Wand2 className="h-4 w-4 text-primary" />
-                  <p className="text-sm font-medium text-foreground">Auto-routing</p>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Wand2 className="h-4 w-4 text-primary" />
+                    <p className="text-sm font-semibold text-foreground">Routing</p>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Auto-select this folder for downloads that match certain criteria.
+                  </p>
                 </div>
                 <Button size="sm" variant="outline" className="rounded-lg gap-1.5 text-xs" onClick={() => setRulesOpen(true)}>
                   <Pencil className="h-3.5 w-3.5" />
@@ -1241,7 +1256,7 @@ function FolderCard({
               </div>
               {folder.rules ? (
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Canto auto-selects this folder when: <span className="text-foreground/80">{describeGroup(folder.rules)}</span>
+                  Matches when: <span className="text-foreground/80">{describeGroup(folder.rules)}</span>
                 </p>
               ) : (
                 <p className="text-sm text-muted-foreground/50 italic">
@@ -1251,7 +1266,7 @@ function FolderCard({
               <div className="flex items-center justify-between pt-1 border-t border-border/20">
                 <div className="space-y-0.5">
                   <p className="text-sm font-medium text-foreground/80">Fallback folder</p>
-                  <p className="text-sm text-muted-foreground">Use this folder when no routing rules match a download.</p>
+                  <p className="text-xs text-muted-foreground">Use this folder when no routing rules match a download.</p>
                 </div>
                 <Switch
                   checked={folder.isDefault}
@@ -1260,9 +1275,6 @@ function FolderCard({
                 />
               </div>
             </div>
-
-            {/* Media Paths */}
-            <MediaPathsSection folderId={folder.id} isLocal={isLocal} />
 
             {/* Actions */}
             <div className="flex items-center justify-between pt-1">
