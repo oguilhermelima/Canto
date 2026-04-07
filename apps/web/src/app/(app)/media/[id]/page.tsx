@@ -169,33 +169,24 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
 
   const mediaById = trpc.media.getById.useQuery(
     { id },
-    {
-      enabled: !isExternal,
-      refetchInterval: (query) => {
-        const d = query.state.data as { processingStatus?: string } | undefined;
-        return d?.processingStatus && d.processingStatus !== "ready" ? 5000 : false;
-      },
-    },
+    { enabled: !isExternal },
   );
-  const mediaByExternal = trpc.media.getByExternal.useQuery(
+  const resolved = trpc.media.resolve.useQuery(
     {
       provider: (provider ?? "tmdb") as "tmdb" | "tvdb",
       externalId: parseInt(externalId ?? "0", 10),
       type: (type ?? "movie") as "movie" | "show",
     },
-    {
-      enabled: !!isExternal,
-      refetchInterval: (query) => {
-        const d = query.state.data as { processingStatus?: string } | undefined;
-        return d?.processingStatus && d.processingStatus !== "ready" ? 5000 : false;
-      },
-    },
+    { enabled: !!isExternal },
   );
 
-  const media = isExternal ? mediaByExternal.data : mediaById.data;
-  const mediaLoading = isExternal
-    ? mediaByExternal.isLoading
-    : mediaById.isLoading;
+  const resolvedData = resolved?.data;
+  const media = isExternal ? resolvedData?.media : mediaById.data;
+  const mediaLoading = isExternal ? resolved.isLoading : mediaById.isLoading;
+  // DB ID — only available for persisted media (DB source or internal link)
+  const mediaId = isExternal
+    ? (resolvedData?.persisted ? (resolvedData.media as { id?: string }).id : undefined)
+    : mediaById.data?.id;
 
   useEffect(() => {
     if (media?.title) {
@@ -203,19 +194,23 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
     }
   }, [media?.title]);
 
-  const extras = trpc.media.getExtras.useQuery(
-    { id: media?.id ?? "" },
-    { enabled: !!media?.id, staleTime: 30 * 60 * 1000 },
+  // For external (resolved) media, extras come from the resolve response
+  // For internal (DB) media, use getExtras as before
+  const resolvedExtras = isExternal ? resolvedData?.extras : undefined;
+  const dbExtras = trpc.media.getExtras.useQuery(
+    { id: mediaId ?? "" },
+    { enabled: !isExternal && !!mediaId, staleTime: 30 * 60 * 1000 },
   );
+  const extras = isExternal ? { data: resolvedExtras, isLoading: resolved.isLoading } : dbExtras;
 
   const availability = trpc.sync.mediaAvailability.useQuery(
-    { mediaId: media?.id ?? "" },
-    { enabled: !!media?.id, staleTime: Infinity },
+    { mediaId: mediaId ?? "" },
+    { enabled: !!mediaId, staleTime: Infinity },
   );
 
   const mediaServers = trpc.sync.mediaServers.useQuery(
-    { mediaId: media?.id ?? "" },
-    { enabled: !!media?.id, staleTime: Infinity },
+    { mediaId: mediaId ?? "" },
+    { enabled: !!mediaId, staleTime: Infinity },
   );
 
   const watchProviderLinks = trpc.provider.watchProviderLinks.useQuery(
@@ -225,14 +220,14 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
 
   const isMovieInLibrary = media?.type === "movie" && !!media?.libraryId;
   const mediaTorrentsQuery = trpc.torrent.listByMedia.useQuery(
-    { mediaId: media?.id ?? "" },
-    { enabled: !!media?.id && isMovieInLibrary },
+    { mediaId: mediaId ?? "" },
+    { enabled: !!mediaId && isMovieInLibrary },
   );
   const mediaTorrents = mediaTorrentsQuery.data;
 
   const torrentSearch = trpc.torrent.search.useQuery(
     {
-      mediaId: media?.id ?? "",
+      mediaId: mediaId ?? "",
       query: advancedSearch && committedQuery ? committedQuery : undefined,
       seasonNumber: advancedSearch ? undefined : torrentSearchContext?.seasonNumber,
       episodeNumbers: advancedSearch ? undefined : torrentSearchContext?.episodeNumbers,
@@ -240,7 +235,7 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
       pageSize: TORRENTS_PER_PAGE,
     },
     {
-      enabled: torrentDialogOpen && !!media?.id && (!advancedSearch || committedQuery.length > 0),
+      enabled: torrentDialogOpen && !!mediaId && (!advancedSearch || committedQuery.length > 0),
       retry: 1,
       staleTime: 0,
     },
@@ -274,11 +269,11 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
           action: {
             label: "Replace",
             onClick: () => {
-              if (!lastDownloadAttempt || !media?.id) return;
+              if (!lastDownloadAttempt || !mediaId) return;
               const isMagnet = lastDownloadAttempt.url.startsWith("magnet:");
               replaceTorrent.mutate({
                 replaceFileIds: [],
-                mediaId: media.id,
+                mediaId: mediaId!,
                 ...(isMagnet
                   ? { magnetUrl: lastDownloadAttempt.url }
                   : { torrentUrl: lastDownloadAttempt.url }),
@@ -298,6 +293,7 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
 
   const deleteTorrentMutation = trpc.torrent.delete.useMutation();
   const utils = trpc.useUtils();
+  const persistMedia = trpc.media.persist.useMutation();
   const requestDownload = trpc.request.create.useMutation({
     onSuccess: () => {
       toast.success("Download requested");
@@ -313,8 +309,8 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
     onError: (err) => toast.error(err.message),
   });
   const existingRequest = trpc.request.list.useQuery(undefined, {
-    select: (data) => data.find((r) => r.mediaId === media?.id),
-    enabled: !isAdmin && !!media?.id,
+    select: (data) => data.find((r) => r.mediaId === mediaId),
+    enabled: !isAdmin && !!mediaId,
   });
 
   // Library config queries
@@ -323,14 +319,14 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
   });
   const setContinuousDownload = trpc.library.setContinuousDownload.useMutation({
     onSuccess: () => {
-      void utils.media.getById.invalidate({ id: media?.id });
-      void utils.media.getByExternal.invalidate();
+      void utils.media.getById.invalidate({ id: mediaId });
+      void utils.media.resolve.invalidate();
     },
   });
   const setMediaLibrary = trpc.library.setMediaLibrary.useMutation({
     onSuccess: () => {
       void utils.media.getById.invalidate({ id });
-      void utils.media.getByExternal.invalidate();
+      void utils.media.resolve.invalidate();
       toast.success("Library updated");
     },
     onError: (error) => {
@@ -339,11 +335,11 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
   });
 
   const handleDownload = (url: string, title: string): void => {
-    if (!media?.id) return;
+    if (!mediaId) return;
     setLastDownloadAttempt({ url, title });
     const isMagnet = url.startsWith("magnet:");
     downloadTorrent.mutate({
-      mediaId: media.id,
+      mediaId: mediaId!,
       ...(isMagnet ? { magnetUrl: url } : { torrentUrl: url }),
       title,
       seasonNumber: torrentSearchContext?.seasonNumber,
@@ -554,12 +550,6 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {media.processingStatus && media.processingStatus !== "ready" && (
-                  <div className="flex items-center gap-1.5 rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span className="hidden sm:inline">Refreshing metadata</span>
-                  </div>
-                )}
                 <button
                   type="button"
                   onClick={() => {
@@ -695,7 +685,7 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
             )}
           >
           <SeasonTabs
-            seasons={media.seasons.map((s) => ({
+            seasons={media.seasons.map((s: any) => ({
               id: s.id,
               seasonNumber: s.number,
               name: s.name ?? `Season ${s.number}`,
@@ -703,7 +693,7 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
               episodeCount: s.episodeCount,
               airDate: s.airDate,
               posterPath: s.posterPath,
-              episodes: s.episodes?.map((e) => ({
+              episodes: s.episodes?.map((e: any) => ({
                 id: e.id,
                 episodeNumber: e.number,
                 title: e.title ?? `Episode ${e.number}`,
@@ -866,7 +856,7 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
                   // Then remove from library by clearing libraryId
                   await setMediaLibrary.mutateAsync({ mediaId: media.id, libraryId: null });
                   void utils.media.getById.invalidate({ id: media.id });
-                  void utils.media.getByExternal.invalidate();
+                  void utils.media.resolve.invalidate();
                   void utils.library.list.invalidate();
                   void utils.torrent.listByMedia.invalidate();
                   setRemoveDialogOpen(false);
@@ -1125,9 +1115,9 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
                     All
                   </button>
                   {media.seasons
-                    .filter((s) => s.number > 0)
-                    .sort((a, b) => a.number - b.number)
-                    .map((s) => (
+                    .filter((s: any) => s.number > 0)
+                    .sort((a: any, b: any) => a.number - b.number)
+                    .map((s: any) => (
                       <button
                         key={s.number}
                         className={cn(
