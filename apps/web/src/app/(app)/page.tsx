@@ -12,7 +12,7 @@ import { FeaturedCarousel } from "~/components/media/featured-carousel";
 import { AddToListButton } from "~/components/media/add-to-list-button";
 import { StateMessage } from "~/components/layout/state-message";
 import { MediaLogo } from "~/components/media/media-logo";
-import { mediaHref } from "~/lib/media-href";
+import { mediaHref, mediaDetailHref } from "~/lib/media-href";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -174,11 +174,10 @@ export default function DiscoverPage(): React.JSX.Element {
     posterPath: item.posterPath,
     year: item.year,
     voteAverage: item.voteAverage,
-    href: `/media/${item.id}`,
+    href: mediaDetailHref(item),
   }));
 
   const getPreviewUrl = (item: SpotlightItem): string => {
-    if (item.id) return `/media/${item.id}`;
     return mediaHref(item.provider, item.externalId, item.type);
   };
 

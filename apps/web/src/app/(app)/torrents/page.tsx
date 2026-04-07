@@ -31,6 +31,7 @@ import {
 import { StateMessage } from "~/components/layout/state-message";
 import { trpc } from "~/lib/trpc/client";
 import { authClient } from "~/lib/auth-client";
+import { mediaDetailHref } from "~/lib/media-href";
 import {
   formatBytes,
   formatSpeed,
@@ -177,7 +178,7 @@ export default function DownloadsPage(): React.JSX.Element {
                 <div className="flex items-center gap-5 p-5 sm:p-6">
                   {/* Poster */}
                   <Link
-                    href={t.media ? `/media/${t.media.id}` : "#"}
+                    href={t.media ? mediaDetailHref(t.media) : "#"}
                     className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-muted sm:h-24 sm:w-24"
                   >
                     {t.media?.posterPath ? (
@@ -274,7 +275,7 @@ export default function DownloadsPage(): React.JSX.Element {
                   <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
                     {t.media && (
                       <Link
-                        href={`/media/${t.media.id}`}
+                        href={mediaDetailHref(t.media)}
                         className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
                         title="Info"
                       >
@@ -305,7 +306,7 @@ export default function DownloadsPage(): React.JSX.Element {
                 {/* Mobile actions */}
                 <div className="flex items-center justify-end gap-1.5 px-4 pb-4 sm:hidden">
                   {t.media && (
-                    <Link href={`/media/${t.media.id}`} className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground" title="Info">
+                    <Link href={mediaDetailHref(t.media)} className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground" title="Info">
                       <Tv size={16} />
                     </Link>
                   )}

@@ -42,21 +42,16 @@ export function MediaCard({
   className,
 }: MediaCardProps): React.JSX.Element {
   const linkHref =
-    href ??
-    (id
-      ? `/media/${id}`
-      : mediaHref(provider ?? "tmdb", externalId ?? "0", type));
+    href ?? mediaHref(provider ?? "tmdb", externalId ?? id ?? "0", type);
 
   const utils = trpc.useUtils();
 
   const handlePrefetch = useCallback(() => {
-    if (id) {
-      void utils.media.getById.prefetch({ id });
-      void utils.media.getExtras.prefetch({ id });
-    } else if (externalId && provider && type) {
-      void utils.media.getByExternal.prefetch({
-        provider: provider as "tmdb" | "tvdb",
-        externalId: parseInt(externalId, 10),
+    const eid = externalId ?? id;
+    if (eid && type) {
+      void utils.media.resolve.prefetch({
+        provider: (provider ?? "tmdb") as "tmdb" | "tvdb",
+        externalId: parseInt(eid, 10),
         type: type as "movie" | "show",
       });
     }

@@ -1,11 +1,15 @@
 /**
- * Build a URL for a media detail page.
- * TMDB media uses clean paths: /show/123, /movie/456
- * Other providers fall back to: /media/ext?provider=...&externalId=...&type=...
+ * Build a URL for a media detail page from provider metadata.
+ * Always produces clean paths: /movies/123, /shows/456
  */
 export function mediaHref(provider: string, externalId: number | string, type: string): string {
-  if (provider === "tmdb") {
-    return `/${type === "show" ? "show" : "movie"}/${externalId}`;
-  }
-  return `/media/ext?provider=${provider}&externalId=${externalId}&type=${type}`;
+  return `/${type === "show" ? "shows" : "movies"}/${externalId}`;
+}
+
+/**
+ * Build a URL for a media detail page from a DB row.
+ * DB rows always have externalId + type.
+ */
+export function mediaDetailHref(media: { type: string; externalId: number }): string {
+  return `/${media.type === "show" ? "shows" : "movies"}/${media.externalId}`;
 }

@@ -23,6 +23,7 @@ import { TabBar } from "~/components/layout/tab-bar";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { authClient } from "~/lib/auth-client";
+import { mediaDetailHref } from "~/lib/media-href";
 
 /* ─── Status config ─── */
 
@@ -72,7 +73,7 @@ export default function RequestsPage(): React.JSX.Element {
     id: string;
     title: string;
     action: "approved" | "rejected";
-    mediaId?: string;
+    media?: { type: string; externalId: number };
   } | null>(null);
   const [adminNote, setAdminNote] = useState("");
 
@@ -94,14 +95,14 @@ export default function RequestsPage(): React.JSX.Element {
   const resolveMutation = trpc.request.resolve.useMutation({
     onSuccess: (_, vars) => {
       void utils.request.list.invalidate();
-      const mediaId = resolveTarget?.mediaId;
+      const targetMedia = resolveTarget?.media;
       setResolveTarget(null);
       setAdminNote("");
-      if (vars.status === "approved" && mediaId) {
+      if (vars.status === "approved" && targetMedia) {
         toast.success("Request approved", {
           action: {
             label: "Go to media",
-            onClick: () => router.push(`/media/${mediaId}`),
+            onClick: () => router.push(mediaDetailHref(targetMedia)),
           },
         });
       } else {
@@ -242,7 +243,7 @@ export default function RequestsPage(): React.JSX.Element {
                   <div className="flex items-center gap-5 p-5 sm:p-6">
                     {/* Poster */}
                     <Link
-                      href={media?.id ? `/media/${media.id}` : "#"}
+                      href={media ? mediaDetailHref(media) : "#"}
                       className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-muted sm:h-24 sm:w-24"
                     >
                       {media?.posterPath ? (
@@ -263,7 +264,7 @@ export default function RequestsPage(): React.JSX.Element {
                     {/* Info */}
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Link href={media?.id ? `/media/${media.id}` : "#"} className="truncate text-base font-semibold text-foreground hover:underline sm:text-lg">
+                        <Link href={media ? mediaDetailHref(media) : "#"} className="truncate text-base font-semibold text-foreground hover:underline sm:text-lg">
                           {media?.title ?? "Unknown media"}
                         </Link>
                         {statusConfig && (
@@ -308,7 +309,7 @@ export default function RequestsPage(): React.JSX.Element {
                               id: req.id,
                               title: media?.title ?? "this request",
                               action: "approved",
-                              mediaId: media?.id,
+                              media: media ? { type: media.type, externalId: media.externalId } : undefined,
                             })}
                             className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-green-500/15 hover:text-green-500"
                             title="Approve"
@@ -320,7 +321,7 @@ export default function RequestsPage(): React.JSX.Element {
                               id: req.id,
                               title: media?.title ?? "this request",
                               action: "rejected",
-                              mediaId: media?.id,
+                              media: media ? { type: media.type, externalId: media.externalId } : undefined,
                             })}
                             className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-500"
                             title="Reject"

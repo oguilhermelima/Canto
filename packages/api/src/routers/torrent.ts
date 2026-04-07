@@ -144,10 +144,10 @@ export const torrentRouter = createTRPCRouter({
 
     // Batch-fetch linked media info
     const mediaIds = [...new Set(dbRows.map((r) => r.mediaId).filter(Boolean))] as string[];
-    const mediaMap = new Map<string, { id: string; title: string; posterPath: string | null; type: string; year: number | null }>();
+    const mediaMap = new Map<string, { id: string; title: string; posterPath: string | null; type: string; year: number | null; externalId: number }>();
     for (const id of mediaIds) {
       const m = await findMediaById(ctx.db, id);
-      if (m) mediaMap.set(m.id, { id: m.id, title: m.title, posterPath: m.posterPath, type: m.type, year: m.year });
+      if (m) mediaMap.set(m.id, { id: m.id, title: m.title, posterPath: m.posterPath, type: m.type, year: m.year, externalId: m.externalId });
     }
 
     return merged.map((item) => ({
