@@ -196,7 +196,7 @@ export default function DiscoverPage(): React.JSX.Element {
       {/* Mobile logo */}
       <div className="relative z-10 flex h-16 items-center px-4 md:hidden">
         <Link href="/" className="flex items-center gap-2.5">
-          <img src="/room.png" alt="Canto" className="h-9 w-9 dark:invert" />
+          <img src="/canto.svg" alt="Canto" className="h-9 w-9 dark:invert" />
           <span className="text-lg font-bold tracking-tight text-foreground">Canto</span>
         </Link>
       </div>

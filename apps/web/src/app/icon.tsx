@@ -6,9 +6,9 @@ export const size = { width: 128, height: 128 };
 export const contentType = "image/png";
 
 export default async function Icon() {
-  const imgData = await readFile(join(process.cwd(), "public", "room.png"));
+  const imgData = await readFile(join(process.cwd(), "public", "canto.svg"));
   const base64 = imgData.toString("base64");
-  const src = `data:image/png;base64,${base64}`;
+  const src = `data:image/svg+xml;base64,${base64}`;
 
   return new ImageResponse(
     (

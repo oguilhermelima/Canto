@@ -291,7 +291,7 @@ export function Topbar(): React.JSX.Element {
       >
         {/* Left: Logo */}
         <Link href="/" className="flex shrink-0 items-center gap-2">
-          <img src="/room.png" alt="Canto" className="h-9 w-9 dark:invert" />
+          <img src="/canto.svg" alt="Canto" className="h-9 w-9 dark:invert" />
           <span className="text-lg font-bold tracking-tight text-foreground">
             Canto
           </span>

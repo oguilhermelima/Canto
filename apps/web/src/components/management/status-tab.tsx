@@ -209,7 +209,7 @@ export function StatusTab(): React.JSX.Element {
       <SettingsSection title="System" description="Version and instance information.">
         <div className="rounded-2xl border border-border/40 p-5">
           <div className="flex items-center gap-4">
-            <img src="/room.png" alt="Canto" className="h-10 w-10 dark:invert" />
+            <img src="/canto.svg" alt="Canto" className="h-10 w-10 dark:invert" />
             <div>
               <p className="text-sm font-semibold text-foreground">Canto</p>
               <p className="text-sm text-muted-foreground">Version 0.1.0</p>

@@ -109,7 +109,7 @@ export default function AuthLayout({
         <div className="relative z-10 flex flex-col items-center gap-6 px-12 text-center">
           <div className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/room.png" alt="Canto" className="h-14 w-14 dark:invert" />
+            <img src="/canto.svg" alt="Canto" className="h-14 w-14 dark:invert" />
             <span className="text-4xl font-bold tracking-tight text-white">Canto</span>
           </div>
 
