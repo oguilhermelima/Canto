@@ -10,6 +10,7 @@ import { trpc } from "~/lib/trpc/client";
 import { tmdbBackdropLoader } from "~/lib/tmdb-image";
 import { MediaCarousel } from "~/components/media/media-carousel";
 import { FeaturedCarousel } from "~/components/media/featured-carousel";
+import { BackdropCarousel } from "~/components/media/backdrop-carousel";
 import { AddToListButton } from "~/components/media/add-to-list-button";
 import { StateMessage } from "~/components/layout/state-message";
 import { MediaLogo } from "~/components/media/media-logo";
@@ -77,6 +78,13 @@ export default function DiscoverPage(): React.JSX.Element {
   const trendingShows = trpc.media.browse.useInfiniteQuery({ type: "show" }, infiniteOpts);
   const trendingAnime = trpc.media.browse.useInfiniteQuery({ type: "show", genres: "16", language: "ja" }, infiniteOpts);
   const animeMovies = trpc.media.browse.useInfiniteQuery({ type: "movie", mode: "discover", genres: "16", language: "ja" }, infiniteOpts);
+
+  // Genre-based backdrop rows
+  const actionShows = trpc.media.browse.useInfiniteQuery({ type: "show", mode: "discover", genres: "10759" }, infiniteOpts);
+  const scifiShows = trpc.media.browse.useInfiniteQuery({ type: "show", mode: "discover", genres: "10765" }, infiniteOpts);
+  const thrillerMovies = trpc.media.browse.useInfiniteQuery({ type: "movie", mode: "discover", genres: "53" }, infiniteOpts);
+  const crimeShows = trpc.media.browse.useInfiniteQuery({ type: "show", mode: "discover", genres: "80" }, infiniteOpts);
+  const dramaShows = trpc.media.browse.useInfiniteQuery({ type: "show", mode: "discover", genres: "18" }, infiniteOpts);
   const utils = trpc.useUtils();
   const recsVersionRef = useRef<number | null>(null);
   const recommendations = trpc.media.recommendations.useInfiniteQuery(
@@ -137,6 +145,36 @@ export default function DiscoverPage(): React.JSX.Element {
   const flatAnime = useMemo(() => trendingAnime.data?.pages.flatMap((p) => p.results) ?? [], [trendingAnime.data]);
   const flatAnimeMovies = useMemo(() => animeMovies.data?.pages.flatMap((p) => p.results) ?? [], [animeMovies.data]);
 
+  const mapBackdropItems = useCallback(
+    (results: typeof flatMovies) =>
+      results
+        .filter((r) => r.backdropPath)
+        .map((r) => ({
+          externalId: String(r.externalId),
+          provider: r.provider,
+          type: r.type as "movie" | "show",
+          title: r.title,
+          backdropPath: r.backdropPath ?? null,
+          year: r.year,
+          voteAverage: r.voteAverage,
+          popularity: r.popularity,
+          releaseDate: r.releaseDate,
+        })),
+    [],
+  );
+
+  const flatActionShows = useMemo(() => actionShows.data?.pages.flatMap((p) => p.results) ?? [], [actionShows.data]);
+  const flatScifiShows = useMemo(() => scifiShows.data?.pages.flatMap((p) => p.results) ?? [], [scifiShows.data]);
+  const flatThrillerMovies = useMemo(() => thrillerMovies.data?.pages.flatMap((p) => p.results) ?? [], [thrillerMovies.data]);
+  const flatCrimeShows = useMemo(() => crimeShows.data?.pages.flatMap((p) => p.results) ?? [], [crimeShows.data]);
+  const flatDramaShows = useMemo(() => dramaShows.data?.pages.flatMap((p) => p.results) ?? [], [dramaShows.data]);
+
+  const actionItems = useMemo(() => mapBackdropItems(flatActionShows), [mapBackdropItems, flatActionShows]);
+  const scifiItems = useMemo(() => mapBackdropItems(flatScifiShows), [mapBackdropItems, flatScifiShows]);
+  const thrillerItems = useMemo(() => mapBackdropItems(flatThrillerMovies), [mapBackdropItems, flatThrillerMovies]);
+  const crimeItems = useMemo(() => mapBackdropItems(flatCrimeShows), [mapBackdropItems, flatCrimeShows]);
+  const dramaItems = useMemo(() => mapBackdropItems(flatDramaShows), [mapBackdropItems, flatDramaShows]);
+
 
   useDocumentTitle("Discover");
 
@@ -147,24 +185,10 @@ export default function DiscoverPage(): React.JSX.Element {
     return () => clearTimeout(timeout);
   }, [spotlightPaused, spotlightItems.length, nextSpotlight, currentSpotlight]);
 
-  const mapItems = useCallback(
-    (results: typeof flatMovies) =>
-      results.map((r) => ({
-        externalId: String(r.externalId),
-        provider: r.provider,
-        type: r.type as "movie" | "show",
-        title: r.title,
-        posterPath: r.posterPath ?? null,
-        year: r.year,
-        voteAverage: r.voteAverage,
-      })),
-    [],
-  );
-
-  const movieItems = useMemo(() => mapItems(flatMovies), [mapItems, flatMovies]);
-  const showItems = useMemo(() => mapItems(flatShows), [mapItems, flatShows]);
-  const animeItems = useMemo(() => mapItems(flatAnime), [mapItems, flatAnime]);
-  const animeMovieItems = useMemo(() => mapItems(flatAnimeMovies), [mapItems, flatAnimeMovies]);
+  const movieItems = useMemo(() => mapBackdropItems(flatMovies), [mapBackdropItems, flatMovies]);
+  const showItems = useMemo(() => mapBackdropItems(flatShows), [mapBackdropItems, flatShows]);
+  const animeItems = useMemo(() => mapBackdropItems(flatAnime), [mapBackdropItems, flatAnime]);
+  const animeMovieItems = useMemo(() => mapBackdropItems(flatAnimeMovies), [mapBackdropItems, flatAnimeMovies]);
 
   const recentItems = (recentlyAdded.data?.items ?? []).map((item) => ({
     id: item.id,
@@ -449,7 +473,7 @@ export default function DiscoverPage(): React.JSX.Element {
         ) : (
           <FeaturedCarousel
             title="Recommended for you"
-            seeAllHref="/discover?preset=recommended"
+            seeAllHref="/search"
             items={(() => {
               const seen = new Set<string>();
               return (recommendations.data?.pages ?? []).flatMap((p) => p.items).filter((r) => {
@@ -471,13 +495,25 @@ export default function DiscoverPage(): React.JSX.Element {
             <StateMessage preset="error" onRetry={() => trendingShows.refetch()} minHeight="200px" />
           </section>
         ) : (
-          <MediaCarousel
+          <BackdropCarousel
             title="Trending TV Shows"
-            seeAllHref="/discover?preset=trending_shows"
+            seeAllHref="/search?type=show"
             items={showItems}
             isLoading={trendingShows.isLoading}
             isFetchingMore={trendingShows.isFetchingNextPage}
             onLoadMore={trendingShows.hasNextPage ? () => void trendingShows.fetchNextPage() : undefined}
+            badgeStrategy="auto"
+          />
+        )}
+
+        {!actionShows.isError && (
+          <BackdropCarousel
+            title="Action & Adventure Series"
+            items={actionItems}
+            isLoading={actionShows.isLoading}
+            isFetchingMore={actionShows.isFetchingNextPage}
+            onLoadMore={actionShows.hasNextPage ? () => void actionShows.fetchNextPage() : undefined}
+            badgeStrategy="auto"
           />
         )}
 
@@ -487,13 +523,25 @@ export default function DiscoverPage(): React.JSX.Element {
             <StateMessage preset="error" onRetry={() => trendingMovies.refetch()} minHeight="200px" />
           </section>
         ) : (
-          <MediaCarousel
+          <BackdropCarousel
             title="Trending Movies"
-            seeAllHref="/discover?preset=trending_movies"
+            seeAllHref="/search?type=movie"
             items={movieItems}
             isLoading={trendingMovies.isLoading}
             isFetchingMore={trendingMovies.isFetchingNextPage}
             onLoadMore={trendingMovies.hasNextPage ? () => void trendingMovies.fetchNextPage() : undefined}
+            badgeStrategy="auto"
+          />
+        )}
+
+        {!scifiShows.isError && (
+          <BackdropCarousel
+            title="Sci-Fi & Fantasy"
+            items={scifiItems}
+            isLoading={scifiShows.isLoading}
+            isFetchingMore={scifiShows.isFetchingNextPage}
+            onLoadMore={scifiShows.hasNextPage ? () => void scifiShows.fetchNextPage() : undefined}
+            badgeStrategy="auto"
           />
         )}
 
@@ -503,13 +551,25 @@ export default function DiscoverPage(): React.JSX.Element {
             <StateMessage preset="error" onRetry={() => trendingAnime.refetch()} minHeight="200px" />
           </section>
         ) : (
-          <MediaCarousel
+          <BackdropCarousel
             title="Trending Anime"
-            seeAllHref="/discover?preset=trending_anime"
+            seeAllHref="/search?type=show"
             items={animeItems}
             isLoading={trendingAnime.isLoading}
             isFetchingMore={trendingAnime.isFetchingNextPage}
             onLoadMore={trendingAnime.hasNextPage ? () => void trendingAnime.fetchNextPage() : undefined}
+            badgeStrategy="auto"
+          />
+        )}
+
+        {!thrillerMovies.isError && (
+          <BackdropCarousel
+            title="Thriller Movies"
+            items={thrillerItems}
+            isLoading={thrillerMovies.isLoading}
+            isFetchingMore={thrillerMovies.isFetchingNextPage}
+            onLoadMore={thrillerMovies.hasNextPage ? () => void thrillerMovies.fetchNextPage() : undefined}
+            badgeStrategy="auto"
           />
         )}
 
@@ -519,13 +579,36 @@ export default function DiscoverPage(): React.JSX.Element {
             <StateMessage preset="error" onRetry={() => animeMovies.refetch()} minHeight="200px" />
           </section>
         ) : (
-          <MediaCarousel
+          <BackdropCarousel
             title="Trending Anime Movies"
-            seeAllHref="/discover?preset=trending_anime_movies"
+            seeAllHref="/search?type=movie"
             items={animeMovieItems}
             isLoading={animeMovies.isLoading}
             isFetchingMore={animeMovies.isFetchingNextPage}
             onLoadMore={animeMovies.hasNextPage ? () => void animeMovies.fetchNextPage() : undefined}
+            badgeStrategy="auto"
+          />
+        )}
+
+        {!crimeShows.isError && (
+          <BackdropCarousel
+            title="Crime & Mystery"
+            items={crimeItems}
+            isLoading={crimeShows.isLoading}
+            isFetchingMore={crimeShows.isFetchingNextPage}
+            onLoadMore={crimeShows.hasNextPage ? () => void crimeShows.fetchNextPage() : undefined}
+            badgeStrategy="auto"
+          />
+        )}
+
+        {!dramaShows.isError && (
+          <BackdropCarousel
+            title="Drama Series"
+            items={dramaItems}
+            isLoading={dramaShows.isLoading}
+            isFetchingMore={dramaShows.isFetchingNextPage}
+            onLoadMore={dramaShows.hasNextPage ? () => void dramaShows.fetchNextPage() : undefined}
+            badgeStrategy="auto"
           />
         )}
       </div>
