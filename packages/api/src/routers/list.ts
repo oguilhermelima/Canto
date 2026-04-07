@@ -20,12 +20,12 @@ import {
   findListItems,
   addListItem,
   findMediaInLists,
-} from "../infrastructure/repositories/list-repository";
+} from "@canto/core/infrastructure/repositories/list-repository";
 
 // ── Extracted rules & use-cases ──
-import { slugify } from "../domain/rules/slugify";
-import { verifyListOwnership } from "../domain/rules/list-ownership";
-import { addItemToList, removeItemFromList } from "../domain/use-cases/manage-list-items";
+import { slugify } from "@canto/core/domain/rules/slugify";
+import { verifyListOwnership } from "@canto/core/domain/rules/list-ownership";
+import { addItemToList, removeItemFromList } from "@canto/core/domain/use-cases/manage-list-items";
 
 export const listRouter = createTRPCRouter({
   getAll: protectedProcedure.query(({ ctx }) =>
@@ -127,7 +127,7 @@ export const listRouter = createTRPCRouter({
     .input(getByMediaIdInput)
     .mutation(async ({ ctx, input }) => {
       const { ensureServerLibrary } = await import(
-        "../infrastructure/repositories/list-repository"
+        "@canto/core/infrastructure/repositories/list-repository"
       );
       const serverLib = await ensureServerLibrary(ctx.db);
       return addListItem(ctx.db, { listId: serverLib.id, mediaId: input.mediaId });

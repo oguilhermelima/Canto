@@ -19,9 +19,9 @@ import {
 } from "@canto/validators";
 
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
-import { getDownloadClient } from "../infrastructure/adapters/download-client-factory";
-import { resolveFolder } from "../domain/rules/folder-routing";
-import type { RoutableMedia } from "../domain/rules/folder-routing";
+import { getDownloadClient } from "@canto/core/infrastructure/adapters/download-client-factory";
+import { resolveFolder } from "@canto/core/domain/rules/folder-routing";
+import type { RoutableMedia } from "@canto/core/domain/rules/folder-routing";
 import {
   findFolderById,
   findAllFolders,
@@ -38,12 +38,12 @@ import {
   findMediaPathsByFolder,
   addMediaPath,
   removeMediaPath,
-} from "../infrastructure/repositories/folder-repository";
-import { findMediaById } from "../infrastructure/repositories/media-repository";
+} from "@canto/core/infrastructure/repositories/folder-repository";
+import { findMediaById } from "@canto/core/infrastructure/repositories/media-repository";
 
 // ── Extracted rules & use-cases ──
-import { validatePath } from "../domain/rules/validate-path";
-import { testFolderPaths } from "../domain/use-cases/test-folder-paths";
+import { validatePath } from "@canto/core/domain/rules/validate-path";
+import { testFolderPaths } from "@canto/core/domain/use-cases/test-folder-paths";
 
 export const folderRouter = createTRPCRouter({
   list: adminProcedure.query(({ ctx }) => findAllFolders(ctx.db)),

@@ -8,18 +8,18 @@ import {
 import { getSetting, setSetting } from "@canto/db/settings";
 
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
-import { SETTINGS } from "../lib/settings-keys";
+import { SETTINGS } from "@canto/core/lib/settings-keys";
 import {
   findUserPreferences,
   upsertUserPreference,
-} from "../infrastructure/repositories/library-repository";
+} from "@canto/core/infrastructure/repositories/library-repository";
 import {
   findFolderById,
   seedDefaultFolders,
-} from "../infrastructure/repositories/folder-repository";
-import { findLibraryStats, listLibraryMedia, updateMedia } from "../infrastructure/repositories/media-repository";
-import { getUserLanguage } from "../domain/services/user-service";
-import { batchMediaTranslations } from "../domain/services/translation-service";
+} from "@canto/core/infrastructure/repositories/folder-repository";
+import { findLibraryStats, listLibraryMedia, updateMedia } from "@canto/core/infrastructure/repositories/media-repository";
+import { getUserLanguage } from "@canto/core/domain/services/user-service";
+import { batchMediaTranslations } from "@canto/core/domain/services/translation-service";
 
 /* -------------------------------------------------------------------------- */
 /*  Library Router — media listing + user preferences                          */

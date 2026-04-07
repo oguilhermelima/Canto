@@ -4,12 +4,12 @@ import {
   genresInput,
 } from "@canto/validators";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
-import { getTmdbProvider } from "../lib/tmdb-client";
-import { cached } from "../infrastructure/cache/redis";
-import { findWatchProviderLinks } from "../infrastructure/repositories/extras-repository";
+import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
+import { cached } from "@canto/core/infrastructure/cache/redis";
+import { findWatchProviderLinks } from "@canto/core/infrastructure/repositories/extras-repository";
 
 // ── Extracted use-case ──
-import { getSpotlight } from "../domain/use-cases/get-spotlight";
+import { getSpotlight } from "@canto/core/domain/use-cases/get-spotlight";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                    */
@@ -102,7 +102,7 @@ export const providerRouter = createTRPCRouter({
 /* -------------------------------------------------------------------------- */
 
 import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "../lib/settings-keys";
+import { SETTINGS } from "@canto/core/lib/settings-keys";
 
 async function fetchFromTmdb<T>(
   _tmdb: unknown,

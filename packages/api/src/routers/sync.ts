@@ -6,20 +6,20 @@ import {
   resolveSyncItemInput,
   discoverServerLibrariesInput,
 } from "@canto/validators";
-import { SETTINGS } from "../lib/settings-keys";
+import { SETTINGS } from "@canto/core/lib/settings-keys";
 
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
-import { getTmdbProvider } from "../lib/tmdb-client";
+import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
 import {
   findSyncItemsByMediaId,
   findSyncItemsPaginated,
-} from "../infrastructure/repositories/sync-repository";
-import { dispatchJellyfinSync, dispatchPlexSync, dispatchFolderScan } from "../infrastructure/queue/bullmq-dispatcher";
+} from "@canto/core/infrastructure/repositories/sync-repository";
+import { dispatchJellyfinSync, dispatchPlexSync, dispatchFolderScan } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
 
 // ── Extracted use-cases & services ──
-import { resolveSyncItem } from "../domain/use-cases/resolve-sync-item";
-import { discoverServerLibraries } from "../domain/use-cases/discover-server-libraries";
-import { getMediaAvailability } from "../domain/services/media-availability-service";
+import { resolveSyncItem } from "@canto/core/domain/use-cases/resolve-sync-item";
+import { discoverServerLibraries } from "@canto/core/domain/use-cases/discover-server-libraries";
+import { getMediaAvailability } from "@canto/core/domain/services/media-availability-service";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                     */

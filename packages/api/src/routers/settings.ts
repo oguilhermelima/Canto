@@ -26,14 +26,14 @@ import type { ServiceEnum } from "@canto/validators";
 import { and, eq } from "drizzle-orm";
 import { media, user, supportedLanguage } from "@canto/db/schema";
 import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure, t } from "../trpc";
-import { SETTINGS } from "../lib/settings-keys";
-import { dispatchRefreshAllLanguage, dispatchMediaPipeline } from "../infrastructure/queue/bullmq-dispatcher";
+import { SETTINGS } from "@canto/core/lib/settings-keys";
+import { dispatchRefreshAllLanguage, dispatchMediaPipeline } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
 
 // ── Extracted use-cases & services ──
-import { testService } from "../infrastructure/adapters/service-tester";
-import { authenticateJellyfin } from "../domain/use-cases/authenticate-jellyfin";
-import { authenticatePlex, loginPlex, createPlexPin, checkPlexPin } from "../domain/use-cases/authenticate-plex";
-import { validateServiceUrl } from "../domain/rules/validate-service-url";
+import { testService } from "@canto/core/infrastructure/adapters/service-tester";
+import { authenticateJellyfin } from "@canto/core/domain/use-cases/authenticate-jellyfin";
+import { authenticatePlex, loginPlex, createPlexPin, checkPlexPin } from "@canto/core/domain/use-cases/authenticate-plex";
+import { validateServiceUrl } from "@canto/core/domain/rules/validate-service-url";
 
 const setupOrAdminProcedure = t.procedure.use(async ({ ctx, next }) => {
   const completed = await getSetting<boolean>("onboarding.completed");

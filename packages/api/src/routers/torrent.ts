@@ -13,12 +13,12 @@ import {
 } from "@canto/validators";
 
 import { createTRPCRouter, adminProcedure } from "../trpc";
-import { getDownloadClient } from "../infrastructure/adapters/download-client-factory";
-import { buildIndexers } from "../infrastructure/adapters/indexer-factory";
-import { autoImportTorrent } from "../domain/use-cases/import-torrent";
-import { mergeLiveData } from "../domain/use-cases/merge-live-data";
-import { searchTorrents } from "../domain/use-cases/search-torrents";
-import { downloadTorrent, replaceTorrent } from "../domain/use-cases/download-torrent";
+import { getDownloadClient } from "@canto/core/infrastructure/adapters/download-client-factory";
+import { buildIndexers } from "@canto/core/infrastructure/adapters/indexer-factory";
+import { autoImportTorrent } from "@canto/core/domain/use-cases/import-torrent";
+import { mergeLiveData } from "@canto/core/domain/use-cases/merge-live-data";
+import { searchTorrents } from "@canto/core/domain/use-cases/search-torrents";
+import { downloadTorrent, replaceTorrent } from "@canto/core/domain/use-cases/download-torrent";
 import {
   findTorrentById,
   findAllTorrents,
@@ -26,13 +26,13 @@ import {
   updateTorrent,
   deleteTorrent as deleteTorrentRecord,
   claimTorrentForImport,
-} from "../infrastructure/repositories/torrent-repository";
+} from "@canto/core/infrastructure/repositories/torrent-repository";
 
 // ── Extracted use-cases ──
-import { retryTorrent } from "../domain/use-cases/retry-torrent";
-import { listLiveTorrents } from "../domain/use-cases/list-live-torrents";
-import { renameTorrent } from "../domain/use-cases/rename-torrent";
-import { getQBClient } from "../infrastructure/adapters/qbittorrent";
+import { retryTorrent } from "@canto/core/domain/use-cases/retry-torrent";
+import { listLiveTorrents } from "@canto/core/domain/use-cases/list-live-torrents";
+import { renameTorrent } from "@canto/core/domain/use-cases/rename-torrent";
+import { getQBClient } from "@canto/core/infrastructure/adapters/qbittorrent";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                    */

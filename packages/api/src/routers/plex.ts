@@ -1,11 +1,11 @@
 import { TRPCError } from "@trpc/server";
 
 import { toggleLibraryInput } from "@canto/validators";
-import { getPlexCredentials } from "../lib/server-credentials";
+import { getPlexCredentials } from "@canto/core/lib/server-credentials";
 import { createTRPCRouter, adminProcedure } from "../trpc";
-import { syncPlexLibraries } from "../domain/use-cases/sync-plex-libraries";
-import { testPlexConnection, scanPlexLibrary, getPlexSections } from "../infrastructure/adapters/plex";
-import { updateFolder, findAllServerLinks } from "../infrastructure/repositories/folder-repository";
+import { syncPlexLibraries } from "@canto/core/domain/use-cases/sync-plex-libraries";
+import { testPlexConnection, scanPlexLibrary, getPlexSections } from "@canto/core/infrastructure/adapters/plex";
+import { updateFolder, findAllServerLinks } from "@canto/core/infrastructure/repositories/folder-repository";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                    */

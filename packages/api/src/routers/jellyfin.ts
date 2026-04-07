@@ -1,16 +1,16 @@
 import { TRPCError } from "@trpc/server";
 
 import { toggleLibraryInput, mergeJellyfinVersionsInput } from "@canto/validators";
-import { getJellyfinCredentials } from "../lib/server-credentials";
+import { getJellyfinCredentials } from "@canto/core/lib/server-credentials";
 import { createTRPCRouter, adminProcedure } from "../trpc";
-import { syncJellyfinLibraries } from "../domain/use-cases/sync-jellyfin-libraries";
+import { syncJellyfinLibraries } from "@canto/core/domain/use-cases/sync-jellyfin-libraries";
 import {
   testJellyfinConnection,
   scanJellyfinLibrary,
   mergeJellyfinVersions,
   getJellyfinLibraryFolders,
-} from "../infrastructure/adapters/jellyfin";
-import { updateFolder } from "../infrastructure/repositories/folder-repository";
+} from "@canto/core/infrastructure/adapters/jellyfin";
+import { updateFolder } from "@canto/core/infrastructure/repositories/folder-repository";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                    */

@@ -165,9 +165,9 @@ importers:
 
   apps/worker:
     dependencies:
-      '@canto/api':
+      '@canto/core':
         specifier: workspace:*
-        version: link:../../packages/api
+        version: link:../../packages/core
       '@canto/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -202,6 +202,9 @@ importers:
       '@canto/auth':
         specifier: workspace:*
         version: link:../auth
+      '@canto/core':
+        specifier: workspace:*
+        version: link:../core
       '@canto/db':
         specifier: workspace:*
         version: link:../db
@@ -214,18 +217,9 @@ importers:
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.15.1(typescript@5.9.3)
-      bullmq:
-        specifier: ^5.34.8
-        version: 5.71.1
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@opentelemetry/api@1.9.1)(gel@2.2.0)(kysely@0.28.14)(postgres@3.4.8)
-      fast-xml-parser:
-        specifier: ^5.5.9
-        version: 5.5.9
-      ioredis:
-        specifier: ^5.6.1
-        version: 5.10.1
       superjson:
         specifier: ^2.2.2
         version: 2.2.6
@@ -254,6 +248,46 @@ importers:
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@opentelemetry/api@1.9.1)(gel@2.2.0)(kysely@0.28.14)(postgres@3.4.8)
+    devDependencies:
+      '@canto/tsconfig':
+        specifier: workspace:*
+        version: link:../../tooling/typescript
+      '@types/node':
+        specifier: ^22.13.0
+        version: 22.19.15
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+
+  packages/core:
+    dependencies:
+      '@canto/db':
+        specifier: workspace:*
+        version: link:../db
+      '@canto/providers':
+        specifier: workspace:*
+        version: link:../providers
+      '@canto/validators':
+        specifier: workspace:*
+        version: link:../validators
+      '@trpc/server':
+        specifier: 'catalog:'
+        version: 11.15.1(typescript@5.9.3)
+      bullmq:
+        specifier: ^5.34.8
+        version: 5.71.1
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@opentelemetry/api@1.9.1)(gel@2.2.0)(kysely@0.28.14)(postgres@3.4.8)
+      fast-xml-parser:
+        specifier: ^5.5.9
+        version: 5.5.9
+      ioredis:
+        specifier: ^5.6.1
+        version: 5.10.1
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
     devDependencies:
       '@canto/tsconfig':
         specifier: workspace:*
