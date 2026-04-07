@@ -9,6 +9,10 @@ import { Film, Tv } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { tmdbBackdropLoader } from "~/lib/tmdb-image";
 import { mediaHref } from "~/lib/media-href";
+import { MediaLogo } from "./media-logo";
+import { useLogo } from "~/hooks/use-logos";
+
+const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
 export type BadgeType = "trending" | "new" | "top-rated";
 
@@ -18,6 +22,7 @@ interface BackdropCardProps {
   type: "movie" | "show";
   title: string;
   backdropPath: string | null;
+  logoPath?: string | null;
   year?: number | null;
   voteAverage?: number | null;
   badge?: BadgeType | null;
@@ -36,6 +41,11 @@ export function BackdropCard({
   type,
   title,
   backdropPath,
+  // logoPath from props (via enriched browse):
+  //   undefined = not provided (cold start → fetch per-card)
+  //   null = no logo exists on TMDB
+  //   string = logo file path
+  logoPath: logoFromProps,
   year,
   voteAverage,
   badge,
@@ -43,6 +53,22 @@ export function BackdropCard({
 }: BackdropCardProps): React.JSX.Element {
   const href = mediaHref(provider ?? "tmdb", externalId ?? "0", type);
   const utils = trpc.useUtils();
+
+  // If browse already provided logoPath, skip the per-card query
+  const hasLogoFromProps = logoFromProps !== undefined;
+  // getLogo is protected — unauthenticated users fall back to text title
+  const fetchedLogo = useLogo(provider, externalId, type, {
+    title,
+    posterPath: null,
+    backdropPath,
+    year,
+    voteAverage,
+  }, { skip: hasLogoFromProps });
+
+  const logoPath = hasLogoFromProps ? logoFromProps : fetchedLogo;
+
+  // undefined = still loading, null = no logo, string = logo path
+  const logoResolved = logoPath !== undefined;
 
   const handlePrefetch = useCallback(() => {
     if (externalId && type) {
@@ -54,12 +80,17 @@ export function BackdropCard({
     }
   }, [externalId, provider, type, utils]);
 
+  // Show skeleton until logo is resolved
+  if (!logoResolved) {
+    return <BackdropCardSkeleton className={className} />;
+  }
+
   return (
     <Link
       href={href}
       onMouseEnter={handlePrefetch}
       className={cn(
-        "group relative flex shrink-0 overflow-hidden rounded-xl transition-all duration-300 ease-out hover:z-10 hover:scale-[1.03] hover:ring-2 hover:ring-foreground/20",
+        "group relative flex shrink-0 overflow-hidden rounded-xl animate-in fade-in-0 zoom-in-95 duration-500 ease-out fill-mode-both transition-all hover:z-10 hover:scale-[1.03] hover:ring-2 hover:ring-foreground/20",
         className,
       )}
     >
@@ -71,7 +102,7 @@ export function BackdropCard({
             alt={title}
             fill
             className="object-cover transition-transform duration-500 group-hover:scale-105"
-            fadeDuration={300}
+            fadeDuration={500}
             loading="lazy"
             sizes="(max-width: 640px) 80vw, (max-width: 1024px) 40vw, 25vw"
           />
@@ -99,12 +130,16 @@ export function BackdropCard({
           </div>
         )}
 
-        {/* Bottom gradient + title */}
+        {/* Bottom gradient + logo or title */}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3 pb-3 pt-12">
-          <p className="line-clamp-2 text-sm font-semibold leading-tight text-white drop-shadow-lg">
-            {title}
-          </p>
-          <div className="mt-1 flex items-center gap-2 text-[11px] text-white/60">
+          {logoPath ? (
+            <MediaLogo src={`${TMDB_IMAGE_BASE}/w500${logoPath}`} alt={title} size="card" />
+          ) : (
+            <p className="line-clamp-2 text-sm font-semibold leading-tight text-white drop-shadow-lg">
+              {title}
+            </p>
+          )}
+          <div className="mt-3 flex items-center gap-2 text-xs text-white/60">
             <span>{type === "movie" ? "Movie" : "TV Show"}</span>
             {voteAverage != null && voteAverage > 0 && (
               <>

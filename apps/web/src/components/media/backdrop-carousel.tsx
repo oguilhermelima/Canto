@@ -16,6 +16,7 @@ interface BackdropItem {
   type: "movie" | "show";
   title: string;
   backdropPath: string | null;
+  logoPath?: string | null;
   year?: number | null;
   voteAverage?: number | null;
   popularity?: number | null;

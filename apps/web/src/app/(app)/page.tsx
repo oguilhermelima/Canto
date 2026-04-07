@@ -155,6 +155,7 @@ export default function DiscoverPage(): React.JSX.Element {
           type: r.type as "movie" | "show",
           title: r.title,
           backdropPath: r.backdropPath ?? null,
+          logoPath: r.logoPath,
           year: r.year,
           voteAverage: r.voteAverage,
           popularity: r.popularity,
