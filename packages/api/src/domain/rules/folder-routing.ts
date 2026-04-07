@@ -39,11 +39,13 @@ function evaluateCondition(cond: RuleCondition, media: RoutableMedia): boolean {
     case "genre":
       if (cond.op === "contains_any") return arraysOverlap(media.genres, cond.value);
       if (cond.op === "contains_all") return arraysContainAll(media.genres, cond.value);
+      if (cond.op === "not_contains_any") return !arraysOverlap(media.genres, cond.value);
       return false;
 
     case "genreId":
       if (cond.op === "contains_any") return arraysOverlap(media.genreIds, cond.value);
       if (cond.op === "contains_all") return arraysContainAll(media.genreIds, cond.value);
+      if (cond.op === "not_contains_any") return !arraysOverlap(media.genreIds, cond.value);
       return false;
 
     case "originCountry":

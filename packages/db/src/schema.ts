@@ -161,8 +161,6 @@ export const folderServerLink = pgTable(
   "folder_server_link",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    folderId: uuid("folder_id")
-      .references(() => downloadFolder.id, { onDelete: "set null" }),
     /** "jellyfin" | "plex" */
     serverType: varchar("server_type", { length: 20 }).notNull(),
     /** Jellyfin folder ID or Plex section key */
@@ -193,8 +191,8 @@ export const folderServerLink = pgTable(
 
 export type RuleCondition =
   | { field: "type"; op: "eq"; value: "movie" | "show" }
-  | { field: "genre"; op: "contains_any" | "contains_all"; value: string[] }
-  | { field: "genreId"; op: "contains_any" | "contains_all"; value: number[] }
+  | { field: "genre"; op: "contains_any" | "contains_all" | "not_contains_any"; value: string[] }
+  | { field: "genreId"; op: "contains_any" | "contains_all" | "not_contains_any"; value: number[] }
   | { field: "originCountry"; op: "contains_any" | "not_contains_any"; value: string[] }
   | { field: "originalLanguage"; op: "eq" | "neq"; value: string }
   | { field: "contentRating"; op: "eq" | "in"; value: string | string[] }
@@ -839,7 +837,6 @@ export const accountRelations = relations(account, ({ one }) => ({
 
 export const downloadFolderRelations = relations(downloadFolder, ({ many }) => ({
   media: many(media),
-  serverLinks: many(folderServerLink),
   mediaPaths: many(folderMediaPath),
 }));
 
@@ -850,12 +847,7 @@ export const folderMediaPathRelations = relations(folderMediaPath, ({ one }) => 
   }),
 }));
 
-export const folderServerLinkRelations = relations(folderServerLink, ({ one }) => ({
-  folder: one(downloadFolder, {
-    fields: [folderServerLink.folderId],
-    references: [downloadFolder.id],
-  }),
-}));
+export const folderServerLinkRelations = relations(folderServerLink, () => ({}));
 
 /** @deprecated Use downloadFolderRelations */
 export const libraryRelations = downloadFolderRelations;

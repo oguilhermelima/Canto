@@ -8,12 +8,41 @@ import {
   deleteSetting,
 } from "@canto/db/settings";
 
-import { eq } from "drizzle-orm";
-import { user, supportedLanguage } from "@canto/db/schema";
-import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure } from "../trpc";
+import { and, eq } from "drizzle-orm";
+import { db } from "@canto/db/client";
+import { media, user, supportedLanguage } from "@canto/db/schema";
+import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure, t } from "../trpc";
 import { SETTINGS } from "../lib/settings-keys";
-import { dispatchRefreshAllLanguage } from "../infrastructure/queue/bullmq-dispatcher";
+import { dispatchRefreshAllLanguage, dispatchReconcileShow } from "../infrastructure/queue/bullmq-dispatcher";
 import { randomUUID } from "crypto";
+
+function validateServiceUrl(url: string): void {
+  const parsed = new URL(url);
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Only HTTP/HTTPS URLs are allowed" });
+  }
+  const hostname = parsed.hostname.toLowerCase();
+  // Block cloud metadata endpoints and link-local — allow private IPs since this is self-hosted
+  const blockedPatterns = [
+    /^169\.254\./, /^0\./,
+    /^metadata\.google\.internal$/i,
+    /^metadata\.internal$/i,
+  ];
+  if (blockedPatterns.some((re) => re.test(hostname))) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "This URL is not allowed" });
+  }
+}
+
+
+const setupOrAdminProcedure = t.procedure.use(async ({ ctx, next }) => {
+  const completed = await getSetting<boolean>("onboarding.completed");
+  if (completed) {
+    if (!ctx.session || ctx.session.user.role !== "admin") {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: "Onboarding is already completed" });
+    }
+  }
+  return next({ ctx });
+});
 
 /** Get or create a stable Plex client identifier (persisted in settings). */
 async function getOrCreatePlexClientId(): Promise<string> {
@@ -77,9 +106,9 @@ export const settingsRouter = createTRPCRouter({
 
   /** Bulk upsert multiple settings at once */
   setMany: adminProcedure
-    .input(z.record(z.string(), z.unknown()))
+    .input(z.object({ settings: z.array(z.object({ key: z.string(), value: z.unknown() })) }))
     .mutation(async ({ input }) => {
-      for (const [key, value] of Object.entries(input)) {
+      for (const { key, value } of input.settings) {
         await setSetting(key, value);
       }
       return { success: true };
@@ -103,6 +132,7 @@ export const settingsRouter = createTRPCRouter({
           if (!url || !apiKey) {
             return { connected: false, error: "URL or API key not configured" };
           }
+          validateServiceUrl(url);
           try {
             const res = await fetch(`${url}/System/Info`, {
               headers: { "X-Emby-Token": apiKey },
@@ -111,7 +141,7 @@ export const settingsRouter = createTRPCRouter({
             const info = (await res.json()) as { ServerName: string; Version: string };
             return { connected: true, serverName: info.ServerName, version: info.Version };
           } catch (err) {
-            return { connected: false, error: err instanceof Error ? err.message : "Connection failed" };
+            return { connected: false, error: "Connection failed" };
           }
         }
 
@@ -121,6 +151,7 @@ export const settingsRouter = createTRPCRouter({
           if (!url || !token) {
             return { connected: false, error: "URL or token not configured" };
           }
+          validateServiceUrl(url);
           try {
             const res = await fetch(`${url}/?X-Plex-Token=${token}`, {
               headers: { Accept: "application/json" },
@@ -135,7 +166,7 @@ export const settingsRouter = createTRPCRouter({
               version: data.MediaContainer.version,
             };
           } catch (err) {
-            return { connected: false, error: err instanceof Error ? err.message : "Connection failed" };
+            return { connected: false, error: "Connection failed" };
           }
         }
 
@@ -146,6 +177,7 @@ export const settingsRouter = createTRPCRouter({
           if (!url) {
             return { connected: false, error: "URL not configured" };
           }
+          validateServiceUrl(url);
           try {
             const body = new URLSearchParams({ username, password });
             const res = await fetch(`${url}/api/v2/auth/login`, {
@@ -160,7 +192,7 @@ export const settingsRouter = createTRPCRouter({
             }
             return { connected: true };
           } catch (err) {
-            return { connected: false, error: err instanceof Error ? err.message : "Connection failed" };
+            return { connected: false, error: "Connection failed" };
           }
         }
 
@@ -170,12 +202,13 @@ export const settingsRouter = createTRPCRouter({
           if (!url || !apiKey) {
             return { connected: false, error: "URL or API key not configured" };
           }
+          validateServiceUrl(url);
           try {
             const res = await fetch(`${url}/api/v1/health?apikey=${apiKey}`);
             if (!res.ok) return { connected: false, error: `HTTP ${res.status}` };
             return { connected: true };
           } catch (err) {
-            return { connected: false, error: err instanceof Error ? err.message : "Connection failed" };
+            return { connected: false, error: "Connection failed" };
           }
         }
 
@@ -185,6 +218,7 @@ export const settingsRouter = createTRPCRouter({
           if (!url || !apiKey) {
             return { connected: false, error: "URL or API key not configured" };
           }
+          validateServiceUrl(url);
           try {
             const res = await fetch(
               `${url}/api/v2.0/indexers/all/results/torznab/api?apikey=${apiKey}&t=caps`,
@@ -192,7 +226,7 @@ export const settingsRouter = createTRPCRouter({
             if (!res.ok) return { connected: false, error: `HTTP ${res.status}` };
             return { connected: true };
           } catch (err) {
-            return { connected: false, error: err instanceof Error ? err.message : "Connection failed" };
+            return { connected: false, error: "Connection failed" };
           }
         }
 
@@ -217,7 +251,7 @@ export const settingsRouter = createTRPCRouter({
             );
             return { connected: true };
           } catch (err) {
-            return { connected: false, error: err instanceof Error ? err.message : "Connection failed" };
+            return { connected: false, error: "Connection failed" };
           }
         }
 
@@ -231,7 +265,7 @@ export const settingsRouter = createTRPCRouter({
             if (!res.ok) return { connected: false, error: `Invalid API key (HTTP ${res.status})` };
             return { connected: true };
           } catch (err) {
-            return { connected: false, error: err instanceof Error ? err.message : "Connection failed" };
+            return { connected: false, error: "Connection failed" };
           }
         }
       }
@@ -285,6 +319,21 @@ export const settingsRouter = createTRPCRouter({
       return { success: true };
     }),
 
+  /** Toggle TVDB default for shows and reprocess all library shows */
+  toggleTvdbDefault: adminProcedure
+    .input(z.object({ enabled: z.boolean() }))
+    .mutation(async ({ input }) => {
+      await setSetting("tvdb.defaultShows", input.enabled);
+      const shows = await db
+        .select({ id: media.id })
+        .from(media)
+        .where(and(eq(media.inLibrary, true), eq(media.type, "show")));
+      for (const show of shows) {
+        await dispatchReconcileShow(show.id);
+      }
+      return { success: true, reprocessing: shows.length };
+    }),
+
   /** Get enabled state for all services */
   isOnboardingCompleted: publicProcedure.query(async () => {
     const val = await getSetting<boolean>(SETTINGS.ONBOARDING_COMPLETED);
@@ -309,7 +358,7 @@ export const settingsRouter = createTRPCRouter({
    * Authenticate with Jellyfin using username/password and obtain an API key.
    * Saves the URL and key to settings on success.
    */
-  authenticateJellyfin: publicProcedure
+  authenticateJellyfin: setupOrAdminProcedure
     .input(
       z.object({
         url: z.string().url(),
@@ -318,6 +367,7 @@ export const settingsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input }) => {
+      validateServiceUrl(input.url);
       try {
         // Authenticate
         const authRes = await fetch(
@@ -397,7 +447,7 @@ export const settingsRouter = createTRPCRouter({
       } catch (err) {
         return {
           success: false,
-          error: err instanceof Error ? err.message : "Connection failed",
+          error: "Connection failed",
         };
       }
     }),
@@ -406,7 +456,7 @@ export const settingsRouter = createTRPCRouter({
    * Authenticate with Plex using a token.
    * Validates and saves the URL and token.
    */
-  authenticatePlex: publicProcedure
+  authenticatePlex: setupOrAdminProcedure
     .input(
       z.object({
         url: z.string().url(),
@@ -414,6 +464,7 @@ export const settingsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input }) => {
+      validateServiceUrl(input.url);
       try {
         const res = await fetch(
           `${input.url}/?X-Plex-Token=${input.token}`,
@@ -440,7 +491,7 @@ export const settingsRouter = createTRPCRouter({
       } catch (err) {
         return {
           success: false,
-          error: err instanceof Error ? err.message : "Connection failed",
+          error: "Connection failed",
         };
       }
     }),
@@ -449,7 +500,7 @@ export const settingsRouter = createTRPCRouter({
    * Authenticate with Plex via plex.tv using email + password.
    * Gets an auth token from plex.tv, validates against the server, and saves.
    */
-  loginPlex: publicProcedure
+  loginPlex: setupOrAdminProcedure
     .input(
       z.object({
         url: z.string().url(),
@@ -459,6 +510,7 @@ export const settingsRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       try {
+        validateServiceUrl(input.url);
         // Sign in via plex.tv
         const signInRes = await fetch("https://plex.tv/users/sign_in.json", {
           method: "POST",
@@ -511,7 +563,7 @@ export const settingsRouter = createTRPCRouter({
       } catch (err) {
         return {
           success: false,
-          error: err instanceof Error ? err.message : "Connection failed",
+          error: "Connection failed",
         };
       }
     }),
@@ -520,7 +572,7 @@ export const settingsRouter = createTRPCRouter({
    * Create a Plex PIN for the OAuth flow.
    * Returns the PIN id and code to redirect the user to app.plex.tv/auth.
    */
-  plexPinCreate: publicProcedure.mutation(async () => {
+  plexPinCreate: setupOrAdminProcedure.mutation(async () => {
     const clientId = await getOrCreatePlexClientId();
     const res = await fetch("https://plex.tv/api/v2/pins?strong=true", {
       method: "POST",
@@ -545,7 +597,7 @@ export const settingsRouter = createTRPCRouter({
    * Poll a Plex PIN to check if the user has authenticated.
    * Once authToken is present, validate against the server and save.
    */
-  plexPinCheck: publicProcedure
+  plexPinCheck: setupOrAdminProcedure
     .input(
       z.object({
         pinId: z.number(),
@@ -554,6 +606,9 @@ export const settingsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input }) => {
+      if (input.serverUrl) {
+        validateServiceUrl(input.serverUrl);
+      }
       const res = await fetch(`https://plex.tv/api/v2/pins/${input.pinId}`, {
         headers: {
           Accept: "application/json",

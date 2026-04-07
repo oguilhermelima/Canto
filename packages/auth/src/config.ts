@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@canto/db/client";
 import * as schema from "@canto/db/schema";
-import { count } from "drizzle-orm";
+import { count, sql } from "drizzle-orm";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -34,21 +34,27 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user) => {
-          // First user becomes admin automatically
-          const [result] = await db
-            .select({ total: count() })
-            .from(schema.user);
+          // First user becomes admin automatically.
+          // Advisory lock serializes concurrent sign-ups to prevent TOCTOU race.
+          await db.execute(sql`SELECT pg_advisory_lock(42)`);
+          try {
+            const [result] = await db
+              .select({ total: count() })
+              .from(schema.user);
 
-          if ((result?.total ?? 0) === 0) {
-            return {
-              data: {
-                ...user,
-                role: "admin",
-              },
-            };
+            if (result && result.total === 0) {
+              return {
+                data: {
+                  ...user,
+                  role: "admin",
+                },
+              };
+            }
+
+            return { data: user };
+          } finally {
+            await db.execute(sql`SELECT pg_advisory_unlock(42)`);
           }
-
-          return { data: user };
         },
         after: async (user) => {
           // Auto-create watchlist for every new user
