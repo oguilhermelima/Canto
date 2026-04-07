@@ -1,17 +1,18 @@
-import { eq, and } from "drizzle-orm";
 import { db } from "@canto/db/client";
-import { media, mediaFile } from "@canto/db/schema";
+import { eq, and } from "drizzle-orm";
+import { media } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
 import { SETTINGS } from "@canto/api/lib/settings-keys";
 import { downloadTorrent } from "@canto/api/domain/use-cases/download-torrent";
 import { detectQuality } from "@canto/api/domain/rules/quality";
 import { calculateConfidence } from "@canto/api/domain/rules/scoring";
 import { parseSeasons, parseEpisodes } from "@canto/api/domain/rules/parsing";
+import { matchRssTitle } from "@canto/api/domain/rules/rss-matching";
+import { detectMissingEpisodes } from "@canto/api/domain/use-cases/detect-episode-gaps";
 import { getDownloadClient } from "@canto/api/infrastructure/adapters/download-client-factory";
 import { getProwlarrClient } from "@canto/api/infrastructure/adapters/prowlarr";
 import {
   findBlocklistByMediaId,
-  findMediaByIdWithSeasons,
 } from "@canto/api/infrastructure/repositories";
 
 /**
@@ -68,12 +69,6 @@ export async function handleRssSync(): Promise<void> {
 
   console.log(`[rss-sync] ${rssItems.length} RSS item(s) to process`);
 
-  // Build title lookup (lowercase title → show)
-  const titleMap = new Map<string, typeof monitoredShows[number]>();
-  for (const show of monitoredShows) {
-    titleMap.set(show.title.toLowerCase(), show);
-  }
-
   // 3. Match and download
   let downloadCount = 0;
 
@@ -82,21 +77,10 @@ export async function handleRssSync(): Promise<void> {
       // Parse season/episode from RSS title
       const seasons = parseSeasons(item.title);
       const episodes = parseEpisodes(item.title);
-      if (seasons.length === 0) continue; // Can't match without season
+      if (seasons.length === 0) continue;
 
-      // Try to match against monitored shows by checking if show title appears in RSS title
-      let matchedShow: typeof monitoredShows[number] | undefined;
-      const lowerTitle = item.title.toLowerCase();
-
-      for (const show of monitoredShows) {
-        // Check if show title appears in the RSS item title
-        const showWords = show.title.toLowerCase().replace(/[^\w\s]/g, "");
-        if (lowerTitle.includes(showWords) || lowerTitle.includes(showWords.replace(/\s+/g, "."))) {
-          matchedShow = show;
-          break;
-        }
-      }
-
+      // Match against monitored shows
+      const matchedShow = matchRssTitle(item.title, monitoredShows);
       if (!matchedShow) continue;
 
       // Check scoring
@@ -112,36 +96,19 @@ export async function handleRssSync(): Promise<void> {
       const blockedTitles = new Set(blocked.map((b) => b.title.toLowerCase()));
       if (blockedTitles.has(item.title.toLowerCase())) continue;
 
-      // Check if episodes already downloaded
-      const mediaRow = await findMediaByIdWithSeasons(db, matchedShow.id);
-      if (!mediaRow) continue;
-
       const seasonNum = seasons[0]!;
-      const seasonRow = mediaRow.seasons?.find((s) => s.number === seasonNum);
-      if (!seasonRow?.episodes) continue;
-
       const targetEpisodes = episodes.length > 0
         ? episodes
-        : seasonRow.episodes.map((e) => e.number); // Season pack
+        : []; // Will be resolved in detectMissingEpisodes
 
-      // Check which episodes are missing files
-      const missingEpisodes: number[] = [];
-      for (const epNum of targetEpisodes) {
-        const ep = seasonRow.episodes.find((e) => e.number === epNum);
-        if (!ep) continue;
+      // Detect which episodes are missing
+      const allTargetEps = targetEpisodes.length > 0
+        ? targetEpisodes
+        : await getAllSeasonEpisodes(seasonNum, matchedShow.id);
 
-        const existingFile = await db.query.mediaFile.findFirst({
-          where: and(
-            eq(mediaFile.episodeId, ep.id),
-            eq(mediaFile.status, "imported"),
-          ),
-        });
+      if (allTargetEps.length === 0) continue;
 
-        if (!existingFile) {
-          missingEpisodes.push(epNum);
-        }
-      }
-
+      const missingEpisodes = await detectMissingEpisodes(db, matchedShow.id, seasonNum, allTargetEps);
       if (missingEpisodes.length === 0) continue;
 
       // Download!
@@ -177,4 +144,12 @@ export async function handleRssSync(): Promise<void> {
   if (downloadCount > 0) {
     console.log(`[rss-sync] Started ${downloadCount} download(s)`);
   }
+}
+
+async function getAllSeasonEpisodes(seasonNum: number, mediaId: string): Promise<number[]> {
+  const { findMediaByIdWithSeasons } = await import("@canto/api/infrastructure/repositories");
+  const mediaRow = await findMediaByIdWithSeasons(db, mediaId);
+  if (!mediaRow) return [];
+  const seasonRow = mediaRow.seasons?.find((s) => s.number === seasonNum);
+  return seasonRow?.episodes?.map((e) => e.number) ?? [];
 }

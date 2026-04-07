@@ -131,6 +131,46 @@
     "./domain/use-cases/fetch-media-metadata": {
       "types": "./src/domain/use-cases/fetch-media-metadata.ts",
       "default": "./src/domain/use-cases/fetch-media-metadata.ts"
+    },
+    "./domain/use-cases/scan-jellyfin-media": {
+      "types": "./src/domain/use-cases/scan-jellyfin-media.ts",
+      "default": "./src/domain/use-cases/scan-jellyfin-media.ts"
+    },
+    "./domain/use-cases/scan-plex-media": {
+      "types": "./src/domain/use-cases/scan-plex-media.ts",
+      "default": "./src/domain/use-cases/scan-plex-media.ts"
+    },
+    "./domain/use-cases/resolve-external-id": {
+      "types": "./src/domain/use-cases/resolve-external-id.ts",
+      "default": "./src/domain/use-cases/resolve-external-id.ts"
+    },
+    "./domain/use-cases/process-sync-imports": {
+      "types": "./src/domain/use-cases/process-sync-imports.ts",
+      "default": "./src/domain/use-cases/process-sync-imports.ts"
+    },
+    "./domain/use-cases/fetch-server-media-info": {
+      "types": "./src/domain/use-cases/fetch-server-media-info.ts",
+      "default": "./src/domain/use-cases/fetch-server-media-info.ts"
+    },
+    "./domain/use-cases/continuous-download": {
+      "types": "./src/domain/use-cases/continuous-download.ts",
+      "default": "./src/domain/use-cases/continuous-download.ts"
+    },
+    "./domain/use-cases/retry-stalled-torrent": {
+      "types": "./src/domain/use-cases/retry-stalled-torrent.ts",
+      "default": "./src/domain/use-cases/retry-stalled-torrent.ts"
+    },
+    "./domain/use-cases/trigger-media-server-scans": {
+      "types": "./src/domain/use-cases/trigger-media-server-scans.ts",
+      "default": "./src/domain/use-cases/trigger-media-server-scans.ts"
+    },
+    "./domain/use-cases/detect-episode-gaps": {
+      "types": "./src/domain/use-cases/detect-episode-gaps.ts",
+      "default": "./src/domain/use-cases/detect-episode-gaps.ts"
+    },
+    "./domain/rules/rss-matching": {
+      "types": "./src/domain/rules/rss-matching.ts",
+      "default": "./src/domain/rules/rss-matching.ts"
     }
   },
   "scripts": {

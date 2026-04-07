@@ -1,16 +1,13 @@
 import { db } from "@canto/db/client";
-import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "@canto/api/lib/settings-keys";
-import { searchTorrents } from "@canto/api/domain/use-cases/search-torrents";
-import { downloadTorrent } from "@canto/api/domain/use-cases/download-torrent";
 import { autoImportTorrent } from "@canto/api/domain/use-cases/import-torrent";
+import { tryContinuousDownload } from "@canto/api/domain/use-cases/continuous-download";
+import { triggerMediaServerScans } from "@canto/api/domain/use-cases/trigger-media-server-scans";
 import { getDownloadClient } from "@canto/api/infrastructure/adapters/download-client-factory";
 import { buildIndexers } from "@canto/api/infrastructure/adapters/indexer-factory";
 import {
   findUnimportedTorrents,
   findTorrentById,
   findMediaById,
-  findAllServerLinks,
   ensureServerLibrary,
   addListItem,
   updateRequestStatus,
@@ -20,53 +17,6 @@ import {
   updateMedia,
 } from "@canto/api/infrastructure/repositories";
 import { logAndSwallow } from "@canto/api/lib/log-error";
-
-/* -------------------------------------------------------------------------- */
-/*  Media server scan trigger (via folder_server_link junction)                */
-/* -------------------------------------------------------------------------- */
-
-async function triggerMediaServerScans(): Promise<void> {
-  const links = await findAllServerLinks(db);
-  if (links.length === 0) return;
-
-  const jellyfinUrl = await getSetting(SETTINGS.JELLYFIN_URL);
-  const jellyfinKey = await getSetting(SETTINGS.JELLYFIN_API_KEY);
-  const plexUrl = await getSetting(SETTINGS.PLEX_URL);
-  const plexToken = await getSetting(SETTINGS.PLEX_TOKEN);
-
-  for (const link of links) {
-    if (link.serverType === "jellyfin" && jellyfinUrl && jellyfinKey) {
-      try {
-        if (link.serverLibraryId) {
-          await fetch(`${jellyfinUrl}/Library/${link.serverLibraryId}/Refresh`, {
-            method: "POST",
-            headers: { "X-Emby-Token": jellyfinKey },
-          });
-          console.log(`[import-torrents] Triggered Jellyfin scan for library ${link.serverLibraryId}`);
-        } else {
-          await fetch(`${jellyfinUrl}/Library/Refresh`, {
-            method: "POST",
-            headers: { "X-Emby-Token": jellyfinKey },
-          });
-          console.log("[import-torrents] Triggered Jellyfin full library scan");
-        }
-      } catch (err) {
-        console.warn("[import-torrents] Failed to trigger Jellyfin scan:", err);
-      }
-    }
-
-    if (link.serverType === "plex" && plexUrl && plexToken) {
-      try {
-        await fetch(
-          `${plexUrl}/library/sections/${link.serverLibraryId}/refresh?X-Plex-Token=${plexToken}`,
-        );
-        console.log(`[import-torrents] Triggered Plex scan for section ${link.serverLibraryId}`);
-      } catch (err) {
-        console.warn("[import-torrents] Failed to trigger Plex scan:", err);
-      }
-    }
-  }
-}
 
 /* -------------------------------------------------------------------------- */
 /*  Main handler                                                               */
@@ -154,7 +104,9 @@ export async function handleImportTorrents(): Promise<void> {
 
         // Continuous download: try to grab next episode (matching quality)
         if (updated.mediaId && mediaRow) {
+          const indexers = await buildIndexers();
           void tryContinuousDownload(
+            db,
             {
               id: mediaRow.id,
               type: mediaRow.type,
@@ -164,6 +116,8 @@ export async function handleImportTorrents(): Promise<void> {
             row.seasonNumber,
             row.episodeNumbers,
             { quality: row.quality, source: row.source },
+            indexers,
+            qbClient,
           ).catch(logAndSwallow("import-torrents tryContinuousDownload"));
         }
       }
@@ -181,61 +135,6 @@ export async function handleImportTorrents(): Promise<void> {
 
   // Trigger media server scans after successful imports
   if (importedFolderIds.size > 0) {
-    await triggerMediaServerScans();
+    await triggerMediaServerScans(db);
   }
 }
-
-async function tryContinuousDownload(
-  mediaRow: { id: string; type: string; continuousDownload: boolean; title: string },
-  importedSeasonNumber: number | null,
-  importedEpisodeNumbers: number[] | null,
-  preferredQuality?: { quality: string; source: string },
-): Promise<void> {
-  if (mediaRow.type !== "show" || !mediaRow.continuousDownload) return;
-  if (!importedEpisodeNumbers?.length || !importedSeasonNumber) return;
-
-  const lastImportedEp = Math.max(...importedEpisodeNumbers);
-  const nextEp = lastImportedEp + 1;
-
-  console.log(`[continuous-download] Searching next episode S${String(importedSeasonNumber).padStart(2, "0")}E${String(nextEp).padStart(2, "0")} for "${mediaRow.title}"`);
-
-  try {
-    const indexers = await buildIndexers();
-    const { results } = await searchTorrents(db, {
-      mediaId: mediaRow.id,
-      seasonNumber: importedSeasonNumber,
-      episodeNumbers: [nextEp],
-    }, indexers);
-
-    if (results.length === 0) {
-      console.log(`[continuous-download] No results for next episode`);
-      return;
-    }
-
-    // Prefer results matching the quality/source of the previously imported episode
-    let best = results[0]!;
-    if (preferredQuality && preferredQuality.quality !== "unknown") {
-      const matching = results.find(
-        (r) => r.quality === preferredQuality.quality && (preferredQuality.source === "unknown" || r.source === preferredQuality.source),
-      );
-      if (matching) best = matching;
-    }
-    console.log(`[continuous-download] Auto-downloading "${best.title}" (confidence: ${best.confidence})`);
-
-    const qbClient = await getDownloadClient();
-    await downloadTorrent(db, {
-      mediaId: mediaRow.id,
-      title: best.title,
-      magnetUrl: best.magnetUrl ?? undefined,
-      torrentUrl: best.downloadUrl ?? undefined,
-      seasonNumber: importedSeasonNumber,
-      episodeNumbers: [nextEp],
-    }, qbClient);
-  } catch (err) {
-    console.warn(
-      `[continuous-download] Failed for "${mediaRow.title}":`,
-      err instanceof Error ? err.message : err,
-    );
-  }
-}
-

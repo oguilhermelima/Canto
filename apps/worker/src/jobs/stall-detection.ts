@@ -1,13 +1,11 @@
 import { db } from "@canto/db/client";
 import { getDownloadClient } from "@canto/api/infrastructure/adapters/download-client-factory";
 import { buildIndexers } from "@canto/api/infrastructure/adapters/indexer-factory";
-import { searchTorrents } from "@canto/api/domain/use-cases/search-torrents";
-import { downloadTorrent } from "@canto/api/domain/use-cases/download-torrent";
 import { createNotification } from "@canto/api/domain/use-cases/create-notification";
+import { retryStalledTorrent } from "@canto/api/domain/use-cases/retry-stalled-torrent";
 import {
   findAllTorrents,
   updateTorrent,
-  createBlocklistEntry,
 } from "@canto/api/infrastructure/repositories";
 
 /** How long a torrent must be downloading with no progress before we consider it stalled (ms) */
@@ -44,10 +42,8 @@ export async function handleStallDetection(): Promise<void> {
     const live = liveMap.get(row.hash);
     if (!live) continue;
 
-    // Only flag if qBit reports stalledDL
     if (live.state !== "stalledDL") continue;
 
-    // Check age — don't stall-flag very recent torrents
     const createdAt = row.createdAt ? new Date(row.createdAt).getTime() : 0;
     if (now - createdAt < STALL_THRESHOLD_MS) continue;
 
@@ -59,6 +55,8 @@ export async function handleStallDetection(): Promise<void> {
   console.log(
     `[stall-detection] Found ${stalled.length} stalled torrent(s)`,
   );
+
+  const indexers = await buildIndexers();
 
   for (const row of stalled) {
     try {
@@ -75,7 +73,7 @@ export async function handleStallDetection(): Promise<void> {
 
       // Auto-retry: search for alternative and download
       if (row.mediaId) {
-        await autoRetryStalled(row);
+        await retryStalledTorrent(db, row, indexers, qb);
       }
     } catch (err) {
       console.error(
@@ -83,81 +81,5 @@ export async function handleStallDetection(): Promise<void> {
         err instanceof Error ? err.message : err,
       );
     }
-  }
-}
-
-async function autoRetryStalled(
-  row: { id: string; title: string; mediaId: string | null; seasonNumber: number | null; episodeNumbers: number[] | null },
-): Promise<void> {
-  if (!row.mediaId) return;
-
-  // Blocklist the stalled torrent
-  try {
-    await createBlocklistEntry(db, {
-      mediaId: row.mediaId,
-      title: row.title,
-      reason: "stalled",
-    });
-  } catch {
-    // May already be blocklisted
-  }
-
-  // Remove stalled torrent from qBit
-  const qb = await getDownloadClient();
-  try {
-    const stalledRow = await db.query.torrent.findFirst({
-      where: (t, { eq }) => eq(t.id, row.id),
-    });
-    if (stalledRow?.hash) {
-      await qb.deleteTorrent(stalledRow.hash, false);
-    }
-  } catch {
-    // qBit may not have it
-  }
-
-  // Search for alternative
-  const indexers = await buildIndexers();
-  if (indexers.length === 0) return;
-
-  try {
-    const { results } = await searchTorrents(
-      db,
-      {
-        mediaId: row.mediaId,
-        seasonNumber: row.seasonNumber ?? undefined,
-        episodeNumbers: row.episodeNumbers ?? undefined,
-      },
-      indexers,
-    );
-
-    if (results.length === 0) {
-      console.log(
-        `[stall-detection] No alternative found for "${row.title}"`,
-      );
-      return;
-    }
-
-    const best = results[0]!;
-    console.log(
-      `[stall-detection] Auto-retrying with "${best.title}" (confidence: ${best.confidence})`,
-    );
-
-    await downloadTorrent(
-      db,
-      {
-        mediaId: row.mediaId,
-        title: best.title,
-        magnetUrl: best.magnetUrl ?? undefined,
-        torrentUrl: best.downloadUrl ?? undefined,
-        seasonNumber: row.seasonNumber ?? undefined,
-        episodeNumbers: row.episodeNumbers ?? undefined,
-      },
-      qb,
-    );
-  } catch (err) {
-    console.warn(
-      `[stall-detection] Auto-retry failed for "${row.title}":`,
-      err instanceof Error ? err.message : err,
-    );
   }
 }

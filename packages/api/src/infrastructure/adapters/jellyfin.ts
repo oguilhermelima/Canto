@@ -42,6 +42,24 @@ export async function scanJellyfinLibrary(
 }
 
 /**
+ * Trigger a library scan for a specific library, or the full library if no ID is given.
+ */
+export async function triggerJellyfinScan(
+  url: string,
+  apiKey: string,
+  libraryId?: string,
+): Promise<void> {
+  const endpoint = libraryId
+    ? `${url}/Library/${libraryId}/Refresh`
+    : `${url}/Library/Refresh`;
+  await fetch(endpoint, {
+    method: "POST",
+    headers: headers(apiKey),
+    signal: AbortSignal.timeout(10_000),
+  });
+}
+
+/**
  * Retrieve all virtual (library) folders from Jellyfin.
  */
 export async function getJellyfinLibraryFolders(

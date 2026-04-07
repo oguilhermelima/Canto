@@ -1,4 +1,4 @@
-import { and, eq, or, isNull, desc, count, sql } from "drizzle-orm";
+import { and, eq, or, isNull, desc, count, sql, inArray } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { list, listItem, media } from "@canto/db/schema";
 import type { RecsFilters } from "../../domain/types/recs-filters";
@@ -275,4 +275,44 @@ export async function isMediaInServerLibrary(
     ),
   });
   return !!item;
+}
+
+/**
+ * Reconcile the Server Library list with what's actually on media servers.
+ * Adds missing items and removes items no longer on any server.
+ */
+export async function reconcileServerLibrary(
+  db: Database,
+  tag: string,
+): Promise<void> {
+  const serverLib = await ensureServerLibrary(db);
+
+  // All media IDs confirmed on a server (imported torrents + synced items)
+  const onServerRows = await db.execute(sql`
+    SELECT DISTINCT media_id::text FROM (
+      SELECT media_id FROM torrent WHERE imported = true AND media_id IS NOT NULL
+      UNION
+      SELECT media_id FROM sync_item WHERE result IN ('imported', 'skipped') AND media_id IS NOT NULL
+    ) x
+  `);
+  const serverMediaIds = new Set(
+    (onServerRows as unknown as Array<{ media_id: string }>).map((r) => r.media_id),
+  );
+
+  // Add missing items
+  for (const mediaId of serverMediaIds) {
+    await addListItem(db, { listId: serverLib.id, mediaId }).catch(() => { /* already in list */ });
+  }
+
+  // Remove items no longer on server
+  if (serverMediaIds.size > 0) {
+    const idsArray = [...serverMediaIds];
+    await db.execute(sql`
+      DELETE FROM list_item
+      WHERE list_id = ${serverLib.id}::uuid
+      AND media_id NOT IN (${sql.join(idsArray.map((id) => sql`${id}::uuid`), sql`, `)})
+    `);
+  }
+
+  console.log(`[${tag}] Server Library reconciled: ${serverMediaIds.size} items`);
 }

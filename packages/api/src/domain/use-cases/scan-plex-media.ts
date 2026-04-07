@@ -1,0 +1,85 @@
+/* -------------------------------------------------------------------------- */
+/*  Use-case: Scan Plex libraries for media items                            */
+/* -------------------------------------------------------------------------- */
+
+import type { PendingImport } from "./scan-jellyfin-media";
+
+export interface PlexLibraryRef {
+  plexLibraryId: string;
+  type: string;
+  linkId: string;
+}
+
+export async function scanPlexMedia(
+  url: string,
+  token: string,
+  libs: PlexLibraryRef[],
+): Promise<PendingImport[]> {
+  const items: PendingImport[] = [];
+
+  for (const lib of libs) {
+    const plexPageSize = 100;
+    let offset = 0;
+
+    while (true) {
+      const res = await fetch(
+        `${url}/library/sections/${lib.plexLibraryId}/all?X-Plex-Token=${token}&includeGuids=1&X-Plex-Container-Start=${offset}&X-Plex-Container-Size=${plexPageSize}`,
+        { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(30_000) },
+      );
+      if (!res.ok) break;
+
+      const data = await res.json() as {
+        MediaContainer: {
+          totalSize?: number;
+          size?: number;
+          Metadata?: Array<{
+            ratingKey: string;
+            title: string;
+            year?: number;
+            type?: string;
+            Guid?: Array<{ id: string }>;
+          }>;
+        };
+      };
+
+      const metadata = data.MediaContainer.Metadata ?? [];
+      for (const item of metadata) {
+        let tmdbId: number | undefined;
+        let imdbId: string | undefined;
+
+        for (const guid of item.Guid ?? []) {
+          if (guid.id.startsWith("tmdb://")) {
+            tmdbId = parseInt(guid.id.replace("tmdb://", ""), 10);
+          } else if (guid.id.startsWith("imdb://")) {
+            imdbId = guid.id.replace("imdb://", "");
+          }
+        }
+
+        let mediaType: "movie" | "show";
+        if (lib.type === "mixed") {
+          mediaType = item.type === "movie" ? "movie" : "show";
+        } else {
+          mediaType = lib.type === "movies" ? "movie" : "show";
+        }
+
+        items.push({
+          tmdbId,
+          imdbId,
+          title: item.title,
+          year: item.year,
+          type: mediaType,
+          libraryId: null,
+          serverLinkId: lib.linkId,
+          source: "plex",
+          plexRatingKey: item.ratingKey,
+        });
+      }
+
+      offset += plexPageSize;
+      const totalSize = data.MediaContainer.totalSize ?? 0;
+      if (metadata.length < plexPageSize || offset >= totalSize) break;
+    }
+  }
+
+  return items;
+}
