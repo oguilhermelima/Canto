@@ -7,12 +7,12 @@ interface MediaLogoProps {
   src: string;
   alt: string;
   /** Size preset — controls the max-h / max-w constraints. */
-  size?: "hero" | "carousel" | "spotlight";
+  size?: "hero" | "carousel" | "spotlight" | "card";
   className?: string;
 }
 
 const DROP_SHADOW =
-  "drop-shadow(0 0 2px rgba(255,255,255,0.8)) drop-shadow(0 0 8px rgba(255,255,255,0.3)) drop-shadow(0 2px 10px rgba(0,0,0,0.6)) drop-shadow(0 0 24px rgba(0,0,0,0.4))";
+  "drop-shadow(0 0 1px rgba(255,255,255,0.5)) drop-shadow(0 0 3px rgba(255,255,255,0.15)) drop-shadow(0 1px 4px rgba(0,0,0,0.6)) drop-shadow(0 0 12px rgba(0,0,0,0.3))";
 
 type Variant = "normal" | "tall" | "extreme";
 
@@ -31,6 +31,11 @@ const SIZE_CLASSES: Record<string, Record<Variant, string>> = {
     normal: "max-h-20 max-w-[260px]",
     tall: "max-h-36 max-w-[200px]",
     extreme: "max-h-44 max-w-[180px]",
+  },
+  card: {
+    normal: "max-h-12 max-w-[200px]",
+    tall: "max-h-24 max-w-[160px]",
+    extreme: "max-h-28 max-w-[140px]",
   },
 };
 
