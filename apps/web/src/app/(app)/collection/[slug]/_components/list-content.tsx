@@ -1,6 +1,7 @@
 "use client";
 
-import { Film, Tv } from "lucide-react";
+import type { RefObject } from "react";
+import { Film, Loader2, Tv } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { TabBar } from "~/components/layout/tab-bar";
 import { MediaGrid } from "~/components/media/media-grid";
@@ -27,6 +28,9 @@ interface ListContentProps {
   onTypeChange: (type: "all" | "movie" | "show") => void;
   showFilters: boolean;
   onToggleFilters: () => void;
+  sentinelRef: RefObject<HTMLDivElement | null>;
+  isFetchingNextPage: boolean;
+  hasNextPage: boolean;
 }
 
 export function ListContent({
@@ -36,6 +40,9 @@ export function ListContent({
   onTypeChange,
   showFilters,
   onToggleFilters,
+  sentinelRef,
+  isFetchingNextPage,
+  hasNextPage,
 }: ListContentProps): React.JSX.Element {
   const router = useRouter();
 
@@ -59,7 +66,21 @@ export function ListContent({
           action={{ label: "Discover Media", onClick: () => router.push("/") }}
         />
       ) : (
-        <MediaGrid items={items} isLoading={isLoading} compact={showFilters} />
+        <>
+          <MediaGrid items={items} isLoading={isLoading} compact={showFilters} />
+
+          <div ref={sentinelRef} className="h-1" />
+
+          {isFetchingNextPage && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          )}
+
+          {!hasNextPage && !isFetchingNextPage && items.length > 0 && !isLoading && (
+            <StateMessage preset="endOfItems" inline />
+          )}
+        </>
       )}
     </div>
   );

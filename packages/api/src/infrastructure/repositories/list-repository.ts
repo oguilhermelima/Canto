@@ -203,17 +203,28 @@ export async function findListItems(
     default: orderByExpr = [desc(listItem.addedAt)];
   }
 
-  return db
-    .select({
-      listItem: listItem,
-      media: media,
-    })
-    .from(listItem)
-    .innerJoin(media, eq(listItem.mediaId, media.id))
-    .where(and(...conditions))
-    .orderBy(...orderByExpr)
-    .limit(lim)
-    .offset(off);
+  const whereClause = and(...conditions);
+
+  const [items, [countRow]] = await Promise.all([
+    db
+      .select({
+        listItem: listItem,
+        media: media,
+      })
+      .from(listItem)
+      .innerJoin(media, eq(listItem.mediaId, media.id))
+      .where(whereClause)
+      .orderBy(...orderByExpr)
+      .limit(lim)
+      .offset(off),
+    db
+      .select({ total: count() })
+      .from(listItem)
+      .innerJoin(media, eq(listItem.mediaId, media.id))
+      .where(whereClause),
+  ]);
+
+  return { items, total: countRow?.total ?? 0 };
 }
 
 export async function addListItem(

@@ -39,6 +39,7 @@ export const listRouter = createTRPCRouter({
         slug: z.string(),
         limit: z.number().int().min(1).max(100).default(50),
         offset: z.number().int().min(0).default(0),
+        cursor: z.number().int().min(0).nullish(),
         // Filters
         genreIds: z.array(z.number()).optional(),
         genreMode: z.enum(["and", "or"]).default("or").optional(),
@@ -64,9 +65,9 @@ export const listRouter = createTRPCRouter({
       if (!listRow) {
         throw new TRPCError({ code: "NOT_FOUND", message: "List not found" });
       }
-      const items = await findListItems(ctx.db, listRow.id, {
+      const { items, total } = await findListItems(ctx.db, listRow.id, {
         limit: input.limit,
-        offset: input.offset,
+        offset: input.cursor ?? input.offset,
         genreIds: input.genreIds,
         genreMode: input.genreMode ?? "or",
         language: input.language,
@@ -81,7 +82,7 @@ export const listRouter = createTRPCRouter({
         watchProviders: input.watchProviders,
         watchRegion: input.watchRegion,
       });
-      return { list: listRow, items };
+      return { list: listRow, items, total };
     }),
 
   /** Create a custom list */
