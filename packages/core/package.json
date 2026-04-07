@@ -1,0 +1,34 @@
+{
+  "name": "@canto/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./domain/ports": "./src/domain/ports/index.ts",
+    "./domain/types": "./src/domain/types/index.ts",
+    "./domain/rules": "./src/domain/rules/index.ts",
+    "./infrastructure/repositories": "./src/infrastructure/repositories/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "clean": "rm -rf .cache dist node_modules",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@canto/db": "workspace:*",
+    "@canto/providers": "workspace:*",
+    "@canto/validators": "workspace:*",
+    "@trpc/server": "catalog:",
+    "bullmq": "^5.34.8",
+    "drizzle-orm": "catalog:",
+    "fast-xml-parser": "^5.5.9",
+    "ioredis": "^5.6.1",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@canto/tsconfig": "workspace:*",
+    "@types/node": "^22.13.0",
+    "typescript": "catalog:"
+  }
+}
