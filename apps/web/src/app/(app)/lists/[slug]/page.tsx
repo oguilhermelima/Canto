@@ -2,24 +2,12 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Film, Tv } from "lucide-react";
-import { cn } from "@canto/ui/cn";
+import { type FilterOutput } from "~/components/media/filter-sidebar";
 import { trpc } from "~/lib/trpc/client";
 import { StateMessage } from "~/components/layout/state-message";
 import { PageHeader } from "~/components/layout/page-header";
-import { TabBar } from "~/components/layout/tab-bar";
-import { MediaGrid } from "~/components/media/media-grid";
-import {
-  FilterSidebar,
-  type FilterOutput,
-} from "~/components/media/filter-sidebar";
-import { FilterButton } from "../_components/filter-button";
-
-const TYPE_OPTIONS = [
-  { value: "all", label: "All" },
-  { value: "movie", label: "Movies", icon: Film },
-  { value: "show", label: "TV Shows", icon: Tv },
-];
+import { ListFilterSidebar } from "./_components/list-filter-sidebar";
+import { ListContent } from "./_components/list-content";
 
 export default function ListDetailPage(): React.JSX.Element {
   const params = useParams<{ slug: string }>();
@@ -88,44 +76,20 @@ export default function ListDetailPage(): React.JSX.Element {
       />
 
       <div className="flex px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        {/* Sidebar */}
-        <div
-          className={cn(
-            "hidden w-[20rem] shrink-0 transition-[margin,opacity] duration-300 ease-in-out md:block",
-            showFilters
-              ? "mr-4 opacity-100 lg:mr-8"
-              : "-ml-[20rem] mr-0 opacity-0",
-          )}
-        >
-          <FilterSidebar
-            mediaType={typeFilter}
-            onFilterChange={handleFilterChange}
-          />
-        </div>
+        <ListFilterSidebar
+          mediaType={typeFilter}
+          visible={showFilters}
+          onFilterChange={handleFilterChange}
+        />
 
-        {/* Content */}
-        <div className="min-w-0 flex-1">
-          <TabBar
-            tabs={TYPE_OPTIONS}
-            value={typeFilter}
-            onChange={(v) => setTypeFilter(v as "all" | "movie" | "show")}
-            leading={
-              <FilterButton
-                active={showFilters}
-                onClick={() => setShowFilters((v) => !v)}
-              />
-            }
-          />
-
-          {!isLoading && items.length === 0 ? (
-            <StateMessage
-              preset="emptyList"
-              action={{ label: "Discover Media", onClick: () => router.push("/") }}
-            />
-          ) : (
-            <MediaGrid items={items} isLoading={isLoading} compact={showFilters} />
-          )}
-        </div>
+        <ListContent
+          items={items}
+          isLoading={isLoading}
+          typeFilter={typeFilter}
+          onTypeChange={setTypeFilter}
+          showFilters={showFilters}
+          onToggleFilters={() => setShowFilters((v) => !v)}
+        />
       </div>
     </div>
   );
