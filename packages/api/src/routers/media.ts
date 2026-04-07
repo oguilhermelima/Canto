@@ -13,6 +13,7 @@ import {
   resolveMediaInput,
   getPersonInput,
   recommendationsInput,
+  getLogoInput,
 } from "@canto/validators";
 
 import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure } from "../trpc";
@@ -38,6 +39,8 @@ import { getByExternal } from "@canto/core/domain/use-cases/get-by-external";
 import { resolveMedia } from "@canto/core/domain/use-cases/resolve-media";
 import { persistMediaUseCase } from "@canto/core/domain/use-cases/persist-media";
 import { getRecommendations } from "@canto/core/domain/use-cases/get-recommendations";
+import { fetchLogos, enrichBrowseWithLogos } from "@canto/core/domain/use-cases/fetch-logos";
+import { db as appDb } from "@canto/db/client";
 import { setLibraryStatus } from "@canto/core/domain/use-cases/manage-library-status";
 import { mapPoolItem } from "@canto/core/domain/mappers/media-mapper";
 import type { RecsFilters } from "@canto/core/infrastructure/repositories/user-recommendation-repository";
@@ -68,20 +71,21 @@ export const mediaRouter = createTRPCRouter({
         }
 
         const searchLang = (await getSetting(SETTINGS.LANGUAGE)) ?? "en-US";
-        return cached(
+        const searchResults = await cached(
           `browse:search:${input.provider}:${input.type}:${input.query}:${page}:${searchLang}`,
-          300,
+          1800,
           async () => {
             const provider = await getProviderWithKey(input.provider);
             return provider.search(input.query!, input.type, { page });
           },
         );
+        return enrichBrowseWithLogos(appDb, searchResults);
       }
 
       const settingsLang = (await getSetting(SETTINGS.LANGUAGE)) ?? "en-US";
       const cacheKey = `browse:${input.type}:${input.mode}:${input.genres ?? ""}:${input.language ?? ""}:${input.sortBy ?? ""}:${input.dateFrom ?? ""}:${input.dateTo ?? ""}:${input.keywords ?? ""}:${input.scoreMin ?? ""}:${input.runtimeMax ?? ""}:${input.certification ?? ""}:${input.status ?? ""}:${input.watchProviders ?? ""}:${input.watchRegion ?? ""}:${input.runtimeMin ?? ""}:${page}:${settingsLang}`;
 
-      return cached(cacheKey, 300, async () => {
+      const browseResults = await cached(cacheKey, 1800, async () => {
         const provider = await getTmdbProvider();
         const today = new Date().toISOString().slice(0, 10);
 
@@ -136,6 +140,7 @@ export const mediaRouter = createTRPCRouter({
           with_runtime_gte: input.runtimeMin,
         }));
       });
+      return enrichBrowseWithLogos(appDb, browseResults);
     }),
 
   getById: protectedProcedure.input(getByIdInput).query(async ({ ctx, input }) => {
@@ -295,6 +300,15 @@ export const mediaRouter = createTRPCRouter({
     .mutation(async ({ ctx }) => {
       await dispatchRebuildUserRecs(ctx.session.user.id);
       return { success: true };
+    }),
+
+  getLogo: protectedProcedure
+    .input(getLogoInput)
+    .query(async ({ ctx, input }) => {
+      const tmdb = await getTmdbProvider();
+      const result = await fetchLogos(ctx.db, tmdb, [input]);
+      const key = `${input.provider}-${input.externalId}`;
+      return { logoPath: result[key] ?? null };
     }),
 
   recommendations: protectedProcedure
