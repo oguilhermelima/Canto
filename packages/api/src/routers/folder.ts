@@ -1,5 +1,5 @@
-import { access, constants, readdir } from "node:fs/promises";
 import nodePath from "node:path";
+import { readdir } from "node:fs/promises";
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -14,7 +14,6 @@ import {
   findFolderById,
   findAllFolders,
   findAllFoldersWithLinks,
-  findDefaultFolder,
   createFolder,
   updateFolder,
   deleteFolder,
@@ -30,20 +29,11 @@ import {
 } from "../infrastructure/repositories/folder-repository";
 import { findMediaById } from "../infrastructure/repositories/media-repository";
 
-function validatePath(p: string): string {
-  const normalized = nodePath.normalize(p);
-  if (normalized.includes("..")) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: `Path "${p}" contains invalid traversal segments` });
-  }
-  if (!nodePath.isAbsolute(normalized)) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: `Path "${p}" must be absolute` });
-  }
-  return normalized;
-}
+// ── Extracted rules & use-cases ──
+import { validatePath } from "../domain/rules/validate-path";
+import { testFolderPaths } from "../domain/use-cases/test-folder-paths";
 
 export const folderRouter = createTRPCRouter({
-  // ── CRUD ──
-
   list: adminProcedure.query(({ ctx }) => findAllFolders(ctx.db)),
 
   listWithLinks: adminProcedure.query(({ ctx }) => findAllFoldersWithLinks(ctx.db)),
@@ -52,8 +42,8 @@ export const folderRouter = createTRPCRouter({
 
   create: adminProcedure
     .input(createFolderInput)
-    .mutation(async ({ ctx, input }) => {
-      return createFolder(ctx.db, {
+    .mutation(({ ctx, input }) =>
+      createFolder(ctx.db, {
         name: input.name,
         downloadPath: input.downloadPath ? validatePath(input.downloadPath) : null,
         libraryPath: input.libraryPath ? validatePath(input.libraryPath) : null,
@@ -61,8 +51,8 @@ export const folderRouter = createTRPCRouter({
         rules: input.rules ?? null,
         priority: input.priority,
         isDefault: input.isDefault,
-      });
-    }),
+      }),
+    ),
 
   update: adminProcedure
     .input(updateFolderInput)
@@ -94,8 +84,6 @@ export const folderRouter = createTRPCRouter({
     .input(z.object({ id: z.string().uuid() }))
     .mutation(({ ctx, input }) => setDefaultFolder(ctx.db, input.id)),
 
-  // ── Resolve — auto-select folder for a media item ──
-
   resolve: protectedProcedure
     .input(z.object({ mediaId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
@@ -103,7 +91,6 @@ export const folderRouter = createTRPCRouter({
       if (!media) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
 
       const folders = await findAllFolders(ctx.db);
-
       const routable: RoutableMedia = {
         type: media.type,
         genres: media.genres,
@@ -116,14 +103,8 @@ export const folderRouter = createTRPCRouter({
 
       const folderId = resolveFolder(folders, routable);
       const folder = folderId ? folders.find((f) => f.id === folderId) : null;
-
-      return {
-        folderId,
-        folderName: folder?.name ?? null,
-      };
+      return { folderId, folderName: folder?.name ?? null };
     }),
-
-  // ── Filesystem browsing ──
 
   browse: adminProcedure
     .input(z.object({ path: z.string().default("/") }))
@@ -141,9 +122,6 @@ export const folderRouter = createTRPCRouter({
       }
     }),
 
-  // ── qBittorrent categories ──
-
-  /** Fetch existing categories and default save path from qBittorrent */
   qbitCategories: adminProcedure.query(async () => {
     try {
       const client = await getDownloadClient();
@@ -157,42 +135,7 @@ export const folderRouter = createTRPCRouter({
     }
   }),
 
-  // ── Path management ──
-
-  testPaths: adminProcedure.mutation(async ({ ctx }) => {
-    const { getSetting } = await import("@canto/db/settings");
-    const importMethod = (await getSetting<string>("download.importMethod")) ?? "local";
-
-    const folders = await findAllFolders(ctx.db);
-    const results: Array<{
-      name: string;
-      downloadPath: { ok: boolean; error?: string };
-      libraryPath: { ok: boolean; error?: string };
-    }> = [];
-
-    for (const folder of folders) {
-      if (importMethod === "remote") {
-        // Remote mode — paths are from qBittorrent's perspective, can't verify locally
-        results.push({
-          name: folder.name,
-          downloadPath: folder.downloadPath
-            ? { ok: true, error: "Remote mode — path is from qBittorrent's perspective" }
-            : { ok: false, error: "Not configured" },
-          libraryPath: folder.libraryPath
-            ? { ok: true, error: "Remote mode — path is from qBittorrent's perspective" }
-            : { ok: false, error: "Not configured" },
-        });
-      } else {
-        const dl = await testPath(folder.downloadPath);
-        const lib = await testPath(folder.libraryPath);
-        results.push({ name: folder.name, downloadPath: dl, libraryPath: lib });
-      }
-    }
-
-    return results;
-  }),
-
-  // ── Server Links ──
+  testPaths: adminProcedure.mutation(({ ctx }) => testFolderPaths(ctx.db)),
 
   listAllServerLinks: adminProcedure
     .input(z.object({ serverType: z.enum(["jellyfin", "plex"]).optional() }).optional())
@@ -220,8 +163,6 @@ export const folderRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  // ── Media Paths ──
-
   listMediaPaths: adminProcedure
     .input(z.object({ folderId: z.string().uuid() }))
     .query(({ ctx, input }) => findMediaPathsByFolder(ctx.db, input.folderId)),
@@ -245,13 +186,3 @@ export const folderRouter = createTRPCRouter({
       return { success: true };
     }),
 });
-
-async function testPath(p: string | null): Promise<{ ok: boolean; error?: string }> {
-  if (!p) return { ok: false, error: "Not configured" };
-  try {
-    await access(p, constants.R_OK | constants.W_OK);
-    return { ok: true };
-  } catch {
-    return { ok: false, error: `Path "${p}" is not accessible or writable` };
-  }
-}

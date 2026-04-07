@@ -1,0 +1,57 @@
+import type { Database } from "@canto/db/client";
+import type { MediaProviderPort } from "../ports/media-provider.port";
+import type { MediaType, ProviderName } from "@canto/providers";
+import { getSetting } from "@canto/db/settings";
+import { getSupportedLanguageCodes, persistFullMedia } from "@canto/db/persist-media";
+import { SETTINGS } from "../../lib/settings-keys";
+import { logAndSwallow } from "../../lib/log-error";
+import {
+  findMediaByExternalId,
+  findMediaByAnyReference,
+  findMediaByIdWithSeasons,
+} from "../../infrastructure/repositories/media-repository";
+import { dispatchTranslateEpisodes } from "../../infrastructure/queue/bullmq-dispatcher";
+import { fetchMediaMetadata } from "./fetch-media-metadata";
+
+interface PersistMediaInput {
+  externalId: number;
+  provider: ProviderName;
+  type: MediaType;
+}
+
+/**
+ * Persist a resolved media item to DB (fetch + persist + dispatch translations).
+ * Called when the user takes an action (download, add to library) on non-persisted media.
+ */
+export async function persistMediaUseCase(
+  db: Database,
+  input: PersistMediaInput,
+  providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort },
+) {
+  const tvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+
+  const existing = tvdbEnabled
+    ? await findMediaByAnyReference(db, input.externalId, input.provider)
+    : await findMediaByExternalId(db, input.externalId, input.provider);
+
+  if (existing?.processingStatus === "ready") return existing;
+
+  const supportedLangs = [...await getSupportedLanguageCodes(db)];
+
+  const result = await fetchMediaMetadata(
+    input.externalId, input.provider, input.type,
+    providers,
+    { useTVDBSeasons: tvdbEnabled, supportedLanguages: supportedLangs },
+  );
+
+  const mediaId = await persistFullMedia(db, result, existing?.id);
+
+  if (result.tvdbId && result.tvdbSeasons?.length) {
+    const nonEnLangs = supportedLangs.filter((l) => !l.startsWith("en"));
+    for (const lang of nonEnLangs) {
+      void dispatchTranslateEpisodes(mediaId, result.tvdbId, lang).catch(logAndSwallow("media:persist dispatchTranslateEpisodes"));
+    }
+  }
+
+  return findMediaByIdWithSeasons(db, mediaId);
+}

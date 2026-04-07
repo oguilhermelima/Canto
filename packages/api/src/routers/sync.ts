@@ -1,34 +1,26 @@
 import { z } from "zod";
 
-import { db } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
 import { SETTINGS } from "../lib/settings-keys";
-import { persistMedia, getSupportedLanguageCodes } from "@canto/db/persist-media";
 
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
 import { getTmdbProvider } from "../lib/tmdb-client";
 import {
-  findSyncItemById,
   findSyncItemsByMediaId,
-  findSyncItemsWithEpisodes,
   findSyncItemsPaginated,
-  updateSyncItem,
 } from "../infrastructure/repositories/sync-repository";
-import { findAllServerLinks } from "../infrastructure/repositories/folder-repository";
-import { findMediaByAnyReference, updateMedia } from "../infrastructure/repositories/media-repository";
 import { dispatchJellyfinSync, dispatchPlexSync, dispatchFolderScan } from "../infrastructure/queue/bullmq-dispatcher";
-import { getJellyfinCredentials, getPlexCredentials } from "../lib/server-credentials";
-import { getJellyfinLibraryFolders } from "../infrastructure/adapters/jellyfin";
-import { getPlexSections } from "../infrastructure/adapters/plex";
+
+// ── Extracted use-cases & services ──
+import { resolveSyncItem } from "../domain/use-cases/resolve-sync-item";
+import { discoverServerLibraries } from "../domain/use-cases/discover-server-libraries";
+import { getMediaAvailability } from "../domain/services/media-availability-service";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                     */
 /* -------------------------------------------------------------------------- */
 
 export const syncRouter = createTRPCRouter({
-  /**
-   * Trigger sync for both Jellyfin and Plex.
-   */
   importMedia: adminProcedure.mutation(async () => {
     const [jellyfin, plex] = await Promise.all([
       dispatchJellyfinSync(),
@@ -37,31 +29,22 @@ export const syncRouter = createTRPCRouter({
     return { started: { jellyfin, plex } };
   }),
 
-  /** Trigger Jellyfin sync only */
   syncJellyfin: adminProcedure.mutation(async () => {
     const started = await dispatchJellyfinSync();
     return { started };
   }),
 
-  /** Trigger Plex sync only */
   syncPlex: adminProcedure.mutation(async () => {
     const started = await dispatchPlexSync();
     return { started };
   }),
 
-  /**
-   * Get the current status of sync jobs (per-source progress counters).
-   */
   importMediaStatus: protectedProcedure.query(async () => {
     type SyncStatus = {
       status: "running" | "completed" | "failed";
-      total: number;
-      processed: number;
-      imported: number;
-      skipped: number;
-      failed: number;
-      startedAt: string;
-      completedAt?: string;
+      total: number; processed: number; imported: number;
+      skipped: number; failed: number;
+      startedAt: string; completedAt?: string;
     };
     const [jellyfin, plex] = await Promise.all([
       getSetting<SyncStatus>(`${SETTINGS.SYNC_MEDIA_IMPORT_STATUS}.jellyfin-sync`),
@@ -70,22 +53,17 @@ export const syncRouter = createTRPCRouter({
     return { jellyfin: jellyfin ?? null, plex: plex ?? null };
   }),
 
-  /**
-   * List synced items with pagination and optional filter by result.
-   */
   listSyncedItems: protectedProcedure
-    .input(
-      z.object({
-        libraryId: z.string().uuid().optional(),
-        source: z.enum(["jellyfin", "plex"]).optional(),
-        result: z.enum(["imported", "skipped", "failed"]).optional(),
-        page: z.number().int().min(1).default(1),
-        pageSize: z.number().int().min(1).max(100).default(50),
-      }),
-    )
-    .query(async ({ input }) => {
+    .input(z.object({
+      libraryId: z.string().uuid().optional(),
+      source: z.enum(["jellyfin", "plex"]).optional(),
+      result: z.enum(["imported", "skipped", "failed"]).optional(),
+      page: z.number().int().min(1).default(1),
+      pageSize: z.number().int().min(1).max(100).default(50),
+    }))
+    .query(async ({ ctx, input }) => {
       const { items, total } = await findSyncItemsPaginated(
-        db,
+        ctx.db,
         { libraryId: input.libraryId, source: input.source, result: input.result },
         input.pageSize,
         (input.page - 1) * input.pageSize,
@@ -93,9 +71,6 @@ export const syncRouter = createTRPCRouter({
       return { items, total, page: input.page, pageSize: input.pageSize };
     }),
 
-  /**
-   * Search TMDB for a sync item that failed to match automatically.
-   */
   searchForSyncItem: protectedProcedure
     .input(z.object({ query: z.string().min(1) }))
     .query(async ({ input }) => {
@@ -103,64 +78,21 @@ export const syncRouter = createTRPCRouter({
       return tmdb.search(input.query, "movie");
     }),
 
-  /**
-   * Manually resolve a failed sync item with a specific TMDB ID.
-   * Fetches metadata, persists to DB, marks as imported.
-   */
   resolveSyncItem: adminProcedure
-    .input(
-      z.object({
-        syncItemId: z.string().uuid(),
-        tmdbId: z.number().int(),
-        type: z.enum(["movie", "show"]),
-      }),
-    )
-    .mutation(async ({ input }) => {
-      const item = await findSyncItemById(db, input.syncItemId);
-      if (!item) throw new Error("Sync item not found");
-
+    .input(z.object({
+      syncItemId: z.string().uuid(),
+      tmdbId: z.number().int(),
+      type: z.enum(["movie", "show"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
       const tmdb = await getTmdbProvider();
-      const supportedLangs = [...await getSupportedLanguageCodes(db)];
-      const normalized = await tmdb.getMetadata(input.tmdbId, input.type, { supportedLanguages: supportedLangs });
-
-      // Check if media already exists by external ID
-      const existing = await findMediaByAnyReference(db, input.tmdbId, "tmdb");
-
-      let mediaId: string;
-      if (existing) {
-        mediaId = existing.id;
-        if (!existing.inLibrary || !existing.downloaded) {
-          const updates: Record<string, unknown> = {
-            inLibrary: true, downloaded: true, libraryPath: item.serverItemPath, addedAt: existing.addedAt ?? new Date(),
-          };
-          if (item.libraryId) updates.libraryId = item.libraryId;
-          await updateMedia(db, existing.id, updates);
-        }
-      } else {
-        const inserted = await persistMedia(db, normalized);
-        const updates: Record<string, unknown> = {
-          inLibrary: true, downloaded: true, libraryPath: item.serverItemPath, addedAt: new Date(),
-        };
-        if (item.libraryId) updates.libraryId = item.libraryId;
-        await updateMedia(db, inserted.id, updates);
-        mediaId = inserted.id;
-      }
-
-      await updateSyncItem(db, input.syncItemId, {
-        tmdbId: input.tmdbId, mediaId, result: "imported", reason: null,
-      });
-
-      const suggestedName = `${normalized.title} (${normalized.year ?? "Unknown"}) [tmdb-${input.tmdbId}]`;
-      return { mediaId, suggestedName };
+      return resolveSyncItem(ctx.db, input, tmdb);
     }),
 
-  /**
-   * Get which media servers have a given media item, with deep links.
-   */
   mediaServers: protectedProcedure
     .input(z.object({ mediaId: z.string().uuid() }))
-    .query(async ({ input }) => {
-      const items = await findSyncItemsByMediaId(db, input.mediaId);
+    .query(async ({ ctx, input }) => {
+      const items = await findSyncItemsByMediaId(ctx.db, input.mediaId);
 
       const result: {
         jellyfin?: { url: string };
@@ -191,135 +123,16 @@ export const syncRouter = createTRPCRouter({
       return result;
     }),
 
-  /**
-   * Get media availability across all sources (downloads, Jellyfin, Plex).
-   * Returns source-level info + episode-level availability for shows.
-   */
   mediaAvailability: protectedProcedure
     .input(z.object({ mediaId: z.string().uuid() }))
-    .query(async ({ input }) => {
-      const items = await findSyncItemsWithEpisodes(db, input.mediaId);
+    .query(({ ctx, input }) => getMediaAvailability(ctx.db, input.mediaId)),
 
-      const sources: Array<{
-        type: "jellyfin" | "plex";
-        resolution?: string | null;
-        videoCodec?: string | null;
-        episodeCount?: number;
-      }> = [];
-
-      // Episode-level map: "S01E05" → [{ type, resolution }]
-      const episodeMap: Record<string, Array<{ type: string; resolution?: string | null }>> = {};
-
-      for (const item of items) {
-        if (!item.source) continue;
-        const srcType = item.source as "jellyfin" | "plex";
-
-        if (item.episodes.length === 0) continue;
-
-        // For movies: single episode entry with no season/episode number
-        const movieEp = item.episodes.find((e) => e.seasonNumber == null && e.episodeNumber == null);
-        if (movieEp) {
-          sources.push({
-            type: srcType,
-            resolution: movieEp.resolution,
-            videoCodec: movieEp.videoCodec,
-          });
-          continue;
-        }
-
-        // For shows
-        sources.push({
-          type: srcType,
-          resolution: item.episodes[0]?.resolution, // most common resolution
-          videoCodec: item.episodes[0]?.videoCodec,
-          episodeCount: item.episodes.length,
-        });
-
-        for (const ep of item.episodes) {
-          if (ep.seasonNumber == null || ep.episodeNumber == null) continue;
-          const key = `S${String(ep.seasonNumber).padStart(2, "0")}E${String(ep.episodeNumber).padStart(2, "0")}`;
-          if (!episodeMap[key]) episodeMap[key] = [];
-          episodeMap[key].push({ type: srcType, resolution: ep.resolution });
-        }
-      }
-
-      return { sources, episodes: episodeMap };
-    }),
-
-  /**
-   * Trigger an on-demand folder scan (scan library paths for existing media).
-   */
   scanFolders: adminProcedure.mutation(async () => {
     const started = await dispatchFolderScan();
     return { started };
   }),
 
-  /**
-   * Discover server libraries and their link status.
-   * Fetches libraries from the server and joins with existing folder_server_link rows.
-   */
   discoverServerLibraries: adminProcedure
     .input(z.object({ serverType: z.enum(["jellyfin", "plex"]) }))
-    .query(async ({ input }) => {
-      const { serverType } = input;
-
-      type DiscoveredLibrary = {
-        serverType: string;
-        serverLibraryId: string;
-        serverLibraryName: string;
-        contentType: string;
-        serverPath: string | null;
-        linkId?: string;
-        syncEnabled: boolean;
-        lastSyncedAt: Date | null;
-      };
-
-      let serverLibraries: Array<{
-        id: string;
-        name: string;
-        contentType: string;
-        path: string | null;
-      }>;
-
-      if (serverType === "jellyfin") {
-        const creds = await getJellyfinCredentials();
-        if (!creds) return [];
-        const folders = await getJellyfinLibraryFolders(creds.url, creds.apiKey);
-        serverLibraries = folders.map((f) => ({
-          id: f.Id,
-          name: f.Name,
-          contentType: f.CollectionType === "movies" ? "movies" : "shows",
-          path: f.Locations[0] ?? null,
-        }));
-      } else {
-        const creds = await getPlexCredentials();
-        if (!creds) return [];
-        const sections = await getPlexSections(creds.url, creds.token);
-        serverLibraries = sections.map((s) => ({
-          id: s.key,
-          name: s.title,
-          contentType: s.type === "movie" ? "movies" : "shows",
-          path: s.Location[0]?.path ?? null,
-        }));
-      }
-
-      const existingLinks = await findAllServerLinks(db, serverType);
-      const linkMap = new Map(existingLinks.map((l) => [l.serverLibraryId, l]));
-
-      const result: DiscoveredLibrary[] = serverLibraries.map((lib) => {
-        const link = linkMap.get(lib.id);
-        return {
-          serverType,
-          serverLibraryId: lib.id,
-          serverLibraryName: lib.name,
-          contentType: link?.contentType ?? lib.contentType,
-          serverPath: lib.path,
-          linkId: link?.id,
-          syncEnabled: link?.syncEnabled ?? false,
-          lastSyncedAt: link?.lastSyncedAt ?? null,
-        };
-      });
-
-      return result;
-    }),
+    .query(({ ctx, input }) => discoverServerLibraries(ctx.db, input.serverType)),
 });
