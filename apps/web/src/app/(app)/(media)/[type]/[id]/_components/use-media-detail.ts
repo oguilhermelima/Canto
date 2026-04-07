@@ -18,8 +18,6 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
   const [seasonsHighlight, setSeasonsHighlight] = useState(false);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
-  const [removeDeleteFiles, setRemoveDeleteFiles] = useState(false);
-  const [removeDeleteTorrent, setRemoveDeleteTorrent] = useState(true);
   const [torrentSearchQuery, setTorrentSearchQuery] = useState("");
   const [torrentPage, setTorrentPage] = useState(0);
   const [torrentQualityFilter, setTorrentQualityFilter] =
@@ -442,10 +440,6 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
     setSeasonsHighlight,
     removeDialogOpen,
     setRemoveDialogOpen,
-    removeDeleteFiles,
-    setRemoveDeleteFiles,
-    removeDeleteTorrent,
-    setRemoveDeleteTorrent,
     preferencesOpen,
     setPreferencesOpen,
 

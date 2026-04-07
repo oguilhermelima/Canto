@@ -13,6 +13,7 @@
     "./card": "./src/components/card.tsx",
     "./badge": "./src/components/badge.tsx",
     "./skeleton": "./src/components/skeleton.tsx",
+    "./confirmation-dialog": "./src/components/confirmation-dialog.tsx",
     "./dialog": "./src/components/dialog.tsx",
     "./dropdown-menu": "./src/components/dropdown-menu.tsx",
     "./scroll-area": "./src/components/scroll-area.tsx",
@@ -26,6 +27,9 @@
     "./switch": "./src/components/switch.tsx",
     "./label": "./src/components/label.tsx",
     "./popover": "./src/components/popover.tsx",
+    "./password-input": "./src/components/password-input.tsx",
+    "./textarea": "./src/components/textarea.tsx",
+    "./form-field": "./src/components/form-field.tsx",
     "./cn": "./src/lib/utils.ts"
   },
   "scripts": {

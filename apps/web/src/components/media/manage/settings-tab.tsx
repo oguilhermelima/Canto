@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@canto/ui/button";
+import { ConfirmationDialog } from "@canto/ui/confirmation-dialog";
 import { Separator } from "@canto/ui/separator";
 import {
   Select,
@@ -11,13 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@canto/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@canto/ui/dialog";
 import { Switch } from "@canto/ui/switch";
 import { FolderOpen, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -46,8 +40,6 @@ export function SettingsTab({
   const utils = trpc.useUtils();
 
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
-  const [removeDeleteFiles, setRemoveDeleteFiles] = useState(false);
-  const [removeDeleteTorrent, setRemoveDeleteTorrent] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const { data: libraries } = trpc.folder.list.useQuery(undefined, {
@@ -132,13 +124,15 @@ export function SettingsTab({
     },
   });
 
-  const handleRemoveFromLibrary = async (): Promise<void> => {
+  const handleRemoveFromLibrary = async (
+    values: Record<string, boolean>,
+  ): Promise<void> => {
     if (mediaTorrents && mediaTorrents.length > 0) {
       for (const torrent of mediaTorrents) {
         await deleteTorrentMutation.mutateAsync({
           id: torrent.id,
-          deleteFiles: removeDeleteFiles,
-          removeTorrent: removeDeleteTorrent,
+          deleteFiles: values.deleteFiles ?? false,
+          removeTorrent: values.removeTorrent ?? false,
         });
       }
     }
@@ -228,140 +222,60 @@ export function SettingsTab({
       </div>
 
       {/* Remove from library confirmation dialog */}
-      <Dialog
+      <ConfirmationDialog
         open={removeDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            setRemoveDeleteFiles(false);
-            setRemoveDeleteTorrent(true);
-          }
-          setRemoveDialogOpen(open);
-        }}
-      >
-        <DialogContent className="z-[60] max-w-md gap-0 overflow-hidden rounded-2xl border-border bg-background p-0 [&>button:last-child]:hidden">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <div>
-              <DialogTitle className="text-lg font-semibold">
-                Remove from Library
-              </DialogTitle>
-              <DialogDescription className="mt-0.5 text-sm text-muted-foreground">
-                {mediaTitle}
-              </DialogDescription>
-            </div>
-            <button
-              onClick={() => setRemoveDialogOpen(false)}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-muted transition-colors hover:bg-muted/80"
-            >
-              <span className="text-lg leading-none text-foreground">
-                &times;
-              </span>
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-3 p-5">
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/50">
-              <input
-                type="checkbox"
-                checked={removeDeleteFiles}
-                onChange={(e) => setRemoveDeleteFiles(e.target.checked)}
-                className="mt-0.5 rounded border-border"
-              />
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  Delete files from disk
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Remove downloaded files permanently.
-                </p>
-              </div>
-            </label>
-
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/50">
-              <input
-                type="checkbox"
-                checked={removeDeleteTorrent}
-                onChange={(e) => setRemoveDeleteTorrent(e.target.checked)}
-                className="mt-0.5 rounded border-border"
-              />
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  Remove from download client
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Remove from qBittorrent. Stops seeding and frees the slot.
-                </p>
-              </div>
-            </label>
-          </div>
-
-          <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
-            <Button
-              variant="outline"
-              onClick={() => setRemoveDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              className="bg-red-500 text-white hover:bg-red-600"
-              disabled={removeFromLibrary.isPending || deleteTorrentMutation.isPending}
-              onClick={() => void handleRemoveFromLibrary()}
-            >
-              {removeFromLibrary.isPending || deleteTorrentMutation.isPending
-                ? "Removing..."
-                : "Remove"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        onOpenChange={setRemoveDialogOpen}
+        title="Remove from Library"
+        description={mediaTitle}
+        checkboxes={[
+          {
+            id: "deleteFiles",
+            label: "Delete files from disk",
+            description: "Remove downloaded files permanently.",
+          },
+          {
+            id: "removeTorrent",
+            label: "Remove from download client",
+            description:
+              "Remove from qBittorrent. Stops seeding and frees the slot.",
+            defaultChecked: true,
+          },
+        ]}
+        onConfirm={(values) => void handleRemoveFromLibrary(values)}
+        confirmLabel={
+          removeFromLibrary.isPending || deleteTorrentMutation.isPending
+            ? "Removing..."
+            : "Remove"
+        }
+        variant="danger"
+        loading={
+          removeFromLibrary.isPending || deleteTorrentMutation.isPending
+        }
+        className="z-[60]"
+      />
 
       {/* Delete media confirmation dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="z-[60] max-w-md gap-0 overflow-hidden rounded-2xl border-border bg-background p-0 [&>button:last-child]:hidden">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <div>
-              <DialogTitle className="text-lg font-semibold">
-                Delete Media
-              </DialogTitle>
-              <DialogDescription className="mt-0.5 text-sm text-muted-foreground">
-                {mediaTitle}
-              </DialogDescription>
-            </div>
-            <button
-              onClick={() => setDeleteDialogOpen(false)}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-muted transition-colors hover:bg-muted/80"
-            >
-              <span className="text-lg leading-none text-foreground">
-                &times;
-              </span>
-            </button>
-          </div>
-
-          <div className="p-5">
-            <p className="text-sm text-muted-foreground">
-              Are you sure you want to permanently delete{" "}
-              <span className="font-medium text-foreground">{mediaTitle}</span>?
-              This will remove all metadata, seasons, episodes, and associated
-              files. This action cannot be undone.
-            </p>
-          </div>
-
-          <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
-            <Button
-              variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              className="bg-red-500 text-white hover:bg-red-600"
-              disabled={deleteMutation.isPending}
-              onClick={() => deleteMutation.mutate({ id: mediaId })}
-            >
-              {deleteMutation.isPending ? "Deleting..." : "Delete Permanently"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Media"
+        description={mediaTitle}
+        body={
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to permanently delete{" "}
+            <span className="font-medium text-foreground">{mediaTitle}</span>?
+            This will remove all metadata, seasons, episodes, and associated
+            files. This action cannot be undone.
+          </p>
+        }
+        onConfirm={() => deleteMutation.mutate({ id: mediaId })}
+        confirmLabel={
+          deleteMutation.isPending ? "Deleting..." : "Delete Permanently"
+        }
+        variant="danger"
+        loading={deleteMutation.isPending}
+        className="z-[60]"
+      />
     </div>
   );
 }

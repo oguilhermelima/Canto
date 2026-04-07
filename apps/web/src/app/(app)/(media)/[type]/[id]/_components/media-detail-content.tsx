@@ -174,12 +174,8 @@ export function MediaDetailContent({
       {/* Remove from library dialog */}
       <RemoveDialog
         media={media}
-        removeDialogOpen={detail.removeDialogOpen}
-        setRemoveDialogOpen={detail.setRemoveDialogOpen}
-        removeDeleteFiles={detail.removeDeleteFiles}
-        setRemoveDeleteFiles={detail.setRemoveDeleteFiles}
-        removeDeleteTorrent={detail.removeDeleteTorrent}
-        setRemoveDeleteTorrent={detail.setRemoveDeleteTorrent}
+        open={detail.removeDialogOpen}
+        onOpenChange={detail.setRemoveDialogOpen}
         setMediaLibrary={detail.setMediaLibrary}
         deleteTorrentMutation={detail.deleteTorrentMutation}
         utils={detail.utils}
