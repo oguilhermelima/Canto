@@ -322,7 +322,7 @@ export default function DiscoverPage(): React.JSX.Element {
                     <span>{currentItem.year}</span>
                   </>
                 )}
-                {currentItem.genres.length > 0 && (
+                {currentItem.genres && currentItem.genres.length > 0 && (
                   <>
                     <span className="text-foreground/30">|</span>
                     {currentItem.genres.map((genre, i) => {

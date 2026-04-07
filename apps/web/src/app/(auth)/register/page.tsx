@@ -3,18 +3,14 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Loader2, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
 import { Label } from "@canto/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@canto/ui/card";
 import { authClient } from "~/lib/auth-client";
+
+const inputCn =
+  "bg-accent rounded-xl border-none ring-0 focus-visible:ring-0 focus-visible:ring-offset-0";
 
 export default function RegisterPage(): React.JSX.Element {
   const router = useRouter();
@@ -24,6 +20,8 @@ export default function RegisterPage(): React.JSX.Element {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     document.title = "Register — Canto";
@@ -69,91 +67,118 @@ export default function RegisterPage(): React.JSX.Element {
   }
 
   return (
-    <Card>
-      <CardHeader className="space-y-1">
-        <div className="mb-4 flex justify-center">
-          <img src="/room.png" alt="Canto" className="h-10 w-10 dark:invert" />
+    <div className="space-y-8">
+      <div className="space-y-2 text-center">
+        <h1 className="text-2xl font-semibold text-foreground">Make yourself at home</h1>
+        <p className="text-sm text-muted-foreground">
+          Create your account to get started
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+        <div className="space-y-2">
+          <Label htmlFor="name">Name</Label>
+          <Input
+            id="name"
+            type="text"
+            placeholder="Your name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            autoComplete="name"
+            disabled={loading}
+            className={inputCn}
+          />
         </div>
-        <CardTitle className="text-center text-2xl">Create an account</CardTitle>
-        <CardDescription className="text-center">
-          Enter your details to get started
-        </CardDescription>
-      </CardHeader>
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
-          {error && (
-            <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {error}
-            </div>
-          )}
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              type="text"
-              placeholder="Your name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              autoComplete="name"
-              disabled={loading}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              disabled={loading}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+            disabled={loading}
+            className={inputCn}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <div className="relative">
             <Input
               id="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               placeholder="At least 8 characters"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="new-password"
               disabled={loading}
+              className={`${inputCn} pr-10`}
             />
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirm-password">Confirm password</Label>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="confirm-password">Confirm password</Label>
+          <div className="relative">
             <Input
               id="confirm-password"
-              type="password"
+              type={showConfirm ? "text" : "password"}
               placeholder="Repeat your password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               autoComplete="new-password"
               disabled={loading}
+              className={`${inputCn} pr-10`}
             />
-          </div>
-        </CardContent>
-        <CardFooter className="flex flex-col gap-4">
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Creating account..." : "Create account"}
-          </Button>
-          <p className="text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link
-              href="/login"
-              className="font-medium text-foreground underline-offset-4 hover:underline"
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label={showConfirm ? "Hide password" : "Show password"}
+              onClick={() => setShowConfirm((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
             >
-              Sign in
-            </Link>
-          </p>
-        </CardFooter>
+              {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+        <Button
+          type="submit"
+          className="w-full rounded-xl"
+          size="lg"
+          disabled={loading || !name || !email || !password || !confirmPassword}
+        >
+          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
+          {loading ? "Creating account..." : "Get started"}
+        </Button>
       </form>
-    </Card>
+
+      <p className="text-center text-sm text-muted-foreground">
+        Already have an account?{" "}
+        <Link
+          href="/login"
+          className="font-medium text-foreground underline-offset-4 hover:underline"
+        >
+          Sign in
+        </Link>
+      </p>
+    </div>
   );
 }

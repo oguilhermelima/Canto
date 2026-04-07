@@ -3,18 +3,14 @@
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Loader2, LogIn, Eye, EyeOff } from "lucide-react";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
 import { Label } from "@canto/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@canto/ui/card";
 import { authClient } from "~/lib/auth-client";
+
+const inputCn =
+  "bg-accent rounded-xl border-none ring-0 focus-visible:ring-0 focus-visible:ring-offset-0";
 
 export default function LoginPage(): React.JSX.Element {
   return (
@@ -31,10 +27,29 @@ function LoginContent(): React.JSX.Element {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     document.title = "Login — Canto";
   }, []);
+
+  // On very first visit (middleware redirect), go to register if no users exist yet.
+  // Skip if user navigated here from another page (clicked "Sign in" link).
+  useEffect(() => {
+    const isDirectAccess = !document.referrer || !document.referrer.includes(window.location.origin);
+    if (!isDirectAccess) return;
+
+    let cancelled = false;
+    fetch("/api/trpc/settings.isOnboardingCompleted")
+      .then((r) => r.json())
+      .then((data: { result?: { data?: { json?: boolean } } }) => {
+        if (!cancelled && data.result?.data?.json === false) {
+          router.replace("/register");
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit(
     e: React.FormEvent<HTMLFormElement>,
@@ -66,65 +81,79 @@ function LoginContent(): React.JSX.Element {
   }
 
   return (
-    <Card>
-      <CardHeader className="space-y-1">
-        <div className="mb-4 flex justify-center">
-          <img src="/room.png" alt="Canto" className="h-10 w-10 dark:invert" />
-        </div>
-        <CardTitle className="text-center text-2xl">Welcome back</CardTitle>
-        <CardDescription className="text-center">
-          Sign in to your account to continue
-        </CardDescription>
-      </CardHeader>
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
-          {error && (
-            <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {error}
-            </div>
-          )}
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              disabled={loading}
-            />
+    <div className="space-y-8">
+      <div className="space-y-2 text-center">
+        <h1 className="text-2xl font-semibold text-foreground">Good to see you again</h1>
+        <p className="text-sm text-muted-foreground">
+          Pick up right where you left off
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+        )}
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+            disabled={loading}
+            className={inputCn}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <div className="relative">
             <Input
               id="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="current-password"
               disabled={loading}
+              className={`${inputCn} pr-10`}
             />
-          </div>
-        </CardContent>
-        <CardFooter className="flex flex-col gap-4">
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
-          </Button>
-          <p className="text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link
-              href="/register"
-              className="font-medium text-foreground underline-offset-4 hover:underline"
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
             >
-              Create one
-            </Link>
-          </p>
-        </CardFooter>
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+        <Button
+          type="submit"
+          className="w-full rounded-xl"
+          size="lg"
+          disabled={loading || !email || !password}
+        >
+          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
+          {loading ? "Signing in..." : "Sign in"}
+        </Button>
       </form>
-    </Card>
+
+      <p className="text-center text-sm text-muted-foreground">
+        Don&apos;t have an account?{" "}
+        <Link
+          href="/register"
+          className="font-medium text-foreground underline-offset-4 hover:underline"
+        >
+          Create one
+        </Link>
+      </p>
+    </div>
   );
 }

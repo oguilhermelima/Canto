@@ -257,7 +257,7 @@ function PreferencesSection(): React.JSX.Element {
       { language: value },
       {
         onSuccess: () => {
-          setMany.mutate({ "general.language": value });
+          setMany.mutate({ settings: [{ key: "general.language", value }] });
           toast.success("Language updated. Refreshing all metadata in background...");
           refreshLanguage.mutate();
         },
