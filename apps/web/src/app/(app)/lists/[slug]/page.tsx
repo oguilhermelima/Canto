@@ -2,11 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  Film,
-  Settings2,
-  Tv,
-} from "lucide-react";
+import { Film, Tv } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { trpc } from "~/lib/trpc/client";
 import { StateMessage } from "~/components/layout/state-message";
@@ -17,6 +13,7 @@ import {
   FilterSidebar,
   type FilterOutput,
 } from "~/components/media/filter-sidebar";
+import { FilterButton } from "../_components/filter-button";
 
 const TYPE_OPTIONS = [
   { value: "all", label: "All" },
@@ -70,7 +67,6 @@ export default function ListDetailPage(): React.JSX.Element {
         voteAverage: item.media.voteAverage ?? undefined,
       })) ?? [];
 
-    // Type filter (client-side, tabs)
     return typeFilter === "all" ? all : all.filter((i) => i.type === typeFilter);
   }, [data, typeFilter]);
 
@@ -109,29 +105,15 @@ export default function ListDetailPage(): React.JSX.Element {
 
         {/* Content */}
         <div className="min-w-0 flex-1">
-          {/* Tab Bar */}
           <TabBar
             tabs={TYPE_OPTIONS}
             value={typeFilter}
             onChange={(v) => setTypeFilter(v as "all" | "movie" | "show")}
             leading={
-              <button
-                type="button"
-                className={cn(
-                  "flex h-[38px] w-[38px] items-center justify-center rounded-xl transition-all",
-                  showFilters
-                    ? "bg-foreground text-background"
-                    : "bg-muted/60 text-muted-foreground hover:text-foreground",
-                )}
+              <FilterButton
+                active={showFilters}
                 onClick={() => setShowFilters((v) => !v)}
-              >
-                <Settings2
-                  className={cn(
-                    "h-4 w-4 transition-transform duration-300",
-                    showFilters && "rotate-90",
-                  )}
-                />
-              </button>
+              />
             }
           />
 
