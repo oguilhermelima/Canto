@@ -5,16 +5,14 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { TabBar } from "~/components/layout/tab-bar";
 import { authClient } from "~/lib/auth-client";
 import { PageHeader } from "~/components/layout/page-header";
-import { SettingsSection } from "~/components/settings/shared";
-import { MetadataProvidersSection, DownloadClientSection, IndexersSection, JellyfinConnectionSection, PlexConnectionSection } from "~/components/settings/services-section";
-import { SearchSection } from "~/components/settings/search-section";
+import { MetadataProvidersSection } from "~/components/settings/services-section";
 import { AboutSection } from "~/components/settings/about-section";
-import { DownloadFolders } from "~/components/settings/download-folders";
-import { ImportMethodSection, SeedingSection, AutoMergeSection } from "~/components/settings/import-seeding";
-import { MediaServerSyncSection } from "~/components/settings/media-server-sync";
 import { StatusTab } from "~/components/management/status-tab";
-
 import { UsersTab } from "~/components/management/users-tab";
+import { JellyfinSection } from "./_components/jellyfin-section";
+import { PlexSection } from "./_components/plex-section";
+import { DownloadsSection } from "./_components/downloads-section";
+import { SearchTabSection } from "./_components/search-tab-section";
 
 const NAV_ITEMS = [
   { key: "status", label: "Status" },
@@ -28,80 +26,6 @@ const NAV_ITEMS = [
 ] as const;
 
 type NavKey = (typeof NAV_ITEMS)[number]["key"];
-
-/* -------------------------------------------------------------------------- */
-/*  Jellyfin tab                                                               */
-/* -------------------------------------------------------------------------- */
-
-function JellyfinSection(): React.JSX.Element {
-  return (
-    <div>
-      <JellyfinConnectionSection />
-      <MediaServerSyncSection serverType="jellyfin" />
-      <AutoMergeSection />
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Plex tab                                                                   */
-/* -------------------------------------------------------------------------- */
-
-function PlexSection(): React.JSX.Element {
-  return (
-    <div>
-      <PlexConnectionSection />
-      <MediaServerSyncSection serverType="plex" />
-      <AutoMergeSection />
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Downloads tab                                                              */
-/* -------------------------------------------------------------------------- */
-
-function DownloadsSection(): React.JSX.Element {
-  return (
-    <div>
-      <DownloadClientSection />
-      <ImportMethodSection />
-      <SettingsSection
-        title="Libraries"
-        description="Each library defines where files are downloaded, where your media is stored, and how new downloads are routed."
-      >
-        <div className="mb-4 rounded-xl border border-border/30 bg-muted/5 px-4 py-3">
-          <p className="text-sm text-muted-foreground">
-            Canto renames and organizes files in the storage path so media servers can recognize them:
-          </p>
-          <p className="mt-1.5 font-mono text-xs text-muted-foreground leading-relaxed">
-            Movie Title (2024) [tmdbid-12345]/<br />
-            <span className="pl-4">Movie Title (2024) [Bluray-1080p][h265].mkv</span>
-          </p>
-        </div>
-        <DownloadFolders mode="settings" />
-      </SettingsSection>
-      <SeedingSection />
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Search tab                                                                 */
-/* -------------------------------------------------------------------------- */
-
-function SearchTabSection(): React.JSX.Element {
-  return (
-    <div>
-      <IndexersSection />
-      <SearchSection />
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Main Page                                                                  */
-/* -------------------------------------------------------------------------- */
 
 export default function ManagePage(): React.JSX.Element {
   const searchParams = useSearchParams();
@@ -118,7 +42,6 @@ export default function ManagePage(): React.JSX.Element {
 
   useEffect(() => { document.title = "Manage — Canto"; }, []);
 
-  // Admin-only page — redirect non-admins to /account
   useEffect(() => {
     if (!isPending && session && !isAdmin) {
       router.replace("/account");
