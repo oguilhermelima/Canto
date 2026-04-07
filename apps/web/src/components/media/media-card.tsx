@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import Image from "next/image";
+import { FadeImage } from "~/components/ui/fade-image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
@@ -69,12 +69,13 @@ export function MediaCard({
       {/* Poster */}
       <div className="poster-frame relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-muted transition-shadow duration-300">
         {posterPath ? (
-          <Image
+          <FadeImage
             loader={tmdbPosterLoader}
             src={posterPath}
             alt={title}
             fill
             className="object-cover"
+            fadeDuration={300}
             loading="lazy"
             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
           />

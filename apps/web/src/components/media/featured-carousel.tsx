@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
-import Image from "next/image";
+import { FadeImage } from "~/components/ui/fade-image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { ChevronLeft, ChevronRight, Film, Tv, Volume2, VolumeOff } from "lucide-react";
@@ -218,12 +218,13 @@ function FeaturedCard({
         )}
       >
         {posterSrc ? (
-          <Image
+          <FadeImage
             loader={tmdbPosterLoader}
             src={posterSrc}
             alt={item.title}
             fill
             className="object-cover"
+            fadeDuration={400}
             priority={index < 2}
             sizes="(max-width: 640px) 230px, (max-width: 1024px) 250px, (max-width: 1536px) 280px, 320px"
           />
@@ -258,21 +259,23 @@ function FeaturedCard({
             />
           </div>
         ) : backdropSrc ? (
-          <Image
+          <FadeImage
             loader={tmdbBackdropLoader}
             src={backdropSrc}
             alt={item.title}
             fill
             className="object-cover"
+            fadeDuration={400}
             sizes="(max-width: 640px) 100vw, 50vw"
           />
         ) : posterSrc ? (
-          <Image
+          <FadeImage
             loader={tmdbPosterLoader}
             src={posterSrc}
             alt={item.title}
             fill
             className="object-cover blur-sm scale-110"
+            fadeDuration={400}
             sizes="(max-width: 640px) 100vw, 50vw"
           />
         ) : null}

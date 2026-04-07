@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { FadeImage } from "~/components/ui/fade-image";
 import { Film, Tv, Star, MapPin, Cake, User } from "lucide-react";
 import { computeAge, formatDate } from "./helpers";
 
@@ -31,11 +31,12 @@ export function PersonHero({ person }: PersonHeroProps): React.JSX.Element {
       {/* Backdrop */}
       <div className="relative h-[450px] w-full overflow-hidden bg-muted md:h-[550px]">
         {backdropPath ? (
-          <Image
+          <FadeImage
             src={`https://image.tmdb.org/t/p/w1280${backdropPath}`}
             alt=""
             fill
             className="object-cover object-top opacity-30"
+            fadeDuration={700}
             priority
             sizes="100vw"
           />
@@ -50,11 +51,12 @@ export function PersonHero({ person }: PersonHeroProps): React.JSX.Element {
           {/* Profile photo */}
           <div className="relative h-[220px] w-[220px] shrink-0 overflow-hidden rounded-xl bg-muted shadow-2xl ring-4 ring-background md:h-[300px] md:w-[300px]">
             {person.profilePath ? (
-              <Image
+              <FadeImage
                 src={`https://image.tmdb.org/t/p/h632${person.profilePath}`}
                 alt={person.name}
                 fill
                 className="object-cover"
+                fadeDuration={500}
                 priority
                 sizes="300px"
               />

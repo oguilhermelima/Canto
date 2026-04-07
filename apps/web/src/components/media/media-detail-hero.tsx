@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { FadeImage } from "~/components/ui/fade-image";
 import { Skeleton } from "@canto/ui/skeleton";
 import {
   Popover,
@@ -143,11 +144,12 @@ export function MediaDetailHero({
       {/* Backdrop image — exactly 100dvh tall, scrolls with content */}
       {backdropPath ? (
         <div className="absolute inset-x-0 top-0 h-dvh overflow-hidden">
-          <Image
+          <FadeImage
             src={resolveImage(backdropPath, "original")}
             alt=""
             fill
             className="object-cover object-top"
+            fadeDuration={700}
             priority
             sizes="100vw"
           />

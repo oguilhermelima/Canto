@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { FadeImage } from "~/components/ui/fade-image";
 import { cn } from "@canto/ui/cn";
 import { Check, Star, CheckCircle2, Download } from "lucide-react";
 
@@ -58,11 +58,12 @@ export function EpisodeCard({
       {/* Thumbnail */}
       <div className="relative h-20 w-36 shrink-0 overflow-hidden rounded-xl bg-muted sm:h-[88px] sm:w-40">
         {episode.stillPath ? (
-          <Image
+          <FadeImage
             src={episode.stillPath.startsWith("http") ? episode.stillPath : `https://image.tmdb.org/t/p/w400${episode.stillPath}`}
             alt={episode.title || `Episode ${episode.episodeNumber}`}
             fill
             className="object-cover"
+            fadeDuration={300}
             sizes="160px"
             loading="lazy"
           />

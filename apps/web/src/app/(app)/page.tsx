@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import Image from "next/image";
+import { FadeImage } from "~/components/ui/fade-image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
@@ -12,6 +12,7 @@ import { FeaturedCarousel } from "~/components/media/featured-carousel";
 import { AddToListButton } from "~/components/media/add-to-list-button";
 import { StateMessage } from "~/components/layout/state-message";
 import { MediaLogo } from "~/components/media/media-logo";
+import { useDocumentTitle } from "~/hooks/use-document-title";
 import { mediaHref, mediaDetailHref } from "~/lib/media-href";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
@@ -136,10 +137,7 @@ export default function DiscoverPage(): React.JSX.Element {
   const flatAnimeMovies = useMemo(() => animeMovies.data?.pages.flatMap((p) => p.results) ?? [], [animeMovies.data]);
 
 
-  // Set page title
-  useEffect(() => {
-    document.title = "Discover — Canto";
-  }, []);
+  useDocumentTitle("Discover");
 
   // Auto-rotate spotlight — resets on manual slide change
   useEffect(() => {
@@ -210,11 +208,12 @@ export default function DiscoverPage(): React.JSX.Element {
             key={currentSpotlight}
             className="absolute inset-0 overflow-hidden"
           >
-            <Image
+            <FadeImage
               src={`${TMDB_IMAGE_BASE}/original${currentItem.backdropPath}`}
               alt=""
               fill
-              className="object-cover object-center animate-[spotlightFadeIn_1s_cubic-bezier(0.16,1,0.3,1)_both]"
+              className="object-cover object-center"
+              fadeDuration={800}
               priority
               sizes="100vw"
             />

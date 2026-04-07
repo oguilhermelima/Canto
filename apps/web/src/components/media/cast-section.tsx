@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import Image from "next/image";
+import { FadeImage } from "~/components/ui/fade-image";
 import Link from "next/link";
 import { Skeleton } from "@canto/ui/skeleton";
 import { User, ChevronDown } from "lucide-react";
@@ -112,11 +112,12 @@ function CastCard({
     >
       <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-full bg-muted ring-2 ring-border/20 transition-[filter] duration-200 group-hover:brightness-110">
         {profilePath ? (
-          <Image
+          <FadeImage
             src={`https://image.tmdb.org/t/p/w342${profilePath}`}
             alt={name}
             fill
             className="object-cover"
+            fadeDuration={300}
             sizes="130px"
           />
         ) : (
