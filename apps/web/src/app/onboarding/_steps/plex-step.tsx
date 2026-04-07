@@ -12,8 +12,8 @@ import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import type { ConfigureFooter } from "../_components/onboarding-footer";
 import type { Settings } from "../_components/constants";
-import { str, bool, inputCn } from "../_components/constants";
-import { PasswordInput } from "../_components/password-input";
+import { str, bool } from "../_components/constants";
+import { PasswordInput } from "@canto/ui/password-input";
 import { ServiceLogo } from "../_components/service-logo";
 import { StepHeader } from "../_components/step-header";
 
@@ -130,7 +130,7 @@ export function PlexStep({
       />
 
       <div className="w-full max-w-md space-y-3">
-        <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Server URL (e.g. http://192.168.1.100:32400)" className={inputCn} />
+        <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Server URL (e.g. http://192.168.1.100:32400)" variant="ghost" />
         <div className="flex rounded-xl bg-accent p-1">
           <button type="button" onClick={() => setAuthMode("oauth")} className={cn("flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors", authMode === "oauth" ? "bg-background text-foreground" : "text-muted-foreground")}>
             Sign in with Plex
@@ -150,7 +150,7 @@ export function PlexStep({
             {polling ? "Waiting for Plex..." : "Sign in with Plex"}
           </Button>
         ) : (
-          <PasswordInput value={token} onChange={(e) => setToken(e.target.value)} placeholder="X-Plex-Token" className={inputCn} />
+          <PasswordInput value={token} onChange={(e) => setToken(e.target.value)} placeholder="X-Plex-Token" variant="ghost" />
         )}
         {connected && (
           <div className="space-y-2 text-left">

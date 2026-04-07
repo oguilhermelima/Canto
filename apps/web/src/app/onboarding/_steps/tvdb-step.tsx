@@ -6,8 +6,8 @@ import { Switch } from "@canto/ui/switch";
 import { trpc } from "~/lib/trpc/client";
 import type { ConfigureFooter } from "../_components/onboarding-footer";
 import type { Settings } from "../_components/constants";
-import { str, bool, inputCn } from "../_components/constants";
-import { PasswordInput } from "../_components/password-input";
+import { str, bool } from "../_components/constants";
+import { PasswordInput } from "@canto/ui/password-input";
 import { StepHeader } from "../_components/step-header";
 
 export function TvdbStep({
@@ -60,7 +60,7 @@ export function TvdbStep({
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
           placeholder="Enter your TVDB API key"
-          className={inputCn}
+          variant="ghost"
         />
 
         {apiKey && (

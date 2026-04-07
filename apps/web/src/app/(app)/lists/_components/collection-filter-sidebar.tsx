@@ -1,6 +1,13 @@
 "use client";
 
 import { Input } from "@canto/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@canto/ui/select";
 import { ArrowDown, ArrowUp, RotateCcw, Search } from "lucide-react";
 
 export interface CollectionFilterState {
@@ -66,7 +73,8 @@ export function CollectionFilterSidebar({
               value={filters.searchQuery}
               onChange={(e) => update({ searchQuery: e.target.value })}
               placeholder="Search collections..."
-              className="!h-9 !rounded-xl !border-0 !bg-accent !pl-9 !text-[13px] !font-medium !text-foreground/70 !placeholder:text-foreground/30"
+              variant="ghost"
+              className="h-9 pl-9 text-[13px] font-medium text-foreground/70 placeholder:text-foreground/30"
             />
           </div>
         </div>
@@ -80,15 +88,19 @@ export function CollectionFilterSidebar({
             <span className="text-[15px] font-semibold text-foreground">Sort By</span>
           </button>
           <div className="flex items-center gap-2">
-            <select
+            <Select
               value={filters.sortBy}
-              onChange={(e) => update({ sortBy: e.target.value as "name" | "date" })}
-              className="h-9 flex-1 appearance-none rounded-xl border-0 bg-accent px-3 text-[13px] text-foreground/70 outline-none"
+              onValueChange={(value) => update({ sortBy: value as "name" | "date" })}
             >
-              {COLLECTION_SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+              <SelectTrigger className="h-9 flex-1 rounded-xl border-0 bg-accent px-3 text-[13px] text-foreground/70">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {COLLECTION_SORT_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <button
               type="button"
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-0 bg-accent text-muted-foreground transition-colors hover:text-foreground"

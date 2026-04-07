@@ -3,14 +3,12 @@
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Loader2, LogIn, Eye, EyeOff } from "lucide-react";
+import { Loader2, LogIn } from "lucide-react";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
-import { Label } from "@canto/ui/label";
+import { FormField } from "@canto/ui/form-field";
+import { PasswordInput } from "@canto/ui/password-input";
 import { authClient } from "~/lib/auth-client";
-
-const inputCn =
-  "bg-accent rounded-xl border-none ring-0 focus-visible:ring-0 focus-visible:ring-offset-0";
 
 export default function LoginPage(): React.JSX.Element {
   return (
@@ -27,7 +25,6 @@ function LoginContent(): React.JSX.Element {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     document.title = "Login — Canto";
@@ -95,8 +92,7 @@ function LoginContent(): React.JSX.Element {
             {error}
           </div>
         )}
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+        <FormField label="Email" htmlFor="email" className="space-y-2">
           <Input
             id="email"
             type="email"
@@ -106,34 +102,21 @@ function LoginContent(): React.JSX.Element {
             required
             autoComplete="email"
             disabled={loading}
-            className={inputCn}
+            variant="ghost"
           />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <div className="relative">
-            <Input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-              disabled={loading}
-              className={`${inputCn} pr-10`}
-            />
-            <button
-              type="button"
-              tabIndex={-1}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-            >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-        </div>
+        </FormField>
+        <FormField label="Password" htmlFor="password" className="space-y-2">
+          <PasswordInput
+            id="password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+            disabled={loading}
+            variant="ghost"
+          />
+        </FormField>
         <Button
           type="submit"
           className="w-full rounded-xl"

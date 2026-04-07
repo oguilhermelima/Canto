@@ -97,3 +97,11 @@ export { Slider } from "./components/slider";
 export { Switch } from "./components/switch";
 
 export { Label } from "./components/label";
+
+export { PasswordInput } from "./components/password-input";
+
+export { Textarea } from "./components/textarea";
+export type { TextareaProps } from "./components/textarea";
+
+export { FormField } from "./components/form-field";
+export type { FormFieldProps } from "./components/form-field";

@@ -10,6 +10,13 @@ import {
   DialogTitle,
 } from "@canto/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@canto/ui/select";
+import {
   Download,
   Search,
   ChevronLeft,
@@ -368,48 +375,60 @@ export function TorrentDialog({
                     />
                   </div>
                   <div className="grid grid-cols-3 gap-2">
-                    <select
+                    <Select
                       value={torrentQualityFilter}
-                      onChange={(e) => {
-                        setTorrentQualityFilter(e.target.value);
+                      onValueChange={(value) => {
+                        setTorrentQualityFilter(value);
                         setTorrentPage(0);
                       }}
-                      className="h-9 rounded-xl bg-background px-3 text-xs text-foreground outline-none"
                     >
-                      <option value="all">Quality</option>
-                      <option value="uhd">4K</option>
-                      <option value="fullhd">1080p</option>
-                      <option value="hd">720p</option>
-                      <option value="sd">SD</option>
-                    </select>
-                    <select
+                      <SelectTrigger className="h-9 rounded-xl border-0 bg-background px-3 text-xs text-foreground">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Quality</SelectItem>
+                        <SelectItem value="uhd">4K</SelectItem>
+                        <SelectItem value="fullhd">1080p</SelectItem>
+                        <SelectItem value="hd">720p</SelectItem>
+                        <SelectItem value="sd">SD</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select
                       value={torrentSourceFilter}
-                      onChange={(e) => {
-                        setTorrentSourceFilter(e.target.value);
+                      onValueChange={(value) => {
+                        setTorrentSourceFilter(value);
                         setTorrentPage(0);
                       }}
-                      className="h-9 rounded-xl bg-background px-3 text-xs text-foreground outline-none"
                     >
-                      <option value="all">Source</option>
-                      <option value="remux">Remux</option>
-                      <option value="bluray">Blu-Ray</option>
-                      <option value="webdl">WEB-DL</option>
-                      <option value="webrip">WEBRip</option>
-                      <option value="hdtv">HDTV</option>
-                    </select>
-                    <select
+                      <SelectTrigger className="h-9 rounded-xl border-0 bg-background px-3 text-xs text-foreground">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Source</SelectItem>
+                        <SelectItem value="remux">Remux</SelectItem>
+                        <SelectItem value="bluray">Blu-Ray</SelectItem>
+                        <SelectItem value="webdl">WEB-DL</SelectItem>
+                        <SelectItem value="webrip">WEBRip</SelectItem>
+                        <SelectItem value="hdtv">HDTV</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select
                       value={torrentSizeFilter}
-                      onChange={(e) => {
-                        setTorrentSizeFilter(e.target.value);
+                      onValueChange={(value) => {
+                        setTorrentSizeFilter(value);
                         setTorrentPage(0);
                       }}
-                      className="h-9 rounded-xl bg-background px-3 text-xs text-foreground outline-none"
                     >
-                      <option value="all">Size</option>
-                      <option value="small">&lt; 2 GB</option>
-                      <option value="medium">2–10 GB</option>
-                      <option value="large">&gt; 10 GB</option>
-                    </select>
+                      <SelectTrigger className="h-9 rounded-xl border-0 bg-background px-3 text-xs text-foreground">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Size</SelectItem>
+                        <SelectItem value="small">{"< 2 GB"}</SelectItem>
+                        <SelectItem value="medium">2–10 GB</SelectItem>
+                        <SelectItem value="large">{"> 10 GB"}</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="mr-0.5 text-xs text-foreground/50">
@@ -468,48 +487,60 @@ export function TorrentDialog({
               />
             </div>
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-              <select
+              <Select
                 value={torrentQualityFilter}
-                onChange={(e) => {
-                  setTorrentQualityFilter(e.target.value);
+                onValueChange={(value) => {
+                  setTorrentQualityFilter(value);
                   setTorrentPage(0);
                 }}
-                className="h-8 rounded-lg bg-muted/60 px-2.5 text-xs text-foreground outline-none"
               >
-                <option value="all">Quality</option>
-                <option value="uhd">4K</option>
-                <option value="fullhd">1080p</option>
-                <option value="hd">720p</option>
-                <option value="sd">SD</option>
-              </select>
-              <select
+                <SelectTrigger className="h-8 w-auto rounded-lg border-0 bg-muted/60 px-2.5 text-xs text-foreground">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Quality</SelectItem>
+                  <SelectItem value="uhd">4K</SelectItem>
+                  <SelectItem value="fullhd">1080p</SelectItem>
+                  <SelectItem value="hd">720p</SelectItem>
+                  <SelectItem value="sd">SD</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
                 value={torrentSourceFilter}
-                onChange={(e) => {
-                  setTorrentSourceFilter(e.target.value);
+                onValueChange={(value) => {
+                  setTorrentSourceFilter(value);
                   setTorrentPage(0);
                 }}
-                className="h-8 rounded-lg bg-muted/60 px-2.5 text-xs text-foreground outline-none"
               >
-                <option value="all">Source</option>
-                <option value="remux">Remux</option>
-                <option value="bluray">Blu-Ray</option>
-                <option value="webdl">WEB-DL</option>
-                <option value="webrip">WEBRip</option>
-                <option value="hdtv">HDTV</option>
-              </select>
-              <select
+                <SelectTrigger className="h-8 w-auto rounded-lg border-0 bg-muted/60 px-2.5 text-xs text-foreground">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Source</SelectItem>
+                  <SelectItem value="remux">Remux</SelectItem>
+                  <SelectItem value="bluray">Blu-Ray</SelectItem>
+                  <SelectItem value="webdl">WEB-DL</SelectItem>
+                  <SelectItem value="webrip">WEBRip</SelectItem>
+                  <SelectItem value="hdtv">HDTV</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
                 value={torrentSizeFilter}
-                onChange={(e) => {
-                  setTorrentSizeFilter(e.target.value);
+                onValueChange={(value) => {
+                  setTorrentSizeFilter(value);
                   setTorrentPage(0);
                 }}
-                className="h-8 rounded-lg bg-muted/60 px-2.5 text-xs text-foreground outline-none"
               >
-                <option value="all">Size</option>
-                <option value="small">&lt; 2 GB</option>
-                <option value="medium">2–10 GB</option>
-                <option value="large">&gt; 10 GB</option>
-              </select>
+                <SelectTrigger className="h-8 w-auto rounded-lg border-0 bg-muted/60 px-2.5 text-xs text-foreground">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Size</SelectItem>
+                  <SelectItem value="small">{"< 2 GB"}</SelectItem>
+                  <SelectItem value="medium">2–10 GB</SelectItem>
+                  <SelectItem value="large">{"> 10 GB"}</SelectItem>
+                </SelectContent>
+              </Select>
               <div className="mx-1 h-4 w-px bg-border/50" />
               <span className="text-xs text-muted-foreground/60">Sort</span>
               <div className="flex items-center gap-0.5">

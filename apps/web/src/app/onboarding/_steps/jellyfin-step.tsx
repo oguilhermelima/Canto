@@ -11,8 +11,8 @@ import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import type { ConfigureFooter } from "../_components/onboarding-footer";
 import type { Settings } from "../_components/constants";
-import { str, bool, inputCn } from "../_components/constants";
-import { PasswordInput } from "../_components/password-input";
+import { str, bool } from "../_components/constants";
+import { PasswordInput } from "@canto/ui/password-input";
 import { ServiceLogo } from "../_components/service-logo";
 import { StepHeader } from "../_components/step-header";
 
@@ -114,7 +114,7 @@ export function JellyfinStep({
       />
 
       <div className="w-full max-w-md space-y-3">
-        <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Server URL (e.g. http://192.168.1.100:8096)" className={inputCn} />
+        <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Server URL (e.g. http://192.168.1.100:8096)" variant="ghost" />
         <div className="flex rounded-xl bg-accent p-1">
           <button type="button" onClick={() => setAuthMode("credentials")} className={cn("flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors", authMode === "credentials" ? "bg-background text-foreground" : "text-muted-foreground")}>
             Username & Password
@@ -125,11 +125,11 @@ export function JellyfinStep({
         </div>
         {authMode === "credentials" ? (
           <>
-            <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" className={inputCn} />
-            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className={inputCn} />
+            <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" variant="ghost" />
+            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" variant="ghost" />
           </>
         ) : (
-          <PasswordInput value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key" className={inputCn} />
+          <PasswordInput value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key" variant="ghost" />
         )}
         {connected && (
           <div className="space-y-2 text-left">

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@canto/ui/button";
-import { Input } from "@canto/ui/input";
+import { PasswordInput } from "@canto/ui/password-input";
 import { Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { authClient } from "~/lib/auth-client";
@@ -35,26 +35,26 @@ export function PasswordSection(): React.JSX.Element {
           <label htmlFor="account-current-password" className="text-sm font-medium text-muted-foreground">
             Current password
           </label>
-          <Input
+          <PasswordInput
             id="account-current-password"
-            type="password"
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
             placeholder="Enter current password"
-            className="h-10 rounded-xl border-none bg-accent text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+            variant="ghost"
+            className="text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border"
           />
         </div>
         <div className="space-y-1.5">
           <label htmlFor="account-new-password" className="text-sm font-medium text-muted-foreground">
             New password
           </label>
-          <Input
+          <PasswordInput
             id="account-new-password"
-            type="password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             placeholder="Enter new password"
-            className="h-10 rounded-xl border-none bg-accent text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+            variant="ghost"
+            className="text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border"
           />
         </div>
       </div>

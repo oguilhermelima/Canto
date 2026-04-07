@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@canto/ui/dialog";
+import { Textarea } from "@canto/ui/textarea";
 import { cn } from "@canto/ui/cn";
 
 export interface ResolveTarget {
@@ -59,12 +60,12 @@ export function ResolveDialog({
           <label className="mb-1.5 block text-sm font-medium text-foreground">
             Note (optional)
           </label>
-          <textarea
+          <Textarea
             value={adminNote}
             onChange={(e) => setAdminNote(e.target.value)}
             placeholder="Add a note for the user..."
             rows={3}
-            className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="rounded-xl"
           />
         </div>
         <DialogFooter>

@@ -5,8 +5,8 @@ import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import type { ConfigureFooter } from "../_components/onboarding-footer";
 import type { Settings } from "../_components/constants";
-import { str, inputCn } from "../_components/constants";
-import { PasswordInput } from "../_components/password-input";
+import { str } from "../_components/constants";
+import { PasswordInput } from "@canto/ui/password-input";
 import { ServiceLogo } from "../_components/service-logo";
 import { StepHeader } from "../_components/step-header";
 
@@ -74,7 +74,7 @@ export function TmdbStep({
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
           placeholder="Enter your TMDB API key (v3 auth)"
-          className={inputCn}
+          variant="ghost"
         />
       </div>
     </div>

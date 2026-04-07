@@ -65,7 +65,8 @@ export function ProfileSection(): React.JSX.Element {
                 setName(e.target.value);
                 setDirty(true);
               }}
-              className="h-10 rounded-xl border-none bg-accent text-sm focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+              variant="ghost"
+              className="text-sm focus-visible:ring-1 focus-visible:ring-border"
             />
           </div>
           <div className="space-y-1.5">
@@ -80,7 +81,8 @@ export function ProfileSection(): React.JSX.Element {
                 setEmail(e.target.value);
                 setDirty(true);
               }}
-              className="h-10 rounded-xl border-none bg-accent text-sm focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+              variant="ghost"
+              className="text-sm focus-visible:ring-1 focus-visible:ring-border"
             />
           </div>
         </div>

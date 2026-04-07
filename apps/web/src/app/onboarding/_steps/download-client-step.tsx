@@ -6,8 +6,8 @@ import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import type { ConfigureFooter } from "../_components/onboarding-footer";
 import type { Settings } from "../_components/constants";
-import { str, inputCn } from "../_components/constants";
-import { PasswordInput } from "../_components/password-input";
+import { str } from "../_components/constants";
+import { PasswordInput } from "@canto/ui/password-input";
 import { ServiceLogo } from "../_components/service-logo";
 import { StepHeader } from "../_components/step-header";
 
@@ -77,9 +77,9 @@ export function DownloadClientStep({
       </p>
 
       <div className="w-full max-w-md space-y-3">
-        <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="WebUI URL (e.g. http://localhost:8080)" className={inputCn} />
-        <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" className={inputCn} />
-        <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className={inputCn} />
+        <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="WebUI URL (e.g. http://localhost:8080)" variant="ghost" />
+        <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" variant="ghost" />
+        <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" variant="ghost" />
       </div>
     </div>
   );

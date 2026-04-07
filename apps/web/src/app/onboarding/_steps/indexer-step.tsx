@@ -7,8 +7,8 @@ import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import type { ConfigureFooter } from "../_components/onboarding-footer";
 import type { Settings } from "../_components/constants";
-import { bool, str, inputCn } from "../_components/constants";
-import { PasswordInput } from "../_components/password-input";
+import { bool, str } from "../_components/constants";
+import { PasswordInput } from "@canto/ui/password-input";
 import { ServiceLogo } from "../_components/service-logo";
 import { AnimatedCollapse } from "../_components/animated-collapse";
 import { StepHeader } from "../_components/step-header";
@@ -117,9 +117,9 @@ export function IndexerStep({
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder={`${choice === "prowlarr" ? "Prowlarr" : "Jackett"} URL (e.g. http://localhost:${choice === "prowlarr" ? "9696" : "9117"})`}
-              className={inputCn}
+              variant="ghost"
             />
-            <PasswordInput value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key" className={inputCn} />
+            <PasswordInput value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key" variant="ghost" />
           </div>
         </AnimatedCollapse>
       </div>

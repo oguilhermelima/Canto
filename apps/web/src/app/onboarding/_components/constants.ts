@@ -21,10 +21,6 @@ export const str = (s: Settings | undefined, key: string): string =>
 export const bool = (s: Settings | undefined, key: string): boolean =>
   (s?.[key] as boolean) ?? false;
 
-/** Shared input className — bg-accent, rounded-xl, no ring */
-export const inputCn =
-  "bg-accent rounded-xl border-none ring-0 focus-visible:ring-0 focus-visible:ring-offset-0";
-
 /** Shared primary button className */
 export const btnCn = "rounded-xl min-w-[200px]";
 
