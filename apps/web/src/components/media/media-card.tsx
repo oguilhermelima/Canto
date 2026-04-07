@@ -8,6 +8,7 @@ import { Skeleton } from "@canto/ui/skeleton";
 import { Film, Tv } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { tmdbPosterLoader } from "~/lib/tmdb-image";
+import { mediaHref } from "~/lib/media-href";
 
 interface MediaCardProps {
   id?: string;
@@ -44,7 +45,7 @@ export function MediaCard({
     href ??
     (id
       ? `/media/${id}`
-      : `/media/ext?provider=${provider}&externalId=${externalId}&type=${type}`);
+      : mediaHref(provider ?? "tmdb", externalId ?? "0", type));
 
   const utils = trpc.useUtils();
 

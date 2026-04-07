@@ -118,18 +118,18 @@ function FolderSelector({
 
 interface MediaDetailPageProps {
   params: Promise<{ id: string }>;
+  mediaType?: "movie" | "show";
 }
 
 export default function MediaDetailPage({
   params,
+  mediaType,
 }: MediaDetailPageProps): React.JSX.Element {
   const { id } = use(params);
-  // Key forces full remount when navigating between media pages,
-  // preventing stale state (search results, filters, dialogs) from persisting
-  return <MediaDetailContent key={id} id={id} />;
+  return <MediaDetailContent key={id} id={id} mediaType={mediaType} />;
 }
 
-function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
+function MediaDetailContent({ id, mediaType }: { id: string; mediaType?: "movie" | "show" }): React.JSX.Element {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { data: session } = authClient.useSession();
@@ -162,10 +162,12 @@ function MediaDetailContent({ id }: { id: string }): React.JSX.Element {
   const { region: watchRegion } = useWatchRegion();
   const { enabled: directSearchEnabled } = useDirectSearch();
 
-  const provider = searchParams.get("provider");
-  const externalId = searchParams.get("externalId");
-  const type = searchParams.get("type");
-  const isExternal = id === "ext" && provider && externalId && type;
+  // Support both /media/ext?provider=tmdb&externalId=123&type=show (legacy)
+  // and /show/123 or /movie/456 (new clean paths via mediaType prop)
+  const provider = searchParams.get("provider") ?? (mediaType ? "tmdb" : null);
+  const externalId = searchParams.get("externalId") ?? (mediaType ? id : null);
+  const type = searchParams.get("type") ?? mediaType ?? null;
+  const isExternal = (id === "ext" || mediaType) && provider && externalId && type;
 
   const mediaById = trpc.media.getById.useQuery(
     { id },

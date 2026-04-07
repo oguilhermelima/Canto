@@ -267,7 +267,7 @@ const workers = [
     }
 
     console.log(`[media-pipeline] Done: ${result.media.title} → ready`);
-  }, { connection: redisConnection, concurrency: 3 }),
+  }, { connection: redisConnection, concurrency: 5 }),
 ];
 
 /* -------------------------------------------------------------------------- */

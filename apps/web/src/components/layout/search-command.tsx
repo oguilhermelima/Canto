@@ -14,6 +14,7 @@ import { Input } from "@canto/ui/input";
 import { Skeleton } from "@canto/ui/skeleton";
 import { Search, Star, Film, Tv } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
+import { mediaHref } from "~/lib/media-href";
 
 interface SearchCommandProps {
   open: boolean;
@@ -60,7 +61,7 @@ export function SearchCommand({
       onOpenChange(false);
       setQuery("");
       router.push(
-        `/media/ext?provider=${provider}&externalId=${externalId}&type=${type}`,
+        mediaHref(provider, Number(externalId), type),
       );
     },
     [onOpenChange, router],

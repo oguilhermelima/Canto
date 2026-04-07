@@ -9,6 +9,7 @@ import { AddToListButton } from "~/components/media/add-to-list-button";
 import { Skeleton } from "@canto/ui/skeleton";
 import { tmdbPosterLoader, tmdbBackdropLoader } from "~/lib/tmdb-image";
 import { MediaLogo } from "~/components/media/media-logo";
+import { mediaHref } from "~/lib/media-href";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -216,7 +217,7 @@ function FeaturedCard({
     );
   }, [muted]);
 
-  const href = `/media/ext?provider=${item.provider}&externalId=${item.externalId}&type=${item.type}`;
+  const href = mediaHref(item.provider, item.externalId, item.type);
   const posterSrc = item.posterPath ?? null;
   const backdropSrc = item.backdropPath ?? null;
 

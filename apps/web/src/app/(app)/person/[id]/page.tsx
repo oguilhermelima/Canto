@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { StateMessage } from "~/components/layout/state-message";
+import { mediaHref } from "~/lib/media-href";
 
 interface PersonPageProps {
   params: Promise<{ id: string }>;
@@ -301,7 +302,7 @@ function TimelineCard({
 }: {
   credit: CreditItem;
 }): React.JSX.Element {
-  const href = `/media/ext?provider=tmdb&externalId=${credit.id}&type=${credit.mediaType}`;
+  const href = mediaHref("tmdb", credit.id, credit.mediaType);
 
   return (
     <Link

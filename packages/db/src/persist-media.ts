@@ -15,7 +15,6 @@ import {
   episodeTranslation,
   media,
   mediaCredit,
-  mediaRecommendation,
   mediaTranslation,
   mediaVideo,
   mediaWatchProvider,
@@ -521,104 +520,6 @@ export async function persistExtras(
   mediaId: string,
   extras: MediaExtras,
 ): Promise<void> {
-  // ── Pre-transaction: build recommendation items ──
-
-  const allRecItems = [
-    ...extras.recommendations.map((r) => ({
-      result: r,
-      sourceType: "recommendation" as const,
-    })),
-    ...extras.similar.map((r) => ({
-      result: r,
-      sourceType: "similar" as const,
-    })),
-  ];
-
-  // Dedup by externalId
-  const uniqueRecItems = new Map<number, (typeof allRecItems)[number]>();
-  for (const item of allRecItems) {
-    if (!uniqueRecItems.has(item.result.externalId)) {
-      uniqueRecItems.set(item.result.externalId, item);
-    }
-  }
-
-  // Fetch existing recommendation junction entries (for diff)
-  const existingRecs = await db
-    .select({
-      id: mediaRecommendation.id,
-      mediaId: mediaRecommendation.mediaId,
-      sourceType: mediaRecommendation.sourceType,
-    })
-    .from(mediaRecommendation)
-    .where(eq(mediaRecommendation.sourceMediaId, mediaId));
-
-  // Look up existing media rows for recommendation items
-  const recExternalIds = [...uniqueRecItems.values()].map((i) => i.result.externalId);
-  const recTitles = [...uniqueRecItems.values()].map((i) => i.result.title);
-  const existingMedia = recExternalIds.length > 0
-    ? await db.query.media.findMany({
-        where: sql`(
-          (${media.externalId} IN (${sql.join(recExternalIds.map((id) => sql`${id}`), sql`, `)}) AND ${media.provider} = 'tmdb')
-          OR (${media.provider} = 'tvdb' AND ${media.title} IN (${sql.join(recTitles.map((t) => sql`${t}`), sql`, `)}))
-        )`,
-        columns: { id: true, externalId: true, title: true, provider: true, type: true, logoPath: true },
-      })
-    : [];
-
-  const existingMediaByExtId = new Map(
-    existingMedia.filter((m) => m.provider === "tmdb").map((m) => [m.externalId, m]),
-  );
-  const existingMediaByTitle = new Map(
-    existingMedia.filter((m) => m.provider === "tvdb").map((m) => [m.title, m]),
-  );
-
-  // Build media field objects for recommendation items
-  const newRecFields = [...uniqueRecItems.values()].map((item) => ({
-    externalId: item.result.externalId,
-    provider: item.result.provider ?? ("tmdb" as const),
-    type: item.result.type,
-    title: item.result.title,
-    overview: item.result.overview,
-    posterPath: item.result.posterPath,
-    backdropPath: item.result.backdropPath,
-    logoPath: null as string | null,
-    releaseDate: item.result.releaseDate || null,
-    voteAverage: item.result.voteAverage,
-    sourceType: item.sourceType,
-  }));
-
-  // ── Persist light media rows for recommendations (outside transaction) ──
-  const mediaIdByExtKey = new Map<string, string>();
-  for (const fields of newRecFields) {
-    const key = `${fields.provider}-${fields.externalId}`;
-    const existing = existingMediaByExtId.get(fields.externalId)
-      ?? existingMediaByTitle.get(fields.title);
-    if (existing) {
-      mediaIdByExtKey.set(key, existing.id);
-    } else {
-      const [inserted] = await db.insert(media).values({
-        type: fields.type,
-        externalId: fields.externalId,
-        provider: fields.provider,
-        title: fields.title,
-        overview: fields.overview ?? null,
-        posterPath: fields.posterPath ?? null,
-        backdropPath: fields.backdropPath ?? null,
-        logoPath: fields.logoPath,
-        releaseDate: fields.releaseDate,
-        voteAverage: fields.voteAverage ?? null,
-        downloaded: false,
-        processingStatus: "pending",
-      }).returning();
-      mediaIdByExtKey.set(key, inserted!.id);
-      // Don't dispatch enrich-media — recs get enriched lazily via media.resolve
-    }
-  }
-
-  const existingRecByMediaId = new Map(
-    existingRecs.map((r) => [r.mediaId, r]),
-  );
-
   // ── Transaction: only DB writes, no network I/O ──
 
   await db.transaction(async (tx) => {
@@ -699,37 +600,6 @@ export async function persistExtras(
       if (wpRows.length > 0) {
         await tx.insert(mediaWatchProvider).values(wpRows);
       }
-    }
-
-    // ── Diff-based media_recommendation update ──
-
-    const newRecMediaIds = new Set(mediaIdByExtKey.values());
-    const toDelete = existingRecs
-      .filter((r) => !newRecMediaIds.has(r.mediaId))
-      .map((r) => r.id);
-    if (toDelete.length > 0) {
-      await tx.delete(mediaRecommendation).where(
-        sql`${mediaRecommendation.id} IN (${sql.join(
-          toDelete.map((id) => sql`${id}`),
-          sql`, `,
-        )})`,
-      );
-    }
-
-    for (const fields of newRecFields) {
-      const key = `${fields.provider}-${fields.externalId}`;
-      const recMediaId = mediaIdByExtKey.get(key);
-      if (!recMediaId) continue;
-      if (existingRecByMediaId.has(recMediaId)) continue;
-
-      await tx
-        .insert(mediaRecommendation)
-        .values({
-          mediaId: recMediaId,
-          sourceMediaId: mediaId,
-          sourceType: fields.sourceType,
-        })
-        .onConflictDoNothing();
     }
 
     // Update extrasUpdatedAt

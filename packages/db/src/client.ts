@@ -12,7 +12,7 @@ function createDb(): Database {
   if (!url) {
     throw new Error("DATABASE_URL environment variable is required");
   }
-  return drizzle(postgres(url), { schema, casing: "snake_case" });
+  return drizzle(postgres(url, { max: 20 }), { schema, casing: "snake_case" });
 }
 
 export const db: Database = new Proxy({} as Database, {
