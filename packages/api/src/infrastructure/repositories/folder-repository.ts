@@ -29,7 +29,7 @@ export async function findAllFolders(db: Database) {
 export async function findAllFoldersWithLinks(db: Database) {
   return db.query.downloadFolder.findMany({
     orderBy: (f, { asc }) => [asc(f.priority), asc(f.name)],
-    with: { serverLinks: true, mediaPaths: true },
+    with: { mediaPaths: true },
   });
 }
 
@@ -115,12 +115,6 @@ export async function seedDefaultFolders(db: Database) {
 
 // ── Server Links ──
 
-export async function findServerLinksByFolder(db: Database, folderId: string) {
-  return db.query.folderServerLink.findMany({
-    where: eq(folderServerLink.folderId, folderId),
-  });
-}
-
 export async function findServerLink(
   db: Database,
   serverType: string,
@@ -137,7 +131,6 @@ export async function findServerLink(
 export async function findEnabledSyncLinks(db: Database) {
   return db.query.folderServerLink.findMany({
     where: eq(folderServerLink.syncEnabled, true),
-    with: { folder: true },
   });
 }
 
@@ -148,7 +141,6 @@ export async function upsertServerLink(db: Database, data: FolderServerLinkInser
     .onConflictDoUpdate({
       target: [folderServerLink.serverType, folderServerLink.serverLibraryId],
       set: {
-        folderId: data.folderId,
         serverLibraryName: data.serverLibraryName,
         serverPath: data.serverPath,
         contentType: data.contentType,
@@ -161,7 +153,7 @@ export async function upsertServerLink(db: Database, data: FolderServerLinkInser
 export async function updateServerLink(
   db: Database,
   id: string,
-  data: Partial<Pick<FolderServerLinkInsert, "syncEnabled" | "contentType" | "lastSyncedAt" | "folderId">>,
+  data: Partial<Pick<FolderServerLinkInsert, "syncEnabled" | "contentType" | "lastSyncedAt">>,
 ) {
   const [updated] = await db
     .update(folderServerLink)
@@ -179,10 +171,9 @@ export async function findAllServerLinks(db: Database, serverType?: string) {
   if (serverType) {
     return db.query.folderServerLink.findMany({
       where: eq(folderServerLink.serverType, serverType),
-      with: { folder: true },
     });
   }
-  return db.query.folderServerLink.findMany({ with: { folder: true } });
+  return db.query.folderServerLink.findMany();
 }
 
 // ── Media Paths ──

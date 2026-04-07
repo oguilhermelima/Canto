@@ -4,8 +4,8 @@ import { z } from "zod";
 
 const ruleCondition = z.discriminatedUnion("field", [
   z.object({ field: z.literal("type"), op: z.literal("eq"), value: z.enum(["movie", "show"]) }),
-  z.object({ field: z.literal("genre"), op: z.enum(["contains_any", "contains_all"]), value: z.array(z.string()) }),
-  z.object({ field: z.literal("genreId"), op: z.enum(["contains_any", "contains_all"]), value: z.array(z.number()) }),
+  z.object({ field: z.literal("genre"), op: z.enum(["contains_any", "contains_all", "not_contains_any"]), value: z.array(z.string()) }),
+  z.object({ field: z.literal("genreId"), op: z.enum(["contains_any", "contains_all", "not_contains_any"]), value: z.array(z.number()) }),
   z.object({ field: z.literal("originCountry"), op: z.enum(["contains_any", "not_contains_any"]), value: z.array(z.string()) }),
   z.object({ field: z.literal("originalLanguage"), op: z.enum(["eq", "neq"]), value: z.string() }),
   z.object({ field: z.literal("contentRating"), op: z.enum(["eq", "in"]), value: z.union([z.string(), z.array(z.string())]) }),
@@ -64,7 +64,6 @@ export const removeMediaPathInput = z.object({
 // ── Server link inputs ──
 
 export const addServerLinkInput = z.object({
-  folderId: z.string().uuid().optional(),
   serverType: z.enum(["jellyfin", "plex"]),
   serverLibraryId: z.string().min(1),
   serverLibraryName: z.string().optional(),

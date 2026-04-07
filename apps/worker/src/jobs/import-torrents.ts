@@ -12,7 +12,7 @@ import {
   findUnimportedTorrents,
   findTorrentById,
   findMediaById,
-  findServerLinksByFolder,
+  findAllServerLinks,
   ensureServerLibrary,
   addListItem,
   updateRequestStatus,
@@ -27,10 +27,8 @@ import { logAndSwallow } from "@canto/api/lib/log-error";
 /*  Media server scan trigger (via folder_server_link junction)                */
 /* -------------------------------------------------------------------------- */
 
-async function triggerMediaServerScans(folderId?: string): Promise<void> {
-  if (!folderId) return;
-
-  const links = await findServerLinksByFolder(db, folderId);
+async function triggerMediaServerScans(): Promise<void> {
+  const links = await findAllServerLinks(db);
   if (links.length === 0) return;
 
   const jellyfinUrl = await getSetting(SETTINGS.JELLYFIN_URL);
@@ -183,9 +181,9 @@ export async function handleImportTorrents(): Promise<void> {
     }
   }
 
-  // Trigger media server scans for ALL folders that had successful imports
-  for (const folderId of importedFolderIds) {
-    await triggerMediaServerScans(folderId);
+  // Trigger media server scans after successful imports
+  if (importedFolderIds.size > 0) {
+    await triggerMediaServerScans();
   }
 }
 
@@ -304,7 +302,7 @@ export async function importSingleTorrent(torrentId: string): Promise<boolean> {
           addedAt: linkedMedia.addedAt ?? new Date(),
         });
       }
-      await triggerMediaServerScans(linkedMedia?.libraryId ?? undefined);
+      await triggerMediaServerScans();
       return true;
     }
     return false;

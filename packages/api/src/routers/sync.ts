@@ -14,7 +14,7 @@ import {
   findSyncItemsPaginated,
   updateSyncItem,
 } from "../infrastructure/repositories/sync-repository";
-import { findAllServerLinks, findAllFolders } from "../infrastructure/repositories/folder-repository";
+import { findAllServerLinks } from "../infrastructure/repositories/folder-repository";
 import { findMediaByAnyReference, updateMedia } from "../infrastructure/repositories/media-repository";
 import { dispatchJellyfinSync, dispatchPlexSync, dispatchFolderScan } from "../infrastructure/queue/bullmq-dispatcher";
 import { getJellyfinCredentials, getPlexCredentials } from "../lib/server-credentials";
@@ -270,8 +270,6 @@ export const syncRouter = createTRPCRouter({
         contentType: string;
         serverPath: string | null;
         linkId?: string;
-        linkedFolderId?: string | null;
-        linkedFolderName?: string;
         syncEnabled: boolean;
         lastSyncedAt: Date | null;
       };
@@ -306,13 +304,10 @@ export const syncRouter = createTRPCRouter({
       }
 
       const existingLinks = await findAllServerLinks(db, serverType);
-      const folders = await findAllFolders(db);
-      const folderMap = new Map(folders.map((f) => [f.id, f]));
       const linkMap = new Map(existingLinks.map((l) => [l.serverLibraryId, l]));
 
       const result: DiscoveredLibrary[] = serverLibraries.map((lib) => {
         const link = linkMap.get(lib.id);
-        const folder = link?.folderId ? folderMap.get(link.folderId) : undefined;
         return {
           serverType,
           serverLibraryId: lib.id,
@@ -320,8 +315,6 @@ export const syncRouter = createTRPCRouter({
           contentType: link?.contentType ?? lib.contentType,
           serverPath: lib.path,
           linkId: link?.id,
-          linkedFolderId: link?.folderId ?? null,
-          linkedFolderName: folder?.name,
           syncEnabled: link?.syncEnabled ?? false,
           lastSyncedAt: link?.lastSyncedAt ?? null,
         };

@@ -20,7 +20,6 @@ import {
   deleteFolder,
   setDefaultFolder,
   seedDefaultFolders,
-  findServerLinksByFolder,
   upsertServerLink,
   updateServerLink,
   removeServerLink,
@@ -195,10 +194,6 @@ export const folderRouter = createTRPCRouter({
 
   // ── Server Links ──
 
-  listServerLinks: adminProcedure
-    .input(z.object({ folderId: z.string().uuid() }))
-    .query(({ ctx, input }) => findServerLinksByFolder(ctx.db, input.folderId)),
-
   listAllServerLinks: adminProcedure
     .input(z.object({ serverType: z.enum(["jellyfin", "plex"]).optional() }).optional())
     .query(({ ctx, input }) => findAllServerLinks(ctx.db, input?.serverType)),
@@ -211,12 +206,10 @@ export const folderRouter = createTRPCRouter({
     .input(z.object({
       id: z.string().uuid(),
       syncEnabled: z.boolean().optional(),
-      folderId: z.string().uuid().nullable().optional(),
     }))
     .mutation(({ ctx, input }) => {
       const data: Record<string, unknown> = {};
       if (input.syncEnabled !== undefined) data.syncEnabled = input.syncEnabled;
-      if (input.folderId !== undefined) data.folderId = input.folderId;
       return updateServerLink(ctx.db, input.id, data);
     }),
 

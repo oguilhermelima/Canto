@@ -121,7 +121,7 @@ function syncItemBase(item: PendingImport): {
 async function scanJellyfin(
   url: string,
   apiKey: string,
-  libs: Array<{ folderId: string | null; jellyfinLibraryId: string; type: string; linkId: string }>,
+  libs: Array<{ jellyfinLibraryId: string; type: string; linkId: string }>,
 ): Promise<PendingImport[]> {
   const items: PendingImport[] = [];
 
@@ -163,7 +163,7 @@ async function scanJellyfin(
               title: item.Name,
               year: item.ProductionYear,
               type: mediaType,
-              libraryId: lib.folderId,
+              libraryId: null,
               serverLinkId: lib.linkId,
               path: item.Path,
               source: "jellyfin",
@@ -192,7 +192,7 @@ async function scanJellyfin(
 async function scanPlex(
   url: string,
   token: string,
-  libs: Array<{ folderId: string | null; plexLibraryId: string; type: string; linkId: string }>,
+  libs: Array<{ plexLibraryId: string; type: string; linkId: string }>,
 ): Promise<PendingImport[]> {
   const items: PendingImport[] = [];
 
@@ -248,7 +248,7 @@ async function scanPlex(
           title: item.title,
           year: item.year,
           type: mediaType,
-          libraryId: lib.folderId,
+          libraryId: null,
           serverLinkId: lib.linkId,
           source: "plex",
           plexRatingKey: item.ratingKey,
@@ -810,7 +810,6 @@ export async function handleJellyfinSync(): Promise<void> {
   const linked = syncLinks
     .filter((l) => l.serverType === "jellyfin")
     .map((l) => ({
-      folderId: l.folderId ?? null,
       jellyfinLibraryId: l.serverLibraryId,
       type: l.contentType ?? "mixed",
       linkId: l.id,
@@ -840,7 +839,6 @@ export async function handlePlexSync(): Promise<void> {
   const linked = plexSyncLinks
     .filter((l) => l.serverType === "plex")
     .map((l) => ({
-      folderId: l.folderId ?? null,
       plexLibraryId: l.serverLibraryId,
       type: l.contentType ?? "mixed",
       linkId: l.id,
