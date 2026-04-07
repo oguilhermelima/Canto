@@ -2,8 +2,8 @@ import { use } from "react";
 import { redirect, notFound } from "next/navigation";
 
 const REDIRECTS: Record<string, string> = {
-  movies: "trending_movies",
-  shows: "trending_shows",
+  movies: "movie",
+  shows: "show",
 };
 
 export default function TypeIndexPage({
@@ -12,7 +12,7 @@ export default function TypeIndexPage({
   params: Promise<{ type: string }>;
 }): never {
   const { type } = use(params);
-  const preset = REDIRECTS[type];
-  if (!preset) notFound();
-  redirect(`/discover?preset=${preset}`);
+  const searchType = REDIRECTS[type];
+  if (!searchType) notFound();
+  redirect(`/search?type=${searchType}`);
 }
