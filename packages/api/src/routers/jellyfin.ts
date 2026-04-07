@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
+import { toggleLibraryInput, mergeJellyfinVersionsInput } from "@canto/validators";
 import { getJellyfinCredentials } from "../lib/server-credentials";
 import { createTRPCRouter, adminProcedure } from "../trpc";
 import { syncJellyfinLibraries } from "../domain/use-cases/sync-jellyfin-libraries";
@@ -43,7 +43,7 @@ export const jellyfinRouter = createTRPCRouter({
   }),
 
   toggleLibrary: adminProcedure
-    .input(z.object({ id: z.string().uuid(), enabled: z.boolean() }))
+    .input(toggleLibraryInput)
     .mutation(({ ctx, input }) => updateFolder(ctx.db, input.id, { enabled: input.enabled })),
 
   scan: adminProcedure.mutation(async () => {
@@ -54,7 +54,7 @@ export const jellyfinRouter = createTRPCRouter({
   }),
 
   mergeVersions: adminProcedure
-    .input(z.object({ jellyfinItemIds: z.array(z.string()).min(2) }))
+    .input(mergeJellyfinVersionsInput)
     .mutation(async ({ input }) => {
       const creds = await getJellyfinCredentials();
       if (!creds) throw new TRPCError({ code: "BAD_REQUEST", message: "Jellyfin not configured" });

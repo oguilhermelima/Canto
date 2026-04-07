@@ -1,7 +1,16 @@
 import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
-import { torrentDownloadInput, torrentSearchInput } from "@canto/validators";
+import {
+  torrentDownloadInput,
+  torrentSearchInput,
+  torrentReplaceInput,
+  listLiveTorrentsInput,
+  deleteTorrentInput,
+  renameTorrentInput,
+  moveTorrentInput,
+  getByIdInput,
+  getByMediaIdInput,
+} from "@canto/validators";
 
 import { createTRPCRouter, adminProcedure } from "../trpc";
 import { getDownloadClient } from "../infrastructure/adapters/download-client-factory";
@@ -45,22 +54,14 @@ export const torrentRouter = createTRPCRouter({
     }),
 
   replace: adminProcedure
-    .input(z.object({
-      replaceFileIds: z.array(z.string().uuid()),
-      mediaId: z.string().uuid(),
-      title: z.string().min(1),
-      magnetUrl: z.string().url().optional(),
-      torrentUrl: z.string().url().optional(),
-      seasonNumber: z.number().int().nonnegative().optional(),
-      episodeNumbers: z.array(z.number().int().positive()).optional(),
-    }))
+    .input(torrentReplaceInput)
     .mutation(async ({ ctx, input }) => {
       const qb = await getDownloadClient();
       return replaceTorrent(ctx.db, input, qb);
     }),
 
   retry: adminProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
       const qb = await getDownloadClient();
       const result = await retryTorrent(ctx.db, input.id, qb);
@@ -71,21 +72,18 @@ export const torrentRouter = createTRPCRouter({
   list: adminProcedure.query(({ ctx }) => findAllTorrents(ctx.db)),
 
   listByMedia: adminProcedure
-    .input(z.object({ mediaId: z.string().uuid() }))
+    .input(getByMediaIdInput)
     .query(({ ctx, input }) => findTorrentsByMediaId(ctx.db, input.mediaId)),
 
   listLive: adminProcedure
-    .input(z.object({
-      limit: z.number().int().min(1).max(100).default(20),
-      cursor: z.number().int().min(0).default(0),
-    }))
+    .input(listLiveTorrentsInput)
     .query(async ({ ctx, input }) => {
       const qb = await getDownloadClient();
       return listLiveTorrents(ctx.db, input.limit, input.cursor, qb);
     }),
 
   listLiveByMedia: adminProcedure
-    .input(z.object({ mediaId: z.string().uuid() }))
+    .input(getByMediaIdInput)
     .query(async ({ ctx, input }) => {
       const dbRows = await findTorrentsByMediaId(ctx.db, input.mediaId);
       if (dbRows.length === 0) return [];
@@ -95,7 +93,7 @@ export const torrentRouter = createTRPCRouter({
     }),
 
   pause: adminProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
       const row = await findTorrentById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
@@ -104,7 +102,7 @@ export const torrentRouter = createTRPCRouter({
     }),
 
   resume: adminProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
       const row = await findTorrentById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
@@ -113,7 +111,7 @@ export const torrentRouter = createTRPCRouter({
     }),
 
   cancel: adminProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
       const row = await findTorrentById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
@@ -125,7 +123,7 @@ export const torrentRouter = createTRPCRouter({
     }),
 
   import: adminProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
       const row = await findTorrentById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
@@ -152,11 +150,7 @@ export const torrentRouter = createTRPCRouter({
     }),
 
   delete: adminProcedure
-    .input(z.object({
-      id: z.string().uuid(),
-      deleteFiles: z.boolean().default(false),
-      removeTorrent: z.boolean().default(true),
-    }))
+    .input(deleteTorrentInput)
     .mutation(async ({ ctx, input }) => {
       const row = await findTorrentById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
@@ -171,7 +165,7 @@ export const torrentRouter = createTRPCRouter({
     }),
 
   rename: adminProcedure
-    .input(z.object({ id: z.string().uuid(), newName: z.string().min(1) }))
+    .input(renameTorrentInput)
     .mutation(async ({ ctx, input }) => {
       const result = await renameTorrent(ctx.db, input.id, input.newName);
       if (!result) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
@@ -179,7 +173,7 @@ export const torrentRouter = createTRPCRouter({
     }),
 
   move: adminProcedure
-    .input(z.object({ id: z.string().uuid(), newPath: z.string().min(1) }))
+    .input(moveTorrentInput)
     .mutation(async ({ ctx, input }) => {
       const row = await findTorrentById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });

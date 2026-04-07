@@ -1,5 +1,8 @@
-import { z } from "zod";
-
+import {
+  filterOptionsInput,
+  filterSearchInput,
+  genresInput,
+} from "@canto/validators";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getTmdbProvider } from "../lib/tmdb-client";
 import { cached } from "../infrastructure/cache/redis";
@@ -14,11 +17,7 @@ import { getSpotlight } from "../domain/use-cases/get-spotlight";
 
 export const providerRouter = createTRPCRouter({
   filterOptions: publicProcedure
-    .input(z.object({
-      type: z.enum(["regions", "watchProviders"]),
-      mediaType: z.enum(["movie", "show"]).optional(),
-      region: z.string().length(2).optional(),
-    }))
+    .input(filterOptionsInput)
     .query(async ({ input }): Promise<
       | Array<{ code: string; englishName: string; nativeName: string }>
       | Array<{ providerId: number; providerName: string; logoPath: string; displayPriority: number }>
@@ -59,10 +58,7 @@ export const providerRouter = createTRPCRouter({
     }),
 
   filterSearch: publicProcedure
-    .input(z.object({
-      type: z.enum(["networks", "companies"]),
-      query: z.string().min(1),
-    }))
+    .input(filterSearchInput)
     .query(({ input }) => {
       const endpoint = input.type === "networks" ? "/search/network" : "/search/company";
       return cached(`provider:${input.type}:${input.query}`, 300, async () => {
@@ -84,7 +80,7 @@ export const providerRouter = createTRPCRouter({
   }),
 
   genres: publicProcedure
-    .input(z.object({ type: z.enum(["movie", "show"]).default("movie") }).optional())
+    .input(genresInput.optional())
     .query(async ({ input }) => {
       const type = input?.type ?? "movie";
       const provider = await getTmdbProvider();

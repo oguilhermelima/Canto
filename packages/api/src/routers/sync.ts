@@ -1,6 +1,11 @@
-import { z } from "zod";
-
 import { getSetting } from "@canto/db/settings";
+import {
+  getByMediaIdInput,
+  listSyncedItemsInput,
+  searchForSyncItemInput,
+  resolveSyncItemInput,
+  discoverServerLibrariesInput,
+} from "@canto/validators";
 import { SETTINGS } from "../lib/settings-keys";
 
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
@@ -54,13 +59,7 @@ export const syncRouter = createTRPCRouter({
   }),
 
   listSyncedItems: protectedProcedure
-    .input(z.object({
-      libraryId: z.string().uuid().optional(),
-      source: z.enum(["jellyfin", "plex"]).optional(),
-      result: z.enum(["imported", "skipped", "failed"]).optional(),
-      page: z.number().int().min(1).default(1),
-      pageSize: z.number().int().min(1).max(100).default(50),
-    }))
+    .input(listSyncedItemsInput)
     .query(async ({ ctx, input }) => {
       const { items, total } = await findSyncItemsPaginated(
         ctx.db,
@@ -72,25 +71,21 @@ export const syncRouter = createTRPCRouter({
     }),
 
   searchForSyncItem: protectedProcedure
-    .input(z.object({ query: z.string().min(1) }))
+    .input(searchForSyncItemInput)
     .query(async ({ input }) => {
       const tmdb = await getTmdbProvider();
       return tmdb.search(input.query, "movie");
     }),
 
   resolveSyncItem: adminProcedure
-    .input(z.object({
-      syncItemId: z.string().uuid(),
-      tmdbId: z.number().int(),
-      type: z.enum(["movie", "show"]),
-    }))
+    .input(resolveSyncItemInput)
     .mutation(async ({ ctx, input }) => {
       const tmdb = await getTmdbProvider();
       return resolveSyncItem(ctx.db, input, tmdb);
     }),
 
   mediaServers: protectedProcedure
-    .input(z.object({ mediaId: z.string().uuid() }))
+    .input(getByMediaIdInput)
     .query(async ({ ctx, input }) => {
       const items = await findSyncItemsByMediaId(ctx.db, input.mediaId);
 
@@ -124,7 +119,7 @@ export const syncRouter = createTRPCRouter({
     }),
 
   mediaAvailability: protectedProcedure
-    .input(z.object({ mediaId: z.string().uuid() }))
+    .input(getByMediaIdInput)
     .query(({ ctx, input }) => getMediaAvailability(ctx.db, input.mediaId)),
 
   scanFolders: adminProcedure.mutation(async () => {
@@ -133,6 +128,6 @@ export const syncRouter = createTRPCRouter({
   }),
 
   discoverServerLibraries: adminProcedure
-    .input(z.object({ serverType: z.enum(["jellyfin", "plex"]) }))
+    .input(discoverServerLibrariesInput)
     .query(({ ctx, input }) => discoverServerLibraries(ctx.db, input.serverType)),
 });

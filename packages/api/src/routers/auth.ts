@@ -1,6 +1,6 @@
 import { asc, eq } from "drizzle-orm";
-import { z } from "zod";
 import { user } from "@canto/db/schema";
+import { setUserPreferencesInput } from "@canto/validators";
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
 
 export const authRouter = createTRPCRouter({
@@ -40,12 +40,7 @@ export const authRouter = createTRPCRouter({
 
   /** Update user preferences (watch region & direct search) */
   setUserPreferences: protectedProcedure
-    .input(
-      z.object({
-        watchRegion: z.string().max(10).optional(),
-        directSearchEnabled: z.boolean().optional(),
-      }),
-    )
+    .input(setUserPreferencesInput)
     .mutation(async ({ ctx, input }) => {
       const updates: Partial<{
         watchRegion: string;

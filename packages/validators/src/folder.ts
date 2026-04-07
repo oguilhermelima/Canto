@@ -75,3 +75,30 @@ export const addServerLinkInput = z.object({
 export const removeServerLinkInput = z.object({
   id: z.string().uuid(),
 });
+
+export const browseFolderInput = z.object({
+  path: z.string().default("/"),
+});
+export type BrowseFolderInput = z.infer<typeof browseFolderInput>;
+
+export const listServerLinksInput = z.object({
+  serverType: z.enum(["jellyfin", "plex"]).optional(),
+});
+export type ListServerLinksInput = z.infer<typeof listServerLinksInput>;
+
+export const updateServerLinkInput = z.object({
+  id: z.string().uuid(),
+  syncEnabled: z.boolean().optional(),
+});
+export type UpdateServerLinkInput = z.infer<typeof updateServerLinkInput>;
+
+export const listMediaPathsInput = z.object({
+  folderId: z.string().uuid(),
+});
+export type ListMediaPathsInput = z.infer<typeof listMediaPathsInput>;
+
+export const toggleLibraryInput = z.object({
+  id: z.string().uuid(),
+  enabled: z.boolean(),
+});
+export type ToggleLibraryInput = z.infer<typeof toggleLibraryInput>;

@@ -1,6 +1,14 @@
 import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
+import {
+  getByIdInput,
+  getByMediaIdInput,
+  getListBySlugInput,
+  createListInput,
+  updateListInput,
+  addListItemInput,
+  removeListItemInput,
+} from "@canto/validators";
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
 import {
   findUserListsWithCounts,
@@ -25,25 +33,7 @@ export const listRouter = createTRPCRouter({
   ),
 
   getBySlug: protectedProcedure
-    .input(z.object({
-      slug: z.string(),
-      limit: z.number().int().min(1).max(100).default(50),
-      offset: z.number().int().min(0).default(0),
-      cursor: z.number().int().min(0).nullish(),
-      genreIds: z.array(z.number()).optional(),
-      genreMode: z.enum(["and", "or"]).default("or").optional(),
-      language: z.string().optional(),
-      scoreMin: z.number().optional(),
-      yearMin: z.string().optional(),
-      yearMax: z.string().optional(),
-      runtimeMin: z.number().optional(),
-      runtimeMax: z.number().optional(),
-      certification: z.string().optional(),
-      status: z.string().optional(),
-      sortBy: z.string().optional(),
-      watchProviders: z.string().optional(),
-      watchRegion: z.string().optional(),
-    }))
+    .input(getListBySlugInput)
     .query(async ({ ctx, input }) => {
       const listRow = await findListBySlug(ctx.db, input.slug, ctx.session.user.id);
       if (!listRow) throw new TRPCError({ code: "NOT_FOUND", message: "List not found" });
@@ -68,10 +58,7 @@ export const listRouter = createTRPCRouter({
     }),
 
   create: protectedProcedure
-    .input(z.object({
-      name: z.string().min(1).max(200),
-      description: z.string().max(1000).optional(),
-    }))
+    .input(createListInput)
     .mutation(async ({ ctx, input }) => {
       const slug = slugify(input.name);
       if (!slug || slug === "server-library" || slug === "watchlist") {
@@ -98,11 +85,7 @@ export const listRouter = createTRPCRouter({
     }),
 
   update: protectedProcedure
-    .input(z.object({
-      id: z.string().uuid(),
-      name: z.string().min(1).max(200).optional(),
-      description: z.string().max(1000).optional(),
-    }))
+    .input(updateListInput)
     .mutation(async ({ ctx, input }) => {
       await verifyListOwnership(ctx.db, input.id, ctx.session.user.id, ctx.session.user.role);
       const data: Parameters<typeof updateList>[2] = {};
@@ -115,7 +98,7 @@ export const listRouter = createTRPCRouter({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
       await verifyListOwnership(ctx.db, input.id, ctx.session.user.id, ctx.session.user.role);
       await deleteList(ctx.db, input.id);
@@ -123,32 +106,25 @@ export const listRouter = createTRPCRouter({
     }),
 
   addItem: protectedProcedure
-    .input(z.object({
-      listId: z.string().uuid(),
-      mediaId: z.string().uuid(),
-      notes: z.string().max(1000).optional(),
-    }))
+    .input(addListItemInput)
     .mutation(({ ctx, input }) =>
       addItemToList(ctx.db, input, ctx.session.user.id, ctx.session.user.role),
     ),
 
   removeItem: protectedProcedure
-    .input(z.object({
-      listId: z.string().uuid(),
-      mediaId: z.string().uuid(),
-    }))
+    .input(removeListItemInput)
     .mutation(({ ctx, input }) =>
       removeItemFromList(ctx.db, input, ctx.session.user.id, ctx.session.user.role),
     ),
 
   isInLists: protectedProcedure
-    .input(z.object({ mediaId: z.string().uuid() }))
+    .input(getByMediaIdInput)
     .query(({ ctx, input }) =>
       findMediaInLists(ctx.db, input.mediaId, ctx.session.user.id),
     ),
 
   addToServerLibrary: adminProcedure
-    .input(z.object({ mediaId: z.string().uuid() }))
+    .input(getByMediaIdInput)
     .mutation(async ({ ctx, input }) => {
       const { ensureServerLibrary } = await import(
         "../infrastructure/repositories/list-repository"

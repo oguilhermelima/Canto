@@ -2,9 +2,21 @@ import nodePath from "node:path";
 import { readdir } from "node:fs/promises";
 
 import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
-import { createFolderInput, updateFolderInput, addServerLinkInput, removeServerLinkInput, addMediaPathInput, removeMediaPathInput } from "@canto/validators";
+import {
+  createFolderInput,
+  updateFolderInput,
+  addServerLinkInput,
+  removeServerLinkInput,
+  addMediaPathInput,
+  removeMediaPathInput,
+  getByIdInput,
+  getByMediaIdInput,
+  browseFolderInput,
+  listServerLinksInput,
+  updateServerLinkInput,
+  listMediaPathsInput,
+} from "@canto/validators";
 
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
 import { getDownloadClient } from "../infrastructure/adapters/download-client-factory";
@@ -74,18 +86,18 @@ export const folderRouter = createTRPCRouter({
     }),
 
   delete: adminProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
       await deleteFolder(ctx.db, input.id);
       return { success: true };
     }),
 
   setDefault: adminProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(getByIdInput)
     .mutation(({ ctx, input }) => setDefaultFolder(ctx.db, input.id)),
 
   resolve: protectedProcedure
-    .input(z.object({ mediaId: z.string().uuid() }))
+    .input(getByMediaIdInput)
     .query(async ({ ctx, input }) => {
       const media = await findMediaById(ctx.db, input.mediaId);
       if (!media) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
@@ -107,7 +119,7 @@ export const folderRouter = createTRPCRouter({
     }),
 
   browse: adminProcedure
-    .input(z.object({ path: z.string().default("/") }))
+    .input(browseFolderInput)
     .query(async ({ input }) => {
       const normalized = nodePath.resolve(input.path);
       try {
@@ -138,7 +150,7 @@ export const folderRouter = createTRPCRouter({
   testPaths: adminProcedure.mutation(({ ctx }) => testFolderPaths(ctx.db)),
 
   listAllServerLinks: adminProcedure
-    .input(z.object({ serverType: z.enum(["jellyfin", "plex"]).optional() }).optional())
+    .input(listServerLinksInput.optional())
     .query(({ ctx, input }) => findAllServerLinks(ctx.db, input?.serverType)),
 
   addServerLink: adminProcedure
@@ -146,10 +158,7 @@ export const folderRouter = createTRPCRouter({
     .mutation(({ ctx, input }) => upsertServerLink(ctx.db, input)),
 
   updateServerLink: adminProcedure
-    .input(z.object({
-      id: z.string().uuid(),
-      syncEnabled: z.boolean().optional(),
-    }))
+    .input(updateServerLinkInput)
     .mutation(({ ctx, input }) => {
       const data: Record<string, unknown> = {};
       if (input.syncEnabled !== undefined) data.syncEnabled = input.syncEnabled;
@@ -164,7 +173,7 @@ export const folderRouter = createTRPCRouter({
     }),
 
   listMediaPaths: adminProcedure
-    .input(z.object({ folderId: z.string().uuid() }))
+    .input(listMediaPathsInput)
     .query(({ ctx, input }) => findMediaPathsByFolder(ctx.db, input.folderId)),
 
   addMediaPath: adminProcedure

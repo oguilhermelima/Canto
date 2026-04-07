@@ -1,5 +1,4 @@
 import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 import { eq } from "drizzle-orm";
 
 import { getProvider } from "@canto/providers";
@@ -9,6 +8,11 @@ import { getSetting } from "@canto/db/settings";
 import {
   getByExternalInput,
   getByIdInput,
+  getByMediaIdInput,
+  browseMediaInput,
+  resolveMediaInput,
+  getPersonInput,
+  recommendationsInput,
 } from "@canto/validators";
 
 import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure } from "../trpc";
@@ -54,27 +58,7 @@ async function getProviderWithKey(name: "tmdb" | "tvdb"): ReturnType<typeof getP
 
 export const mediaRouter = createTRPCRouter({
   browse: publicProcedure
-    .input(z.object({
-      mode: z.enum(["search", "trending", "discover"]).default("trending"),
-      type: z.enum(["movie", "show"]),
-      query: z.string().optional(),
-      provider: z.enum(["tmdb", "tvdb"]).default("tmdb"),
-      genres: z.string().optional(),
-      language: z.string().optional(),
-      sortBy: z.string().optional(),
-      dateFrom: z.string().optional(),
-      keywords: z.string().optional(),
-      scoreMin: z.number().optional(),
-      runtimeMax: z.number().optional(),
-      dateTo: z.string().optional(),
-      certification: z.string().optional(),
-      status: z.string().optional(),
-      watchProviders: z.string().optional(),
-      watchRegion: z.string().optional(),
-      runtimeMin: z.number().optional(),
-      page: z.number().int().min(1).default(1),
-      cursor: z.number().int().positive().nullish(),
-    }))
+    .input(browseMediaInput)
     .query(async ({ input }) => {
       const page = input.cursor ?? input.page;
 
@@ -178,29 +162,21 @@ export const mediaRouter = createTRPCRouter({
     }),
 
   resolve: protectedProcedure
-    .input(z.object({
-      externalId: z.number(),
-      provider: z.enum(["tmdb", "tvdb"]),
-      type: z.enum(["movie", "show"]),
-    }))
+    .input(resolveMediaInput)
     .query(async ({ ctx, input }) => {
       const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
       return resolveMedia(ctx.db, input, ctx.session.user.id, { tmdb, tvdb });
     }),
 
   persist: protectedProcedure
-    .input(z.object({
-      externalId: z.number(),
-      provider: z.enum(["tmdb", "tvdb"]),
-      type: z.enum(["movie", "show"]),
-    }))
+    .input(resolveMediaInput)
     .mutation(async ({ ctx, input }) => {
       const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
       return persistMediaUseCase(ctx.db, input, { tmdb, tvdb });
     }),
 
   getExtras: publicProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(getByIdInput)
     .query(async ({ ctx, input }) => {
       const row = await findMediaById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
@@ -228,7 +204,7 @@ export const mediaRouter = createTRPCRouter({
     }),
 
   updateMetadata: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
       const row = await findMediaById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
@@ -250,7 +226,7 @@ export const mediaRouter = createTRPCRouter({
     }),
 
   addToLibrary: adminProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
       const updated = await setLibraryStatus(ctx.db, input.id, { inLibrary: true });
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
@@ -258,7 +234,7 @@ export const mediaRouter = createTRPCRouter({
     }),
 
   markDownloaded: adminProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
       const updated = await setLibraryStatus(ctx.db, input.id, { inLibrary: true, downloaded: true });
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
@@ -266,7 +242,7 @@ export const mediaRouter = createTRPCRouter({
     }),
 
   removeFromLibrary: adminProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
       const updated = await updateMedia(ctx.db, input.id, { inLibrary: false, downloaded: false });
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
@@ -283,7 +259,7 @@ export const mediaRouter = createTRPCRouter({
     }),
 
   delete: adminProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
       const deleted = await deleteMedia(ctx.db, input.id);
       if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
@@ -291,7 +267,7 @@ export const mediaRouter = createTRPCRouter({
     }),
 
   syncTvdbSeasons: adminProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
       const [{ reconcileShowStructure }, tmdb, tvdb, { jobDispatcher }] = await Promise.all([
         import("../domain/use-cases/reconcile-show-structure"),
@@ -303,11 +279,11 @@ export const mediaRouter = createTRPCRouter({
     }),
 
   listFiles: publicProcedure
-    .input(z.object({ mediaId: z.string().uuid() }))
+    .input(getByMediaIdInput)
     .query(({ ctx, input }) => findMediaFilesByMediaId(ctx.db, input.mediaId)),
 
   getPerson: publicProcedure
-    .input(z.object({ personId: z.number() }))
+    .input(getPersonInput)
     .query(({ input }) =>
       cached(`person:${input.personId}`, 86400, async () => {
         const provider = await getTmdbProvider();
@@ -322,23 +298,7 @@ export const mediaRouter = createTRPCRouter({
     }),
 
   recommendations: protectedProcedure
-    .input(z.object({
-      cursor: z.number().int().min(0).default(0),
-      pageSize: z.number().int().min(1).max(20).default(10),
-      genreIds: z.array(z.number()).optional(),
-      genreMode: z.enum(["and", "or"]).default("or").optional(),
-      language: z.string().optional(),
-      scoreMin: z.number().optional(),
-      yearMin: z.string().optional(),
-      yearMax: z.string().optional(),
-      runtimeMin: z.number().optional(),
-      runtimeMax: z.number().optional(),
-      certification: z.string().optional(),
-      status: z.string().optional(),
-      sortBy: z.string().optional(),
-      watchProviders: z.string().optional(),
-      watchRegion: z.string().optional(),
-    }).optional())
+    .input(recommendationsInput.optional())
     .query(async ({ ctx, input }) => {
       const page = input?.cursor ?? 0;
       const pageSize = input?.pageSize ?? 10;

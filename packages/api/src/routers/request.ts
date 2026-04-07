@@ -1,6 +1,11 @@
 import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
+import {
+  getByIdInput,
+  createRequestInput,
+  listRequestsInput,
+  resolveRequestInput,
+} from "@canto/validators";
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
 import {
   createDownloadRequest,
@@ -13,12 +18,7 @@ import {
 export const requestRouter = createTRPCRouter({
   /** Create a download request for a media item */
   create: protectedProcedure
-    .input(
-      z.object({
-        mediaId: z.string().uuid(),
-        note: z.string().max(1000).optional(),
-      }),
-    )
+    .input(createRequestInput)
     .mutation(async ({ ctx, input }) => {
       const row = await createDownloadRequest(ctx.db, {
         userId: ctx.session.user.id,
@@ -36,17 +36,7 @@ export const requestRouter = createTRPCRouter({
 
   /** List requests — users see their own, admin sees all */
   list: protectedProcedure
-    .input(
-      z
-        .object({
-          status: z
-            .enum(["pending", "approved", "rejected", "downloaded", "cancelled"])
-            .optional(),
-          limit: z.number().int().min(1).max(100).default(20),
-          cursor: z.number().int().min(0).default(0),
-        })
-        .optional(),
-    )
+    .input(listRequestsInput.optional())
     .query(async ({ ctx, input }) => {
       const limit = input?.limit ?? 20;
       const offset = input?.cursor ?? 0;
@@ -62,13 +52,7 @@ export const requestRouter = createTRPCRouter({
 
   /** Admin: approve or reject a request */
   resolve: adminProcedure
-    .input(
-      z.object({
-        id: z.string().uuid(),
-        status: z.enum(["approved", "rejected"]),
-        adminNote: z.string().max(1000).optional(),
-      }),
-    )
+    .input(resolveRequestInput)
     .mutation(async ({ ctx, input }) => {
       const row = await resolveRequest(ctx.db, input.id, {
         status: input.status,
@@ -86,7 +70,7 @@ export const requestRouter = createTRPCRouter({
 
   /** Cancel own pending request */
   cancel: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
       const row = await cancelRequest(
         ctx.db,

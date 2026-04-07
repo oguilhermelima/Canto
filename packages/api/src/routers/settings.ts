@@ -1,5 +1,4 @@
 import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
 import {
   getAllSettings,
@@ -7,6 +6,22 @@ import {
   setSetting,
   deleteSetting,
 } from "@canto/db/settings";
+import {
+  serviceEnum,
+  getSettingInput,
+  setSettingInput,
+  deleteSettingInput,
+  setManySettingsInput,
+  testServiceInput,
+  setUserLanguageInput,
+  toggleServiceInput,
+  toggleTvdbDefaultInput,
+  authenticateJellyfinInput,
+  authenticatePlexInput,
+  loginPlexInput,
+  checkPlexPinInput,
+} from "@canto/validators";
+import type { ServiceEnum } from "@canto/validators";
 
 import { and, eq } from "drizzle-orm";
 import { media, user, supportedLanguage } from "@canto/db/schema";
@@ -30,13 +45,9 @@ const setupOrAdminProcedure = t.procedure.use(async ({ ctx, next }) => {
   return next({ ctx });
 });
 
-const serviceEnum = z.enum([
-  "jellyfin", "plex", "qbittorrent", "prowlarr", "jackett", "tvdb", "tmdb",
-]);
-
 const ALL_SERVICES = serviceEnum.options;
 
-const SERVICE_ENABLED_KEY: Record<z.infer<typeof serviceEnum>, string> = {
+const SERVICE_ENABLED_KEY: Record<ServiceEnum, string> = {
   jellyfin: SETTINGS.JELLYFIN_ENABLED,
   plex: SETTINGS.PLEX_ENABLED,
   qbittorrent: SETTINGS.QBITTORRENT_ENABLED,
@@ -50,25 +61,25 @@ export const settingsRouter = createTRPCRouter({
   getAll: adminProcedure.query(() => getAllSettings()),
 
   get: adminProcedure
-    .input(z.object({ key: z.string() }))
+    .input(getSettingInput)
     .query(({ input }) => getSetting(input.key)),
 
   set: adminProcedure
-    .input(z.object({ key: z.string(), value: z.unknown() }))
+    .input(setSettingInput)
     .mutation(async ({ input }) => {
       await setSetting(input.key, input.value);
       return { success: true };
     }),
 
   delete: adminProcedure
-    .input(z.object({ key: z.string() }))
+    .input(deleteSettingInput)
     .mutation(async ({ input }) => {
       await deleteSetting(input.key);
       return { success: true };
     }),
 
   setMany: adminProcedure
-    .input(z.object({ settings: z.array(z.object({ key: z.string(), value: z.unknown() })) }))
+    .input(setManySettingsInput)
     .mutation(async ({ input }) => {
       for (const { key, value } of input.settings) {
         await setSetting(key, value);
@@ -77,10 +88,7 @@ export const settingsRouter = createTRPCRouter({
     }),
 
   testService: adminProcedure
-    .input(z.object({
-      service: serviceEnum,
-      values: z.record(z.string(), z.string()),
-    }))
+    .input(testServiceInput)
     .mutation(({ input }) => testService(input.service, input.values)),
 
   getUserLanguage: protectedProcedure.query(async ({ ctx }) => {
@@ -92,7 +100,7 @@ export const settingsRouter = createTRPCRouter({
   }),
 
   setUserLanguage: protectedProcedure
-    .input(z.object({ language: z.string().min(2).max(10) }))
+    .input(setUserLanguageInput)
     .mutation(async ({ ctx, input }) => {
       const lang = await ctx.db.query.supportedLanguage.findFirst({
         where: eq(supportedLanguage.code, input.language),
@@ -120,14 +128,14 @@ export const settingsRouter = createTRPCRouter({
   }),
 
   toggleService: adminProcedure
-    .input(z.object({ service: serviceEnum, enabled: z.boolean() }))
+    .input(toggleServiceInput)
     .mutation(async ({ input }) => {
       await setSetting(SERVICE_ENABLED_KEY[input.service], input.enabled);
       return { success: true };
     }),
 
   toggleTvdbDefault: adminProcedure
-    .input(z.object({ enabled: z.boolean() }))
+    .input(toggleTvdbDefaultInput)
     .mutation(async ({ ctx, input }) => {
       await setSetting("tvdb.defaultShows", input.enabled);
       const shows = await ctx.db
@@ -160,35 +168,20 @@ export const settingsRouter = createTRPCRouter({
   }),
 
   authenticateJellyfin: setupOrAdminProcedure
-    .input(z.object({
-      url: z.string().url(),
-      username: z.string().min(1),
-      password: z.string(),
-    }))
+    .input(authenticateJellyfinInput)
     .mutation(({ input }) => authenticateJellyfin(input)),
 
   authenticatePlex: setupOrAdminProcedure
-    .input(z.object({
-      url: z.string().url(),
-      token: z.string().min(1),
-    }))
+    .input(authenticatePlexInput)
     .mutation(({ input }) => authenticatePlex(input)),
 
   loginPlex: setupOrAdminProcedure
-    .input(z.object({
-      url: z.string().url(),
-      email: z.string().min(1),
-      password: z.string().min(1),
-    }))
+    .input(loginPlexInput)
     .mutation(({ input }) => loginPlex(input)),
 
   plexPinCreate: setupOrAdminProcedure.mutation(() => createPlexPin()),
 
   plexPinCheck: setupOrAdminProcedure
-    .input(z.object({
-      pinId: z.number(),
-      clientId: z.string(),
-      serverUrl: z.string().url().optional(),
-    }))
+    .input(checkPlexPinInput)
     .query(({ input }) => checkPlexPin(input)),
 });

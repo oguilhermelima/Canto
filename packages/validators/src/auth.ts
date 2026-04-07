@@ -12,3 +12,9 @@ export const registerInput = z.object({
   password: z.string().min(8).max(128),
 });
 export type RegisterInput = z.infer<typeof registerInput>;
+
+export const setUserPreferencesInput = z.object({
+  watchRegion: z.string().max(10).optional(),
+  directSearchEnabled: z.boolean().optional(),
+});
+export type SetUserPreferencesInput = z.infer<typeof setUserPreferencesInput>;

@@ -32,3 +32,29 @@ export const listInput = z.object({
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
 });
 export type ListInput = z.infer<typeof listInput>;
+
+export const setMediaLibraryInput = z.object({
+  mediaId: z.string().uuid(),
+  libraryId: z.string().uuid().nullable(),
+});
+export type SetMediaLibraryInput = z.infer<typeof setMediaLibraryInput>;
+
+export const setContinuousDownloadInput = z.object({
+  mediaId: z.string().uuid(),
+  enabled: z.boolean(),
+});
+export type SetContinuousDownloadInput = z.infer<typeof setContinuousDownloadInput>;
+
+export const setPreferenceInput = z.object({
+  key: z.string(),
+  value: z.unknown(),
+});
+export type SetPreferenceInput = z.infer<typeof setPreferenceInput>;
+
+export const setDownloadSettingsInput = z.object({
+  importMethod: z.enum(["local", "remote"]),
+  seedRatioLimit: z.number().min(0).nullable(),
+  seedTimeLimitHours: z.number().min(0).nullable(),
+  seedCleanupFiles: z.boolean(),
+});
+export type SetDownloadSettingsInput = z.infer<typeof setDownloadSettingsInput>;

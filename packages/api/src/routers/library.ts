@@ -1,6 +1,10 @@
-import { z } from "zod";
-
-import { listInput } from "@canto/validators";
+import {
+  listInput,
+  setMediaLibraryInput,
+  setContinuousDownloadInput,
+  setPreferenceInput,
+  setDownloadSettingsInput,
+} from "@canto/validators";
 import { getSetting, setSetting } from "@canto/db/settings";
 
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
@@ -53,19 +57,13 @@ export const libraryRouter = createTRPCRouter({
 
   /** Assign a folder to a media item */
   setMediaLibrary: adminProcedure
-    .input(z.object({
-      mediaId: z.string().uuid(),
-      libraryId: z.string().uuid().nullable(),
-    }))
+    .input(setMediaLibraryInput)
     .mutation(({ ctx, input }) =>
       updateMedia(ctx.db, input.mediaId, { libraryId: input.libraryId }),
     ),
 
   setContinuousDownload: adminProcedure
-    .input(z.object({
-      mediaId: z.string().uuid(),
-      enabled: z.boolean(),
-    }))
+    .input(setContinuousDownloadInput)
     .mutation(({ ctx, input }) =>
       updateMedia(ctx.db, input.mediaId, { continuousDownload: input.enabled }),
     ),
@@ -79,7 +77,7 @@ export const libraryRouter = createTRPCRouter({
   ),
 
   setPreference: protectedProcedure
-    .input(z.object({ key: z.string(), value: z.unknown() }))
+    .input(setPreferenceInput)
     .mutation(async ({ ctx, input }) => {
       await upsertUserPreference(ctx.db, ctx.session.user.id, input.key, input.value);
       return { success: true };
@@ -105,12 +103,7 @@ export const libraryRouter = createTRPCRouter({
   }),
 
   setDownloadSettings: adminProcedure
-    .input(z.object({
-      importMethod: z.enum(["local", "remote"]),
-      seedRatioLimit: z.number().min(0).nullable(),
-      seedTimeLimitHours: z.number().min(0).nullable(),
-      seedCleanupFiles: z.boolean(),
-    }))
+    .input(setDownloadSettingsInput)
     .mutation(async ({ input }) => {
       await Promise.all([
         setSetting(SETTINGS.IMPORT_METHOD, input.importMethod),

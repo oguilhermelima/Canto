@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
+import { toggleLibraryInput } from "@canto/validators";
 import { getPlexCredentials } from "../lib/server-credentials";
 import { createTRPCRouter, adminProcedure } from "../trpc";
 import { syncPlexLibraries } from "../domain/use-cases/sync-plex-libraries";
@@ -48,6 +48,6 @@ export const plexRouter = createTRPCRouter({
   }),
 
   toggleLibrary: adminProcedure
-    .input(z.object({ id: z.string().uuid(), enabled: z.boolean() }))
+    .input(toggleLibraryInput)
     .mutation(({ ctx, input }) => updateFolder(ctx.db, input.id, { enabled: input.enabled })),
 });

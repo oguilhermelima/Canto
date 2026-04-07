@@ -24,3 +24,39 @@ export const torrentDownloadInput = z.object({
   folderId: z.string().uuid().optional(),
 });
 export type TorrentDownloadInput = z.infer<typeof torrentDownloadInput>;
+
+export const torrentReplaceInput = z.object({
+  replaceFileIds: z.array(z.string().uuid()),
+  mediaId: z.string().uuid(),
+  title: z.string().min(1),
+  magnetUrl: z.string().url().optional(),
+  torrentUrl: z.string().url().optional(),
+  seasonNumber: z.number().int().nonnegative().optional(),
+  episodeNumbers: z.array(z.number().int().positive()).optional(),
+});
+export type TorrentReplaceInput = z.infer<typeof torrentReplaceInput>;
+
+export const listLiveTorrentsInput = z.object({
+  limit: z.number().int().min(1).max(100).default(20),
+  cursor: z.number().int().min(0).default(0),
+});
+export type ListLiveTorrentsInput = z.infer<typeof listLiveTorrentsInput>;
+
+export const deleteTorrentInput = z.object({
+  id: z.string().uuid(),
+  deleteFiles: z.boolean().default(false),
+  removeTorrent: z.boolean().default(true),
+});
+export type DeleteTorrentInput = z.infer<typeof deleteTorrentInput>;
+
+export const renameTorrentInput = z.object({
+  id: z.string().uuid(),
+  newName: z.string().min(1),
+});
+export type RenameTorrentInput = z.infer<typeof renameTorrentInput>;
+
+export const moveTorrentInput = z.object({
+  id: z.string().uuid(),
+  newPath: z.string().min(1),
+});
+export type MoveTorrentInput = z.infer<typeof moveTorrentInput>;

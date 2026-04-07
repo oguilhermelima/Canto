@@ -3,3 +3,8 @@ export * from "./library";
 export * from "./auth";
 export * from "./torrent";
 export * from "./folder";
+export * from "./list";
+export * from "./settings";
+export * from "./sync";
+export * from "./request";
+export * from "./provider";
