@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { downloadRequest } from "@canto/db/schema";
 
@@ -24,12 +24,47 @@ export async function findRequestsByUser(db: Database, userId: string, status?: 
   });
 }
 
+export async function findRequestsByUserPaginated(
+  db: Database,
+  userId: string,
+  opts: { limit: number; offset: number },
+): Promise<{ items: Awaited<ReturnType<typeof findRequestsByUser>>; total: number }> {
+  const where = eq(downloadRequest.userId, userId);
+  const [items, [total]] = await Promise.all([
+    db.query.downloadRequest.findMany({
+      where,
+      with: { media: true },
+      orderBy: [desc(downloadRequest.createdAt)],
+      limit: opts.limit,
+      offset: opts.offset,
+    }),
+    db.select({ count: count() }).from(downloadRequest).where(where),
+  ]);
+  return { items, total: total?.count ?? 0 };
+}
+
 export async function findAllRequests(db: Database, status?: string) {
   return db.query.downloadRequest.findMany({
     where: status ? eq(downloadRequest.status, status) : undefined,
     with: { media: true, user: { columns: { id: true, name: true, email: true } } },
     orderBy: [desc(downloadRequest.createdAt)],
   });
+}
+
+export async function findAllRequestsPaginated(
+  db: Database,
+  opts: { limit: number; offset: number },
+): Promise<{ items: Awaited<ReturnType<typeof findAllRequests>>; total: number }> {
+  const [items, [total]] = await Promise.all([
+    db.query.downloadRequest.findMany({
+      with: { media: true, user: { columns: { id: true, name: true, email: true } } },
+      orderBy: [desc(downloadRequest.createdAt)],
+      limit: opts.limit,
+      offset: opts.offset,
+    }),
+    db.select({ count: count() }).from(downloadRequest),
+  ]);
+  return { items, total: total?.count ?? 0 };
 }
 
 export async function findRequestById(db: Database, id: string) {

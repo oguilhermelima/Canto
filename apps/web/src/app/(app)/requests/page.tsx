@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@canto/ui/cn";
 import { Input } from "@canto/ui/input";
 import { Skeleton } from "@canto/ui/skeleton";
-import { Search, ArrowUpDown } from "lucide-react";
+import { Search, ArrowUpDown, Loader2 } from "lucide-react";
 import { PageHeader } from "~/components/layout/page-header";
 import { StateMessage } from "~/components/layout/state-message";
 import { TabBar } from "~/components/layout/tab-bar";
@@ -31,8 +31,49 @@ export default function RequestsPage(): React.JSX.Element {
 
   useDocumentTitle("Requests");
 
+  const PAGE_SIZE = 20;
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
   const utils = trpc.useUtils();
-  const { data: requests, isLoading, isError } = trpc.request.list.useQuery();
+  const {
+    data,
+    isLoading,
+    isError,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = trpc.request.list.useInfiniteQuery(
+    { limit: PAGE_SIZE },
+    {
+      getNextPageParam: (lastPage, _allPages, lastPageParam) => {
+        const currentOffset = (lastPageParam as number) ?? 0;
+        const nextOffset = currentOffset + PAGE_SIZE;
+        if (nextOffset >= lastPage.total) return undefined;
+        return nextOffset;
+      },
+      initialCursor: 0,
+    },
+  );
+
+  const requests = useMemo(
+    () => data?.pages.flatMap((p) => p.items) ?? [],
+    [data],
+  );
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          void fetchNextPage();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const cancelMutation = trpc.request.cancel.useMutation({
     onSuccess: () => {
@@ -191,7 +232,18 @@ export default function RequestsPage(): React.JSX.Element {
                 cancelPending={cancelMutation.isPending}
               />
             ))}
-            {filtered.length > 0 && <StateMessage preset="endOfItems" inline />}
+
+            <div ref={sentinelRef} className="h-1" />
+
+            {isFetchingNextPage && (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            )}
+
+            {!hasNextPage && !isFetchingNextPage && filtered.length > 0 && (
+              <StateMessage preset="endOfItems" inline />
+            )}
           </div>
         )}
       </div>

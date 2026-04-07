@@ -183,7 +183,7 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
     onError: (err) => toast.error(err.message),
   });
   const existingRequest = trpc.request.list.useQuery(undefined, {
-    select: (data) => data.find((r) => r.mediaId === mediaId),
+    select: (data) => data.items.find((r) => r.mediaId === mediaId),
     enabled: !isAdmin && !!mediaId,
   });
 

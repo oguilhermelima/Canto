@@ -4,8 +4,8 @@ import { z } from "zod";
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
 import {
   createDownloadRequest,
-  findRequestsByUser,
-  findAllRequests,
+  findRequestsByUserPaginated,
+  findAllRequestsPaginated,
   resolveRequest,
   cancelRequest,
 } from "../infrastructure/repositories/request-repository";
@@ -42,14 +42,22 @@ export const requestRouter = createTRPCRouter({
           status: z
             .enum(["pending", "approved", "rejected", "downloaded", "cancelled"])
             .optional(),
+          limit: z.number().int().min(1).max(100).default(20),
+          cursor: z.number().int().min(0).default(0),
         })
         .optional(),
     )
     .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 20;
+      const offset = input?.cursor ?? 0;
+
       if (ctx.session.user.role === "admin") {
-        return findAllRequests(ctx.db, input?.status);
+        return findAllRequestsPaginated(ctx.db, { limit, offset });
       }
-      return findRequestsByUser(ctx.db, ctx.session.user.id, input?.status);
+      return findRequestsByUserPaginated(ctx.db, ctx.session.user.id, {
+        limit,
+        offset,
+      });
     }),
 
   /** Admin: approve or reject a request */
