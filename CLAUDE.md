@@ -22,8 +22,9 @@ apps/
 └── worker/           # Background jobs (BullMQ consumer)
 
 packages/
-├── api/              # tRPC v11 router definitions
+├── api/              # tRPC v11 router definitions (thin layer)
 ├── auth/             # better-auth config + schemas
+├── core/             # Domain logic, infrastructure, shared lib
 ├── db/               # Drizzle ORM schema + client
 ├── ui/               # Shared React components (shadcn/ui)
 ├── providers/        # TMDB, AniList, TVDB — normalized output

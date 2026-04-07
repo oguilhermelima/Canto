@@ -9,6 +9,7 @@ COPY apps/web/package.json ./apps/web/
 COPY apps/worker/package.json ./apps/worker/
 COPY packages/api/package.json ./packages/api/
 COPY packages/auth/package.json ./packages/auth/
+COPY packages/core/package.json ./packages/core/
 COPY packages/db/package.json ./packages/db/
 COPY packages/providers/package.json ./packages/providers/
 COPY packages/ui/package.json ./packages/ui/
