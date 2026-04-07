@@ -2,18 +2,18 @@ import { db } from "@canto/db/client";
 import { eq, and } from "drizzle-orm";
 import { media } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "@canto/api/lib/settings-keys";
-import { downloadTorrent } from "@canto/api/domain/use-cases/download-torrent";
-import { detectQuality } from "@canto/api/domain/rules/quality";
-import { calculateConfidence } from "@canto/api/domain/rules/scoring";
-import { parseSeasons, parseEpisodes } from "@canto/api/domain/rules/parsing";
-import { matchRssTitle } from "@canto/api/domain/rules/rss-matching";
-import { detectMissingEpisodes } from "@canto/api/domain/use-cases/detect-episode-gaps";
-import { getDownloadClient } from "@canto/api/infrastructure/adapters/download-client-factory";
-import { getProwlarrClient } from "@canto/api/infrastructure/adapters/prowlarr";
+import { SETTINGS } from "@canto/core/lib/settings-keys";
+import { downloadTorrent } from "@canto/core/domain/use-cases/download-torrent";
+import { detectQuality } from "@canto/core/domain/rules/quality";
+import { calculateConfidence } from "@canto/core/domain/rules/scoring";
+import { parseSeasons, parseEpisodes } from "@canto/core/domain/rules/parsing";
+import { matchRssTitle } from "@canto/core/domain/rules/rss-matching";
+import { detectMissingEpisodes } from "@canto/core/domain/use-cases/detect-episode-gaps";
+import { getDownloadClient } from "@canto/core/infrastructure/adapters/download-client-factory";
+import { getProwlarrClient } from "@canto/core/infrastructure/adapters/prowlarr";
 import {
   findBlocklistByMediaId,
-} from "@canto/api/infrastructure/repositories";
+} from "@canto/core/infrastructure/repositories";
 
 /**
  * RSS Sync: Poll Prowlarr RSS feeds and auto-download matching releases
@@ -147,7 +147,7 @@ export async function handleRssSync(): Promise<void> {
 }
 
 async function getAllSeasonEpisodes(seasonNum: number, mediaId: string): Promise<number[]> {
-  const { findMediaByIdWithSeasons } = await import("@canto/api/infrastructure/repositories");
+  const { findMediaByIdWithSeasons } = await import("@canto/core/infrastructure/repositories");
   const mediaRow = await findMediaByIdWithSeasons(db, mediaId);
   if (!mediaRow) return [];
   const seasonRow = mediaRow.seasons?.find((s) => s.number === seasonNum);

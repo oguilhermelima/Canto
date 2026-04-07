@@ -3,10 +3,10 @@ import { getSetting } from "@canto/db/settings";
 import { TmdbProvider } from "@canto/providers";
 import {
   findEnabledSyncLinks,
-} from "@canto/api/infrastructure/repositories";
-import { scanJellyfinMedia } from "@canto/api/domain/use-cases/scan-jellyfin-media";
-import { scanPlexMedia } from "@canto/api/domain/use-cases/scan-plex-media";
-import { processSyncImports } from "@canto/api/domain/use-cases/process-sync-imports";
+} from "@canto/core/infrastructure/repositories";
+import { scanJellyfinMedia } from "@canto/core/domain/use-cases/scan-jellyfin-media";
+import { scanPlexMedia } from "@canto/core/domain/use-cases/scan-plex-media";
+import { processSyncImports } from "@canto/core/domain/use-cases/process-sync-imports";
 
 /* -------------------------------------------------------------------------- */
 /*  Individual sync handlers                                                    */

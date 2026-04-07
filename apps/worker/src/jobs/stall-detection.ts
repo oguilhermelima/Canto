@@ -1,12 +1,12 @@
 import { db } from "@canto/db/client";
-import { getDownloadClient } from "@canto/api/infrastructure/adapters/download-client-factory";
-import { buildIndexers } from "@canto/api/infrastructure/adapters/indexer-factory";
-import { createNotification } from "@canto/api/domain/use-cases/create-notification";
-import { retryStalledTorrent } from "@canto/api/domain/use-cases/retry-stalled-torrent";
+import { getDownloadClient } from "@canto/core/infrastructure/adapters/download-client-factory";
+import { buildIndexers } from "@canto/core/infrastructure/adapters/indexer-factory";
+import { createNotification } from "@canto/core/domain/use-cases/create-notification";
+import { retryStalledTorrent } from "@canto/core/domain/use-cases/retry-stalled-torrent";
 import {
   findAllTorrents,
   updateTorrent,
-} from "@canto/api/infrastructure/repositories";
+} from "@canto/core/infrastructure/repositories";
 
 /** How long a torrent must be downloading with no progress before we consider it stalled (ms) */
 const STALL_THRESHOLD_MS = 60 * 60 * 1000; // 60 minutes

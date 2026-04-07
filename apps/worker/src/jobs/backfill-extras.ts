@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { media, mediaVideo, userRecommendation } from "@canto/db/schema";
-import { dispatchRefreshExtras } from "@canto/api/infrastructure/queue/bullmq-dispatcher";
+import { dispatchRefreshExtras } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
 
 const STALE_DAYS = 7;
 

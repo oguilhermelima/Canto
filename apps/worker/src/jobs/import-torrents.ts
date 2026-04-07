@@ -1,9 +1,9 @@
 import { db } from "@canto/db/client";
-import { autoImportTorrent } from "@canto/api/domain/use-cases/import-torrent";
-import { tryContinuousDownload } from "@canto/api/domain/use-cases/continuous-download";
-import { triggerMediaServerScans } from "@canto/api/domain/use-cases/trigger-media-server-scans";
-import { getDownloadClient } from "@canto/api/infrastructure/adapters/download-client-factory";
-import { buildIndexers } from "@canto/api/infrastructure/adapters/indexer-factory";
+import { autoImportTorrent } from "@canto/core/domain/use-cases/import-torrent";
+import { tryContinuousDownload } from "@canto/core/domain/use-cases/continuous-download";
+import { triggerMediaServerScans } from "@canto/core/domain/use-cases/trigger-media-server-scans";
+import { getDownloadClient } from "@canto/core/infrastructure/adapters/download-client-factory";
+import { buildIndexers } from "@canto/core/infrastructure/adapters/indexer-factory";
 import {
   findUnimportedTorrents,
   findTorrentById,
@@ -15,8 +15,8 @@ import {
   resetStaleImports,
   updateTorrent,
   updateMedia,
-} from "@canto/api/infrastructure/repositories";
-import { logAndSwallow } from "@canto/api/lib/log-error";
+} from "@canto/core/infrastructure/repositories";
+import { logAndSwallow } from "@canto/core/lib/log-error";
 
 /* -------------------------------------------------------------------------- */
 /*  Main handler                                                               */

@@ -3,12 +3,12 @@ import path from "node:path";
 
 import { db } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "@canto/api/lib/settings-keys";
-import { getDownloadClient } from "@canto/api/infrastructure/adapters/download-client-factory";
+import { SETTINGS } from "@canto/core/lib/settings-keys";
+import { getDownloadClient } from "@canto/core/infrastructure/adapters/download-client-factory";
 import {
   findTorrentByHash,
   updateTorrent,
-} from "@canto/api/infrastructure/repositories";
+} from "@canto/core/infrastructure/repositories";
 
 /**
  * Seed management: removes torrents from the download client once they've

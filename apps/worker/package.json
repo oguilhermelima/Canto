@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@canto/api": "workspace:*",
+    "@canto/core": "workspace:*",
     "@canto/db": "workspace:*",
     "@canto/providers": "workspace:*",
     "bullmq": "^5.34.8",

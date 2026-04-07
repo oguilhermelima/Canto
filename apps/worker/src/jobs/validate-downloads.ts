@@ -5,9 +5,9 @@ import { eq, and } from "drizzle-orm";
 import { db } from "@canto/db/client";
 import { media, mediaFile } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "@canto/api/lib/settings-keys";
-import { updateMedia } from "@canto/api/infrastructure/repositories";
-import { createNotification } from "@canto/api/domain/use-cases/create-notification";
+import { SETTINGS } from "@canto/core/lib/settings-keys";
+import { updateMedia } from "@canto/core/infrastructure/repositories";
+import { createNotification } from "@canto/core/domain/use-cases/create-notification";
 
 /**
  * Periodic validation: checks that media marked as `downloaded` still has
