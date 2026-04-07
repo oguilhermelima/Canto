@@ -1,6 +1,7 @@
 import { getSetting } from "@canto/db/settings";
 import { SETTINGS } from "../../lib/settings-keys";
 import type { IndexerResult, SearchContext } from "../../domain/types/torrent";
+import type { IndexerPort } from "../../domain/ports/indexer";
 import { parseTorznabXml } from "./torznab-parser";
 
 /* ── Indexer capability types ─────────────────────────────────────────────── */
@@ -17,7 +18,7 @@ interface IndexerCapability {
 
 /* ── ProwlarrClient ───────────────────────────────────────────────────────── */
 
-export class ProwlarrClient {
+export class ProwlarrClient implements IndexerPort {
   private baseUrl: string;
   private apiKey: string;
   private cachedIndexers: IndexerCapability[] | null = null;

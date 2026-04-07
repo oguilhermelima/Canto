@@ -1,9 +1,10 @@
 import { getSetting } from "@canto/db/settings";
 import { SETTINGS } from "../../lib/settings-keys";
 import type { IndexerResult, SearchContext } from "../../domain/types/torrent";
+import type { IndexerPort } from "../../domain/ports/indexer";
 import { parseTorznabXml } from "./torznab-parser";
 
-export class JackettClient {
+export class JackettClient implements IndexerPort {
   private baseUrl: string;
   private apiKey: string;
 
