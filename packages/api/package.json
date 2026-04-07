@@ -123,6 +123,10 @@
     "./domain/use-cases/scan-folder-for-media": {
       "types": "./src/domain/use-cases/scan-folder-for-media.ts",
       "default": "./src/domain/use-cases/scan-folder-for-media.ts"
+    },
+    "./domain/use-cases/fetch-media-metadata": {
+      "types": "./src/domain/use-cases/fetch-media-metadata.ts",
+      "default": "./src/domain/use-cases/fetch-media-metadata.ts"
     }
   },
   "scripts": {

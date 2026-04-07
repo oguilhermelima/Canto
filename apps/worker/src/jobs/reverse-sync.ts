@@ -15,7 +15,7 @@ import {
   addListItem,
 } from "@canto/api/infrastructure/repositories";
 import { SETTINGS } from "@canto/api/lib/settings-keys";
-import { dispatchEnrichMedia } from "@canto/api/infrastructure/queue/bullmq-dispatcher";
+import { dispatchMediaPipeline } from "@canto/api/infrastructure/queue/bullmq-dispatcher";
 import { logAndSwallow } from "@canto/api/lib/log-error";
 
 /* -------------------------------------------------------------------------- */
@@ -571,7 +571,7 @@ async function processPendingImports(
           // Only enrich if media has never been enriched (no metadata yet)
           // Don't re-enrich already-ready media — that destroys TVDB data
           if (!existing.metadataUpdatedAt) {
-            void dispatchEnrichMedia(existing.id, true).catch(logAndSwallow("reverse-sync dispatchEnrichMedia"));
+            void dispatchMediaPipeline({ mediaId: existing.id }).catch(logAndSwallow("reverse-sync dispatchMediaPipeline"));
           }
 
           if (existing.inLibrary) {
@@ -631,7 +631,7 @@ async function processPendingImports(
           if (item.libraryId) mediaUpdates.libraryId = item.libraryId;
           await updateMedia(db, inserted.id, mediaUpdates);
           mediaId = inserted.id;
-          void dispatchEnrichMedia(inserted.id, true).catch(logAndSwallow("reverse-sync dispatchEnrichMedia"));
+          void dispatchMediaPipeline({ mediaId: inserted.id }).catch(logAndSwallow("reverse-sync dispatchMediaPipeline"));
         }
 
         // Add to Server Library list

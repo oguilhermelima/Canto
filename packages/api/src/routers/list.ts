@@ -14,7 +14,7 @@ import {
   removeListItem,
   findMediaInLists,
 } from "../infrastructure/repositories/list-repository";
-import { dispatchRefreshExtras } from "../infrastructure/queue/bullmq-dispatcher";
+import { dispatchMediaPipeline } from "../infrastructure/queue/bullmq-dispatcher";
 import { deleteUserRecommendationsForSource, removeMediaFromUserRecs } from "../infrastructure/repositories/user-recommendation-repository";
 import { addMediaToUserRecs } from "../domain/use-cases/rebuild-user-recs";
 import { logAndSwallow } from "../lib/log-error";
@@ -216,8 +216,8 @@ export const listRouter = createTRPCRouter({
       void removeMediaFromUserRecs(ctx.db, ctx.session.user.id, input.mediaId)
         .catch(logAndSwallow("list:addItem removeMediaFromUserRecs"));
       // 2. Enrich the media (credits, videos, recs) in background
-      void dispatchRefreshExtras(input.mediaId)
-        .catch(logAndSwallow("list:addItem dispatchRefreshExtras"));
+      void dispatchMediaPipeline({ mediaId: input.mediaId })
+        .catch(logAndSwallow("list:addItem dispatchMediaPipeline"));
       // 3. Add new recommendations based on this media (additive, instant)
       void addMediaToUserRecs(ctx.db, ctx.session.user.id, input.mediaId)
         .catch(logAndSwallow("list:addItem addMediaToUserRecs"));

@@ -3,9 +3,10 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 
 import { getProvider } from "@canto/providers";
-import type { SearchResult } from "@canto/providers";
+import type { SearchResult, NormalizedMedia, NormalizedSeason, MediaType, ProviderName } from "@canto/providers";
 import { user } from "@canto/db/schema";
-import { persistMedia, updateMediaFromNormalized, getSupportedLanguageCodes } from "@canto/db/persist-media";
+import type { Database } from "@canto/db/client";
+import { persistMedia, updateMediaFromNormalized, getSupportedLanguageCodes, persistFullMedia } from "@canto/db/persist-media";
 import { getSetting } from "@canto/db/settings";
 import {
   getByExternalInput,
@@ -16,7 +17,8 @@ import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure }
 import { getTmdbProvider } from "../lib/tmdb-client";
 import { getTvdbProvider } from "../lib/tvdb-client";
 import { SETTINGS } from "../lib/settings-keys";
-import { dispatchRefreshExtras, dispatchReconcileShow, dispatchEnrichMedia, dispatchRebuildUserRecs } from "../infrastructure/queue/bullmq-dispatcher";
+import { dispatchRefreshExtras, dispatchReconcileShow, dispatchEnrichMedia, dispatchRebuildUserRecs, dispatchTranslateEpisodes } from "../infrastructure/queue/bullmq-dispatcher";
+import { fetchMediaMetadata } from "../domain/use-cases/fetch-media-metadata";
 import { cached } from "../infrastructure/cache/redis";
 import { logAndSwallow } from "../lib/log-error";
 import {
@@ -59,6 +61,102 @@ async function getProviderWithKey(name: "tmdb" | "tvdb"): ReturnType<typeof getP
     return getTmdbProvider();
   }
   return getTvdbProvider();
+}
+
+/**
+ * Load extras (credits, videos, watch providers, similar, recs) from DB tables
+ * for an already-persisted media item.
+ */
+async function loadExtrasFromDB(db: Database, mediaId: string, lang: string) {
+  const [credits, videos, watchProviders, similar, recommendations] = await Promise.all([
+    findCreditsByMediaId(db, mediaId),
+    findVideosByMediaId(db, mediaId),
+    findWatchProvidersByMediaId(db, mediaId),
+    findRecommendationsBySource(db, mediaId, "similar"),
+    findRecommendationsBySource(db, mediaId, "recommendation"),
+  ]);
+
+  const cast = credits
+    .filter((c) => c.type === "cast")
+    .map((c) => ({
+      id: c.personId,
+      name: c.name,
+      character: c.character ?? "",
+      profilePath: c.profilePath ?? undefined,
+      order: c.order,
+    }));
+
+  const crew = credits
+    .filter((c) => c.type === "crew")
+    .map((c) => ({
+      id: c.personId,
+      name: c.name,
+      job: c.job ?? "",
+      department: c.department ?? "",
+      profilePath: c.profilePath ?? undefined,
+    }));
+
+  const wpByRegion: Record<string, {
+    link?: string;
+    flatrate?: Array<{ providerId: number; providerName: string; logoPath: string }>;
+    rent?: Array<{ providerId: number; providerName: string; logoPath: string }>;
+    buy?: Array<{ providerId: number; providerName: string; logoPath: string }>;
+  }> = {};
+
+  for (const wp of watchProviders) {
+    if (!wpByRegion[wp.region]) wpByRegion[wp.region] = {};
+    const region = wpByRegion[wp.region]!;
+    const entry = {
+      providerId: wp.providerId,
+      providerName: wp.providerName,
+      logoPath: wp.logoPath ?? "",
+    };
+    if (wp.type === "stream") {
+      (region.flatrate ??= []).push(entry);
+    } else if (wp.type === "rent") {
+      (region.rent ??= []).push(entry);
+    } else if (wp.type === "buy") {
+      (region.buy ??= []).push(entry);
+    }
+  }
+
+  const mappedSimilar = similar.map(mapPoolItem);
+  const mappedRecs = recommendations.map(mapPoolItem);
+  const [translatedSimilar, translatedRecs] = await Promise.all([
+    translateMediaItems(db, mappedSimilar, lang),
+    translateMediaItems(db, mappedRecs, lang),
+  ]);
+
+  const langPrefix = lang.split("-")[0];
+  const mappedVideos = videos.map((v) => ({
+    id: v.id,
+    key: v.externalKey,
+    name: v.name,
+    site: v.site,
+    type: v.type,
+    official: v.official,
+    language: (v as { language?: string }).language ?? null,
+  }));
+  mappedVideos.sort((a, b) => {
+    if (a.language === langPrefix && b.language !== langPrefix) return -1;
+    if (b.language === langPrefix && a.language !== langPrefix) return 1;
+    return 0;
+  });
+
+  return {
+    credits: { cast, crew },
+    similar: translatedSimilar,
+    recommendations: translatedRecs,
+    videos: mappedVideos,
+    watchProviders: wpByRegion,
+  };
+}
+
+function normalizedMediaToResponse(media: NormalizedMedia, tvdbSeasons?: NormalizedSeason[]) {
+  return {
+    ...media,
+    seasons: tvdbSeasons ?? media.seasons,
+  };
 }
 
 export const mediaRouter = createTRPCRouter({
@@ -262,6 +360,91 @@ export const mediaRouter = createTRPCRouter({
     }),
 
   /**
+   * Resolve media by external ID — returns complete metadata without persisting.
+   * For already-persisted media: returns from DB with translations + extras.
+   * For new media: fetches live from providers and returns without persisting.
+   */
+  resolve: protectedProcedure
+    .input(z.object({
+      externalId: z.number(),
+      provider: z.enum(["tmdb", "tvdb"]),
+      type: z.enum(["movie", "show"]),
+    }))
+    .query(async ({ ctx, input }) => {
+      const tvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+
+      const existing = tvdbEnabled
+        ? await findMediaByAnyReference(ctx.db, input.externalId, input.provider)
+        : await findMediaByExternalId(ctx.db, input.externalId, input.provider);
+
+      if (existing?.processingStatus === "ready") {
+        const lang = await getUserLanguage(ctx.db, ctx.session.user.id);
+        const translated = await applyMediaTranslation(ctx.db, existing, lang);
+        if (translated.seasons) {
+          await applySeasonsTranslation(ctx.db, translated.seasons as any, lang);
+        }
+        const extras = await loadExtrasFromDB(ctx.db, existing.id, lang);
+        return { source: "db" as const, media: translated, extras, persisted: true };
+      }
+
+      const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
+      const supportedLangs = [...await getSupportedLanguageCodes(ctx.db)];
+
+      const result = await fetchMediaMetadata(
+        input.externalId, input.provider, input.type,
+        { tmdb, tvdb },
+        { useTVDBSeasons: tvdbEnabled, supportedLanguages: supportedLangs },
+      );
+
+      return {
+        source: "live" as const,
+        media: normalizedMediaToResponse(result.media, result.tvdbSeasons),
+        extras: result.extras,
+        persisted: false,
+      };
+    }),
+
+  /**
+   * Persist a resolved media item to DB (fetch + persist + dispatch translations).
+   * Called when the user takes an action (download, add to library) on non-persisted media.
+   */
+  persist: protectedProcedure
+    .input(z.object({
+      externalId: z.number(),
+      provider: z.enum(["tmdb", "tvdb"]),
+      type: z.enum(["movie", "show"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const tvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+
+      const existing = tvdbEnabled
+        ? await findMediaByAnyReference(ctx.db, input.externalId, input.provider)
+        : await findMediaByExternalId(ctx.db, input.externalId, input.provider);
+
+      if (existing?.processingStatus === "ready") return existing;
+
+      const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
+      const supportedLangs = [...await getSupportedLanguageCodes(ctx.db)];
+
+      const result = await fetchMediaMetadata(
+        input.externalId, input.provider, input.type,
+        { tmdb, tvdb },
+        { useTVDBSeasons: tvdbEnabled, supportedLanguages: supportedLangs },
+      );
+
+      const mediaId = await persistFullMedia(ctx.db, result, existing?.id);
+
+      if (result.tvdbId && result.tvdbSeasons?.length) {
+        const nonEnLangs = supportedLangs.filter((l) => !l.startsWith("en"));
+        for (const lang of nonEnLangs) {
+          void dispatchTranslateEpisodes(mediaId, result.tvdbId, lang).catch(logAndSwallow("media:persist dispatchTranslateEpisodes"));
+        }
+      }
+
+      return findMediaByIdWithSeasons(ctx.db, mediaId);
+    }),
+
+  /**
    * Get extras (credits, similar, recommendations, videos, watch providers).
    * Reads from dedicated tables (populated by refresh-extras job).
    * Falls back to TMDB direct fetch if tables are empty (dispatches background refresh).
@@ -388,10 +571,19 @@ export const mediaRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const row = await findMediaById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
-      const provider = await getProviderWithKey(row.provider as "tmdb" | "tvdb");
-      const langs = [...await getSupportedLanguageCodes(ctx.db)];
-      const normalized = await provider.getMetadata(row.externalId, row.type as "movie" | "show", { supportedLanguages: langs });
-      return updateMediaFromNormalized(ctx.db, input.id, normalized);
+
+      const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
+      const tvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+      const supportedLangs = [...await getSupportedLanguageCodes(ctx.db)];
+
+      const result = await fetchMediaMetadata(
+        row.externalId, row.provider as ProviderName, row.type as MediaType,
+        { tmdb, tvdb },
+        { reprocess: true, useTVDBSeasons: tvdbEnabled, supportedLanguages: supportedLangs },
+      );
+
+      await persistFullMedia(ctx.db, result, row.id);
+      return findMediaById(ctx.db, input.id);
     }),
 
   /**

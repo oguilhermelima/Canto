@@ -13,7 +13,7 @@ import { db } from "@canto/db/client";
 import { media, user, supportedLanguage } from "@canto/db/schema";
 import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure, t } from "../trpc";
 import { SETTINGS } from "../lib/settings-keys";
-import { dispatchRefreshAllLanguage, dispatchReconcileShow } from "../infrastructure/queue/bullmq-dispatcher";
+import { dispatchRefreshAllLanguage, dispatchMediaPipeline } from "../infrastructure/queue/bullmq-dispatcher";
 import { randomUUID } from "crypto";
 
 function validateServiceUrl(url: string): void {
@@ -329,7 +329,7 @@ export const settingsRouter = createTRPCRouter({
         .from(media)
         .where(and(eq(media.inLibrary, true), eq(media.type, "show")));
       for (const show of shows) {
-        await dispatchReconcileShow(show.id);
+        await dispatchMediaPipeline({ mediaId: show.id, useTVDBSeasons: input.enabled });
       }
       return { success: true, reprocessing: shows.length };
     }),

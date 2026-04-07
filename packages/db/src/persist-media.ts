@@ -1,12 +1,24 @@
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 
-import type { NormalizedMedia } from "@canto/providers";
+import type { MediaExtras, NormalizedMedia, NormalizedSeason } from "@canto/providers";
+
+/** Mirrors the MediaMetadata type from fetch-media-metadata use case. */
+export interface MediaMetadata {
+  media: NormalizedMedia;
+  extras: MediaExtras;
+  tvdbSeasons?: NormalizedSeason[];
+  tvdbId?: number;
+}
 
 import {
   episode,
   episodeTranslation,
   media,
+  mediaCredit,
+  mediaRecommendation,
   mediaTranslation,
+  mediaVideo,
+  mediaWatchProvider,
   season,
   seasonTranslation,
   supportedLanguage,
@@ -441,6 +453,512 @@ export async function persistTranslations(
             overview: sql`EXCLUDED.overview`,
           },
         });
+    }
+  }
+}
+
+// ─── persistFullMedia ───────────────────────────────────────────────────────
+
+/**
+ * Takes a complete MediaMetadata result and persists everything to DB.
+ * Replaces the scattered persistence across enrich-media, refresh-extras,
+ * and reconcile-show-structure.
+ */
+export async function persistFullMedia(
+  db: Database,
+  metadata: MediaMetadata,
+  existingMediaId?: string,
+): Promise<string> {
+  const { media: normalized, extras, tvdbSeasons, tvdbId } = metadata;
+
+  // 1. Insert or update media row
+  let mediaId: string;
+  if (existingMediaId) {
+    await updateMediaFromNormalized(db, existingMediaId, normalized);
+    mediaId = existingMediaId;
+  } else {
+    const inserted = await persistMedia(db, normalized, { crossRefLookup: !!tvdbId });
+    mediaId = inserted.id;
+  }
+
+  // 2. Apply TVDB season structure if present
+  if (tvdbSeasons && tvdbSeasons.length > 0) {
+    await applyTvdbSeasons(db, mediaId, tvdbSeasons, normalized);
+    if (tvdbId) {
+      await db
+        .update(media)
+        .set({ tvdbId, updatedAt: new Date() })
+        .where(eq(media.id, mediaId));
+    }
+  }
+
+  // 3. Persist extras (credits, videos, watch providers, recommendations)
+  await persistExtras(db, mediaId, extras);
+
+  // 4. Mark as ready
+  await db
+    .update(media)
+    .set({
+      processingStatus: "ready",
+      metadataUpdatedAt: new Date(),
+      extrasUpdatedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(media.id, mediaId));
+
+  return mediaId;
+}
+
+// ─── persistExtras ──────────────────────────────────────────────────────────
+
+/**
+ * Persist media extras (credits, videos, watch providers, recommendations).
+ * Extracted from refresh-extras.ts — handles delete + re-insert for simple
+ * tables and diff-based updates for recommendation junctions.
+ */
+export async function persistExtras(
+  db: Database,
+  mediaId: string,
+  extras: MediaExtras,
+): Promise<void> {
+  // ── Pre-transaction: build recommendation items ──
+
+  const allRecItems = [
+    ...extras.recommendations.map((r) => ({
+      result: r,
+      sourceType: "recommendation" as const,
+    })),
+    ...extras.similar.map((r) => ({
+      result: r,
+      sourceType: "similar" as const,
+    })),
+  ];
+
+  // Dedup by externalId
+  const uniqueRecItems = new Map<number, (typeof allRecItems)[number]>();
+  for (const item of allRecItems) {
+    if (!uniqueRecItems.has(item.result.externalId)) {
+      uniqueRecItems.set(item.result.externalId, item);
+    }
+  }
+
+  // Fetch existing recommendation junction entries (for diff)
+  const existingRecs = await db
+    .select({
+      id: mediaRecommendation.id,
+      mediaId: mediaRecommendation.mediaId,
+      sourceType: mediaRecommendation.sourceType,
+    })
+    .from(mediaRecommendation)
+    .where(eq(mediaRecommendation.sourceMediaId, mediaId));
+
+  // Look up existing media rows for recommendation items
+  const recExternalIds = [...uniqueRecItems.values()].map((i) => i.result.externalId);
+  const recTitles = [...uniqueRecItems.values()].map((i) => i.result.title);
+  const existingMedia = recExternalIds.length > 0
+    ? await db.query.media.findMany({
+        where: sql`(
+          (${media.externalId} IN (${sql.join(recExternalIds.map((id) => sql`${id}`), sql`, `)}) AND ${media.provider} = 'tmdb')
+          OR (${media.provider} = 'tvdb' AND ${media.title} IN (${sql.join(recTitles.map((t) => sql`${t}`), sql`, `)}))
+        )`,
+        columns: { id: true, externalId: true, title: true, provider: true, type: true, logoPath: true },
+      })
+    : [];
+
+  const existingMediaByExtId = new Map(
+    existingMedia.filter((m) => m.provider === "tmdb").map((m) => [m.externalId, m]),
+  );
+  const existingMediaByTitle = new Map(
+    existingMedia.filter((m) => m.provider === "tvdb").map((m) => [m.title, m]),
+  );
+
+  // Build media field objects for recommendation items
+  const newRecFields = [...uniqueRecItems.values()].map((item) => ({
+    externalId: item.result.externalId,
+    provider: item.result.provider ?? ("tmdb" as const),
+    type: item.result.type,
+    title: item.result.title,
+    overview: item.result.overview,
+    posterPath: item.result.posterPath,
+    backdropPath: item.result.backdropPath,
+    logoPath: null as string | null,
+    releaseDate: item.result.releaseDate || null,
+    voteAverage: item.result.voteAverage,
+    sourceType: item.sourceType,
+  }));
+
+  // ── Persist light media rows for recommendations (outside transaction) ──
+  const mediaIdByExtKey = new Map<string, string>();
+  for (const fields of newRecFields) {
+    const key = `${fields.provider}-${fields.externalId}`;
+    const existing = existingMediaByExtId.get(fields.externalId)
+      ?? existingMediaByTitle.get(fields.title);
+    if (existing) {
+      mediaIdByExtKey.set(key, existing.id);
+    } else {
+      const [inserted] = await db.insert(media).values({
+        type: fields.type,
+        externalId: fields.externalId,
+        provider: fields.provider,
+        title: fields.title,
+        overview: fields.overview ?? null,
+        posterPath: fields.posterPath ?? null,
+        backdropPath: fields.backdropPath ?? null,
+        logoPath: fields.logoPath,
+        releaseDate: fields.releaseDate,
+        voteAverage: fields.voteAverage ?? null,
+        downloaded: false,
+        processingStatus: "pending",
+      }).returning();
+      mediaIdByExtKey.set(key, inserted!.id);
+      // Don't dispatch enrich-media — recs get enriched lazily via media.resolve
+    }
+  }
+
+  const existingRecByMediaId = new Map(
+    existingRecs.map((r) => [r.mediaId, r]),
+  );
+
+  // ── Transaction: only DB writes, no network I/O ──
+
+  await db.transaction(async (tx) => {
+    // Clear existing data for this media
+    await tx.delete(mediaCredit).where(eq(mediaCredit.mediaId, mediaId));
+    await tx.delete(mediaVideo).where(eq(mediaVideo.mediaId, mediaId));
+    await tx.delete(mediaWatchProvider).where(eq(mediaWatchProvider.mediaId, mediaId));
+
+    // Insert credits (cast)
+    if (extras.credits.cast.length > 0) {
+      await tx.insert(mediaCredit).values(
+        extras.credits.cast.map((c, i) => ({
+          mediaId,
+          personId: c.id,
+          name: c.name,
+          character: c.character,
+          profilePath: c.profilePath,
+          type: "cast" as const,
+          order: c.order ?? i,
+        })),
+      );
+    }
+
+    // Insert credits (crew)
+    if (extras.credits.crew.length > 0) {
+      await tx.insert(mediaCredit).values(
+        extras.credits.crew.map((c, i) => ({
+          mediaId,
+          personId: c.id,
+          name: c.name,
+          department: c.department,
+          job: c.job,
+          profilePath: c.profilePath,
+          type: "crew" as const,
+          order: i,
+        })),
+      );
+    }
+
+    // Insert videos
+    if (extras.videos.length > 0) {
+      await tx.insert(mediaVideo).values(
+        extras.videos.map((v) => ({
+          mediaId,
+          externalKey: v.key,
+          site: v.site,
+          name: v.name,
+          type: v.type,
+          official: v.official,
+          language: v.language ?? null,
+        })),
+      );
+    }
+
+    // Insert watch providers (flatten all regions)
+    if (extras.watchProviders) {
+      const wpRows: Array<{
+        mediaId: string;
+        providerId: number;
+        providerName: string;
+        logoPath: string | undefined;
+        type: string;
+        region: string;
+      }> = [];
+
+      for (const [region, data] of Object.entries(extras.watchProviders)) {
+        for (const wp of data.flatrate ?? []) {
+          wpRows.push({ mediaId, providerId: wp.providerId, providerName: wp.providerName, logoPath: wp.logoPath, type: "stream", region });
+        }
+        for (const wp of data.rent ?? []) {
+          wpRows.push({ mediaId, providerId: wp.providerId, providerName: wp.providerName, logoPath: wp.logoPath, type: "rent", region });
+        }
+        for (const wp of data.buy ?? []) {
+          wpRows.push({ mediaId, providerId: wp.providerId, providerName: wp.providerName, logoPath: wp.logoPath, type: "buy", region });
+        }
+      }
+
+      if (wpRows.length > 0) {
+        await tx.insert(mediaWatchProvider).values(wpRows);
+      }
+    }
+
+    // ── Diff-based media_recommendation update ──
+
+    const newRecMediaIds = new Set(mediaIdByExtKey.values());
+    const toDelete = existingRecs
+      .filter((r) => !newRecMediaIds.has(r.mediaId))
+      .map((r) => r.id);
+    if (toDelete.length > 0) {
+      await tx.delete(mediaRecommendation).where(
+        sql`${mediaRecommendation.id} IN (${sql.join(
+          toDelete.map((id) => sql`${id}`),
+          sql`, `,
+        )})`,
+      );
+    }
+
+    for (const fields of newRecFields) {
+      const key = `${fields.provider}-${fields.externalId}`;
+      const recMediaId = mediaIdByExtKey.get(key);
+      if (!recMediaId) continue;
+      if (existingRecByMediaId.has(recMediaId)) continue;
+
+      await tx
+        .insert(mediaRecommendation)
+        .values({
+          mediaId: recMediaId,
+          sourceMediaId: mediaId,
+          sourceType: fields.sourceType,
+        })
+        .onConflictDoNothing();
+    }
+
+    // Update extrasUpdatedAt
+    await tx
+      .update(media)
+      .set({ extrasUpdatedAt: new Date() })
+      .where(eq(media.id, mediaId));
+  });
+}
+
+// ─── applyTvdbSeasons ───────────────────────────────────────────────────────
+
+/**
+ * Apply TVDB season/episode structure to a media item.
+ * Saves existing translations, deletes seasons (cascade), persists new TVDB
+ * seasons, and restores translations by matching season/episode numbers.
+ * Extracted from reconcile-show-structure.ts lines 65-263.
+ */
+export async function applyTvdbSeasons(
+  db: Database,
+  mediaId: string,
+  tvdbSeasons: NormalizedSeason[],
+  normalized: NormalizedMedia,
+): Promise<void> {
+  // Save existing episode translations before deleting seasons (cascade deletes them)
+  const existingSeasons = await db.query.season.findMany({
+    where: eq(season.mediaId, mediaId),
+    with: {
+      episodes: {
+        columns: { id: true, number: true, absoluteNumber: true },
+      },
+    },
+  });
+
+  const existingEpIds = existingSeasons.flatMap((s) =>
+    s.episodes.map((e) => e.id),
+  );
+
+  interface SavedEpTranslation {
+    absoluteNumber: number | null;
+    seasonNumber: number;
+    episodeNumber: number;
+    language: string;
+    title: string | null;
+    overview: string | null;
+  }
+  let savedEpTranslations: SavedEpTranslation[] = [];
+
+  if (existingEpIds.length > 0) {
+    const epTrans = await db.query.episodeTranslation.findMany({
+      where: sql`${episodeTranslation.episodeId} IN (${sql.join(
+        existingEpIds.map((id) => sql`${id}`),
+        sql`, `,
+      )})`,
+    });
+
+    const epInfoById = new Map<
+      string,
+      { absoluteNumber: number | null; seasonNumber: number; number: number }
+    >();
+    for (const s of existingSeasons) {
+      for (const e of s.episodes) {
+        epInfoById.set(e.id, {
+          absoluteNumber: e.absoluteNumber,
+          seasonNumber: s.number,
+          number: e.number,
+        });
+      }
+    }
+
+    savedEpTranslations = epTrans.map((t) => {
+      const info = epInfoById.get(t.episodeId);
+      return {
+        absoluteNumber: info?.absoluteNumber ?? null,
+        seasonNumber: info?.seasonNumber ?? 0,
+        episodeNumber: info?.number ?? 0,
+        language: t.language,
+        title: t.title,
+        overview: t.overview,
+      };
+    });
+  }
+
+  // Save season translations
+  const existingSeasonIds = existingSeasons.map((s) => s.id);
+  interface SavedSeasonTranslation {
+    seasonNumber: number;
+    language: string;
+    name: string | null;
+    overview: string | null;
+  }
+  let savedSeasonTranslations: SavedSeasonTranslation[] = [];
+
+  if (existingSeasonIds.length > 0) {
+    const sTrans = await db.query.seasonTranslation.findMany({
+      where: sql`${seasonTranslation.seasonId} IN (${sql.join(
+        existingSeasonIds.map((id) => sql`${id}`),
+        sql`, `,
+      )})`,
+    });
+
+    const seasonNumberById = new Map(
+      existingSeasons.map((s) => [s.id, s.number]),
+    );
+
+    savedSeasonTranslations = sTrans.map((t) => ({
+      seasonNumber: seasonNumberById.get(t.seasonId) ?? 0,
+      language: t.language,
+      name: t.name,
+      overview: t.overview,
+    }));
+  }
+
+  // Delete seasons (cascade deletes episodes + translations)
+  await db.delete(season).where(eq(season.mediaId, mediaId));
+
+  // Persist new TVDB seasons — create a synthetic NormalizedMedia for persistSeasons
+  await persistSeasons(db, mediaId, {
+    ...normalized,
+    type: "show",
+    seasons: tvdbSeasons,
+  });
+
+  // Update season/episode counts
+  const tvdbSeasonCount = tvdbSeasons.filter((s) => s.number > 0).length;
+  const tvdbEpisodeCount = tvdbSeasons.reduce(
+    (sum, s) => sum + (s.episodes?.length ?? 0),
+    0,
+  );
+  await db
+    .update(media)
+    .set({
+      numberOfSeasons: tvdbSeasonCount,
+      numberOfEpisodes: tvdbEpisodeCount,
+      updatedAt: new Date(),
+    })
+    .where(eq(media.id, mediaId));
+
+  // Restore saved translations by matching to new seasons/episodes
+  if (savedEpTranslations.length > 0 || savedSeasonTranslations.length > 0) {
+    const newSeasons = await db.query.season.findMany({
+      where: eq(season.mediaId, mediaId),
+      with: {
+        episodes: {
+          columns: { id: true, number: true, absoluteNumber: true },
+        },
+      },
+    });
+
+    // Restore season translations
+    if (savedSeasonTranslations.length > 0) {
+      const seasonIdByNumber = new Map(
+        newSeasons.map((s) => [s.number, s.id]),
+      );
+      const seasonTransRows = savedSeasonTranslations
+        .filter((t) => seasonIdByNumber.has(t.seasonNumber))
+        .map((t) => ({
+          seasonId: seasonIdByNumber.get(t.seasonNumber)!,
+          language: t.language,
+          name: t.name,
+          overview: t.overview,
+        }));
+
+      for (let i = 0; i < seasonTransRows.length; i += 500) {
+        const chunk = seasonTransRows.slice(i, i + 500);
+        await db
+          .insert(seasonTranslation)
+          .values(chunk)
+          .onConflictDoUpdate({
+            target: [seasonTranslation.seasonId, seasonTranslation.language],
+            set: {
+              name: sql`EXCLUDED.name`,
+              overview: sql`EXCLUDED.overview`,
+            },
+          });
+      }
+    }
+
+    // Restore episode translations
+    if (savedEpTranslations.length > 0) {
+      const newEpByAbsolute = new Map<number, string>();
+      const newEpBySeasonEp = new Map<string, string>();
+      for (const s of newSeasons) {
+        for (const e of s.episodes) {
+          if (e.absoluteNumber != null) {
+            newEpByAbsolute.set(e.absoluteNumber, e.id);
+          }
+          newEpBySeasonEp.set(`${s.number}-${e.number}`, e.id);
+        }
+      }
+
+      const epTransRows: Array<{
+        episodeId: string;
+        language: string;
+        title: string | null;
+        overview: string | null;
+      }> = [];
+
+      for (const t of savedEpTranslations) {
+        let newEpId: string | undefined;
+        if (t.absoluteNumber != null) {
+          newEpId = newEpByAbsolute.get(t.absoluteNumber);
+        }
+        if (!newEpId) {
+          newEpId = newEpBySeasonEp.get(`${t.seasonNumber}-${t.episodeNumber}`);
+        }
+        if (newEpId) {
+          epTransRows.push({
+            episodeId: newEpId,
+            language: t.language,
+            title: t.title,
+            overview: t.overview,
+          });
+        }
+      }
+
+      for (let i = 0; i < epTransRows.length; i += 500) {
+        const chunk = epTransRows.slice(i, i + 500);
+        await db
+          .insert(episodeTranslation)
+          .values(chunk)
+          .onConflictDoUpdate({
+            target: [episodeTranslation.episodeId, episodeTranslation.language],
+            set: {
+              title: sql`EXCLUDED.title`,
+              overview: sql`EXCLUDED.overview`,
+            },
+          });
+      }
     }
   }
 }

@@ -14,11 +14,18 @@ import { replaceShowWithTvdb } from "@canto/api/domain/use-cases/replace-show-wi
 import { rebuildUserRecs } from "@canto/api/domain/use-cases/rebuild-user-recs";
 import { refreshAllLanguage } from "@canto/api/domain/use-cases/refresh-all-language";
 import { translateEpisodes } from "@canto/api/domain/use-cases/translate-episodes";
+import { fetchMediaMetadata } from "@canto/api/domain/use-cases/fetch-media-metadata";
+import type { ProviderName, MediaType } from "@canto/providers";
 import { findUsersForDailyRecsCheck } from "@canto/api/infrastructure/repositories/user-recommendation-repository";
-import { dispatchRebuildUserRecs } from "@canto/api/infrastructure/queue/bullmq-dispatcher";
+import { findMediaById } from "@canto/api/infrastructure/repositories";
+import { dispatchRebuildUserRecs, dispatchTranslateEpisodes } from "@canto/api/infrastructure/queue/bullmq-dispatcher";
+import type { MediaPipelineJob } from "@canto/api/infrastructure/queue/bullmq-dispatcher";
 import { jobDispatcher } from "@canto/api/infrastructure/adapters/job-dispatcher.adapter";
+import { SETTINGS } from "@canto/api/lib/settings-keys";
 import { db } from "@canto/db/client";
 import { seedLanguages } from "@canto/db";
+import { getSetting } from "@canto/db/settings";
+import { getSupportedLanguageCodes, persistFullMedia } from "@canto/db/persist-media";
 import { getTmdbProvider } from "@canto/api/lib/tmdb-client";
 import { getTvdbProvider } from "@canto/api/lib/tvdb-client";
 
@@ -214,6 +221,52 @@ const workers = [
     const { mediaId, tvdbId, language } = job.data as { mediaId: string; tvdbId: number; language: string };
     const tvdb = await getTvdbProvider();
     await translateEpisodes(db, mediaId, tvdbId, language, tvdb);
+  }, { connection: redisConnection, concurrency: 3 }),
+
+  // ── Unified media pipeline ──
+
+  new Worker("media-pipeline", async (job) => {
+    const data = job.data as MediaPipelineJob;
+    const tvdbSetting = data.useTVDBSeasons ?? (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+    const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
+    const supportedLangs = [...await getSupportedLanguageCodes(db)];
+
+    let externalId: number;
+    let provider: ProviderName;
+    let type: MediaType;
+    let existingId: string | undefined;
+
+    if (data.mediaId) {
+      const row = await findMediaById(db, data.mediaId);
+      if (!row) return;
+      externalId = row.externalId;
+      provider = row.provider as ProviderName;
+      type = row.type as MediaType;
+      existingId = row.id;
+      console.log(`[media-pipeline] Reprocessing: ${row.title} (${row.id})`);
+    } else {
+      externalId = data.externalId!;
+      provider = data.provider! as ProviderName;
+      type = data.type! as MediaType;
+      console.log(`[media-pipeline] Processing: ${provider}/${externalId}`);
+    }
+
+    const result = await fetchMediaMetadata(
+      externalId, provider, type,
+      { tmdb, tvdb },
+      { reprocess: !!existingId, useTVDBSeasons: tvdbSetting, supportedLanguages: supportedLangs },
+    );
+
+    const mediaId = await persistFullMedia(db, result, existingId);
+
+    if (result.tvdbId && result.tvdbSeasons?.length) {
+      const nonEnLangs = supportedLangs.filter(l => !l.startsWith("en"));
+      for (const lang of nonEnLangs) {
+        void dispatchTranslateEpisodes(mediaId, result.tvdbId, lang).catch(() => {});
+      }
+    }
+
+    console.log(`[media-pipeline] Done: ${result.media.title} → ready`);
   }, { connection: redisConnection, concurrency: 3 }),
 ];
 

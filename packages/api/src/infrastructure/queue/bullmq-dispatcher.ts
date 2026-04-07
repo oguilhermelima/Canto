@@ -97,6 +97,29 @@ export async function dispatchFolderScan(): Promise<boolean> {
 }
 
 /** Add a job only if no active/waiting job with the same ID exists. */
+const getMediaPipelineQueue = createQueueGetter("media-pipeline");
+
+export interface MediaPipelineJob {
+  externalId?: number;
+  provider?: string;
+  type?: string;
+  mediaId?: string;
+  useTVDBSeasons?: boolean;
+}
+
+export async function dispatchMediaPipeline(data: MediaPipelineJob): Promise<void> {
+  const q = await getMediaPipelineQueue();
+  const jobId = data.mediaId
+    ? `media-pipeline-${data.mediaId}`
+    : `media-pipeline-${data.provider}-${data.externalId}`;
+  await q.add("media-pipeline", data, {
+    jobId,
+    removeOnComplete: true,
+    removeOnFail: 100,
+  });
+}
+
+/** Add a job only if no active/waiting job with the same ID exists. */
 async function dispatchUniqueJob(queue: Queue, jobId: string): Promise<boolean> {
   const existing = await queue.getJob(jobId);
   if (existing) {
