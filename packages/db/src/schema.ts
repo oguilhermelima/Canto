@@ -203,8 +203,6 @@ export type RuleGroup = {
   conditions: Array<RuleCondition | RuleGroup>;
 };
 
-/** @deprecated Alias for backward compatibility — use downloadFolder */
-export const library = downloadFolder;
 
 // ─── Media tables ───
 
@@ -274,7 +272,7 @@ export const media = pgTable(
     productionCountries: jsonb("production_countries").$type<string[]>(),
 
     // Library state
-    libraryId: uuid("library_id").references(() => library.id, {
+    libraryId: uuid("library_id").references(() => downloadFolder.id, {
       onDelete: "set null",
     }),
     inLibrary: boolean("in_library").notNull().default(false),
@@ -505,7 +503,7 @@ export const syncItem = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     libraryId: uuid("library_id")
-      .references(() => library.id, { onDelete: "set null" }),
+      .references(() => downloadFolder.id, { onDelete: "set null" }),
     serverLinkId: uuid("server_link_id")
       .references(() => folderServerLink.id, { onDelete: "set null" }),
     serverItemTitle: varchar("server_item_title", { length: 500 }).notNull(),
@@ -849,13 +847,11 @@ export const folderMediaPathRelations = relations(folderMediaPath, ({ one }) => 
 
 export const folderServerLinkRelations = relations(folderServerLink, () => ({}));
 
-/** @deprecated Use downloadFolderRelations */
-export const libraryRelations = downloadFolderRelations;
 
 export const mediaRelations = relations(media, ({ many, one }) => ({
-  library: one(library, {
+  library: one(downloadFolder, {
     fields: [media.libraryId],
-    references: [library.id],
+    references: [downloadFolder.id],
   }),
   qualityProfile: one(qualityProfile, {
     fields: [media.qualityProfileId],
@@ -931,9 +927,9 @@ export const mediaFileRelations = relations(mediaFile, ({ one }) => ({
 }));
 
 export const syncItemRelations = relations(syncItem, ({ one, many }) => ({
-  library: one(library, {
+  library: one(downloadFolder, {
     fields: [syncItem.libraryId],
-    references: [library.id],
+    references: [downloadFolder.id],
   }),
   serverLink: one(folderServerLink, {
     fields: [syncItem.serverLinkId],

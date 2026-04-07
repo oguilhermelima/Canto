@@ -1,19 +1,14 @@
 import { db } from "@canto/db/client";
-import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "@canto/api/lib/settings-keys";
 import { getDownloadClient } from "@canto/api/infrastructure/adapters/download-client-factory";
-import { getProwlarrClient } from "@canto/api/infrastructure/adapters/prowlarr";
-import { getJackettClient } from "@canto/api/infrastructure/adapters/jackett";
+import { buildIndexers } from "@canto/api/infrastructure/adapters/indexer-factory";
 import { searchTorrents } from "@canto/api/domain/use-cases/search-torrents";
 import { downloadTorrent } from "@canto/api/domain/use-cases/download-torrent";
 import { createNotification } from "@canto/api/domain/use-cases/create-notification";
-import type { IndexerPort } from "@canto/api/domain/ports";
 import {
   findAllTorrents,
   updateTorrent,
   createBlocklistEntry,
 } from "@canto/api/infrastructure/repositories";
-import { logAndSwallow } from "@canto/api/lib/log-error";
 
 /** How long a torrent must be downloading with no progress before we consider it stalled (ms) */
 const STALL_THRESHOLD_MS = 60 * 60 * 1000; // 60 minutes
@@ -89,15 +84,6 @@ export async function handleStallDetection(): Promise<void> {
       );
     }
   }
-}
-
-async function buildIndexers(): Promise<IndexerPort[]> {
-  const indexers: IndexerPort[] = [];
-  const prowlarrEnabled = (await getSetting<boolean>(SETTINGS.PROWLARR_ENABLED)) === true;
-  const jackettEnabled = (await getSetting<boolean>(SETTINGS.JACKETT_ENABLED)) === true;
-  if (prowlarrEnabled) indexers.push(await getProwlarrClient());
-  if (jackettEnabled) indexers.push(await getJackettClient());
-  return indexers;
 }
 
 async function autoRetryStalled(

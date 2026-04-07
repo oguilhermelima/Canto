@@ -64,24 +64,6 @@ export async function getJellyfinLibraryFolders(
 }
 
 /**
- * Search Jellyfin items by title (used for auto-merge matching).
- */
-export async function searchJellyfinItems(
-  url: string,
-  apiKey: string,
-  query: string,
-  itemType: "Movie" | "Series",
-): Promise<Array<{ Id: string; Name: string; ProviderIds?: Record<string, string> }>> {
-  const res = await fetch(
-    `${url}/Items?searchTerm=${encodeURIComponent(query)}&Recursive=true&IncludeItemTypes=${itemType}&Fields=Path,ProviderIds`,
-    { headers: headers(apiKey), signal: AbortSignal.timeout(10_000) },
-  );
-  if (!res.ok) return [];
-  const data = (await res.json()) as { Items: Array<{ Id: string; Name: string; ProviderIds?: Record<string, string> }> };
-  return data.Items;
-}
-
-/**
  * Merge multiple Jellyfin items into a single multi-version entry.
  */
 export async function mergeJellyfinVersions(

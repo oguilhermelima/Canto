@@ -4,7 +4,7 @@ import { media, mediaFile } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
 import { SETTINGS } from "@canto/api/lib/settings-keys";
 import { downloadTorrent } from "@canto/api/domain/use-cases/download-torrent";
-import { detectQuality, detectSource } from "@canto/api/domain/rules/quality";
+import { detectQuality } from "@canto/api/domain/rules/quality";
 import { calculateConfidence } from "@canto/api/domain/rules/scoring";
 import { parseSeasons, parseEpisodes } from "@canto/api/domain/rules/parsing";
 import { getDownloadClient } from "@canto/api/infrastructure/adapters/download-client-factory";
@@ -13,7 +13,6 @@ import {
   findBlocklistByMediaId,
   findMediaByIdWithSeasons,
 } from "@canto/api/infrastructure/repositories";
-import { logAndSwallow } from "@canto/api/lib/log-error";
 
 /**
  * RSS Sync: Poll Prowlarr RSS feeds and auto-download matching releases

@@ -1,13 +1,13 @@
 import type { CachePort } from "../../domain/ports/cache";
 import Redis from "ioredis";
 
-export interface RedisConnectionOptions {
+interface RedisConnectionOptions {
   host: string;
   port: number;
   password?: string;
 }
 
-export function createRedisCache(connection: RedisConnectionOptions): CachePort {
+function createRedisCache(connection: RedisConnectionOptions): CachePort {
   const redis = new Redis({
     host: connection.host,
     port: connection.port,

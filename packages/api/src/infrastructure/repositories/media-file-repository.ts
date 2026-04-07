@@ -97,12 +97,3 @@ export async function createMediaFileNoConflict(
 ) {
   await db.insert(mediaFile).values(data).onConflictDoNothing();
 }
-
-export async function findAllMediaFiles(db: Database, status?: string) {
-  if (status) {
-    return db.query.mediaFile.findMany({
-      where: eq(mediaFile.status, status),
-    });
-  }
-  return db.query.mediaFile.findMany();
-}

@@ -858,7 +858,7 @@ export async function handlePlexSync(): Promise<void> {
 /*  Combined handler (for backward compat / global scheduler)                  */
 /* -------------------------------------------------------------------------- */
 
-export async function handleReverseSync(): Promise<void> {
+async function handleReverseSync(): Promise<void> {
   await handleJellyfinSync();
   await handlePlexSync();
 }

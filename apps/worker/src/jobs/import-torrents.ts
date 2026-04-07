@@ -5,9 +5,7 @@ import { searchTorrents } from "@canto/api/domain/use-cases/search-torrents";
 import { downloadTorrent } from "@canto/api/domain/use-cases/download-torrent";
 import { autoImportTorrent } from "@canto/api/domain/use-cases/import-torrent";
 import { getDownloadClient } from "@canto/api/infrastructure/adapters/download-client-factory";
-import { getJackettClient } from "@canto/api/infrastructure/adapters/jackett";
-import { getProwlarrClient } from "@canto/api/infrastructure/adapters/prowlarr";
-import type { IndexerPort } from "@canto/api/domain/ports";
+import { buildIndexers } from "@canto/api/infrastructure/adapters/indexer-factory";
 import {
   findUnimportedTorrents,
   findTorrentById,
@@ -187,19 +185,6 @@ export async function handleImportTorrents(): Promise<void> {
   }
 }
 
-/**
- * After a show episode import, check if continuous download is enabled.
- * If so, find the next un-downloaded episode and auto-download it.
- */
-async function buildIndexers(): Promise<IndexerPort[]> {
-  const indexers: IndexerPort[] = [];
-  const prowlarrEnabled = (await getSetting<boolean>(SETTINGS.PROWLARR_ENABLED)) === true;
-  const jackettEnabled = (await getSetting<boolean>(SETTINGS.JACKETT_ENABLED)) === true;
-  if (prowlarrEnabled) indexers.push(await getProwlarrClient());
-  if (jackettEnabled) indexers.push(await getJackettClient());
-  return indexers;
-}
-
 async function tryContinuousDownload(
   mediaRow: { id: string; type: string; continuousDownload: boolean; title: string },
   importedSeasonNumber: number | null,
@@ -254,67 +239,3 @@ async function tryContinuousDownload(
   }
 }
 
-export async function importSingleTorrent(torrentId: string): Promise<boolean> {
-  const row = await findTorrentById(db, torrentId);
-
-  if (!row || !row.hash || !row.mediaId) return false;
-  if (row.imported) return true;
-
-  try {
-    // Atomically claim the torrent to prevent race conditions with the worker
-    const claimed = await claimTorrentForImport(db, row.id);
-    if (!claimed) {
-      console.log(`[import-torrents] Skipping "${row.title}" — already being imported`);
-      return false;
-    }
-
-    const qbClient = await getDownloadClient();
-    await autoImportTorrent(db, claimed, qbClient);
-
-    // Re-read row to check if import succeeded
-    const updated = await findTorrentById(db, row.id);
-
-    if (updated?.imported) {
-      // Mark the torrent as imported in qBittorrent by updating its category
-      try {
-        const [torrentInfo] = await qbClient.listTorrents({ hashes: [row.hash!] });
-        if (torrentInfo) {
-          const importedCategory = torrentInfo.category
-            ? `${torrentInfo.category}-imported`
-            : "imported";
-          await qbClient.ensureCategory(importedCategory);
-          await qbClient.setCategory(row.hash!, importedCategory);
-          console.log(`[import-torrents] Set qBit category to "${importedCategory}" for "${row.title}"`);
-        }
-      } catch (err) {
-        console.warn(
-          `[import-torrents] Failed to update qBit category for "${row.title}":`,
-          err instanceof Error ? err.message : err,
-        );
-      }
-
-      const linkedMedia = updated.mediaId
-        ? await findMediaById(db, updated.mediaId)
-        : null;
-      if (linkedMedia && !linkedMedia.downloaded) {
-        await updateMedia(db, linkedMedia.id, {
-          downloaded: true,
-          addedAt: linkedMedia.addedAt ?? new Date(),
-        });
-      }
-      await triggerMediaServerScans();
-      return true;
-    }
-    return false;
-  } catch (err) {
-    console.error(
-      `[import-torrents] Error importing "${row.title}":`,
-      err instanceof Error ? err.message : err,
-    );
-    // Reset importing flag so the torrent can be retried
-    await updateTorrent(db, row.id, { importing: false }).catch(
-      logAndSwallow("importSingleTorrent reset importing flag"),
-    );
-    return false;
-  }
-}

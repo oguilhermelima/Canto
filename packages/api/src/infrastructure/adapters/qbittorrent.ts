@@ -176,18 +176,6 @@ export class QBittorrentClient implements DownloadClientPort {
     }
   }
 
-  async renameFolder(hash: string, oldPath: string, newPath: string): Promise<void> {
-    const body = new URLSearchParams({ hash, oldPath, newPath });
-    const response = await this.request("/api/v2/torrents/renameFolder", {
-      method: "POST",
-      body,
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    });
-    if (!response.ok) {
-      throw new Error(`qBittorrent renameFolder failed: ${response.status}`);
-    }
-  }
-
   async renameFile(hash: string, oldPath: string, newPath: string): Promise<void> {
     const body = new URLSearchParams({ hash, oldPath, newPath });
     const response = await this.request("/api/v2/torrents/renameFile", {

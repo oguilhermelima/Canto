@@ -17,6 +17,3 @@ export async function autoElectDefault(db: Database): Promise<void> {
     await updateFolder(db, first.id, { isDefault: true });
   }
 }
-
-/** @deprecated Use autoElectDefault */
-export const autoElectDefaults = autoElectDefault;

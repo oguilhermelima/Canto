@@ -148,11 +148,6 @@ export async function translateMediaItems<T extends { externalId: number; provid
   });
 }
 
-/**
- * @deprecated Use translateMediaItems instead. Kept as alias for backward compatibility.
- */
-export const translatePoolItems = translateMediaItems;
-
 /** Batch-fetch media translations for a list of media IDs */
 export async function batchMediaTranslations(
   db: Database,
