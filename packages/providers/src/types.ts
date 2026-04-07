@@ -10,6 +10,7 @@ export interface SearchResult {
   overview?: string;
   posterPath?: string;
   backdropPath?: string;
+  logoPath?: string;
   releaseDate?: string;
   year?: number;
   voteAverage?: number;

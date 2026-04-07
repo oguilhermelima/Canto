@@ -67,6 +67,18 @@ export const getPersonInput = z.object({
 });
 export type GetPersonInput = z.infer<typeof getPersonInput>;
 
+export const getLogoInput = z.object({
+  externalId: z.number().int(),
+  provider: providerType,
+  type: mediaType,
+  title: z.string(),
+  posterPath: z.string().nullish(),
+  backdropPath: z.string().nullish(),
+  year: z.number().nullish(),
+  voteAverage: z.number().nullish(),
+});
+export type GetLogoInput = z.infer<typeof getLogoInput>;
+
 export const recommendationsInput = z.object({
   cursor: z.number().int().min(0).default(0),
   pageSize: z.number().int().min(1).max(20).default(10),
