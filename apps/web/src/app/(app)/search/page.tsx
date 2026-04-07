@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useDebounceCallback } from "usehooks-ts";
 import { type FilterOutput } from "~/components/layout/browse-layout";
+import { useDocumentTitle } from "~/hooks/use-document-title";
 import { MobileSearchInput, DesktopSearchInput } from "./_components/search-input";
 import { SearchResults } from "./_components/search-results";
 import { useSearchQueries } from "./_components/use-search-queries";
@@ -53,10 +54,7 @@ export default function SearchPage(): React.JSX.Element {
     }
   }, [searchParams]);
 
-  // Set page title
-  useEffect(() => {
-    document.title = query ? `"${query}" — Canto` : "Search — Canto";
-  }, [query]);
+  useDocumentTitle(query ? `"${query}"` : "Search");
 
   const isSearching = query.length >= 2;
 

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { trpc } from "~/lib/trpc/client";
+import { useDocumentTitle } from "~/hooks/use-document-title";
 import { BrowseLayout, type FilterOutput } from "~/components/layout/browse-layout";
 import { StateMessage } from "~/components/layout/state-message";
 
@@ -9,9 +10,7 @@ export function RecommendedSection(): React.JSX.Element {
   const [filters, setFilters] = useState<FilterOutput>({});
   const [mediaType, setMediaType] = useState<"movie" | "show" | "all">("all");
 
-  useEffect(() => {
-    document.title = "Recommended for you — Canto";
-  }, []);
+  useDocumentTitle("Recommended for you");
 
   const queryInput = useMemo(
     () => ({

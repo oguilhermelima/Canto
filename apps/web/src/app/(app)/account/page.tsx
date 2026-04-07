@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "~/lib/auth-client";
+import { useDocumentTitle } from "~/hooks/use-document-title";
 import { PageHeader } from "~/components/layout/page-header";
 import { ProfileSection } from "./_components/profile-section";
 import { PasswordSection } from "./_components/password-section";
@@ -13,9 +14,7 @@ export default function AccountPage(): React.JSX.Element {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
 
-  useEffect(() => {
-    document.title = "Account — Canto";
-  }, []);
+  useDocumentTitle("Account");
 
   useEffect(() => {
     if (!isPending && !session) {

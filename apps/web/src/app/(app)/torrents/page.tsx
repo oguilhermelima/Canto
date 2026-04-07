@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Skeleton } from "@canto/ui/skeleton";
 import { PageHeader } from "~/components/layout/page-header";
 import { TabBar } from "~/components/layout/tab-bar";
 import { StateMessage } from "~/components/layout/state-message";
 import { trpc } from "~/lib/trpc/client";
 import { authClient } from "~/lib/auth-client";
+import { useDocumentTitle } from "~/hooks/use-document-title";
 import { resolveState } from "~/lib/torrent-utils";
 import { TorrentCard } from "./_components/torrent-card";
 import { DeleteDialog, type DeleteTarget } from "./_components/delete-dialog";
@@ -25,9 +26,7 @@ export default function DownloadsPage(): React.JSX.Element {
   const { data: session } = authClient.useSession();
   const isAdmin = (session?.user as { role?: string } | undefined)?.role === "admin";
 
-  useEffect(() => {
-    document.title = "Downloads — Canto";
-  }, []);
+  useDocumentTitle("Downloads");
 
   const utils = trpc.useUtils();
   const { data: torrents, isLoading, isError } = trpc.torrent.listLive.useQuery(

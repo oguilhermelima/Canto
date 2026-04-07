@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
+import { useDocumentTitle } from "~/hooks/use-document-title";
 import { resolveState } from "~/lib/torrent-utils";
 
 function epKey(sn: number, en: number): string {
@@ -25,11 +26,7 @@ export function useManageMedia(id: string, mediaType: "movie" | "show") {
 
   const mediaId = media?.id;
 
-  useEffect(() => {
-    if (media?.title) {
-      document.title = `Manage: ${media.title} \u2014 Canto`;
-    }
-  }, [media?.title]);
+  useDocumentTitle(media?.title ? `Manage: ${media.title}` : undefined);
 
   // ── Queries ──
   const { data: libraries } = trpc.folder.list.useQuery(undefined, {

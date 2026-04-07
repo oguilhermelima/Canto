@@ -1,7 +1,8 @@
 "use client";
 
-import { use, useEffect } from "react";
+import { use } from "react";
 import { trpc } from "~/lib/trpc/client";
+import { useDocumentTitle } from "~/hooks/use-document-title";
 import { StateMessage } from "~/components/layout/state-message";
 import { PersonHero } from "./_components/person-hero";
 import { FilmographyTimeline } from "./_components/filmography-timeline";
@@ -23,11 +24,7 @@ export default function PersonPage({
     { enabled: !Number.isNaN(personId) },
   );
 
-  useEffect(() => {
-    if (person?.name) {
-      document.title = `${person.name} — Canto`;
-    }
-  }, [person?.name]);
+  useDocumentTitle(person?.name);
 
   if (isLoading) return <PersonPageSkeleton />;
 

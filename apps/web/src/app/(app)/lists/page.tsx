@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, FolderOpen, Server } from "lucide-react";
 import { cn } from "@canto/ui/cn";
@@ -10,6 +10,7 @@ import {
   FilterSidebar,
   type FilterOutput,
 } from "~/components/media/filter-sidebar";
+import { useDocumentTitle } from "~/hooks/use-document-title";
 import { FilterButton } from "./_components/filter-button";
 import { MediaListTab } from "./_components/media-list-tab";
 import {
@@ -36,9 +37,7 @@ export default function LibraryPage(): React.JSX.Element {
   const [filters, setFilters] = useState<FilterOutput>({});
   const [collectionFilters, setCollectionFilters] = useState<CollectionFilterState>(DEFAULT_COLLECTION_FILTERS);
 
-  useEffect(() => {
-    document.title = "Library — Canto";
-  }, []);
+  useDocumentTitle("Library");
 
   const handleTabChange = (value: string): void => {
     const tab = value as Tab;

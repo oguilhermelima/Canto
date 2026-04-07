@@ -4,6 +4,7 @@ import { useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { TabBar } from "~/components/layout/tab-bar";
 import { authClient } from "~/lib/auth-client";
+import { useDocumentTitle } from "~/hooks/use-document-title";
 import { PageHeader } from "~/components/layout/page-header";
 import { MetadataProvidersSection } from "~/components/settings/services-section";
 import { AboutSection } from "~/components/settings/about-section";
@@ -40,7 +41,7 @@ export default function ManagePage(): React.JSX.Element {
     router.replace(`/manage?tab=${key}`, { scroll: false });
   }, [router]);
 
-  useEffect(() => { document.title = "Manage — Canto"; }, []);
+  useDocumentTitle("Manage");
 
   useEffect(() => {
     if (!isPending && session && !isAdmin) {

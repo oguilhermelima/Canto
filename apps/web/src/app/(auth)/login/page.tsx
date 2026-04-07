@@ -9,6 +9,7 @@ import { Input } from "@canto/ui/input";
 import { FormField } from "@canto/ui/form-field";
 import { PasswordInput } from "@canto/ui/password-input";
 import { authClient } from "~/lib/auth-client";
+import { useDocumentTitle } from "~/hooks/use-document-title";
 
 export default function LoginPage(): React.JSX.Element {
   return (
@@ -26,9 +27,7 @@ function LoginContent(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    document.title = "Login — Canto";
-  }, []);
+  useDocumentTitle("Login");
 
   // On very first visit (middleware redirect), go to register if no users exist yet.
   // Skip if user navigated here from another page (clicked "Sign in" link).

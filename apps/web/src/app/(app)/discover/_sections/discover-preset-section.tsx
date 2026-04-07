@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { trpc } from "~/lib/trpc/client";
+import { useDocumentTitle } from "~/hooks/use-document-title";
 import { BrowseLayout, type FilterOutput } from "~/components/layout/browse-layout";
 import { StateMessage } from "~/components/layout/state-message";
 import { PRESETS, DEFAULT_PRESET } from "../_components/constants";
@@ -11,9 +12,7 @@ export function DiscoverPresetSection({ presetKey }: { presetKey: string }): Rea
   const [filters, setFilters] = useState<FilterOutput>({});
   const [mediaType, setMediaType] = useState<"movie" | "show" | "all">(preset.type);
 
-  useEffect(() => {
-    document.title = `${preset.title} — Canto`;
-  }, [preset.title]);
+  useDocumentTitle(preset.title);
 
   const hasFilters = Object.keys(filters).length > 0;
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, ArrowRight } from "lucide-react";
@@ -9,6 +9,7 @@ import { Input } from "@canto/ui/input";
 import { FormField } from "@canto/ui/form-field";
 import { PasswordInput } from "@canto/ui/password-input";
 import { authClient } from "~/lib/auth-client";
+import { useDocumentTitle } from "~/hooks/use-document-title";
 
 export default function RegisterPage(): React.JSX.Element {
   const router = useRouter();
@@ -19,9 +20,7 @@ export default function RegisterPage(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    document.title = "Register — Canto";
-  }, []);
+  useDocumentTitle("Register");
 
   async function handleSubmit(
     e: React.FormEvent<HTMLFormElement>,

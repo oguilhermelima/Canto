@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { type FilterOutput } from "~/components/media/filter-sidebar";
 import { trpc } from "~/lib/trpc/client";
+import { useDocumentTitle } from "~/hooks/use-document-title";
 import { StateMessage } from "~/components/layout/state-message";
 import { PageHeader } from "~/components/layout/page-header";
 import { ListFilterSidebar } from "./_components/list-filter-sidebar";
@@ -36,11 +37,7 @@ export default function ListDetailPage(): React.JSX.Element {
     watchRegion: filters.watchRegion,
   });
 
-  useEffect(() => {
-    if (data?.list.name) {
-      document.title = `${data.list.name} — Canto`;
-    }
-  }, [data?.list.name]);
+  useDocumentTitle(data?.list.name);
 
   const handleFilterChange = useCallback((f: FilterOutput) => setFilters(f), []);
 

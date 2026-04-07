@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@canto/ui/cn";
 import { Input } from "@canto/ui/input";
@@ -12,6 +12,7 @@ import { TabBar } from "~/components/layout/tab-bar";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { authClient } from "~/lib/auth-client";
+import { useDocumentTitle } from "~/hooks/use-document-title";
 import { mediaDetailHref } from "~/lib/media-href";
 import { STATUS_TABS, TYPE_TABS } from "./_components/constants";
 import { RequestCard } from "./_components/request-card";
@@ -28,9 +29,7 @@ export default function RequestsPage(): React.JSX.Element {
   const [sortBy, setSortBy] = useState<"date" | "title">("date");
   const [resolveTarget, setResolveTarget] = useState<ResolveTarget | null>(null);
 
-  useEffect(() => {
-    document.title = "Requests — Canto";
-  }, []);
+  useDocumentTitle("Requests");
 
   const utils = trpc.useUtils();
   const { data: requests, isLoading, isError } = trpc.request.list.useQuery();
