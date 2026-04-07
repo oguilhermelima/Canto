@@ -3,6 +3,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 
 import { getProvider } from "@canto/providers";
+import type { SearchResult } from "@canto/providers";
 import { user } from "@canto/db/schema";
 import { persistMedia, updateMediaFromNormalized, getSupportedLanguageCodes } from "@canto/db/persist-media";
 import { getSetting } from "@canto/db/settings";
@@ -15,7 +16,7 @@ import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure }
 import { getTmdbProvider } from "../lib/tmdb-client";
 import { getTvdbProvider } from "../lib/tvdb-client";
 import { SETTINGS } from "../lib/settings-keys";
-import { dispatchRefreshExtras, dispatchReconcileShow, dispatchEnrichMedia } from "../infrastructure/queue/bullmq-dispatcher";
+import { dispatchRefreshExtras, dispatchReconcileShow, dispatchEnrichMedia, dispatchRebuildUserRecs } from "../infrastructure/queue/bullmq-dispatcher";
 import { cached } from "../infrastructure/cache/redis";
 import { logAndSwallow } from "../lib/log-error";
 import {
@@ -113,12 +114,19 @@ export const mediaRouter = createTRPCRouter({
 
       return cached(cacheKey, 300, async () => {
         const provider = await getTmdbProvider();
+        const today = new Date().toISOString().slice(0, 10);
+
+        // Filter out unreleased items
+        const filterReleased = <T extends { results: SearchResult[] }>(data: T): T => ({
+          ...data,
+          results: data.results.filter((r) => !r.releaseDate || r.releaseDate <= today),
+        });
 
         if (input.mode === "trending") {
           const hasFilters = input.genres || input.language || input.keywords || input.scoreMin != null || input.runtimeMax != null || input.certification || input.status || input.watchProviders || input.runtimeMin != null;
           if (hasFilters) {
             // Use discover mode for proper server-side filtering
-            return provider.discover(input.type, {
+            return filterReleased(await provider.discover(input.type, {
               page,
               with_genres: input.genres,
               with_original_language: input.language,
@@ -128,21 +136,21 @@ export const mediaRouter = createTRPCRouter({
               sort_by: input.sortBy ?? "popularity.desc",
               first_air_date_gte: input.type === "show" ? input.dateFrom : undefined,
               release_date_gte: input.type === "movie" ? input.dateFrom : undefined,
-              first_air_date_lte: input.type === "show" ? input.dateTo : undefined,
-              release_date_lte: input.type === "movie" ? input.dateTo : undefined,
+              first_air_date_lte: input.type === "show" ? (input.dateTo ?? today) : undefined,
+              release_date_lte: input.type === "movie" ? (input.dateTo ?? today) : undefined,
               certification: input.certification,
               certification_country: input.certification ? "US" : undefined,
               with_status: input.status,
               with_watch_providers: input.watchProviders,
               watch_region: input.watchRegion,
               with_runtime_gte: input.runtimeMin,
-            });
+            }));
           }
-          return provider.getTrending(input.type, { page });
+          return filterReleased(await provider.getTrending(input.type, { page }));
         }
 
         // mode === "discover"
-        return provider.discover(input.type, {
+        return filterReleased(await provider.discover(input.type, {
           page,
           with_genres: input.genres,
           with_original_language: input.language,
@@ -152,15 +160,15 @@ export const mediaRouter = createTRPCRouter({
           sort_by: input.sortBy ?? "popularity.desc",
           first_air_date_gte: input.type === "show" ? input.dateFrom : undefined,
           release_date_gte: input.type === "movie" ? input.dateFrom : undefined,
-          first_air_date_lte: input.type === "show" ? input.dateTo : undefined,
-          release_date_lte: input.type === "movie" ? input.dateTo : undefined,
+          first_air_date_lte: input.type === "show" ? (input.dateTo ?? today) : undefined,
+          release_date_lte: input.type === "movie" ? (input.dateTo ?? today) : undefined,
           certification: input.certification,
           certification_country: input.certification ? "US" : undefined,
           with_status: input.status,
           with_watch_providers: input.watchProviders,
           watch_region: input.watchRegion,
           with_runtime_gte: input.runtimeMin,
-        });
+        }));
       });
     }),
 
@@ -504,6 +512,13 @@ export const mediaRouter = createTRPCRouter({
         return provider.getPerson(input.personId);
       }),
     ),
+
+  /** Trigger a rebuild of the current user's personalized recommendations. */
+  rebuildMyRecommendations: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      await dispatchRebuildUserRecs(ctx.session.user.id);
+      return { success: true };
+    }),
 
   /**
    * Get per-user recommendations.

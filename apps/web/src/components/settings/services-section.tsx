@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Skeleton } from "@canto/ui/skeleton";
 import { Button } from "@canto/ui/button";
 import { Badge } from "@canto/ui/badge";
@@ -24,6 +24,13 @@ import {
   ExternalLink,
   ChevronDown,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@canto/ui/dialog";
 import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
@@ -287,7 +294,7 @@ function ServiceRow({
                 size="sm"
                 className="h-7 text-xs"
                 onClick={() =>
-                  setMany.mutate(values, {
+                  setMany.mutate({ settings: Object.entries(values).map(([key, value]) => ({ key, value })) }, {
                     onSuccess: () => { setDirty(false); toast.success("Settings saved"); },
                     onError: () => toast.error("Failed to save settings"),
                   })
@@ -422,7 +429,7 @@ function MediaServerRow({
       }
     } else {
       setMany.mutate(
-        { [urlField.key]: url, [apiKeyField.key]: apiKey },
+        { settings: [{ key: urlField.key, value: url }, { key: apiKeyField.key, value: apiKey }] },
         { onSuccess: () => { setDirty(false); setActiveSection(null); toast.success("Settings saved"); }, onError: () => toast.error("Failed to save settings") },
       );
     }
@@ -713,7 +720,7 @@ function TmdbSection(): React.JSX.Element {
             <Button
               size="sm"
               className="h-7 text-xs"
-              onClick={() => setSettings.mutate({ "tmdb.apiKey": tmdbKey, "tmdb.enabled": true }, { onSuccess: () => { setDirty(false); toast.success("Saved"); } })}
+              onClick={() => setSettings.mutate({ settings: [{ key: "tmdb.apiKey", value: tmdbKey }, { key: "tmdb.enabled", value: true }] }, { onSuccess: () => { setDirty(false); toast.success("Saved"); } })}
               disabled={setSettings.isPending}
             >
               {setSettings.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
@@ -785,7 +792,7 @@ function TvdbApiKeySection(): React.JSX.Element {
       {
         onSuccess: (data) => {
           if (data.connected) {
-            setMany.mutate({ ...values, "tvdb.enabled": true }, {
+            setMany.mutate({ settings: [...Object.entries(values).map(([key, value]) => ({ key, value })), { key: "tvdb.enabled", value: true }] }, {
               onSuccess: () => { setDirty(false); toast.success("TVDB connected and saved"); },
               onError: () => toast.error("Failed to save settings"),
             });
@@ -948,47 +955,101 @@ function WatchRegionSection(): React.JSX.Element {
 function TvdbDefaultToggle(): React.JSX.Element {
   const utils = trpc.useUtils();
   const { data: allSettings } = trpc.settings.getAll.useQuery();
-  const setMany = trpc.settings.setMany.useMutation({
-    onSuccess: () => void utils.settings.getAll.invalidate(),
+  const toggleTvdb = trpc.settings.toggleTvdbDefault.useMutation({
+    onSuccess: (data, variables) => {
+      void utils.settings.getAll.invalidate();
+      toast.success(
+        variables.enabled
+          ? `TVDB enabled — reprocessing ${data.reprocessing} shows`
+          : `TVDB disabled — reprocessing ${data.reprocessing} shows with TMDB`,
+      );
+    },
+    onError: () => toast.error("Failed to update preference"),
   });
 
-  const isConnected = !!allSettings?.["tvdb.token"];
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const isConnected = allSettings?.["tvdb.enabled"] === true;
   const defaultShows = allSettings?.["tvdb.defaultShows"] === true;
 
-  const handleToggleDefault = (checked: boolean): void => {
-    setMany.mutate(
-      { "tvdb.defaultShows": checked },
-      {
-        onSuccess: () => toast.success(checked ? "TVDB set as default for TV shows" : "TMDB restored as default"),
-        onError: () => toast.error("Failed to update preference"),
-      },
-    );
-  };
+  const handleSwitchClick = useCallback(() => {
+    setConfirmOpen(true);
+  }, []);
+
+  const handleConfirm = useCallback(() => {
+    toggleTvdb.mutate({ enabled: !defaultShows });
+    setConfirmOpen(false);
+  }, [defaultShows, toggleTvdb]);
 
   return (
-    <div className="flex items-start justify-between gap-6">
-      <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
-        <p>
-          When enabled, Canto uses <strong className="text-foreground">TVDB</strong> to validate and correct the
-          <strong className="text-foreground"> season and episode organization</strong> of TV shows and anime.
-          All other metadata (titles, images, ratings, translations) stays from TMDB.
-        </p>
-
-        <p className="font-medium text-foreground">What changes with TVDB enabled:</p>
-        <ul className="list-disc pl-5 space-y-1.5">
-          <li><strong className="text-foreground">Accurate season splits</strong> for anime and multi-season shows</li>
-          <li><strong className="text-foreground">Absolute episode numbering</strong> for anime</li>
-          <li><strong className="text-foreground">Correct episode counts</strong> (specials separated)</li>
-        </ul>
-
-        {!isConnected && (
-          <p className="mt-2 rounded-xl bg-yellow-500/10 px-3 py-2 text-yellow-500">
-            Connect your TVDB API key above before enabling this.
+    <>
+      <div className="flex items-start justify-between gap-6">
+        <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+          <p>
+            When enabled, Canto uses <strong className="text-foreground">TVDB</strong> to validate and correct the
+            <strong className="text-foreground"> season and episode organization</strong> of TV shows and anime.
+            All other metadata (titles, images, ratings, translations) stays from TMDB.
           </p>
-        )}
+
+          <p className="font-medium text-foreground">What changes with TVDB enabled:</p>
+          <ul className="list-disc pl-5 space-y-1.5">
+            <li><strong className="text-foreground">Accurate season splits</strong> for anime and multi-season shows</li>
+            <li><strong className="text-foreground">Absolute episode numbering</strong> for anime</li>
+            <li><strong className="text-foreground">Correct episode counts</strong> (specials separated)</li>
+          </ul>
+
+          {!isConnected && (
+            <p className="mt-2 rounded-xl bg-yellow-500/10 px-3 py-2 text-yellow-500">
+              Connect your TVDB API key above before enabling this.
+            </p>
+          )}
+        </div>
+        <Switch checked={defaultShows} onCheckedChange={handleSwitchClick} disabled={!isConnected || toggleTvdb.isPending} className="mt-1 shrink-0" />
       </div>
-      <Switch checked={defaultShows} onCheckedChange={handleToggleDefault} disabled={!isConnected} className="mt-1 shrink-0" />
-    </div>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="max-w-md rounded-xl">
+          <DialogHeader>
+            <DialogTitle>
+              {defaultShows ? "Disable TVDB episode structure?" : "Enable TVDB for episode structure?"}
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+                {defaultShows ? (
+                  <p>
+                    This will revert all TV shows to use TMDB's default season/episode structure. Shows that were
+                    corrected by TVDB will be reprocessed with TMDB data.
+                  </p>
+                ) : (
+                  <>
+                    <p>
+                      This will use TVDB to validate and correct season/episode numbering for all TV shows and anime in
+                      your library. Changes include:
+                    </p>
+                    <ul className="list-disc pl-5 space-y-1.5">
+                      <li><strong className="text-foreground">Accurate season splits</strong> for anime and multi-season shows</li>
+                      <li><strong className="text-foreground">Absolute episode numbering</strong> for anime</li>
+                      <li><strong className="text-foreground">Correct episode counts</strong> (specials separated)</li>
+                    </ul>
+                  </>
+                )}
+                <p>All existing shows in your library will be reprocessed. This may take a few minutes.</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="outline" className="rounded-xl" onClick={() => setConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button className="rounded-xl" onClick={handleConfirm} disabled={toggleTvdb.isPending}>
+              {toggleTvdb.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              {defaultShows ? "Disable & reprocess" : "Enable & reprocess"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -1180,7 +1241,7 @@ export function MetadataSettingsSection(): React.JSX.Element {
       {
         onSuccess: () => {
           // Also update global setting for pool items / browse
-          setMany.mutate({ "general.language": value });
+          setMany.mutate({ settings: [{ key: "general.language", value }] });
           toast.success("Language updated. Refreshing all metadata in background...");
           refreshLanguage.mutate();
         },
@@ -1191,7 +1252,7 @@ export function MetadataSettingsSection(): React.JSX.Element {
 
   const handleToggleDefault = (checked: boolean): void => {
     setMany.mutate(
-      { "tvdb.defaultShows": checked },
+      { settings: [{ key: "tvdb.defaultShows", value: checked }] },
       {
         onSuccess: () => toast.success(checked ? "TVDB set as default for TV shows" : "TMDB restored as default"),
         onError: () => toast.error("Failed to update preference"),

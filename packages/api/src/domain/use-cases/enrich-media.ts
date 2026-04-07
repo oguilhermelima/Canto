@@ -16,40 +16,75 @@ export async function enrichMedia(
   const row = await findMediaById(db, mediaId);
   if (!row) return;
 
-  // Stage 1: Full metadata (if not yet fetched)
-  if (!row.metadataUpdatedAt) {
-    try {
-      const supportedLangs = [...await getSupportedLanguageCodes(db)];
-      const provider = row.provider === "tvdb" ? deps.tvdb : deps.tmdb;
-      const normalized = await provider.getMetadata(row.externalId, row.type as "movie" | "show", { supportedLanguages: supportedLangs });
-      await updateMediaFromNormalized(db, mediaId, normalized);
-      await updateMedia(db, mediaId, { processingStatus: "metadata" });
-    } catch (err) {
-      console.error(`[enrich-media] Stage 1 failed for ${mediaId}:`, err instanceof Error ? err.message : err);
-      return; // Don't proceed if metadata fails
-    }
-  }
+  const isShow = row.type === "show";
+  const needsMetadata = !row.metadataUpdatedAt;
+  const needsExtras = deps.full !== false && !row.extrasUpdatedAt;
 
-  // Stage 2: Extras — credits, videos, watch providers, recommendations (if full pipeline)
-  if (deps.full !== false) {
-    // Re-read to get updated data from Stage 1
-    const updated = await findMediaById(db, mediaId);
-    if (updated && !updated.extrasUpdatedAt) {
+  if (deps.full === false) {
+    // Light enrichment — metadata only, no extras or TVDB
+    if (needsMetadata) {
       try {
-        await refreshExtras(db, mediaId, { tmdb: deps.tmdb });
-        await updateMedia(db, mediaId, { processingStatus: "enriched" });
+        const supportedLangs = [...await getSupportedLanguageCodes(db)];
+        const provider = row.provider === "tvdb" ? deps.tvdb : deps.tmdb;
+        const normalized = await provider.getMetadata(row.externalId, row.type as "movie" | "show", { supportedLanguages: supportedLangs });
+        await updateMediaFromNormalized(db, mediaId, normalized);
       } catch (err) {
-        console.error(`[enrich-media] Stage 2 failed for ${mediaId}:`, err instanceof Error ? err.message : err);
+        console.error(`[enrich-media] Metadata failed for ${mediaId}:`, err instanceof Error ? err.message : err);
+        return;
       }
     }
+    await updateMedia(db, mediaId, { processingStatus: "ready" });
+    console.log(`[enrich-media] ${mediaId} → ready`);
+    return;
+  }
 
-    // Stage 3: TVDB reconcile (shows only, if toggle enabled)
+  // Full enrichment — run metadata + extras in parallel, then TVDB reconcile
+  const parallel: Promise<void>[] = [];
+
+  // Metadata fetch (TMDB or TVDB depending on provider)
+  let metadataOk = !needsMetadata; // already done if not needed
+  if (needsMetadata) {
+    parallel.push(
+      (async () => {
+        const supportedLangs = [...await getSupportedLanguageCodes(db)];
+        const provider = row.provider === "tvdb" ? deps.tvdb : deps.tmdb;
+        const normalized = await provider.getMetadata(row.externalId, row.type as "movie" | "show", { supportedLanguages: supportedLangs });
+        await updateMediaFromNormalized(db, mediaId, normalized);
+        metadataOk = true;
+      })().catch((err) => {
+        console.error(`[enrich-media] Metadata failed for ${mediaId}:`, err instanceof Error ? err.message : err);
+      }),
+    );
+  }
+
+  // Extras — credits, videos, watch providers, recommendations (uses externalId from persist, no dependency on metadata)
+  if (needsExtras) {
+    parallel.push(
+      refreshExtras(db, mediaId, { tmdb: deps.tmdb })
+        .catch((err) => {
+          console.error(`[enrich-media] Extras failed for ${mediaId}:`, err instanceof Error ? err.message : err);
+        }),
+    );
+  }
+
+  // Wait for metadata + extras to complete
+  if (parallel.length > 0) {
+    await Promise.allSettled(parallel);
+  }
+
+  if (!metadataOk) {
+    // Metadata failed — can't proceed to TVDB or mark as ready
+    return;
+  }
+
+  // TVDB reconcile — needs tvdbId/imdbId from metadata, so runs after metadata completes
+  if (isShow) {
     const tvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
-    if (tvdbEnabled && (updated?.type ?? row.type) === "show") {
+    if (tvdbEnabled) {
       try {
         await reconcileShowStructure(db, mediaId, { tmdb: deps.tmdb, tvdb: deps.tvdb, dispatcher: deps.dispatcher });
       } catch (err) {
-        console.error(`[enrich-media] Stage 3 failed for ${mediaId}:`, err instanceof Error ? err.message : err);
+        console.error(`[enrich-media] TVDB reconcile failed for ${mediaId}:`, err instanceof Error ? err.message : err);
       }
     }
   }

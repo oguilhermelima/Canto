@@ -1,4 +1,5 @@
 import { desc, eq, and, sql } from "drizzle-orm";
+import { getQualityFilters, getWeightedScoreOrder } from "../rules/recommendation-filters";
 
 import type { Database } from "@canto/db/client";
 import {
@@ -116,8 +117,11 @@ export async function rebuildUserRecs(
       .select({ mediaId: mediaRecommendation.mediaId })
       .from(mediaRecommendation)
       .innerJoin(media, eq(media.id, mediaRecommendation.mediaId))
-      .where(eq(mediaRecommendation.sourceMediaId, seedMediaIds[pos]!))
-      .orderBy(desc(media.voteAverage))
+      .where(and(
+        eq(mediaRecommendation.sourceMediaId, seedMediaIds[pos]!),
+        ...getQualityFilters(),
+      ))
+      .orderBy(getWeightedScoreOrder())
       .limit(MAX_POOL_RANK);
 
     for (let rank = 0; rank < recItems.length; rank++) {
@@ -145,8 +149,11 @@ export async function rebuildUserRecs(
         .select({ mediaId: mediaRecommendation.mediaId })
         .from(mediaRecommendation)
         .innerJoin(media, eq(media.id, mediaRecommendation.mediaId))
-        .where(eq(mediaRecommendation.sourceMediaId, source.sourceMediaId))
-        .orderBy(desc(media.voteAverage))
+        .where(and(
+          eq(mediaRecommendation.sourceMediaId, source.sourceMediaId),
+          ...getQualityFilters(),
+        ))
+        .orderBy(getWeightedScoreOrder())
         .limit(5);
 
       for (let rank = 0; rank < recItems.length; rank++) {
@@ -184,8 +191,11 @@ export async function addMediaToUserRecs(
     .select({ mediaId: mediaRecommendation.mediaId })
     .from(mediaRecommendation)
     .innerJoin(media, eq(media.id, mediaRecommendation.mediaId))
-    .where(eq(mediaRecommendation.sourceMediaId, mediaId))
-    .orderBy(desc(media.voteAverage))
+    .where(and(
+      eq(mediaRecommendation.sourceMediaId, mediaId),
+      ...getQualityFilters(),
+    ))
+    .orderBy(getWeightedScoreOrder())
     .limit(MAX_POOL_RANK);
 
   if (recItems.length === 0) return;

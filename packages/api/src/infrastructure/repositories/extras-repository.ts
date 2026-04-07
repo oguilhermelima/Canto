@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, isNull, isNotNull, not, sql } from "drizzle-orm";
+import { getQualityFilters, getWeightedScoreOrder } from "../../domain/rules/recommendation-filters";
 import type { Database } from "@canto/db/client";
 import {
   blocklist,
@@ -138,9 +139,11 @@ export async function findGlobalRecommendations(
       )`
     : undefined;
 
+
   const where = and(
     sql`${media.id} IN (SELECT media_id FROM media_recommendation)`,
     released,
+    ...getQualityFilters(),
     ...(excludeConditions.length > 0
       ? [not(sql`(${sql.join(excludeConditions, sql` OR `)})`)]
       : []),
@@ -160,7 +163,7 @@ export async function findGlobalRecommendations(
   let orderBy;
   switch (sortBy) {
     case "vote_average.desc":
-      orderBy = [desc(media.voteAverage)];
+      orderBy = [getWeightedScoreOrder()];
       break;
     case "vote_average.asc":
       orderBy = [asc(media.voteAverage)];
@@ -178,7 +181,8 @@ export async function findGlobalRecommendations(
       orderBy = [desc(media.title)];
       break;
     default:
-      orderBy = [desc(media.voteAverage)];
+      // Weighted score: penalizes items with few votes (Bayesian average with m=100, C=6.5)
+      orderBy = [desc(sql`(${media.voteCount} * ${media.voteAverage} + 100 * 6.5) / (${media.voteCount} + 100)`)];
       break;
   }
 

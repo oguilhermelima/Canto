@@ -104,8 +104,8 @@ const FIELD_OPTIONS = [
 
 const OPS_BY_FIELD: Record<string, Array<{ value: string; label: string }>> = {
   type: [{ value: "eq", label: "is" }],
-  genre: [{ value: "contains_any", label: "includes" }, { value: "contains_all", label: "requires every" }],
-  genreId: [{ value: "contains_any", label: "includes" }, { value: "contains_all", label: "requires every" }],
+  genre: [{ value: "contains_any", label: "includes" }, { value: "contains_all", label: "requires every" }, { value: "not_contains_any", label: "excludes" }],
+  genreId: [{ value: "contains_any", label: "includes" }, { value: "contains_all", label: "requires every" }, { value: "not_contains_any", label: "excludes" }],
   originCountry: [{ value: "contains_any", label: "includes" }, { value: "not_contains_any", label: "excludes" }],
   originalLanguage: [{ value: "eq", label: "is" }, { value: "neq", label: "is not" }],
   contentRating: [{ value: "eq", label: "is" }, { value: "in", label: "is one of" }],
@@ -114,8 +114,8 @@ const OPS_BY_FIELD: Record<string, Array<{ value: string; label: string }>> = {
 function describeCondition(c: RuleCondition): string {
   switch (c.field) {
     case "type": return c.value === "movie" ? "Movies" : "Shows";
-    case "genre": return `genre ${c.op === "contains_all" ? "requires every" : "includes"} ${(c.value as string[]).join(", ")}`;
-    case "genreId": return `genre ID ${c.op === "contains_all" ? "requires every" : "includes"} ${(c.value as number[]).join(", ")}`;
+    case "genre": return `genre ${c.op === "contains_all" ? "requires every" : c.op === "not_contains_any" ? "excludes" : "includes"} ${(c.value as string[]).join(", ")}`;
+    case "genreId": return `genre ID ${c.op === "contains_all" ? "requires every" : c.op === "not_contains_any" ? "excludes" : "includes"} ${(c.value as number[]).join(", ")}`;
     case "originCountry": return `country ${c.op === "not_contains_any" ? "excludes" : "includes"} ${(c.value as string[]).join(", ")}`;
     case "originalLanguage": return `language ${c.op === "neq" ? "is not" : "is"} ${c.value as string}`;
     case "contentRating": return `rating ${c.op === "in" ? "is one of" : "is"} ${Array.isArray(c.value) ? (c.value as string[]).join(", ") : c.value}`;
@@ -153,7 +153,8 @@ function RuleBadges({ group }: { group: RuleGroup }): React.JSX.Element {
           case "genre":
             for (const [j, v] of (cond.value as string[]).entries()) {
               if (j > 0) nodes.push({ type: "op", label: cond.op === "contains_all" ? "AND" : "OR" });
-              nodes.push({ type: "badge", label: v, color: "bg-purple-500/15 text-purple-400" });
+              const excluded = cond.op === "not_contains_any";
+              nodes.push({ type: "badge", label: `${excluded ? "!" : ""}${v}`, color: excluded ? "bg-red-500/15 text-red-400" : "bg-purple-500/15 text-purple-400" });
             }
             break;
           case "originCountry":
@@ -235,7 +236,7 @@ function ChipSelect({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
         <div
           role="button"
@@ -267,7 +268,14 @@ function ChipSelect({
           )}
         </div>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[240px] p-1.5 max-h-[240px] overflow-y-auto">
+      <PopoverContent align="start" className="w-[240px] p-0" onWheel={(e) => e.stopPropagation()}>
+        <div
+          className="max-h-[240px] overflow-y-auto p-1.5"
+          onWheel={(e) => {
+            e.stopPropagation();
+            e.currentTarget.scrollTop += e.deltaY;
+          }}
+        >
         {options.map((opt) => {
           const selected = value.includes(opt.value);
           return (
@@ -282,7 +290,7 @@ function ChipSelect({
             >
               <div className={cn(
                 "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
-                selected ? "border-primary bg-primary text-primary-foreground" : "border-border/60",
+                selected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground",
               )}>
                 {selected && <Check className="h-2.5 w-2.5" />}
               </div>
@@ -290,6 +298,7 @@ function ChipSelect({
             </button>
           );
         })}
+        </div>
       </PopoverContent>
     </Popover>
   );
@@ -449,14 +458,16 @@ function ConditionEditor({
     </div>
     {/* Inline hint for operators that need clarification */}
     {condition.field === "genre" && (
-      <p className="text-sm text-muted-foreground/40 pl-[172px] pt-0.5">
+      <p className="text-sm text-muted-foreground pl-[172px] pt-0.5">
         {condition.op === "contains_all"
           ? "The media must have every selected genre."
+          : condition.op === "not_contains_any"
+          ? "The media must not have any of the selected genres."
           : "The media can have any of the selected genres."}
       </p>
     )}
     {condition.field === "originCountry" && (
-      <p className="text-sm text-muted-foreground/40 pl-[172px] pt-0.5">
+      <p className="text-sm text-muted-foreground pl-[172px] pt-0.5">
         {condition.op === "not_contains_any"
           ? "The media must not be from any of these countries."
           : "The media must be from at least one of these countries."}
@@ -665,7 +676,7 @@ function RulesEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">Auto-routing Rules</DialogTitle>
         </DialogHeader>
@@ -1160,20 +1171,26 @@ function FolderCard({
   const [editingDlPath, setEditingDlPath] = useState(!!folder.downloadPath);
   const [editingLibPath, setEditingLibPath] = useState(!!folder.libraryPath);
 
-  useEffect(() => {
-    setName(folder.name);
-    setDlPath(folder.downloadPath ?? "");
-    setLibPath(folder.libraryPath ?? "");
-    setQbitCat(folder.qbitCategory ?? "");
-    setEditingDlPath(!!folder.downloadPath);
-    setEditingLibPath(!!folder.libraryPath);
-  }, [folder]);
-
   const dirty =
     name !== folder.name ||
     dlPath !== (folder.downloadPath ?? "") ||
     libPath !== (folder.libraryPath ?? "") ||
     qbitCat !== (folder.qbitCategory ?? "");
+
+  // Sync state from server, but skip when user has unsaved edits
+  const prevFolderId = useRef(folder.id);
+  useEffect(() => {
+    const isNewFolder = folder.id !== prevFolderId.current;
+    prevFolderId.current = folder.id;
+    if (isNewFolder || !dirty) {
+      setName(folder.name);
+      setDlPath(folder.downloadPath ?? "");
+      setLibPath(folder.libraryPath ?? "");
+      setQbitCat(folder.qbitCategory ?? "");
+      setEditingDlPath(!!folder.downloadPath);
+      setEditingLibPath(!!folder.libraryPath);
+    }
+  }, [folder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateFolder = trpc.folder.update.useMutation({
     onSuccess: () => { toast.success("Saved"); onRefresh(); },

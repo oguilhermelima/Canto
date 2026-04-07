@@ -47,9 +47,11 @@ export function SearchSection(): React.JSX.Element {
 
   const handleSave = (): void => {
     setMany.mutate({
-      [KEYS.maxIndexers]: maxIndexers,
-      [KEYS.timeout]: timeout,
-      [KEYS.concurrency]: concurrency,
+      settings: [
+        { key: KEYS.maxIndexers, value: maxIndexers },
+        { key: KEYS.timeout, value: timeout },
+        { key: KEYS.concurrency, value: concurrency },
+      ],
     });
   };
 
