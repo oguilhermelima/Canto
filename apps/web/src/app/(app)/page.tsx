@@ -7,6 +7,7 @@ import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
 import { ChevronLeft, ChevronRight, Info } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
+import { tmdbBackdropLoader } from "~/lib/tmdb-image";
 import { MediaCarousel } from "~/components/media/media-carousel";
 import { FeaturedCarousel } from "~/components/media/featured-carousel";
 import { AddToListButton } from "~/components/media/add-to-list-button";
@@ -209,7 +210,8 @@ export default function DiscoverPage(): React.JSX.Element {
             className="absolute inset-0 overflow-hidden"
           >
             <FadeImage
-              src={`${TMDB_IMAGE_BASE}/original${currentItem.backdropPath}`}
+              loader={tmdbBackdropLoader}
+              src={currentItem.backdropPath}
               alt=""
               fill
               className="object-cover object-center"
@@ -428,7 +430,7 @@ export default function DiscoverPage(): React.JSX.Element {
         ) : recentItems.length > 0 ? (
           <MediaCarousel
             title="Recently Added"
-            seeAllHref="/lists?tab=server"
+            seeAllHref="/library?tab=server"
             items={recentItems}
             isLoading={recentlyAdded.isLoading}
           />

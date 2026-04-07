@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { FadeImage } from "~/components/ui/fade-image";
+import { tmdbBackdropLoader } from "~/lib/tmdb-image";
 import { Skeleton } from "@canto/ui/skeleton";
 import {
   Popover,
@@ -145,7 +146,8 @@ export function MediaDetailHero({
       {backdropPath ? (
         <div className="absolute inset-x-0 top-0 h-dvh overflow-hidden">
           <FadeImage
-            src={resolveImage(backdropPath, "original")}
+            loader={tmdbBackdropLoader}
+            src={backdropPath}
             alt=""
             fill
             className="object-cover object-top"
