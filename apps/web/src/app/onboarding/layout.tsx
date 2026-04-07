@@ -9,7 +9,7 @@ export default function OnboardingLayout({
     <div className="fixed inset-0 z-50 bg-background">
       {children}
       <Toaster
-        position="bottom-center"
+        position="top-center"
         toastOptions={{
           style: {
             background: "var(--color-foreground)",
