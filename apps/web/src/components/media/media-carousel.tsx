@@ -1,10 +1,10 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { MediaCard, MediaCardSkeleton } from "./media-card";
+import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
 
 interface MediaItem {
   id?: string;
@@ -36,36 +36,19 @@ export function MediaCarousel({
   onLoadMore,
   className,
 }: MediaCarouselProps): React.JSX.Element | null {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(true);
-
-  const updateScrollButtons = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 0);
-    const nearEnd = el.scrollLeft >= el.scrollWidth - el.clientWidth - 300;
-    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10);
-
-    // Trigger load more when near the end
-    if (nearEnd && onLoadMore && !isFetchingMore) {
-      onLoadMore();
-    }
-  }, [onLoadMore, isFetchingMore]);
-
-  const scroll = useCallback(
-    (direction: "left" | "right") => {
-      const el = scrollRef.current;
-      if (!el) return;
-      const scrollAmount = el.clientWidth * 0.8;
-      el.scrollBy({
-        left: direction === "left" ? -scrollAmount : scrollAmount,
-        behavior: "smooth",
-      });
-      setTimeout(updateScrollButtons, 350);
-    },
-    [updateScrollButtons],
-  );
+  const {
+    containerRef,
+    canScrollLeft,
+    canScrollRight,
+    scrollLeft,
+    scrollRight,
+    handleScroll,
+  } = useScrollCarousel({
+    onLoadMore,
+    isFetchingMore,
+    loadMoreThreshold: 300,
+    scrollFraction: 0.8,
+  });
 
   if (!isLoading && items.length === 0) return null;
 
@@ -92,7 +75,7 @@ export function MediaCarousel({
           <button
             aria-label="Scroll left"
             className="absolute left-0 top-0 z-20 hidden h-full w-14 items-center justify-center bg-gradient-to-r from-background/80 to-transparent text-foreground/60 opacity-0 transition-opacity hover:text-foreground group-hover/carousel:opacity-100 md:flex lg:w-20"
-            onClick={() => scroll("left")}
+            onClick={scrollLeft}
           >
             <ChevronLeft size={24} />
           </button>
@@ -103,15 +86,15 @@ export function MediaCarousel({
           <button
             aria-label="Scroll right"
             className="absolute right-0 top-0 z-20 hidden h-full w-14 items-center justify-center bg-gradient-to-l from-background/80 to-transparent text-foreground/60 opacity-0 transition-opacity hover:text-foreground group-hover/carousel:opacity-100 md:flex lg:w-20"
-            onClick={() => scroll("right")}
+            onClick={scrollRight}
           >
             <ChevronRight size={24} />
           </button>
         )}
 
         <div
-          ref={scrollRef}
-          onScroll={updateScrollButtons}
+          ref={containerRef}
+          onScroll={handleScroll}
           className="flex gap-6 overflow-x-auto overflow-y-visible pt-4 pb-6 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
         >
           {isLoading

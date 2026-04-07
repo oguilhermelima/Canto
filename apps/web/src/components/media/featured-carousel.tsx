@@ -10,6 +10,7 @@ import { Skeleton } from "@canto/ui/skeleton";
 import { tmdbPosterLoader, tmdbBackdropLoader } from "~/lib/tmdb-image";
 import { MediaLogo } from "~/components/media/media-logo";
 import { mediaHref } from "~/lib/media-href";
+import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -49,9 +50,20 @@ export function FeaturedCarousel({
   onLoadMore,
   className,
 }: FeaturedCarouselProps): React.JSX.Element | null {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(true);
+  const {
+    containerRef,
+    canScrollLeft,
+    canScrollRight,
+    scrollLeft,
+    scrollRight,
+    handleScroll,
+  } = useScrollCarousel({
+    onLoadMore,
+    isFetchingMore,
+    loadMoreThreshold: 400,
+    scrollFraction: 0.6,
+  });
+
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -65,42 +77,6 @@ export function FeaturedCarousel({
     hoverTimerRef.current = null;
     setHoveredIndex(null);
   }, []);
-
-  const updateScrollButtons = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 0);
-    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10);
-
-    // Load more when near the end
-    const nearEnd = el.scrollLeft >= el.scrollWidth - el.clientWidth - 400;
-    if (nearEnd && onLoadMore && !isFetchingMore) {
-      onLoadMore();
-    }
-  }, [onLoadMore, isFetchingMore]);
-
-  const scroll = useCallback(
-    (direction: "left" | "right") => {
-      const el = scrollRef.current;
-      if (!el) return;
-      el.scrollBy({
-        left: direction === "left" ? -el.clientWidth * 0.6 : el.clientWidth * 0.6,
-        behavior: "smooth",
-      });
-      // Use rAF loop to update buttons as the smooth scroll progresses,
-      // instead of a fixed setTimeout that may fire too early or too late.
-      let lastScrollLeft = el.scrollLeft;
-      const tick = (): void => {
-        updateScrollButtons();
-        if (el.scrollLeft !== lastScrollLeft) {
-          lastScrollLeft = el.scrollLeft;
-          requestAnimationFrame(tick);
-        }
-      };
-      requestAnimationFrame(tick);
-    },
-    [updateScrollButtons],
-  );
 
   if (!isLoading && items.length === 0) return null;
 
@@ -124,7 +100,7 @@ export function FeaturedCarousel({
           <button
             aria-label="Scroll left"
             className="absolute left-0 top-0 z-20 hidden h-full w-14 items-center justify-center bg-gradient-to-r from-background/80 to-transparent text-foreground/60 opacity-0 transition-opacity hover:text-foreground group-hover/carousel:opacity-100 md:flex lg:w-20"
-            onClick={() => scroll("left")}
+            onClick={scrollLeft}
           >
             <ChevronLeft size={24} />
           </button>
@@ -134,15 +110,15 @@ export function FeaturedCarousel({
           <button
             aria-label="Scroll right"
             className="absolute right-0 top-0 z-20 hidden h-full w-14 items-center justify-center bg-gradient-to-l from-background/80 to-transparent text-foreground/60 opacity-0 transition-opacity hover:text-foreground group-hover/carousel:opacity-100 md:flex lg:w-20"
-            onClick={() => scroll("right")}
+            onClick={scrollRight}
           >
             <ChevronRight size={24} />
           </button>
         )}
 
         <div
-          ref={scrollRef}
-          onScroll={updateScrollButtons}
+          ref={containerRef}
+          onScroll={handleScroll}
           className="flex gap-6 overflow-x-auto overflow-y-visible py-2 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
           onMouseLeave={handleMouseLeave}
         >
