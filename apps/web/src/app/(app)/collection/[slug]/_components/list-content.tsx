@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { TabBar } from "~/components/layout/tab-bar";
 import { MediaGrid } from "~/components/media/media-grid";
 import { StateMessage } from "~/components/layout/state-message";
-import { FilterButton } from "../../_components/filter-button";
+import { FilterButton } from "~/components/layout/filter-button";
 
 const TYPE_OPTIONS = [
   { value: "all", label: "All" },

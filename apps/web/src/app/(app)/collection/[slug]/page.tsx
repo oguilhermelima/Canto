@@ -59,7 +59,7 @@ export default function ListDetailPage(): React.JSX.Element {
     return (
       <StateMessage
         preset="notFoundList"
-        action={{ label: "Back to Library", onClick: () => router.push("/lists") }}
+        action={{ label: "Back to Library", onClick: () => router.push("/library") }}
         minHeight="400px"
       />
     );

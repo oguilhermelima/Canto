@@ -27,13 +27,13 @@ import { authClient } from "~/lib/auth-client";
 
 const userNavLinks: Array<{ href: string; label: string; icon: LucideIcon }> = [
   { href: "/", label: "Discover", icon: Compass },
-  { href: "/lists", label: "Library", icon: GalleryVerticalEnd },
+  { href: "/library", label: "Library", icon: GalleryVerticalEnd },
   { href: "/requests", label: "Requests", icon: Send },
 ];
 
 const adminNavLinks: Array<{ href: string; label: string; icon: LucideIcon }> = [
   { href: "/", label: "Discover", icon: Compass },
-  { href: "/lists", label: "Library", icon: GalleryVerticalEnd },
+  { href: "/library", label: "Library", icon: GalleryVerticalEnd },
   { href: "/requests", label: "Requests", icon: Send },
   { href: "/torrents", label: "Downloads", icon: Download },
 ];

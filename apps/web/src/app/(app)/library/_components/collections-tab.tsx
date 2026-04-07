@@ -47,7 +47,7 @@ export function CollectionsTab({
       setName("");
       setDescription("");
       toast.success("Collection created");
-      router.push(`/lists/${newList.slug}`);
+      router.push(`/collection/${newList.slug}`);
     },
     onError: (err) => toast.error(err.message),
   });
@@ -122,7 +122,7 @@ export function CollectionsTab({
             {customLists.slice(0, visibleCount).map((l) => {
               const posters = l.previewPosters ?? [];
               return (
-                <Link key={l.id} href={`/lists/${l.slug}`} className="group relative aspect-[4/3] overflow-hidden rounded-xl bg-muted transition-transform duration-200 hover:scale-[1.03]">
+                <Link key={l.id} href={`/collection/${l.slug}`} className="group relative aspect-[4/3] overflow-hidden rounded-xl bg-muted transition-transform duration-200 hover:scale-[1.03]">
                   {posters.length >= 4 ? (
                     <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-0.5">
                       {posters.slice(0, 4).map((p, i) => (
