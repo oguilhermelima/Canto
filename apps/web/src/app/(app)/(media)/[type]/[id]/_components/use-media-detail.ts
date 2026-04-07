@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { authClient } from "~/lib/auth-client";
 import { useWatchRegion } from "~/hooks/use-watch-region";
+import { useDocumentTitle } from "~/hooks/use-document-title";
 import { useDirectSearch } from "~/hooks/use-direct-search";
 
 const TORRENTS_PER_PAGE = 30;
@@ -64,11 +65,7 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
     isLoading: resolved.isLoading,
   };
 
-  useEffect(() => {
-    if (media?.title) {
-      document.title = `${media.title} — Canto`;
-    }
-  }, [media?.title]);
+  useDocumentTitle(media?.title);
 
   const availability = trpc.sync.mediaAvailability.useQuery(
     { mediaId: mediaId ?? "" },
@@ -277,36 +274,35 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
   });
 
   const watchProvidersByRegion = extras.data?.watchProviders ?? {};
-  const regionData =
-    watchProvidersByRegion[watchRegion as keyof typeof watchProvidersByRegion];
+  const regionData = watchProvidersByRegion[watchRegion];
   const tmdbType = media?.type === "show" ? "tv" : "movie";
   const watchLink =
-    (regionData as any)?.link ??
+    regionData?.link ??
     (media?.externalId
       ? `https://www.themoviedb.org/${tmdbType}/${media.externalId}/watch?locale=${watchRegion}`
       : undefined);
   const providerLinks = watchProviderLinks.data ?? {};
+  type WatchProviderEntry = { providerId: number; providerName: string; logoPath: string };
   const dedup = (
-    providers: any[],
-  ): any[] => {
+    providers: WatchProviderEntry[],
+  ): WatchProviderEntry[] => {
     const seen = new Set<string>();
-    return (providers ?? []).filter((p: any) => {
+    return providers.filter((p) => {
       const key =
-        (providerLinks as Record<string, string>)[p.providerId] ??
-        `__id:${p.providerId}`;
+        providerLinks[p.providerId] ?? `__id:${p.providerId}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
   };
-  const flatrateProviders = dedup((regionData as any)?.flatrate ?? []);
+  const flatrateProviders = dedup(regionData?.flatrate ?? []);
   const rentBuyProviders = dedup([
-    ...((regionData as any)?.rent ?? []),
-    ...((regionData as any)?.buy ?? []),
+    ...(regionData?.rent ?? []),
+    ...(regionData?.buy ?? []),
   ]).filter(
-    (p: any) =>
+    (p) =>
       !flatrateProviders.some(
-        (f: any) =>
+        (f) =>
           f.providerId === p.providerId || f.logoPath === p.logoPath,
       ),
   );

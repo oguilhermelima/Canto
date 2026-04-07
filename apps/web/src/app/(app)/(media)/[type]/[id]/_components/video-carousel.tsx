@@ -48,6 +48,7 @@ export function VideoCarousel({
       <div className="group/carousel relative">
         {canScrollLeft && (
           <button
+            aria-label="Scroll left"
             className="absolute left-0 top-0 z-10 hidden h-full w-12 items-center justify-center bg-gradient-to-r from-background/90 to-transparent opacity-0 transition-opacity group-hover/carousel:opacity-100 md:flex lg:w-16"
             onClick={() => scroll("left")}
           >
@@ -56,6 +57,7 @@ export function VideoCarousel({
         )}
         {canScrollRight && (
           <button
+            aria-label="Scroll right"
             className="absolute right-0 top-0 z-10 hidden h-full w-12 items-center justify-center bg-gradient-to-l from-background/90 to-transparent opacity-0 transition-opacity group-hover/carousel:opacity-100 md:flex lg:w-16"
             onClick={() => scroll("right")}
           >
@@ -81,7 +83,9 @@ export function VideoCarousel({
                 alt={video.name ?? "Video"}
                 width={480}
                 height={360}
-                className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                className="h-full w-full object-cover opacity-0 transition-[opacity,transform] duration-500 group-hover:scale-105"
+                onLoad={(e) => { e.currentTarget.classList.remove("opacity-0"); e.currentTarget.classList.add("opacity-100"); }}
+                onError={(e) => { e.currentTarget.src = `https://img.youtube.com/vi/${video.key}/mqdefault.jpg`; }}
               />
               <div className="absolute inset-0 flex items-center justify-center bg-black/30 transition-colors group-hover:bg-black/20">
                 <Play className="h-10 w-10 text-white" />
