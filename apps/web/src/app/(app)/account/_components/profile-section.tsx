@@ -1,0 +1,97 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Button } from "@canto/ui/button";
+import { Input } from "@canto/ui/input";
+import { Save, Check, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { authClient } from "~/lib/auth-client";
+import { SettingsSection } from "~/components/settings/shared";
+
+export function ProfileSection(): React.JSX.Element {
+  const { data: session } = authClient.useSession();
+  const user = session?.user;
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name ?? "");
+      setEmail(user.email ?? "");
+    }
+  }, [user]);
+
+  const handleSave = async (): Promise<void> => {
+    setSaving(true);
+    try {
+      await authClient.updateUser({ name, image: user?.image });
+      if (email !== user?.email) {
+        await authClient.changeEmail({ newEmail: email });
+      }
+      setDirty(false);
+      toast.success("Profile updated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update profile");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <SettingsSection title="Profile" description="Your account information and display name.">
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground">
+            {user?.name?.charAt(0).toUpperCase() ?? "?"}
+          </div>
+          <div>
+            <p className="text-sm font-medium text-foreground">{user?.name}</p>
+            <p className="text-xs text-muted-foreground">{user?.email}</p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <label htmlFor="account-name" className="text-sm font-medium text-muted-foreground">
+              Name
+            </label>
+            <Input
+              id="account-name"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setDirty(true);
+              }}
+              className="h-10 rounded-xl border-none bg-accent text-sm focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="account-email" className="text-sm font-medium text-muted-foreground">
+              Email
+            </label>
+            <Input
+              id="account-email"
+              type="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setDirty(true);
+              }}
+              className="h-10 rounded-xl border-none bg-accent text-sm focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+            />
+          </div>
+        </div>
+
+        {dirty && (
+          <Button size="sm" className="rounded-xl" onClick={handleSave} disabled={saving}>
+            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            Save changes
+          </Button>
+        )}
+      </div>
+    </SettingsSection>
+  );
+}
