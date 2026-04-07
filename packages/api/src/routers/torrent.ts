@@ -19,6 +19,8 @@ import { downloadTorrent, replaceTorrent } from "../domain/use-cases/download-to
 import {
   findTorrentById,
   findAllTorrents,
+  findAllTorrentsPaginated,
+  countAllTorrents,
   findTorrentsByMediaId,
   updateTorrent,
   deleteTorrent as deleteTorrentRecord,
@@ -136,26 +138,39 @@ export const torrentRouter = createTRPCRouter({
 
   /**
    * List live torrent data from qBittorrent merged with DB records + media info.
+   * Supports offset-based pagination via cursor.
    */
-  listLive: adminProcedure.query(async ({ ctx }) => {
-    const dbRows = await findAllTorrents(ctx.db);
-    const qb = await getDownloadClient();
-    const merged = await mergeLiveData(ctx.db, dbRows, qb);
+  listLive: adminProcedure
+    .input(z.object({
+      limit: z.number().int().min(1).max(100).default(20),
+      cursor: z.number().int().min(0).default(0),
+    }))
+    .query(async ({ ctx, input }) => {
+      const { limit, cursor: offset } = input;
+      const [dbRows, total] = await Promise.all([
+        findAllTorrentsPaginated(ctx.db, limit, offset),
+        countAllTorrents(ctx.db),
+      ]);
+      const qb = await getDownloadClient();
+      const merged = await mergeLiveData(ctx.db, dbRows, qb);
 
-    // Batch-fetch linked media info
-    const mediaIds = [...new Set(dbRows.map((r) => r.mediaId).filter(Boolean))] as string[];
-    const mediaMap = new Map<string, { id: string; title: string; posterPath: string | null; type: string; year: number | null; externalId: number }>();
-    for (const id of mediaIds) {
-      const m = await findMediaById(ctx.db, id);
-      if (m) mediaMap.set(m.id, { id: m.id, title: m.title, posterPath: m.posterPath, type: m.type, year: m.year, externalId: m.externalId });
-    }
+      // Batch-fetch linked media info
+      const mediaIds = [...new Set(dbRows.map((r) => r.mediaId).filter(Boolean))] as string[];
+      const mediaMap = new Map<string, { id: string; title: string; posterPath: string | null; type: string; year: number | null; externalId: number }>();
+      for (const id of mediaIds) {
+        const m = await findMediaById(ctx.db, id);
+        if (m) mediaMap.set(m.id, { id: m.id, title: m.title, posterPath: m.posterPath, type: m.type, year: m.year, externalId: m.externalId });
+      }
 
-    return merged.map((item) => ({
-      ...item.row,
-      media: item.row.mediaId ? mediaMap.get(item.row.mediaId) ?? null : null,
-      live: item.live,
-    }));
-  }),
+      return {
+        items: merged.map((item) => ({
+          ...item.row,
+          media: item.row.mediaId ? mediaMap.get(item.row.mediaId) ?? null : null,
+          live: item.live,
+        })),
+        total,
+      };
+    }),
 
   /**
    * List live torrent data for a specific media, merged with qBittorrent.

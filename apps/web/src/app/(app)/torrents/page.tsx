@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { Loader2 } from "lucide-react";
 import { Skeleton } from "@canto/ui/skeleton";
 import { PageHeader } from "~/components/layout/page-header";
 import { TabBar } from "~/components/layout/tab-bar";
@@ -12,6 +13,8 @@ import { resolveState } from "~/lib/torrent-utils";
 import { TorrentCard } from "./_components/torrent-card";
 import { DeleteDialog, type DeleteTarget } from "./_components/delete-dialog";
 
+const PAGE_SIZE = 20;
+
 const STATUS_TABS = [
   { value: "all", label: "All" },
   { value: "downloading", label: "Active" },
@@ -22,6 +25,7 @@ const STATUS_TABS = [
 export default function DownloadsPage(): React.JSX.Element {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const { data: session } = authClient.useSession();
   const isAdmin = (session?.user as { role?: string } | undefined)?.role === "admin";
@@ -29,10 +33,46 @@ export default function DownloadsPage(): React.JSX.Element {
   useDocumentTitle("Downloads");
 
   const utils = trpc.useUtils();
-  const { data: torrents, isLoading, isError } = trpc.torrent.listLive.useQuery(
-    undefined,
-    { refetchInterval: 3000 },
+  const {
+    data,
+    isLoading,
+    isError,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = trpc.torrent.listLive.useInfiniteQuery(
+    { limit: PAGE_SIZE },
+    {
+      refetchInterval: 3000,
+      getNextPageParam: (lastPage, _allPages, lastPageParam) => {
+        const currentOffset = (lastPageParam as number) ?? 0;
+        if (currentOffset + lastPage.items.length >= lastPage.total) return undefined;
+        return currentOffset + lastPage.items.length;
+      },
+      initialCursor: 0,
+    },
   );
+
+  const torrents = useMemo(
+    () => data?.pages.flatMap((p) => p.items) ?? [],
+    [data],
+  );
+
+  // IntersectionObserver for infinite scroll
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          void fetchNextPage();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const pauseMutation = trpc.torrent.pause.useMutation({
     onSuccess: () => void utils.torrent.listLive.invalidate(),
@@ -53,7 +93,7 @@ export default function DownloadsPage(): React.JSX.Element {
   const filtered =
     statusFilter === "all"
       ? torrents
-      : torrents?.filter((t) => {
+      : torrents.filter((t) => {
           const r = resolveState(t.status, t.live?.state, t.live?.progress);
           if (statusFilter === "downloading") return !r.isDownloaded && !r.canResume;
           if (statusFilter === "completed") return r.isDownloaded;
@@ -62,16 +102,16 @@ export default function DownloadsPage(): React.JSX.Element {
         });
 
   const counts = {
-    all: torrents?.length ?? 0,
-    downloading: torrents?.filter((t) => {
+    all: torrents.length,
+    downloading: torrents.filter((t) => {
       const r = resolveState(t.status, t.live?.state, t.live?.progress);
       return !r.isDownloaded && !r.canResume;
-    }).length ?? 0,
-    completed: torrents?.filter((t) => resolveState(t.status, t.live?.state, t.live?.progress).isDownloaded).length ?? 0,
-    paused: torrents?.filter((t) => {
+    }).length,
+    completed: torrents.filter((t) => resolveState(t.status, t.live?.state, t.live?.progress).isDownloaded).length,
+    paused: torrents.filter((t) => {
       const r = resolveState(t.status, t.live?.state, t.live?.progress);
       return r.canResume && !r.isDownloaded;
-    }).length ?? 0,
+    }).length,
   };
 
   if (!isAdmin) {
@@ -113,7 +153,7 @@ export default function DownloadsPage(): React.JSX.Element {
               </div>
             ))}
           </div>
-        ) : !filtered || filtered.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <StateMessage preset="emptyTorrents" />
         ) : (
           <div className="space-y-3">
@@ -130,7 +170,18 @@ export default function DownloadsPage(): React.JSX.Element {
                 retryPending={retryMutation.isPending}
               />
             ))}
-            {filtered.length > 0 && <StateMessage preset="endOfItems" inline />}
+
+            <div ref={sentinelRef} className="h-1" />
+
+            {isFetchingNextPage && (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            )}
+
+            {!hasNextPage && !isFetchingNextPage && filtered.length > 0 && (
+              <StateMessage preset="endOfItems" inline />
+            )}
           </div>
         )}
 

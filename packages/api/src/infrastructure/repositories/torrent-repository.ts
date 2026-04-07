@@ -35,6 +35,19 @@ export async function findAllTorrents(db: Database) {
   });
 }
 
+export async function findAllTorrentsPaginated(db: Database, limit: number, offset: number) {
+  return db.query.torrent.findMany({
+    orderBy: (t, { desc: d }) => [d(t.createdAt)],
+    limit,
+    offset,
+  });
+}
+
+export async function countAllTorrents(db: Database): Promise<number> {
+  const [result] = await db.select({ count: sql<number>`count(*)` }).from(torrent);
+  return Number(result?.count ?? 0);
+}
+
 export async function createTorrent(
   db: Database,
   data: typeof torrent.$inferInsert,
