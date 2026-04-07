@@ -441,18 +441,37 @@ export const mediaRouter = createTRPCRouter({
     }))
     .query(async ({ ctx, input }) => {
       const tvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+
+      // Check DB first — if complete, return from DB (faster + has translations)
+      const existing = await findMediaByExternalId(ctx.db, input.externalId, input.provider);
+
+      if (existing?.extrasUpdatedAt) {
+        const lang = await getUserLanguage(ctx.db, ctx.session.user.id);
+        const translated = await applyMediaTranslation(ctx.db, existing, lang);
+        if (translated.seasons) {
+          await applySeasonsTranslation(ctx.db, translated.seasons as any, lang);
+        }
+        const extras = await loadExtrasFromDB(ctx.db, existing.id, lang);
+        return {
+          source: "db" as const,
+          media: translated,
+          extras,
+          persisted: true,
+          mediaId: existing.id,
+          inLibrary: existing.inLibrary,
+          downloaded: existing.downloaded,
+        };
+      }
+
+      // Not in DB or incomplete — fetch live from providers
       const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
       const supportedLangs = [...await getSupportedLanguageCodes(ctx.db)];
 
-      // Always fetch live from providers — never read from DB
       const result = await fetchMediaMetadata(
         input.externalId, input.provider, input.type,
         { tmdb, tvdb },
         { useTVDBSeasons: tvdbEnabled, supportedLanguages: supportedLangs },
       );
-
-      // Check if this media is already persisted (for UI: show library status, download buttons, etc.)
-      const existing = await findMediaByExternalId(ctx.db, input.externalId, input.provider);
 
       return {
         source: "live" as const,
