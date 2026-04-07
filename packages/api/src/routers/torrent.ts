@@ -3,15 +3,10 @@ import { z } from "zod";
 
 import { torrentDownloadInput, torrentSearchInput } from "@canto/validators";
 
-import { getSetting } from "@canto/db/settings";
-
 import { createTRPCRouter, adminProcedure } from "../trpc";
-import { SETTINGS } from "../lib/settings-keys";
 import { getDownloadClient } from "../infrastructure/adapters/download-client-factory";
 import { getQBClient } from "../infrastructure/adapters/qbittorrent";
-import { getJackettClient } from "../infrastructure/adapters/jackett";
-import { getProwlarrClient } from "../infrastructure/adapters/prowlarr";
-import type { IndexerPort } from "../domain/ports/indexer";
+import { buildIndexers } from "../infrastructure/adapters/indexer-factory";
 import { autoImportTorrent } from "../domain/use-cases/import-torrent";
 import { mergeLiveData } from "../domain/use-cases/merge-live-data";
 import { searchTorrents } from "../domain/use-cases/search-torrents";
@@ -28,19 +23,6 @@ import {
 } from "../infrastructure/repositories/torrent-repository";
 import { findMediaById } from "../infrastructure/repositories/media-repository";
 import { findFolderById, findDefaultFolder } from "../infrastructure/repositories/folder-repository";
-
-/* -------------------------------------------------------------------------- */
-/*  Helpers                                                                   */
-/* -------------------------------------------------------------------------- */
-
-async function buildIndexers(): Promise<IndexerPort[]> {
-  const indexers: IndexerPort[] = [];
-  const prowlarrEnabled = (await getSetting<boolean>(SETTINGS.PROWLARR_ENABLED)) === true;
-  const jackettEnabled = (await getSetting<boolean>(SETTINGS.JACKETT_ENABLED)) === true;
-  if (prowlarrEnabled) indexers.push(await getProwlarrClient());
-  if (jackettEnabled) indexers.push(await getJackettClient());
-  return indexers;
-}
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                    */

@@ -64,6 +64,10 @@
       "types": "./src/infrastructure/adapters/prowlarr.ts",
       "default": "./src/infrastructure/adapters/prowlarr.ts"
     },
+    "./infrastructure/adapters/indexer-factory": {
+      "types": "./src/infrastructure/adapters/indexer-factory.ts",
+      "default": "./src/infrastructure/adapters/indexer-factory.ts"
+    },
     "./lib/settings-keys": {
       "types": "./src/lib/settings-keys.ts",
       "default": "./src/lib/settings-keys.ts"

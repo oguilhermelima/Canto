@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNotNull, not, sql, count } from "drizzle-orm";
+import { and, desc, eq, sql, count } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
   user,
@@ -9,6 +9,20 @@ import {
   mediaVideo,
   userRecommendation,
 } from "@canto/db/schema";
+import type { RecsFilters } from "../../domain/types/recs-filters";
+import { buildRecsFilterConditions, recsSortOrder } from "./shared/recs-filter-builder";
+
+/** Keep only the highest weight per mediaId. */
+function bestWeightByMedia(rows: Array<{ mediaId: string; weight: number }>): Map<string, number> {
+  const best = new Map<string, number>();
+  for (const r of rows) {
+    const existing = best.get(r.mediaId);
+    if (existing === undefined || r.weight > existing) {
+      best.set(r.mediaId, r.weight);
+    }
+  }
+  return best;
+}
 
 /**
  * Shadow-swap rebuild: inserts new set as inactive, then atomically swaps.
@@ -30,16 +44,7 @@ export async function rebuildUserRecommendations(
   const currentVersion = userRow?.recsVersion ?? 0;
   const nextVersion = currentVersion + 1;
 
-  // Deduplicate: keep highest weight per mediaId
-  const best = new Map<string, number>();
-  for (const r of rows) {
-    const existing = best.get(r.mediaId);
-    if (existing === undefined || r.weight > existing) {
-      best.set(r.mediaId, r.weight);
-    }
-  }
-
-  const deduped = [...best.entries()].map(([mediaId, weight]) => ({
+  const deduped = [...bestWeightByMedia(rows).entries()].map(([mediaId, weight]) => ({
     userId,
     mediaId,
     weight,
@@ -115,16 +120,7 @@ export async function upsertUserRecommendations(
   });
   const currentVersion = userRow?.recsVersion ?? 0;
 
-  // Deduplicate: keep highest weight per mediaId
-  const best = new Map<string, number>();
-  for (const r of rows) {
-    const existing = best.get(r.mediaId);
-    if (existing === undefined || r.weight > existing) {
-      best.set(r.mediaId, r.weight);
-    }
-  }
-
-  const deduped = [...best.entries()].map(([mediaId, weight]) => ({
+  const deduped = [...bestWeightByMedia(rows).entries()].map(([mediaId, weight]) => ({
     userId,
     mediaId,
     weight,
@@ -140,44 +136,8 @@ export async function upsertUserRecommendations(
   }
 }
 
-export interface RecsFilters {
-  genreIds?: number[];
-  genreMode?: "and" | "or";
-  language?: string;
-  scoreMin?: number;
-  yearMin?: string;
-  yearMax?: string;
-  runtimeMin?: number;
-  runtimeMax?: number;
-  certification?: string;
-  status?: string;
-  sortBy?: string;
-  watchProviders?: string; // comma-separated provider IDs like "8,337"
-  watchRegion?: string;    // region code like "BR"
-}
-
-/**
- * Map a TMDB-style sort string to a Drizzle orderBy expression.
- * Falls back to `null` (caller should use the default order).
- */
-function recsSortOrder(sortBy: string | undefined) {
-  switch (sortBy) {
-    case "vote_average.desc":
-      return desc(media.voteAverage);
-    case "vote_average.asc":
-      return asc(media.voteAverage);
-    case "primary_release_date.desc":
-      return desc(media.releaseDate);
-    case "primary_release_date.asc":
-      return asc(media.releaseDate);
-    case "title.asc":
-      return asc(media.title);
-    case "title.desc":
-      return desc(media.title);
-    default:
-      return null;
-  }
-}
+// Re-export for consumers that import from this file
+export type { RecsFilters } from "../../domain/types/recs-filters";
 
 /**
  * Per-user recommendation query.
@@ -192,22 +152,6 @@ export async function findUserRecommendations(
   offset: number,
   filters: RecsFilters = {},
 ) {
-  const {
-    genreIds,
-    genreMode = "or",
-    language,
-    scoreMin,
-    yearMin,
-    yearMax,
-    runtimeMin,
-    runtimeMax,
-    certification,
-    status,
-    sortBy,
-    watchProviders,
-    watchRegion,
-  } = filters;
-
   const excludeClause =
     excludeItems.length > 0
       ? sql`AND NOT (${sql.join(
@@ -218,32 +162,10 @@ export async function findUserRecommendations(
         )})`
       : sql``;
 
-  const genreClause =
-    genreIds && genreIds.length > 0
-      ? genreMode === "and"
-        ? sql`AND ${media.genreIds}::jsonb @> ${JSON.stringify(genreIds)}::jsonb`
-        : sql`AND (${sql.join(genreIds.map((id) => sql`${media.genreIds}::jsonb @> ${JSON.stringify([id])}::jsonb`), sql` OR `)})`
-      : sql``;
+  const filterConditions = buildRecsFilterConditions(filters);
+  const filterClauses = filterConditions.map((c) => sql`AND ${c}`);
 
-  const languageClause = language ? sql`AND ${media.originalLanguage} = ${language}` : sql``;
-  const scoreClause = scoreMin != null ? sql`AND ${media.voteAverage} >= ${scoreMin}` : sql``;
-  const yearMinClause = yearMin ? sql`AND ${media.releaseDate} >= ${yearMin + "-01-01"}` : sql``;
-  const yearMaxClause = yearMax ? sql`AND ${media.releaseDate} <= ${yearMax + "-12-31"}` : sql``;
-  const runtimeMinClause = runtimeMin != null ? sql`AND ${media.runtime} >= ${runtimeMin}` : sql``;
-  const runtimeMaxClause = runtimeMax != null ? sql`AND ${media.runtime} <= ${runtimeMax}` : sql``;
-  const certClause = certification ? sql`AND ${media.contentRating} = ${certification}` : sql``;
-  const statusClause = status ? sql`AND ${media.status} = ${status}` : sql``;
-
-  const wpIds = watchProviders ? watchProviders.split(/[,|]/).map(Number) : [];
-  const wpClause = wpIds.length > 0 && watchRegion
-    ? sql`AND ${media.id} IN (
-        SELECT media_id FROM media_watch_provider
-        WHERE provider_id IN (${sql.join(wpIds.map(id => sql`${id}`), sql`, `)})
-        AND region = ${watchRegion}
-      )`
-    : sql``;
-
-  const customSort = recsSortOrder(sortBy);
+  const customSort = recsSortOrder(filters.sortBy);
 
   return db
     .select({
@@ -273,16 +195,7 @@ export async function findUserRecommendations(
         AND ${userRecommendation.active} = true
         AND (${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL)
         ${excludeClause}
-        ${genreClause}
-        ${languageClause}
-        ${scoreClause}
-        ${yearMinClause}
-        ${yearMaxClause}
-        ${runtimeMinClause}
-        ${runtimeMaxClause}
-        ${certClause}
-        ${statusClause}
-        ${wpClause}`,
+        ${sql.join(filterClauses, sql` `)}`,
     )
     .groupBy(
       media.id,

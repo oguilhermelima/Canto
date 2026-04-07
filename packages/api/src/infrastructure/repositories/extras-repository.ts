@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, isNotNull, not, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, not, sql } from "drizzle-orm";
 import { getQualityFilters, getWeightedScoreOrder } from "../../domain/rules/recommendation-filters";
 import type { Database } from "@canto/db/client";
 import {
@@ -10,7 +10,8 @@ import {
   mediaWatchProvider,
   watchProviderLink,
 } from "@canto/db/schema";
-import type { RecsFilters } from "./user-recommendation-repository";
+import type { RecsFilters } from "../../domain/types/recs-filters";
+import { buildRecsFilterConditions, recsSortOrder } from "./shared/recs-filter-builder";
 
 // ── Credits ──
 
@@ -85,22 +86,6 @@ export async function findGlobalRecommendations(
   offset: number,
   filters: RecsFilters = {},
 ) {
-  const {
-    genreIds,
-    genreMode = "or",
-    language,
-    scoreMin,
-    yearMin,
-    yearMax,
-    runtimeMin,
-    runtimeMax,
-    certification,
-    status,
-    sortBy,
-    watchProviders,
-    watchRegion,
-  } = filters;
-
   const released = sql`${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL`;
 
   const excludeConditions =
@@ -114,32 +99,6 @@ export async function findGlobalRecommendations(
         )
       : [];
 
-  const genreCondition =
-    genreIds && genreIds.length > 0
-      ? genreMode === "and"
-        ? sql`${media.genreIds}::jsonb @> ${JSON.stringify(genreIds)}::jsonb`
-        : sql`(${sql.join(genreIds.map((id) => sql`${media.genreIds}::jsonb @> ${JSON.stringify([id])}::jsonb`), sql` OR `)})`
-      : undefined;
-
-  const languageCondition = language ? eq(media.originalLanguage, language) : undefined;
-  const scoreCondition = scoreMin != null ? sql`${media.voteAverage} >= ${scoreMin}` : undefined;
-  const yearMinCondition = yearMin ? sql`${media.releaseDate} >= ${yearMin + "-01-01"}` : undefined;
-  const yearMaxCondition = yearMax ? sql`${media.releaseDate} <= ${yearMax + "-12-31"}` : undefined;
-  const runtimeMinCondition = runtimeMin != null ? sql`${media.runtime} >= ${runtimeMin}` : undefined;
-  const runtimeMaxCondition = runtimeMax != null ? sql`${media.runtime} <= ${runtimeMax}` : undefined;
-  const certCondition = certification ? eq(media.contentRating, certification) : undefined;
-  const statusCondition = status ? eq(media.status, status) : undefined;
-
-  const wpIds = watchProviders ? watchProviders.split(/[,|]/).map(Number) : [];
-  const wpCondition = wpIds.length > 0 && watchRegion
-    ? sql`${media.id} IN (
-        SELECT media_id FROM media_watch_provider
-        WHERE provider_id IN (${sql.join(wpIds.map(id => sql`${id}`), sql`, `)})
-        AND region = ${watchRegion}
-      )`
-    : undefined;
-
-
   const where = and(
     sql`${media.id} IN (SELECT media_id FROM media_recommendation)`,
     released,
@@ -147,44 +106,11 @@ export async function findGlobalRecommendations(
     ...(excludeConditions.length > 0
       ? [not(sql`(${sql.join(excludeConditions, sql` OR `)})`)]
       : []),
-    ...(genreCondition ? [genreCondition] : []),
-    ...(languageCondition ? [languageCondition] : []),
-    ...(scoreCondition ? [scoreCondition] : []),
-    ...(yearMinCondition ? [yearMinCondition] : []),
-    ...(yearMaxCondition ? [yearMaxCondition] : []),
-    ...(runtimeMinCondition ? [runtimeMinCondition] : []),
-    ...(runtimeMaxCondition ? [runtimeMaxCondition] : []),
-    ...(certCondition ? [certCondition] : []),
-    ...(statusCondition ? [statusCondition] : []),
-    ...(wpCondition ? [wpCondition] : []),
+    ...buildRecsFilterConditions(filters),
   );
 
-  // Map sortBy to orderBy
-  let orderBy;
-  switch (sortBy) {
-    case "vote_average.desc":
-      orderBy = [getWeightedScoreOrder()];
-      break;
-    case "vote_average.asc":
-      orderBy = [asc(media.voteAverage)];
-      break;
-    case "primary_release_date.desc":
-      orderBy = [desc(media.releaseDate)];
-      break;
-    case "primary_release_date.asc":
-      orderBy = [asc(media.releaseDate)];
-      break;
-    case "title.asc":
-      orderBy = [asc(media.title)];
-      break;
-    case "title.desc":
-      orderBy = [desc(media.title)];
-      break;
-    default:
-      // Weighted score: penalizes items with few votes (Bayesian average with m=100, C=6.5)
-      orderBy = [desc(sql`(${media.voteCount} * ${media.voteAverage} + 100 * 6.5) / (${media.voteCount} + 100)`)];
-      break;
-  }
+  const customSort = recsSortOrder(filters.sortBy);
+  const orderBy = customSort ? [customSort] : [getWeightedScoreOrder()];
 
   return db.query.media.findMany({
     where,
