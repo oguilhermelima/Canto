@@ -17,6 +17,8 @@ const TYPE_OPTIONS = [
 interface ListContentProps {
   items: {
     id: string;
+    externalId?: string;
+    provider?: string;
     type: "movie" | "show";
     title: string;
     posterPath: string | null;

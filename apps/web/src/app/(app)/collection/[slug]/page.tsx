@@ -61,6 +61,8 @@ export default function ListDetailPage(): React.JSX.Element {
       data?.pages.flatMap((page) =>
         page.items.map((item) => ({
           id: item.media.id,
+          externalId: String(item.media.externalId),
+          provider: item.media.provider,
           type: item.media.type as "movie" | "show",
           title: item.media.title,
           posterPath: item.media.posterPath,
