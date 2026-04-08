@@ -82,6 +82,51 @@ export async function getJellyfinLibraryFolders(
 }
 
 /**
+ * Refresh metadata for a specific Jellyfin item (best-effort, never throws).
+ */
+export async function refreshJellyfinItem(
+  url: string,
+  apiKey: string,
+  itemId: string,
+): Promise<void> {
+  try {
+    await fetch(
+      `${url}/Items/${itemId}/Refresh?MetadataRefreshMode=FullRefresh&ImageRefreshMode=FullRefresh&ReplaceAllMetadata=true`,
+      {
+        method: "POST",
+        headers: headers(apiKey),
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
+  } catch (err) {
+    console.warn(
+      `[jellyfin] Failed to refresh item ${itemId}:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
+/**
+ * Update provider IDs (TMDB, TVDB, IMDB) on a Jellyfin item.
+ */
+export async function updateJellyfinProviderIds(
+  url: string,
+  apiKey: string,
+  itemId: string,
+  providerIds: Record<string, string>,
+): Promise<void> {
+  const res = await fetch(`${url}/Items/${itemId}`, {
+    method: "POST",
+    headers: { ...headers(apiKey), "Content-Type": "application/json" },
+    body: JSON.stringify({ ProviderIds: providerIds }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to update provider IDs: ${res.status}`);
+  }
+}
+
+/**
  * Merge multiple Jellyfin items into a single multi-version entry.
  */
 export async function mergeJellyfinVersions(

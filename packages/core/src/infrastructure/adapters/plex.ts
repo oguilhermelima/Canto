@@ -53,6 +53,31 @@ export async function getPlexSections(
 }
 
 /**
+ * Refresh metadata for a specific Plex item (best-effort, never throws).
+ */
+export async function refreshPlexItem(
+  url: string,
+  token: string,
+  ratingKey: string,
+): Promise<void> {
+  try {
+    await fetch(
+      `${url}/library/metadata/${ratingKey}/refresh?X-Plex-Token=${token}`,
+      {
+        method: "PUT",
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
+  } catch (err) {
+    console.warn(
+      `[plex] Failed to refresh item ${ratingKey}:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
+/**
  * Trigger a library scan on one or more Plex sections.
  * If no section IDs are provided, scans all sections.
  */
