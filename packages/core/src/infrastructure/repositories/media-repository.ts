@@ -14,6 +14,8 @@ import type { Database } from "@canto/db/client";
 import {
   media,
   mediaFile,
+  syncItem,
+  torrent,
 } from "@canto/db/schema";
 import type { ListInput } from "@canto/validators";
 
@@ -128,6 +130,21 @@ export async function updateMedia(
 export async function deleteMedia(db: Database, id: string) {
   const [deleted] = await db.delete(media).where(eq(media.id, id)).returning();
   return deleted;
+}
+
+/** Check if a media has no sync items (except one) and no torrents referencing it. */
+export async function isMediaOrphaned(
+  db: Database,
+  mediaId: string,
+  excludeSyncItemId: string,
+): Promise<boolean> {
+  const [[otherSyncs], [torrents]] = await Promise.all([
+    db.select({ count: count() }).from(syncItem).where(
+      and(eq(syncItem.mediaId, mediaId), sql`${syncItem.id} != ${excludeSyncItemId}`),
+    ),
+    db.select({ count: count() }).from(torrent).where(eq(torrent.mediaId, mediaId)),
+  ]);
+  return (otherSyncs?.count ?? 0) === 0 && (torrents?.count ?? 0) === 0;
 }
 
 export async function findLibraryExternalIds(db: Database) {

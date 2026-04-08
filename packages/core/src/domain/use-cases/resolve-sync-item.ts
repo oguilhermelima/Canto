@@ -5,11 +5,17 @@ import {
   findSyncItemById,
   updateSyncItem,
 } from "../../infrastructure/repositories/sync-repository";
-import { findMediaByAnyReference, updateMedia } from "../../infrastructure/repositories/media-repository";
+import {
+  findMediaByAnyReference,
+  updateMedia,
+  deleteMedia,
+  isMediaOrphaned,
+} from "../../infrastructure/repositories/media-repository";
 
 /**
- * Manually resolve a failed sync item with a specific TMDB ID.
+ * Resolve a sync item (failed or imported) with a specific TMDB ID.
  * Fetches metadata, persists to DB, marks as imported.
+ * If re-matching an already-imported item, cleans up orphaned old media.
  */
 export async function resolveSyncItem(
   db: Database,
@@ -18,6 +24,8 @@ export async function resolveSyncItem(
 ) {
   const item = await findSyncItemById(db, input.syncItemId);
   if (!item) throw new Error("Sync item not found");
+
+  const oldMediaId = item.mediaId;
 
   const supportedLangs = [...await getSupportedLanguageCodes(db)];
   const normalized = await tmdb.getMetadata(input.tmdbId, input.type, { supportedLanguages: supportedLangs });
@@ -47,6 +55,15 @@ export async function resolveSyncItem(
   await updateSyncItem(db, input.syncItemId, {
     tmdbId: input.tmdbId, mediaId, result: "imported", reason: null,
   });
+
+  // Clean up orphaned old media (re-match scenario)
+  if (oldMediaId && oldMediaId !== mediaId) {
+    const orphaned = await isMediaOrphaned(db, oldMediaId, input.syncItemId);
+    if (orphaned) {
+      await deleteMedia(db, oldMediaId);
+      console.log(`[resolve-sync-item] Deleted orphaned media ${oldMediaId}`);
+    }
+  }
 
   const suggestedName = `${normalized.title} (${normalized.year ?? "Unknown"}) [tmdb-${input.tmdbId}]`;
   return { mediaId, suggestedName };

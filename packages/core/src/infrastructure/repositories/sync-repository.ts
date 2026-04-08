@@ -1,6 +1,6 @@
-import { and, count, desc, eq, inArray, lt } from "drizzle-orm";
+import { and, count, desc, eq, getTableColumns, inArray, lt } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { syncItem, syncEpisode } from "@canto/db/schema";
+import { syncItem, syncEpisode, media } from "@canto/db/schema";
 
 export async function findSyncItemById(db: Database, id: string) {
   return db.query.syncItem.findFirst({
@@ -39,8 +39,15 @@ export async function findSyncItemsPaginated(
 
   const [items, [total]] = await Promise.all([
     db
-      .select()
+      .select({
+        ...getTableColumns(syncItem),
+        mediaPosterPath: media.posterPath,
+        mediaTitle: media.title,
+        mediaType: media.type,
+        mediaYear: media.year,
+      })
       .from(syncItem)
+      .leftJoin(media, eq(syncItem.mediaId, media.id))
       .where(where)
       .orderBy(
         desc(eq(syncItem.result, "failed")),
