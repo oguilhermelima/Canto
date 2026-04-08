@@ -189,13 +189,14 @@ function SyncHistorySection({ source }: { source: "jellyfin" | "plex" }): React.
                       variant="ghost"
                       className="h-8 w-8 p-0"
                       onClick={() => {
+                        const displayTitle = (hasMedia && item.mediaTitle) ? item.mediaTitle : item.serverItemTitle;
                         setEditItem({
                           id: item.id,
-                          title: item.serverItemTitle,
+                          title: displayTitle,
                           type: mediaType,
                           tmdbId: item.tmdbId,
                         });
-                        setSearchQuery(item.serverItemTitle);
+                        setSearchQuery(displayTitle);
                       }}
                     >
                       <Pencil className="h-3.5 w-3.5" />
