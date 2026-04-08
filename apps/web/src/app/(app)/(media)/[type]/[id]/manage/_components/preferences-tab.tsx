@@ -24,7 +24,7 @@ interface PreferencesTabProps {
   setMediaLibrary: ManageData["setMediaLibrary"];
   setContinuousDownload: ManageData["setContinuousDownload"];
   refreshMeta: ManageData["refreshMeta"];
-  syncTvdb: ManageData["syncTvdb"];
+  setOverrideProvider: ManageData["setOverrideProvider"];
 }
 
 export function PreferencesTab({
@@ -35,7 +35,7 @@ export function PreferencesTab({
   setMediaLibrary,
   setContinuousDownload,
   refreshMeta,
-  syncTvdb,
+  setOverrideProvider,
 }: PreferencesTabProps): React.JSX.Element {
   return (
     <div className="space-y-6">
@@ -100,24 +100,28 @@ export function PreferencesTab({
       </SettingsRow>
       {mediaType === "show" && (
         <SettingsRow
-          label="Sync TVDB Seasons"
-          description="Use TVDB for accurate season splits and absolute episode numbering"
+          label="Season/episode provider"
+          description="Choose which provider determines season and episode structure"
         >
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            onClick={() => syncTvdb.mutate({ id: mediaId })}
-            disabled={syncTvdb.isPending}
+          <Select
+            value={media.overrideProviderFor ?? "default"}
+            onValueChange={(v) =>
+              setOverrideProvider.mutate({
+                id: mediaId,
+                overrideProviderFor: v === "default" ? null : (v as "tmdb" | "tvdb"),
+              })
+            }
+            disabled={setOverrideProvider.isPending}
           >
-            <RefreshCw
-              className={cn(
-                "h-4 w-4",
-                syncTvdb.isPending && "animate-spin",
-              )}
-            />
-            {syncTvdb.isPending ? "Syncing..." : "Sync"}
-          </Button>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">Follow global setting</SelectItem>
+              <SelectItem value="tmdb">TMDB</SelectItem>
+              <SelectItem value="tvdb">TVDB</SelectItem>
+            </SelectContent>
+          </Select>
         </SettingsRow>
       )}
     </div>

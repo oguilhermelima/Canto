@@ -92,10 +92,10 @@ export function useManageMedia(id: string, mediaType: "movie" | "show") {
     },
     onError: (err) => toast.error(err.message),
   });
-  const syncTvdb = trpc.media.syncTvdbSeasons.useMutation({
+  const setOverrideProvider = trpc.media.setOverrideProvider.useMutation({
     onSuccess: () => {
       invalidateMedia();
-      toast.success("TVDB seasons synced");
+      toast.success("Provider updated");
     },
     onError: (err) => toast.error(err.message),
   });
@@ -229,7 +229,7 @@ export function useManageMedia(id: string, mediaType: "movie" | "show") {
     movieFiles,
     torrentsBySeason,
     setMediaLibrary,
-    syncTvdb,
+    setOverrideProvider,
     setContinuousDownload,
     refreshMeta,
     removeFromServer,

@@ -80,7 +80,7 @@ export function ManageContent({
               setMediaLibrary={manage.setMediaLibrary}
               setContinuousDownload={manage.setContinuousDownload}
               refreshMeta={manage.refreshMeta}
-              syncTvdb={manage.syncTvdb}
+              setOverrideProvider={manage.setOverrideProvider}
             />
           )}
 
