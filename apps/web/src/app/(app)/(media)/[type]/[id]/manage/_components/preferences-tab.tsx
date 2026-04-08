@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { cn } from "@canto/ui/cn";
 import { Button } from "@canto/ui/button";
 import { Switch } from "@canto/ui/switch";
@@ -12,6 +13,7 @@ import {
 } from "@canto/ui/select";
 import { RefreshCw } from "lucide-react";
 import { SettingsRow } from "./settings-row";
+import { ProviderOverrideDialog } from "./provider-override-dialog";
 import type { useManageMedia } from "./use-manage-media";
 
 type ManageData = ReturnType<typeof useManageMedia>;
@@ -24,7 +26,7 @@ interface PreferencesTabProps {
   setMediaLibrary: ManageData["setMediaLibrary"];
   setContinuousDownload: ManageData["setContinuousDownload"];
   refreshMeta: ManageData["refreshMeta"];
-  setOverrideProvider: ManageData["setOverrideProvider"];
+  invalidateMedia: ManageData["invalidateMedia"];
 }
 
 export function PreferencesTab({
@@ -35,8 +37,11 @@ export function PreferencesTab({
   setMediaLibrary,
   setContinuousDownload,
   refreshMeta,
-  setOverrideProvider,
+  invalidateMedia,
 }: PreferencesTabProps): React.JSX.Element {
+  const [overrideDialogOpen, setOverrideDialogOpen] = useState(false);
+  const [pendingOverride, setPendingOverride] = useState<"tmdb" | "tvdb" | null>(null);
+
   return (
     <div className="space-y-6">
       <SettingsRow
@@ -105,13 +110,11 @@ export function PreferencesTab({
         >
           <Select
             value={media.overrideProviderFor ?? "default"}
-            onValueChange={(v) =>
-              setOverrideProvider.mutate({
-                id: mediaId,
-                overrideProviderFor: v === "default" ? null : (v as "tmdb" | "tvdb"),
-              })
-            }
-            disabled={setOverrideProvider.isPending}
+            onValueChange={(v) => {
+              const value = v === "default" ? null : (v as "tmdb" | "tvdb");
+              setPendingOverride(value);
+              setOverrideDialogOpen(true);
+            }}
           >
             <SelectTrigger className="w-48">
               <SelectValue />
@@ -124,6 +127,14 @@ export function PreferencesTab({
           </Select>
         </SettingsRow>
       )}
+
+      <ProviderOverrideDialog
+        open={overrideDialogOpen}
+        onOpenChange={setOverrideDialogOpen}
+        mediaId={mediaId}
+        targetProvider={pendingOverride}
+        onSuccess={invalidateMedia}
+      />
     </div>
   );
 }

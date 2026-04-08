@@ -80,7 +80,7 @@ export function ManageContent({
               setMediaLibrary={manage.setMediaLibrary}
               setContinuousDownload={manage.setContinuousDownload}
               refreshMeta={manage.refreshMeta}
-              setOverrideProvider={manage.setOverrideProvider}
+              invalidateMedia={manage.invalidateMedia}
             />
           )}
 

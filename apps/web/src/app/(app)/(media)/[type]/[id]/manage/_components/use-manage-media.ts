@@ -92,13 +92,6 @@ export function useManageMedia(id: string, mediaType: "movie" | "show") {
     },
     onError: (err) => toast.error(err.message),
   });
-  const setOverrideProvider = trpc.media.setOverrideProvider.useMutation({
-    onSuccess: () => {
-      invalidateMedia();
-      toast.success("Provider updated");
-    },
-    onError: (err) => toast.error(err.message),
-  });
   const setContinuousDownload = trpc.library.setContinuousDownload.useMutation({
     onSuccess: () => {
       invalidateMedia();
@@ -229,8 +222,8 @@ export function useManageMedia(id: string, mediaType: "movie" | "show") {
     movieFiles,
     torrentsBySeason,
     setMediaLibrary,
-    setOverrideProvider,
     setContinuousDownload,
+    invalidateMedia,
     refreshMeta,
     removeFromServer,
     addToLibrary,

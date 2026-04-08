@@ -85,6 +85,14 @@ export const setOverrideProviderInput = z.object({
 });
 export type SetOverrideProviderInput = z.infer<typeof setOverrideProviderInput>;
 
+export const applyProviderOverrideInput = z.object({
+  id: z.string().uuid(),
+  overrideProviderFor: z.enum(["tmdb", "tvdb"]).nullable(),
+  renameFiles: z.boolean().default(false),
+  updateMediaServer: z.boolean().default(false),
+});
+export type ApplyProviderOverrideInput = z.infer<typeof applyProviderOverrideInput>;
+
 export const recommendationsInput = z.object({
   cursor: z.number().int().min(0).default(0),
   pageSize: z.number().int().min(1).max(20).default(10),
