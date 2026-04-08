@@ -85,7 +85,9 @@ export const syncRouter = createTRPCRouter({
 
       if (input.updateMediaServer && result.mediaId) {
         const { updateMediaServerMetadata } = await import("@canto/core/domain/use-cases/update-media-server-metadata");
-        await updateMediaServerMetadata(ctx.db, result.mediaId);
+        await updateMediaServerMetadata(ctx.db, result.mediaId).catch((err) =>
+          console.warn("[resolveSyncItem] Server update failed:", err instanceof Error ? err.message : err),
+        );
       }
 
       return result;

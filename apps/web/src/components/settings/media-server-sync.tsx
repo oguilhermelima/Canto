@@ -59,7 +59,7 @@ function timeAgo(dateStr: string | Date | null): string {
 /*  Sync History Section                                                       */
 /* -------------------------------------------------------------------------- */
 
-function SyncHistorySection({ source }: { source: "jellyfin" | "plex" }): React.JSX.Element {
+function SyncStatusSection({ source }: { source: "jellyfin" | "plex" }): React.JSX.Element {
   const [filter, setFilter] = useState<"all" | "failed" | "imported" | "skipped">("all");
   const [page, setPage] = useState(1);
   const [editItem, setEditItem] = useState<{
@@ -70,8 +70,8 @@ function SyncHistorySection({ source }: { source: "jellyfin" | "plex" }): React.
   } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tmdbIdInput, setTmdbIdInput] = useState("");
-  const [updateServer, setUpdateServer] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<{ tmdbId: number; type: string } | null>(null);
+  const [updateServer, setUpdateServer] = useState(false);
 
   const utils = trpc.useUtils();
 
@@ -99,13 +99,38 @@ function SyncHistorySection({ source }: { source: "jellyfin" | "plex" }): React.
     onError: (err) => toast.error(err.message),
   });
 
+  const importMedia = trpc.sync.importMedia.useMutation({
+    onSuccess: (data) => {
+      if (data.started.jellyfin || data.started.plex) toast.success("Sync started");
+      else toast.info("Sync already running");
+    },
+    onError: () => toast.error("Failed to start sync"),
+  });
+
   const totalPages = data ? Math.ceil(data.total / data.pageSize) : 0;
 
   return (
     <SettingsSection
-      title="Sync History"
+      title="Sync Status"
       description="Review and correct media matched from your server. Edit any item to fix incorrect matches."
     >
+      {/* Manual sync card */}
+      <div className="flex items-center justify-between rounded-xl border border-border/40 px-4 py-3 mb-4">
+        <div>
+          <p className="text-sm font-medium text-foreground">Manual sync</p>
+          <p className="text-xs text-muted-foreground">Trigger a sync now instead of waiting for the automatic schedule</p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => importMedia.mutate()}
+          disabled={importMedia.isPending}
+        >
+          {importMedia.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
+          Sync
+        </Button>
+      </div>
+
       {/* Filters */}
       <div className="flex items-center gap-2 mb-4">
         {(["all", "failed", "imported"] as const).map((f) => (
@@ -124,88 +149,95 @@ function SyncHistorySection({ source }: { source: "jellyfin" | "plex" }): React.
         ))}
       </div>
 
-      {/* Cards */}
+      {/* Items */}
       {syncedItemsQuery.isError ? (
         <StateMessage preset="error" onRetry={() => syncedItemsQuery.refetch()} minHeight="120px" />
       ) : isLoading ? (
         <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
         </div>
       ) : data && data.items.length > 0 ? (
-        <div className="rounded-xl border border-border/40 overflow-hidden">
-          <div className="divide-y divide-border/30">
-            {data.items.map((item) => {
-              const hasMedia = !!item.mediaId;
-              const mediaType = (item.mediaType ?? "movie") as string;
+        <div className="space-y-2">
+          {data.items.map((item) => {
+            const hasMedia = !!item.mediaId;
+            const mediaType = (item.mediaType ?? "movie") as string;
+            const serverLabel = item.source === "jellyfin" ? "Jellyfin" : "Plex";
+            const isFailed = item.result === "failed";
+            const idsMatch = hasMedia && item.tmdbId != null && item.mediaExternalId != null && item.tmdbId === item.mediaExternalId;
 
-              return (
-                <div key={item.id} className="flex items-center gap-3 px-4 py-3">
-                  {/* Poster */}
-                  <div className="shrink-0">
-                    {item.mediaPosterPath ? (
-                      <img
-                        src={`https://image.tmdb.org/t/p/w92${item.mediaPosterPath}`}
-                        alt=""
-                        className="h-14 w-10 rounded object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="flex h-14 w-10 items-center justify-center rounded bg-muted/50">
-                        {mediaType === "show" ? (
-                          <Tv className="h-4 w-4 text-muted-foreground/40" />
-                        ) : (
-                          <Film className="h-4 w-4 text-muted-foreground/40" />
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Title info */}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline gap-2">
-                      <p className="text-base font-medium text-foreground truncate">
-                        {hasMedia && item.mediaTitle ? item.mediaTitle : item.serverItemTitle}
-                      </p>
-                      <span className="shrink-0 text-sm text-muted-foreground">
-                        {(hasMedia && item.mediaYear) ? item.mediaYear : item.serverItemYear}
-                      </span>
-                    </div>
-                    {item.result === "failed" ? (
-                      <p className="text-sm text-destructive mt-0.5">
-                        {item.reason ?? "Not matched"}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  {/* Status + action */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    {item.result === "failed" && (
-                      <Badge variant="secondary" className="bg-destructive/10 text-destructive border-0 text-[10px]">
-                        Failed
-                      </Badge>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0"
-                      onClick={() => {
-                        const displayTitle = (hasMedia && item.mediaTitle) ? item.mediaTitle : item.serverItemTitle;
-                        setEditItem({
-                          id: item.id,
-                          title: displayTitle,
-                          type: mediaType,
-                          tmdbId: item.tmdbId,
-                        });
-                        setSearchQuery(displayTitle);
-                      }}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+            return (
+              <div
+                key={item.id}
+                className={cn(
+                  "flex items-center gap-4 rounded-xl border px-4 py-3 transition-colors",
+                  isFailed
+                    ? "border-destructive/20 bg-destructive/5"
+                    : "border-border/40 hover:border-border/60",
+                )}
+              >
+                {/* Status dot */}
+                <div className="shrink-0">
+                  {isFailed ? (
+                    <div className="h-2 w-2 rounded-full bg-destructive" />
+                  ) : idsMatch ? (
+                    <div className="h-2 w-2 rounded-full bg-green-500" />
+                  ) : (
+                    <div className="h-2 w-2 rounded-full bg-amber-500" />
+                  )}
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Content */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {hasMedia && item.mediaTitle ? item.mediaTitle : item.serverItemTitle}
+                    </p>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {(hasMedia && item.mediaYear) || item.serverItemYear}
+                    </span>
+                    {hasMedia && item.tmdbId && (
+                      <span className="shrink-0 text-[10px] text-muted-foreground font-mono">
+                        #{item.tmdbId}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {serverLabel}:
+                    </span>
+                    <span className="text-xs text-muted-foreground truncate">
+                      {item.serverItemTitle}
+                    </span>
+                    {!isFailed && !idsMatch && (
+                      <span className="shrink-0 text-[10px] font-medium text-amber-500">ID mismatch</span>
+                    )}
+                  </div>
+                  {isFailed && (
+                    <p className="text-xs text-destructive mt-1">{item.reason ?? "Could not match to any TMDB entry"}</p>
+                  )}
+                </div>
+
+                {/* Action */}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 w-8 p-0 shrink-0"
+                  onClick={() => {
+                    const displayTitle = (hasMedia && item.mediaTitle) ? item.mediaTitle : item.serverItemTitle;
+                    setEditItem({
+                      id: item.id,
+                      title: displayTitle,
+                      type: mediaType,
+                      tmdbId: item.tmdbId,
+                    });
+                    setSearchQuery(displayTitle);
+                  }}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            );
+          })}
         </div>
       ) : (
         <StateMessage preset="emptyGrid" minHeight="120px" />
@@ -225,7 +257,7 @@ function SyncHistorySection({ source }: { source: "jellyfin" | "plex" }): React.
       )}
 
       {/* Edit match dialog */}
-      <Dialog open={!!editItem} onOpenChange={(open) => { if (!open) { setEditItem(null); setSearchQuery(""); setTmdbIdInput(""); setUpdateServer(false); setSelectedMatch(null); } }}>
+      <Dialog open={!!editItem} onOpenChange={(open) => { if (!open) { setEditItem(null); setSearchQuery(""); setTmdbIdInput(""); setSelectedMatch(null); setUpdateServer(false); } }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit match: {editItem?.title}</DialogTitle>
@@ -289,24 +321,36 @@ function SyncHistorySection({ source }: { source: "jellyfin" | "plex" }): React.
               </div>
             )}
 
-            {/* Update media server toggle */}
-            <div className="flex items-center justify-between rounded-xl border border-border/40 px-4 py-3">
-              <div>
-                <p className="text-sm font-medium">Update on Jellyfin/Plex</p>
-                <p className="text-xs text-muted-foreground">
-                  Refresh metadata on the media server after saving
-                </p>
+            {/* Update media server */}
+            <div className="rounded-xl border border-border/40 px-4 py-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 shrink-0 text-amber-500 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Also update on Jellyfin/Plex</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
+                      Correct the metadata on the media server so it displays the right title and poster
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={updateServer}
+                  onCheckedChange={setUpdateServer}
+                />
               </div>
-              <Switch
-                checked={updateServer}
-                onCheckedChange={setUpdateServer}
-              />
+              {updateServer && (
+                <div className="flex items-start gap-3 rounded-lg bg-amber-500/10 px-3 py-2.5 ml-8">
+                  <p className="text-xs text-amber-500 leading-relaxed">
+                    Canto will update the TMDB/TVDB provider IDs on this item and trigger a metadata refresh. This changes how the item appears in your media server.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Footer with Save */}
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => { setEditItem(null); setSearchQuery(""); setTmdbIdInput(""); setUpdateServer(false); setSelectedMatch(null); }}>
+            <Button variant="outline" onClick={() => { setEditItem(null); setSearchQuery(""); setTmdbIdInput(""); setSelectedMatch(null); setUpdateServer(false); }}>
               Cancel
             </Button>
             <Button
@@ -469,14 +513,6 @@ function ServerLibraryGroup({
   isSyncingLibraries: boolean;
   onSyncLibraries: () => void;
 }): React.JSX.Element | null {
-  const importMedia = trpc.sync.importMedia.useMutation({
-    onSuccess: (data) => {
-      if (data.started.jellyfin || data.started.plex) toast.success("Sync started");
-      else toast.info("Sync already running");
-    },
-    onError: () => toast.error("Failed to start sync"),
-  });
-
   if (!enabled) return null;
 
   return (
@@ -485,31 +521,24 @@ function ServerLibraryGroup({
       description="Import your existing collection from the server into Canto. Enabled libraries are scanned every 5 minutes for new content."
     >
       <div className="space-y-4">
-        <LibraryLinkingSection source={source} />
-
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={onSyncLibraries}
-            disabled={isSyncingLibraries}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {isSyncingLibraries ? (
-              <><Loader2 className="mr-1.5 inline h-3.5 w-3.5 animate-spin" />Scanning...</>
-            ) : (
-              "Not seeing a library? Rescan server"
-            )}
-          </button>
+        {/* Rescan server card */}
+        <div className="flex items-center justify-between rounded-xl border border-border/40 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium text-foreground">Scan server libraries</p>
+            <p className="text-xs text-muted-foreground">Discover available libraries on the server to enable syncing</p>
+          </div>
           <Button
             size="sm"
-            variant="ghost"
-            onClick={() => importMedia.mutate()}
-            disabled={importMedia.isPending}
+            variant="outline"
+            onClick={onSyncLibraries}
+            disabled={isSyncingLibraries}
           >
-            {importMedia.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
-            Sync now
+            {isSyncingLibraries ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
+            Scan
           </Button>
         </div>
+
+        <LibraryLinkingSection source={source} />
       </div>
     </SettingsSection>
   );
@@ -625,7 +654,7 @@ export function MediaServerSyncSection({ serverType }: { serverType?: "jellyfin"
             isSyncingLibraries={syncJellyfin.isPending}
             onSyncLibraries={() => syncJellyfin.mutate()}
           />
-          <SyncHistorySection source="jellyfin" />
+          <SyncStatusSection source="jellyfin" />
         </>
       )}
       {showPlex && (
@@ -636,7 +665,7 @@ export function MediaServerSyncSection({ serverType }: { serverType?: "jellyfin"
             isSyncingLibraries={syncPlex.isPending}
             onSyncLibraries={() => syncPlex.mutate()}
           />
-          <SyncHistorySection source="plex" />
+          <SyncStatusSection source="plex" />
         </>
       )}
       {!serverType && <FolderScanSection />}
