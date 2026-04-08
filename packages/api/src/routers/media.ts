@@ -14,6 +14,7 @@ import {
   getPersonInput,
   recommendationsInput,
   getLogoInput,
+  setOverrideProviderInput,
 } from "@canto/validators";
 
 import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure } from "../trpc";
@@ -217,13 +218,14 @@ export const mediaRouter = createTRPCRouter({
       const { fetchMediaMetadata } = await import("@canto/core/domain/use-cases/fetch-media-metadata");
       const { persistFullMedia } = await import("@canto/db/persist-media");
       const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
-      const tvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+      const { getEffectiveProvider } = await import("@canto/core/domain/rules/effective-provider");
+      const effectiveProvider = await getEffectiveProvider(row);
       const supportedLangs = [...await getSupportedLanguageCodes(ctx.db)];
 
       const result = await fetchMediaMetadata(
         row.externalId, row.provider as ProviderName, row.type as MediaType,
         { tmdb, tvdb },
-        { reprocess: true, useTVDBSeasons: tvdbEnabled, supportedLanguages: supportedLangs },
+        { reprocess: true, useTVDBSeasons: effectiveProvider === "tvdb", supportedLanguages: supportedLangs },
       );
 
       await persistFullMedia(ctx.db, result, row.id);
@@ -271,16 +273,41 @@ export const mediaRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  syncTvdbSeasons: adminProcedure
-    .input(getByIdInput)
+  setOverrideProvider: adminProcedure
+    .input(setOverrideProviderInput)
     .mutation(async ({ ctx, input }) => {
-      const [{ reconcileShowStructure }, tmdb, tvdb, { jobDispatcher }] = await Promise.all([
-        import("@canto/core/domain/use-cases/reconcile-show-structure"),
-        getTmdbProvider(),
-        getTvdbProvider(),
-        import("@canto/core/infrastructure/adapters/job-dispatcher.adapter"),
-      ]);
-      await reconcileShowStructure(ctx.db, input.id, { tmdb, tvdb, dispatcher: jobDispatcher }, { force: true });
+      const row = await findMediaById(ctx.db, input.id);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
+      if (row.type !== "show") throw new TRPCError({ code: "BAD_REQUEST", message: "Provider override only applies to shows" });
+
+      await updateMedia(ctx.db, input.id, { overrideProviderFor: input.overrideProviderFor });
+
+      const { getEffectiveProvider } = await import("@canto/core/domain/rules/effective-provider");
+      const effectiveProvider = await getEffectiveProvider({ ...row, overrideProviderFor: input.overrideProviderFor });
+
+      if (effectiveProvider === "tvdb") {
+        const [{ reconcileShowStructure }, tmdb, tvdb, { jobDispatcher }] = await Promise.all([
+          import("@canto/core/domain/use-cases/reconcile-show-structure"),
+          getTmdbProvider(),
+          getTvdbProvider(),
+          import("@canto/core/infrastructure/adapters/job-dispatcher.adapter"),
+        ]);
+        await reconcileShowStructure(ctx.db, input.id, { tmdb, tvdb, dispatcher: jobDispatcher }, { force: true });
+      } else {
+        const { fetchMediaMetadata } = await import("@canto/core/domain/use-cases/fetch-media-metadata");
+        const { persistFullMedia } = await import("@canto/db/persist-media");
+        const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
+        const supportedLangs = [...await getSupportedLanguageCodes(ctx.db)];
+
+        const result = await fetchMediaMetadata(
+          row.externalId, row.provider as ProviderName, row.type as MediaType,
+          { tmdb, tvdb },
+          { reprocess: true, useTVDBSeasons: false, supportedLanguages: supportedLangs },
+        );
+        await persistFullMedia(ctx.db, result, row.id);
+      }
+
+      return findMediaById(ctx.db, input.id);
     }),
 
   listFiles: publicProcedure

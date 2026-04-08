@@ -79,6 +79,12 @@ export const getLogoInput = z.object({
 });
 export type GetLogoInput = z.infer<typeof getLogoInput>;
 
+export const setOverrideProviderInput = z.object({
+  id: z.string().uuid(),
+  overrideProviderFor: z.enum(["tmdb", "tvdb"]).nullable(),
+});
+export type SetOverrideProviderInput = z.infer<typeof setOverrideProviderInput>;
+
 export const recommendationsInput = z.object({
   cursor: z.number().int().min(0).default(0),
   pageSize: z.number().int().min(1).max(20).default(10),
