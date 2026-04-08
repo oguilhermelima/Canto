@@ -53,6 +53,25 @@ export async function getPlexSections(
 }
 
 /**
+ * Fetch a single item's current metadata from Plex.
+ */
+export async function getPlexItem(
+  url: string,
+  token: string,
+  ratingKey: string,
+): Promise<{ title: string; year?: number } | null> {
+  try {
+    const data = await plexFetch<{
+      MediaContainer: { Metadata?: Array<{ title: string; year?: number }> };
+    }>(url, token, `/library/metadata/${ratingKey}`);
+    const item = data.MediaContainer.Metadata?.[0];
+    return item ? { title: item.title, year: item.year } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Refresh metadata for a specific Plex item (best-effort, never throws).
  */
 export async function refreshPlexItem(

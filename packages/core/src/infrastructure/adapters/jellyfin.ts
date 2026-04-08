@@ -82,6 +82,27 @@ export async function getJellyfinLibraryFolders(
 }
 
 /**
+ * Fetch a single item's current metadata from Jellyfin.
+ */
+export async function getJellyfinItem(
+  url: string,
+  apiKey: string,
+  itemId: string,
+): Promise<{ name: string; year?: number; providerIds?: Record<string, string> } | null> {
+  try {
+    const res = await fetch(
+      `${url}/Items/${itemId}?Fields=ProviderIds,ProductionYear`,
+      { headers: headers(apiKey), signal: AbortSignal.timeout(10_000) },
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { Name: string; ProductionYear?: number; ProviderIds?: Record<string, string> };
+    return { name: data.Name, year: data.ProductionYear, providerIds: data.ProviderIds };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Refresh metadata for a specific Jellyfin item (best-effort, never throws).
  */
 export async function refreshJellyfinItem(

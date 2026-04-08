@@ -6,18 +6,26 @@ import type { Database } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
 import { SETTINGS } from "../../lib/settings-keys";
 import { findMediaById } from "../../infrastructure/repositories/media-repository";
-import { findSyncItemsByMediaId } from "../../infrastructure/repositories/sync-repository";
+import { findSyncItemsByMediaId, updateSyncItem } from "../../infrastructure/repositories/sync-repository";
 import {
   updateJellyfinProviderIds,
   refreshJellyfinItem,
+  getJellyfinItem,
 } from "../../infrastructure/adapters/jellyfin";
-import { refreshPlexItem } from "../../infrastructure/adapters/plex";
+import { refreshPlexItem, getPlexItem } from "../../infrastructure/adapters/plex";
+
+export interface ServerUpdateResult {
+  jellyfin: boolean;
+  plex: boolean;
+  /** Updated server title after refresh (confirmation that fix propagated). */
+  updatedServerTitle?: string;
+}
 
 export async function updateMediaServerMetadata(
   db: Database,
   mediaId: string,
-): Promise<{ jellyfin: boolean; plex: boolean }> {
-  const result = { jellyfin: false, plex: false };
+): Promise<ServerUpdateResult> {
+  const result: ServerUpdateResult = { jellyfin: false, plex: false };
 
   const mediaRow = await findMediaById(db, mediaId);
   if (!mediaRow) return result;
@@ -60,6 +68,21 @@ export async function updateMediaServerMetadata(
           jellyfinKey as string,
           item.jellyfinItemId,
         );
+
+        // Re-fetch item to confirm the update and sync the title back
+        const updated = await getJellyfinItem(
+          jellyfinUrl as string,
+          jellyfinKey as string,
+          item.jellyfinItemId,
+        );
+        if (updated) {
+          await updateSyncItem(db, item.id, {
+            serverItemTitle: updated.name,
+            serverItemYear: updated.year ?? null,
+          });
+          result.updatedServerTitle = updated.name;
+        }
+
         result.jellyfin = true;
       } catch (err) {
         console.warn(
@@ -83,6 +106,21 @@ export async function updateMediaServerMetadata(
           plexToken as string,
           item.plexRatingKey,
         );
+
+        // Re-fetch item to confirm and sync title back
+        const updated = await getPlexItem(
+          plexUrl as string,
+          plexToken as string,
+          item.plexRatingKey,
+        );
+        if (updated) {
+          await updateSyncItem(db, item.id, {
+            serverItemTitle: updated.title,
+            serverItemYear: updated.year ?? null,
+          });
+          result.updatedServerTitle = updated.title;
+        }
+
         result.plex = true;
       } catch (err) {
         console.warn(
