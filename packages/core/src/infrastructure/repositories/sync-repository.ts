@@ -11,6 +11,7 @@ export async function findSyncItemById(db: Database, id: string) {
 export async function findSyncItemsByMediaId(db: Database, mediaId: string) {
   return db
     .select({
+      id: syncItem.id,
       source: syncItem.source,
       jellyfinItemId: syncItem.jellyfinItemId,
       plexRatingKey: syncItem.plexRatingKey,
@@ -45,6 +46,7 @@ export async function findSyncItemsPaginated(
         mediaTitle: media.title,
         mediaType: media.type,
         mediaYear: media.year,
+        mediaExternalId: media.externalId,
       })
       .from(syncItem)
       .leftJoin(media, eq(syncItem.mediaId, media.id))
@@ -130,16 +132,20 @@ export async function upsertSyncItemByServerKey(
   );
 
   if (existing) {
+    // Protect resolved items: if already linked to a media with a different tmdbId,
+    // only update server-side metadata (title/path/year) but preserve the match.
+    const isAlreadyResolved = !!existing.mediaId;
+    const incomingDiffers = isAlreadyResolved && data.tmdbId !== existing.tmdbId;
+
     await db
       .update(syncItem)
       .set({
         serverItemTitle: data.serverItemTitle,
         serverItemPath: data.serverItemPath,
         serverItemYear: data.serverItemYear,
-        tmdbId: data.tmdbId,
-        mediaId: data.mediaId,
-        result: data.result,
-        reason: data.reason,
+        ...(incomingDiffers
+          ? {} // preserve existing tmdbId, mediaId, result, reason
+          : { tmdbId: data.tmdbId, mediaId: data.mediaId, result: data.result, reason: data.reason }),
         syncedAt: data.syncedAt,
         serverLinkId: data.serverLinkId,
       })
