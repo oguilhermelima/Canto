@@ -11,6 +11,7 @@ export type ListSyncedItemsInput = z.infer<typeof listSyncedItemsInput>;
 
 export const searchForSyncItemInput = z.object({
   query: z.string().min(1),
+  type: z.enum(["movie", "show"]).optional(),
 });
 export type SearchForSyncItemInput = z.infer<typeof searchForSyncItemInput>;
 

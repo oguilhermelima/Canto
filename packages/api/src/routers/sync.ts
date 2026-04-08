@@ -74,7 +74,7 @@ export const syncRouter = createTRPCRouter({
     .input(searchForSyncItemInput)
     .query(async ({ input }) => {
       const tmdb = await getTmdbProvider();
-      return tmdb.search(input.query, "movie");
+      return tmdb.search(input.query, input.type ?? "movie");
     }),
 
   resolveSyncItem: adminProcedure
