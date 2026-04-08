@@ -9,6 +9,7 @@ import { Skeleton } from "@canto/ui/skeleton";
 import { Badge } from "@canto/ui/badge";
 import {
   Loader2,
+  CheckCircle,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
@@ -16,7 +17,6 @@ import {
   FolderSearch,
   Film,
   Tv,
-  ArrowRight,
   Pencil,
 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
@@ -66,10 +66,12 @@ function SyncHistorySection({ source }: { source: "jellyfin" | "plex" }): React.
     id: string;
     title: string;
     type: string;
+    tmdbId: number | null;
   } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tmdbIdInput, setTmdbIdInput] = useState("");
   const [updateServer, setUpdateServer] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState<{ tmdbId: number; type: string } | null>(null);
 
   const utils = trpc.useUtils();
 
@@ -134,7 +136,6 @@ function SyncHistorySection({ source }: { source: "jellyfin" | "plex" }): React.
           <div className="divide-y divide-border/30">
             {data.items.map((item) => {
               const hasMedia = !!item.mediaId;
-              const titleMismatch = hasMedia && item.mediaTitle && item.mediaTitle !== item.serverItemTitle;
               const mediaType = (item.mediaType ?? "movie") as string;
 
               return (
@@ -163,23 +164,13 @@ function SyncHistorySection({ source }: { source: "jellyfin" | "plex" }): React.
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-2">
                       <p className="text-base font-medium text-foreground truncate">
-                        {item.serverItemTitle}
+                        {hasMedia && item.mediaTitle ? item.mediaTitle : item.serverItemTitle}
                       </p>
-                      {item.serverItemYear && (
-                        <span className="shrink-0 text-sm text-muted-foreground">
-                          {item.serverItemYear}
-                        </span>
-                      )}
+                      <span className="shrink-0 text-sm text-muted-foreground">
+                        {(hasMedia && item.mediaYear) ? item.mediaYear : item.serverItemYear}
+                      </span>
                     </div>
-                    {titleMismatch ? (
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground/40" />
-                        <p className="text-sm text-muted-foreground truncate">
-                          {item.mediaTitle}
-                          {item.mediaYear ? ` (${item.mediaYear})` : ""}
-                        </p>
-                      </div>
-                    ) : item.result === "failed" ? (
+                    {item.result === "failed" ? (
                       <p className="text-sm text-destructive mt-0.5">
                         {item.reason ?? "Not matched"}
                       </p>
@@ -202,6 +193,7 @@ function SyncHistorySection({ source }: { source: "jellyfin" | "plex" }): React.
                           id: item.id,
                           title: item.serverItemTitle,
                           type: mediaType,
+                          tmdbId: item.tmdbId,
                         });
                         setSearchQuery(item.serverItemTitle);
                       }}
@@ -232,53 +224,21 @@ function SyncHistorySection({ source }: { source: "jellyfin" | "plex" }): React.
       )}
 
       {/* Edit match dialog */}
-      <Dialog open={!!editItem} onOpenChange={(open) => { if (!open) { setEditItem(null); setSearchQuery(""); setTmdbIdInput(""); setUpdateServer(false); } }}>
+      <Dialog open={!!editItem} onOpenChange={(open) => { if (!open) { setEditItem(null); setSearchQuery(""); setTmdbIdInput(""); setUpdateServer(false); setSelectedMatch(null); } }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit match: {editItem?.title}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            {/* Update media server toggle */}
-            <div className="flex items-center justify-between rounded-xl border border-border/40 px-4 py-3">
-              <div>
-                <p className="text-sm font-medium">Update on Jellyfin/Plex</p>
-                <p className="text-xs text-muted-foreground">
-                  Correct the metadata on the media server after fixing the match
-                </p>
-              </div>
-              <Switch
-                checked={updateServer}
-                onCheckedChange={setUpdateServer}
-              />
-            </div>
-
             {/* TMDB ID input */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-muted-foreground">TMDB ID</label>
-              <div className="flex gap-2">
-                <Input
-                  value={tmdbIdInput}
-                  onChange={(e) => setTmdbIdInput(e.target.value)}
-                  placeholder="e.g. 12345"
-                  className="h-10 rounded-xl border-none bg-muted/50 text-sm focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
-                />
-                <Button
-                  size="sm"
-                  disabled={!tmdbIdInput || resolveItem.isPending}
-                  onClick={() => {
-                    if (editItem && tmdbIdInput) {
-                      resolveItem.mutate({
-                        syncItemId: editItem.id,
-                        tmdbId: parseInt(tmdbIdInput, 10),
-                        type: editItem.type as "movie" | "show",
-                        updateMediaServer: updateServer,
-                      });
-                    }
-                  }}
-                >
-                  {resolveItem.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Match"}
-                </Button>
-              </div>
+              <Input
+                value={tmdbIdInput}
+                onChange={(e) => { setTmdbIdInput(e.target.value); setSelectedMatch(null); }}
+                placeholder="e.g. 12345"
+                className="h-10 rounded-xl border-none bg-muted/50 text-sm focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+              />
             </div>
 
             <OrDivider />
@@ -297,35 +257,77 @@ function SyncHistorySection({ source }: { source: "jellyfin" | "plex" }): React.
             {/* Search results */}
             {searchResults.data && searchResults.data.results.length > 0 && (
               <div className="max-h-60 overflow-y-auto rounded-xl border border-border/40">
-                {searchResults.data.results.slice(0, 10).map((result) => (
-                  <button
-                    key={`${result.externalId}-${result.type}`}
-                    type="button"
-                    onClick={() => {
-                      if (editItem) {
-                        resolveItem.mutate({
-                          syncItemId: editItem.id,
-                          tmdbId: result.externalId,
-                          type: result.type as "movie" | "show",
-                          updateMediaServer: updateServer,
-                        });
-                      }
-                    }}
-                    className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/30"
-                  >
-                    {result.posterPath ? (
-                      <img src={`https://image.tmdb.org/t/p/w92${result.posterPath}`} alt="" className="h-12 w-8 rounded object-cover" />
-                    ) : (
-                      <div className="flex h-12 w-8 items-center justify-center rounded bg-muted text-[10px] text-muted-foreground">N/A</div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-foreground truncate">{result.title}</p>
-                      <p className="text-xs text-muted-foreground">{result.year} · {result.type}</p>
-                    </div>
-                  </button>
-                ))}
+                {searchResults.data.results.slice(0, 10).map((result) => {
+                  const isSelected = selectedMatch?.tmdbId === result.externalId;
+                  return (
+                    <button
+                      key={`${result.externalId}-${result.type}`}
+                      type="button"
+                      onClick={() => {
+                        setSelectedMatch({ tmdbId: result.externalId, type: result.type });
+                        setTmdbIdInput("");
+                      }}
+                      className={cn(
+                        "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
+                        isSelected ? "bg-primary/10" : "hover:bg-muted/30",
+                      )}
+                    >
+                      {result.posterPath ? (
+                        <img src={`https://image.tmdb.org/t/p/w92${result.posterPath}`} alt="" className="h-12 w-8 rounded object-cover" />
+                      ) : (
+                        <div className="flex h-12 w-8 items-center justify-center rounded bg-muted text-[10px] text-muted-foreground">N/A</div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground truncate">{result.title}</p>
+                        <p className="text-xs text-muted-foreground">{result.year} · {result.type}</p>
+                      </div>
+                      {isSelected && <CheckCircle className="h-4 w-4 shrink-0 text-primary" />}
+                    </button>
+                  );
+                })}
               </div>
             )}
+
+            {/* Update media server toggle */}
+            <div className="flex items-center justify-between rounded-xl border border-border/40 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium">Update on Jellyfin/Plex</p>
+                <p className="text-xs text-muted-foreground">
+                  Refresh metadata on the media server after saving
+                </p>
+              </div>
+              <Switch
+                checked={updateServer}
+                onCheckedChange={setUpdateServer}
+              />
+            </div>
+          </div>
+
+          {/* Footer with Save */}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => { setEditItem(null); setSearchQuery(""); setTmdbIdInput(""); setUpdateServer(false); setSelectedMatch(null); }}>
+              Cancel
+            </Button>
+            <Button
+              disabled={resolveItem.isPending || (!selectedMatch && !tmdbIdInput && !editItem?.tmdbId)}
+              onClick={() => {
+                if (!editItem) return;
+                const tmdbId = selectedMatch?.tmdbId
+                  ?? (tmdbIdInput ? parseInt(tmdbIdInput, 10) : null)
+                  ?? editItem.tmdbId;
+                if (!tmdbId) return;
+                const type = selectedMatch?.type ?? editItem.type;
+                resolveItem.mutate({
+                  syncItemId: editItem.id,
+                  tmdbId,
+                  type: type as "movie" | "show",
+                  updateMediaServer: updateServer,
+                });
+              }}
+            >
+              {resolveItem.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
