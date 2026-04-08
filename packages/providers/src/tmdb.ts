@@ -329,6 +329,24 @@ export class TmdbProvider implements MetadataProvider {
     return results;
   }
 
+  /* ── Find by TVDB ID ────────────────────────────────────────────────── */
+
+  async findByTvdbId(tvdbId: number): Promise<SearchResult[]> {
+    const data = await this.fetch<{
+      movie_results: unknown[];
+      tv_results: unknown[];
+    }>(`/find/${tvdbId}`, { external_source: "tvdb_id" });
+
+    const results: SearchResult[] = [];
+    for (const r of data.movie_results ?? []) {
+      results.push(this.normalizeSearchResult(r, "movie"));
+    }
+    for (const r of data.tv_results ?? []) {
+      results.push(this.normalizeSearchResult(r, "show"));
+    }
+    return results;
+  }
+
   /* ── Extras ─────────────────────────────────────────────────────────── */
 
   async getExtras(externalId: number, type: MediaType, opts?: { supportedLanguages?: string[] }): Promise<MediaExtras> {
