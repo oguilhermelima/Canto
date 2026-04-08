@@ -4,6 +4,7 @@ import {
   season,
   seasonTranslation,
   episodeTranslation,
+  mediaFile,
 } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
 import {
@@ -153,7 +154,61 @@ export async function reconcileShowStructure(
       }));
     }
 
-    // NOW delete seasons (cascade deletes episodes + translations)
+    // Save existing media_files before deleting seasons (cascade deletes episodes + media_files)
+    interface SavedMediaFile {
+      filePath: string;
+      mediaId: string;
+      torrentId: string | null;
+      quality: string | null;
+      source: string | null;
+      status: string;
+      sizeBytes: number | null;
+      absoluteNumber: number | null;
+      seasonNumber: number;
+      episodeNumber: number;
+    }
+    let savedMediaFiles: SavedMediaFile[] = [];
+
+    if (existingEpIds.length > 0) {
+      const files = await db.query.mediaFile.findMany({
+        where: eq(mediaFile.mediaId, mediaId),
+      });
+
+      // Build lookup: episodeId -> {absoluteNumber, seasonNumber, episodeNumber}
+      const epInfoById = new Map<
+        string,
+        { absoluteNumber: number | null; seasonNumber: number; number: number }
+      >();
+      for (const s of existingSeasons) {
+        for (const e of s.episodes) {
+          epInfoById.set(e.id, {
+            absoluteNumber: e.absoluteNumber,
+            seasonNumber: s.number,
+            number: e.number,
+          });
+        }
+      }
+
+      savedMediaFiles = files
+        .filter((f) => f.episodeId != null)
+        .map((f) => {
+          const info = epInfoById.get(f.episodeId!);
+          return {
+            filePath: f.filePath,
+            mediaId: f.mediaId,
+            torrentId: f.torrentId,
+            quality: f.quality,
+            source: f.source,
+            status: f.status,
+            sizeBytes: f.sizeBytes,
+            absoluteNumber: info?.absoluteNumber ?? null,
+            seasonNumber: info?.seasonNumber ?? 0,
+            episodeNumber: info?.number ?? 0,
+          };
+        });
+    }
+
+    // NOW delete seasons (cascade deletes episodes + translations + media_files)
     await db.delete(season).where(eq(season.mediaId, mediaId));
     await persistSeasons(db, mediaId, tvdbData);
     await updateMedia(db, mediaId, {
@@ -161,8 +216,8 @@ export async function reconcileShowStructure(
       numberOfEpisodes: tvdbData.numberOfEpisodes,
     });
 
-    // Restore saved translations by matching to new episodes
-    if (savedEpTranslations.length > 0 || savedSeasonTranslations.length > 0) {
+    // Restore saved translations and media_files by matching to new episodes
+    if (savedEpTranslations.length > 0 || savedSeasonTranslations.length > 0 || savedMediaFiles.length > 0) {
       const newSeasons = await db.query.season.findMany({
         where: eq(season.mediaId, mediaId),
         with: {
@@ -258,6 +313,63 @@ export async function reconcileShowStructure(
                 overview: sql`EXCLUDED.overview`,
               },
             });
+        }
+      }
+
+      // Restore media_files by matching to new episodes
+      if (savedMediaFiles.length > 0) {
+        const newEpByAbsolute = new Map<number, string>();
+        const newEpBySeasonEp = new Map<string, string>();
+        for (const s of newSeasons) {
+          for (const e of s.episodes) {
+            if (e.absoluteNumber != null) {
+              newEpByAbsolute.set(e.absoluteNumber, e.id);
+            }
+            newEpBySeasonEp.set(`${s.number}-${e.number}`, e.id);
+          }
+        }
+
+        const fileRows: Array<{
+          mediaId: string;
+          episodeId: string | null;
+          torrentId: string | null;
+          filePath: string;
+          quality: string | null;
+          source: string | null;
+          status: string;
+          sizeBytes: number | null;
+        }> = [];
+
+        for (const f of savedMediaFiles) {
+          let newEpId: string | undefined;
+          if (f.absoluteNumber != null) {
+            newEpId = newEpByAbsolute.get(f.absoluteNumber);
+          }
+          if (!newEpId) {
+            newEpId = newEpBySeasonEp.get(
+              `${f.seasonNumber}-${f.episodeNumber}`,
+            );
+          }
+          if (!newEpId) {
+            console.warn(
+              `[reconcile] media_file "${f.filePath}" could not be matched to a new episode (abs=${f.absoluteNumber}, S${f.seasonNumber}E${f.episodeNumber})`,
+            );
+          }
+          fileRows.push({
+            mediaId: f.mediaId,
+            episodeId: newEpId ?? null,
+            torrentId: f.torrentId,
+            filePath: f.filePath,
+            quality: f.quality,
+            source: f.source,
+            status: f.status,
+            sizeBytes: f.sizeBytes,
+          });
+        }
+
+        for (let i = 0; i < fileRows.length; i += 500) {
+          const chunk = fileRows.slice(i, i + 500);
+          await db.insert(mediaFile).values(chunk);
         }
       }
     }
