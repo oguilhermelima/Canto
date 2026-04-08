@@ -46,12 +46,15 @@ export async function scanPlexMedia(
       for (const item of metadata) {
         let tmdbId: number | undefined;
         let imdbId: string | undefined;
+        let tvdbId: number | undefined;
 
         for (const guid of item.Guid ?? []) {
           if (guid.id.startsWith("tmdb://")) {
             tmdbId = parseInt(guid.id.replace("tmdb://", ""), 10);
           } else if (guid.id.startsWith("imdb://")) {
             imdbId = guid.id.replace("imdb://", "");
+          } else if (guid.id.startsWith("tvdb://")) {
+            tvdbId = parseInt(guid.id.replace("tvdb://", ""), 10);
           }
         }
 
@@ -65,6 +68,7 @@ export async function scanPlexMedia(
         items.push({
           tmdbId,
           imdbId,
+          tvdbId,
           title: item.title,
           year: item.year,
           type: mediaType,

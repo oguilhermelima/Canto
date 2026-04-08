@@ -11,6 +11,7 @@ export interface JellyfinLibraryRef {
 export interface PendingImport {
   tmdbId?: number;
   imdbId?: string;
+  tvdbId?: number;
   title: string;
   year?: number;
   type: "movie" | "show";
@@ -54,16 +55,18 @@ export async function scanJellyfinMedia(
               Name: string;
               ProductionYear?: number;
               Path?: string;
-              ProviderIds?: { Tmdb?: string; Imdb?: string };
+              ProviderIds?: { Tmdb?: string; Imdb?: string; Tvdb?: string };
             }>;
             TotalRecordCount: number;
           };
 
           for (const item of data.Items) {
             const tmdbStr = item.ProviderIds?.Tmdb;
+            const tvdbStr = item.ProviderIds?.Tvdb;
             items.push({
               tmdbId: tmdbStr ? parseInt(tmdbStr, 10) : undefined,
               imdbId: item.ProviderIds?.Imdb,
+              tvdbId: tvdbStr ? parseInt(tvdbStr, 10) : undefined,
               title: item.Name,
               year: item.ProductionYear,
               type: mediaType,
