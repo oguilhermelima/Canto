@@ -169,9 +169,10 @@ export async function checkPlexPin(input: {
         headers: { Accept: "application/json" },
       });
       if (serverRes.ok) {
-        const serverData = (await serverRes.json()) as { MediaContainer: { friendlyName: string } };
+        const serverData = (await serverRes.json()) as { MediaContainer: { friendlyName: string; machineIdentifier: string } };
         serverName = serverData.MediaContainer.friendlyName;
         await setSetting(SETTINGS.PLEX_URL, input.serverUrl);
+        await setSetting(SETTINGS.PLEX_MACHINE_ID, serverData.MediaContainer.machineIdentifier);
       }
     } catch { /* Server not reachable, still save token */ }
   }
