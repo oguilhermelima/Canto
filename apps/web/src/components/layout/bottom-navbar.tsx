@@ -24,7 +24,7 @@ import {
   Sun,
   Moon,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { authClient } from "~/lib/auth-client";
 
@@ -46,6 +46,8 @@ export function BottomNavbar(): React.JSX.Element {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const { data: session } = authClient.useSession();
   const role = (session?.user as { role?: string } | undefined)?.role;
   const navItems = role === "admin" ? adminNavItems : userNavItems;
@@ -70,6 +72,7 @@ export function BottomNavbar(): React.JSX.Element {
         </Link>
       ))}
 
+      {mounted ? (
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetTrigger asChild>
           <button className="flex flex-col items-center gap-1 px-3 py-2 text-xs text-muted-foreground transition-colors">
@@ -163,6 +166,12 @@ export function BottomNavbar(): React.JSX.Element {
           </div>
         </SheetContent>
       </Sheet>
+      ) : (
+        <button className="flex flex-col items-center gap-1 px-3 py-2 text-xs text-muted-foreground transition-colors">
+          <UserRound size={20} />
+          <span>Menu</span>
+        </button>
+      )}
     </nav>
   );
 }
