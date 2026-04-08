@@ -81,7 +81,14 @@ export const syncRouter = createTRPCRouter({
     .input(resolveSyncItemInput)
     .mutation(async ({ ctx, input }) => {
       const tmdb = await getTmdbProvider();
-      return resolveSyncItem(ctx.db, input, tmdb);
+      const result = await resolveSyncItem(ctx.db, input, tmdb);
+
+      if (input.updateMediaServer && result.mediaId) {
+        const { updateMediaServerMetadata } = await import("@canto/core/domain/use-cases/update-media-server-metadata");
+        await updateMediaServerMetadata(ctx.db, result.mediaId);
+      }
+
+      return result;
     }),
 
   mediaServers: protectedProcedure

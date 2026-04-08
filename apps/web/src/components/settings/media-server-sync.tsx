@@ -69,6 +69,7 @@ function SyncHistorySection({ source }: { source: "jellyfin" | "plex" }): React.
   } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tmdbIdInput, setTmdbIdInput] = useState("");
+  const [updateServer, setUpdateServer] = useState(false);
 
   const utils = trpc.useUtils();
 
@@ -231,12 +232,26 @@ function SyncHistorySection({ source }: { source: "jellyfin" | "plex" }): React.
       )}
 
       {/* Edit match dialog */}
-      <Dialog open={!!editItem} onOpenChange={(open) => { if (!open) { setEditItem(null); setSearchQuery(""); setTmdbIdInput(""); } }}>
+      <Dialog open={!!editItem} onOpenChange={(open) => { if (!open) { setEditItem(null); setSearchQuery(""); setTmdbIdInput(""); setUpdateServer(false); } }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit match: {editItem?.title}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
+            {/* Update media server toggle */}
+            <div className="flex items-center justify-between rounded-xl border border-border/40 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium">Update on Jellyfin/Plex</p>
+                <p className="text-xs text-muted-foreground">
+                  Correct the metadata on the media server after fixing the match
+                </p>
+              </div>
+              <Switch
+                checked={updateServer}
+                onCheckedChange={setUpdateServer}
+              />
+            </div>
+
             {/* TMDB ID input */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-muted-foreground">TMDB ID</label>
@@ -256,6 +271,7 @@ function SyncHistorySection({ source }: { source: "jellyfin" | "plex" }): React.
                         syncItemId: editItem.id,
                         tmdbId: parseInt(tmdbIdInput, 10),
                         type: editItem.type as "movie" | "show",
+                        updateMediaServer: updateServer,
                       });
                     }
                   }}
@@ -291,6 +307,7 @@ function SyncHistorySection({ source }: { source: "jellyfin" | "plex" }): React.
                           syncItemId: editItem.id,
                           tmdbId: result.externalId,
                           type: result.type as "movie" | "show",
+                          updateMediaServer: updateServer,
                         });
                       }
                     }}

@@ -19,6 +19,7 @@ export const resolveSyncItemInput = z.object({
   syncItemId: z.string().uuid(),
   tmdbId: z.number().int(),
   type: z.enum(["movie", "show"]),
+  updateMediaServer: z.boolean().optional().default(false),
 });
 export type ResolveSyncItemInput = z.infer<typeof resolveSyncItemInput>;
 
