@@ -249,6 +249,9 @@ export const media = pgTable(
     imdbId: varchar("imdb_id", { length: 20 }),
     tvdbId: integer("tvdb_id"),
 
+    // Per-media provider override (null = follow global setting)
+    overrideProviderFor: varchar("override_provider_for", { length: 20 }),
+
     // TV-specific
     numberOfSeasons: integer("number_of_seasons"),
     numberOfEpisodes: integer("number_of_episodes"),

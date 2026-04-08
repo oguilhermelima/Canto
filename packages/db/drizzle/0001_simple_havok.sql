@@ -1,0 +1,1 @@
+ALTER TABLE "media" ADD COLUMN "override_provider_for" varchar(20);
