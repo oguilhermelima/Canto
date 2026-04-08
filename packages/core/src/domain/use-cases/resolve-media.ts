@@ -5,6 +5,7 @@ import { getSetting } from "@canto/db/settings";
 import { getSupportedLanguageCodes } from "@canto/db/persist-media";
 import { SETTINGS } from "../../lib/settings-keys";
 import { findMediaByExternalId } from "../../infrastructure/repositories/media-repository";
+import { getEffectiveProviderSync } from "../rules/effective-provider";
 import { fetchMediaMetadata } from "./fetch-media-metadata";
 import { loadExtrasFromDB } from "../services/extras-service";
 import { applyMediaTranslation, applySeasonsTranslation } from "../services/translation-service";
@@ -28,7 +29,7 @@ export async function resolveMedia(
   userId: string,
   providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort },
 ) {
-  const tvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+  const globalTvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
 
   const existing = await findMediaByExternalId(db, input.externalId, input.provider);
 
@@ -50,12 +51,16 @@ export async function resolveMedia(
     };
   }
 
+  const useTVDBSeasons = existing
+    ? getEffectiveProviderSync(existing, globalTvdbEnabled) === "tvdb"
+    : globalTvdbEnabled;
+
   const supportedLangs = [...await getSupportedLanguageCodes(db)];
 
   const result = await fetchMediaMetadata(
     input.externalId, input.provider, input.type,
     providers,
-    { useTVDBSeasons: tvdbEnabled, supportedLanguages: supportedLangs },
+    { useTVDBSeasons, supportedLanguages: supportedLangs },
   );
 
   return {

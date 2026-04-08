@@ -5,6 +5,7 @@ import { getSetting } from "@canto/db/settings";
 import { getSupportedLanguageCodes, persistFullMedia } from "@canto/db/persist-media";
 import { SETTINGS } from "../../lib/settings-keys";
 import { logAndSwallow } from "../../lib/log-error";
+import { getEffectiveProviderSync } from "../rules/effective-provider";
 import {
   findMediaByExternalId,
   findMediaByAnyReference,
@@ -28,20 +29,24 @@ export async function persistMediaUseCase(
   input: PersistMediaInput,
   providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort },
 ) {
-  const tvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+  const globalTvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
 
-  const existing = tvdbEnabled
+  const existing = globalTvdbEnabled
     ? await findMediaByAnyReference(db, input.externalId, input.provider)
     : await findMediaByExternalId(db, input.externalId, input.provider);
 
   if (existing?.processingStatus === "ready") return existing;
+
+  const useTVDBSeasons = existing
+    ? getEffectiveProviderSync(existing, globalTvdbEnabled) === "tvdb"
+    : globalTvdbEnabled;
 
   const supportedLangs = [...await getSupportedLanguageCodes(db)];
 
   const result = await fetchMediaMetadata(
     input.externalId, input.provider, input.type,
     providers,
-    { useTVDBSeasons: tvdbEnabled, supportedLanguages: supportedLangs },
+    { useTVDBSeasons, supportedLanguages: supportedLangs },
   );
 
   const mediaId = await persistFullMedia(db, result, existing?.id);

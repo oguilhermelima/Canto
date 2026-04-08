@@ -1,7 +1,5 @@
 import type { Database } from "@canto/db/client";
-import { getSetting } from "@canto/db/settings";
 import { getSupportedLanguageCodes, updateMediaFromNormalized } from "@canto/db/persist-media";
-import { SETTINGS } from "../../lib/settings-keys";
 import { findMediaById, updateMedia } from "../../infrastructure/repositories/media-repository";
 import { refreshExtras } from "./refresh-extras";
 import { reconcileShowStructure } from "./reconcile-show-structure";
@@ -78,14 +76,12 @@ export async function enrichMedia(
   }
 
   // TVDB reconcile — needs tvdbId/imdbId from metadata, so runs after metadata completes
+  // reconcileShowStructure internally checks per-media override + global setting
   if (isShow) {
-    const tvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
-    if (tvdbEnabled) {
-      try {
-        await reconcileShowStructure(db, mediaId, { tmdb: deps.tmdb, tvdb: deps.tvdb, dispatcher: deps.dispatcher });
-      } catch (err) {
-        console.error(`[enrich-media] TVDB reconcile failed for ${mediaId}:`, err instanceof Error ? err.message : err);
-      }
+    try {
+      await reconcileShowStructure(db, mediaId, { tmdb: deps.tmdb, tvdb: deps.tvdb, dispatcher: deps.dispatcher });
+    } catch (err) {
+      console.error(`[enrich-media] TVDB reconcile failed for ${mediaId}:`, err instanceof Error ? err.message : err);
     }
   }
 

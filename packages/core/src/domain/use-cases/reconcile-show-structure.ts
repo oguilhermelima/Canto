@@ -19,6 +19,7 @@ import {
 import type { MediaProviderPort } from "../ports/media-provider.port";
 import { logAndSwallow } from "../../lib/log-error";
 import type { JobDispatcherPort } from "../ports/job-dispatcher.port";
+import { getEffectiveProvider } from "../rules/effective-provider";
 
 /**
  * Reconcile season/episode structure from TVDB without touching TMDB metadata.
@@ -30,14 +31,13 @@ export async function reconcileShowStructure(
   deps: { tmdb: MediaProviderPort; tvdb: MediaProviderPort; dispatcher: JobDispatcherPort },
   options?: { force?: boolean },
 ): Promise<void> {
-  if (!options?.force) {
-    const tvdbDefault =
-      (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
-    if (!tvdbDefault) return;
-  }
-
   const row = await findMediaById(db, mediaId);
   if (!row || row.type !== "show") return;
+
+  if (!options?.force) {
+    const effectiveProvider = await getEffectiveProvider(row);
+    if (effectiveProvider !== "tvdb") return;
+  }
 
   const isAlreadyTvdb = row.provider === "tvdb";
   const tvdb = deps.tvdb;

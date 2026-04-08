@@ -59,7 +59,8 @@ export function buildMediaDir(
 ): string {
   const safeTitle = sanitizeName(media.title);
   const yearSuffix = media.year ? ` (${media.year})` : "";
-  const idTag = `[tmdbid-${media.externalId}]`;
+  const providerTag = media.provider === "tvdb" ? "tvdbid" : "tmdbid";
+  const idTag = `[${providerTag}-${media.externalId}]`;
   const baseName = `${safeTitle}${yearSuffix} ${idTag}`;
 
   if (media.type === "movie") {

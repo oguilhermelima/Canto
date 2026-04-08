@@ -8,6 +8,7 @@ import type { DownloadClientPort, TorrentFileInfo } from "../ports/download-clie
 import { isVideoFile, sanitizeName, buildMediaDir, buildFileName } from "../rules/naming";
 import { EP_PATTERN, BARE_EP_PATTERN, parseFileEpisodes, isSubtitleFile, parseSubtitleLanguage } from "../rules/parsing";
 import { SETTINGS } from "../../lib/settings-keys";
+import { getEffectiveProviderSync } from "../rules/effective-provider";
 import { createNotification } from "./create-notification";
 import {
   findMediaByIdWithSeasons,
@@ -571,11 +572,19 @@ export async function autoImportTorrent(
     return;
   }
 
+  const globalTvdbEnabled =
+    (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+  const effectiveProvider = getEffectiveProviderSync(mediaRow, globalTvdbEnabled);
+  const namingExternalId =
+    effectiveProvider === "tvdb" && mediaRow.tvdbId
+      ? mediaRow.tvdbId
+      : mediaRow.externalId;
+
   const mediaNaming = {
     title: mediaRow.title,
     year: mediaRow.year,
-    externalId: mediaRow.externalId,
-    provider: mediaRow.provider,
+    externalId: namingExternalId,
+    provider: effectiveProvider,
     type: mediaRow.type,
   };
 

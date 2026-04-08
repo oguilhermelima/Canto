@@ -227,7 +227,8 @@ const workers = [
 
   new Worker("media-pipeline", async (job) => {
     const data = job.data as MediaPipelineJob;
-    const tvdbSetting = data.useTVDBSeasons ?? (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+    const { getEffectiveProviderSync } = await import("@canto/core/domain/rules/effective-provider");
+    const globalTvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
     const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
     const supportedLangs = [...await getSupportedLanguageCodes(db)];
 
@@ -235,6 +236,7 @@ const workers = [
     let provider: ProviderName;
     let type: MediaType;
     let existingId: string | undefined;
+    let useTVDBSeasons: boolean;
 
     if (data.mediaId) {
       const row = await findMediaById(db, data.mediaId);
@@ -243,18 +245,20 @@ const workers = [
       provider = row.provider as ProviderName;
       type = row.type as MediaType;
       existingId = row.id;
+      useTVDBSeasons = getEffectiveProviderSync(row, globalTvdbEnabled) === "tvdb";
       console.log(`[media-pipeline] Reprocessing: ${row.title} (${row.id})`);
     } else {
       externalId = data.externalId!;
       provider = data.provider! as ProviderName;
       type = data.type! as MediaType;
+      useTVDBSeasons = data.useTVDBSeasons ?? globalTvdbEnabled;
       console.log(`[media-pipeline] Processing: ${provider}/${externalId}`);
     }
 
     const result = await fetchMediaMetadata(
       externalId, provider, type,
       { tmdb, tvdb },
-      { reprocess: !!existingId, useTVDBSeasons: tvdbSetting, supportedLanguages: supportedLangs },
+      { reprocess: !!existingId, useTVDBSeasons, supportedLanguages: supportedLangs },
     );
 
     const mediaId = await persistFullMedia(db, result, existingId);
