@@ -8,8 +8,8 @@ export function JellyfinSection(): React.JSX.Element {
   return (
     <div>
       <JellyfinConnectionSection />
-      <MediaServerSyncSection serverType="jellyfin" />
       <AutoMergeSection />
+      <MediaServerSyncSection serverType="jellyfin" />
     </div>
   );
 }

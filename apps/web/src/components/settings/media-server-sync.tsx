@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@canto/ui/button";
 import { Switch } from "@canto/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@canto/ui/dialog";
@@ -9,43 +9,21 @@ import { Skeleton } from "@canto/ui/skeleton";
 import { Badge } from "@canto/ui/badge";
 import {
   Loader2,
-  CheckCircle,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
   AlertCircle,
-  SkipForward,
   FolderSearch,
   Film,
   Tv,
+  ArrowRight,
+  Pencil,
 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { StateMessage } from "~/components/layout/state-message";
 import { SettingsSection } from "~/components/settings/shared";
-
-/* -------------------------------------------------------------------------- */
-/*  Animated collapse                                                          */
-/* -------------------------------------------------------------------------- */
-
-function AnimatedCollapse({ open, children }: { open: boolean; children: React.ReactNode }): React.JSX.Element {
-  const ref = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState(0);
-
-  useEffect(() => {
-    if (ref.current) setHeight(ref.current.scrollHeight);
-  }, [open, children]);
-
-  return (
-    <div
-      className="overflow-hidden transition-all duration-300 ease-in-out"
-      style={{ maxHeight: open ? height : 0, opacity: open ? 1 : 0 }}
-    >
-      <div ref={ref}>{children}</div>
-    </div>
-  );
-}
 
 /* -------------------------------------------------------------------------- */
 /*  OR Divider                                                                 */
@@ -62,13 +40,33 @@ function OrDivider(): React.JSX.Element {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Synced items table                                                         */
+/*  Relative time helper                                                       */
 /* -------------------------------------------------------------------------- */
 
-function SyncedItemsTable({ source }: { source?: "jellyfin" | "plex" }): React.JSX.Element {
+function timeAgo(dateStr: string | Date | null): string {
+  if (!dateStr) return "Never";
+  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (seconds < 60) return "Just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Sync History Section                                                       */
+/* -------------------------------------------------------------------------- */
+
+function SyncHistorySection({ source }: { source: "jellyfin" | "plex" }): React.JSX.Element {
   const [filter, setFilter] = useState<"all" | "failed" | "imported" | "skipped">("all");
   const [page, setPage] = useState(1);
-  const [fixDialogItem, setFixDialogItem] = useState<{ id: string; title: string } | null>(null);
+  const [editItem, setEditItem] = useState<{
+    id: string;
+    title: string;
+    type: string;
+  } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tmdbIdInput, setTmdbIdInput] = useState("");
 
@@ -83,14 +81,14 @@ function SyncedItemsTable({ source }: { source?: "jellyfin" | "plex" }): React.J
   const { data, isLoading } = syncedItemsQuery;
 
   const searchResults = trpc.sync.searchForSyncItem.useQuery(
-    { query: searchQuery },
-    { enabled: searchQuery.length > 1 },
+    { query: searchQuery, type: (editItem?.type as "movie" | "show") ?? "movie" },
+    { enabled: searchQuery.length > 1 && !!editItem },
   );
 
   const resolveItem = trpc.sync.resolveSyncItem.useMutation({
     onSuccess: (result) => {
-      toast.success(`Matched! Suggested name: ${result.suggestedName}`);
-      setFixDialogItem(null);
+      toast.success(`Matched to: ${result.suggestedName}`);
+      setEditItem(null);
       setSearchQuery("");
       setTmdbIdInput("");
       void utils.sync.listSyncedItems.invalidate();
@@ -100,23 +98,20 @@ function SyncedItemsTable({ source }: { source?: "jellyfin" | "plex" }): React.J
 
   const totalPages = data ? Math.ceil(data.total / data.pageSize) : 0;
 
-  const statusIcon = (result: string): React.JSX.Element => {
-    if (result === "imported") return <CheckCircle className="h-3.5 w-3.5 text-green-500" />;
-    if (result === "failed") return <AlertCircle className="h-3.5 w-3.5 text-destructive" />;
-    return <SkipForward className="h-3.5 w-3.5 text-muted-foreground/50" />;
-  };
-
   return (
-    <>
+    <SettingsSection
+      title="Sync History"
+      description="Review and correct media matched from your server. Edit any item to fix incorrect matches."
+    >
       {/* Filters */}
       <div className="flex items-center gap-2 mb-4">
-        {(["all", "failed", "imported", "skipped"] as const).map((f) => (
+        {(["all", "failed", "imported"] as const).map((f) => (
           <button
             key={f}
             type="button"
             onClick={() => { setFilter(f); setPage(1); }}
             className={cn(
-              "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+              "rounded-xl px-4 py-2 text-sm font-medium transition-colors",
               filter === f ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
             )}
           >
@@ -126,47 +121,96 @@ function SyncedItemsTable({ source }: { source?: "jellyfin" | "plex" }): React.J
         ))}
       </div>
 
-      {/* Table */}
+      {/* Cards */}
       {syncedItemsQuery.isError ? (
         <StateMessage preset="error" onRetry={() => syncedItemsQuery.refetch()} minHeight="120px" />
       ) : isLoading ? (
         <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full rounded-xl" />)}
+          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
         </div>
       ) : data && data.items.length > 0 ? (
         <div className="rounded-xl border border-border/40 overflow-hidden">
           <div className="divide-y divide-border/30">
-            {data.items.map((item) => (
-              <div key={item.id} className="flex items-center justify-between px-4 py-3">
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  {statusIcon(item.result)}
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{item.serverItemTitle}</p>
-                    {item.serverItemYear && (
-                      <p className="text-xs text-muted-foreground">{item.serverItemYear}</p>
+            {data.items.map((item) => {
+              const hasMedia = !!item.mediaId;
+              const titleMismatch = hasMedia && item.mediaTitle && item.mediaTitle !== item.serverItemTitle;
+              const mediaType = (item.mediaType ?? "movie") as string;
+
+              return (
+                <div key={item.id} className="flex items-center gap-3 px-4 py-3">
+                  {/* Poster */}
+                  <div className="shrink-0">
+                    {item.mediaPosterPath ? (
+                      <img
+                        src={`https://image.tmdb.org/t/p/w92${item.mediaPosterPath}`}
+                        alt=""
+                        className="h-14 w-10 rounded object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex h-14 w-10 items-center justify-center rounded bg-muted/50">
+                        {mediaType === "show" ? (
+                          <Tv className="h-4 w-4 text-muted-foreground/40" />
+                        ) : (
+                          <Film className="h-4 w-4 text-muted-foreground/40" />
+                        )}
+                      </div>
                     )}
                   </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {item.reason && (
-                    <span className="text-xs text-muted-foreground/50 max-w-[180px] truncate hidden sm:block">{item.reason}</span>
-                  )}
-                  {item.result === "failed" && (
+
+                  {/* Title info */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-base font-medium text-foreground truncate">
+                        {item.serverItemTitle}
+                      </p>
+                      {item.serverItemYear && (
+                        <span className="shrink-0 text-sm text-muted-foreground">
+                          {item.serverItemYear}
+                        </span>
+                      )}
+                    </div>
+                    {titleMismatch ? (
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground/40" />
+                        <p className="text-sm text-muted-foreground truncate">
+                          {item.mediaTitle}
+                          {item.mediaYear ? ` (${item.mediaYear})` : ""}
+                        </p>
+                      </div>
+                    ) : item.result === "failed" ? (
+                      <p className="text-sm text-destructive mt-0.5">
+                        {item.reason ?? "Not matched"}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  {/* Status + action */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {item.result === "failed" && (
+                      <Badge variant="secondary" className="bg-destructive/10 text-destructive border-0 text-[10px]">
+                        Failed
+                      </Badge>
+                    )}
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-xs"
+                      className="h-8 w-8 p-0"
                       onClick={() => {
-                        setFixDialogItem({ id: item.id, title: item.serverItemTitle });
+                        setEditItem({
+                          id: item.id,
+                          title: item.serverItemTitle,
+                          type: mediaType,
+                        });
                         setSearchQuery(item.serverItemTitle);
                       }}
                     >
-                      Fix match
+                      <Pencil className="h-3.5 w-3.5" />
                     </Button>
-                  )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ) : (
@@ -186,11 +230,11 @@ function SyncedItemsTable({ source }: { source?: "jellyfin" | "plex" }): React.J
         </div>
       )}
 
-      {/* Fix match dialog */}
-      <Dialog open={!!fixDialogItem} onOpenChange={(open) => { if (!open) { setFixDialogItem(null); setSearchQuery(""); setTmdbIdInput(""); } }}>
+      {/* Edit match dialog */}
+      <Dialog open={!!editItem} onOpenChange={(open) => { if (!open) { setEditItem(null); setSearchQuery(""); setTmdbIdInput(""); } }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Fix match: {fixDialogItem?.title}</DialogTitle>
+            <DialogTitle>Edit match: {editItem?.title}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             {/* TMDB ID input */}
@@ -207,8 +251,12 @@ function SyncedItemsTable({ source }: { source?: "jellyfin" | "plex" }): React.J
                   size="sm"
                   disabled={!tmdbIdInput || resolveItem.isPending}
                   onClick={() => {
-                    if (fixDialogItem && tmdbIdInput) {
-                      resolveItem.mutate({ syncItemId: fixDialogItem.id, tmdbId: parseInt(tmdbIdInput, 10), type: "movie" });
+                    if (editItem && tmdbIdInput) {
+                      resolveItem.mutate({
+                        syncItemId: editItem.id,
+                        tmdbId: parseInt(tmdbIdInput, 10),
+                        type: editItem.type as "movie" | "show",
+                      });
                     }
                   }}
                 >
@@ -238,9 +286,9 @@ function SyncedItemsTable({ source }: { source?: "jellyfin" | "plex" }): React.J
                     key={`${result.externalId}-${result.type}`}
                     type="button"
                     onClick={() => {
-                      if (fixDialogItem) {
+                      if (editItem) {
                         resolveItem.mutate({
-                          syncItemId: fixDialogItem.id,
+                          syncItemId: editItem.id,
                           tmdbId: result.externalId,
                           type: result.type as "movie" | "show",
                         });
@@ -264,24 +312,8 @@ function SyncedItemsTable({ source }: { source?: "jellyfin" | "plex" }): React.J
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </SettingsSection>
   );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Relative time helper                                                       */
-/* -------------------------------------------------------------------------- */
-
-function timeAgo(dateStr: string | Date | null): string {
-  if (!dateStr) return "Never";
-  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (seconds < 60) return "Just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -348,7 +380,6 @@ function LibraryLinkingSection({ source }: { source: "jellyfin" | "plex" }): Rea
             className="flex flex-col gap-2 px-5 py-3.5"
           >
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              {/* Left: name + info */}
               <div className="flex items-start gap-3 min-w-0 flex-1">
                 <div className="mt-0.5 shrink-0">
                   {lib.contentType === "movies" ? (
@@ -375,7 +406,6 @@ function LibraryLinkingSection({ source }: { source: "jellyfin" | "plex" }): Rea
                 </div>
               </div>
 
-              {/* Right: sync toggle — always visible */}
               <div className="flex items-center gap-2 shrink-0 sm:ml-4">
                 <Switch
                   checked={lib.syncEnabled}
@@ -419,7 +449,6 @@ function ServerLibraryGroup({
   isSyncingLibraries: boolean;
   onSyncLibraries: () => void;
 }): React.JSX.Element | null {
-  const [showSyncedItems, setShowSyncedItems] = useState(false);
   const importMedia = trpc.sync.importMedia.useMutation({
     onSuccess: (data) => {
       if (data.started.jellyfin || data.started.plex) toast.success("Sync started");
@@ -427,8 +456,6 @@ function ServerLibraryGroup({
     },
     onError: () => toast.error("Failed to start sync"),
   });
-
-  const [showHistory, setShowHistory] = useState(false);
 
   if (!enabled) return null;
 
@@ -438,10 +465,8 @@ function ServerLibraryGroup({
       description="Import your existing collection from the server into Canto. Enabled libraries are scanned every 5 minutes for new content."
     >
       <div className="space-y-4">
-        {/* Libraries */}
         <LibraryLinkingSection source={source} />
 
-        {/* Rescan hint */}
         <div className="flex items-center justify-between">
           <button
             type="button"
@@ -464,26 +489,6 @@ function ServerLibraryGroup({
             {importMedia.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}
             Sync now
           </Button>
-        </div>
-
-        {/* Sync History — collapsible */}
-        <div className="rounded-xl border border-border/40 overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setShowHistory((p) => !p)}
-            className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-muted/10"
-          >
-            <div>
-              <p className="text-sm font-medium text-foreground">Sync History</p>
-              <p className="text-sm text-muted-foreground">Results from the latest sync. Fix failed matches here.</p>
-            </div>
-            <ChevronRight size={16} className={cn("text-muted-foreground transition-transform duration-200", showHistory && "rotate-90")} />
-          </button>
-          <AnimatedCollapse open={showHistory}>
-            <div className="border-t border-border/30 px-4 pb-4">
-              <SyncedItemsTable source={source} />
-            </div>
-          </AnimatedCollapse>
         </div>
       </div>
     </SettingsSection>
@@ -522,7 +527,6 @@ function FolderScanSection(): React.JSX.Element {
     >
       <div className="space-y-4">
         <div className="rounded-xl border border-border/40 overflow-hidden">
-          {/* Toggle row */}
           <div className="flex items-center justify-between px-5 py-4">
             <div className="flex items-center gap-3 min-w-0">
               <FolderSearch className="h-5 w-5 shrink-0 text-primary" />
@@ -541,7 +545,6 @@ function FolderScanSection(): React.JSX.Element {
             />
           </div>
 
-          {/* Scan now action */}
           <div className="flex items-center justify-between border-t border-border/30 px-5 py-3.5">
             <p className="text-xs text-muted-foreground">
               {folderScanEnabled ? "Runs periodically in the background" : "Enable the toggle above for automatic scans"}
@@ -591,25 +594,30 @@ export function MediaServerSyncSection({ serverType }: { serverType?: "jellyfin"
 
   const showJellyfin = (!serverType || serverType === "jellyfin") && jellyfinEnabled;
   const showPlex = (!serverType || serverType === "plex") && plexEnabled;
-  const hasMediaServer = showJellyfin || showPlex;
 
   return (
     <>
       {showJellyfin && (
-        <ServerLibraryGroup
-          source="jellyfin"
-          enabled={jellyfinEnabled}
-          isSyncingLibraries={syncJellyfin.isPending}
-          onSyncLibraries={() => syncJellyfin.mutate()}
-        />
+        <>
+          <ServerLibraryGroup
+            source="jellyfin"
+            enabled={jellyfinEnabled}
+            isSyncingLibraries={syncJellyfin.isPending}
+            onSyncLibraries={() => syncJellyfin.mutate()}
+          />
+          <SyncHistorySection source="jellyfin" />
+        </>
       )}
       {showPlex && (
-        <ServerLibraryGroup
-          source="plex"
-          enabled={plexEnabled}
-          isSyncingLibraries={syncPlex.isPending}
-          onSyncLibraries={() => syncPlex.mutate()}
-        />
+        <>
+          <ServerLibraryGroup
+            source="plex"
+            enabled={plexEnabled}
+            isSyncingLibraries={syncPlex.isPending}
+            onSyncLibraries={() => syncPlex.mutate()}
+          />
+          <SyncHistorySection source="plex" />
+        </>
       )}
       {!serverType && <FolderScanSection />}
     </>

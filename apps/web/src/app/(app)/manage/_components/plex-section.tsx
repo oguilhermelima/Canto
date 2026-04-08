@@ -8,8 +8,8 @@ export function PlexSection(): React.JSX.Element {
   return (
     <div>
       <PlexConnectionSection />
-      <MediaServerSyncSection serverType="plex" />
       <AutoMergeSection />
+      <MediaServerSyncSection serverType="plex" />
     </div>
   );
 }
