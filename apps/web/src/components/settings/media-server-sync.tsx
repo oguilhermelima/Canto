@@ -59,8 +59,9 @@ function timeAgo(dateStr: string | Date | null): string {
 /*  Sync History Section                                                       */
 /* -------------------------------------------------------------------------- */
 
-function SyncStatusSection({ source }: { source: "jellyfin" | "plex" }): React.JSX.Element {
+function SyncStatusSection(): React.JSX.Element {
   const [filter, setFilter] = useState<"all" | "failed" | "imported" | "skipped">("all");
+  const [serverFilter, setServerFilter] = useState<"all" | "jellyfin" | "plex">("all");
   const [page, setPage] = useState(1);
   const [editItem, setEditItem] = useState<{
     id: string;
@@ -74,9 +75,11 @@ function SyncStatusSection({ source }: { source: "jellyfin" | "plex" }): React.J
   const [updateServer, setUpdateServer] = useState(false);
 
   const utils = trpc.useUtils();
+  const { data: enabledServices } = trpc.settings.getEnabledServices.useQuery();
+  const multipleServers = [enabledServices?.jellyfin, enabledServices?.plex].filter(Boolean).length > 1;
 
   const syncedItemsQuery = trpc.sync.listSyncedItems.useQuery({
-    source,
+    server: serverFilter === "all" ? undefined : serverFilter,
     result: filter === "all" ? undefined : filter,
     page,
     pageSize: 20,
@@ -147,6 +150,24 @@ function SyncStatusSection({ source }: { source: "jellyfin" | "plex" }): React.J
             {data && f === "all" && ` (${data.total})`}
           </button>
         ))}
+        {multipleServers && (
+          <>
+            <div className="h-4 w-px bg-border/40 mx-1" />
+            {(["all", "jellyfin", "plex"] as const).map((s) => (
+              <button
+                key={`server-${s}`}
+                type="button"
+                onClick={() => { setServerFilter(s); setPage(1); }}
+                className={cn(
+                  "rounded-xl px-3 py-2 text-sm font-medium transition-colors",
+                  serverFilter === s ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {s === "all" ? "All" : s === "jellyfin" ? "Jellyfin" : "Plex"}
+              </button>
+            ))}
+          </>
+        )}
       </div>
 
       {/* Items */}
@@ -161,7 +182,6 @@ function SyncStatusSection({ source }: { source: "jellyfin" | "plex" }): React.J
           {data.items.map((item) => {
             const hasMedia = !!item.mediaId;
             const mediaType = (item.mediaType ?? "movie") as string;
-            const serverLabel = item.source === "jellyfin" ? "Jellyfin" : "Plex";
             const isFailed = item.result === "failed";
             const idsMatch = hasMedia && item.tmdbId != null && item.mediaExternalId != null && item.tmdbId === item.mediaExternalId;
 
@@ -202,9 +222,16 @@ function SyncStatusSection({ source }: { source: "jellyfin" | "plex" }): React.J
                     )}
                   </div>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {serverLabel}:
-                    </span>
+                    {item.jellyfinItemId && (
+                      <span className="shrink-0 rounded px-1.5 py-0 text-[10px] font-medium bg-blue-500/15 text-blue-400">
+                        Jellyfin
+                      </span>
+                    )}
+                    {item.plexRatingKey && (
+                      <span className="shrink-0 rounded px-1.5 py-0 text-[10px] font-medium bg-amber-500/15 text-amber-400">
+                        Plex
+                      </span>
+                    )}
                     <span className="text-xs text-muted-foreground truncate">
                       {item.serverItemTitle}
                     </span>
@@ -517,8 +544,8 @@ function ServerLibraryGroup({
 
   return (
     <SettingsSection
-      title="Reverse Sync"
-      description="Import your existing collection from the server into Canto. Enabled libraries are scanned every 5 minutes for new content."
+      title={`${source === "jellyfin" ? "Jellyfin" : "Plex"} Libraries`}
+      description="Import your existing collection from this server into Canto. Enabled libraries are scanned every 5 minutes."
     >
       <div className="space-y-4">
         {/* Rescan server card */}
@@ -618,7 +645,7 @@ function FolderScanSection(): React.JSX.Element {
 /*  Main exported section                                                      */
 /* -------------------------------------------------------------------------- */
 
-export function MediaServerSyncSection({ serverType }: { serverType?: "jellyfin" | "plex" } = {}): React.JSX.Element {
+export function MediaServerSyncSection(): React.JSX.Element {
   const utils = trpc.useUtils();
   const { data: enabledServices } = trpc.settings.getEnabledServices.useQuery();
   const jellyfinEnabled = enabledServices?.jellyfin === true;
@@ -641,34 +668,26 @@ export function MediaServerSyncSection({ serverType }: { serverType?: "jellyfin"
     onError: () => toast.error("Failed to sync Plex libraries"),
   });
 
-  const showJellyfin = (!serverType || serverType === "jellyfin") && jellyfinEnabled;
-  const showPlex = (!serverType || serverType === "plex") && plexEnabled;
-
   return (
     <>
-      {showJellyfin && (
-        <>
-          <ServerLibraryGroup
-            source="jellyfin"
-            enabled={jellyfinEnabled}
-            isSyncingLibraries={syncJellyfin.isPending}
-            onSyncLibraries={() => syncJellyfin.mutate()}
-          />
-          <SyncStatusSection source="jellyfin" />
-        </>
+      <FolderScanSection />
+      {jellyfinEnabled && (
+        <ServerLibraryGroup
+          source="jellyfin"
+          enabled={jellyfinEnabled}
+          isSyncingLibraries={syncJellyfin.isPending}
+          onSyncLibraries={() => syncJellyfin.mutate()}
+        />
       )}
-      {showPlex && (
-        <>
-          <ServerLibraryGroup
-            source="plex"
-            enabled={plexEnabled}
-            isSyncingLibraries={syncPlex.isPending}
-            onSyncLibraries={() => syncPlex.mutate()}
-          />
-          <SyncStatusSection source="plex" />
-        </>
+      {plexEnabled && (
+        <ServerLibraryGroup
+          source="plex"
+          enabled={plexEnabled}
+          isSyncingLibraries={syncPlex.isPending}
+          onSyncLibraries={() => syncPlex.mutate()}
+        />
       )}
-      {!serverType && <FolderScanSection />}
+      {(jellyfinEnabled || plexEnabled) && <SyncStatusSection />}
     </>
   );
 }
