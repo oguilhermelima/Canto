@@ -15,6 +15,13 @@
       "when": 1775608605209,
       "tag": "0001_simple_havok",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775686714254,
+      "tag": "0002_perfect_exiles",
+      "breakpoints": true
     }
   ]
 }

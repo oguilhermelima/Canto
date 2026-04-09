@@ -507,6 +507,7 @@ export const syncItem = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     libraryId: uuid("library_id")
       .references(() => downloadFolder.id, { onDelete: "set null" }),
+    /** @deprecated use jellyfinServerLinkId / plexServerLinkId */
     serverLinkId: uuid("server_link_id")
       .references(() => folderServerLink.id, { onDelete: "set null" }),
     serverItemTitle: varchar("server_item_title", { length: 500 }).notNull(),
@@ -516,18 +517,30 @@ export const syncItem = pgTable(
     mediaId: uuid("media_id").references(() => media.id, { onDelete: "set null" }),
     result: varchar("result", { length: 20 }).notNull(), // imported | skipped | failed
     reason: varchar("reason", { length: 500 }),
-    /** Which server this item came from */
+    /** @deprecated use jellyfinItemId/plexRatingKey presence as source indicator */
     source: varchar("source", { length: 20 }), // jellyfin | plex
     /** Jellyfin internal item ID for deep linking */
     jellyfinItemId: varchar("jellyfin_item_id", { length: 100 }),
+    /** FK to folderServerLink for the Jellyfin side */
+    jellyfinServerLinkId: uuid("jellyfin_server_link_id")
+      .references(() => folderServerLink.id, { onDelete: "set null" }),
+    /** Last time Jellyfin synced this item */
+    jellyfinSyncedAt: timestamp("jellyfin_synced_at", { withTimezone: true }),
     /** Plex rating key for deep linking */
     plexRatingKey: varchar("plex_rating_key", { length: 100 }),
+    /** FK to folderServerLink for the Plex side */
+    plexServerLinkId: uuid("plex_server_link_id")
+      .references(() => folderServerLink.id, { onDelete: "set null" }),
+    /** Last time Plex synced this item */
+    plexSyncedAt: timestamp("plex_synced_at", { withTimezone: true }),
     syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index("idx_sync_item_library").on(table.libraryId),
     index("idx_sync_item_result").on(table.result),
     index("idx_sync_item_server_link").on(table.serverLinkId),
+    index("idx_sync_item_jellyfin_link").on(table.jellyfinServerLinkId),
+    index("idx_sync_item_plex_link").on(table.plexServerLinkId),
   ],
 );
 
@@ -540,6 +553,8 @@ export const syncEpisode = pgTable(
     syncItemId: uuid("sync_item_id")
       .notNull()
       .references(() => syncItem.id, { onDelete: "cascade" }),
+    /** Which server this episode file came from (jellyfin | plex) */
+    source: varchar("source", { length: 20 }),
     seasonNumber: integer("season_number"),
     episodeNumber: integer("episode_number"),
     serverEpisodeId: varchar("server_episode_id", { length: 100 }),
