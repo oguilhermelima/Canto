@@ -161,6 +161,8 @@ export const folderServerLink = pgTable(
   "folder_server_link",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    /** The user connection this link belongs to (null if global admin link) */
+    userConnectionId: uuid("user_connection_id").references(() => userConnection.id, { onDelete: "cascade" }),
     /** "jellyfin" | "plex" */
     serverType: varchar("server_type", { length: 20 }).notNull(),
     /** Jellyfin folder ID or Plex section key */
@@ -180,9 +182,10 @@ export const folderServerLink = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex("uq_server_link_library").on(
+    uniqueIndex("uq_server_link_library_user").on(
       table.serverType,
       table.serverLibraryId,
+      table.userConnectionId,
     ),
   ],
 );
@@ -819,6 +822,104 @@ export const downloadRequest = pgTable(
   ],
 );
 
+// ─── User Connections (Plex/Jellyfin) ───
+
+export const userConnection = pgTable("user_connection", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  provider: varchar("provider", { length: 20 }).notNull(), // 'plex', 'jellyfin'
+  token: text("token"),
+  externalUserId: varchar("external_user_id", { length: 255 }),
+  accessibleLibraries: jsonb("accessible_libraries").$type<string[]>(),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// ─── User Media States (Watching, Completed, Rating) ───
+
+export const userMediaState = pgTable(
+  "user_media_state",
+  {
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    status: varchar("status", { length: 20 }), // none, planned, watching, completed, dropped
+    rating: integer("rating"),
+    isFavorite: boolean("is_favorite").notNull().default(false),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.mediaId] })],
+);
+
+// ─── User Playback Progress ───
+
+export const userPlaybackProgress = pgTable(
+  "user_playback_progress",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    episodeId: uuid("episode_id").references(() => episode.id, {
+      onDelete: "cascade",
+    }),
+    positionSeconds: integer("position_seconds").notNull().default(0),
+    isCompleted: boolean("is_completed").notNull().default(false),
+    lastWatchedAt: timestamp("last_watched_at", { withTimezone: true }),
+    source: varchar("source", { length: 20 }), // 'jellyfin', 'plex', 'manual'
+  },
+  (table) => [
+    index("idx_user_playback_user").on(table.userId),
+    index("idx_user_playback_media").on(table.mediaId),
+    uniqueIndex("idx_user_playback_unique").on(
+      table.userId,
+      table.mediaId,
+      table.episodeId,
+    ),
+  ],
+);
+
+// ─── User Watch History ───
+
+export const userWatchHistory = pgTable(
+  "user_watch_history",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    episodeId: uuid("episode_id").references(() => episode.id, {
+      onDelete: "cascade",
+    }),
+    watchedAt: timestamp("watched_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    source: varchar("source", { length: 20 }),
+  },
+  (table) => [
+    index("idx_user_history_user").on(table.userId),
+    index("idx_user_history_media").on(table.mediaId),
+  ],
+);
+
 // ─── Relations ───
 
 export const userRelations = relations(user, ({ many }) => ({
@@ -828,6 +929,10 @@ export const userRelations = relations(user, ({ many }) => ({
   lists: many(list),
   downloadRequests: many(downloadRequest),
   recommendations: many(userRecommendation),
+  connections: many(userConnection),
+  mediaStates: many(userMediaState),
+  playbackProgress: many(userPlaybackProgress),
+  watchHistory: many(userWatchHistory),
 }));
 
 export const userPreferenceRelations = relations(userPreference, ({ one }) => ({
@@ -863,7 +968,12 @@ export const folderMediaPathRelations = relations(folderMediaPath, ({ one }) => 
   }),
 }));
 
-export const folderServerLinkRelations = relations(folderServerLink, () => ({}));
+export const folderServerLinkRelations = relations(folderServerLink, ({ one }) => ({
+  userConnection: one(userConnection, {
+    fields: [folderServerLink.userConnectionId],
+    references: [userConnection.id],
+  }),
+}));
 
 
 export const mediaRelations = relations(media, ({ many, one }) => ({
@@ -884,6 +994,9 @@ export const mediaRelations = relations(media, ({ many, one }) => ({
   recommendationsFor: many(mediaRecommendation, { relationName: "sourceMedia" }),
   listItems: many(listItem),
   translations: many(mediaTranslation),
+  userStates: many(userMediaState),
+  playbackProgress: many(userPlaybackProgress),
+  watchHistory: many(userWatchHistory),
 }));
 
 export const seasonRelations = relations(season, ({ one, many }) => ({
@@ -902,6 +1015,8 @@ export const episodeRelations = relations(episode, ({ one, many }) => ({
   }),
   files: many(mediaFile),
   translations: many(episodeTranslation),
+  playbackProgress: many(userPlaybackProgress),
+  watchHistory: many(userWatchHistory),
 }));
 
 export const mediaTranslationRelations = relations(mediaTranslation, ({ one }) => ({
@@ -1068,6 +1183,60 @@ export const downloadRequestRelations = relations(
     media: one(media, {
       fields: [downloadRequest.mediaId],
       references: [media.id],
+    }),
+  }),
+);
+
+export const userConnectionRelations = relations(userConnection, ({ one }) => ({
+  user: one(user, {
+    fields: [userConnection.userId],
+    references: [user.id],
+  }),
+}));
+
+export const userMediaStateRelations = relations(userMediaState, ({ one }) => ({
+  user: one(user, {
+    fields: [userMediaState.userId],
+    references: [user.id],
+  }),
+  media: one(media, {
+    fields: [userMediaState.mediaId],
+    references: [media.id],
+  }),
+}));
+
+export const userPlaybackProgressRelations = relations(
+  userPlaybackProgress,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [userPlaybackProgress.userId],
+      references: [user.id],
+    }),
+    media: one(media, {
+      fields: [userPlaybackProgress.mediaId],
+      references: [media.id],
+    }),
+    episode: one(episode, {
+      fields: [userPlaybackProgress.episodeId],
+      references: [episode.id],
+    }),
+  }),
+);
+
+export const userWatchHistoryRelations = relations(
+  userWatchHistory,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [userWatchHistory.userId],
+      references: [user.id],
+    }),
+    media: one(media, {
+      fields: [userWatchHistory.mediaId],
+      references: [media.id],
+    }),
+    episode: one(episode, {
+      fields: [userWatchHistory.episodeId],
+      references: [episode.id],
     }),
   }),
 );

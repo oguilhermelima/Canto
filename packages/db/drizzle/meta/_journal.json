@@ -22,6 +22,13 @@
       "when": 1775686714254,
       "tag": "0002_perfect_exiles",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1775701487154,
+      "tag": "0003_black_nitro",
+      "breakpoints": true
     }
   ]
 }
