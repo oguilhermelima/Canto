@@ -1,120 +1,80 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, FolderOpen, Server } from "lucide-react";
-import { cn } from "@canto/ui/cn";
+import { Clock3, FolderOpen, History, PlayCircle } from "lucide-react";
 import { PageHeader } from "~/components/layout/page-header";
 import { TabBar } from "~/components/layout/tab-bar";
-import {
-  FilterSidebar,
-  type FilterOutput,
-} from "~/components/media/filter-sidebar";
 import { useDocumentTitle } from "~/hooks/use-document-title";
-import { FilterButton } from "~/components/layout/filter-button";
-import { MediaListTab } from "./_components/media-list-tab";
-import {
-  CollectionFilterSidebar,
-  DEFAULT_COLLECTION_FILTERS,
-  type CollectionFilterState,
-} from "./_components/collection-filter-sidebar";
+import { DEFAULT_COLLECTION_FILTERS } from "./_components/collection-filter-sidebar";
 import { CollectionsTab } from "./_components/collections-tab";
+import { WatchNextTab } from "./_components/watch-next-tab";
+import { HistoryTab } from "./_components/history-tab";
 
 const TABS = [
-  { value: "watchlist", label: "Watchlist", icon: Eye },
+  { value: "continue-watching", label: "Continue Watching", icon: PlayCircle },
+  { value: "watch-next", label: "Watch Next", icon: Clock3 },
   { value: "collections", label: "Collections", icon: FolderOpen },
-  { value: "server", label: "Server Library", icon: Server },
+  { value: "history", label: "History", icon: History },
 ];
 
-type Tab = "watchlist" | "collections" | "server";
+type Tab = "continue-watching" | "watch-next" | "collections" | "history";
 
 export default function LibraryPage(): React.JSX.Element {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const initialTab = (searchParams.get("tab") as Tab) || "watchlist";
+  const initialTab: Tab = (() => {
+    const tab = searchParams.get("tab");
+    if (
+      tab === "continue-watching" ||
+      tab === "watch-next" ||
+      tab === "collections" ||
+      tab === "history"
+    ) {
+      return tab;
+    }
+    return "continue-watching";
+  })();
+
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
-  const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState<FilterOutput>({});
-  const [collectionFilters, setCollectionFilters] = useState<CollectionFilterState>(DEFAULT_COLLECTION_FILTERS);
 
   useDocumentTitle("Library");
 
   const handleTabChange = (value: string): void => {
+    if (
+      value !== "continue-watching" &&
+      value !== "watch-next" &&
+      value !== "collections" &&
+      value !== "history"
+    ) {
+      return;
+    }
     const tab = value as Tab;
     setActiveTab(tab);
     const params = new URLSearchParams();
-    if (tab !== "watchlist") params.set("tab", tab);
+    if (tab !== "continue-watching") params.set("tab", tab);
     router.replace(`/library${params.size > 0 ? `?${params.toString()}` : ""}`, {
       scroll: false,
     });
   };
 
-  const handleFilterChange = useCallback((f: FilterOutput) => setFilters(f), []);
-  const handleCollectionFilterChange = useCallback((f: CollectionFilterState) => setCollectionFilters(f), []);
-  const handleCollectionFilterReset = useCallback(() => setCollectionFilters(DEFAULT_COLLECTION_FILTERS), []);
-
   return (
     <div className="w-full pb-12">
       <PageHeader
         title="Library"
-        subtitle="Your watchlist, collections, and saved media."
+        subtitle="Continue watching, watch next, collections, and history."
       />
 
-      <div className="flex px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        {/* Sidebar */}
-        <div
-          className={cn(
-            "hidden w-[20rem] shrink-0 transition-[margin,opacity] duration-300 ease-in-out md:block",
-            showFilters
-              ? "mr-4 opacity-100 lg:mr-8"
-              : "-ml-[20rem] mr-0 opacity-0",
-          )}
-        >
-          {activeTab === "collections" ? (
-            <CollectionFilterSidebar
-              filters={collectionFilters}
-              onChange={handleCollectionFilterChange}
-              onReset={handleCollectionFilterReset}
-            />
-          ) : (
-            <FilterSidebar
-              mediaType="all"
-              onFilterChange={handleFilterChange}
-            />
-          )}
-        </div>
-
-        {/* Content */}
-        <div className="min-w-0 flex-1">
-          <TabBar
-            tabs={TABS}
-            value={activeTab}
-            onChange={handleTabChange}
-            leading={
-              <FilterButton
-                active={showFilters}
-                onClick={() => setShowFilters((v) => !v)}
-              />
-            }
-          />
-          {activeTab === "watchlist" && (
-            <MediaListTab
-              slug="watchlist"
-              preset="emptyWatchlist"
-              showFilters={showFilters}
-              filters={filters}
-            />
-          )}
-          {activeTab === "collections" && <CollectionsTab filters={collectionFilters} />}
-          {activeTab === "server" && (
-            <MediaListTab
-              slug="server-library"
-              preset="emptyServerLibrary"
-              showFilters={showFilters}
-              filters={filters}
-            />
-          )}
-        </div>
+      <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+        <TabBar
+          tabs={TABS}
+          value={activeTab}
+          onChange={handleTabChange}
+        />
+        {activeTab === "continue-watching" && <WatchNextTab view="continue" />}
+        {activeTab === "watch-next" && <WatchNextTab view="watch_next" />}
+        {activeTab === "collections" && <CollectionsTab filters={DEFAULT_COLLECTION_FILTERS} />}
+        {activeTab === "history" && <HistoryTab />}
       </div>
     </div>
   );
