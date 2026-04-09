@@ -15,8 +15,10 @@ import {
 import type { Database } from "@canto/db/client";
 import {
   folderServerLink,
+  episode,
   media,
   mediaFile,
+  season,
   syncItem,
   torrent,
   userConnection,
@@ -116,6 +118,28 @@ export async function findMediaByAnyReference(
   }
 
   return null;
+}
+
+export async function findEpisodeIdByMediaAndNumbers(
+  db: Database,
+  mediaId: string,
+  seasonNumber: number,
+  episodeNumber: number,
+): Promise<string | null> {
+  const [row] = await db
+    .select({ id: episode.id })
+    .from(episode)
+    .innerJoin(season, eq(episode.seasonId, season.id))
+    .where(
+      and(
+        eq(season.mediaId, mediaId),
+        eq(season.number, seasonNumber),
+        eq(episode.number, episodeNumber),
+      ),
+    )
+    .limit(1);
+
+  return row?.id ?? null;
 }
 
 export async function updateMedia(

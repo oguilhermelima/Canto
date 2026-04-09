@@ -136,11 +136,16 @@ export async function findServerLinkById(db: Database, id: string) {
   });
 }
 
-export async function findEnabledSyncLinks(db: Database, userConnectionId?: string) {
+export async function findEnabledSyncLinks(
+  db: Database,
+  userConnectionId?: string,
+  serverType?: "jellyfin" | "plex",
+) {
   return db.query.folderServerLink.findMany({
     where: and(
       eq(folderServerLink.syncEnabled, true),
       userConnectionId ? eq(folderServerLink.userConnectionId, userConnectionId) : undefined,
+      serverType ? eq(folderServerLink.serverType, serverType) : undefined,
     ),
   });
 }

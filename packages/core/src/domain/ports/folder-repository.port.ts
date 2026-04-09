@@ -24,7 +24,10 @@ export interface FolderRepositoryPort {
 
   // Server Links
   findServerLink(serverType: string, serverLibraryId: string): Promise<ServerLinkRow | undefined>;
-  findEnabledSyncLinks(): Promise<ServerLinkRow[]>;
+  findEnabledSyncLinks(
+    userConnectionId?: string,
+    serverType?: "jellyfin" | "plex",
+  ): Promise<ServerLinkRow[]>;
   upsertServerLink(data: ServerLinkInsert): Promise<ServerLinkRow | undefined>;
   updateServerLink(
     id: string,
