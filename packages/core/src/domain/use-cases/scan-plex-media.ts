@@ -38,6 +38,9 @@ export async function scanPlexMedia(
             year?: number;
             type?: string;
             Guid?: Array<{ id: string }>;
+            viewCount?: number;
+            viewOffset?: number;
+            lastViewedAt?: number;
           }>;
         };
       };
@@ -65,6 +68,10 @@ export async function scanPlexMedia(
           mediaType = lib.type === "movies" ? "movie" : "show";
         }
 
+        const playbackPositionSeconds = item.viewOffset
+          ? Math.floor(item.viewOffset / 1000)
+          : undefined;
+
         items.push({
           tmdbId,
           imdbId,
@@ -76,6 +83,9 @@ export async function scanPlexMedia(
           serverLinkId: lib.linkId,
           source: "plex",
           plexRatingKey: item.ratingKey,
+          played: (item.viewCount ?? 0) > 0,
+          playbackPositionSeconds,
+          lastPlayedAt: item.lastViewedAt ? new Date(item.lastViewedAt * 1000) : undefined,
         });
       }
 

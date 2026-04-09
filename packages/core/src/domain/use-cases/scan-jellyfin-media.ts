@@ -21,6 +21,10 @@ export interface PendingImport {
   source: "jellyfin" | "plex";
   jellyfinItemId?: string;
   plexRatingKey?: string;
+  // User-specific data
+  played?: boolean;
+  playbackPositionSeconds?: number;
+  lastPlayedAt?: Date;
 }
 
 export async function scanJellyfinMedia(
@@ -42,7 +46,7 @@ export async function scanJellyfinMedia(
       try {
         while (true) {
           const res = await fetch(
-            `${url}/Items?ParentId=${lib.jellyfinLibraryId}&IncludeItemTypes=${includeTypes}&Fields=ProviderIds,Path,ProductionYear&Recursive=true&StartIndex=${startIndex}&Limit=${pageSize}`,
+            `${url}/Items?ParentId=${lib.jellyfinLibraryId}&IncludeItemTypes=${includeTypes}&Fields=ProviderIds,Path,ProductionYear,UserData&Recursive=true&StartIndex=${startIndex}&Limit=${pageSize}`,
             { headers: { "X-Emby-Token": apiKey }, signal: AbortSignal.timeout(30_000) },
           );
           if (!res.ok) {
@@ -56,6 +60,11 @@ export async function scanJellyfinMedia(
               ProductionYear?: number;
               Path?: string;
               ProviderIds?: { Tmdb?: string; Imdb?: string; Tvdb?: string };
+              UserData?: {
+                PlaybackPositionTicks?: number;
+                Played?: boolean;
+                LastPlayedDate?: string;
+              };
             }>;
             TotalRecordCount: number;
           };
@@ -63,6 +72,11 @@ export async function scanJellyfinMedia(
           for (const item of data.Items) {
             const tmdbStr = item.ProviderIds?.Tmdb;
             const tvdbStr = item.ProviderIds?.Tvdb;
+
+            const playbackPositionSeconds = item.UserData?.PlaybackPositionTicks
+              ? Math.floor(item.UserData.PlaybackPositionTicks / 10_000_000)
+              : undefined;
+
             items.push({
               tmdbId: tmdbStr ? parseInt(tmdbStr, 10) : undefined,
               imdbId: item.ProviderIds?.Imdb,
@@ -75,6 +89,9 @@ export async function scanJellyfinMedia(
               path: item.Path,
               source: "jellyfin",
               jellyfinItemId: item.Id,
+              played: item.UserData?.Played,
+              playbackPositionSeconds,
+              lastPlayedAt: item.UserData?.LastPlayedDate ? new Date(item.UserData.LastPlayedDate) : undefined,
             });
           }
 
