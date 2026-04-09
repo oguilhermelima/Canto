@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@canto/ui/button";
+import { cn } from "@canto/ui/cn";
 import { Input } from "@canto/ui/input";
 import { Popover, PopoverAnchor, PopoverContent } from "@canto/ui/popover";
 import { EllipsisVertical, Loader2, Trash2 } from "lucide-react";
@@ -11,9 +12,11 @@ import { trpc } from "~/lib/trpc/client";
 export function CollectionEditPopover({
   list,
   onDelete,
+  triggerClassName,
 }: {
   list: { id: string; name: string; description: string | null };
   onDelete: (id: string, name: string) => void;
+  triggerClassName?: string;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [editName, setEditName] = useState(list.name);
@@ -43,7 +46,20 @@ export function CollectionEditPopover({
   return (
     <Popover open={open} onOpenChange={(v) => { setOpen(v); if (v) { setEditName(list.name); setEditDescription(list.description ?? ""); } }}>
       <PopoverAnchor asChild>
-        <button type="button" aria-label={`Edit ${list.name}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((v) => !v); }} className="absolute right-1.5 top-1.5 z-10 flex h-9 w-9 items-center justify-center rounded-xl text-white/80 transition-colors hover:bg-accent hover:text-white">
+        <button
+          type="button"
+          aria-label={`Edit ${list.name}`}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setOpen((v) => !v);
+          }}
+          className={cn(
+            "z-10 flex h-9 w-9 items-center justify-center rounded-xl transition-colors",
+            triggerClassName ??
+              "absolute right-1.5 top-1.5 text-white/80 hover:bg-accent hover:text-white",
+          )}
+        >
           <EllipsisVertical className="h-5 w-5" />
         </button>
       </PopoverAnchor>

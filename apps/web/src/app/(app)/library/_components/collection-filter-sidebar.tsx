@@ -72,7 +72,7 @@ export function CollectionFilterSidebar({
             <Input
               value={filters.searchQuery}
               onChange={(e) => update({ searchQuery: e.target.value })}
-              placeholder="Search collections..."
+              placeholder="Search lists..."
               variant="ghost"
               className="h-9 pl-9 text-[13px] font-medium text-foreground/70 placeholder:text-foreground/30"
             />

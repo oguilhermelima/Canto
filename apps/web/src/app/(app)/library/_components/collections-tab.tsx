@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button } from "@canto/ui/button";
+import { cn } from "@canto/ui/cn";
 import { Input } from "@canto/ui/input";
 import {
   Dialog,
@@ -14,13 +15,52 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@canto/ui/dialog";
-import { Bookmark, Loader2, Plus } from "lucide-react";
-import { cn } from "@canto/ui/cn";
+import {
+  Bookmark,
+  Eye,
+  EyeOff,
+  GripVertical,
+  Loader2,
+  Plus,
+  RotateCcw,
+  Server,
+} from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { StateMessage } from "~/components/layout/state-message";
 import { CollectionEditPopover } from "./collection-edit-popover";
 import type { CollectionFilterState } from "./collection-filter-sidebar";
+
+interface LayoutPreferences {
+  hiddenIds: string[];
+  orderedIds: string[];
+}
+
+const DEFAULT_LAYOUT: LayoutPreferences = { hiddenIds: [], orderedIds: [] };
+const PAGE_SIZE = 12;
+
+function uniqueIds(ids: string[]): string[] {
+  return [...new Set(ids)];
+}
+
+function sameIds(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
+}
+
+function applyManualOrder<T extends { id: string }>(
+  items: T[],
+  orderedIds: string[],
+): T[] {
+  if (orderedIds.length === 0) return items;
+
+  const itemMap = new Map(items.map((item) => [item.id, item] as const));
+  const ordered = orderedIds
+    .map((id) => itemMap.get(id))
+    .filter((item): item is T => !!item);
+  const rest = items.filter((item) => !orderedIds.includes(item.id));
+  return [...ordered, ...rest];
+}
 
 export function CollectionsTab({
   filters,
@@ -34,15 +74,24 @@ export function CollectionsTab({
     id: string;
     name: string;
   } | null>(null);
-  const [showAll, setShowAll] = useState(false);
+  const [layout, setLayout] = useState<LayoutPreferences>(DEFAULT_LAYOUT);
+  const [layoutReady, setLayoutReady] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
   const utils = trpc.useUtils();
   const { data: lists, isLoading, isError, refetch } = trpc.list.getAll.useQuery();
+  const layoutQuery = trpc.list.getCollectionLayout.useQuery();
 
   const createMutation = trpc.list.create.useMutation({
     onSuccess: (newList) => {
       void utils.list.getAll.invalidate();
+      void layoutQuery.refetch();
       setCreateOpen(false);
       setName("");
       setDescription("");
@@ -55,11 +104,44 @@ export function CollectionsTab({
   const deleteMutation = trpc.list.delete.useMutation({
     onSuccess: () => {
       void utils.list.getAll.invalidate();
+      void layoutQuery.refetch();
       setDeleteTarget(null);
       toast.success("Collection deleted");
     },
     onError: (err) => toast.error(err.message),
   });
+
+  const updateLayoutMutation = trpc.list.updateCollectionLayout.useMutation({
+    onSuccess: (nextLayout) => {
+      setLayout({
+        hiddenIds: nextLayout.hiddenListIds,
+        orderedIds: nextLayout.orderedListIds,
+      });
+      utils.list.getCollectionLayout.setData(undefined, nextLayout);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  useEffect(() => {
+    if (!layoutQuery.data) return;
+    setLayout({
+      hiddenIds: layoutQuery.data.hiddenListIds,
+      orderedIds: layoutQuery.data.orderedListIds,
+    });
+    setLayoutReady(true);
+  }, [layoutQuery.data]);
+
+  const persistLayout = useCallback(
+    (nextLayout: LayoutPreferences): void => {
+      setLayout(nextLayout);
+      if (!layoutReady) return;
+      updateLayoutMutation.mutate({
+        hiddenListIds: nextLayout.hiddenIds,
+        orderedListIds: nextLayout.orderedIds,
+      });
+    },
+    [layoutReady, updateLayoutMutation],
+  );
 
   const handleCreate = (): void => {
     if (!name.trim()) return;
@@ -69,157 +151,519 @@ export function CollectionsTab({
     });
   };
 
-  const [cols, setCols] = useState(3);
-  useEffect(() => {
-    const update = (): void => {
-      const w = window.innerWidth;
-      if (w >= 1280) setCols(5);
-      else if (w >= 1024) setCols(4);
-      else if (w >= 640) setCols(3);
-      else setCols(2);
-    };
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
+  const searchQuery = filters.searchQuery.trim().toLowerCase();
+  const canReorder = searchQuery.length === 0;
 
-  const visibleCount = showAll ? Infinity : cols * 2 - 1;
+  const watchlist = useMemo(
+    () => lists?.find((list) => list.type === "watchlist") ?? null,
+    [lists],
+  );
+  const serverLibrary = useMemo(
+    () => lists?.find((list) => list.type === "server") ?? null,
+    [lists],
+  );
+
   const customLists = useMemo(() => {
-    let result = lists?.filter((l) => l.type === "custom") ?? [];
+    let result = lists?.filter((list) => list.type === "custom") ?? [];
 
-    if (filters.searchQuery.trim()) {
-      const q = filters.searchQuery.toLowerCase();
-      result = result.filter((l) => l.name.toLowerCase().includes(q));
+    if (searchQuery) {
+      result = result.filter((list) =>
+        list.name.toLowerCase().includes(searchQuery),
+      );
     }
 
     const dir = filters.sortOrder === "asc" ? 1 : -1;
     result = [...result].sort((a, b) => {
       if (filters.sortBy === "name") return dir * a.name.localeCompare(b.name);
-      return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      return (
+        dir *
+        (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      );
     });
 
     return result;
-  }, [lists, filters]);
+  }, [lists, filters.sortBy, filters.sortOrder, searchQuery]);
+
+  const systemLists = useMemo(() => {
+    const result = [watchlist, serverLibrary].filter(
+      (value): value is NonNullable<typeof value> => !!value,
+    );
+    if (!searchQuery) return result;
+    return result.filter((list) => list.name.toLowerCase().includes(searchQuery));
+  }, [watchlist, serverLibrary, searchQuery]);
+
+  const mergedLists = useMemo(
+    () => [...systemLists, ...customLists],
+    [systemLists, customLists],
+  );
+
+  const validIds = useMemo(
+    () => new Set(mergedLists.map((list) => list.id)),
+    [mergedLists],
+  );
+
+  const normalizedLayout = useMemo(() => {
+    const hiddenIds = uniqueIds(layout.hiddenIds).filter((id) => validIds.has(id));
+    const orderedIds = uniqueIds(layout.orderedIds).filter((id) => validIds.has(id));
+    return { hiddenIds, orderedIds };
+  }, [layout.hiddenIds, layout.orderedIds, validIds]);
+
+  useEffect(() => {
+    if (
+      sameIds(layout.hiddenIds, normalizedLayout.hiddenIds) &&
+      sameIds(layout.orderedIds, normalizedLayout.orderedIds)
+    ) {
+      return;
+    }
+    setLayout(normalizedLayout);
+  }, [layout.hiddenIds, layout.orderedIds, normalizedLayout]);
+
+  const orderedLists = useMemo(
+    () => applyManualOrder(mergedLists, normalizedLayout.orderedIds),
+    [mergedLists, normalizedLayout.orderedIds],
+  );
+
+  const hiddenSet = useMemo(
+    () => new Set(normalizedLayout.hiddenIds),
+    [normalizedLayout.hiddenIds],
+  );
+  const hiddenCount = useMemo(
+    () => orderedLists.filter((list) => hiddenSet.has(list.id)).length,
+    [orderedLists, hiddenSet],
+  );
+
+  const visibleLists = useMemo(
+    () => orderedLists.filter((list) => showHidden || !hiddenSet.has(list.id)),
+    [orderedLists, showHidden, hiddenSet],
+  );
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [
+    showHidden,
+    searchQuery,
+    visibleLists.length,
+    visibleLists.map((list) => list.id).join("|"),
+  ]);
+
+  const renderedLists = useMemo(
+    () => visibleLists.slice(0, visibleCount),
+    [visibleLists, visibleCount],
+  );
+  const hasMore = visibleCount < visibleLists.length;
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+        setVisibleCount((current) => Math.min(current + PAGE_SIZE, visibleLists.length));
+      },
+      { rootMargin: "220px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, visibleLists.length]);
+
+  const reorderByDrop = (sourceId: string, targetId: string): void => {
+    if (sourceId === targetId) return;
+    if (!canReorder) return;
+
+    const currentIds = orderedLists.map((list) => list.id);
+    const sourceIndex = currentIds.indexOf(sourceId);
+    const targetIndex = currentIds.indexOf(targetId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+
+    const reordered = [...currentIds];
+    const [moved] = reordered.splice(sourceIndex, 1);
+    if (!moved) return;
+    reordered.splice(targetIndex, 0, moved);
+
+    const trailingIds = normalizedLayout.orderedIds.filter(
+      (id) => !currentIds.includes(id),
+    );
+    persistLayout({
+      hiddenIds: normalizedLayout.hiddenIds,
+      orderedIds: [...reordered, ...trailingIds],
+    });
+  };
+
+  const handleDrop = (targetId: string): void => {
+    if (!draggedId) return;
+    reorderByDrop(draggedId, targetId);
+    setDraggedId(null);
+    setDropTargetId(null);
+  };
+
+  const toggleHidden = (listId: string): void => {
+    const isHidden = normalizedLayout.hiddenIds.includes(listId);
+    const nextHidden = isHidden
+      ? normalizedLayout.hiddenIds.filter((id) => id !== listId)
+      : [...normalizedLayout.hiddenIds, listId];
+
+    persistLayout({
+      hiddenIds: uniqueIds(nextHidden),
+      orderedIds: normalizedLayout.orderedIds,
+    });
+  };
+
+  const resetLayout = (): void => {
+    setShowHidden(false);
+    persistLayout(DEFAULT_LAYOUT);
+  };
+
+  const hasAnyManagedList =
+    (lists?.some(
+      (list) =>
+        list.type === "watchlist" ||
+        list.type === "server" ||
+        list.type === "custom",
+    ) ??
+      false) === true;
 
   return (
     <>
-      {isLoading ? (
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="aspect-[4/3] animate-pulse rounded-xl bg-muted" />
+      {isLoading || layoutQuery.isLoading ? (
+        <div className="space-y-2.5">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div
+              key={index}
+              className="h-[108px] animate-pulse rounded-2xl bg-muted"
+            />
           ))}
         </div>
-      ) : isError ? (
-        <StateMessage preset="error" onRetry={() => void refetch()} />
-      ) : (lists?.filter((l) => l.type === "custom") ?? []).length === 0 ? (
+      ) : isError || layoutQuery.isError ? (
+        <StateMessage
+          preset="error"
+          onRetry={() => {
+            void refetch();
+            void layoutQuery.refetch();
+          }}
+        />
+      ) : !hasAnyManagedList ? (
         <StateMessage
           preset="emptyCollections"
           action={{ label: "New Collection", onClick: () => setCreateOpen(true) }}
         />
       ) : (
-        <>
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-            {customLists.slice(0, visibleCount).map((l) => {
-              const posters = l.previewPosters ?? [];
-              return (
-                <Link key={l.id} href={`/collection/${l.slug}`} className="group relative aspect-[4/3] overflow-hidden rounded-xl bg-muted transition-transform duration-200 hover:scale-[1.03]">
-                  {posters.length >= 4 ? (
-                    <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-0.5">
-                      {posters.slice(0, 4).map((p, i) => (
-                        <Image key={i} src={`https://image.tmdb.org/t/p/w780${p}`} alt="" width={250} height={188} className="h-full w-full object-cover" />
-                      ))}
-                    </div>
-                  ) : posters.length >= 2 ? (
-                    <div className={cn("grid h-full w-full gap-0.5", posters.length === 2 && "grid-cols-2", posters.length === 3 && "grid-cols-2 grid-rows-2")}>
-                      {posters.map((p, i) => (
-                        <Image key={i} src={`https://image.tmdb.org/t/p/w780${p}`} alt="" width={250} height={188} className={cn("h-full w-full object-cover", posters.length === 3 && i === 0 && "row-span-2")} />
-                      ))}
-                    </div>
-                  ) : posters.length === 1 ? (
-                    <div className="relative h-full w-full">
-                      <Image src={`https://image.tmdb.org/t/p/w92${posters[0]}`} alt="" fill className="scale-110 object-cover blur-2xl brightness-50" />
-                      <div className="relative flex h-full w-full items-center justify-center">
-                        <Image src={`https://image.tmdb.org/t/p/w780${posters[0]}`} alt="" width={120} height={180} className="h-[85%] w-auto rounded-md object-cover shadow-xl" />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-muted to-muted/60">
-                      <Bookmark className="h-8 w-8 text-muted-foreground/20" />
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/10" />
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3 pb-3 pt-14">
-                    <h3 className="truncate text-base font-semibold text-white">{l.name}</h3>
-                    <p className="text-sm text-white/60">{l.itemCount} {l.itemCount === 1 ? "item" : "items"}</p>
-                  </div>
-                  <CollectionEditPopover
-                    list={l}
-                    onDelete={(id, n) => setDeleteTarget({ id, name: n })}
-                  />
-                </Link>
-              );
-            })}
-            {(showAll || customLists.length < visibleCount + 1) && (
-              <button type="button" onClick={() => setCreateOpen(true)} className="group flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border/50 bg-muted/30 transition-all duration-200 hover:scale-[1.03] hover:border-foreground/20 hover:bg-muted/50">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-foreground/5 transition-colors group-hover:bg-foreground/10">
-                  <Plus className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-foreground" />
-                </div>
-                <span className="text-sm font-medium text-muted-foreground transition-colors group-hover:text-foreground">New Collection</span>
-              </button>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "rounded-xl text-xs",
+                showHidden && "bg-accent text-foreground",
+              )}
+              onClick={() => setShowHidden((value) => !value)}
+            >
+              {showHidden ? "Hide hidden lists" : `Show hidden (${hiddenCount})`}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-xl text-xs text-muted-foreground hover:text-foreground"
+              onClick={resetLayout}
+            >
+              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+              Reset order & visibility
+            </Button>
+            {!canReorder && (
+              <span className="text-xs text-muted-foreground">
+                Disable search to reorder with drag and drop.
+              </span>
             )}
           </div>
-          {customLists.length > visibleCount && !showAll ? (
-            <div className="mt-4 flex justify-center">
-              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => setShowAll(true)}>
-                See all collections ({customLists.length})
-              </Button>
+
+          {visibleLists.length === 0 ? (
+            <div className="rounded-2xl border border-border/50 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
+              No lists match your search.
             </div>
-          ) : customLists.length > 0 ? (
-            <StateMessage preset="endOfItems" inline />
-          ) : null}
-        </>
+          ) : (
+            <div className="space-y-2.5">
+              {renderedLists.map((list) => {
+                const isHidden = hiddenSet.has(list.id);
+                const isDropTarget = dropTargetId === list.id && draggedId !== null;
+                return (
+                  <div
+                    key={list.id}
+                    className={cn(
+                      "group flex min-h-[108px] items-center gap-4 rounded-2xl border border-border/50 bg-muted/20 px-4 py-3 transition-colors hover:bg-accent/50",
+                      isHidden && showHidden && "opacity-60",
+                      isDropTarget && "border-dashed border-primary/60 bg-primary/5",
+                    )}
+                    onDragOver={(event) => {
+                      if (!canReorder || !draggedId) return;
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = "move";
+                      setDropTargetId(list.id);
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      const sourceId = draggedId ?? event.dataTransfer.getData("text/plain");
+                      if (!sourceId) return;
+                      setDraggedId(sourceId);
+                      handleDrop(list.id);
+                    }}
+                  >
+                    <button
+                      type="button"
+                      draggable={canReorder}
+                      onDragStart={(event) => {
+                        if (!canReorder) return;
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData("text/plain", list.id);
+                        setDraggedId(list.id);
+                        setDropTargetId(list.id);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedId(null);
+                        setDropTargetId(null);
+                      }}
+                      className={cn(
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors",
+                        canReorder
+                          ? "cursor-grab hover:bg-background/80 hover:text-foreground active:cursor-grabbing"
+                          : "cursor-not-allowed opacity-50",
+                      )}
+                      aria-label={`Reorder ${list.name}`}
+                    >
+                      <GripVertical className="h-4 w-4" />
+                    </button>
+
+                    <Link
+                      href={`/collection/${list.slug}`}
+                      className="flex min-w-0 flex-1 items-center gap-4"
+                    >
+                      <ListPreviewStack
+                        posters={list.previewPosters ?? []}
+                        type={list.type}
+                      />
+
+                      <div className="min-w-0 flex-1">
+                        <h3 className="truncate text-base font-semibold text-foreground">
+                          {list.name}
+                        </h3>
+                        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>
+                            {list.itemCount} {list.itemCount === 1 ? "item" : "items"}
+                          </span>
+                          {(list.type === "watchlist" || list.type === "server") && (
+                            <span className="rounded-lg bg-accent px-2 py-0.5 text-[11px] font-medium">
+                              System
+                            </span>
+                          )}
+                          {isHidden && (
+                            <span className="rounded-lg bg-accent px-2 py-0.5 text-[11px] font-medium">
+                              Hidden
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        className={cn(
+                          "flex h-9 w-9 items-center justify-center rounded-xl transition-colors",
+                          isHidden
+                            ? "text-foreground hover:bg-background/80"
+                            : "text-muted-foreground hover:bg-background/80 hover:text-foreground",
+                        )}
+                        onClick={() => toggleHidden(list.id)}
+                        aria-label={`${isHidden ? "Show" : "Hide"} ${list.name}`}
+                      >
+                        {isHidden ? (
+                          <Eye className="h-4 w-4" />
+                        ) : (
+                          <EyeOff className="h-4 w-4" />
+                        )}
+                      </button>
+
+                      {list.type === "custom" && (
+                        <CollectionEditPopover
+                          list={list}
+                          onDelete={(id, nameValue) =>
+                            setDeleteTarget({ id, name: nameValue })
+                          }
+                          triggerClassName="relative right-auto top-auto text-muted-foreground hover:bg-background/80 hover:text-foreground"
+                        />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {hasMore && (
+                <>
+                  <div ref={sentinelRef} className="h-1" />
+                  <div className="flex items-center justify-center py-2 text-xs text-muted-foreground">
+                    Loading more lists...
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="group flex min-h-[108px] w-full items-center gap-4 rounded-2xl border border-dashed border-border/50 bg-muted/20 px-4 py-3 transition-colors hover:border-foreground/20 hover:bg-muted/40"
+          >
+            <div className="relative h-[90px] w-[110px] shrink-0">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="absolute top-0 h-[90px] w-[58px] rounded-lg border border-border/40 bg-background/70"
+                  style={{ left: `${index * 20}px`, zIndex: index + 1 }}
+                />
+              ))}
+            </div>
+            <div className="min-w-0 flex-1 text-left">
+              <p className="text-base font-semibold text-foreground">New Collection</p>
+              <p className="text-xs text-muted-foreground">
+                Create a custom list
+              </p>
+            </div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-background/70 text-muted-foreground transition-colors group-hover:text-foreground">
+              <Plus className="h-4 w-4" />
+            </div>
+          </button>
+        </div>
       )}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>New Collection</DialogTitle>
-            <DialogDescription>Create a collection to organize your movies and shows.</DialogDescription>
+            <DialogDescription>
+              Create a collection to organize your movies and shows.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-muted-foreground">Name</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Weekend Binges" className="h-10" autoFocus onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); }} />
+              <label className="text-sm font-medium text-muted-foreground">
+                Name
+              </label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Weekend Binges"
+                className="h-10"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreate();
+                }}
+              />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-muted-foreground">Description <span className="text-muted-foreground/50">(optional)</span></label>
-              <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What's this collection for?" className="h-10" />
+              <label className="text-sm font-medium text-muted-foreground">
+                Description{" "}
+                <span className="text-muted-foreground/50">(optional)</span>
+              </label>
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="What's this collection for?"
+                className="h-10"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={!name.trim() || createMutation.isPending}>
-              {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreate}
+              disabled={!name.trim() || createMutation.isPending}
+            >
+              {createMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Create
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Delete Collection</DialogTitle>
-            <DialogDescription>Are you sure you want to delete &quot;{deleteTarget?.name}&quot;? This action cannot be undone.</DialogDescription>
+            <DialogDescription>
+              Are you sure you want to delete &quot;{deleteTarget?.name}&quot;?
+              This action cannot be undone.
+            </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
-            <Button className="bg-red-500 text-white hover:bg-red-600" onClick={() => deleteTarget && deleteMutation.mutate({ id: deleteTarget.id })} disabled={deleteMutation.isPending}>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-red-500 text-white hover:bg-red-600"
+              onClick={() =>
+                deleteTarget && deleteMutation.mutate({ id: deleteTarget.id })
+              }
+              disabled={deleteMutation.isPending}
+            >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function posterSrc(path: string): string {
+  return path.startsWith("http")
+    ? path
+    : `https://image.tmdb.org/t/p/w185${path}`;
+}
+
+function ListPreviewStack({
+  posters,
+  type,
+}: {
+  posters: string[];
+  type: string;
+}): React.JSX.Element {
+  const preview = posters.slice(0, 3);
+  const Icon = type === "watchlist" ? Eye : type === "server" ? Server : Bookmark;
+
+  return (
+    <div className="relative h-[90px] w-[110px] shrink-0">
+      {Array.from({ length: 3 }).map((_, index) => {
+        const poster = preview[index];
+        return (
+          <div
+            key={`${poster ?? "empty"}-${index}`}
+            className="absolute top-0 h-[90px] w-[58px] overflow-hidden rounded-lg border border-background/40 bg-background/70 shadow-md"
+            style={{ left: `${index * 20}px`, zIndex: index + 1 }}
+          >
+            {poster ? (
+              <Image
+                src={posterSrc(poster)}
+                alt=""
+                fill
+                className="object-cover"
+                sizes="58px"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-muted-foreground/40">
+                <Icon className="h-4 w-4" />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
