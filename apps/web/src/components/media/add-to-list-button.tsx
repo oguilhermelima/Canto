@@ -16,7 +16,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@canto/ui/sheet";
-import { Bookmark, Check, Loader2, Plus, X } from "lucide-react";
+import { Bookmark, Check, Eye, Loader2, Plus, X } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { trpc } from "~/lib/trpc/client";
 import { toast } from "sonner";
@@ -31,6 +31,10 @@ interface AddToListButtonProps {
   title?: string;
   size?: "sm" | "lg";
   className?: string;
+  /** Show standalone watchlist toggle button */
+  showWatchlistToggle?: boolean;
+  /** Include watchlist entry inside "Save to list" menu */
+  includeWatchlistInMenu?: boolean;
   /** Called when any popover/sheet opens or closes */
   onOpenChange?: (open: boolean) => void;
 }
@@ -43,6 +47,8 @@ export function AddToListButton({
   title,
   size = "sm",
   className,
+  showWatchlistToggle = true,
+  includeWatchlistInMenu = false,
   onOpenChange,
 }: AddToListButtonProps): React.JSX.Element {
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -159,10 +165,20 @@ export function AddToListButton({
 
   const realWatchlistState = watchlist ? inListIds.has(watchlist.id) : false;
   const isInWatchlist = optimisticWatchlist ?? realWatchlistState;
+  const hasSavedToAnyList = watchlist
+    ? isInWatchlist ||
+      Array.from(inListIds).some((listId) => listId !== watchlist.id)
+    : inListIds.size > 0;
 
-  // Filter: no server library, no watchlist
-  const userLists =
-    lists?.filter((l) => l.type !== "server" && l.type !== "watchlist") ?? [];
+  // Filter: no server library; optionally include watchlist in menu
+  const menuLists =
+    lists
+      ?.filter(
+        (l) =>
+          l.type !== "server" &&
+          (includeWatchlistInMenu || l.type !== "watchlist"),
+      )
+      .sort((a, b) => Number(b.type === "watchlist") - Number(a.type === "watchlist")) ?? [];
 
   const toggleWatchlist = async (): Promise<void> => {
     if (!watchlist) return;
@@ -229,7 +245,7 @@ export function AddToListButton({
   const isLoading =
     addItem.isPending || removeItem.isPending || resolving;
   const isSmall = size === "sm";
-  const btnHeight = isSmall ? "h-8" : "h-10";
+  const btnHeight = isSmall ? "h-8" : "h-11";
   const btnText = isSmall ? "text-xs" : "text-sm";
   const btnPx = isSmall ? "px-3" : "px-4";
 
@@ -246,14 +262,21 @@ export function AddToListButton({
 
       {/* Existing lists */}
       <div className="-mx-1 max-h-[280px] space-y-0.5 overflow-y-auto">
-        {userLists.map((l) => {
+        {menuLists.map((l) => {
           const thumb = posterUrl(l.previewPoster);
-          const saved = inListIds.has(l.id);
+          const isWatchlistRow = l.type === "watchlist";
+          const saved = isWatchlistRow ? isInWatchlist : inListIds.has(l.id);
           return (
             <button
               key={l.id}
               className="flex w-full items-center gap-3 rounded-lg px-1 py-1.5 transition-colors hover:bg-accent"
-              onClick={() => void toggleList(l.id, l.name)}
+              onClick={() => {
+                if (isWatchlistRow) {
+                  void toggleWatchlist();
+                  return;
+                }
+                void toggleList(l.id, l.name);
+              }}
               disabled={isLoading}
             >
               <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
@@ -267,7 +290,11 @@ export function AddToListButton({
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                    <Bookmark className="h-4 w-4" />
+                    {isWatchlistRow ? (
+                      <Eye className="h-4 w-4" />
+                    ) : (
+                      <Bookmark className="h-4 w-4" />
+                    )}
                   </div>
                 )}
               </div>
@@ -277,14 +304,23 @@ export function AddToListButton({
                   {l.itemCount} {l.itemCount === 1 ? "item" : "items"}
                 </p>
               </div>
-              <Bookmark
-                className={cn(
-                  "h-5 w-5 shrink-0",
-                  saved
-                    ? "fill-foreground text-foreground"
-                    : "text-muted-foreground",
-                )}
-              />
+              {isWatchlistRow ? (
+                <Eye
+                  className={cn(
+                    "h-5 w-5 shrink-0",
+                    saved ? "text-foreground" : "text-muted-foreground",
+                  )}
+                />
+              ) : (
+                <Bookmark
+                  className={cn(
+                    "h-5 w-5 shrink-0",
+                    saved
+                      ? "fill-foreground text-foreground"
+                      : "text-muted-foreground",
+                  )}
+                />
+              )}
             </button>
           );
         })}
@@ -332,37 +368,38 @@ export function AddToListButton({
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      {/* Watchlist toggle */}
-      <button
-        className={cn(
-          "group/wl inline-flex items-center gap-2 rounded-xl font-medium transition-all duration-200",
-          btnHeight,
-          btnPx,
-          btnText,
-          isInWatchlist
-            ? "bg-green-500/20 text-green-500 hover:bg-red-500/20 hover:text-red-500"
-            : "bg-foreground text-background hover:bg-foreground/90",
-        )}
-        onClick={() => void toggleWatchlist()}
-        disabled={!watchlist || isLoading}
-      >
-        {resolving ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : isInWatchlist ? (
-          <>
-            <Check className="h-4 w-4 transition-transform duration-200 group-hover/wl:hidden" />
-            <X className="hidden h-4 w-4 transition-transform duration-200 group-hover/wl:block" />
-          </>
-        ) : (
-          <Plus className="h-4 w-4 transition-transform duration-200" />
-        )}
-        <span className={isInWatchlist ? "group-hover/wl:hidden" : ""}>
-          {isInWatchlist ? "In Watchlist" : "Watchlist"}
-        </span>
-        {isInWatchlist && (
-          <span className="hidden group-hover/wl:inline">Remove</span>
-        )}
-      </button>
+      {showWatchlistToggle && (
+        <button
+          className={cn(
+            "group/wl inline-flex items-center gap-2 rounded-xl font-medium transition-all duration-200",
+            btnHeight,
+            btnPx,
+            btnText,
+            isInWatchlist
+              ? "bg-green-500/20 text-green-500 hover:bg-red-500/20 hover:text-red-500"
+              : "bg-foreground text-background hover:bg-foreground/90",
+          )}
+          onClick={() => void toggleWatchlist()}
+          disabled={!watchlist || isLoading}
+        >
+          {resolving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : isInWatchlist ? (
+            <>
+              <Check className="h-4 w-4 transition-transform duration-200 group-hover/wl:hidden" />
+              <X className="hidden h-4 w-4 transition-transform duration-200 group-hover/wl:block" />
+            </>
+          ) : (
+            <Plus className="h-4 w-4 transition-transform duration-200" />
+          )}
+          <span className={isInWatchlist ? "group-hover/wl:hidden" : ""}>
+            {isInWatchlist ? "In Watchlist" : "Watchlist"}
+          </span>
+          {isInWatchlist && (
+            <span className="hidden group-hover/wl:inline">Remove</span>
+          )}
+        </button>
+      )}
 
       {/* Save to list — Popover on desktop, Sheet on mobile */}
       {/* Desktop */}
@@ -371,13 +408,22 @@ export function AddToListButton({
           <PopoverTrigger asChild>
             <button
               className={cn(
-                "inline-flex items-center justify-center rounded-xl bg-foreground/15 transition-colors hover:bg-foreground/25",
+                "inline-flex items-center justify-center rounded-xl transition-colors",
+                hasSavedToAnyList
+                  ? "bg-foreground/25 hover:bg-foreground/30"
+                  : "bg-foreground/15 hover:bg-foreground/25",
                 btnHeight,
-                isSmall ? "w-8" : "w-10",
+                isSmall ? "w-8" : "w-11",
               )}
               aria-label="Save to list"
+              aria-pressed={hasSavedToAnyList}
             >
-              <Bookmark className="h-4 w-4 text-foreground" />
+              <Bookmark
+                className={cn(
+                  "h-4 w-4 text-foreground",
+                  hasSavedToAnyList && "fill-foreground",
+                )}
+              />
             </button>
           </PopoverTrigger>
           <PopoverContent align="start" sideOffset={8} className="w-72 p-3">
@@ -392,13 +438,22 @@ export function AddToListButton({
           <SheetTrigger asChild>
             <button
               className={cn(
-                "inline-flex items-center justify-center rounded-xl bg-foreground/15 transition-colors hover:bg-foreground/25",
+                "inline-flex items-center justify-center rounded-xl transition-colors",
+                hasSavedToAnyList
+                  ? "bg-foreground/25 hover:bg-foreground/30"
+                  : "bg-foreground/15 hover:bg-foreground/25",
                 btnHeight,
-                isSmall ? "w-8" : "w-10",
+                isSmall ? "w-8" : "w-11",
               )}
               aria-label="Save to list"
+              aria-pressed={hasSavedToAnyList}
             >
-              <Bookmark className="h-4 w-4 text-foreground" />
+              <Bookmark
+                className={cn(
+                  "h-4 w-4 text-foreground",
+                  hasSavedToAnyList && "fill-foreground",
+                )}
+              />
             </button>
           </SheetTrigger>
           <SheetContent side="bottom" className="rounded-t-2xl">
