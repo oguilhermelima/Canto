@@ -4,13 +4,19 @@ import { TmdbProvider } from "@canto/providers";
 import {
   findEnabledSyncLinks,
   findAllUserConnections,
+  findEpisodeIdByMediaAndNumbers,
   findMediaByAnyReference,
+  findSyncItemByServerKey,
   upsertUserPlaybackProgress,
 } from "@canto/core/infrastructure/repositories";
 import { scanJellyfinMedia } from "@canto/core/domain/use-cases/scan-jellyfin-media";
 import { scanPlexMedia } from "@canto/core/domain/use-cases/scan-plex-media";
 import { processSyncImports } from "@canto/core/domain/use-cases/process-sync-imports";
 import type { PendingImport } from "@canto/core/domain/use-cases/scan-jellyfin-media";
+
+function isSyncProvider(value: string): value is "jellyfin" | "plex" {
+  return value === "jellyfin" || value === "plex";
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Main Sync Handler                                                         */
@@ -30,10 +36,23 @@ export async function runReverseSync(): Promise<void> {
 
   for (const conn of connections) {
     if (!conn.token) continue;
+    if (!isSyncProvider(conn.provider)) continue;
+    const provider = conn.provider;
 
-    console.log(`[reverse-sync] Processing connection for user ${conn.userId} (${conn.provider})`);
+    console.log(`[reverse-sync] Processing connection for user ${conn.userId} (${provider})`);
 
-    const syncLinks = await findEnabledSyncLinks(db, conn.id);
+    const syncLinksForConnection = await findEnabledSyncLinks(db, conn.id, provider);
+    const syncLinks =
+      syncLinksForConnection.length > 0
+        ? syncLinksForConnection
+        : await findEnabledSyncLinks(db, undefined, provider);
+
+    if (syncLinksForConnection.length === 0 && syncLinks.length > 0) {
+      console.warn(
+        `[reverse-sync] Using ${syncLinks.length} legacy global link(s) for ${provider} on user ${conn.userId}.`,
+      );
+    }
+
     const linked = syncLinks.map((l) => ({
       jellyfinLibraryId: l.serverLibraryId,
       plexLibraryId: l.serverLibraryId,
@@ -44,9 +63,19 @@ export async function runReverseSync(): Promise<void> {
     if (linked.length === 0) continue;
 
     let items: PendingImport[] = [];
-    if (conn.provider === "jellyfin" && jellyfinUrl) {
-      items = await scanJellyfinMedia(jellyfinUrl, conn.token, linked);
-    } else if (conn.provider === "plex" && plexUrl) {
+    if (provider === "jellyfin" && jellyfinUrl) {
+      if (!conn.externalUserId) {
+        console.warn(
+          `[reverse-sync] Jellyfin connection for user ${conn.userId} is missing externalUserId; user playback metadata may be incomplete.`,
+        );
+      }
+      items = await scanJellyfinMedia(
+        jellyfinUrl,
+        conn.token,
+        linked,
+        conn.externalUserId ?? undefined,
+      );
+    } else if (provider === "plex" && plexUrl) {
       items = await scanPlexMedia(plexUrl, conn.token, linked);
     }
 
@@ -54,46 +83,78 @@ export async function runReverseSync(): Promise<void> {
 
     // 1. Update user-specific playback progress and watch history
     for (const item of items) {
-      if (item.played === undefined && item.playbackPositionSeconds === undefined) continue;
+      const hasPlaybackPosition = (item.playbackPositionSeconds ?? 0) > 0;
+      const isPlayed = item.played === true;
+      if (!hasPlaybackPosition && !isPlayed) continue;
 
-      // Find the media in our DB to get its ID
-      const mediaItem = await findMediaByAnyReference(db, item.tmdbId ?? 0, "tmdb", item.imdbId, item.tvdbId);
-      if (!mediaItem) continue;
+      // Find the media in our DB to get its ID.
+      // If direct references fail, fall back to the previously resolved sync_item mapping.
+      const mediaByReference = await findMediaByAnyReference(
+        db,
+        item.tmdbId ?? 0,
+        "tmdb",
+        item.imdbId,
+        item.tvdbId,
+      );
+      let mediaId: string | null = mediaByReference?.id ?? null;
+      if (!mediaId) {
+        const resolvedSyncItem = await findSyncItemByServerKey(
+          db,
+          provider,
+          item.libraryId,
+          item.jellyfinItemId,
+          item.plexRatingKey,
+          item.serverLinkId,
+        );
+        if (resolvedSyncItem?.mediaId) {
+          mediaId = resolvedSyncItem.mediaId;
+        }
+      }
+      if (!mediaId) continue;
+      const resolvedMediaType = mediaByReference?.type ?? item.type;
+      let episodeId: string | undefined;
+      if (
+        resolvedMediaType === "show" &&
+        Number.isInteger(item.seasonNumber) &&
+        Number.isInteger(item.episodeNumber) &&
+        (item.seasonNumber ?? -1) >= 0 &&
+        (item.episodeNumber ?? -1) >= 0
+      ) {
+        const foundEpisodeId = await findEpisodeIdByMediaAndNumbers(
+          db,
+          mediaId,
+          item.seasonNumber ?? 0,
+          item.episodeNumber ?? 0,
+        );
+        if (foundEpisodeId) episodeId = foundEpisodeId;
+      }
 
       // Update progress
-      if (item.playbackPositionSeconds !== undefined || item.played !== undefined) {
-        await upsertUserPlaybackProgress(db, {
-          userId: conn.userId,
-          mediaId: mediaItem.id,
-          positionSeconds: item.playbackPositionSeconds ?? 0,
-          isCompleted: item.played ?? false,
-          lastWatchedAt: item.lastPlayedAt ?? new Date(),
-          source: conn.provider,
-        });
-      }
-
-      // If played, add to history if not already there (simplified check)
-      if (item.played && item.lastPlayedAt) {
-        // We could check if there's already a watch history entry for this item around this time
-        // but for now let's just add it if we want to be thorough.
-        // Actually, let's keep it simple for now as requested.
-      }
+      await upsertUserPlaybackProgress(db, {
+        userId: conn.userId,
+        mediaId,
+        episodeId,
+        positionSeconds: hasPlaybackPosition ? item.playbackPositionSeconds ?? 0 : 0,
+        isCompleted: isPlayed,
+        lastWatchedAt: item.lastPlayedAt ?? new Date(),
+        source: provider,
+      });
     }
 
     // 2. Handle global library sync (only for libraries not yet synced in this run)
     const newItemsForGlobalSync = items.filter(item => {
-      const libKey = `${conn.provider}:${item.serverLinkId}`;
+      const libKey = `${provider}:${item.serverLinkId}`;
       if (globallySyncedLibraries.has(libKey)) return false;
       return true;
     });
 
     if (newItemsForGlobalSync.length > 0) {
       console.log(`[reverse-sync] Syncing ${newItemsForGlobalSync.length} new items for global library from user ${conn.userId}`);
-      await processSyncImports(db, newItemsForGlobalSync, `${conn.provider}-sync`, tmdb);
+      await processSyncImports(db, newItemsForGlobalSync, `${provider}-sync`, tmdb);
       
       // Mark these libraries as globally synced
       for (const item of newItemsForGlobalSync) {
-        globallySyncedLibraries.add(`${conn.provider}:${item.serverLinkId}`);
+        globallySyncedLibraries.add(`${provider}:${item.serverLinkId}`);
       }
     }
   }
