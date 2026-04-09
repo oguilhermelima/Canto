@@ -34,6 +34,14 @@ export const updateListInput = z.object({
 });
 export type UpdateListInput = z.infer<typeof updateListInput>;
 
+export const updateCollectionLayoutInput = z.object({
+  hiddenListIds: z.array(z.string().uuid()).max(500).default([]),
+  orderedListIds: z.array(z.string().uuid()).max(500).default([]),
+});
+export type UpdateCollectionLayoutInput = z.infer<
+  typeof updateCollectionLayoutInput
+>;
+
 export const addListItemInput = z.object({
   listId: z.string().uuid(),
   mediaId: z.string().uuid(),

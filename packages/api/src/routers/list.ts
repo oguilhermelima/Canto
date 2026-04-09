@@ -6,6 +6,7 @@ import {
   getListBySlugInput,
   createListInput,
   updateListInput,
+  updateCollectionLayoutInput,
   addListItemInput,
   removeListItemInput,
 } from "@canto/validators";
@@ -21,16 +22,120 @@ import {
   addListItem,
   findMediaInLists,
 } from "@canto/core/infrastructure/repositories/list-repository";
+import {
+  findUserPreferences,
+  upsertUserPreference,
+} from "@canto/core/infrastructure/repositories/library-repository";
 
 // ── Extracted rules & use-cases ──
 import { slugify } from "@canto/core/domain/rules/slugify";
 import { verifyListOwnership } from "@canto/core/domain/rules/list-ownership";
 import { addItemToList, removeItemFromList } from "@canto/core/domain/use-cases/manage-list-items";
 
+const COLLECTION_LAYOUT_PREF_KEY = "library.collectionLayout.v1";
+
+export interface CollectionLayoutPreference {
+  hiddenListIds: string[];
+  orderedListIds: string[];
+}
+
+function uniqueIds(ids: string[]): string[] {
+  return [...new Set(ids)];
+}
+
+function parseCollectionLayoutPreference(
+  value: unknown,
+): CollectionLayoutPreference {
+  if (!value || typeof value !== "object") {
+    return { hiddenListIds: [], orderedListIds: [] };
+  }
+
+  const record = value as Record<string, unknown>;
+  const hiddenListIds = Array.isArray(record.hiddenListIds)
+    ? record.hiddenListIds.filter((id): id is string => typeof id === "string")
+    : [];
+  const orderedListIds = Array.isArray(record.orderedListIds)
+    ? record.orderedListIds.filter((id): id is string => typeof id === "string")
+    : [];
+
+  return {
+    hiddenListIds: uniqueIds(hiddenListIds),
+    orderedListIds: uniqueIds(orderedListIds),
+  };
+}
+
+function normalizeCollectionLayout(
+  input: CollectionLayoutPreference,
+  validListIds: Set<string>,
+): CollectionLayoutPreference {
+  return {
+    hiddenListIds: input.hiddenListIds.filter((id) => validListIds.has(id)),
+    orderedListIds: input.orderedListIds.filter((id) => validListIds.has(id)),
+  };
+}
+
 export const listRouter = createTRPCRouter({
   getAll: protectedProcedure.query(({ ctx }) =>
     findUserListsWithCounts(ctx.db, ctx.session.user.id),
   ),
+
+  getCollectionLayout: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    const [preferences, lists] = await Promise.all([
+      findUserPreferences(ctx.db, userId),
+      findUserListsWithCounts(ctx.db, userId),
+    ]);
+
+    const preferencesRecord = preferences as Record<string, unknown>;
+    const layout = parseCollectionLayoutPreference(
+      preferencesRecord[COLLECTION_LAYOUT_PREF_KEY],
+    );
+    const validListIds = new Set(
+      lists
+        .filter(
+          (list) =>
+            list.type === "watchlist" ||
+            list.type === "custom" ||
+            list.type === "server",
+        )
+        .map((list) => list.id),
+    );
+    return normalizeCollectionLayout(layout, validListIds);
+  }),
+
+  updateCollectionLayout: protectedProcedure
+    .input(updateCollectionLayoutInput)
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const lists = await findUserListsWithCounts(ctx.db, userId);
+      const validListIds = new Set(
+        lists
+          .filter(
+            (list) =>
+              list.type === "watchlist" ||
+              list.type === "custom" ||
+              list.type === "server",
+          )
+          .map((list) => list.id),
+      );
+
+      const normalized = normalizeCollectionLayout(
+        {
+          hiddenListIds: uniqueIds(input.hiddenListIds),
+          orderedListIds: uniqueIds(input.orderedListIds),
+        },
+        validListIds,
+      );
+
+      await upsertUserPreference(
+        ctx.db,
+        userId,
+        COLLECTION_LAYOUT_PREF_KEY,
+        normalized,
+      );
+
+      return normalized;
+    }),
 
   getBySlug: protectedProcedure
     .input(getListBySlugInput)
