@@ -14,6 +14,9 @@ import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { AddToListButton } from "~/components/media/add-to-list-button";
 import { MediaLogo } from "~/components/media/media-logo";
+import { WatchStatusDropdown } from "~/components/media/WatchStatusDropdown";
+import { RatingControl } from "~/components/media/RatingControl";
+import { PlaybackProgressInfo } from "~/components/media/PlaybackProgressInfo";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -72,6 +75,16 @@ interface MediaDetailHeroProps {
   videos?: VideoItem[];
   // Crew
   crew?: CrewMember[];
+  // User state
+  persistedId?: string;
+  trackingStatus?: "none" | "planned" | "watching" | "completed" | "dropped";
+  rating?: number | null;
+  playbackProgress?: {
+    progressSeconds: number;
+    lastWatchedAt: Date | null;
+    source: string | null;
+    isCompleted: boolean;
+  } | null;
 }
 
 export function MediaDetailHero({
@@ -97,6 +110,10 @@ export function MediaDetailHero({
   watchProviderLinks,
   videos,
   crew,
+  persistedId,
+  trackingStatus,
+  rating,
+  playbackProgress,
 }: MediaDetailHeroProps): React.JSX.Element {
   const resolveImage = (path: string, size: string): string =>
     path.startsWith("http") ? path : `${TMDB_IMAGE_BASE}/${size}${path}`;
@@ -247,11 +264,13 @@ export function MediaDetailHero({
           )}
 
           {/* Where to Watch row */}
-          {(hasServers || hasProviders) && (
+          {(hasServers || hasProviders || playbackProgress) && (
             <div className="flex items-center gap-3 overflow-x-auto scrollbar-none">
-              <span className="shrink-0 text-xs font-medium capitalize text-foreground/40">
-                Where to watch
-              </span>
+              {(hasServers || hasProviders) && (
+                <span className="shrink-0 text-xs font-medium capitalize text-foreground/40">
+                  Where to watch
+                </span>
+              )}
               {/* Jellyfin */}
               {servers?.jellyfin && (
                 <a
@@ -330,12 +349,35 @@ export function MediaDetailHero({
                   getUrl={getProviderUrl}
                 />
               )}
+
+              {playbackProgress && (
+                <div className="ml-auto pl-4 border-l border-foreground/10 shrink-0">
+                  <PlaybackProgressInfo
+                    progressSeconds={playbackProgress.progressSeconds}
+                    lastWatchedAt={playbackProgress.lastWatchedAt}
+                    source={playbackProgress.source}
+                    isCompleted={playbackProgress.isCompleted}
+                  />
+                </div>
+              )}
             </div>
           )}
 
           {/* Action buttons */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <AddToListButton mediaId={id} title={title} size="lg" />
+            {persistedId && (
+              <div className="flex items-center gap-2">
+                <WatchStatusDropdown
+                  mediaId={persistedId}
+                  initialStatus={trackingStatus}
+                />
+                <RatingControl
+                  mediaId={persistedId}
+                  initialRating={rating}
+                />
+              </div>
+            )}
           </div>
 
         </div>

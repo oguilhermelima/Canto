@@ -96,6 +96,19 @@ export function MediaDetailContent({
           name: c.name,
           job: c.job,
         }))}
+        persistedId={detail.mediaId}
+        trackingStatus={detail.userMediaState.data?.trackingStatus as "none" | "planned" | "watching" | "completed" | "dropped" | undefined}
+        rating={detail.userMediaState.data?.rating}
+        playbackProgress={
+          detail.userMediaState.data
+            ? {
+                progressSeconds: detail.userMediaState.data.progress,
+                lastWatchedAt: detail.userMediaState.data.lastWatchedAt,
+                source: detail.userMediaState.data.source,
+                isCompleted: detail.userMediaState.data.isCompleted,
+              }
+            : null
+        }
       >
         <div className="flex flex-col gap-12 pb-16 md:gap-16">
           {/* Admin: Download & Manage */}

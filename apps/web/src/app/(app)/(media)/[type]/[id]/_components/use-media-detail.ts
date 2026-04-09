@@ -119,6 +119,11 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
 
   const utils = trpc.useUtils();
 
+  const userMediaState = trpc.userMedia.getState.useQuery(
+    { mediaId: mediaId ?? "" },
+    { enabled: !!mediaId },
+  );
+
   const replaceTorrent = trpc.torrent.replace.useMutation({
     onSuccess: () => {
       toast.success("Replacement download started");
@@ -373,6 +378,7 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
     torrentSearch,
     existingRequest,
     allLibraries,
+    userMediaState,
 
     // Mutations
     downloadTorrent,
