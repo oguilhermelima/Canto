@@ -10,8 +10,7 @@ import { MetadataProvidersSection } from "~/components/settings/services-section
 import { AboutSection } from "~/components/settings/about-section";
 import { StatusTab } from "~/components/management/status-tab";
 import { UsersTab } from "~/components/management/users-tab";
-import { JellyfinSection } from "./_components/jellyfin-section";
-import { PlexSection } from "./_components/plex-section";
+import { MediaServersSection } from "./_components/media-servers-section";
 import { DownloadsSection } from "./_components/downloads-section";
 import { SearchTabSection } from "./_components/search-tab-section";
 
@@ -21,8 +20,7 @@ const NAV_ITEMS = [
   { key: "metadata", label: "Metadata" },
   { key: "downloads", label: "Libraries" },
   { key: "search", label: "Indexers" },
-  { key: "jellyfin", label: "Jellyfin" },
-  { key: "plex", label: "Plex" },
+  { key: "media-servers", label: "Media Servers" },
   { key: "about", label: "About" },
 ] as const;
 
@@ -34,8 +32,9 @@ export default function ManagePage(): React.JSX.Element {
   const { data: session, isPending } = authClient.useSession();
   const isAdmin = (session?.user as { role?: string } | undefined)?.role === "admin";
 
-  const tabParam = searchParams.get("tab") as NavKey | null;
-  const activeNav = tabParam && NAV_ITEMS.some((i) => i.key === tabParam) ? tabParam : "status";
+  const tabParam = searchParams.get("tab");
+  const resolvedTab = tabParam === "jellyfin" || tabParam === "plex" ? "media-servers" as const : tabParam as NavKey | null;
+  const activeNav = resolvedTab && NAV_ITEMS.some((i) => i.key === resolvedTab) ? resolvedTab : "status";
 
   const setActiveNav = useCallback((key: string) => {
     router.replace(`/manage?tab=${key}`, { scroll: false });
@@ -66,8 +65,7 @@ export default function ManagePage(): React.JSX.Element {
         {activeNav === "metadata" && <MetadataProvidersSection />}
         {activeNav === "downloads" && <DownloadsSection />}
         {activeNav === "search" && <SearchTabSection />}
-        {activeNav === "jellyfin" && <JellyfinSection />}
-        {activeNav === "plex" && <PlexSection />}
+        {activeNav === "media-servers" && <MediaServersSection />}
         {activeNav === "about" && <AboutSection />}
       </div>
     </div>

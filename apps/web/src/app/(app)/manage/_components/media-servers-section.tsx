@@ -1,15 +1,15 @@
 "use client";
 
-import { JellyfinConnectionSection } from "~/components/settings/services-section";
+import { MediaServerConnectionSection } from "~/components/settings/services-section";
 import { MediaServerSyncSection } from "~/components/settings/media-server-sync";
 import { AutoMergeSection } from "~/components/settings/import-seeding";
 
-export function JellyfinSection(): React.JSX.Element {
+export function MediaServersSection(): React.JSX.Element {
   return (
     <div>
-      <JellyfinConnectionSection />
+      <MediaServerConnectionSection />
       <AutoMergeSection />
-      <MediaServerSyncSection serverType="jellyfin" />
+      <MediaServerSyncSection />
     </div>
   );
 }
