@@ -31,7 +31,7 @@ export const libraryRouter = createTRPCRouter({
    * Paginated + filtered library listing.
    */
   list: protectedProcedure.input(listInput).query(async ({ ctx, input }) => {
-    const result = await listLibraryMedia(ctx.db, input);
+    const result = await listLibraryMedia(ctx.db, input, ctx.session.user.id);
     const userLang = await getUserLanguage(ctx.db, ctx.session.user.id);
     if (userLang.startsWith("en")) return result;
 

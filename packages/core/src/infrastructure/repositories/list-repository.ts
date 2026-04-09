@@ -1,6 +1,6 @@
 import { and, eq, or, isNull, desc, count, sql, inArray } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { list, listItem, media } from "@canto/db/schema";
+import { list, listItem, media, syncItem, folderServerLink, userConnection } from "@canto/db/schema";
 import type { RecsFilters } from "../../domain/types/recs-filters";
 import { buildRecsFilterConditions, recsSortOrder } from "./shared/recs-filter-builder";
 
@@ -157,9 +157,12 @@ export async function ensureServerLibrary(db: Database) {
 export async function findListItems(
   db: Database,
   listId: string,
-  opts: { limit?: number; offset?: number } & RecsFilters = {},
+  opts: { userId?: string; limit?: number; offset?: number } & RecsFilters = {},
 ) {
-  const { limit: lim = 50, offset: off = 0, sortBy, ...filterOpts } = opts;
+  const { userId, limit: lim = 50, offset: off = 0, sortBy, ...filterOpts } = opts;
+
+  const listRow = await findListById(db, listId);
+  const isServerLibrary = listRow?.type === "server";
 
   const conditions = [
     eq(listItem.listId, listId),
@@ -168,6 +171,41 @@ export async function findListItems(
 
   const customSort = recsSortOrder(sortBy);
   const orderByExpr = customSort ? [customSort] : [desc(listItem.addedAt)];
+
+  if (isServerLibrary && userId) {
+    // Get the user's connected providers
+    const connectedProviders = await db
+      .select({ provider: userConnection.provider })
+      .from(userConnection)
+      .where(and(eq(userConnection.userId, userId), eq(userConnection.enabled, true)));
+
+    if (connectedProviders.length === 0) {
+      // No connections — return nothing
+      return { items: [], total: 0 };
+    }
+
+    const providerValues = connectedProviders.map((c) => c.provider) as Array<"jellyfin" | "plex">;
+
+    // Show items that were synced via any of the user's connected providers
+    const accessibleMediaIds = db
+      .select({ mediaId: syncItem.mediaId })
+      .from(syncItem)
+      .innerJoin(
+        folderServerLink,
+        or(
+          eq(syncItem.jellyfinServerLinkId, folderServerLink.id),
+          eq(syncItem.plexServerLinkId, folderServerLink.id),
+        ),
+      )
+      .where(
+        and(
+          inArray(syncItem.result, ["imported", "skipped"]),
+          inArray(folderServerLink.serverType, providerValues),
+        ),
+      );
+
+    conditions.push(sql`${listItem.mediaId} IN (${accessibleMediaIds})`);
+  }
 
   const whereClause = and(...conditions);
 

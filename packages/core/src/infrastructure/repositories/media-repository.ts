@@ -6,16 +6,20 @@ import {
   eq,
   gte,
   ilike,
+  inArray,
   lte,
+  or,
   sql,
   type SQL,
 } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
+  folderServerLink,
   media,
   mediaFile,
   syncItem,
   torrent,
+  userConnection,
 } from "@canto/db/schema";
 import type { ListInput } from "@canto/validators";
 
@@ -253,12 +257,50 @@ function buildOrderBy(sortBy: ListInput["sortBy"], sortOrder: ListInput["sortOrd
 export async function listLibraryMedia(
   db: Database,
   input: ListInput,
+  userId?: string,
 ): Promise<{ items: MediaRow[]; total: number; page: number; pageSize: number }> {
   const page = input.cursor ?? input.page;
   const pageSize = input.pageSize;
   const offset = (page - 1) * pageSize;
 
-  const where = buildLibraryFilters(input);
+  let where: SQL = buildLibraryFilters(input);
+
+  if (userId) {
+    // Get which providers the user has connected accounts for.
+    // If none → return empty (user hasn't linked any media server account yet).
+    const connectedProviders = await db
+      .select({ provider: userConnection.provider })
+      .from(userConnection)
+      .where(and(eq(userConnection.userId, userId), eq(userConnection.enabled, true)));
+
+    if (connectedProviders.length === 0) {
+      return { items: [], total: 0, page, pageSize };
+    }
+
+    // Show media that has been synced from any provider the user has connected to.
+    // We join syncItem → folderServerLink and filter by serverType matching the user's providers.
+    // This is robust: it works regardless of which user triggered the last sync run.
+    const providerValues = connectedProviders.map((c) => c.provider) as Array<"jellyfin" | "plex">;
+    const accessibleMediaIds = db
+      .select({ id: syncItem.mediaId })
+      .from(syncItem)
+      .innerJoin(
+        folderServerLink,
+        or(
+          eq(syncItem.jellyfinServerLinkId, folderServerLink.id),
+          eq(syncItem.plexServerLinkId, folderServerLink.id),
+        ),
+      )
+      .where(
+        and(
+          inArray(syncItem.result, ["imported", "skipped"]),
+          inArray(folderServerLink.serverType, providerValues),
+        ),
+      );
+
+    where = and(where, sql`${media.id} IN (${accessibleMediaIds})`)!;
+  }
+
   const orderBy = buildOrderBy(input.sortBy, input.sortOrder);
 
   const [items, [totalRow]] = await Promise.all([

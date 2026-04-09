@@ -38,6 +38,7 @@ export const listRouter = createTRPCRouter({
       const listRow = await findListBySlug(ctx.db, input.slug, ctx.session.user.id);
       if (!listRow) throw new TRPCError({ code: "NOT_FOUND", message: "List not found" });
       const { items, total } = await findListItems(ctx.db, listRow.id, {
+        userId: ctx.session.user.id,
         limit: input.limit,
         offset: input.cursor ?? input.offset,
         genreIds: input.genreIds,
