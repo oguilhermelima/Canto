@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { downloadFolder, folderServerLink, folderMediaPath, type RuleGroup } from "@canto/db/schema";
 
@@ -119,18 +119,29 @@ export async function findServerLink(
   db: Database,
   serverType: string,
   serverLibraryId: string,
+  userConnectionId?: string,
 ) {
   return db.query.folderServerLink.findFirst({
     where: and(
       eq(folderServerLink.serverType, serverType),
       eq(folderServerLink.serverLibraryId, serverLibraryId),
+      userConnectionId ? eq(folderServerLink.userConnectionId, userConnectionId) : isNull(folderServerLink.userConnectionId),
     ),
   });
 }
 
-export async function findEnabledSyncLinks(db: Database) {
+export async function findServerLinkById(db: Database, id: string) {
+  return db.query.folderServerLink.findFirst({
+    where: eq(folderServerLink.id, id),
+  });
+}
+
+export async function findEnabledSyncLinks(db: Database, userConnectionId?: string) {
   return db.query.folderServerLink.findMany({
-    where: eq(folderServerLink.syncEnabled, true),
+    where: and(
+      eq(folderServerLink.syncEnabled, true),
+      userConnectionId ? eq(folderServerLink.userConnectionId, userConnectionId) : undefined,
+    ),
   });
 }
 
@@ -139,7 +150,7 @@ export async function upsertServerLink(db: Database, data: FolderServerLinkInser
     .insert(folderServerLink)
     .values(data)
     .onConflictDoUpdate({
-      target: [folderServerLink.serverType, folderServerLink.serverLibraryId],
+      target: [folderServerLink.serverType, folderServerLink.serverLibraryId, folderServerLink.userConnectionId],
       set: {
         serverLibraryName: data.serverLibraryName,
         serverPath: data.serverPath,
@@ -167,13 +178,14 @@ export async function removeServerLink(db: Database, id: string) {
   await db.delete(folderServerLink).where(eq(folderServerLink.id, id));
 }
 
-export async function findAllServerLinks(db: Database, serverType?: string) {
-  if (serverType) {
-    return db.query.folderServerLink.findMany({
-      where: eq(folderServerLink.serverType, serverType),
-    });
-  }
-  return db.query.folderServerLink.findMany();
+export async function findAllServerLinks(db: Database, serverType?: string, userConnectionId?: string) {
+  const conditions = [];
+  if (serverType) conditions.push(eq(folderServerLink.serverType, serverType));
+  if (userConnectionId) conditions.push(eq(folderServerLink.userConnectionId, userConnectionId));
+  
+  return db.query.folderServerLink.findMany({
+    where: conditions.length > 0 ? and(...conditions) : undefined,
+  });
 }
 
 // ── Media Paths ──

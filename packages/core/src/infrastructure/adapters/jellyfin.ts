@@ -167,3 +167,4 @@ export async function mergeJellyfinVersions(
     throw new Error(`Merge failed: ${res.status}`);
   }
 }
+
