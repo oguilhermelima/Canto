@@ -16,6 +16,16 @@ async function getOrCreatePlexClientId(): Promise<string> {
   return id;
 }
 
+export interface PlexAuthResult {
+  success: boolean;
+  error?: string;
+  token?: string;
+  machineId?: string;
+  serverName?: string;
+  user?: string;
+  userId?: string;
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Authenticate with token                                                    */
 /* -------------------------------------------------------------------------- */
@@ -23,10 +33,11 @@ async function getOrCreatePlexClientId(): Promise<string> {
 export async function authenticatePlex(input: {
   url: string;
   token: string;
-}): Promise<{ success: boolean; error?: string; serverName?: string }> {
-  validateServiceUrl(input.url);
+}): Promise<PlexAuthResult> {
+  const baseUrl = input.url.replace(/\/$/, "");
   try {
-    const res = await fetch(`${input.url}/?X-Plex-Token=${input.token}`, {
+    validateServiceUrl(baseUrl);
+    const res = await fetch(`${baseUrl}/?X-Plex-Token=${input.token}`, {
       headers: { Accept: "application/json" },
     });
     if (!res.ok) {
@@ -36,12 +47,39 @@ export async function authenticatePlex(input: {
     const data = (await res.json()) as {
       MediaContainer: { friendlyName: string; machineIdentifier: string };
     };
-    await setSetting(SETTINGS.PLEX_URL, input.url);
-    await setSetting(SETTINGS.PLEX_TOKEN, input.token);
-    await setSetting(SETTINGS.PLEX_MACHINE_ID, data.MediaContainer.machineIdentifier);
-    return { success: true, serverName: data.MediaContainer.friendlyName };
-  } catch {
-    return { success: false, error: "Connection failed" };
+
+    // Also get user info to get the Plex User ID
+    let userId: string | undefined;
+    let user: string | undefined;
+    try {
+      const userRes = await fetch("https://plex.tv/api/v2/user", {
+        headers: {
+          Accept: "application/json",
+          "X-Plex-Product": "Canto",
+          "X-Plex-Token": input.token,
+        },
+      });
+      if (userRes.ok) {
+        const userData = (await userRes.json()) as { id: number; username: string };
+        userId = String(userData.id);
+        user = userData.username;
+      }
+    } catch { /* Non-critical */ }
+
+    return {
+      success: true,
+      token: input.token,
+      machineId: data.MediaContainer.machineIdentifier,
+      serverName: data.MediaContainer.friendlyName,
+      user,
+      userId,
+    };
+  } catch (err) {
+    if (err instanceof Error && !err.message.includes("fetch")) {
+      return { success: false, error: err.message };
+    }
+    const cause = (err as { cause?: { message?: string } })?.cause?.message;
+    return { success: false, error: cause ? `Cannot reach server: ${cause}` : "Cannot reach the Plex server. Check the URL and ensure it is running." };
   }
 }
 
@@ -53,9 +91,10 @@ export async function loginPlex(input: {
   url: string;
   email: string;
   password: string;
-}): Promise<{ success: boolean; error?: string; serverName?: string; user?: string }> {
+}): Promise<PlexAuthResult> {
+  const baseUrl = input.url.replace(/\/$/, "");
   try {
-    validateServiceUrl(input.url);
+    validateServiceUrl(baseUrl);
     const signInRes = await fetch("https://plex.tv/users/sign_in.json", {
       method: "POST",
       headers: {
@@ -73,10 +112,10 @@ export async function loginPlex(input: {
       return { success: false, error: `plex.tv returned HTTP ${signInRes.status}` };
     }
 
-    const signInData = (await signInRes.json()) as { user: { authToken: string; username: string } };
+    const signInData = (await signInRes.json()) as { user: { authToken: string; username: string; id: number } };
     const token = signInData.user.authToken;
 
-    const serverRes = await fetch(`${input.url}/?X-Plex-Token=${token}`, {
+    const serverRes = await fetch(`${baseUrl}/?X-Plex-Token=${token}`, {
       headers: { Accept: "application/json" },
     });
     if (!serverRes.ok) {
@@ -87,13 +126,20 @@ export async function loginPlex(input: {
       MediaContainer: { friendlyName: string; machineIdentifier: string };
     };
 
-    await setSetting(SETTINGS.PLEX_URL, input.url);
-    await setSetting(SETTINGS.PLEX_TOKEN, token);
-    await setSetting(SETTINGS.PLEX_MACHINE_ID, serverData.MediaContainer.machineIdentifier);
-
-    return { success: true, serverName: serverData.MediaContainer.friendlyName, user: signInData.user.username };
-  } catch {
-    return { success: false, error: "Connection failed" };
+    return {
+      success: true,
+      token,
+      machineId: serverData.MediaContainer.machineIdentifier,
+      serverName: serverData.MediaContainer.friendlyName,
+      user: signInData.user.username,
+      userId: String(signInData.user.id),
+    };
+  } catch (err) {
+    if (err instanceof Error && !err.message.includes("fetch")) {
+      return { success: false, error: err.message };
+    }
+    const cause = (err as { cause?: { message?: string } })?.cause?.message;
+    return { success: false, error: cause ? `Cannot reach server: ${cause}` : "Cannot reach the Plex server. Check the URL and ensure it is running." };
   }
 }
 
@@ -122,7 +168,15 @@ export async function checkPlexPin(input: {
   pinId: number;
   clientId: string;
   serverUrl?: string;
-}): Promise<{ authenticated: boolean; expired?: boolean; username?: string; serverName?: string }> {
+}): Promise<{
+  authenticated: boolean;
+  expired?: boolean;
+  token?: string;
+  userId?: string;
+  username?: string;
+  serverName?: string;
+  machineId?: string;
+}> {
   if (input.serverUrl) validateServiceUrl(input.serverUrl);
 
   const res = await fetch(`https://plex.tv/api/v2/pins/${input.pinId}`, {
@@ -143,10 +197,10 @@ export async function checkPlexPin(input: {
   }
 
   const token = data.authToken;
-  await setSetting(SETTINGS.PLEX_TOKEN, token);
 
   // Try to get user info
   let username: string | undefined;
+  let userId: string | undefined;
   try {
     const userRes = await fetch("https://plex.tv/api/v2/user", {
       headers: {
@@ -156,13 +210,15 @@ export async function checkPlexPin(input: {
       },
     });
     if (userRes.ok) {
-      const userData = (await userRes.json()) as { username: string };
+      const userData = (await userRes.json()) as { id: number; username: string };
       username = userData.username;
+      userId = String(userData.id);
     }
   } catch { /* Non-critical */ }
 
-  // If server URL provided, validate and save
+  // If server URL provided, validate
   let serverName: string | undefined;
+  let machineId: string | undefined;
   if (input.serverUrl) {
     try {
       const serverRes = await fetch(`${input.serverUrl}/?X-Plex-Token=${token}`, {
@@ -171,10 +227,9 @@ export async function checkPlexPin(input: {
       if (serverRes.ok) {
         const serverData = (await serverRes.json()) as { MediaContainer: { friendlyName: string; machineIdentifier: string } };
         serverName = serverData.MediaContainer.friendlyName;
-        await setSetting(SETTINGS.PLEX_URL, input.serverUrl);
-        await setSetting(SETTINGS.PLEX_MACHINE_ID, serverData.MediaContainer.machineIdentifier);
+        machineId = serverData.MediaContainer.machineIdentifier;
       }
-    } catch { /* Server not reachable, still save token */ }
+    } catch { /* Server not reachable */ }
   }
 
   // Auto-discover server if no URL provided
@@ -197,15 +252,16 @@ export async function checkPlexPin(input: {
         }>;
         const server = resources.find((r) => r.provides.includes("server"));
         if (server) {
-          await setSetting(SETTINGS.PLEX_MACHINE_ID, server.clientIdentifier);
+          machineId = server.clientIdentifier;
           const localConn = server.connections.find((c) => c.local);
           const conn = localConn ?? server.connections[0];
-          if (conn) await setSetting(SETTINGS.PLEX_URL, conn.uri);
+          // We don't save the URL here anymore, it will be saved in the router if needed,
+          // but usually the admin sets the global URL.
           serverName = server.name;
         }
       }
     } catch { /* Non-critical */ }
   }
 
-  return { authenticated: true, username, serverName };
+  return { authenticated: true, token, userId, username, serverName, machineId };
 }
