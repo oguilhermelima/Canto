@@ -9,3 +9,5 @@ export * from "./notification-repository";
 export * from "./list-repository";
 export * from "./request-repository";
 export * from "./user-recommendation-repository";
+export * from "./user-connection-repository";
+export * from "./user-media-repository";
