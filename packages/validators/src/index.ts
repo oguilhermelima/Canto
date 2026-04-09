@@ -8,3 +8,5 @@ export * from "./settings";
 export * from "./sync";
 export * from "./request";
 export * from "./provider";
+export * from "./user-connection";
+export * from "./user-media-tracking";

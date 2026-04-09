@@ -70,6 +70,7 @@ export const addServerLinkInput = z.object({
   serverPath: z.string().optional(),
   syncEnabled: z.boolean().default(false),
   contentType: z.enum(["movies", "shows"]).optional(),
+  userConnectionId: z.string().uuid().optional(),
 });
 
 export const removeServerLinkInput = z.object({
