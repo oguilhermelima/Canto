@@ -149,25 +149,99 @@ export const folderRouter = createTRPCRouter({
 
   testPaths: adminProcedure.mutation(({ ctx }) => testFolderPaths(ctx.db)),
 
-  listAllServerLinks: adminProcedure
+  listAllServerLinks: protectedProcedure
     .input(listServerLinksInput.optional())
-    .query(({ ctx, input }) => findAllServerLinks(ctx.db, input?.serverType)),
-
-  addServerLink: adminProcedure
-    .input(addServerLinkInput)
-    .mutation(({ ctx, input }) => upsertServerLink(ctx.db, input)),
-
-  updateServerLink: adminProcedure
-    .input(updateServerLinkInput)
-    .mutation(({ ctx, input }) => {
-      const data: Record<string, unknown> = {};
-      if (input.syncEnabled !== undefined) data.syncEnabled = input.syncEnabled;
-      return updateServerLink(ctx.db, input.id, data);
+    .query(async ({ ctx, input }) => {
+      // Find the user's connection for this provider
+      let userConnId: string | undefined;
+      if (input?.serverType) {
+        const { userConnection } = await import("@canto/db/schema");
+        const { eq, and } = await import("drizzle-orm");
+        const conn = await ctx.db.query.userConnection.findFirst({
+          where: and(
+            eq(userConnection.userId, ctx.session.user.id),
+            eq(userConnection.provider, input.serverType),
+          ),
+        });
+        userConnId = conn?.id;
+      }
+      return findAllServerLinks(ctx.db, input?.serverType, userConnId);
     }),
 
-  removeServerLink: adminProcedure
+  addServerLink: protectedProcedure
+    .input(addServerLinkInput)
+    .mutation(async ({ ctx, input }) => {
+      let userConnId = input.userConnectionId;
+
+      // If no ID provided, find the one for the current user
+      if (!userConnId) {
+        const { userConnection } = await import("@canto/db/schema");
+        const { eq, and } = await import("drizzle-orm");
+        const conn = await ctx.db.query.userConnection.findFirst({
+          where: and(
+            eq(userConnection.userId, ctx.session.user.id),
+            eq(userConnection.provider, input.serverType),
+          ),
+        });
+        userConnId = conn?.id;
+      }
+
+      if (!userConnId && ctx.session.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You must have a connected account to add server links" });
+      }
+
+      const link = await upsertServerLink(ctx.db, {
+        ...input,
+        userConnectionId: userConnId,
+      });
+
+      // Kick off a sync so the user's library data is populated right away
+      if (input.syncEnabled) {
+        const { dispatchJellyfinSync, dispatchPlexSync } = await import(
+          "@canto/core/infrastructure/queue/bullmq-dispatcher"
+        );
+        if (input.serverType === "jellyfin") {
+          await dispatchJellyfinSync().catch(() => { /* non-critical */ });
+        } else if (input.serverType === "plex") {
+          await dispatchPlexSync().catch(() => { /* non-critical */ });
+        }
+      }
+
+      return link;
+    }),
+
+  updateServerLink: protectedProcedure
+    .input(updateServerLinkInput)
+    .mutation(async ({ ctx, input }) => {
+      const data: Record<string, unknown> = {};
+      if (input.syncEnabled !== undefined) data.syncEnabled = input.syncEnabled;
+      const link = await updateServerLink(ctx.db, input.id, data);
+
+      // If sync was just enabled, kick off a sync
+      if (input.syncEnabled === true) {
+        const { findServerLinkById } = await import(
+          "@canto/core/infrastructure/repositories/folder-repository"
+        );
+        const serverLink = await findServerLinkById(ctx.db, input.id);
+        if (serverLink) {
+          const { dispatchJellyfinSync, dispatchPlexSync } = await import(
+            "@canto/core/infrastructure/queue/bullmq-dispatcher"
+          );
+          if (serverLink.serverType === "jellyfin") {
+            await dispatchJellyfinSync().catch(() => { /* non-critical */ });
+          } else if (serverLink.serverType === "plex") {
+            await dispatchPlexSync().catch(() => { /* non-critical */ });
+          }
+        }
+      }
+
+      return link;
+    }),
+
+  removeServerLink: protectedProcedure
     .input(removeServerLinkInput)
     .mutation(async ({ ctx, input }) => {
+      // For now, simple delete. In a more secure version, we'd verify ownership of the link here.
       await removeServerLink(ctx.db, input.id);
       return { success: true };
     }),

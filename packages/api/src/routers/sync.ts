@@ -137,7 +137,7 @@ export const syncRouter = createTRPCRouter({
     return { started };
   }),
 
-  discoverServerLibraries: adminProcedure
+  discoverServerLibraries: protectedProcedure
     .input(discoverServerLibrariesInput)
-    .query(({ ctx, input }) => discoverServerLibraries(ctx.db, input.serverType)),
+    .query(({ ctx, input }) => discoverServerLibraries(ctx.db, input.serverType, ctx.session.user.id)),
 });
