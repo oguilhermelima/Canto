@@ -63,7 +63,7 @@ export const syncRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const { items, total } = await findSyncItemsPaginated(
         ctx.db,
-        { libraryId: input.libraryId, source: input.source, result: input.result },
+        { libraryId: input.libraryId, server: input.server, result: input.result },
         input.pageSize,
         (input.page - 1) * input.pageSize,
       );
@@ -103,7 +103,8 @@ export const syncRouter = createTRPCRouter({
         plex?: { url: string };
       } = {};
 
-      const jellyfinItem = items.find((i) => i.source === "jellyfin" && i.jellyfinItemId);
+      // With unified items, jellyfinItemId and plexRatingKey can both be set on the same row
+      const jellyfinItem = items.find((i) => !!i.jellyfinItemId);
       if (jellyfinItem) {
         const jellyfinUrl = await getSetting<string>(SETTINGS.JELLYFIN_URL);
         if (jellyfinUrl) {
@@ -113,7 +114,7 @@ export const syncRouter = createTRPCRouter({
         }
       }
 
-      const plexItem = items.find((i) => i.source === "plex" && i.plexRatingKey);
+      const plexItem = items.find((i) => !!i.plexRatingKey);
       if (plexItem) {
         const plexUrl = await getSetting<string>(SETTINGS.PLEX_URL);
         const machineId = await getSetting<string>(SETTINGS.PLEX_MACHINE_ID);

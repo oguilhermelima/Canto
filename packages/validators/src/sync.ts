@@ -2,7 +2,8 @@ import { z } from "zod";
 
 export const listSyncedItemsInput = z.object({
   libraryId: z.string().uuid().optional(),
-  source: z.enum(["jellyfin", "plex"]).optional(),
+  /** Filter by media server. "jellyfin" = has jellyfinItemId, "plex" = has plexRatingKey */
+  server: z.enum(["jellyfin", "plex"]).optional(),
   result: z.enum(["imported", "skipped", "failed"]).optional(),
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).max(100).default(50),
