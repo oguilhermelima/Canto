@@ -8,15 +8,13 @@ import { TabBar } from "~/components/layout/tab-bar";
 import { useManageMedia } from "./use-manage-media";
 import { PreferencesTab } from "./preferences-tab";
 import { DownloadsTab } from "./downloads-tab";
-import { JellyfinTab } from "./jellyfin-tab";
-import { PlexTab } from "./plex-tab";
+import { ServersTab } from "./servers-tab";
 import { DangerZoneTab } from "./danger-zone-tab";
 
 const TABS = [
   { value: "preferences", label: "Preferences" },
   { value: "downloads", label: "Torrents" },
-  { value: "jellyfin", label: "Jellyfin" },
-  { value: "plex", label: "Plex" },
+  { value: "servers", label: "Servers" },
   { value: "danger", label: "Danger Zone" },
 ] as const;
 
@@ -102,17 +100,8 @@ export function ManageContent({
             />
           )}
 
-          {activeTab === "jellyfin" && (
-            <JellyfinTab
-              mediaType={mediaType}
-              seasons={manage.seasons}
-              availability={manage.availability}
-              mediaServers={manage.mediaServers}
-            />
-          )}
-
-          {activeTab === "plex" && (
-            <PlexTab
+          {activeTab === "servers" && (
+            <ServersTab
               mediaType={mediaType}
               seasons={manage.seasons}
               availability={manage.availability}
