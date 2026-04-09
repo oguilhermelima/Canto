@@ -13,9 +13,9 @@ import {
   findMediaByAnyReference,
   updateMedia,
   createSyncEpisodes,
-  upsertSyncItemByServerKey,
+  upsertUnifiedSyncItem,
   pruneOldSyncItems,
-  deleteSyncEpisodesBySyncItemId,
+  deleteSyncEpisodesBySource,
   updateServerLink,
   ensureServerLibrary,
   addListItem,
@@ -67,25 +67,23 @@ async function updateStatus(tag: string, status: SyncStatus): Promise<void> {
   await setSetting(`${STATUS_KEY_PREFIX}.${tag}`, status);
 }
 
-function syncItemBase(item: PendingImport): {
-  libraryId: string | null;
-  serverLinkId: string;
-  serverItemTitle: string;
-  serverItemPath: string | undefined;
-  serverItemYear: number | undefined;
-  source: string;
-  jellyfinItemId: string | undefined;
-  plexRatingKey: string | undefined;
-} {
+function syncItemBase(item: PendingImport, syncRunStart: Date) {
+  const isJellyfin = item.source === "jellyfin";
   return {
     libraryId: item.libraryId,
+    // Legacy columns (kept during transition)
     serverLinkId: item.serverLinkId,
+    source: item.source,
+    // Unified server-specific columns
+    jellyfinItemId: isJellyfin ? item.jellyfinItemId : undefined,
+    jellyfinServerLinkId: isJellyfin ? item.serverLinkId : undefined,
+    jellyfinSyncedAt: isJellyfin ? syncRunStart : undefined,
+    plexRatingKey: isJellyfin ? undefined : item.plexRatingKey,
+    plexServerLinkId: isJellyfin ? undefined : item.serverLinkId,
+    plexSyncedAt: isJellyfin ? undefined : syncRunStart,
     serverItemTitle: item.title,
     serverItemPath: item.path,
     serverItemYear: item.year,
-    source: item.source,
-    jellyfinItemId: item.jellyfinItemId,
-    plexRatingKey: item.plexRatingKey,
   };
 }
 
@@ -95,7 +93,8 @@ async function fetchAndStoreSyncEpisodes(
   item: PendingImport,
   serverConfig: ServerConfig,
 ): Promise<void> {
-  await deleteSyncEpisodesBySyncItemId(db, syncItemId);
+  // Only delete episodes for this server's side, preserving the other server's episodes
+  await deleteSyncEpisodesBySource(db, syncItemId, item.source);
   let mediaFiles: MediaFileInfo[] = [];
   if (item.source === "jellyfin" && item.jellyfinItemId && serverConfig.jellyfinUrl && serverConfig.jellyfinKey) {
     mediaFiles = await fetchJellyfinMediaInfo(serverConfig.jellyfinUrl, serverConfig.jellyfinKey, item.jellyfinItemId, item.type);
@@ -107,6 +106,7 @@ async function fetchAndStoreSyncEpisodes(
       db,
       mediaFiles.map((f) => ({
         syncItemId,
+        source: item.source,
         seasonNumber: f.seasonNumber,
         episodeNumber: f.episodeNumber,
         serverEpisodeId: f.serverEpisodeId,
@@ -191,8 +191,8 @@ export async function processSyncImports(
         if (!resolved) {
           console.log(`[reverse-sync] Could not resolve: ${item.title} (${item.year})`);
           status.failed++;
-          await upsertSyncItemByServerKey(db, {
-            ...syncItemBase(item),
+          await upsertUnifiedSyncItem(db, {
+            ...syncItemBase(item, syncRunStart),
             result: "failed",
             reason: "Could not find on TMDB",
             syncedAt: syncRunStart,
@@ -230,8 +230,8 @@ export async function processSyncImports(
 
           if (existing.inLibrary) {
             status.skipped++;
-            const skippedSyncItem = await upsertSyncItemByServerKey(db, {
-              ...syncItemBase(item),
+            const skippedSyncItem = await upsertUnifiedSyncItem(db, {
+              ...syncItemBase(item, syncRunStart),
               tmdbId,
               mediaId,
               result: "skipped",
@@ -271,8 +271,8 @@ export async function processSyncImports(
         } catch { /* already in server library */ }
 
         status.imported++;
-        const insertedSyncItem = await upsertSyncItemByServerKey(db, {
-          ...syncItemBase(item),
+        const insertedSyncItem = await upsertUnifiedSyncItem(db, {
+          ...syncItemBase(item, syncRunStart),
           tmdbId,
           mediaId,
           result: "imported",
@@ -292,8 +292,8 @@ export async function processSyncImports(
         const msg = err instanceof Error ? err.message : "Unknown error";
         console.error(`[reverse-sync] Error processing ${item.title}:`, msg);
         status.failed++;
-        await upsertSyncItemByServerKey(db, {
-          ...syncItemBase(item),
+        await upsertUnifiedSyncItem(db, {
+          ...syncItemBase(item, syncRunStart),
           tmdbId: item.tmdbId,
           result: "failed",
           reason: msg.slice(0, 500),
@@ -330,8 +330,8 @@ export async function processSyncImports(
       mediaId = existing?.id;
     }
 
-    await upsertSyncItemByServerKey(db, {
-      ...syncItemBase(item),
+    await upsertUnifiedSyncItem(db, {
+      ...syncItemBase(item, syncRunStart),
       tmdbId: item.tmdbId,
       mediaId: mediaId ?? null,
       result: mediaId ? "skipped" : "failed",

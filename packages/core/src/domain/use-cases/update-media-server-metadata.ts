@@ -42,9 +42,8 @@ export async function updateMediaServerMetadata(
   const plexToken = await getSetting<string>(SETTINGS.PLEX_TOKEN);
 
   for (const item of syncItems) {
-    // Jellyfin items
+    // Jellyfin update — works regardless of source column (unified items have both IDs)
     if (
-      item.source === "jellyfin" &&
       item.jellyfinItemId &&
       jellyfinEnabled &&
       jellyfinUrl &&
@@ -92,9 +91,8 @@ export async function updateMediaServerMetadata(
       }
     }
 
-    // Plex items
+    // Plex update — works regardless of source column (unified items have both IDs)
     if (
-      item.source === "plex" &&
       item.plexRatingKey &&
       plexEnabled &&
       plexUrl &&
