@@ -362,14 +362,12 @@ function MediaServerRow({
   serviceKey,
   urlField,
   apiKeyField,
-  loginFields,
   isLast,
 }: {
   title: string;
   serviceKey: "jellyfin" | "plex";
   urlField: { key: string; label: string; placeholder: string };
   apiKeyField: { key: string; label: string; placeholder: string; secret?: boolean };
-  loginFields: Array<{ key: string; label: string; placeholder: string; secret?: boolean }>;
   isLast?: boolean;
 }): React.JSX.Element {
   const utils = trpc.useUtils();
@@ -382,18 +380,10 @@ function MediaServerRow({
   const toggleService = trpc.settings.toggleService.useMutation({
     onSuccess: () => void utils.settings.getEnabledServices.invalidate(),
   });
-  const authJellyfin = trpc.settings.authenticateJellyfin.useMutation({
-    onSuccess: () => void utils.settings.getAll.invalidate(),
-  });
-  const loginPlex = trpc.settings.loginPlex.useMutation({
-    onSuccess: () => void utils.settings.getAll.invalidate(),
-  });
 
   const isEnabled = enabledServices?.[serviceKey] === true;
-  const [activeSection, setActiveSection] = useState<"token" | "login" | null>(null);
   const [url, setUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
-  const [loginValues, setLoginValues] = useState<Record<string, string>>({});
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [dirty, setDirty] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -403,41 +393,19 @@ function MediaServerRow({
       setUrl((allSettings[urlField.key] as string) ?? "");
       setApiKey((allSettings[apiKeyField.key] as string) ?? "");
       setDirty(false);
-      // Auto-expand if enabled but not yet configured
       if (isEnabled && !allSettings[urlField.key]) setExpanded(true);
     }
   }, [allSettings, urlField.key, apiKeyField.key, isEnabled]);
 
-  const isConnected = allSettings?.[urlField.key];
-  const authMutation = serviceKey === "jellyfin" ? authJellyfin : loginPlex;
-  const isPending = setMany.isPending || authMutation.isPending;
-
   const handleSave = (): void => {
-    if (activeSection === "login") {
-      const onAuthSuccess = (data: { success: boolean; serverName?: string; user?: string; error?: string }): void => {
-        if (data.success) {
-          toast.success(data.serverName ? `Connected to ${data.serverName}${data.user ? ` as ${data.user}` : ""}` : "Credentials saved");
-          setDirty(false);
-        } else {
-          toast.error(data.error ?? "Authentication failed");
-        }
-      };
-      if (serviceKey === "jellyfin") {
-        authJellyfin.mutate({ url, username: loginValues.username ?? "", password: loginValues.password ?? "" }, { onSuccess: onAuthSuccess });
-      } else {
-        loginPlex.mutate({ url, email: loginValues.email ?? "", password: loginValues.password ?? "" }, { onSuccess: onAuthSuccess });
-      }
-    } else {
-      setMany.mutate(
-        { settings: [{ key: urlField.key, value: url }, { key: apiKeyField.key, value: apiKey }] },
-        { onSuccess: () => { setDirty(false); setActiveSection(null); toast.success("Settings saved"); }, onError: () => toast.error("Failed to save settings") },
-      );
-    }
+    setMany.mutate(
+      { settings: [{ key: urlField.key, value: url }, { key: apiKeyField.key, value: apiKey }] },
+      { onSuccess: () => { setDirty(false); toast.success("Settings saved"); }, onError: () => toast.error("Failed to save settings") },
+    );
   };
 
   const handleToggle = (): void => {
     toggleService.mutate({ service: serviceKey, enabled: !isEnabled });
-    // Auto-expand when enabling
     if (!isEnabled) setExpanded(true);
   };
 
@@ -452,7 +420,6 @@ function MediaServerRow({
 
   return (
     <div className={cn(!isLast && "border-b border-border/30")}>
-      {/* Header — click to expand/collapse */}
       <div
         role="button"
         tabIndex={0}
@@ -465,9 +432,9 @@ function MediaServerRow({
           <span className="inline-block h-5 w-5 shrink-0" style={logoStyle} />
           <p className="text-base font-semibold text-foreground">{title}</p>
           {isEnabled ? (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-green-500/10 text-green-500 border-green-500/20">Connected</Badge>
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-green-500/10 text-green-500 border-green-500/20">Active</Badge>
           ) : (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Disconnected</Badge>
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Inactive</Badge>
           )}
         </div>
         <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
@@ -490,9 +457,9 @@ function MediaServerRow({
                 size="sm"
                 className="h-7 text-xs"
                 onClick={handleSave}
-                disabled={isPending}
+                disabled={setMany.isPending}
               >
-                {isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
+                {setMany.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
                 Save
               </Button>
             </>
@@ -501,7 +468,6 @@ function MediaServerRow({
         </div>
       </div>
 
-      {/* Content — collapsible */}
       <AnimatedCollapse open={expanded}>
         <div className="px-5 py-5 space-y-5">
           {info?.subtitle && (
@@ -514,96 +480,39 @@ function MediaServerRow({
             </a>
           )}
 
-          {/* Server URL */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-muted-foreground">{urlField.label}</label>
-            <Input
-              value={url}
-              placeholder={urlField.placeholder}
-              onChange={(e) => { setUrl(e.target.value); setDirty(true); }}
-              className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
-            />
-          </div>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-muted-foreground">{urlField.label}</label>
+              <Input
+                value={url}
+                placeholder={urlField.placeholder}
+                onChange={(e) => { setUrl(e.target.value); setDirty(true); }}
+                className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+              />
+            </div>
 
-          {/* Auth methods */}
-          <div className="space-y-3">
-            <p className="text-sm font-medium text-muted-foreground">Authentication</p>
-
-            {/* Jellyfin: Token first, then credentials */}
-            {isJellyfin && (
-              <>
-                <div className={cn("rounded-xl border p-4 transition-all", activeSection === "login" ? "border-border/20 opacity-40" : activeSection === "token" ? "border-border/60 bg-muted/30" : "border-border/40 hover:border-border/60")}>
-                  <p className="text-sm font-medium text-foreground mb-3">{apiKeyField.label}</p>
-                  <div className="relative">
-                    <Input
-                      type={apiKeyField.secret && !showSecrets[apiKeyField.key] ? "password" : "text"}
-                      value={apiKey}
-                      placeholder={apiKeyField.placeholder}
-                      onChange={(e) => { setApiKey(e.target.value); setDirty(true); setActiveSection(e.target.value ? "token" : null); }}
-                      className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
-                      disabled={activeSection === "login"}
-                    />
-                    {apiKeyField.secret && activeSection !== "login" && (
-                      <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors" onClick={() => setShowSecrets((p) => ({ ...p, [apiKeyField.key]: !p[apiKeyField.key] }))}>
-                        {showSecrets[apiKeyField.key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <OrDivider />
-
-                <div className={cn("rounded-xl border p-4 transition-all", activeSection === "token" ? "border-border/20 opacity-40" : activeSection === "login" ? "border-border/60 bg-muted/30" : "border-border/40 hover:border-border/60")}>
-                  <p className="text-sm font-medium text-foreground mb-3">Login with credentials</p>
-                  <SettingsFields
-                    fields={loginFields}
-                    values={loginValues}
-                    onChange={(key, value) => { const next = { ...loginValues, [key]: value }; setLoginValues(next); setDirty(true); setActiveSection(Object.values(next).some((v) => v) ? "login" : null); }}
-                    showSecrets={showSecrets}
-                    onToggleSecret={(key) => setShowSecrets((p) => ({ ...p, [key]: !p[key] }))}
-                    disabled={activeSection === "token"}
-                  />
-                </div>
-              </>
-            )}
-
-            {/* Plex: Sign in first, then token */}
-            {!isJellyfin && (
-              <>
-                <PlexOAuthSection
-                  serverUrl={url}
-                  disabled={activeSection === "token"}
-                  isConnected={!!isConnected}
-                  onSuccess={() => { void utils.settings.getAll.invalidate(); setDirty(false); setActiveSection(null); }}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-muted-foreground">{apiKeyField.label}</label>
+              <div className="relative">
+                <Input
+                  type={apiKeyField.secret && !showSecrets[apiKeyField.key] ? "password" : "text"}
+                  value={apiKey}
+                  placeholder={apiKeyField.placeholder}
+                  onChange={(e) => { setApiKey(e.target.value); setDirty(true); }}
+                  className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
                 />
-
-                <OrDivider />
-
-                <div className={cn("rounded-xl border p-4 transition-all", activeSection === "login" ? "border-border/20 opacity-40" : activeSection === "token" ? "border-border/60 bg-muted/30" : "border-border/40 hover:border-border/60")}>
-                  <p className="text-sm font-medium text-foreground mb-2">{apiKeyField.label}</p>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Filled automatically when you sign in above. To find it manually, visit{" "}
-                    <a href="https://plex.tv/devices.xml" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">plex.tv/devices.xml</a>
-                    {" "}while logged in.
-                  </p>
-                  <div className="relative">
-                    <Input
-                      type={apiKeyField.secret && !showSecrets[apiKeyField.key] ? "password" : "text"}
-                      value={apiKey}
-                      placeholder={apiKeyField.placeholder}
-                      onChange={(e) => { setApiKey(e.target.value); setDirty(true); setActiveSection(e.target.value ? "token" : null); }}
-                      className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
-                      disabled={activeSection === "login"}
-                    />
-                    {apiKeyField.secret && activeSection !== "login" && (
-                      <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors" onClick={() => setShowSecrets((p) => ({ ...p, [apiKeyField.key]: !p[apiKeyField.key] }))}>
-                        {showSecrets[apiKeyField.key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
+                {apiKeyField.secret && (
+                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors" onClick={() => setShowSecrets((p) => ({ ...p, [apiKeyField.key]: !p[apiKeyField.key] }))}>
+                    {showSecrets[apiKeyField.key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground px-1">
+                {isJellyfin 
+                  ? "System-wide API Key for background tasks and metadata." 
+                  : "System-wide X-Plex-Token for background tasks and metadata."}
+              </p>
+            </div>
           </div>
         </div>
       </AnimatedCollapse>
@@ -1149,26 +1058,15 @@ export function MediaServerConnectionSection(): React.JSX.Element {
           title="Jellyfin"
           serviceKey="jellyfin"
           urlField={{ key: "jellyfin.url", label: "Server URL", placeholder: "http://192.168.1.100:8096" }}
-          apiKeyField={{ key: "jellyfin.apiKey", label: "API Key", placeholder: "Your Jellyfin API key", secret: true }}
-          loginFields={[
-            { key: "username", label: "Username", placeholder: "admin" },
-            { key: "password", label: "Password", placeholder: "Password", secret: true },
-          ]}
+          apiKeyField={{ key: "jellyfin.apiKey", label: "System API Key", placeholder: "Your Jellyfin API key (for background tasks)", secret: true }}
           isLast
         />
+        <p className="px-5 pb-4 text-[10px] text-muted-foreground">
+          Users connect their personal Jellyfin accounts in <strong>Account → Media Server Connections</strong>.
+        </p>
       </SectionCard>
       <SectionCard title="Plex">
-        <MediaServerRow
-          title="Plex"
-          serviceKey="plex"
-          urlField={{ key: "plex.url", label: "Server URL", placeholder: "http://192.168.1.100:32400" }}
-          apiKeyField={{ key: "plex.token", label: "X-Plex-Token", placeholder: "Your Plex authentication token", secret: true }}
-          loginFields={[
-            { key: "email", label: "Email", placeholder: "your@email.com" },
-            { key: "password", label: "Password", placeholder: "Password", secret: true },
-          ]}
-          isLast
-        />
+        <PlexServerSection />
       </SectionCard>
     </SettingsSection>
   );
@@ -1182,13 +1080,12 @@ export function JellyfinConnectionSection(): React.JSX.Element {
           title="Jellyfin"
           serviceKey="jellyfin"
           urlField={{ key: "jellyfin.url", label: "Server URL", placeholder: "http://192.168.1.100:8096" }}
-          apiKeyField={{ key: "jellyfin.apiKey", label: "API Key", placeholder: "Your Jellyfin API key", secret: true }}
-          loginFields={[
-            { key: "username", label: "Username", placeholder: "admin" },
-            { key: "password", label: "Password", placeholder: "Password", secret: true },
-          ]}
+          apiKeyField={{ key: "jellyfin.apiKey", label: "System API Key", placeholder: "Your Jellyfin API key (for background tasks)", secret: true }}
           isLast
         />
+        <p className="px-5 pb-4 text-[10px] text-muted-foreground">
+          Users connect their personal Jellyfin accounts in <strong>Account → Media Server Connections</strong>.
+        </p>
       </SectionCard>
     </SettingsSection>
   );
@@ -1198,19 +1095,116 @@ export function PlexConnectionSection(): React.JSX.Element {
   return (
     <SettingsSection title="Connection" description="Connect Plex to sync libraries and trigger scans after downloads.">
       <SectionCard title="Plex">
-        <MediaServerRow
-          title="Plex"
-          serviceKey="plex"
-          urlField={{ key: "plex.url", label: "Server URL", placeholder: "http://192.168.1.100:32400" }}
-          apiKeyField={{ key: "plex.token", label: "X-Plex-Token", placeholder: "Your Plex authentication token", secret: true }}
-          loginFields={[
-            { key: "email", label: "Email", placeholder: "your@email.com" },
-            { key: "password", label: "Password", placeholder: "Password", secret: true },
-          ]}
-          isLast
-        />
+        <PlexServerSection />
       </SectionCard>
     </SettingsSection>
+  );
+}
+
+function PlexServerSection(): React.JSX.Element {
+  const utils = trpc.useUtils();
+  const { data: allSettings, isLoading } = trpc.settings.getAll.useQuery();
+  const { data: enabledServices } = trpc.settings.getEnabledServices.useQuery();
+  const setMany = trpc.settings.setMany.useMutation({
+    onSuccess: () => void utils.settings.getAll.invalidate(),
+  });
+  const toggleService = trpc.settings.toggleService.useMutation({
+    onSuccess: () => void utils.settings.getEnabledServices.invalidate(),
+  });
+
+  const isEnabled = enabledServices?.plex === true;
+  const isConnected = !!allSettings?.["plex.token"];
+  const [url, setUrl] = useState("");
+  const [dirty, setDirty] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (allSettings) {
+      setUrl((allSettings["plex.url"] as string) ?? "");
+      setDirty(false);
+      if (isEnabled && !allSettings["plex.url"]) setExpanded(true);
+    }
+  }, [allSettings, isEnabled]);
+
+  const handleToggle = (): void => {
+    toggleService.mutate({ service: "plex", enabled: !isEnabled });
+    if (!isEnabled) setExpanded(true);
+  };
+
+  const handleSave = (): void => {
+    setMany.mutate(
+      { settings: [{ key: "plex.url", value: url }] },
+      {
+        onSuccess: () => { setDirty(false); toast.success("Settings saved"); },
+        onError: () => toast.error("Failed to save settings"),
+      },
+    );
+  };
+
+  if (isLoading) return <div className="px-5 py-5"><Skeleton className="h-10 w-full" /></div>;
+
+  const info = SERVICE_INFO.plex;
+
+  return (
+    <div>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setExpanded((p) => !p)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded((p) => !p); } }}
+        className={cn("flex w-full items-center justify-between px-5 py-3.5 text-left cursor-pointer bg-gradient-to-r", BRAND_GRADIENT.plex)}
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform duration-300", expanded && "rotate-180")} />
+          <span className="inline-block h-5 w-5 shrink-0 bg-[#e5a00d]" style={{ mask: "url(/plex-logo.svg) center/contain no-repeat", WebkitMask: "url(/plex-logo.svg) center/contain no-repeat" }} />
+          <p className="text-base font-semibold text-foreground">Plex</p>
+          {isEnabled ? (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-green-500/10 text-green-500 border-green-500/20">Active</Badge>
+          ) : (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Inactive</Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+          {isEnabled && dirty && (
+            <Button size="sm" className="h-7 text-xs" onClick={handleSave} disabled={setMany.isPending}>
+              {setMany.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
+              Save
+            </Button>
+          )}
+          <Switch checked={isEnabled} onCheckedChange={() => handleToggle()} />
+        </div>
+      </div>
+
+      <AnimatedCollapse open={expanded}>
+        <div className="px-5 py-5 space-y-5">
+          {info?.subtitle && <p className="text-sm text-muted-foreground">{info.subtitle}</p>}
+          {info?.link && (
+            <a href={info.link.href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
+              <ExternalLink className="h-3.5 w-3.5" />
+              {info.link.label}
+            </a>
+          )}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-muted-foreground">Server URL</label>
+            <Input
+              value={url}
+              placeholder="http://192.168.1.100:32400"
+              onChange={(e) => { setUrl(e.target.value); setDirty(true); }}
+              className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
+            />
+          </div>
+          <PlexOAuthSection
+            serverUrl={url}
+            disabled={!isEnabled || !url}
+            onSuccess={() => void utils.settings.getAll.invalidate()}
+            isConnected={isConnected}
+          />
+          <p className="text-[10px] text-muted-foreground px-1">
+            Users connect their personal Plex accounts in <strong>Account → Media Server Connections</strong>.
+          </p>
+        </div>
+      </AnimatedCollapse>
+    </div>
   );
 }
 

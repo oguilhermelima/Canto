@@ -646,47 +646,13 @@ function FolderScanSection(): React.JSX.Element {
 /* -------------------------------------------------------------------------- */
 
 export function MediaServerSyncSection(): React.JSX.Element {
-  const utils = trpc.useUtils();
   const { data: enabledServices } = trpc.settings.getEnabledServices.useQuery();
   const jellyfinEnabled = enabledServices?.jellyfin === true;
   const plexEnabled = enabledServices?.plex === true;
 
-  const syncJellyfin = trpc.jellyfin.syncLibraries.useMutation({
-    onSuccess: (data) => {
-      void utils.folder.listWithLinks.invalidate();
-      void utils.sync.discoverServerLibraries.invalidate();
-      toast.success(`Synced ${data.length} Jellyfin libraries`);
-    },
-    onError: () => toast.error("Failed to sync Jellyfin libraries"),
-  });
-  const syncPlex = trpc.plex.syncLibraries.useMutation({
-    onSuccess: (data) => {
-      void utils.folder.listWithLinks.invalidate();
-      void utils.sync.discoverServerLibraries.invalidate();
-      toast.success(`Synced ${data.length} Plex libraries`);
-    },
-    onError: () => toast.error("Failed to sync Plex libraries"),
-  });
-
   return (
     <>
       <FolderScanSection />
-      {jellyfinEnabled && (
-        <ServerLibraryGroup
-          source="jellyfin"
-          enabled={jellyfinEnabled}
-          isSyncingLibraries={syncJellyfin.isPending}
-          onSyncLibraries={() => syncJellyfin.mutate()}
-        />
-      )}
-      {plexEnabled && (
-        <ServerLibraryGroup
-          source="plex"
-          enabled={plexEnabled}
-          isSyncingLibraries={syncPlex.isPending}
-          onSyncLibraries={() => syncPlex.mutate()}
-        />
-      )}
       {(jellyfinEnabled || plexEnabled) && <SyncStatusSection />}
     </>
   );
