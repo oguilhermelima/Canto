@@ -14,9 +14,9 @@ import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { AddToListButton } from "~/components/media/add-to-list-button";
 import { MediaLogo } from "~/components/media/media-logo";
-import { WatchStatusDropdown } from "~/components/media/WatchStatusDropdown";
 import { RatingControl } from "~/components/media/RatingControl";
 import { PlaybackProgressInfo } from "~/components/media/PlaybackProgressInfo";
+import { WatchTrackingButton } from "~/components/media/watched-toggle-button";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -36,6 +36,17 @@ interface VideoItem {
   key: string;
   name?: string;
   type?: string;
+}
+
+interface WatchSeason {
+  number: number;
+  episodes: Array<{
+    id: string;
+    seasonNumber: number;
+    number: number;
+    title?: string | null;
+    airDate?: string | null;
+  }>;
 }
 
 interface MediaDetailHeroProps {
@@ -85,10 +96,10 @@ interface MediaDetailHeroProps {
     source: string | null;
     isCompleted: boolean;
   } | null;
+  watchTrackingSeasons?: WatchSeason[];
 }
 
 export function MediaDetailHero({
-  id,
   type,
   title,
   overview,
@@ -101,6 +112,8 @@ export function MediaDetailHero({
   runtime,
   contentRating,
   logoPath,
+  externalId,
+  provider,
   isAdmin,
   children,
   servers,
@@ -114,6 +127,7 @@ export function MediaDetailHero({
   trackingStatus,
   rating,
   playbackProgress,
+  watchTrackingSeasons,
 }: MediaDetailHeroProps): React.JSX.Element {
   const resolveImage = (path: string, size: string): string =>
     path.startsWith("http") ? path : `${TMDB_IMAGE_BASE}/${size}${path}`;
@@ -142,6 +156,7 @@ export function MediaDetailHero({
   const director = (crew ?? []).find(
     (c) => c.job === "Director" || c.job === "Creator",
   );
+  const isWatched = trackingStatus === "completed";
 
   // Trailers (top 4)
   const trailers = (videos ?? []).slice(0, 4);
@@ -364,14 +379,33 @@ export function MediaDetailHero({
           )}
 
           {/* Action buttons */}
-          <div className="flex flex-wrap items-center gap-3">
-            <AddToListButton mediaId={id} title={title} size="lg" />
-            {persistedId && (
-              <div className="flex items-center gap-2">
-                <WatchStatusDropdown
+          <div className="flex flex-col items-start gap-3">
+            <div className="inline-flex items-center gap-2">
+              {persistedId && (
+                <WatchTrackingButton
                   mediaId={persistedId}
-                  initialStatus={trackingStatus}
+                  mediaType={type}
+                  title={title}
+                  trackingStatus={trackingStatus}
+                  seasons={watchTrackingSeasons}
                 />
+              )}
+              <AddToListButton
+                mediaId={persistedId}
+                externalId={externalId ?? undefined}
+                provider={provider ?? undefined}
+                type={type}
+                title={title}
+                size="lg"
+                showWatchlistToggle={false}
+                includeWatchlistInMenu
+              />
+            </div>
+            {persistedId && isWatched && (
+              <div className="inline-flex items-center gap-3 rounded-2xl border border-foreground/10 bg-black/30 px-3 py-2 backdrop-blur-md">
+                <span className="text-sm font-medium text-foreground/80">
+                  Rate
+                </span>
                 <RatingControl
                   mediaId={persistedId}
                   initialRating={rating}

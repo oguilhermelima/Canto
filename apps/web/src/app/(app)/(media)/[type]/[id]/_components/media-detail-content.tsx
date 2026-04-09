@@ -83,6 +83,7 @@ export function MediaDetailContent({
         runtime={media.runtime}
         contentRating={media.contentRating}
         logoPath={media.logoPath}
+        externalId={media.externalId}
         provider={media.provider}
         isAdmin={detail.isAdmin}
         servers={detail.mediaServers.data}
@@ -99,6 +100,19 @@ export function MediaDetailContent({
         persistedId={detail.mediaId}
         trackingStatus={detail.userMediaState.data?.trackingStatus as "none" | "planned" | "watching" | "completed" | "dropped" | undefined}
         rating={detail.userMediaState.data?.rating}
+        watchTrackingSeasons={
+          media.seasons?.map((season) => ({
+            number: season.number,
+                episodes:
+                  season.episodes?.map((episode) => ({
+                    id: episode.id,
+                    seasonNumber: season.number,
+                    number: episode.number,
+                    title: episode.title ?? null,
+                    airDate: episode.airDate ?? null,
+                  })) ?? [],
+              })) ?? []
+        }
         playbackProgress={
           detail.userMediaState.data
             ? {
