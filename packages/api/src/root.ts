@@ -11,6 +11,8 @@ import { requestRouter } from "./routers/request";
 import { settingsRouter } from "./routers/settings";
 import { syncRouter } from "./routers/sync";
 import { torrentRouter } from "./routers/torrent";
+import { userConnectionRouter } from "./routers/userConnection";
+import { userMediaRouter } from "./routers/userMedia";
 
 export const appRouter = createTRPCRouter({
   auth: authRouter,
@@ -25,6 +27,8 @@ export const appRouter = createTRPCRouter({
   provider: providerRouter,
   settings: settingsRouter,
   sync: syncRouter,
+  userConnection: userConnectionRouter,
+  userMedia: userMediaRouter,
 });
 
 export type AppRouter = typeof appRouter;
