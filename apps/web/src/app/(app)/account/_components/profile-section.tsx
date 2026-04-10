@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
-import { Save, Check, Loader2 } from "lucide-react";
+import { Save, Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { authClient } from "~/lib/auth-client";
 import { SettingsSection } from "~/components/settings/shared";
+import { AvatarPickerDialog } from "../../profile/me/_components/avatar-picker-dialog";
 
 export function ProfileSection(): React.JSX.Element {
   const { data: session } = authClient.useSession();
@@ -16,6 +17,7 @@ export function ProfileSection(): React.JSX.Element {
   const [email, setEmail] = useState("");
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -44,9 +46,26 @@ export function ProfileSection(): React.JSX.Element {
     <SettingsSection title="Profile" description="Your account information and display name.">
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground">
-            {user?.name?.charAt(0).toUpperCase() ?? "?"}
-          </div>
+          <button
+            type="button"
+            className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-full"
+            onClick={() => setPickerOpen(true)}
+          >
+            {user?.image ? (
+              <img
+                src={user.image}
+                alt={user.name ?? ""}
+                className="h-16 w-16 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground">
+                {user?.name?.charAt(0).toUpperCase() ?? "?"}
+              </div>
+            )}
+            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+              <Camera className="h-5 w-5 text-white" />
+            </div>
+          </button>
           <div>
             <p className="text-sm font-medium text-foreground">{user?.name}</p>
             <p className="text-xs text-muted-foreground">{user?.email}</p>
@@ -94,6 +113,12 @@ export function ProfileSection(): React.JSX.Element {
           </Button>
         )}
       </div>
+
+      <AvatarPickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        currentImage={user?.image}
+      />
     </SettingsSection>
   );
 }
