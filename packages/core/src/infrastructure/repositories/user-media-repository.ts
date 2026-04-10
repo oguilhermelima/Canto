@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, or } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
   episode,
@@ -193,7 +193,11 @@ export interface UserPlaybackProgressFeedRow {
 export async function findUserPlaybackProgressFeed(
   db: Database,
   userId: string,
+  mediaType?: "movie" | "show",
 ): Promise<UserPlaybackProgressFeedRow[]> {
+  const conditions = [eq(userPlaybackProgress.userId, userId)];
+  if (mediaType) conditions.push(eq(media.type, mediaType));
+
   return db
     .select({
       id: userPlaybackProgress.id,
@@ -220,7 +224,7 @@ export async function findUserPlaybackProgressFeed(
     .innerJoin(media, eq(userPlaybackProgress.mediaId, media.id))
     .leftJoin(episode, eq(userPlaybackProgress.episodeId, episode.id))
     .leftJoin(season, eq(episode.seasonId, season.id))
-    .where(eq(userPlaybackProgress.userId, userId))
+    .where(and(...conditions))
     .orderBy(desc(userPlaybackProgress.lastWatchedAt), desc(userPlaybackProgress.id));
 }
 
@@ -245,7 +249,11 @@ export async function findUserWatchHistoryFeed(
   db: Database,
   userId: string,
   limit = 100,
+  mediaType?: "movie" | "show",
 ): Promise<UserWatchHistoryFeedRow[]> {
+  const conditions = [eq(userWatchHistory.userId, userId)];
+  if (mediaType) conditions.push(eq(media.type, mediaType));
+
   return db
     .select({
       id: userWatchHistory.id,
@@ -267,7 +275,7 @@ export async function findUserWatchHistoryFeed(
     .innerJoin(media, eq(userWatchHistory.mediaId, media.id))
     .leftJoin(episode, eq(userWatchHistory.episodeId, episode.id))
     .leftJoin(season, eq(episode.seasonId, season.id))
-    .where(eq(userWatchHistory.userId, userId))
+    .where(and(...conditions))
     .orderBy(desc(userWatchHistory.watchedAt), desc(userWatchHistory.id))
     .limit(limit);
 }
@@ -291,7 +299,14 @@ export interface UserListMediaCandidateRow {
 export async function findUserListMediaCandidates(
   db: Database,
   userId: string,
+  mediaType?: "movie" | "show",
 ): Promise<UserListMediaCandidateRow[]> {
+  const conditions = [
+    eq(list.userId, userId),
+    or(eq(list.type, "watchlist"), eq(list.type, "custom")),
+  ];
+  if (mediaType) conditions.push(eq(media.type, mediaType));
+
   return db
     .select({
       listId: list.id,
@@ -311,12 +326,7 @@ export async function findUserListMediaCandidates(
     .from(listItem)
     .innerJoin(list, eq(listItem.listId, list.id))
     .innerJoin(media, eq(listItem.mediaId, media.id))
-    .where(
-      and(
-        eq(list.userId, userId),
-        or(eq(list.type, "watchlist"), eq(list.type, "custom")),
-      ),
-    )
+    .where(and(...conditions))
     .orderBy(desc(listItem.addedAt), desc(listItem.id));
 }
 
@@ -411,4 +421,76 @@ export async function findEpisodesByMediaIds(
     .innerJoin(season, eq(episode.seasonId, season.id))
     .where(inArray(season.mediaId, mediaIds))
     .orderBy(asc(season.mediaId), asc(season.number), asc(episode.number));
+}
+
+/* -------------------------------------------------------------------------- */
+/*  User Library Stats                                                        */
+/* -------------------------------------------------------------------------- */
+
+export interface UserLibraryStats {
+  totalWatched: number;
+  moviesWatched: number;
+  showsWatched: number;
+  watchedThisMonth: number;
+  currentlyWatching: number;
+}
+
+export async function findUserLibraryStats(
+  db: Database,
+  userId: string,
+): Promise<UserLibraryStats> {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const completedCondition = and(
+    eq(userMediaState.userId, userId),
+    eq(userMediaState.status, "completed"),
+  );
+
+  const [
+    [totalRow],
+    [moviesRow],
+    [showsRow],
+    [monthRow],
+    [watchingRow],
+  ] = await Promise.all([
+    db
+      .select({ total: count() })
+      .from(userMediaState)
+      .where(completedCondition),
+    db
+      .select({ total: count() })
+      .from(userMediaState)
+      .innerJoin(media, eq(userMediaState.mediaId, media.id))
+      .where(and(completedCondition, eq(media.type, "movie"))),
+    db
+      .select({ total: count() })
+      .from(userMediaState)
+      .innerJoin(media, eq(userMediaState.mediaId, media.id))
+      .where(and(completedCondition, eq(media.type, "show"))),
+    db
+      .select({ total: count() })
+      .from(userMediaState)
+      .where(
+        and(
+          eq(userMediaState.userId, userId),
+          eq(userMediaState.status, "completed"),
+          gte(userMediaState.updatedAt, monthStart),
+        ),
+      ),
+    db
+      .select({ total: count() })
+      .from(userMediaState)
+      .where(
+        and(eq(userMediaState.userId, userId), eq(userMediaState.status, "watching")),
+      ),
+  ]);
+
+  return {
+    totalWatched: totalRow?.total ?? 0,
+    moviesWatched: moviesRow?.total ?? 0,
+    showsWatched: showsRow?.total ?? 0,
+    watchedThisMonth: monthRow?.total ?? 0,
+    currentlyWatching: watchingRow?.total ?? 0,
+  };
 }

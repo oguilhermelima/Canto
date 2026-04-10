@@ -14,6 +14,7 @@ import {
   findUserWatchHistoryByMediaIds,
   findUserWatchHistoryByMedia,
   findUserWatchHistoryFeed,
+  findUserLibraryStats,
   upsertUserMediaState,
 } from "@canto/core/infrastructure/repositories";
 
@@ -162,12 +163,17 @@ export const userMediaRouter = createTRPCRouter({
       }));
     }),
 
+  getLibraryStats: protectedProcedure.query(({ ctx }) =>
+    findUserLibraryStats(ctx.db, ctx.session.user.id),
+  ),
+
   getLibraryWatchNext: protectedProcedure
     .input(
       z.object({
         limit: z.number().int().min(1).max(100).default(24),
         cursor: z.number().int().min(0).nullish(),
         view: z.enum(["all", "continue", "watch_next"]).default("all"),
+        mediaType: z.enum(["movie", "show"]).optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -178,8 +184,8 @@ export const userMediaRouter = createTRPCRouter({
       const now = new Date();
 
       const [playbackRows, listMediaRows] = await Promise.all([
-        findUserPlaybackProgressFeed(ctx.db, userId),
-        findUserListMediaCandidates(ctx.db, userId),
+        findUserPlaybackProgressFeed(ctx.db, userId, input.mediaType),
+        findUserListMediaCandidates(ctx.db, userId, input.mediaType),
       ]);
 
       const continueMediaIds = new Set<string>();
@@ -745,6 +751,7 @@ export const userMediaRouter = createTRPCRouter({
       z.object({
         limit: z.number().int().min(1).max(200).default(40),
         cursor: z.number().int().min(0).nullish(),
+        mediaType: z.enum(["movie", "show"]).optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -754,8 +761,8 @@ export const userMediaRouter = createTRPCRouter({
       const fetchLimit = Math.max(300, (cursor + limit) * 3);
 
       const [historyRows, playbackRows] = await Promise.all([
-        findUserWatchHistoryFeed(ctx.db, userId, fetchLimit),
-        findUserPlaybackProgressFeed(ctx.db, userId),
+        findUserWatchHistoryFeed(ctx.db, userId, fetchLimit, input.mediaType),
+        findUserPlaybackProgressFeed(ctx.db, userId, input.mediaType),
       ]);
 
       const timelineEntries: Array<{
