@@ -1,0 +1,53 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { writeFile, mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { auth } from "@canto/auth";
+import { headers } from "next/headers";
+
+const MAX_SIZE = 2 * 1024 * 1024; // 2MB
+const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const UPLOAD_DIR = join(process.cwd(), "uploads", "avatars");
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const formData = await request.formData();
+  const file = formData.get("file") as File | null;
+
+  if (!file) {
+    return NextResponse.json({ error: "No file provided" }, { status: 400 });
+  }
+
+  if (!ALLOWED_TYPES.has(file.type)) {
+    return NextResponse.json(
+      { error: "Invalid file type. Allowed: JPEG, PNG, WebP, GIF" },
+      { status: 400 },
+    );
+  }
+
+  if (file.size > MAX_SIZE) {
+    return NextResponse.json(
+      { error: "File too large. Maximum size is 2MB" },
+      { status: 400 },
+    );
+  }
+
+  const ext = file.type.split("/")[1] === "jpeg" ? "jpg" : file.type.split("/")[1]!;
+  const filename = `${session.user.id}-${Date.now()}.${ext}`;
+
+  await mkdir(UPLOAD_DIR, { recursive: true });
+  const buffer = Buffer.from(await file.arrayBuffer());
+  await writeFile(join(UPLOAD_DIR, filename), buffer);
+
+  const imageUrl = `/api/avatar/${filename}`;
+
+  await auth.api.updateUser({
+    headers: await headers(),
+    body: { image: imageUrl },
+  });
+
+  return NextResponse.json({ url: imageUrl });
+}
