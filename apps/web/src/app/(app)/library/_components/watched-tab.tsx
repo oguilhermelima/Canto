@@ -10,7 +10,7 @@ import {
 
 const PAGE_SIZE = 40;
 
-export function HistoryTab(): React.JSX.Element {
+export function WatchedTab(): React.JSX.Element {
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -34,6 +34,12 @@ export function HistoryTab(): React.JSX.Element {
       (data?.pages.flatMap((page) => page.items) ?? []) as LibraryPlaybackEntry[],
     [data],
   );
+
+  const watchedItems = useMemo(() => {
+    return entries.filter(
+      (entry) => entry.isCompleted === true || (entry.progressPercent ?? 0) >= 100,
+    );
+  }, [entries]);
 
   const handleFetchNextPage = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -71,7 +77,7 @@ export function HistoryTab(): React.JSX.Element {
     return (
       <div className="rounded-2xl border border-border/50 bg-muted/20 px-4 py-6">
         <p className="text-sm text-muted-foreground">
-          Failed to load your watch history.
+          Failed to load your watched list.
         </p>
         <button
           type="button"
@@ -84,11 +90,11 @@ export function HistoryTab(): React.JSX.Element {
     );
   }
 
-  if (entries.length === 0) {
+  if (watchedItems.length === 0) {
     return (
       <div className="rounded-2xl border border-border/50 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
-        No watch history yet. Mark items as watched or sync Plex/Jellyfin to
-        build your timeline.
+        No watched items yet. Mark something as watched or sync Plex/Jellyfin to
+        populate this tab.
       </div>
     );
   }
@@ -96,8 +102,8 @@ export function HistoryTab(): React.JSX.Element {
   return (
     <>
       <div className="space-y-2.5">
-        {entries.map((entry) => (
-          <LibraryPlaybackCard key={entry.id} entry={entry} mode="history" />
+        {watchedItems.map((entry) => (
+          <LibraryPlaybackCard key={entry.id} entry={entry} mode="watched" />
         ))}
       </div>
 
