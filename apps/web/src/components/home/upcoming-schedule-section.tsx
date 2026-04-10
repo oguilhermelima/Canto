@@ -161,7 +161,7 @@ export function UpcomingScheduleSection(): React.JSX.Element {
   return (
     <UpcomingScheduleSectionContent
       title="Upcoming Schedule"
-      seeAllHref="/library?tab=collections"
+      seeAllHref="/library/collections"
     />
   );
 }

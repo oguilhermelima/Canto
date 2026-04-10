@@ -14,7 +14,6 @@ import { BackdropCarousel } from "~/components/media/backdrop-carousel";
 import { AddToListButton } from "~/components/media/add-to-list-button";
 import { StateMessage } from "~/components/layout/state-message";
 import { MediaLogo } from "~/components/media/media-logo";
-import { UpcomingScheduleSection } from "~/components/home/upcoming-schedule-section";
 import { useDocumentTitle } from "~/hooks/use-document-title";
 import { mediaHref, mediaDetailHref } from "~/lib/media-href";
 import { WatchNextTab } from "./library/_components/watch-next-tab";
@@ -452,16 +451,8 @@ export default function DiscoverPage(): React.JSX.Element {
         <WatchNextTab
           view="continue"
           title="Continue Watching"
-          seeAllHref="/library?tab=history"
+          seeAllHref="/library/watched"
         />
-
-        <WatchNextTab
-          view="watch_next"
-          title="Watch Next"
-          seeAllHref="/library?tab=collections"
-        />
-
-        <UpcomingScheduleSection />
 
         {recentlyAdded.isError ? (
           <section className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
@@ -471,7 +462,7 @@ export default function DiscoverPage(): React.JSX.Element {
         ) : recentItems.length > 0 ? (
           <MediaCarousel
             title="Recently Added"
-            seeAllHref="/library?tab=collections"
+            seeAllHref="/library/collections"
             items={recentItems}
             isLoading={recentlyAdded.isLoading}
           />
