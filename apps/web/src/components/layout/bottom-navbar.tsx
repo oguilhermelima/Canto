@@ -76,8 +76,14 @@ export function BottomNavbar(): React.JSX.Element {
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetTrigger asChild>
           <button className="flex flex-col items-center gap-1 px-3 py-2 text-xs text-muted-foreground transition-colors">
-            <UserRound size={20} />
-            <span>Menu</span>
+            <div className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full bg-muted">
+              {session?.user?.image ? (
+                <img src={session.user.image} alt="" className="h-5 w-5 rounded-full object-cover" />
+              ) : (
+                <UserRound size={14} />
+              )}
+            </div>
+            <span>Profile</span>
           </button>
         </SheetTrigger>
         <SheetContent side="bottom" className="rounded-t-2xl">

@@ -209,13 +209,13 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
         ref={triggerRef}
         aria-label="User menu"
         onClick={() => setOpen((o) => !o)}
-        className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-muted/60 transition-colors hover:bg-muted focus:outline-none"
+        className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-muted/60 transition-colors hover:bg-muted focus:outline-none"
       >
         {session?.user?.image ? (
           <img
             src={session.user.image}
             alt={session.user.name ?? ""}
-            className="h-9 w-9 rounded-xl object-cover"
+            className="h-8 w-8 rounded-full object-cover"
           />
         ) : session?.user?.name ? (
           <span className="text-xs font-medium">
