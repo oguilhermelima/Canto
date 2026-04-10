@@ -3,13 +3,17 @@
 import { cn } from "@canto/ui/cn";
 import { Button } from "@canto/ui/button";
 import {
+  CheckCircle2,
+  Heart,
   Orbit,
   Rocket,
+  Star,
   Telescope,
   Radio,
   Satellite,
   SatelliteDish,
   MapPinOff,
+  XCircle,
 } from "lucide-react";
 
 /* ─── Space-themed presets ─── */
@@ -70,6 +74,26 @@ export const SPACE_STATES = {
     icon: MapPinOff,
     title: "Coordinates unknown",
     description: "This crew member wasn't found in any star chart.",
+  },
+  emptyCompleted: {
+    icon: CheckCircle2,
+    title: "No missions completed",
+    description: "Finished media will dock at this station.",
+  },
+  emptyDropped: {
+    icon: XCircle,
+    title: "No missions aborted",
+    description: "Media you've stopped tracking will appear here.",
+  },
+  emptyRatings: {
+    icon: Star,
+    title: "No transmissions scored",
+    description: "Rate media to build your personal star chart.",
+  },
+  emptyFavorites: {
+    icon: Heart,
+    title: "No stars in your constellation",
+    description: "Mark media as favorite to see them here.",
   },
   emptyGrid: {
     icon: Telescope,
