@@ -184,10 +184,12 @@ export function WatchNextTab({
   view = "watch_next",
   title = "Watch Next",
   seeAllHref,
+  mediaType,
 }: {
   view?: WatchNextView;
   title?: string;
   seeAllHref?: string;
+  mediaType?: "movie" | "show";
 }): React.JSX.Element {
   const {
     data,
@@ -198,7 +200,7 @@ export function WatchNextTab({
     isFetchingNextPage,
     fetchNextPage,
   } = trpc.userMedia.getLibraryWatchNext.useInfiniteQuery(
-    { limit: PAGE_SIZE, view },
+    { limit: PAGE_SIZE, view, mediaType },
     {
       getNextPageParam: (lastPage) => lastPage.nextCursor,
       initialCursor: 0,

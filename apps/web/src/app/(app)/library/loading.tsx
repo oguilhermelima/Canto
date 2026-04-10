@@ -1,33 +1,76 @@
 import { Skeleton } from "@canto/ui/skeleton";
 
-export default function ListsLoading(): React.JSX.Element {
+export default function LibraryLoading(): React.JSX.Element {
   return (
-    <div className="px-4 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+    <div className="w-full pb-12">
       {/* Header */}
-      <Skeleton className="mb-1 h-9 w-32" />
-      <Skeleton className="mb-8 h-5 w-72" />
+      <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+        <Skeleton className="mb-1 h-9 w-32" />
+        <Skeleton className="mb-6 h-5 w-72" />
 
-      {/* Tabs */}
-      <div className="mb-8 flex gap-1">
-        <Skeleton className="h-8 w-24 rounded-xl" />
-        <Skeleton className="h-8 w-28 rounded-xl" />
-        <Skeleton className="h-8 w-32 rounded-xl" />
+        {/* Stats bar */}
+        <div className="mb-8 flex gap-8">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <Skeleton className="h-10 w-10 rounded-xl" />
+              <div>
+                <Skeleton className="h-5 w-10" />
+                <Skeleton className="mt-1 h-3 w-16" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
-        {Array.from({ length: 18 }).map((_, i) => (
-          <div
-            key={i}
-            className="flex flex-col overflow-hidden rounded-xl border border-border bg-card"
-          >
-            <Skeleton className="aspect-[2/3] w-full" />
-            <div className="space-y-2 p-3">
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-3 w-1/2" />
-            </div>
+      <div className="flex flex-col gap-12">
+        {/* Watch Next skeleton */}
+        <section className="pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+          <Skeleton className="mb-4 h-6 w-32" />
+          <div className="flex gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton
+                key={i}
+                className="aspect-video w-[280px] shrink-0 rounded-xl sm:w-[300px] lg:w-[340px]"
+              />
+            ))}
           </div>
-        ))}
+        </section>
+
+        {/* Upcoming Schedule skeleton */}
+        <section className="pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+          <Skeleton className="mb-4 h-6 w-44" />
+          <div className="flex gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton
+                key={i}
+                className="aspect-video w-[280px] shrink-0 rounded-xl sm:w-[300px] lg:w-[340px]"
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* Collections skeleton */}
+        <section className="pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+          <Skeleton className="mb-4 h-6 w-32" />
+          <div className="flex gap-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton
+                key={i}
+                className="aspect-[16/9] w-[260px] shrink-0 rounded-xl sm:w-[280px] lg:w-[300px]"
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* History skeleton */}
+        <section className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+          <Skeleton className="mb-4 h-6 w-36" />
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-[72px] rounded-xl" />
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );
