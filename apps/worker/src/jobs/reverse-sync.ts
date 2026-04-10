@@ -9,6 +9,7 @@ import {
   findSyncItemByServerKey,
   upsertUserPlaybackProgress,
 } from "@canto/core/infrastructure/repositories";
+import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/use-cases/promote-user-media-state-from-playback";
 import { scanJellyfinMedia } from "@canto/core/domain/use-cases/scan-jellyfin-media";
 import { scanPlexMedia } from "@canto/core/domain/use-cases/scan-plex-media";
 import { processSyncImports } from "@canto/core/domain/use-cases/process-sync-imports";
@@ -82,6 +83,7 @@ export async function runReverseSync(): Promise<void> {
     if (items.length === 0) continue;
 
     // 1. Update user-specific playback progress and watch history
+    const touchedMediaIds = new Set<string>();
     for (const item of items) {
       const hasPlaybackPosition = (item.playbackPositionSeconds ?? 0) > 0;
       const isPlayed = item.played === true;
@@ -138,6 +140,15 @@ export async function runReverseSync(): Promise<void> {
         isCompleted: isPlayed,
         lastWatchedAt: item.lastPlayedAt ?? new Date(),
         source: provider,
+      });
+      touchedMediaIds.add(mediaId);
+    }
+
+    // Promote tracking status from synced playback when status is still none/planned.
+    for (const mediaId of touchedMediaIds) {
+      await promoteUserMediaStateFromPlayback(db, {
+        userId: conn.userId,
+        mediaId,
       });
     }
 
