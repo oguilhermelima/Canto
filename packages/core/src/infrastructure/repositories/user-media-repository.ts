@@ -55,6 +55,20 @@ export async function findUserPlaybackProgress(
   });
 }
 
+export async function findUserPlaybackProgressByMedia(
+  db: Database,
+  userId: string,
+  mediaId: string,
+) {
+  return db.query.userPlaybackProgress.findMany({
+    where: and(
+      eq(userPlaybackProgress.userId, userId),
+      eq(userPlaybackProgress.mediaId, mediaId),
+    ),
+    orderBy: (t, { desc }) => [desc(t.lastWatchedAt), desc(t.id)],
+  });
+}
+
 export async function upsertUserPlaybackProgress(
   db: Database,
   data: typeof userPlaybackProgress.$inferInsert,
@@ -165,6 +179,7 @@ export interface UserPlaybackProgressFeedRow {
   mediaType: string;
   title: string;
   posterPath: string | null;
+  backdropPath: string | null;
   year: number | null;
   mediaRuntime: number | null;
   externalId: number;
@@ -191,6 +206,7 @@ export async function findUserPlaybackProgressFeed(
       mediaType: media.type,
       title: media.title,
       posterPath: media.posterPath,
+      backdropPath: media.backdropPath,
       year: media.year,
       mediaRuntime: media.runtime,
       externalId: media.externalId,
@@ -265,7 +281,9 @@ export interface UserListMediaCandidateRow {
   mediaType: string;
   title: string;
   posterPath: string | null;
+  backdropPath: string | null;
   year: number | null;
+  releaseDate: string | null;
   externalId: number;
   provider: string;
 }
@@ -284,7 +302,9 @@ export async function findUserListMediaCandidates(
       mediaType: media.type,
       title: media.title,
       posterPath: media.posterPath,
+      backdropPath: media.backdropPath,
       year: media.year,
+      releaseDate: media.releaseDate,
       externalId: media.externalId,
       provider: media.provider,
     })
