@@ -84,8 +84,14 @@ export function BottomNavbar(): React.JSX.Element {
           <SheetHeader className="text-left">
             <SheetTitle className="sr-only">Menu</SheetTitle>
             <div className="flex items-center gap-3 px-1">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                {session?.user?.name ? (
+              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-muted">
+                {session?.user?.image ? (
+                  <img
+                    src={session.user.image}
+                    alt={session.user.name ?? ""}
+                    className="h-10 w-10 rounded-full object-cover"
+                  />
+                ) : session?.user?.name ? (
                   <span className="text-sm font-medium">{session.user.name.charAt(0).toUpperCase()}</span>
                 ) : (
                   <UserRound className="h-5 w-5" />
