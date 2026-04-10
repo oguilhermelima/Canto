@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNull, or, type SQL } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
   episode,
@@ -492,5 +492,142 @@ export async function findUserLibraryStats(
     showsWatched: showsRow?.total ?? 0,
     watchedThisMonth: monthRow?.total ?? 0,
     currentlyWatching: watchingRow?.total ?? 0,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  User Media Paginated (profile tabs)                                       */
+/* -------------------------------------------------------------------------- */
+
+export interface UserMediaPaginatedRow {
+  mediaId: string;
+  status: string | null;
+  rating: number | null;
+  isFavorite: boolean;
+  stateUpdatedAt: Date;
+  mediaType: string;
+  title: string;
+  posterPath: string | null;
+  year: number | null;
+  externalId: number;
+  provider: string;
+}
+
+export async function findUserMediaPaginated(
+  db: Database,
+  userId: string,
+  opts: {
+    status?: string;
+    hasRating?: boolean;
+    isFavorite?: boolean;
+    mediaType?: "movie" | "show";
+    sortBy?: "updatedAt" | "rating" | "title" | "year";
+    sortOrder?: "asc" | "desc";
+    limit: number;
+    offset: number;
+  },
+): Promise<{ items: UserMediaPaginatedRow[]; total: number }> {
+  const conditions: SQL[] = [eq(userMediaState.userId, userId)];
+
+  if (opts.status) {
+    conditions.push(eq(userMediaState.status, opts.status));
+  }
+  if (opts.hasRating) {
+    conditions.push(gt(userMediaState.rating, 0));
+  }
+  if (opts.isFavorite) {
+    conditions.push(eq(userMediaState.isFavorite, true));
+  }
+  if (opts.mediaType) {
+    conditions.push(eq(media.type, opts.mediaType));
+  }
+
+  const where = and(...conditions);
+
+  const sortDir = opts.sortOrder === "asc" ? asc : desc;
+  const sortColumn = (() => {
+    switch (opts.sortBy) {
+      case "rating": return userMediaState.rating;
+      case "title": return media.title;
+      case "year": return media.year;
+      default: return userMediaState.updatedAt;
+    }
+  })();
+
+  const selectFields = {
+    mediaId: userMediaState.mediaId,
+    status: userMediaState.status,
+    rating: userMediaState.rating,
+    isFavorite: userMediaState.isFavorite,
+    stateUpdatedAt: userMediaState.updatedAt,
+    mediaType: media.type,
+    title: media.title,
+    posterPath: media.posterPath,
+    year: media.year,
+    externalId: media.externalId,
+    provider: media.provider,
+  };
+
+  const [items, [countRow]] = await Promise.all([
+    db
+      .select(selectFields)
+      .from(userMediaState)
+      .innerJoin(media, eq(userMediaState.mediaId, media.id))
+      .where(where)
+      .orderBy(sortDir(sortColumn), desc(userMediaState.updatedAt))
+      .limit(opts.limit)
+      .offset(opts.offset),
+    db
+      .select({ total: count() })
+      .from(userMediaState)
+      .innerJoin(media, eq(userMediaState.mediaId, media.id))
+      .where(where),
+  ]);
+
+  return { items, total: countRow?.total ?? 0 };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  User Media Counts (profile tab badges)                                    */
+/* -------------------------------------------------------------------------- */
+
+export interface UserMediaCounts {
+  planned: number;
+  watching: number;
+  completed: number;
+  dropped: number;
+  favorites: number;
+  rated: number;
+}
+
+export async function findUserMediaCounts(
+  db: Database,
+  userId: string,
+): Promise<UserMediaCounts> {
+  const base = eq(userMediaState.userId, userId);
+
+  const [
+    [plannedRow],
+    [watchingRow],
+    [completedRow],
+    [droppedRow],
+    [favoritesRow],
+    [ratedRow],
+  ] = await Promise.all([
+    db.select({ total: count() }).from(userMediaState).where(and(base, eq(userMediaState.status, "planned"))),
+    db.select({ total: count() }).from(userMediaState).where(and(base, eq(userMediaState.status, "watching"))),
+    db.select({ total: count() }).from(userMediaState).where(and(base, eq(userMediaState.status, "completed"))),
+    db.select({ total: count() }).from(userMediaState).where(and(base, eq(userMediaState.status, "dropped"))),
+    db.select({ total: count() }).from(userMediaState).where(and(base, eq(userMediaState.isFavorite, true))),
+    db.select({ total: count() }).from(userMediaState).where(and(base, gt(userMediaState.rating, 0))),
+  ]);
+
+  return {
+    planned: plannedRow?.total ?? 0,
+    watching: watchingRow?.total ?? 0,
+    completed: completedRow?.total ?? 0,
+    dropped: droppedRow?.total ?? 0,
+    favorites: favoritesRow?.total ?? 0,
+    rated: ratedRow?.total ?? 0,
   };
 }

@@ -15,6 +15,8 @@ import {
   findUserWatchHistoryByMedia,
   findUserWatchHistoryFeed,
   findUserLibraryStats,
+  findUserMediaPaginated,
+  findUserMediaCounts,
   upsertUserMediaState,
 } from "@canto/core/infrastructure/repositories";
 
@@ -165,6 +167,40 @@ export const userMediaRouter = createTRPCRouter({
 
   getLibraryStats: protectedProcedure.query(({ ctx }) =>
     findUserLibraryStats(ctx.db, ctx.session.user.id),
+  ),
+
+  getUserMedia: protectedProcedure
+    .input(
+      z.object({
+        status: z.enum(["planned", "watching", "completed", "dropped"]).optional(),
+        hasRating: z.boolean().optional(),
+        isFavorite: z.boolean().optional(),
+        mediaType: z.enum(["movie", "show"]).optional(),
+        sortBy: z.enum(["updatedAt", "rating", "title", "year"]).default("updatedAt"),
+        sortOrder: z.enum(["asc", "desc"]).default("desc"),
+        limit: z.number().int().min(1).max(100).default(24),
+        cursor: z.number().int().min(0).nullish(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const offset = input.cursor ?? 0;
+      const result = await findUserMediaPaginated(ctx.db, ctx.session.user.id, {
+        status: input.status,
+        hasRating: input.hasRating,
+        isFavorite: input.isFavorite,
+        mediaType: input.mediaType,
+        sortBy: input.sortBy,
+        sortOrder: input.sortOrder,
+        limit: input.limit,
+        offset,
+      });
+      const nextCursor =
+        offset + input.limit < result.total ? offset + input.limit : undefined;
+      return { items: result.items, total: result.total, nextCursor };
+    }),
+
+  getUserMediaCounts: protectedProcedure.query(({ ctx }) =>
+    findUserMediaCounts(ctx.db, ctx.session.user.id),
   ),
 
   getLibraryWatchNext: protectedProcedure
