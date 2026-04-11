@@ -1,4 +1,4 @@
-import { link, copyFile, mkdir, stat } from "node:fs/promises";
+import { link, copyFile, mkdir, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 
 import type { Database } from "@canto/db/client";
@@ -29,6 +29,16 @@ type ImportMethod = "local" | "remote";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+async function safeCopy(source: string, target: string): Promise<void> {
+  try {
+    await copyFile(source, target);
+  } catch (cpErr) {
+    // Clean up orphaned partial copy before rethrowing so retries start clean.
+    await unlink(target).catch(() => undefined);
+    throw cpErr;
+  }
+}
+
 async function hardlinkOrCopy(source: string, target: string): Promise<"hardlink" | "copy" | "exists"> {
   try {
     await link(source, target);
@@ -37,7 +47,7 @@ async function hardlinkOrCopy(source: string, target: string): Promise<"hardlink
     const [srcStat, tgtStat] = await Promise.all([stat(source), stat(target)]);
     if (srcStat.ino !== tgtStat.ino) {
       // Hardlink failed silently — fall back to copy
-      await copyFile(source, target);
+      await safeCopy(source, target);
       return "copy";
     }
 
@@ -45,13 +55,23 @@ async function hardlinkOrCopy(source: string, target: string): Promise<"hardlink
   } catch (err: unknown) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "EEXIST") {
-      // Target already exists (e.g., re-import) — skip silently
-      return "exists";
-    }
-    if (code === "EXDEV") {
-      // Cross-filesystem — fall back to copy
+      // Target already exists. Only accept it if size matches source —
+      // otherwise it's stale from a prior failed import and must be replaced.
       try {
-        await copyFile(source, target);
+        const [srcStat, tgtStat] = await Promise.all([stat(source), stat(target)]);
+        if (srcStat.size === tgtStat.size) return "exists";
+        await unlink(target);
+        // Fall through to retry the link below.
+      } catch {
+        // Source disappeared or target stat failed — bubble original EEXIST up
+        throw err;
+      }
+      return hardlinkOrCopy(source, target);
+    }
+    if (code === "EXDEV" || code === "EPERM" || code === "ENOTSUP") {
+      // Cross-filesystem or filesystem without hardlink support (FAT32, SMB) — copy instead.
+      try {
+        await safeCopy(source, target);
         return "copy";
       } catch (cpErr: unknown) {
         if ((cpErr as NodeJS.ErrnoException).code === "EEXIST") return "exists";
@@ -195,7 +215,15 @@ async function importLocalVideoFiles(
       if (pf.seasonNumber !== undefined && pf.seasonNumber !== primarySeasonNumber) {
         const altMediaDir = buildMediaDir(mediaNaming, pf.seasonNumber);
         fileTargetDir = path.join(libraryPath, altMediaDir);
-        await mkdir(fileTargetDir, { recursive: true });
+        try {
+          await mkdir(fileTargetDir, { recursive: true });
+        } catch (mkErr) {
+          const code = (mkErr as NodeJS.ErrnoException).code;
+          console.error(
+            `[auto-import] mkdir failed for "${fileTargetDir}" (${code}) — file "${pf.file.name}" will be skipped`,
+          );
+          throw mkErr;
+        }
       }
 
       const sourcePath = path.join(savePath, pf.file.name);
@@ -222,7 +250,11 @@ async function importLocalVideoFiles(
 
       importedCount += await upsertMediaFile(db, pf, targetPath, placeholders, alreadyImported, mediaRow, torrentRow);
     } catch (err) {
-      console.error(`[auto-import] File error "${pf.file.name}":`, err instanceof Error ? err.message : err);
+      const code = (err as NodeJS.ErrnoException).code;
+      console.error(
+        `[auto-import] File error "${pf.file.name}"${code ? ` (${code})` : ""}:`,
+        err instanceof Error ? err.message : err,
+      );
     }
   }
 
@@ -283,7 +315,88 @@ async function importRemoteVideoFiles(
   torrentRow: { id: string; quality: string; source: string },
   originalFiles: TorrentFileInfo[],
 ): Promise<number> {
-  // Move torrent files to target directory via client API
+  // Match each parsed file against the PRE-MOVE torrent file list so we can
+  // rename the files in place BEFORE asking qBit to move them. Renaming is
+  // instant (it just changes the internal path within the torrent), whereas
+  // setLocation can take minutes for cross-filesystem moves of large files.
+  // Doing the rename first eliminates the window in which the file exists at
+  // the destination with its raw torrent name — otherwise Jellyfin's scheduled
+  // scan may pick up that intermediate name and create a phantom entry.
+  const matchForPf = new Map<ParsedFile, TorrentFileInfo>();
+
+  for (const pf of parsedFiles) {
+    const pfBasename = pf.file.name.substring(pf.file.name.lastIndexOf("/") + 1);
+    const pfExt = pf.extension.toLowerCase();
+
+    // Tier 1: exact size + same extension
+    const sizeAndExtMatches = originalFiles.filter(
+      (of) => of.size === pf.file.size && of.name.toLowerCase().endsWith(pfExt),
+    );
+    let match: TorrentFileInfo | undefined;
+    if (sizeAndExtMatches.length === 1) {
+      match = sizeAndExtMatches[0];
+    } else if (sizeAndExtMatches.length > 1) {
+      // Tier 2: among size+ext matches, prefer one whose basename contains the original name
+      match = sizeAndExtMatches.find((of) =>
+        of.name.substring(of.name.lastIndexOf("/") + 1).includes(pfBasename),
+      ) ?? sizeAndExtMatches[0];
+      console.warn(
+        `[auto-import] Ambiguous file match for "${pfBasename}" — ${sizeAndExtMatches.length} candidates, using "${match?.name}"`,
+      );
+    } else {
+      // Tier 3: fall back to size-only match
+      const sizeMatch = originalFiles.find((of) => of.size === pf.file.size);
+      if (sizeMatch) {
+        console.warn(
+          `[auto-import] Weak file match (size only) for "${pfBasename}" → "${sizeMatch.name}"`,
+        );
+      }
+      match = sizeMatch;
+    }
+
+    if (!match) {
+      console.warn(`[auto-import] No torrent file matched for "${pfBasename}"`);
+      continue;
+    }
+
+    matchForPf.set(pf, match);
+  }
+
+  // Dedupe rename operations by original name: multi-episode files produce
+  // multiple ParsedFile entries that all point at the same physical torrent
+  // file and share the same targetFilename.
+  const renameOps = new Map<string, string>();
+  for (const [pf, match] of matchForPf) {
+    if (match.name !== pf.targetFilename && !renameOps.has(match.name)) {
+      renameOps.set(match.name, pf.targetFilename);
+    }
+  }
+
+  // Track the post-rename name for every original name we touched. If rename
+  // fails we fall back to the original name and still let the move proceed —
+  // the data will land in the right directory even if the filename is stale.
+  const renamedByOriginal = new Map<string, string>();
+  for (const [oldPath, newPath] of renameOps) {
+    try {
+      await client.renameFile(hash, oldPath, newPath);
+      renamedByOriginal.set(oldPath, newPath);
+      console.log(`[auto-import] Renamed "${oldPath}" → "${newPath}"`);
+    } catch (err) {
+      console.warn(
+        `[auto-import] renameFile failed for "${oldPath}": ${err instanceof Error ? err.message : err} — proceeding with move using original name`,
+      );
+      renamedByOriginal.set(oldPath, oldPath);
+      await createNotification(db, {
+        title: "File rename failed",
+        message: `Could not rename "${oldPath.substring(oldPath.lastIndexOf("/") + 1)}" during import. The file is using its original name.`,
+        type: "import_warning",
+        mediaId: mediaRow.id,
+      });
+    }
+  }
+
+  // Now move the torrent to the final location. Because the rename already
+  // happened, qBit moves each file to `targetLocation/<final name>`.
   try {
     await client.setLocation(hash, targetLocation);
     console.log(`[auto-import] Remote move → ${targetLocation}`);
@@ -293,84 +406,66 @@ async function importRemoteVideoFiles(
   }
 
   // Poll until qBittorrent has finished moving files to the new location.
-  // We check the torrent's save_path (not file names, which are relative and don't change).
+  // Cross-filesystem moves of large torrents can take several minutes, so we
+  // watch the torrent state (qBit reports "moving") with a hard 30-minute cap
+  // to avoid infinite loops if qBit gets stuck.
+  const MAX_MOVE_MS = 30 * 60 * 1000;
+  const POLL_INTERVAL_MS = 3000;
+  const deadline = Date.now() + MAX_MOVE_MS;
+  const normalizedTarget = path.normalize(targetLocation);
+
   let moved = false;
-  for (let attempt = 0; attempt < 15; attempt++) {
-    await new Promise((r) => setTimeout(r, 2000));
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     const torrents = await client.listTorrents({ hashes: [hash] });
     const info = torrents[0];
-    if (info && path.normalize(info.save_path).startsWith(path.normalize(targetLocation))) {
+    if (!info) continue;
+
+    const savePathMatches = path.normalize(info.save_path).startsWith(normalizedTarget);
+    if (savePathMatches && info.state !== "moving") {
       moved = true;
       break;
     }
   }
 
   if (!moved) {
-    console.error(`[auto-import] Remote move did not complete after polling — files may not have moved to "${targetLocation}"`);
+    console.error(
+      `[auto-import] Remote move did not complete within ${MAX_MOVE_MS / 60000} minutes — files may not have moved to "${targetLocation}"`,
+    );
     return 0;
   }
 
-  // Re-fetch file list after confirmed move
-  let movedFiles = await client.getTorrentFiles(hash);
-
-  let importedCount = 0;
-
-  for (const pf of parsedFiles) {
-    try {
-      // Find matching moved file — match by size + extension first, then by position
-      const pfBasename = pf.file.name.substring(pf.file.name.lastIndexOf("/") + 1);
-      const pfExt = pf.extension.toLowerCase();
-
-      // Tier 1: exact size + same extension
-      const sizeAndExtMatches = movedFiles.filter(
-        (mf) => mf.size === pf.file.size && mf.name.toLowerCase().endsWith(pfExt),
+  // Warn if any file is still under a subfolder after rename+move. Sibling
+  // files of nested releases (samples, .nfo, .txt) cannot be cleaned up from
+  // the worker — filesystem cleanup is intentionally out of scope here.
+  try {
+    const finalFiles = await client.getTorrentFiles(hash);
+    const nested = finalFiles.filter((f) => f.name.includes("/"));
+    if (nested.length > 0) {
+      console.warn(
+        `[auto-import] Torrent ${hash} still has ${nested.length} file(s) under subfolders after import: ${nested.map((f) => f.name).join(", ")}`,
       );
-      let movedFile: TorrentFileInfo | undefined;
-      if (sizeAndExtMatches.length === 1) {
-        movedFile = sizeAndExtMatches[0];
-      } else if (sizeAndExtMatches.length > 1) {
-        // Tier 2: among size+ext matches, prefer one whose basename contains the original name
-        movedFile = sizeAndExtMatches.find((mf) =>
-          mf.name.substring(mf.name.lastIndexOf("/") + 1).includes(pfBasename),
-        ) ?? sizeAndExtMatches[0];
-        console.warn(
-          `[auto-import] Ambiguous file match for "${pfBasename}" — ${sizeAndExtMatches.length} candidates, using "${movedFile?.name}"`,
-        );
-      } else {
-        // Tier 3: fall back to size-only match
-        const sizeMatch = movedFiles.find((mf) => mf.size === pf.file.size);
-        if (sizeMatch) {
-          console.warn(
-            `[auto-import] Weak file match (size only) for "${pfBasename}" → "${sizeMatch.name}"`,
-          );
-        }
-        movedFile = sizeMatch;
-      }
+    }
+  } catch {
+    // Non-critical
+  }
 
-      if (!movedFile) continue;
-
-      // Rename via client API
-      let actualFilename = pf.targetFilename;
-      if (movedFile.name !== pf.targetFilename) {
-        try {
-          await client.renameFile(hash, movedFile.name, pf.targetFilename);
-        } catch {
-          console.warn(`[auto-import] renameFile failed for "${movedFile.name}", skipping rename`);
-          // Use the actual filename on disk since rename failed
-          actualFilename = movedFile.name.substring(movedFile.name.lastIndexOf("/") + 1);
-          await createNotification(db, {
-            title: "File rename failed",
-            message: `Could not rename "${actualFilename}" during import. The file is using its original name.`,
-            type: "import_warning",
-            mediaId: mediaRow.id,
-          });
-        }
-      }
-
-      // Compute host path using the actual filename (may differ from target if rename failed)
-      const finalPath = `${targetLocation}/${actualFilename}`;
-
-      importedCount += await upsertMediaFile(db, pf, finalPath, placeholders, alreadyImported, mediaRow, torrentRow);
+  // Upsert media_file rows. finalPath is derived from the already-known
+  // target location and the renamed filename — no need to re-fetch from qBit.
+  let importedCount = 0;
+  for (const [pf, match] of matchForPf) {
+    try {
+      const finalName = renamedByOriginal.get(match.name) ?? match.name;
+      const finalPath = `${targetLocation}/${finalName}`;
+      importedCount += await upsertMediaFile(
+        db,
+        pf,
+        finalPath,
+        placeholders,
+        alreadyImported,
+        mediaRow,
+        torrentRow,
+      );
     } catch (err) {
       console.error(`[auto-import] File error "${pf.file.name}":`, err instanceof Error ? err.message : err);
     }
