@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { userConnection } from "@canto/db/schema";
 
@@ -63,4 +63,32 @@ export async function deleteUserConnection(db: Database, id: string) {
     .where(eq(userConnection.id, id))
     .returning();
   return deleted;
+}
+
+export async function markUserConnectionStale(
+  db: Database,
+  userConnectionId: string,
+  reason: string,
+): Promise<void> {
+  await db
+    .update(userConnection)
+    .set({ staleReason: reason, updatedAt: new Date() })
+    .where(eq(userConnection.id, userConnectionId));
+}
+
+export async function clearUserConnectionStale(
+  db: Database,
+  userConnectionId: string,
+): Promise<void> {
+  // Guarded by isNotNull so a healthy connection doesn't churn updatedAt
+  // on every successful scan.
+  await db
+    .update(userConnection)
+    .set({ staleReason: null, updatedAt: new Date() })
+    .where(
+      and(
+        eq(userConnection.id, userConnectionId),
+        isNotNull(userConnection.staleReason),
+      ),
+    );
 }
