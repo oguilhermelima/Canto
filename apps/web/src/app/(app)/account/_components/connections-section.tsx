@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@canto/ui/dialog";
-import { Plus, Loader2, Unlink, CheckCircle2 } from "lucide-react";
+import { Plus, Loader2, Unlink, CheckCircle2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@canto/ui/cn";
 import { SettingsSection } from "~/components/settings/shared";
@@ -88,77 +88,116 @@ function ProviderIcon({
 function ConnectionCard({
   conn,
   onDisconnect,
+  onReauthenticate,
 }: {
-  conn: { id: string; provider: string; enabled: boolean; updatedAt: Date | string };
+  conn: {
+    id: string;
+    provider: string;
+    enabled: boolean;
+    updatedAt: Date | string;
+    staleReason: string | null;
+  };
   onDisconnect: (id: string) => void;
+  onReauthenticate: (provider: Provider) => void;
 }): React.JSX.Element {
   const [confirming, setConfirming] = useState(false);
   const provider = conn.provider as Provider;
   const brand = BRAND[provider];
+  const isStale = conn.staleReason != null;
 
   return (
     <div
       className={cn(
-        "group flex items-center gap-5 rounded-2xl border bg-muted/20 px-5 py-4 transition-colors",
-        brand.border,
+        "group flex flex-col gap-3 rounded-2xl border bg-muted/20 px-5 py-4 transition-colors",
+        isStale ? "border-amber-500/40" : brand.border,
       )}
     >
-      {/* Icon */}
-      <div
-        className={cn(
-          "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border",
-          brand.bg,
-          brand.border,
-        )}
-      >
-        <ProviderIcon provider={provider} size={22} />
-      </div>
-
-      {/* Info */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-foreground">{brand.label}</span>
-          <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-500">
-            <CheckCircle2 className="h-3 w-3" />
-            Connected
-          </span>
-        </div>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Updated {formatRelative(conn.updatedAt)}
-        </p>
-      </div>
-
-      {/* Action */}
-      {confirming ? (
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs text-muted-foreground">Disconnect?</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="rounded-xl h-7 px-2 text-xs text-destructive hover:bg-destructive/10"
-            onClick={() => onDisconnect(conn.id)}
-          >
-            Yes
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="rounded-xl h-7 px-2 text-xs"
-            onClick={() => setConfirming(false)}
-          >
-            No
-          </Button>
-        </div>
-      ) : (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="shrink-0 rounded-xl gap-1.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10"
-          onClick={() => setConfirming(true)}
+      <div className="flex items-center gap-5">
+        {/* Icon */}
+        <div
+          className={cn(
+            "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border",
+            brand.bg,
+            brand.border,
+          )}
         >
-          <Unlink className="h-3.5 w-3.5" />
-          Disconnect
-        </Button>
+          <ProviderIcon provider={provider} size={22} />
+        </div>
+
+        {/* Info */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-foreground">{brand.label}</span>
+            {isStale ? (
+              <span className="flex items-center gap-1 text-[11px] font-medium text-amber-500">
+                <AlertTriangle className="h-3 w-3" />
+                Re-authentication needed
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-500">
+                <CheckCircle2 className="h-3 w-3" />
+                Connected
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Updated {formatRelative(conn.updatedAt)}
+          </p>
+        </div>
+
+        {/* Action */}
+        {confirming ? (
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs text-muted-foreground">Disconnect?</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-xl h-7 px-2 text-xs text-destructive hover:bg-destructive/10"
+              onClick={() => onDisconnect(conn.id)}
+            >
+              Yes
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-xl h-7 px-2 text-xs"
+              onClick={() => setConfirming(false)}
+            >
+              No
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 shrink-0">
+            {isStale && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-xl gap-1.5 text-amber-500 hover:bg-amber-500/10"
+                onClick={() => onReauthenticate(provider)}
+              >
+                Re-authenticate
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "rounded-xl gap-1.5 text-muted-foreground transition-opacity hover:text-destructive hover:bg-destructive/10",
+                isStale ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+              )}
+              onClick={() => setConfirming(true)}
+            >
+              <Unlink className="h-3.5 w-3.5" />
+              Disconnect
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {isStale && (
+        <p className="text-xs text-amber-500 pl-[68px]">
+          {conn.staleReason}
+        </p>
       )}
     </div>
   );
@@ -255,6 +294,7 @@ export function ConnectionsSection(): React.JSX.Element {
                   key={provider}
                   conn={conn}
                   onDisconnect={(id) => removeConnection.mutate({ id })}
+                  onReauthenticate={openAdd}
                 />
               );
             }
