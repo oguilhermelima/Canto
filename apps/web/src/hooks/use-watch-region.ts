@@ -45,6 +45,7 @@ export function useWatchRegion(): {
       utils.auth.getUserPreferences.setData(undefined, (prev) => ({
         watchRegion: newRegion,
         directSearchEnabled: prev?.directSearchEnabled ?? true,
+        isPublic: prev?.isPublic ?? false,
       }));
       // Persist to DB
       mutation.mutate({ watchRegion: newRegion });

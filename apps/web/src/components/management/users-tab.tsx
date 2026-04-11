@@ -26,7 +26,7 @@ export function UsersTab(): React.JSX.Element {
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 rounded-2xl border border-border/40 p-4">
+            <div key={i} className="flex items-center gap-4 rounded-2xl border border-border/60 bg-card p-4">
               <Skeleton className="h-10 w-10 rounded-full shrink-0" />
               <div className="flex-1 space-y-2">
                 <Skeleton className="h-4 w-32" />
@@ -39,7 +39,7 @@ export function UsersTab(): React.JSX.Element {
       ) : (
         <div className="space-y-2">
           {(users ?? []).map((u) => (
-            <div key={u.id} className="flex items-center gap-4 rounded-2xl border border-border/40 p-4 transition-colors hover:bg-muted/5">
+            <div key={u.id} className="flex items-center gap-4 rounded-2xl border border-border/60 bg-card p-4 transition-colors hover:bg-muted/10">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
                 {u.name.charAt(0).toUpperCase()}
               </div>

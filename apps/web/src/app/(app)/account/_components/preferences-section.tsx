@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@canto/ui/select";
-import { Save, Check } from "lucide-react";
+import { Save, Check, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { useWatchRegion } from "~/hooks/use-watch-region";
@@ -75,6 +75,16 @@ export function PreferencesSection(): React.JSX.Element {
 
   /* Direct search */
   const { enabled: directSearchEnabled, setEnabled: setDirectSearch } = useDirectSearch();
+
+  /* Watch state reconciliation */
+  const reconcileMutation = trpc.userMedia.reconcileStatesFromPlayback.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Reconciled ${data.promoted} of ${data.scanned} items`);
+      void utils.userMedia.getUserMediaCounts.invalidate();
+      void utils.userMedia.getLibraryStats.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
 
   return (
     <SettingsSection title="Preferences" description="Language, streaming region, and playback behavior.">
@@ -185,6 +195,33 @@ export function PreferencesSection(): React.JSX.Element {
             onCheckedChange={setDirectSearch}
             className="mt-0.5 shrink-0"
           />
+        </div>
+
+        <div className="h-px bg-border/40" />
+
+        {/* Watch state reconciliation */}
+        <div className="flex items-start justify-between gap-6">
+          <div>
+            <p className="text-sm font-medium text-foreground">Reconcile Watch State</p>
+            <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
+              Recomputes your watched status from Jellyfin/Plex playback data. Run this if your
+              Completed count looks wrong or lags behind what you've actually watched.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-xl"
+            onClick={() => reconcileMutation.mutate()}
+            disabled={reconcileMutation.isPending}
+          >
+            {reconcileMutation.isPending ? (
+              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
+            {reconcileMutation.isPending ? "Reconciling..." : "Reconcile"}
+          </Button>
         </div>
       </div>
     </SettingsSection>

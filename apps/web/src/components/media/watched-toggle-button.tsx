@@ -955,24 +955,22 @@ export function WatchTrackingButton({
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="flex h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-border bg-background p-0 md:h-[56vh] md:max-h-[56vh] md:max-w-3xl md:rounded-[2rem] [&>button:last-child]:hidden">
-          <div className="shrink-0 border-b border-border/50 px-5 pb-3 pt-4 md:px-6">
+          <DialogHeader bar className="border-border/50">
             <TabBar
               tabs={MODAL_TABS}
               value={activeTab}
               onChange={(value) => setActiveTab(value as ModalTab)}
               className="mb-2 py-0"
             />
-            <DialogHeader className="text-left">
-              <DialogTitle className="text-lg">
-                {activeTab === "track" ? "Track watch history" : "Watch history"}
-              </DialogTitle>
-              <DialogDescription>
-                {activeTab === "track"
-                  ? `Mark what you watched for ${title}.`
-                  : `Review watched entries for ${title}.`}
-              </DialogDescription>
-            </DialogHeader>
-          </div>
+            <DialogTitle>
+              {activeTab === "track" ? "Track watch history" : "Watch history"}
+            </DialogTitle>
+            <DialogDescription>
+              {activeTab === "track"
+                ? `Mark what you watched for ${title}.`
+                : `Review watched entries for ${title}.`}
+            </DialogDescription>
+          </DialogHeader>
 
           {activeTab === "track" ? (
             <>

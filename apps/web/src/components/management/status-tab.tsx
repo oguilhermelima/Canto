@@ -42,8 +42,8 @@ function StatCard({
 }): React.JSX.Element {
   const content = (
     <div className={cn(
-      "rounded-2xl border border-border/40 p-5 transition-colors",
-      href && "hover:bg-muted/10 cursor-pointer",
+      "rounded-2xl border border-border/60 bg-card p-5 transition-colors",
+      href && "cursor-pointer hover:bg-muted/10",
     )}>
       <div className="flex items-center gap-3 mb-3">
         <div className={cn("flex h-9 w-9 items-center justify-center rounded-xl", bgColor)}>
@@ -132,8 +132,8 @@ export function StatusTab(): React.JSX.Element {
       {/* Library */}
       <SettingsSection title="Library" description="Overview of your media collection and download activity.">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard icon={Film} label="Movies" value={stats?.movies ?? 0} loading={statsLoading} href="/library?type=movie" />
-          <StatCard icon={Tv} label="Shows" value={stats?.shows ?? 0} loading={statsLoading} href="/library?type=show" />
+          <StatCard icon={Film} label="Movies" value={stats?.movies ?? 0} loading={statsLoading} href="/collection/server-library?type=movie" />
+          <StatCard icon={Tv} label="Shows" value={stats?.shows ?? 0} loading={statsLoading} href="/collection/server-library?type=show" />
           <StatCard icon={Database} label="Total Media" value={stats?.total ?? 0} loading={statsLoading} />
           <StatCard icon={HardDrive} label="Torrents" value={torrents?.length ?? 0} loading={torrentsLoading} href="/torrents" />
         </div>
@@ -149,7 +149,7 @@ export function StatusTab(): React.JSX.Element {
           </div>
 
           {activeTorrents.length > 0 && (
-            <div className="rounded-2xl border border-border/40 px-4">
+            <div className="rounded-2xl border border-border/60 bg-card px-4">
               {activeTorrents.slice(0, 5).map((t) => (
                 <TorrentRow key={t.id} torrent={t} />
               ))}
@@ -194,7 +194,7 @@ export function StatusTab(): React.JSX.Element {
 
       {/* Services */}
       <SettingsSection title="Services" description="Connection status for all configured external services.">
-        <div className="rounded-2xl border border-border/40 px-4">
+        <div className="rounded-2xl border border-border/60 bg-card px-4">
           <ServiceRow name="TMDB" enabled={true} icon={Film} />
           <ServiceRow name="TVDB" enabled={services?.tvdb ?? false} icon={Tv} />
           <ServiceRow name="qBittorrent" enabled={services?.qbittorrent ?? false} icon={Download} />
@@ -207,7 +207,7 @@ export function StatusTab(): React.JSX.Element {
 
       {/* System */}
       <SettingsSection title="System" description="Version and instance information.">
-        <div className="rounded-2xl border border-border/40 p-5">
+        <div className="rounded-2xl border border-border/60 bg-card p-5">
           <div className="flex items-center gap-4">
             <img src="/canto.svg" alt="Canto" className="h-10 w-10 dark:invert" />
             <div>

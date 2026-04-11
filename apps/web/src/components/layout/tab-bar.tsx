@@ -99,7 +99,7 @@ export function TabBar({ tabs, value, onChange, leading, trailing, className }: 
               {tab.count != null && tab.count > 0 && (
                 <span
                   className={cn(
-                    "min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none",
+                    "min-w-5 rounded-full px-1.5 py-0.5 text-center text-xs font-semibold leading-none",
                     isActive
                       ? "bg-background/20 text-background"
                       : "bg-foreground/5 text-muted-foreground",

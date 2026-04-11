@@ -7,6 +7,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogHeader,
   DialogTitle,
 } from "./dialog";
 
@@ -67,13 +68,13 @@ export function ConfirmationDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         className={cn(
-          "max-w-md gap-0 overflow-hidden rounded-2xl border-border bg-background p-0 [&>button:last-child]:hidden",
+          "max-w-md gap-0 overflow-hidden border-border bg-background p-0 [&>button:last-child]:hidden",
           className,
         )}
       >
-        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+        <DialogHeader bar className="flex items-center justify-between">
           <div>
-            <DialogTitle className="text-lg font-semibold">{title}</DialogTitle>
+            <DialogTitle>{title}</DialogTitle>
             {description ? (
               <DialogDescription className="mt-0.5 text-sm text-muted-foreground">
                 {description}
@@ -90,7 +91,7 @@ export function ConfirmationDialog({
               &times;
             </span>
           </button>
-        </div>
+        </DialogHeader>
 
         {hasBody && (
           <div className="flex flex-col gap-3 p-5">

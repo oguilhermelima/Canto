@@ -7,6 +7,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogHeader,
   DialogTitle,
 } from "@canto/ui/dialog";
 import {
@@ -159,12 +160,11 @@ export function TorrentDialog({
       }}
     >
       <DialogContent className="flex h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-border bg-background p-0 md:h-auto md:max-h-[70vh] md:max-w-5xl md:rounded-[2rem] [&>button:last-child]:hidden">
-        {/* Header */}
-        <div className="flex shrink-0 items-center gap-3 px-5 pb-3 pt-5 md:px-6">
+        <DialogHeader bar className="flex items-center gap-3">
           <div className="relative min-w-0 flex-1" style={{ height: "1.75rem" }}>
             <DialogTitle
               className={cn(
-                "absolute inset-0 flex items-center truncate text-lg font-semibold tracking-tight transition-all duration-300",
+                "absolute inset-0 flex items-center truncate transition-all duration-300",
                 advancedSearch
                   ? "pointer-events-none translate-y-1 opacity-0"
                   : "translate-y-0 opacity-100",
@@ -279,7 +279,7 @@ export function TorrentDialog({
           >
             <X size={16} />
           </button>
-        </div>
+        </DialogHeader>
 
         {/* Folder selector */}
         {isAdmin && (

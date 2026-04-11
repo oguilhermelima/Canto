@@ -13,14 +13,16 @@ import { UsersTab } from "~/components/management/users-tab";
 import { MediaServersSection } from "./_components/media-servers-section";
 import { DownloadsSection } from "./_components/downloads-section";
 import { SearchTabSection } from "./_components/search-tab-section";
+import { ManualScanSection } from "./_components/manual-scan-section";
 
 const NAV_ITEMS = [
   { key: "status", label: "Status" },
   { key: "users", label: "Users" },
   { key: "metadata", label: "Metadata" },
-  { key: "downloads", label: "Libraries" },
   { key: "search", label: "Indexers" },
+  { key: "downloads", label: "Libraries" },
   { key: "media-servers", label: "Media Servers" },
+  { key: "manual-scan", label: "Manual Scan" },
   { key: "about", label: "About" },
 ] as const;
 
@@ -66,6 +68,7 @@ export default function ManagePage(): React.JSX.Element {
         {activeNav === "downloads" && <DownloadsSection />}
         {activeNav === "search" && <SearchTabSection />}
         {activeNav === "media-servers" && <MediaServersSection />}
+        {activeNav === "manual-scan" && <ManualScanSection />}
         {activeNav === "about" && <AboutSection />}
       </div>
     </div>

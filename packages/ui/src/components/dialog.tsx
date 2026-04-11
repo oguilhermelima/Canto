@@ -32,7 +32,7 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border border-border bg-background p-6 shadow-2xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-top-half data-[state=open]:slide-in-from-top-half data-[state=open]:duration-300 data-[state=closed]:duration-200 sm:rounded-xl",
+        "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-[2rem] border border-border bg-background p-6 shadow-2xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-top-half data-[state=open]:slide-in-from-top-half data-[state=open]:duration-300 data-[state=closed]:duration-200",
         className,
       )}
       {...props}
@@ -47,13 +47,25 @@ const DialogContent = React.forwardRef<
 ));
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
+interface DialogHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
+  /**
+   * When true, renders as a full-bleed header bar — shrink-0, bottom border,
+   * and horizontal padding. Pair with `<DialogContent className="p-0">` for
+   * the bordered-header pattern used in big modals (torrent, sync items, etc).
+   */
+  bar?: boolean;
+}
+
 const DialogHeader = ({
   className,
+  bar = false,
   ...props
-}: React.HTMLAttributes<HTMLDivElement>): React.JSX.Element => (
+}: DialogHeaderProps): React.JSX.Element => (
   <div
     className={cn(
-      "flex flex-col space-y-1.5 text-center sm:text-left",
+      bar
+        ? "shrink-0 border-b border-border/40 px-6 py-4"
+        : "flex flex-col space-y-1.5 text-center sm:text-left",
       className,
     )}
     {...props}
@@ -81,10 +93,7 @@ const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn(
-      "text-lg font-semibold leading-none tracking-tight",
-      className,
-    )}
+    className={cn("text-lg font-semibold tracking-tight", className)}
     {...props}
   />
 ));

@@ -79,7 +79,8 @@ export function SearchSection(): React.JSX.Element {
               max={50}
               value={maxIndexers}
               onChange={(e) => { setMaxIndexers(parseInt(e.target.value, 10) || DEFAULTS.maxIndexers); setDirty(true); }}
-              className="w-32 rounded-xl"
+              variant="ghost"
+              className="w-32"
             />
           </div>
 
@@ -98,7 +99,8 @@ export function SearchSection(): React.JSX.Element {
                 step={1000}
                 value={timeout}
                 onChange={(e) => { setTimeout_(parseInt(e.target.value, 10) || DEFAULTS.timeout); setDirty(true); }}
-                className="w-32 rounded-xl"
+                variant="ghost"
+              className="w-32"
               />
               <span className="text-xs text-muted-foreground">{(timeout / 1000).toFixed(0)}s</span>
             </div>
@@ -117,7 +119,8 @@ export function SearchSection(): React.JSX.Element {
               max={20}
               value={concurrency}
               onChange={(e) => { setConcurrency(parseInt(e.target.value, 10) || DEFAULTS.concurrency); setDirty(true); }}
-              className="w-32 rounded-xl"
+              variant="ghost"
+              className="w-32"
             />
           </div>
         </div>

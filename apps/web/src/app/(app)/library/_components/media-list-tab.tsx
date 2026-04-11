@@ -6,7 +6,9 @@ import { Loader2 } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { StateMessage } from "~/components/layout/state-message";
 import { MediaGrid } from "~/components/media/media-grid";
+import { MediaListView } from "~/components/media/media-list-view";
 import type { FilterOutput } from "~/components/media/filter-sidebar";
+import type { ViewMode } from "~/components/layout/view-mode-toggle";
 
 const PAGE_SIZE = 20;
 
@@ -15,11 +17,13 @@ export function MediaListTab({
   preset,
   showFilters,
   filters,
+  viewMode = "grid",
 }: {
   slug: string;
   preset: "emptyWatchlist" | "emptyServerLibrary";
   showFilters: boolean;
   filters: FilterOutput;
+  viewMode?: ViewMode;
 }): React.JSX.Element {
   const router = useRouter();
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -66,6 +70,7 @@ export function MediaListTab({
           posterPath: item.media.posterPath,
           year: item.media.year ?? undefined,
           voteAverage: item.media.voteAverage ?? undefined,
+          overview: item.media.overview ?? undefined,
         })),
       ) ?? [],
     [data],
@@ -103,7 +108,11 @@ export function MediaListTab({
 
   return (
     <>
-      <MediaGrid items={items} isLoading={isLoading} compact={showFilters} />
+      {viewMode === "grid" ? (
+        <MediaGrid items={items} isLoading={isLoading} compact={showFilters} />
+      ) : (
+        <MediaListView items={items} isLoading={isLoading} compact={showFilters} />
+      )}
 
       <div ref={sentinelRef} className="h-1" />
 

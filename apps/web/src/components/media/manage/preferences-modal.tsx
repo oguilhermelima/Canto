@@ -9,6 +9,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogHeader,
   DialogTitle,
 } from "@canto/ui/dialog";
 import {
@@ -297,11 +298,10 @@ export function PreferencesModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[80vh] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border-border bg-background p-0 [&>button:last-child]:hidden">
-        {/* Header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
+      <DialogContent className="flex h-[80vh] max-w-4xl flex-col gap-0 overflow-hidden border-border bg-background p-0 [&>button:last-child]:hidden">
+        <DialogHeader bar className="flex items-center justify-between">
           <div>
-            <DialogTitle className="text-lg font-semibold">Settings</DialogTitle>
+            <DialogTitle>Settings</DialogTitle>
             <DialogDescription className="mt-0.5 text-sm text-muted-foreground">
               {mediaTitle}
             </DialogDescription>
@@ -312,7 +312,7 @@ export function PreferencesModal({
           >
             <span className="text-lg leading-none text-foreground">×</span>
           </button>
-        </div>
+        </DialogHeader>
 
         <div className="flex min-h-0 flex-1">
           {/* Sidebar */}

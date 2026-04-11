@@ -269,9 +269,9 @@ function ServiceRow({
           <BrandLogo serviceKey={serviceKey} />
           <p className="text-base font-semibold text-foreground">{title}</p>
           {isEnabled ? (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-green-500/10 text-green-500 border-green-500/20">Connected</Badge>
+            <Badge variant="secondary" className="rounded-lg border-green-500/20 bg-green-500/10 px-2 py-0 text-xs text-green-500">Connected</Badge>
           ) : (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Disconnected</Badge>
+            <Badge variant="secondary" className="rounded-lg px-2 py-0 text-xs">Disconnected</Badge>
           )}
         </div>
         <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
@@ -280,19 +280,19 @@ function ServiceRow({
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-7 text-xs"
+                className="h-8 rounded-xl text-xs"
                 onClick={() => testService.mutate(
                   { service: serviceKey, values },
                   { onSuccess: (data) => showTestResult(data) },
                 )}
                 disabled={testService.isPending}
               >
-                {testService.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Check className="mr-1 h-3 w-3" />}
+                {testService.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1 h-3.5 w-3.5" />}
                 Test
               </Button>
               <Button
                 size="sm"
-                className="h-7 text-xs"
+                className="h-8 rounded-xl text-xs"
                 onClick={() =>
                   setMany.mutate({ settings: Object.entries(values).map(([key, value]) => ({ key, value })) }, {
                     onSuccess: () => { setDirty(false); toast.success("Settings saved"); },
@@ -301,7 +301,7 @@ function ServiceRow({
                 }
                 disabled={setMany.isPending}
               >
-                {setMany.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
+                {setMany.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1 h-3.5 w-3.5" />}
                 Save
               </Button>
             </>
@@ -432,9 +432,9 @@ function MediaServerRow({
           <span className="inline-block h-5 w-5 shrink-0" style={logoStyle} />
           <p className="text-base font-semibold text-foreground">{title}</p>
           {isEnabled ? (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-green-500/10 text-green-500 border-green-500/20">Active</Badge>
+            <Badge variant="secondary" className="rounded-lg border-green-500/20 bg-green-500/10 px-2 py-0 text-xs text-green-500">Active</Badge>
           ) : (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Inactive</Badge>
+            <Badge variant="secondary" className="rounded-lg px-2 py-0 text-xs">Inactive</Badge>
           )}
         </div>
         <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
@@ -443,23 +443,23 @@ function MediaServerRow({
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-7 text-xs"
+                className="h-8 rounded-xl text-xs"
                 onClick={() => testService.mutate(
                   { service: serviceKey, values: { [urlField.key]: url, [apiKeyField.key]: apiKey } },
                   { onSuccess: (data) => showTestResult(data) },
                 )}
                 disabled={testService.isPending}
               >
-                {testService.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Check className="mr-1 h-3 w-3" />}
+                {testService.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1 h-3.5 w-3.5" />}
                 Test
               </Button>
               <Button
                 size="sm"
-                className="h-7 text-xs"
+                className="h-8 rounded-xl text-xs"
                 onClick={handleSave}
                 disabled={setMany.isPending}
               >
-                {setMany.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
+                {setMany.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1 h-3.5 w-3.5" />}
                 Save
               </Button>
             </>
@@ -507,9 +507,9 @@ function MediaServerRow({
                   </button>
                 )}
               </div>
-              <p className="text-[10px] text-muted-foreground px-1">
-                {isJellyfin 
-                  ? "System-wide API Key for background tasks and metadata." 
+              <p className="px-1 text-xs text-muted-foreground">
+                {isJellyfin
+                  ? "System-wide API Key for background tasks and metadata."
                   : "System-wide X-Plex-Token for background tasks and metadata."}
               </p>
             </div>
@@ -558,14 +558,14 @@ function PlexOAuthSection({ serverUrl, disabled, onSuccess, isConnected }: { ser
   };
 
   return (
-    <div className={cn("rounded-xl border p-4 transition-all", disabled ? "border-border/20 opacity-40" : "border-border/40 hover:border-border/60")}>
-      <p className="text-sm font-medium text-foreground mb-2">{isConnected ? "Plex account" : "Sign in with Plex"}</p>
-      <p className="text-sm text-muted-foreground mb-3">
+    <div className={cn("rounded-xl border bg-card p-4 transition-all", disabled ? "border-border/30 opacity-40" : "border-border/60 hover:border-border/80")}>
+      <p className="mb-2 text-sm font-medium text-foreground">{isConnected ? "Plex account" : "Sign in with Plex"}</p>
+      <p className="mb-3 text-sm text-muted-foreground">
         {isConnected
           ? "Your Plex account is connected. Re-authenticate if your token has expired."
           : "Opens a popup where you sign in with your Plex account. Works with Google, Apple, and email."}
       </p>
-      <Button size="sm" variant="outline" className="gap-2" onClick={handleSignIn} disabled={disabled || polling || createPin.isPending}>
+      <Button size="sm" variant="outline" className="gap-2 rounded-xl" onClick={handleSignIn} disabled={disabled || polling || createPin.isPending}>
         {polling ? (<><Loader2 className="h-4 w-4 animate-spin" />Waiting for Plex...</>) : createPin.isPending ? (<><Loader2 className="h-4 w-4 animate-spin" />Creating PIN...</>) : (
           <><span className="inline-block h-4 w-4 shrink-0 bg-[#e5a00d]" style={{ mask: "url(/plex-logo.svg) center/contain no-repeat", WebkitMask: "url(/plex-logo.svg) center/contain no-repeat" }} />{isConnected ? "Re-authenticate" : "Sign in with Plex"}</>
         )}
@@ -619,20 +619,20 @@ function TmdbSection(): React.JSX.Element {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/tmdb.svg" alt="" className="h-5 w-5 shrink-0" />
           <p className="text-base font-semibold text-foreground">TMDB</p>
-          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Required</Badge>
+          <Badge variant="secondary" className="rounded-lg px-2 py-0 text-xs">Required</Badge>
           {hasKey && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-green-500/10 text-green-500 border-green-500/20">Connected</Badge>
+            <Badge variant="secondary" className="rounded-lg border-green-500/20 bg-green-500/10 px-2 py-0 text-xs text-green-500">Connected</Badge>
           )}
         </div>
         <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
           {dirty && (
             <Button
               size="sm"
-              className="h-7 text-xs"
+              className="h-8 rounded-xl text-xs"
               onClick={() => setSettings.mutate({ settings: [{ key: "tmdb.apiKey", value: tmdbKey }, { key: "tmdb.enabled", value: true }] }, { onSuccess: () => { setDirty(false); toast.success("Saved"); } })}
               disabled={setSettings.isPending}
             >
-              {setSettings.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
+              {setSettings.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1 h-3.5 w-3.5" />}
               Save
             </Button>
           )}
@@ -734,20 +734,20 @@ function TvdbApiKeySection(): React.JSX.Element {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/tvdb.svg" alt="" className="h-5 w-5 shrink-0" />
           <p className="text-base font-semibold text-foreground">TVDB</p>
-          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Optional</Badge>
+          <Badge variant="secondary" className="rounded-lg px-2 py-0 text-xs">Optional</Badge>
           {hasKey && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-green-500/10 text-green-500 border-green-500/20">Connected</Badge>
+            <Badge variant="secondary" className="rounded-lg border-green-500/20 bg-green-500/10 px-2 py-0 text-xs text-green-500">Connected</Badge>
           )}
         </div>
         <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
           {dirty && (
             <Button
               size="sm"
-              className="h-7 text-xs"
+              className="h-8 rounded-xl text-xs"
               onClick={handleSave}
               disabled={isPending}
             >
-              {isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
+              {isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1 h-3.5 w-3.5" />}
               Save & Test
             </Button>
           )}
@@ -825,7 +825,7 @@ function WatchRegionSection(): React.JSX.Element {
               </SelectContent>
             </Select>
           )}
-          <Button size="sm" onClick={handleSaveRegion} disabled={!hasPendingChange && !saved}>
+          <Button size="sm" className="rounded-xl" onClick={handleSaveRegion} disabled={!hasPendingChange && !saved}>
             {saved ? <Check className="mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />}
             {saved ? "Saved" : "Save"}
           </Button>
@@ -916,7 +916,7 @@ function TvdbDefaultToggle(): React.JSX.Element {
       </div>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent className="max-w-md rounded-xl">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
               {defaultShows ? "Disable TVDB episode structure?" : "Enable TVDB for episode structure?"}
@@ -1061,12 +1061,15 @@ export function MediaServerConnectionSection(): React.JSX.Element {
           apiKeyField={{ key: "jellyfin.apiKey", label: "System API Key", placeholder: "Your Jellyfin API key (for background tasks)", secret: true }}
           isLast
         />
-        <p className="px-5 pb-4 text-[10px] text-muted-foreground">
+        <p className="px-5 pb-4 pt-3 text-xs text-muted-foreground">
           Users connect their personal Jellyfin accounts in <strong>Account → Media Server Connections</strong>.
         </p>
       </SectionCard>
       <SectionCard title="Plex">
         <PlexServerSection />
+        <p className="px-5 pb-4 pt-3 text-xs text-muted-foreground">
+          Users connect their personal Plex accounts in <strong>Account → Media Server Connections</strong>.
+        </p>
       </SectionCard>
     </SettingsSection>
   );
@@ -1083,7 +1086,7 @@ export function JellyfinConnectionSection(): React.JSX.Element {
           apiKeyField={{ key: "jellyfin.apiKey", label: "System API Key", placeholder: "Your Jellyfin API key (for background tasks)", secret: true }}
           isLast
         />
-        <p className="px-5 pb-4 text-[10px] text-muted-foreground">
+        <p className="px-5 pb-4 pt-3 text-xs text-muted-foreground">
           Users connect their personal Jellyfin accounts in <strong>Account → Media Server Connections</strong>.
         </p>
       </SectionCard>
@@ -1159,15 +1162,15 @@ function PlexServerSection(): React.JSX.Element {
           <span className="inline-block h-5 w-5 shrink-0 bg-[#e5a00d]" style={{ mask: "url(/plex-logo.svg) center/contain no-repeat", WebkitMask: "url(/plex-logo.svg) center/contain no-repeat" }} />
           <p className="text-base font-semibold text-foreground">Plex</p>
           {isEnabled ? (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-green-500/10 text-green-500 border-green-500/20">Active</Badge>
+            <Badge variant="secondary" className="rounded-lg border-green-500/20 bg-green-500/10 px-2 py-0 text-xs text-green-500">Active</Badge>
           ) : (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Inactive</Badge>
+            <Badge variant="secondary" className="rounded-lg px-2 py-0 text-xs">Inactive</Badge>
           )}
         </div>
         <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
           {isEnabled && dirty && (
-            <Button size="sm" className="h-7 text-xs" onClick={handleSave} disabled={setMany.isPending}>
-              {setMany.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Save className="mr-1 h-3 w-3" />}
+            <Button size="sm" className="h-8 rounded-xl text-xs" onClick={handleSave} disabled={setMany.isPending}>
+              {setMany.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1 h-3.5 w-3.5" />}
               Save
             </Button>
           )}
@@ -1199,9 +1202,6 @@ function PlexServerSection(): React.JSX.Element {
             onSuccess={() => void utils.settings.getAll.invalidate()}
             isConnected={isConnected}
           />
-          <p className="text-[10px] text-muted-foreground px-1">
-            Users connect their personal Plex accounts in <strong>Account → Media Server Connections</strong>.
-          </p>
         </div>
       </AnimatedCollapse>
     </div>

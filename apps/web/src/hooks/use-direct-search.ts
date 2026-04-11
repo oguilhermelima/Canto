@@ -42,6 +42,7 @@ export function useDirectSearch(): {
       utils.auth.getUserPreferences.setData(undefined, (prev) => ({
         watchRegion: prev?.watchRegion ?? null,
         directSearchEnabled: value,
+        isPublic: prev?.isPublic ?? false,
       }));
       // Persist to DB
       mutation.mutate({ directSearchEnabled: value });

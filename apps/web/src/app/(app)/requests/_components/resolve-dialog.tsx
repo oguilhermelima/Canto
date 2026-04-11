@@ -45,7 +45,7 @@ export function ResolveDialog({
         if (!open) handleClose();
       }}
     >
-      <DialogContent className="max-w-md rounded-2xl border-border bg-background">
+      <DialogContent className="max-w-md border-border bg-background">
         <DialogHeader>
           <DialogTitle>
             {target?.action === "approved" ? "Approve" : "Reject"} Request

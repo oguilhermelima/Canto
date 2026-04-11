@@ -8,8 +8,8 @@ export function MediaServersSection(): React.JSX.Element {
   return (
     <div>
       <MediaServerConnectionSection />
-      <AutoMergeSection />
       <MediaServerSyncSection />
+      <AutoMergeSection />
     </div>
   );
 }
