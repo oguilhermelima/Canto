@@ -22,6 +22,7 @@ const getRefreshAllLangQueue = createQueueGetter("refresh-all-language");
 const getTranslateEpisodesQueue = createQueueGetter("translate-episodes");
 const getJellyfinSyncQueue = createQueueGetter("jellyfin-sync");
 const getPlexSyncQueue = createQueueGetter("plex-sync");
+const getReverseSyncUserQueue = createQueueGetter("reverse-sync-user");
 const getFolderScanQueue = createQueueGetter("folder-scan");
 
 export async function dispatchEnrichMedia(mediaId: string, full = false): Promise<void> {
@@ -88,6 +89,23 @@ export async function dispatchJellyfinSync(): Promise<boolean> {
 export async function dispatchPlexSync(): Promise<boolean> {
   const q = await getPlexSyncQueue();
   return dispatchUniqueJob(q, "plex-sync-run");
+}
+
+/**
+ * Dispatch an on-demand reverse-sync for a single user. Dedupes via jobId so
+ * rapid app-focus triggers collapse into one run per user.
+ */
+export async function dispatchUserReverseSync(userId: string): Promise<boolean> {
+  const q = await getReverseSyncUserQueue();
+  const jobId = `reverse-sync-user-${userId}`;
+  const existing = await q.getJob(jobId);
+  if (existing) {
+    const state = await existing.getState();
+    if (state === "active" || state === "waiting") return false;
+    await existing.remove();
+  }
+  await q.add(q.name, { userId }, { jobId, removeOnComplete: true, removeOnFail: 50 });
+  return true;
 }
 
 /** Dispatch an on-demand folder scan job (deduplicates active/waiting jobs). */
