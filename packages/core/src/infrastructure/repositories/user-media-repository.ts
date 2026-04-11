@@ -51,6 +51,7 @@ export async function findUserPlaybackProgress(
       eq(userPlaybackProgress.userId, userId),
       eq(userPlaybackProgress.mediaId, mediaId),
       episodeId ? eq(userPlaybackProgress.episodeId, episodeId) : isNull(userPlaybackProgress.episodeId),
+      isNull(userPlaybackProgress.deletedAt),
     ),
   });
 }
@@ -64,6 +65,7 @@ export async function findUserPlaybackProgressByMedia(
     where: and(
       eq(userPlaybackProgress.userId, userId),
       eq(userPlaybackProgress.mediaId, mediaId),
+      isNull(userPlaybackProgress.deletedAt),
     ),
     orderBy: (t, { desc }) => [desc(t.lastWatchedAt), desc(t.id)],
   });
@@ -75,6 +77,8 @@ export async function upsertUserPlaybackProgress(
 ) {
   // PostgreSQL unique indexes treat NULL as distinct, so ON CONFLICT won't fire
   // for rows where episodeId IS NULL (movies). We do a find-then-update instead.
+  // We include soft-deleted rows in the lookup so the tombstone logic below
+  // can decide whether to resurrect them.
   const existing = await db.query.userPlaybackProgress.findFirst({
     where: and(
       eq(userPlaybackProgress.userId, data.userId),
@@ -86,6 +90,26 @@ export async function upsertUserPlaybackProgress(
   });
 
   if (existing) {
+    // Tombstone semantics: if the user previously deleted this row, ignore
+    // server-sourced echoes that are not strictly newer than the deletion.
+    // A genuine new watch (lastWatchedAt > deletedAt) clears the tombstone.
+    if (existing.deletedAt) {
+      const incomingAt = data.lastWatchedAt instanceof Date
+        ? data.lastWatchedAt
+        : data.lastWatchedAt
+          ? new Date(data.lastWatchedAt)
+          : null;
+      if (!incomingAt || incomingAt.getTime() <= existing.deletedAt.getTime()) {
+        return existing;
+      }
+      const [revived] = await db
+        .update(userPlaybackProgress)
+        .set({ ...data, deletedAt: null })
+        .where(eq(userPlaybackProgress.id, existing.id))
+        .returning();
+      return revived;
+    }
+
     const [updated] = await db
       .update(userPlaybackProgress)
       .set(data)
@@ -113,7 +137,12 @@ export async function findDistinctPlaybackMediaPairs(
       mediaId: userPlaybackProgress.mediaId,
     })
     .from(userPlaybackProgress)
-    .where(userId ? eq(userPlaybackProgress.userId, userId) : undefined);
+    .where(
+      and(
+        userId ? eq(userPlaybackProgress.userId, userId) : undefined,
+        isNull(userPlaybackProgress.deletedAt),
+      ),
+    );
   return rows;
 }
 
@@ -143,6 +172,7 @@ export async function findUserWatchHistory(
       eq(userWatchHistory.userId, userId),
       eq(userWatchHistory.mediaId, mediaId),
       episodeId ? eq(userWatchHistory.episodeId, episodeId) : isNull(userWatchHistory.episodeId),
+      isNull(userWatchHistory.deletedAt),
     ),
     orderBy: (t, { desc }) => [desc(t.watchedAt)],
   });
@@ -157,6 +187,7 @@ export async function findUserWatchHistoryByMedia(
     where: and(
       eq(userWatchHistory.userId, userId),
       eq(userWatchHistory.mediaId, mediaId),
+      isNull(userWatchHistory.deletedAt),
     ),
     orderBy: (t, { desc }) => [desc(t.watchedAt)],
   });
@@ -167,19 +198,66 @@ export async function deleteUserWatchHistoryByIds(
   userId: string,
   mediaId: string,
   entryIds: string[],
-) {
-  if (entryIds.length === 0) return 0;
+): Promise<{ count: number; episodeIds: (string | null)[] }> {
+  if (entryIds.length === 0) return { count: 0, episodeIds: [] };
 
   const deleted = await db
-    .delete(userWatchHistory)
+    .update(userWatchHistory)
+    .set({ deletedAt: new Date() })
     .where(
       and(
         eq(userWatchHistory.userId, userId),
         eq(userWatchHistory.mediaId, mediaId),
         inArray(userWatchHistory.id, entryIds),
+        isNull(userWatchHistory.deletedAt),
       ),
     )
-    .returning({ id: userWatchHistory.id });
+    .returning({ id: userWatchHistory.id, episodeId: userWatchHistory.episodeId });
+
+  return {
+    count: deleted.length,
+    episodeIds: [...new Set(deleted.map((r) => r.episodeId))],
+  };
+}
+
+/**
+ * Soft-delete playback progress rows for a given (userId, mediaId, episodeId)
+ * tuple. A NULL in `episodeIds` matches the movie-level row (episodeId IS NULL).
+ * The tombstone prevents reverse-sync from resurrecting the row on the next
+ * scan when the server still reports the item as watched.
+ */
+export async function softDeleteUserPlaybackProgress(
+  db: Database,
+  userId: string,
+  mediaId: string,
+  episodeIds: (string | null)[],
+): Promise<number> {
+  if (episodeIds.length === 0) return 0;
+
+  const concreteIds = episodeIds.filter((id): id is string => id !== null);
+  const hasMovieLevel = episodeIds.some((id) => id === null);
+
+  const episodeClauses: SQL[] = [];
+  if (concreteIds.length > 0) {
+    episodeClauses.push(inArray(userPlaybackProgress.episodeId, concreteIds));
+  }
+  if (hasMovieLevel) {
+    episodeClauses.push(isNull(userPlaybackProgress.episodeId));
+  }
+  if (episodeClauses.length === 0) return 0;
+
+  const deleted = await db
+    .update(userPlaybackProgress)
+    .set({ deletedAt: new Date() })
+    .where(
+      and(
+        eq(userPlaybackProgress.userId, userId),
+        eq(userPlaybackProgress.mediaId, mediaId),
+        isNull(userPlaybackProgress.deletedAt),
+        episodeClauses.length === 1 ? episodeClauses[0] : or(...episodeClauses),
+      ),
+    )
+    .returning({ id: userPlaybackProgress.id });
 
   return deleted.length;
 }
@@ -211,7 +289,10 @@ export async function findUserPlaybackProgressFeed(
   userId: string,
   mediaType?: "movie" | "show",
 ): Promise<UserPlaybackProgressFeedRow[]> {
-  const conditions = [eq(userPlaybackProgress.userId, userId)];
+  const conditions = [
+    eq(userPlaybackProgress.userId, userId),
+    isNull(userPlaybackProgress.deletedAt),
+  ];
   if (mediaType) conditions.push(eq(media.type, mediaType));
 
   return db
@@ -267,7 +348,10 @@ export async function findUserWatchHistoryFeed(
   limit = 100,
   mediaType?: "movie" | "show",
 ): Promise<UserWatchHistoryFeedRow[]> {
-  const conditions = [eq(userWatchHistory.userId, userId)];
+  const conditions = [
+    eq(userWatchHistory.userId, userId),
+    isNull(userWatchHistory.deletedAt),
+  ];
   if (mediaType) conditions.push(eq(media.type, mediaType));
 
   return db
@@ -404,6 +488,7 @@ export async function findUserWatchHistoryByMediaIds(
       and(
         eq(userWatchHistory.userId, userId),
         inArray(userWatchHistory.mediaId, mediaIds),
+        isNull(userWatchHistory.deletedAt),
       ),
     )
     .orderBy(desc(userWatchHistory.watchedAt), desc(userWatchHistory.id));
@@ -439,6 +524,7 @@ export async function findUserCompletedPlaybackByMediaIds(
         eq(userPlaybackProgress.userId, userId),
         inArray(userPlaybackProgress.mediaId, mediaIds),
         eq(userPlaybackProgress.isCompleted, true),
+        isNull(userPlaybackProgress.deletedAt),
       ),
     );
 }
@@ -480,6 +566,7 @@ export async function findUserWatchingShowsMetadata(
       and(
         eq(userPlaybackProgress.userId, userId),
         eq(media.type, "show"),
+        isNull(userPlaybackProgress.deletedAt),
       ),
     )
     .orderBy(desc(userPlaybackProgress.lastWatchedAt));
