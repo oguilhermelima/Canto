@@ -15,6 +15,7 @@ import { mediaHref } from "~/lib/media-href";
 import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
 import { useLogo } from "~/hooks/use-logos";
 import { MediaLogo } from "~/components/media/media-logo";
+import { StateMessage } from "~/components/layout/state-message";
 import { cn } from "@canto/ui/cn";
 
 const PAGE_SIZE = 24;
@@ -245,27 +246,45 @@ export function UpcomingScheduleSectionContent({
 
   if (isError) {
     return (
-      <div className="rounded-2xl border border-border/50 bg-muted/20 px-4 py-6">
-        <p className="text-sm text-muted-foreground">
-          Failed to load your upcoming schedule.
-        </p>
-        <button
-          type="button"
-          className="mt-2 text-sm font-medium text-foreground/80 hover:text-foreground"
-          onClick={() => void refetch()}
-        >
-          Try again
-        </button>
-      </div>
+      <section className="relative">
+        <div className="mb-0 flex items-center justify-between pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24">
+          <h2 className="text-xl font-semibold text-foreground">{title}</h2>
+          {seeAllHref ? (
+            <Link
+              href={seeAllHref}
+              className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              See more
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          ) : null}
+        </div>
+        <div className="mt-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+          <StateMessage preset="error" onRetry={() => void refetch()} minHeight="200px" />
+        </div>
+      </section>
     );
   }
 
   if (items.length === 0) {
     return (
-      <div className="rounded-2xl border border-border/50 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
-        No upcoming releases right now. Add titles to your Watchlist or
-        Collections to build a schedule.
-      </div>
+      <section className="relative">
+        <div className="mb-0 flex items-center justify-between pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24">
+          <h2 className="text-xl font-semibold text-foreground">{title}</h2>
+          {seeAllHref ? (
+            <Link
+              href={seeAllHref}
+              className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              See more
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          ) : null}
+        </div>
+        <div className="mt-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+          <StateMessage preset="emptyUpcoming" minHeight="200px" />
+        </div>
+      </section>
     );
   }
 

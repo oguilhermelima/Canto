@@ -105,6 +105,21 @@ export const SPACE_STATES = {
     title: "No matching signals",
     description: "Try adjusting your filters to widen the search area.",
   },
+  emptyContinueWatching: {
+    icon: Radio,
+    title: "No missions in flight",
+    description: "Press play on Plex or Jellyfin — your active journeys will dock here.",
+  },
+  emptyWatchNext: {
+    icon: Telescope,
+    title: "Queue awaits coordinates",
+    description: "Add titles to your Watchlist or Collections and we'll line them up for launch.",
+  },
+  emptyUpcoming: {
+    icon: Satellite,
+    title: "No stars on the horizon",
+    description: "Add titles to your Watchlist or Collections to track upcoming release windows.",
+  },
 
   // Error states — hopeful, mission-control vibe
   error: {
