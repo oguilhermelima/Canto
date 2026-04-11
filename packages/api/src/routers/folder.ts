@@ -2,6 +2,7 @@ import nodePath from "node:path";
 import { readdir } from "node:fs/promises";
 
 import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 
 import {
   createFolderInput,
@@ -146,6 +147,54 @@ export const folderRouter = createTRPCRouter({
       return { categories: {} as Record<string, { name: string; savePath: string }>, defaultSavePath: "" };
     }
   }),
+
+  createQbitCategory: adminProcedure
+    .input(
+      z.object({
+        name: z
+          .string()
+          .min(1, "Category name is required")
+          .max(100)
+          .regex(/^[^\\/]+$/, "Category name cannot contain / or \\"),
+        savePath: z.string().min(1, "Save path is required").max(500),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const client = await getDownloadClient();
+
+      const existing = await client.listCategories().catch(() => ({} as Record<string, { name: string; savePath: string }>));
+      if (existing[input.name]) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `Category "${input.name}" already exists in qBittorrent`,
+        });
+      }
+
+      try {
+        await client.createCategory(input.name, input.savePath);
+      } catch (err) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Failed to create category: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
+
+      // Validate the path by editing the category — qBittorrent rejects
+      // unwritable save paths on editCategory (HTTP 409).
+      try {
+        await client.editCategory(input.name, input.savePath);
+      } catch (err) {
+        // Roll back the category we just created so the user can retry.
+        await client.removeCategories([input.name]).catch(() => undefined);
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `qBittorrent cannot write to "${input.savePath}". Verify the path exists and is mounted on the download client.`,
+          cause: err instanceof Error ? err : undefined,
+        });
+      }
+
+      return { name: input.name, savePath: input.savePath };
+    }),
 
   testPaths: adminProcedure.mutation(({ ctx }) => testFolderPaths(ctx.db)),
 

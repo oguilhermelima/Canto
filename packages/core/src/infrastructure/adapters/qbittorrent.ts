@@ -75,9 +75,11 @@ export class QBittorrentClient implements DownloadClientPort {
   async addTorrent(
     magnetOrUrl: string,
     category?: string,
+    savePath?: string,
   ): Promise<void> {
     const body = new URLSearchParams({ urls: magnetOrUrl });
     if (category) body.set("category", category);
+    if (savePath) body.set("savepath", savePath);
 
     const response = await this.request("/api/v2/torrents/add", {
       method: "POST",
@@ -191,12 +193,15 @@ export class QBittorrentClient implements DownloadClientPort {
   async createCategory(category: string, savePath?: string): Promise<void> {
     const body = new URLSearchParams({ category });
     if (savePath) body.set("savePath", savePath);
-    await this.request("/api/v2/torrents/createCategory", {
+    const response = await this.request("/api/v2/torrents/createCategory", {
       method: "POST",
       body,
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
-    // 409 = category already exists, which is fine
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(`qBittorrent createCategory failed: HTTP ${response.status} ${text}`.trim());
+    }
   }
 
   async editCategory(category: string, savePath: string): Promise<void> {
@@ -207,7 +212,21 @@ export class QBittorrentClient implements DownloadClientPort {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
     if (!response.ok) {
-      throw new Error(`qBittorrent editCategory failed: HTTP ${response.status}`);
+      const text = await response.text().catch(() => "");
+      throw new Error(`qBittorrent editCategory failed: HTTP ${response.status} ${text}`.trim());
+    }
+  }
+
+  async removeCategories(categories: string[]): Promise<void> {
+    if (categories.length === 0) return;
+    const body = new URLSearchParams({ categories: categories.join("\n") });
+    const response = await this.request("/api/v2/torrents/removeCategories", {
+      method: "POST",
+      body,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    if (!response.ok) {
+      throw new Error(`qBittorrent removeCategories failed: HTTP ${response.status}`);
     }
   }
 

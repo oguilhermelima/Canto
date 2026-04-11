@@ -253,7 +253,7 @@ async function coreDownload(
       }
 
       if (["incomplete", "removed", "error"].includes(existingByTitle.status)) {
-        await qbClient.addTorrent(magnetOrUrl, qbCategory);
+        await qbClient.addTorrent(magnetOrUrl, qbCategory, downloadPath);
 
         let hash = existingByTitle.hash;
         if (!hash && magnetOrUrl.startsWith("magnet:")) {
@@ -422,7 +422,7 @@ async function coreDownload(
       }
     }
 
-    await qbClient.addTorrent(resolvedUrl, qbCategory);
+    await qbClient.addTorrent(resolvedUrl, qbCategory, downloadPath);
 
     // Mark media as "in library" the moment the torrent is accepted
     if (!mediaRow.inLibrary) {
