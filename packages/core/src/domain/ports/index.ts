@@ -16,6 +16,5 @@ export type { ListRepositoryPort } from "./list-repository.port";
 export type { MediaFileRepositoryPort } from "./media-file-repository.port";
 export type { NotificationRepositoryPort } from "./notification-repository.port";
 export type { RequestRepositoryPort } from "./request-repository.port";
-export type { SyncRepositoryPort, SyncItemFilters } from "./sync-repository.port";
 export type { UserRecommendationRepositoryPort } from "./user-recommendation-repository.port";
 export type { LibraryRepositoryPort } from "./library-repository.port";
