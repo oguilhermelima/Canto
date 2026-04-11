@@ -269,11 +269,20 @@ export interface ReverseSyncOptions {
    * which delta runs must skip to avoid nuking unchanged items.
    */
   force?: boolean;
+  /**
+   * Restrict the run to a single user. Used by on-demand syncs dispatched
+   * from the web app (e.g. app-focus trigger) so we don't loop every user
+   * every time one person opens the app.
+   */
+  userId?: string;
 }
 
 export async function runReverseSync(options: ReverseSyncOptions = {}): Promise<void> {
   const force = options.force === true;
-  const connections = await findAllUserConnections(db);
+  const allConnections = await findAllUserConnections(db);
+  const connections = options.userId
+    ? allConnections.filter((c) => c.userId === options.userId)
+    : allConnections;
   const tmdbApiKey = await getSetting<string>("tmdb.apiKey");
   if (!tmdbApiKey) throw new Error("TMDB API key not configured");
   const tmdb = new TmdbProvider(tmdbApiKey);
@@ -519,4 +528,8 @@ export async function handlePlexSync(): Promise<void> {
 
 export async function handleReverseSyncFull(): Promise<void> {
   return runReverseSync({ force: true });
+}
+
+export async function handleReverseSyncUser(userId: string): Promise<void> {
+  return runReverseSync({ userId });
 }
