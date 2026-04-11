@@ -20,6 +20,7 @@ import {
   findUserLibraryStats,
   findUserMediaPaginated,
   findUserMediaCounts,
+  softDeleteUserPlaybackProgress,
   upsertUserMediaState,
 } from "@canto/core/infrastructure/repositories";
 import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/use-cases/promote-user-media-state-from-playback";
@@ -1401,12 +1402,24 @@ export const userMediaRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
       }
 
-      const removedItems = await deleteUserWatchHistoryByIds(
-        ctx.db,
-        ctx.session.user.id,
-        input.mediaId,
-        [...new Set(input.entryIds)],
-      );
+      const { count: removedItems, episodeIds: removedEpisodeIds } =
+        await deleteUserWatchHistoryByIds(
+          ctx.db,
+          ctx.session.user.id,
+          input.mediaId,
+          [...new Set(input.entryIds)],
+        );
+
+      // Tombstone the matching playback rows so the next reverse-sync scan
+      // doesn't resurrect the deletion via upsertUserPlaybackProgress.
+      if (removedEpisodeIds.length > 0) {
+        await softDeleteUserPlaybackProgress(
+          ctx.db,
+          ctx.session.user.id,
+          input.mediaId,
+          removedEpisodeIds,
+        );
+      }
 
       const now = new Date();
       const releasedEpisodeIds = new Set(
