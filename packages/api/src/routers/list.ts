@@ -1,4 +1,6 @@
 import { TRPCError } from "@trpc/server";
+import { eq } from "drizzle-orm";
+import { user } from "@canto/db/schema";
 
 import {
   getByIdInput,
@@ -9,6 +11,13 @@ import {
   updateCollectionLayoutInput,
   addListItemInput,
   removeListItemInput,
+  addListMemberInput,
+  updateListMemberInput,
+  removeListMemberInput,
+  createListInvitationInput,
+  acceptListInvitationInput,
+  getListMembersInput,
+  getListVotesInput,
 } from "@canto/validators";
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
 import {
@@ -26,6 +35,17 @@ import {
   findUserPreferences,
   upsertUserPreference,
 } from "@canto/core/infrastructure/repositories/library-repository";
+import {
+  findListMembers,
+  addListMember,
+  updateListMemberRole,
+  removeListMember,
+  createInvitation,
+  findInvitationByToken,
+  acceptInvitation,
+  findPendingInvitations,
+  getListMemberVotes,
+} from "@canto/core/infrastructure/repositories/list-member-repository";
 
 // ── Extracted rules & use-cases ──
 import { slugify } from "@canto/core/domain/rules/slugify";
@@ -175,12 +195,24 @@ export const listRouter = createTRPCRouter({
             : "List name must contain at least one letter or number",
         });
       }
+
+      // Default visibility to user's profile visibility
+      let visibility = input.visibility;
+      if (!visibility) {
+        const [userRow] = await ctx.db
+          .select({ isPublic: user.isPublic })
+          .from(user)
+          .where(eq(user.id, ctx.session.user.id));
+        visibility = userRow?.isPublic ? "public" : "private";
+      }
+
       try {
         return await createList(ctx.db, {
           userId: ctx.session.user.id,
           name: input.name, slug,
           description: input.description,
           type: "custom",
+          visibility,
         });
       } catch (err) {
         if (err instanceof Error && err.message.includes("unique")) {
@@ -193,13 +225,16 @@ export const listRouter = createTRPCRouter({
   update: protectedProcedure
     .input(updateListInput)
     .mutation(async ({ ctx, input }) => {
-      await verifyListOwnership(ctx.db, input.id, ctx.session.user.id, ctx.session.user.role);
+      await verifyListOwnership(ctx.db, input.id, ctx.session.user.id, ctx.session.user.role, {
+        requiredPermission: "admin",
+      });
       const data: Parameters<typeof updateList>[2] = {};
       if (input.name) {
         data.name = input.name;
         data.slug = slugify(input.name);
       }
       if (input.description !== undefined) data.description = input.description;
+      if (input.visibility !== undefined) data.visibility = input.visibility;
       return updateList(ctx.db, input.id, data);
     }),
 
@@ -237,5 +272,122 @@ export const listRouter = createTRPCRouter({
       );
       const serverLib = await ensureServerLibrary(ctx.db);
       return addListItem(ctx.db, { listId: serverLib.id, mediaId: input.mediaId });
+    }),
+
+  // ── Members ──
+
+  getMembers: protectedProcedure
+    .input(getListMembersInput)
+    .query(async ({ ctx, input }) => {
+      await verifyListOwnership(ctx.db, input.listId, ctx.session.user.id, ctx.session.user.role, {
+        requiredPermission: "view",
+      });
+      const [members, invitations, listRow] = await Promise.all([
+        findListMembers(ctx.db, input.listId),
+        findPendingInvitations(ctx.db, input.listId),
+        findListById(ctx.db, input.listId),
+      ]);
+
+      // Include owner info
+      let owner = null;
+      if (listRow?.userId) {
+        const [ownerRow] = await ctx.db
+          .select({ id: user.id, name: user.name, email: user.email, image: user.image })
+          .from(user)
+          .where(eq(user.id, listRow.userId));
+        owner = ownerRow ?? null;
+      }
+
+      return { members, invitations, owner };
+    }),
+
+  addMember: protectedProcedure
+    .input(addListMemberInput)
+    .mutation(async ({ ctx, input }) => {
+      await verifyListOwnership(ctx.db, input.listId, ctx.session.user.id, ctx.session.user.role, {
+        requiredPermission: "admin",
+      });
+      return addListMember(ctx.db, {
+        listId: input.listId,
+        userId: input.userId,
+        role: input.role,
+      });
+    }),
+
+  updateMember: protectedProcedure
+    .input(updateListMemberInput)
+    .mutation(async ({ ctx, input }) => {
+      await verifyListOwnership(ctx.db, input.listId, ctx.session.user.id, ctx.session.user.role, {
+        requiredPermission: "admin",
+      });
+      return updateListMemberRole(ctx.db, input.listId, input.userId, input.role);
+    }),
+
+  removeMember: protectedProcedure
+    .input(removeListMemberInput)
+    .mutation(async ({ ctx, input }) => {
+      const listRow = await findListById(ctx.db, input.listId);
+      if (!listRow) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // Users can remove themselves, or admins/owners can remove others
+      const isSelf = input.userId === ctx.session.user.id;
+      if (!isSelf) {
+        await verifyListOwnership(ctx.db, input.listId, ctx.session.user.id, ctx.session.user.role, {
+          requiredPermission: "admin",
+        });
+      }
+
+      await removeListMember(ctx.db, input.listId, input.userId);
+      return { success: true };
+    }),
+
+  // ── Invitations ──
+
+  createInvitation: protectedProcedure
+    .input(createListInvitationInput)
+    .mutation(async ({ ctx, input }) => {
+      await verifyListOwnership(ctx.db, input.listId, ctx.session.user.id, ctx.session.user.role, {
+        requiredPermission: "admin",
+      });
+      return createInvitation(ctx.db, {
+        listId: input.listId,
+        invitedBy: ctx.session.user.id,
+        invitedEmail: input.email,
+        invitedUserId: input.userId,
+        role: input.role,
+      });
+    }),
+
+  acceptInvitation: protectedProcedure
+    .input(acceptListInvitationInput)
+    .mutation(async ({ ctx, input }) => {
+      const invitation = await findInvitationByToken(ctx.db, input.token);
+      if (!invitation) throw new TRPCError({ code: "NOT_FOUND", message: "Invitation not found" });
+      if (invitation.status !== "pending") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invitation already used" });
+      }
+      if (new Date() > invitation.expiresAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invitation expired" });
+      }
+
+      await acceptInvitation(ctx.db, input.token);
+      await addListMember(ctx.db, {
+        listId: invitation.listId,
+        userId: ctx.session.user.id,
+        role: invitation.role,
+      });
+
+      return { success: true, listId: invitation.listId };
+    }),
+
+  // ── Vote Aggregation ──
+
+  getVotes: protectedProcedure
+    .input(getListVotesInput)
+    .query(async ({ ctx, input }) => {
+      await verifyListOwnership(ctx.db, input.listId, ctx.session.user.id, ctx.session.user.role, {
+        requiredPermission: "view",
+      });
+      return getListMemberVotes(ctx.db, input.listId, input.mediaIds);
     }),
 });

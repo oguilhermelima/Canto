@@ -1,14 +1,24 @@
 import { and, eq, or, isNull, desc, count, sql, inArray } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { list, listItem, media, syncItem, folderServerLink, userConnection } from "@canto/db/schema";
+import { list, listItem, listMember, media, folderServerLink, userConnection, userMediaLibrary } from "@canto/db/schema";
 import type { RecsFilters } from "../../domain/types/recs-filters";
 import { buildRecsFilterConditions, recsSortOrder } from "./shared/recs-filter-builder";
 
 // ── Lists ──
 
 export async function findUserLists(db: Database, userId: string) {
+  // Include lists owned by user, server lists, and lists where user is a member
+  const memberListIds = db
+    .select({ listId: listMember.listId })
+    .from(listMember)
+    .where(eq(listMember.userId, userId));
+
   return db.query.list.findMany({
-    where: or(eq(list.userId, userId), eq(list.type, "server")),
+    where: or(
+      eq(list.userId, userId),
+      eq(list.type, "server"),
+      sql`${list.id} IN (${memberListIds})`,
+    ),
     orderBy: [desc(list.isSystem), list.position],
   });
 }
@@ -17,8 +27,17 @@ export async function findUserListsWithCounts(
   db: Database,
   userId: string,
 ) {
+  const memberListIds = db
+    .select({ listId: listMember.listId })
+    .from(listMember)
+    .where(eq(listMember.userId, userId));
+
   const lists = await db.query.list.findMany({
-    where: or(eq(list.userId, userId), eq(list.type, "server")),
+    where: or(
+      eq(list.userId, userId),
+      eq(list.type, "server"),
+      sql`${list.id} IN (${memberListIds})`,
+    ),
     orderBy: [desc(list.isSystem), list.position],
   });
 
@@ -107,7 +126,7 @@ export async function createList(
 export async function updateList(
   db: Database,
   id: string,
-  data: Partial<Pick<typeof list.$inferInsert, "name" | "slug" | "description" | "position">>,
+  data: Partial<Pick<typeof list.$inferInsert, "name" | "slug" | "description" | "position" | "visibility">>,
 ) {
   const [row] = await db
     .update(list)
@@ -173,36 +192,12 @@ export async function findListItems(
   const orderByExpr = customSort ? [customSort] : [desc(listItem.addedAt)];
 
   if (isServerLibrary && userId) {
-    // Get the user's connected providers
-    const connectedProviders = await db
-      .select({ provider: userConnection.provider })
-      .from(userConnection)
-      .where(and(eq(userConnection.userId, userId), eq(userConnection.enabled, true)));
-
-    if (connectedProviders.length === 0) {
-      // No connections — return nothing
-      return { items: [], total: 0 };
-    }
-
-    const providerValues = connectedProviders.map((c) => c.provider) as Array<"jellyfin" | "plex">;
-
-    // Show items that were synced via any of the user's connected providers
+    // Use the canonical user_media_library table to determine what's in this user's server library.
+    // This is cleaner than the old sync_item-based approach and avoids duplicates.
     const accessibleMediaIds = db
-      .select({ mediaId: syncItem.mediaId })
-      .from(syncItem)
-      .innerJoin(
-        folderServerLink,
-        or(
-          eq(syncItem.jellyfinServerLinkId, folderServerLink.id),
-          eq(syncItem.plexServerLinkId, folderServerLink.id),
-        ),
-      )
-      .where(
-        and(
-          inArray(syncItem.result, ["imported", "skipped"]),
-          inArray(folderServerLink.serverType, providerValues),
-        ),
-      );
+      .select({ mediaId: userMediaLibrary.mediaId })
+      .from(userMediaLibrary)
+      .where(eq(userMediaLibrary.userId, userId));
 
     conditions.push(sql`${listItem.mediaId} IN (${accessibleMediaIds})`);
   }
@@ -325,12 +320,12 @@ export async function reconcileServerLibrary(
 ): Promise<void> {
   const serverLib = await ensureServerLibrary(db);
 
-  // All media IDs confirmed on a server (imported torrents + synced items)
+  // All media IDs confirmed on a server (imported torrents + synced versions)
   const onServerRows = await db.execute(sql`
     SELECT DISTINCT media_id::text FROM (
       SELECT media_id FROM torrent WHERE imported = true AND media_id IS NOT NULL
       UNION
-      SELECT media_id FROM sync_item WHERE result IN ('imported', 'skipped') AND media_id IS NOT NULL
+      SELECT media_id FROM media_version WHERE result IN ('imported', 'skipped') AND media_id IS NOT NULL
     ) x
   `);
   const serverMediaIds = new Set(

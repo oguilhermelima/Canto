@@ -5,8 +5,10 @@ import { Film, Loader2, Tv } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { TabBar } from "~/components/layout/tab-bar";
 import { MediaGrid } from "~/components/media/media-grid";
+import { MediaListView } from "~/components/media/media-list-view";
 import { StateMessage } from "~/components/layout/state-message";
 import { FilterButton } from "~/components/layout/filter-button";
+import { ViewModeToggle, type ViewMode } from "~/components/layout/view-mode-toggle";
 
 const TYPE_OPTIONS = [
   { value: "all", label: "All" },
@@ -24,12 +26,17 @@ interface ListContentProps {
     posterPath: string | null;
     year?: number;
     voteAverage?: number;
+    overview?: string | null;
+    totalRating?: number;
+    voteCount?: number;
   }[];
   isLoading: boolean;
   typeFilter: "all" | "movie" | "show";
   onTypeChange: (type: "all" | "movie" | "show") => void;
   showFilters: boolean;
   onToggleFilters: () => void;
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
   sentinelRef: RefObject<HTMLDivElement | null>;
   isFetchingNextPage: boolean;
   hasNextPage: boolean;
@@ -42,6 +49,8 @@ export function ListContent({
   onTypeChange,
   showFilters,
   onToggleFilters,
+  viewMode,
+  onViewModeChange,
   sentinelRef,
   isFetchingNextPage,
   hasNextPage,
@@ -60,6 +69,7 @@ export function ListContent({
             onClick={onToggleFilters}
           />
         }
+        trailing={<ViewModeToggle value={viewMode} onChange={onViewModeChange} />}
       />
 
       {!isLoading && items.length === 0 ? (
@@ -69,7 +79,11 @@ export function ListContent({
         />
       ) : (
         <>
-          <MediaGrid items={items} isLoading={isLoading} compact={showFilters} />
+          {viewMode === "grid" ? (
+            <MediaGrid items={items} isLoading={isLoading} compact={showFilters} />
+          ) : (
+            <MediaListView items={items} isLoading={isLoading} compact={showFilters} />
+          )}
 
           <div ref={sentinelRef} className="h-1" />
 

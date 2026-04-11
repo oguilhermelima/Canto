@@ -16,5 +16,6 @@ export type RegisterInput = z.infer<typeof registerInput>;
 export const setUserPreferencesInput = z.object({
   watchRegion: z.string().max(10).optional(),
   directSearchEnabled: z.boolean().optional(),
+  isPublic: z.boolean().optional(),
 });
 export type SetUserPreferencesInput = z.infer<typeof setUserPreferencesInput>;

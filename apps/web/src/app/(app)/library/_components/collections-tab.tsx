@@ -19,16 +19,20 @@ import {
   Bookmark,
   Eye,
   EyeOff,
+  Globe,
   GripVertical,
   Loader2,
+  Lock,
   Plus,
   RotateCcw,
   Server,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { StateMessage } from "~/components/layout/state-message";
 import { CollectionEditPopover } from "./collection-edit-popover";
+import { CollectionMembersDialog } from "./collection-members-dialog";
 import type { CollectionFilterState } from "./collection-filter-sidebar";
 
 interface LayoutPreferences {
@@ -74,6 +78,7 @@ export function CollectionsTab({
     id: string;
     name: string;
   } | null>(null);
+  const [shareListId, setShareListId] = useState<string | null>(null);
   const [layout, setLayout] = useState<LayoutPreferences>(DEFAULT_LAYOUT);
   const [layoutReady, setLayoutReady] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
@@ -454,6 +459,17 @@ export function CollectionsTab({
                               System
                             </span>
                           )}
+                          {list.type === "custom" && (
+                            <span className="flex items-center gap-1 rounded-lg bg-accent px-2 py-0.5 text-[11px] font-medium">
+                              {list.visibility === "public" ? (
+                                <><Globe className="h-3 w-3" /> Public</>
+                              ) : list.visibility === "shared" ? (
+                                <><Users className="h-3 w-3" /> Shared</>
+                              ) : (
+                                <><Lock className="h-3 w-3" /> Private</>
+                              )}
+                            </span>
+                          )}
                           {isHidden && (
                             <span className="rounded-lg bg-accent px-2 py-0.5 text-[11px] font-medium">
                               Hidden
@@ -488,6 +504,7 @@ export function CollectionsTab({
                           onDelete={(id, nameValue) =>
                             setDeleteTarget({ id, name: nameValue })
                           }
+                          onShare={(id) => setShareListId(id)}
                           triggerClassName="relative right-auto top-auto text-muted-foreground hover:bg-background/80 hover:text-foreground"
                         />
                       )}
@@ -618,6 +635,12 @@ export function CollectionsTab({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CollectionMembersDialog
+        listId={shareListId}
+        open={!!shareListId}
+        onOpenChange={(open) => { if (!open) setShareListId(null); }}
+      />
     </>
   );
 }

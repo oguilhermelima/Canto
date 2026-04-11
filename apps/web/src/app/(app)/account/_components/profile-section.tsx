@@ -3,9 +3,11 @@
 import { useState, useEffect } from "react";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
+import { Switch } from "@canto/ui/switch";
 import { Save, Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { authClient } from "~/lib/auth-client";
+import { trpc } from "~/lib/trpc/client";
 import { SettingsSection } from "~/components/settings/shared";
 import { AvatarPickerDialog } from "../../profile/me/_components/avatar-picker-dialog";
 
@@ -18,6 +20,22 @@ export function ProfileSection(): React.JSX.Element {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  const utils = trpc.useUtils();
+  const { data: prefs } = trpc.auth.getUserPreferences.useQuery();
+  const setPrefs = trpc.auth.setUserPreferences.useMutation({
+    onSuccess: () => void utils.auth.getUserPreferences.invalidate(),
+  });
+
+  const handleTogglePublic = (checked: boolean): void => {
+    setPrefs.mutate(
+      { isPublic: checked },
+      {
+        onSuccess: () => toast.success(checked ? "Profile set to public" : "Profile set to private"),
+        onError: () => toast.error("Failed to update profile visibility"),
+      },
+    );
+  };
 
   useEffect(() => {
     if (user) {
@@ -112,6 +130,24 @@ export function ProfileSection(): React.JSX.Element {
             Save changes
           </Button>
         )}
+
+        <div className="h-px bg-border/40" />
+
+        <div className="flex items-start justify-between gap-6">
+          <div>
+            <p className="text-sm font-medium text-foreground">Public Profile</p>
+            <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
+              When enabled, other users can see your profile, ratings, and public collections.
+              New collections will default to your profile visibility.
+            </p>
+          </div>
+          <Switch
+            checked={prefs?.isPublic ?? false}
+            onCheckedChange={handleTogglePublic}
+            disabled={setPrefs.isPending}
+            className="mt-0.5 shrink-0"
+          />
+        </div>
       </div>
 
       <AvatarPickerDialog
