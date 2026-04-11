@@ -296,16 +296,17 @@ export async function runReverseSync(options: ReverseSyncOptions = {}): Promise<
 
     console.log(`[reverse-sync] Processing connection for user ${conn.userId} (${provider})`);
 
-    const syncLinksForConnection = await findEnabledSyncLinks(db, conn.id, provider);
-    const syncLinks =
-      syncLinksForConnection.length > 0
-        ? syncLinksForConnection
-        : await findEnabledSyncLinks(db, undefined, provider);
-
-    if (syncLinksForConnection.length === 0 && syncLinks.length > 0) {
+    // Reverse-sync is strictly per-user: only links owned by this user's
+    // connection count. Admin-level global folderServerLink rows (created
+    // during server cadastro / onboarding) are intentionally ignored here
+    // — they serve the admin catalog and post-download scan triggers, not
+    // playback state sync.
+    const syncLinks = await findEnabledSyncLinks(db, conn.id, provider);
+    if (syncLinks.length === 0) {
       console.warn(
-        `[reverse-sync] Using ${syncLinks.length} legacy global link(s) for ${provider} on user ${conn.userId}.`,
+        `[reverse-sync] ${provider} connection for user ${conn.userId} has no per-user sync links; skipping. The user may need to re-authenticate to rediscover libraries.`,
       );
+      continue;
     }
 
     const libs: LibraryDescriptor[] = syncLinks.map((l) => ({
