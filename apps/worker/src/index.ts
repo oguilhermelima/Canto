@@ -5,6 +5,7 @@ import {
   handleJellyfinSync,
   handlePlexSync,
   handleReverseSyncFull,
+  handleReverseSyncUser,
 } from "./jobs/reverse-sync";
 import { handleStallDetection } from "./jobs/stall-detection";
 import { handleRssSync } from "./jobs/rss-sync";
@@ -52,6 +53,7 @@ const queues = {
   jellyfinSync: new Queue("jellyfin-sync", { connection: redisConnection }),
   plexSync: new Queue("plex-sync", { connection: redisConnection }),
   reverseSyncFull: new Queue("reverse-sync-full", { connection: redisConnection }),
+  reverseSyncUser: new Queue("reverse-sync-user", { connection: redisConnection }),
   stallDetection: new Queue("stall-detection", { connection: redisConnection }),
   rssSync: new Queue("rss-sync", { connection: redisConnection }),
   dailyRecsCheck: new Queue("daily-recs-check", { connection: redisConnection }),
@@ -163,6 +165,16 @@ const workers = [
     console.log(`[reverse-sync-full] Running job ${job.id}`);
     await handleReverseSyncFull();
   }, { connection: redisConnection, concurrency: 1 }),
+
+  new Worker("reverse-sync-user", async (job) => {
+    const { userId } = job.data as { userId: string };
+    if (!userId) {
+      console.warn(`[reverse-sync-user] Job ${job.id} missing userId, skipping`);
+      return;
+    }
+    console.log(`[reverse-sync-user] Running job ${job.id} for user ${userId}`);
+    await handleReverseSyncUser(userId);
+  }, { connection: redisConnection, concurrency: 2 }),
 
   new Worker("stall-detection", async (job) => {
     console.log(`[stall-detection] Running job ${job.id}`);
