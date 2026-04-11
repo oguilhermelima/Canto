@@ -14,6 +14,8 @@ interface MediaItem {
   year?: number | null;
   voteAverage?: number | null;
   overview?: string | null;
+  totalRating?: number;
+  voteCount?: number;
 }
 
 interface MediaGridProps {
@@ -54,14 +56,23 @@ export function MediaGrid({
     <>
       <div className={cn("grid gap-6", cols, className)}>
         {items.map((item, i) => (
-          <MediaCard
-            key={item.id ?? `${item.provider}-${item.externalId}-${i}`}
-            {...item}
-            showTypeBadge
-            showRating={false}
-            showYear={false}
-            showTitle={false}
-          />
+          <div key={item.id ?? `${item.provider}-${item.externalId}-${i}`} className="relative">
+            <MediaCard
+              {...item}
+              showTypeBadge
+              showRating={false}
+              showYear={false}
+              showTitle={false}
+            />
+            {item.totalRating != null && item.voteCount != null && item.voteCount > 0 && (
+              <div className="absolute left-1.5 top-1.5 z-10 flex items-center gap-1 rounded-lg bg-primary px-2 py-0.5">
+                <span className="text-xs font-bold text-primary-foreground">{item.totalRating}</span>
+                <span className="text-[10px] text-primary-foreground/70">
+                  ({item.voteCount})
+                </span>
+              </div>
+            )}
+          </div>
         ))}
       </div>
     </>
