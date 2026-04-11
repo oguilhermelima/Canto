@@ -67,6 +67,12 @@ const queues = {
 /*  Schedules                                                                 */
 /* -------------------------------------------------------------------------- */
 
+// Spread reverse-sync cron fires by a random phase offset so multiple Canto
+// instances (or coincident minute boundaries) don't herd on the same instant.
+function jitterStart(maxMs: number): Date {
+  return new Date(Date.now() + Math.floor(Math.random() * maxMs));
+}
+
 async function setupSchedules(): Promise<void> {
   await queues.importTorrents.upsertJobScheduler(
     "import-torrents-scheduler",
@@ -76,13 +82,13 @@ async function setupSchedules(): Promise<void> {
 
   await queues.jellyfinSync.upsertJobScheduler(
     "jellyfin-sync-scheduler",
-    { every: 5 * 60 * 1000 },          // 5 min
+    { every: 5 * 60 * 1000, startDate: jitterStart(60 * 1000) },
     { name: "jellyfin-sync" },
   );
 
   await queues.plexSync.upsertJobScheduler(
     "plex-sync-scheduler",
-    { every: 5 * 60 * 1000 },          // 5 min
+    { every: 5 * 60 * 1000, startDate: jitterStart(60 * 1000) },
     { name: "plex-sync" },
   );
 
@@ -92,7 +98,7 @@ async function setupSchedules(): Promise<void> {
   // delta scans and cannot detect items removed on the server.
   await queues.reverseSyncFull.upsertJobScheduler(
     "reverse-sync-full-scheduler",
-    { every: 24 * 60 * 60 * 1000 },    // 24h
+    { every: 24 * 60 * 60 * 1000, startDate: jitterStart(10 * 60 * 1000) },
     { name: "reverse-sync-full" },
   );
 
