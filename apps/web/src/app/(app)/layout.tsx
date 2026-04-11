@@ -1,14 +1,46 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Toaster } from "sonner";
 import { Topbar } from "~/components/layout/topbar";
 import { BottomNavbar } from "~/components/layout/bottom-navbar";
+import { trpc } from "~/lib/trpc/client";
+
+const SYNC_DEBOUNCE_MS = 30_000;
+
+function useReverseSyncOnFocus(): void {
+  const syncNow = trpc.userConnection.syncNow.useMutation();
+  const lastRunRef = useRef(0);
+  const triggerRef = useRef<() => void>(() => {});
+
+  triggerRef.current = () => {
+    const now = Date.now();
+    if (now - lastRunRef.current < SYNC_DEBOUNCE_MS) return;
+    lastRunRef.current = now;
+    syncNow.mutate();
+  };
+
+  useEffect(() => {
+    const fire = (): void => triggerRef.current();
+    fire();
+    const onVisibility = (): void => {
+      if (document.visibilityState === "visible") fire();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", fire);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", fire);
+    };
+  }, []);
+}
 
 export default function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }): React.JSX.Element {
+  useReverseSyncOnFocus();
 
   return (
     <div className="min-h-screen bg-background">
