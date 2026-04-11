@@ -59,6 +59,10 @@ export const SETTINGS = {
   SEED_TIME_LIMIT_HOURS: "download.seedTimeLimitHours",
   SEED_CLEANUP_FILES: "download.seedCleanupFiles",
 
+  // Post-import behavior
+  /** Auto-merge quality variants of the same movie into one multi-version entry on Jellyfin */
+  AUTO_MERGE_VERSIONS: "autoMergeVersions",
+
   // Onboarding
   ONBOARDING_COMPLETED: "onboarding.completed",
 

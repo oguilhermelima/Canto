@@ -12,22 +12,21 @@ import { SettingsSection } from "~/components/settings/shared";
 
 export function AutoMergeSection(): React.JSX.Element {
   const utils = trpc.useUtils();
-  const { data: preferences } = trpc.library.getPreferences.useQuery(undefined, { retry: false });
-  const setPreference = trpc.library.setPreference.useMutation({
-    onSuccess: () => { void utils.library.getPreferences.invalidate(); },
+  const { data: autoMergeVersions } = trpc.library.getAutoMergeVersions.useQuery(undefined, { retry: false });
+  const setAutoMerge = trpc.library.setAutoMergeVersions.useMutation({
+    onSuccess: () => { void utils.library.getAutoMergeVersions.invalidate(); },
   });
-  const autoMergeVersions = (preferences as Record<string, unknown> | undefined)?.autoMergeVersions ?? true;
 
   return (
     <SettingsSection title="Post-import" description="Automatic actions after media files are imported.">
       <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card px-4 py-3">
         <div>
           <p className="text-sm font-medium text-foreground">Auto-merge versions</p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground leading-relaxed">
+          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
             When you download a second quality version, the media server will automatically merge them.
           </p>
         </div>
-        <Switch checked={autoMergeVersions === true} onCheckedChange={(checked) => setPreference.mutate({ key: "autoMergeVersions", value: checked })} />
+        <Switch checked={autoMergeVersions === true} onCheckedChange={(checked) => setAutoMerge.mutate(checked)} />
       </div>
     </SettingsSection>
   );
@@ -186,7 +185,7 @@ export function SeedingSection(): React.JSX.Element {
           </div>
         </div>
 
-        <div className="flex items-center justify-between rounded-xl border border-border/40 px-4 py-3">
+        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card px-4 py-3">
           <div>
             <p className="text-sm font-medium text-foreground">Clean up after seeding</p>
             <p className="text-xs text-muted-foreground">

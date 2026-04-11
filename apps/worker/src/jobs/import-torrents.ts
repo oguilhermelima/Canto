@@ -1,13 +1,17 @@
 import { db } from "@canto/db/client";
 import { autoImportTorrent } from "@canto/core/domain/use-cases/import-torrent";
 import { tryContinuousDownload } from "@canto/core/domain/use-cases/continuous-download";
-import { triggerMediaServerScans } from "@canto/core/domain/use-cases/trigger-media-server-scans";
+import {
+  triggerMediaServerScans,
+  type ImportedMedia,
+} from "@canto/core/domain/use-cases/trigger-media-server-scans";
 import { getDownloadClient } from "@canto/core/infrastructure/adapters/download-client-factory";
 import { buildIndexers } from "@canto/core/infrastructure/adapters/indexer-factory";
 import {
   findUnimportedTorrents,
   findTorrentById,
   findMediaById,
+  findMediaFilesByMediaId,
   ensureServerLibrary,
   addListItem,
   updateRequestStatus,
@@ -39,6 +43,7 @@ export async function handleImportTorrents(): Promise<void> {
   );
 
   const importedFolderIds = new Set<string>();
+  const importedMediaIds = new Set<string>();
 
   for (const row of toImport) {
     try {
@@ -87,6 +92,7 @@ export async function handleImportTorrents(): Promise<void> {
           if (mediaRow.libraryId) {
             importedFolderIds.add(mediaRow.libraryId);
           }
+          importedMediaIds.add(mediaRow.id);
         }
 
         // Add to Server Library list
@@ -135,6 +141,21 @@ export async function handleImportTorrents(): Promise<void> {
 
   // Trigger media server scans after successful imports
   if (importedFolderIds.size > 0) {
-    await triggerMediaServerScans(db);
+    const importedMedias: ImportedMedia[] = [];
+    for (const mediaId of importedMediaIds) {
+      const mediaRow = await findMediaById(db, mediaId);
+      if (!mediaRow) continue;
+      const files = await findMediaFilesByMediaId(db, mediaId);
+      const importedCount = files.filter((f) => f.status === "imported").length;
+      importedMedias.push({
+        id: mediaRow.id,
+        title: mediaRow.title,
+        type: mediaRow.type,
+        externalId: mediaRow.externalId,
+        provider: mediaRow.provider,
+        mediaFileCount: importedCount,
+      });
+    }
+    await triggerMediaServerScans(db, importedMedias);
   }
 }

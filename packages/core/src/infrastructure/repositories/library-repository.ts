@@ -13,7 +13,7 @@ export async function findUserPreferences(db: Database, userId: string) {
   });
   const prefs: Record<string, unknown> = {};
   for (const row of rows) prefs[row.key] = row.value;
-  return { autoMergeVersions: true, defaultQuality: "fullhd", ...prefs };
+  return { defaultQuality: "fullhd", ...prefs };
 }
 
 export async function upsertUserPreference(

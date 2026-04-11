@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   listInput,
   setMediaLibraryInput,
@@ -111,6 +112,22 @@ export const libraryRouter = createTRPCRouter({
         setSetting(SETTINGS.SEED_TIME_LIMIT_HOURS, input.seedTimeLimitHours),
         setSetting(SETTINGS.SEED_CLEANUP_FILES, input.seedCleanupFiles),
       ]);
+      return { success: true };
+    }),
+
+  /* ────────────────────────────────────────────────────────────────────────── */
+  /*  Post-import settings (global)                                            */
+  /* ────────────────────────────────────────────────────────────────────────── */
+
+  getAutoMergeVersions: adminProcedure.query(async () => {
+    const value = await getSetting<boolean>(SETTINGS.AUTO_MERGE_VERSIONS);
+    return value ?? true;
+  }),
+
+  setAutoMergeVersions: adminProcedure
+    .input(z.boolean())
+    .mutation(async ({ input }) => {
+      await setSetting(SETTINGS.AUTO_MERGE_VERSIONS, input);
       return { success: true };
     }),
 });
