@@ -4,13 +4,16 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   addUserWatchHistory,
   deleteUserWatchHistoryByIds,
+  findDistinctPlaybackMediaPairs,
   findEpisodesByMediaIds,
+  findUserCompletedPlaybackByMediaIds,
   findUserListMediaCandidates,
   findMediaByIdWithSeasons,
   findUserMediaStatesByMediaIds,
   findUserPlaybackProgressFeed,
   findUserMediaState,
   findUserPlaybackProgress,
+  findUserWatchingShowsMetadata,
   findUserWatchHistoryByMediaIds,
   findUserWatchHistoryByMedia,
   findUserWatchHistoryFeed,
@@ -19,6 +22,8 @@ import {
   findUserMediaCounts,
   upsertUserMediaState,
 } from "@canto/core/infrastructure/repositories";
+import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/use-cases/promote-user-media-state-from-playback";
+import { pushWatchStateToServers } from "@canto/core/domain/use-cases/push-watch-state";
 
 type TrackingStatus = "none" | "planned" | "watching" | "completed" | "dropped";
 type WatchedAtMode = "just_now" | "release_date" | "other_date" | "unknown_date";
@@ -219,9 +224,12 @@ export const userMediaRouter = createTRPCRouter({
       const view = input.view;
       const now = new Date();
 
-      const [playbackRows, listMediaRows] = await Promise.all([
+      const [playbackRows, listMediaRows, watchingShows] = await Promise.all([
         findUserPlaybackProgressFeed(ctx.db, userId, input.mediaType),
         findUserListMediaCandidates(ctx.db, userId, input.mediaType),
+        input.mediaType === "movie"
+          ? Promise.resolve([])
+          : findUserWatchingShowsMetadata(ctx.db, userId),
       ]);
 
       const continueMediaIds = new Set<string>();
@@ -338,10 +346,30 @@ export const userMediaRouter = createTRPCRouter({
         if (row.addedAt > existing.addedAt) existing.addedAt = row.addedAt;
       }
 
+      // Include shows with playback activity that aren't in any list.
+      // This ensures actively-watched shows surface in Watch Next even if the user
+      // hasn't explicitly added them to their watchlist.
+      for (const row of watchingShows) {
+        if (listMediaMap.has(row.mediaId)) continue;
+        listMediaMap.set(row.mediaId, {
+          mediaId: row.mediaId,
+          mediaType: row.mediaType,
+          title: row.title,
+          posterPath: row.posterPath,
+          backdropPath: row.backdropPath,
+          year: row.year,
+          externalId: row.externalId,
+          provider: row.provider,
+          addedAt: row.lastActivityAt ?? new Date(),
+          listNames: new Set(),
+        });
+      }
+
       const candidateMediaIds = [...listMediaMap.keys()];
-      const [states, historyRows, episodeRows] = await Promise.all([
+      const [states, historyRows, completedPlaybackRows, episodeRows] = await Promise.all([
         findUserMediaStatesByMediaIds(ctx.db, userId, candidateMediaIds),
         findUserWatchHistoryByMediaIds(ctx.db, userId, candidateMediaIds),
+        findUserCompletedPlaybackByMediaIds(ctx.db, userId, candidateMediaIds),
         findEpisodesByMediaIds(
           ctx.db,
           candidateMediaIds.filter(
@@ -359,6 +387,13 @@ export const userMediaRouter = createTRPCRouter({
         Array<{ episodeId: string | null }>
       >();
       for (const row of historyRows) {
+        const bucket = historyByMediaId.get(row.mediaId) ?? [];
+        bucket.push({ episodeId: row.episodeId });
+        historyByMediaId.set(row.mediaId, bucket);
+      }
+      // Also treat isCompleted=true playback rows as "watched" — this catches
+      // episodes synced from Jellyfin/Plex that never hit user_watch_history.
+      for (const row of completedPlaybackRows) {
         const bucket = historyByMediaId.get(row.mediaId) ?? [];
         bucket.push({ episodeId: row.episodeId });
         historyByMediaId.set(row.mediaId, bucket);
@@ -1316,6 +1351,20 @@ export const userMediaRouter = createTRPCRouter({
         status: computedStatus,
       });
 
+      if (!input.markDropped && computedStatus === "completed") {
+        void pushWatchStateToServers(
+          ctx.db,
+          ctx.session.user.id,
+          input.mediaId,
+          true,
+        ).catch((err) => {
+          console.error(
+            "[userMedia.logWatched] pushWatchStateToServers failed:",
+            err instanceof Error ? err.message : err,
+          );
+        });
+      }
+
       const latestHistoryDate = history[0]?.watchedAt ?? null;
       const trackedItems = input.markDropped ? 0 : episodeIdsToLog.length;
 
@@ -1386,6 +1435,20 @@ export const userMediaRouter = createTRPCRouter({
         status: computedStatus,
       });
 
+      if (history.length === 0) {
+        void pushWatchStateToServers(
+          ctx.db,
+          ctx.session.user.id,
+          input.mediaId,
+          false,
+        ).catch((err) => {
+          console.error(
+            "[userMedia.removeHistoryEntries] pushWatchStateToServers failed:",
+            err instanceof Error ? err.message : err,
+          );
+        });
+      }
+
       const [state, progress] = await Promise.all([
         findUserMediaState(ctx.db, ctx.session.user.id, input.mediaId),
         findUserPlaybackProgress(ctx.db, ctx.session.user.id, input.mediaId),
@@ -1415,6 +1478,18 @@ export const userMediaRouter = createTRPCRouter({
         userId: ctx.session.user.id,
         mediaId: input.mediaId,
         status: "dropped",
+      });
+
+      void pushWatchStateToServers(
+        ctx.db,
+        ctx.session.user.id,
+        input.mediaId,
+        false,
+      ).catch((err) => {
+        console.error(
+          "[userMedia.markDropped] pushWatchStateToServers failed:",
+          err instanceof Error ? err.message : err,
+        );
       });
 
       const [state, progress] = await Promise.all([
@@ -1447,6 +1522,18 @@ export const userMediaRouter = createTRPCRouter({
         status: "none",
       });
 
+      void pushWatchStateToServers(
+        ctx.db,
+        ctx.session.user.id,
+        input.mediaId,
+        false,
+      ).catch((err) => {
+        console.error(
+          "[userMedia.clearTracking] pushWatchStateToServers failed:",
+          err instanceof Error ? err.message : err,
+        );
+      });
+
       const [state, progress] = await Promise.all([
         findUserMediaState(ctx.db, ctx.session.user.id, input.mediaId),
         findUserPlaybackProgress(ctx.db, ctx.session.user.id, input.mediaId),
@@ -1465,4 +1552,36 @@ export const userMediaRouter = createTRPCRouter({
         },
       };
     }),
+
+  /**
+   * Reconcile user_media_state from existing playback_progress and watch_history.
+   * Fixes out-of-sync state where items are watched but not marked completed.
+   * Runs for the current user only.
+   */
+  reconcileStatesFromPlayback: protectedProcedure.mutation(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+    const pairs = await findDistinctPlaybackMediaPairs(ctx.db, userId);
+
+    let promoted = 0;
+    const errors: string[] = [];
+    for (const pair of pairs) {
+      try {
+        const result = await promoteUserMediaStateFromPlayback(ctx.db, {
+          userId: pair.userId,
+          mediaId: pair.mediaId,
+        });
+        if (result) promoted++;
+      } catch (err) {
+        errors.push(
+          `${pair.mediaId}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
+    return {
+      scanned: pairs.length,
+      promoted,
+      errors: errors.slice(0, 10),
+    };
+  }),
 });
