@@ -283,13 +283,15 @@ export const mediaRouter = createTRPCRouter({
 
       const currentSeasons = (row.seasons ?? []).filter((s: { number: number }) => s.number > 0);
       const mediaFiles = await findMediaFilesByMediaId(ctx.db, input.id);
-      const { findSyncItemsByMediaId } = await import("@canto/core/infrastructure/repositories/sync-repository");
-      const syncItems = await findSyncItemsByMediaId(ctx.db, input.id);
+      const { findMediaVersionsByMediaId } = await import(
+        "@canto/core/infrastructure/repositories/media-version-repository"
+      );
+      const versions = await findMediaVersionsByMediaId(ctx.db, input.id);
 
       return {
         currentSeasonCount: currentSeasons.length,
         fileCount: mediaFiles.length,
-        hasMediaServer: syncItems.length > 0,
+        hasMediaServer: versions.length > 0,
       };
     }),
 

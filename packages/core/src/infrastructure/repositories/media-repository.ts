@@ -8,7 +8,6 @@ import {
   ilike,
   inArray,
   lte,
-  or,
   sql,
   type SQL,
 } from "drizzle-orm";
@@ -18,8 +17,8 @@ import {
   episode,
   media,
   mediaFile,
+  mediaVersion,
   season,
-  syncItem,
   torrent,
   userConnection,
 } from "@canto/db/schema";
@@ -142,6 +141,22 @@ export async function findEpisodeIdByMediaAndNumbers(
   return row?.id ?? null;
 }
 
+export async function findEpisodeNumbersById(
+  db: Database,
+  episodeId: string,
+): Promise<{ seasonNumber: number; episodeNumber: number } | null> {
+  const [row] = await db
+    .select({
+      seasonNumber: season.number,
+      episodeNumber: episode.number,
+    })
+    .from(episode)
+    .innerJoin(season, eq(episode.seasonId, season.id))
+    .where(eq(episode.id, episodeId))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function updateMedia(
   db: Database,
   id: string,
@@ -160,19 +175,24 @@ export async function deleteMedia(db: Database, id: string) {
   return deleted;
 }
 
-/** Check if a media has no sync items (except one) and no torrents referencing it. */
+/**
+ * Check if a media has no media_version rows and no torrents referencing it.
+ * Optionally exclude a single version id (used when checking whether the
+ * media would become orphaned after a version is deleted / re-pointed).
+ */
 export async function isMediaOrphaned(
   db: Database,
   mediaId: string,
-  excludeSyncItemId: string,
+  excludeVersionId?: string,
 ): Promise<boolean> {
-  const [[otherSyncs], [torrents]] = await Promise.all([
-    db.select({ count: count() }).from(syncItem).where(
-      and(eq(syncItem.mediaId, mediaId), sql`${syncItem.id} != ${excludeSyncItemId}`),
-    ),
+  const versionWhere = excludeVersionId
+    ? and(eq(mediaVersion.mediaId, mediaId), sql`${mediaVersion.id} != ${excludeVersionId}`)
+    : eq(mediaVersion.mediaId, mediaId);
+  const [[otherVersions], [torrents]] = await Promise.all([
+    db.select({ count: count() }).from(mediaVersion).where(versionWhere),
     db.select({ count: count() }).from(torrent).where(eq(torrent.mediaId, mediaId)),
   ]);
-  return (otherSyncs?.count ?? 0) === 0 && (torrents?.count ?? 0) === 0;
+  return (otherVersions?.count ?? 0) === 0 && (torrents?.count ?? 0) === 0;
 }
 
 export async function findLibraryExternalIds(db: Database) {
@@ -278,6 +298,33 @@ function buildOrderBy(sortBy: ListInput["sortBy"], sortOrder: ListInput["sortOrd
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Reconcile in_library based on anchoring media_versions                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Flip `in_library = false` for any media that is currently marked in the
+ * library but has no remaining media_version rows AND is not present in the
+ * local download folder (`downloaded = false`).
+ *
+ * Runs at the tail of a reverse-sync cycle: once all scanners have upserted
+ * observations and the stale prune has removed unreachable rows, any media
+ * with zero media_version anchors is no longer on any server.
+ */
+export async function reconcileMediaInLibrary(db: Database): Promise<number> {
+  const result = await db.execute(sql`
+    UPDATE ${media}
+    SET in_library = false, updated_at = NOW()
+    WHERE in_library = true
+      AND downloaded = false
+      AND NOT EXISTS (
+        SELECT 1 FROM ${mediaVersion}
+        WHERE ${mediaVersion.mediaId} = ${media.id}
+      )
+  `);
+  return (result as unknown as { rowCount?: number }).rowCount ?? 0;
+}
+
 export async function listLibraryMedia(
   db: Database,
   input: ListInput,
@@ -301,23 +348,16 @@ export async function listLibraryMedia(
       return { items: [], total: 0, page, pageSize };
     }
 
-    // Show media that has been synced from any provider the user has connected to.
-    // We join syncItem → folderServerLink and filter by serverType matching the user's providers.
-    // This is robust: it works regardless of which user triggered the last sync run.
+    // Show media that has a media_version row from any provider the user has
+    // connected to. Robust across which user triggered the last sync run.
     const providerValues = connectedProviders.map((c) => c.provider) as Array<"jellyfin" | "plex">;
     const accessibleMediaIds = db
-      .select({ id: syncItem.mediaId })
-      .from(syncItem)
-      .innerJoin(
-        folderServerLink,
-        or(
-          eq(syncItem.jellyfinServerLinkId, folderServerLink.id),
-          eq(syncItem.plexServerLinkId, folderServerLink.id),
-        ),
-      )
+      .select({ id: mediaVersion.mediaId })
+      .from(mediaVersion)
+      .innerJoin(folderServerLink, eq(mediaVersion.serverLinkId, folderServerLink.id))
       .where(
         and(
-          inArray(syncItem.result, ["imported", "skipped"]),
+          inArray(mediaVersion.result, ["imported", "skipped"]),
           inArray(folderServerLink.serverType, providerValues),
         ),
       );

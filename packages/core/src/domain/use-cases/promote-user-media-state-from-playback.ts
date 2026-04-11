@@ -66,6 +66,14 @@ function computePlaybackDrivenStatus(params: {
     return hasMovieProgress ? "watching" : "none";
   }
 
+  // SHOW-level completion signal: Jellyfin/Plex mark the series as "played"
+  // when all episodes on the server have been watched. Treat this as a strong
+  // "completed" signal, even if we don't have episode-level data for all episodes.
+  const hasShowLevelCompletion = params.playback.some(
+    (entry) => entry.episodeId === null && entry.isCompleted,
+  );
+  if (hasShowLevelCompletion) return "completed";
+
   const completedEpisodeIds = new Set<string>();
   for (const entry of params.history) {
     if (entry.episodeId && params.releasedEpisodeIds.has(entry.episodeId)) {
@@ -90,6 +98,10 @@ function computePlaybackDrivenStatus(params: {
       entry.positionSeconds > 0,
   );
 
+  const hasShowLevelProgress = params.playback.some(
+    (entry) => entry.episodeId === null && entry.positionSeconds > 0,
+  );
+
   if (
     params.releasedEpisodeIds.size > 0 &&
     completedEpisodeIds.size >= params.releasedEpisodeIds.size
@@ -97,7 +109,7 @@ function computePlaybackDrivenStatus(params: {
     return "completed";
   }
 
-  if (completedEpisodeIds.size > 0 || hasEpisodeProgress) {
+  if (completedEpisodeIds.size > 0 || hasEpisodeProgress || hasShowLevelProgress) {
     return "watching";
   }
 
