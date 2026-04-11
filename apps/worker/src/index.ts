@@ -1,7 +1,11 @@
 import { Queue, Worker } from "bullmq";
 
 import { handleImportTorrents } from "./jobs/import-torrents";
-import { handleJellyfinSync, handlePlexSync } from "./jobs/reverse-sync";
+import {
+  handleJellyfinSync,
+  handlePlexSync,
+  handleReverseSyncFull,
+} from "./jobs/reverse-sync";
 import { handleStallDetection } from "./jobs/stall-detection";
 import { handleRssSync } from "./jobs/rss-sync";
 import { handleBackfillExtras } from "./jobs/backfill-extras";
@@ -47,6 +51,7 @@ const queues = {
   importTorrents: new Queue("import-torrents", { connection: redisConnection }),
   jellyfinSync: new Queue("jellyfin-sync", { connection: redisConnection }),
   plexSync: new Queue("plex-sync", { connection: redisConnection }),
+  reverseSyncFull: new Queue("reverse-sync-full", { connection: redisConnection }),
   stallDetection: new Queue("stall-detection", { connection: redisConnection }),
   rssSync: new Queue("rss-sync", { connection: redisConnection }),
   dailyRecsCheck: new Queue("daily-recs-check", { connection: redisConnection }),
@@ -77,6 +82,16 @@ async function setupSchedules(): Promise<void> {
     "plex-sync-scheduler",
     { every: 5 * 60 * 1000 },          // 5 min
     { name: "plex-sync" },
+  );
+
+  // Daily full scan — ignores per-link delta checkpoints so deletion
+  // detection (prune of stale media_version / user_media_library rows) still
+  // runs at least once every 24h. The 5-min jellyfin/plex jobs only do
+  // delta scans and cannot detect items removed on the server.
+  await queues.reverseSyncFull.upsertJobScheduler(
+    "reverse-sync-full-scheduler",
+    { every: 24 * 60 * 60 * 1000 },    // 24h
+    { name: "reverse-sync-full" },
   );
 
   await queues.stallDetection.upsertJobScheduler(
@@ -142,6 +157,11 @@ const workers = [
   new Worker("plex-sync", async (job) => {
     console.log(`[plex-sync] Running job ${job.id}`);
     await handlePlexSync();
+  }, { connection: redisConnection, concurrency: 1 }),
+
+  new Worker("reverse-sync-full", async (job) => {
+    console.log(`[reverse-sync-full] Running job ${job.id}`);
+    await handleReverseSyncFull();
   }, { connection: redisConnection, concurrency: 1 }),
 
   new Worker("stall-detection", async (job) => {
