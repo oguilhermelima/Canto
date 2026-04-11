@@ -8,12 +8,15 @@
     "./domain/ports": "./src/domain/ports/index.ts",
     "./domain/types": "./src/domain/types/index.ts",
     "./domain/rules": "./src/domain/rules/index.ts",
+    "./domain/sync": "./src/domain/sync/index.ts",
     "./infrastructure/repositories": "./src/infrastructure/repositories/index.ts",
     "./*": "./src/*.ts"
   },
   "scripts": {
     "clean": "rm -rf .cache dist node_modules",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@canto/db": "workspace:*",
@@ -29,6 +32,7 @@
   "devDependencies": {
     "@canto/tsconfig": "workspace:*",
     "@types/node": "^22.13.0",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^3.2.4"
   }
 }
