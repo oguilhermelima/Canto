@@ -1,0 +1,1 @@
+ALTER TABLE "user_connection" ADD COLUMN "stale_reason" varchar(200);

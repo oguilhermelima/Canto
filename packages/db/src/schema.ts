@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -40,6 +40,7 @@ export const user = pgTable("user", {
     .default("en-US")
     .references(() => supportedLanguage.code),
   watchRegion: varchar("watch_region", { length: 10 }),
+  isPublic: boolean("is_public").notNull().default(false),
   directSearchEnabled: boolean("direct_search_enabled").notNull().default(true),
   recsVersion: integer("recs_version").notNull().default(0),
   recsUpdatedAt: timestamp("recs_updated_at", { withTimezone: true }),
@@ -502,74 +503,76 @@ export const mediaFile = pgTable(
   ],
 );
 
-// ─── Sync items (reverse sync from Jellyfin/Plex) ───
+// ─── Media versions (one row per observed file on Jellyfin/Plex) ───
 
-export const syncItem = pgTable(
-  "sync_item",
+export const mediaVersion = pgTable(
+  "media_version",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    libraryId: uuid("library_id")
-      .references(() => downloadFolder.id, { onDelete: "set null" }),
-    /** @deprecated use jellyfinServerLinkId / plexServerLinkId */
+    mediaId: uuid("media_id").references(() => media.id, { onDelete: "set null" }),
+    source: varchar("source", { length: 20 }).notNull(), // jellyfin | plex
     serverLinkId: uuid("server_link_id")
       .references(() => folderServerLink.id, { onDelete: "set null" }),
+    serverItemId: varchar("server_item_id", { length: 100 }).notNull(),
     serverItemTitle: varchar("server_item_title", { length: 500 }).notNull(),
     serverItemPath: varchar("server_item_path", { length: 1000 }),
     serverItemYear: integer("server_item_year"),
-    tmdbId: integer("tmdb_id"),
-    mediaId: uuid("media_id").references(() => media.id, { onDelete: "set null" }),
-    result: varchar("result", { length: 20 }).notNull(), // imported | skipped | failed
-    reason: varchar("reason", { length: 500 }),
-    /** @deprecated use jellyfinItemId/plexRatingKey presence as source indicator */
-    source: varchar("source", { length: 20 }), // jellyfin | plex
-    /** Jellyfin internal item ID for deep linking */
-    jellyfinItemId: varchar("jellyfin_item_id", { length: 100 }),
-    /** FK to folderServerLink for the Jellyfin side */
-    jellyfinServerLinkId: uuid("jellyfin_server_link_id")
-      .references(() => folderServerLink.id, { onDelete: "set null" }),
-    /** Last time Jellyfin synced this item */
-    jellyfinSyncedAt: timestamp("jellyfin_synced_at", { withTimezone: true }),
-    /** Plex rating key for deep linking */
-    plexRatingKey: varchar("plex_rating_key", { length: 100 }),
-    /** FK to folderServerLink for the Plex side */
-    plexServerLinkId: uuid("plex_server_link_id")
-      .references(() => folderServerLink.id, { onDelete: "set null" }),
-    /** Last time Plex synced this item */
-    plexSyncedAt: timestamp("plex_synced_at", { withTimezone: true }),
-    syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => [
-    index("idx_sync_item_library").on(table.libraryId),
-    index("idx_sync_item_result").on(table.result),
-    index("idx_sync_item_server_link").on(table.serverLinkId),
-    index("idx_sync_item_jellyfin_link").on(table.jellyfinServerLinkId),
-    index("idx_sync_item_plex_link").on(table.plexServerLinkId),
-  ],
-);
-
-// ─── Sync episode details (media files from Jellyfin/Plex) ───
-
-export const syncEpisode = pgTable(
-  "sync_episode",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    syncItemId: uuid("sync_item_id")
-      .notNull()
-      .references(() => syncItem.id, { onDelete: "cascade" }),
-    /** Which server this episode file came from (jellyfin | plex) */
-    source: varchar("source", { length: 20 }),
-    seasonNumber: integer("season_number"),
-    episodeNumber: integer("episode_number"),
-    serverEpisodeId: varchar("server_episode_id", { length: 100 }),
-    resolution: varchar("resolution", { length: 10 }), // 4K, 1080p, 720p, SD
+    resolution: varchar("resolution", { length: 10 }),
     videoCodec: varchar("video_codec", { length: 20 }),
     audioCodec: varchar("audio_codec", { length: 20 }),
     container: varchar("container", { length: 10 }),
     fileSize: bigint("file_size", { mode: "number" }),
+    bitrate: bigint("bitrate", { mode: "number" }),
+    durationMs: bigint("duration_ms", { mode: "number" }),
+    hdr: varchar("hdr", { length: 20 }),
+    primaryAudioLang: varchar("primary_audio_lang", { length: 10 }),
+    audioLangs: text("audio_langs").array(),
+    subtitleLangs: text("subtitle_langs").array(),
+    tmdbId: integer("tmdb_id"),
+    result: varchar("result", { length: 20 }).notNull(), // imported | skipped | unmatched | failed
+    reason: varchar("reason", { length: 500 }),
+    syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("uq_media_version_source_server_item").on(
+      table.source,
+      table.serverItemId,
+    ),
+    index("idx_media_version_media").on(table.mediaId),
+    index("idx_media_version_result").on(table.result),
+    index("idx_media_version_server_link").on(table.serverLinkId),
+  ],
+);
+
+// ─── Media version episode details (per-episode file metadata) ───
+
+export const mediaVersionEpisode = pgTable(
+  "media_version_episode",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    versionId: uuid("version_id")
+      .notNull()
+      .references(() => mediaVersion.id, { onDelete: "cascade" }),
+    seasonNumber: integer("season_number"),
+    episodeNumber: integer("episode_number"),
+    serverEpisodeId: varchar("server_episode_id", { length: 100 }),
+    resolution: varchar("resolution", { length: 10 }),
+    videoCodec: varchar("video_codec", { length: 20 }),
+    audioCodec: varchar("audio_codec", { length: 20 }),
+    container: varchar("container", { length: 10 }),
+    fileSize: bigint("file_size", { mode: "number" }),
+    bitrate: bigint("bitrate", { mode: "number" }),
+    durationMs: bigint("duration_ms", { mode: "number" }),
+    hdr: varchar("hdr", { length: 20 }),
+    primaryAudioLang: varchar("primary_audio_lang", { length: 10 }),
+    audioLangs: text("audio_langs").array(),
+    subtitleLangs: text("subtitle_langs").array(),
     filePath: varchar("file_path", { length: 1000 }),
   },
   (table) => [
-    index("idx_sync_episode_item").on(table.syncItemId),
+    index("idx_media_version_episode_version").on(table.versionId),
   ],
 );
 
@@ -751,6 +754,7 @@ export const list = pgTable(
     slug: varchar("slug", { length: 200 }).notNull(),
     description: text("description"),
     type: varchar("type", { length: 20 }).notNull(), // 'watchlist' | 'custom' | 'server'
+    visibility: varchar("visibility", { length: 20 }).notNull().default("private"), // 'public' | 'private' | 'shared'
     isSystem: boolean("is_system").notNull().default(false),
     position: integer("position").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -788,6 +792,58 @@ export const listItem = pgTable(
   ],
 );
 
+// ─── List Members (multi-user collaboration) ───
+
+export const listMember = pgTable(
+  "list_member",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    listId: uuid("list_id")
+      .notNull()
+      .references(() => list.id, { onDelete: "cascade" }),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: varchar("role", { length: 20 }).notNull().default("viewer"), // 'viewer' | 'editor' | 'admin'
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("idx_list_member_unique").on(table.listId, table.userId),
+    index("idx_list_member_user").on(table.userId),
+  ],
+);
+
+export const listInvitation = pgTable(
+  "list_invitation",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    listId: uuid("list_id")
+      .notNull()
+      .references(() => list.id, { onDelete: "cascade" }),
+    invitedBy: varchar("invited_by", { length: 36 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    invitedEmail: varchar("invited_email", { length: 255 }),
+    invitedUserId: varchar("invited_user_id", { length: 36 }).references(
+      () => user.id,
+      { onDelete: "cascade" },
+    ),
+    role: varchar("role", { length: 20 }).notNull().default("viewer"), // 'viewer' | 'editor' | 'admin'
+    token: varchar("token", { length: 64 }).notNull().unique(),
+    status: varchar("status", { length: 20 }).notNull().default("pending"), // 'pending' | 'accepted' | 'rejected' | 'expired'
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_list_invitation_list").on(table.listId),
+    index("idx_list_invitation_token").on(table.token),
+  ],
+);
+
 // ─── Download Requests (user → admin) ───
 
 export const downloadRequest = pgTable(
@@ -822,6 +878,39 @@ export const downloadRequest = pgTable(
   ],
 );
 
+// ─── User Media Library (per-user server library ownership) ───
+// Tracks which media items a user has in their Jellyfin/Plex library.
+// Prevents duplicating media rows per user — media is shared, ownership is tracked here.
+
+export const userMediaLibrary = pgTable(
+  "user_media_library",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    source: varchar("source", { length: 20 }).notNull(), // 'jellyfin' | 'plex'
+    serverLinkId: uuid("server_link_id").references(() => folderServerLink.id, {
+      onDelete: "set null",
+    }),
+    serverItemId: varchar("server_item_id", { length: 255 }), // jellyfinItemId or plexRatingKey
+    addedAt: timestamp("added_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("idx_user_media_library_unique").on(table.userId, table.mediaId, table.source),
+    index("idx_user_media_library_user").on(table.userId),
+    index("idx_user_media_library_media").on(table.mediaId),
+  ],
+);
+
 // ─── User Connections (Plex/Jellyfin) ───
 
 export const userConnection = pgTable("user_connection", {
@@ -834,6 +923,7 @@ export const userConnection = pgTable("user_connection", {
   externalUserId: varchar("external_user_id", { length: 255 }),
   accessibleLibraries: jsonb("accessible_libraries").$type<string[]>(),
   enabled: boolean("enabled").notNull().default(true),
+  staleReason: varchar("stale_reason", { length: 200 }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -927,6 +1017,7 @@ export const userRelations = relations(user, ({ many }) => ({
   accounts: many(account),
   preferences: many(userPreference),
   lists: many(list),
+  listMemberships: many(listMember),
   downloadRequests: many(downloadRequest),
   recommendations: many(userRecommendation),
   connections: many(userConnection),
@@ -987,6 +1078,7 @@ export const mediaRelations = relations(media, ({ many, one }) => ({
   }),
   seasons: many(season),
   files: many(mediaFile),
+  versions: many(mediaVersion),
   credits: many(mediaCredit),
   videos: many(mediaVideo),
   watchProviders: many(mediaWatchProvider),
@@ -1059,26 +1151,22 @@ export const mediaFileRelations = relations(mediaFile, ({ one }) => ({
   }),
 }));
 
-export const syncItemRelations = relations(syncItem, ({ one, many }) => ({
-  library: one(downloadFolder, {
-    fields: [syncItem.libraryId],
-    references: [downloadFolder.id],
-  }),
-  serverLink: one(folderServerLink, {
-    fields: [syncItem.serverLinkId],
-    references: [folderServerLink.id],
-  }),
+export const mediaVersionRelations = relations(mediaVersion, ({ one, many }) => ({
   media: one(media, {
-    fields: [syncItem.mediaId],
+    fields: [mediaVersion.mediaId],
     references: [media.id],
   }),
-  episodes: many(syncEpisode),
+  serverLink: one(folderServerLink, {
+    fields: [mediaVersion.serverLinkId],
+    references: [folderServerLink.id],
+  }),
+  episodes: many(mediaVersionEpisode),
 }));
 
-export const syncEpisodeRelations = relations(syncEpisode, ({ one }) => ({
-  syncItem: one(syncItem, {
-    fields: [syncEpisode.syncItemId],
-    references: [syncItem.id],
+export const mediaVersionEpisodeRelations = relations(mediaVersionEpisode, ({ one }) => ({
+  version: one(mediaVersion, {
+    fields: [mediaVersionEpisode.versionId],
+    references: [mediaVersion.id],
   }),
 }));
 
@@ -1160,6 +1248,8 @@ export const listRelations = relations(list, ({ one, many }) => ({
     references: [user.id],
   }),
   items: many(listItem),
+  members: many(listMember),
+  invitations: many(listInvitation),
 }));
 
 export const listItemRelations = relations(listItem, ({ one }) => ({
@@ -1170,6 +1260,28 @@ export const listItemRelations = relations(listItem, ({ one }) => ({
   media: one(media, {
     fields: [listItem.mediaId],
     references: [media.id],
+  }),
+}));
+
+export const listMemberRelations = relations(listMember, ({ one }) => ({
+  list: one(list, {
+    fields: [listMember.listId],
+    references: [list.id],
+  }),
+  user: one(user, {
+    fields: [listMember.userId],
+    references: [user.id],
+  }),
+}));
+
+export const listInvitationRelations = relations(listInvitation, ({ one }) => ({
+  list: one(list, {
+    fields: [listInvitation.listId],
+    references: [list.id],
+  }),
+  inviter: one(user, {
+    fields: [listInvitation.invitedBy],
+    references: [user.id],
   }),
 }));
 
@@ -1191,6 +1303,17 @@ export const userConnectionRelations = relations(userConnection, ({ one }) => ({
   user: one(user, {
     fields: [userConnection.userId],
     references: [user.id],
+  }),
+}));
+
+export const userMediaLibraryRelations = relations(userMediaLibrary, ({ one }) => ({
+  user: one(user, {
+    fields: [userMediaLibrary.userId],
+    references: [user.id],
+  }),
+  media: one(media, {
+    fields: [userMediaLibrary.mediaId],
+    references: [media.id],
   }),
 }));
 

@@ -1,0 +1,4 @@
+CREATE UNIQUE INDEX "uq_sync_item_media_id" ON "sync_item" USING btree ("media_id") WHERE "sync_item"."media_id" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "uq_sync_item_jellyfin_id" ON "sync_item" USING btree ("jellyfin_item_id") WHERE "sync_item"."jellyfin_item_id" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "uq_sync_item_plex_rating_key" ON "sync_item" USING btree ("plex_rating_key") WHERE "sync_item"."plex_rating_key" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "uq_sync_item_tmdb_id" ON "sync_item" USING btree ("tmdb_id") WHERE "sync_item"."tmdb_id" IS NOT NULL;
