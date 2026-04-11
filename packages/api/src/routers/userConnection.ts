@@ -182,6 +182,19 @@ export const userConnectionRouter = createTRPCRouter({
       return { success: true };
     }),
 
+  /**
+   * On-demand reverse sync for the current user. Called by the web app on
+   * mount / tab-focus so users see fresh playback state without waiting for
+   * the 5-min scheduled sweep. Dedupes in the dispatcher via jobId.
+   */
+  syncNow: protectedProcedure.mutation(async ({ ctx }) => {
+    const { dispatchUserReverseSync } = await import(
+      "@canto/core/infrastructure/queue/bullmq-dispatcher"
+    );
+    const dispatched = await dispatchUserReverseSync(ctx.session.user.id);
+    return { dispatched };
+  }),
+
   // Plex PIN OAuth flow
   plexPinCreate: protectedProcedure.mutation(() => createPlexPin()),
 
