@@ -1,8 +1,8 @@
 /* -------------------------------------------------------------------------- */
-/*  Use-case: Resolve TMDB ID from external IDs or title search (with retry)  */
+/*  Use-case: Resolve TMDB ID from external IDs (trust-first, no title search) */
 /* -------------------------------------------------------------------------- */
 
-import type { TmdbProvider, SearchResult } from "@canto/providers";
+import type { TmdbProvider } from "@canto/providers";
 
 const TMDB_DELAY_MS = 300;
 const TMDB_MAX_RETRIES = 3;
@@ -39,48 +39,18 @@ export interface ResolvedExternalId {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Title scoring                                                              */
-/* -------------------------------------------------------------------------- */
-
-function normalize(s: string): string {
-  return s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
-}
-
-function scoreTitleMatch(
-  result: SearchResult,
-  title: string,
-  year?: number,
-): number {
-  let score = 0;
-
-  const normalizedTitle = normalize(title);
-  const matchesTitle = normalize(result.title) === normalizedTitle;
-  const matchesOriginal = result.originalTitle
-    ? normalize(result.originalTitle) === normalizedTitle
-    : false;
-
-  if (matchesTitle || matchesOriginal) score += 50;
-
-  if (year && result.year) {
-    if (result.year === year) score += 30;
-    else if (Math.abs(result.year - year) <= 1) score += 15;
-  }
-
-  score += Math.min(result.popularity ?? 0, 100) / 10;
-
-  return score;
-}
-
-/* -------------------------------------------------------------------------- */
 /*  Main resolver                                                              */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Resolve a TMDB ID using a multi-step chain:
- * 1. Validate server-provided tmdbId against title search
- * 2. IMDB ID → TMDB /find
- * 3. TVDB ID → TMDB /find
- * 4. Ranked title search
+ * Resolve a TMDB ID by trusting provider IDs. We are a sync, not a matcher:
+ *   1. If item.tmdbId → return directly.
+ *   2. Else if item.imdbId → TMDB /find → prefer type match, else first.
+ *   3. Else if item.tvdbId → TMDB /find → prefer type match, else first.
+ *   4. Else return null.
+ *
+ * Any thrown error is swallowed and returned as null — the caller will mark
+ * the sync item as "unmatched" and surface it for admin action.
  */
 export async function resolveExternalId(
   tmdb: TmdbProvider,
@@ -88,72 +58,42 @@ export async function resolveExternalId(
     tmdbId?: number;
     imdbId?: string;
     tvdbId?: number;
-    title: string;
-    year?: number;
     type: "movie" | "show";
   },
 ): Promise<ResolvedExternalId | null> {
-  // Cache search results from Step 1 to reuse in Step 4
-  let searchResults: SearchResult[] | null = null;
-
-  // Step 1 — Validate tmdbId if present
-  if (item.tmdbId) {
-    const searchData = await tmdbCall(() => tmdb.search(item.title, item.type));
-    searchResults = searchData.results;
-
-    if (searchResults.some((r) => r.externalId === item.tmdbId)) {
+  try {
+    if (item.tmdbId) {
       return { tmdbId: item.tmdbId, resolvedType: item.type };
     }
 
+    if (item.imdbId) {
+      const results = await tmdbCall(() => tmdb.findByImdbId(item.imdbId!));
+      const match = results.find((r) => r.type === item.type) ?? results[0];
+      if (match) {
+        return {
+          tmdbId: match.externalId,
+          resolvedType: match.type as "movie" | "show",
+        };
+      }
+    }
+
+    if (item.tvdbId && tmdb.findByTvdbId) {
+      const results = await tmdbCall(() => tmdb.findByTvdbId!(item.tvdbId!));
+      const match = results.find((r) => r.type === item.type) ?? results[0];
+      if (match) {
+        return {
+          tmdbId: match.externalId,
+          resolvedType: match.type as "movie" | "show",
+        };
+      }
+    }
+
+    return null;
+  } catch (err) {
     console.warn(
-      `[resolve-external-id] tmdbId ${item.tmdbId} not found in search results for "${item.title}", falling through`,
+      `[resolve-external-id] lookup failed, returning null:`,
+      err instanceof Error ? err.message : err,
     );
+    return null;
   }
-
-  // Step 2 — IMDB ID lookup
-  if (item.imdbId) {
-    const results = await tmdbCall(() => tmdb.findByImdbId(item.imdbId!));
-    const match = results.find((r) => r.type === item.type) ?? results[0];
-    if (match) {
-      return { tmdbId: match.externalId, resolvedType: match.type as "movie" | "show" };
-    }
-  }
-
-  // Step 3 — TVDB ID lookup
-  if (item.tvdbId && tmdb.findByTvdbId) {
-    const results = await tmdbCall(() => tmdb.findByTvdbId!(item.tvdbId!));
-    const match = results.find((r) => r.type === item.type) ?? results[0];
-    if (match) {
-      return { tmdbId: match.externalId, resolvedType: match.type as "movie" | "show" };
-    }
-  }
-
-  // Step 4 — Ranked title search (reuse results from Step 1 if available)
-  if (!searchResults) {
-    const query = item.year ? `${item.title} ${item.year}` : item.title;
-    const searchData = await tmdbCall(() => tmdb.search(query, item.type));
-    searchResults = searchData.results;
-  }
-
-  if (searchResults.length === 0) return null;
-
-  let bestScore = 0;
-  let bestResult: SearchResult | null = null;
-
-  for (const r of searchResults) {
-    const score = scoreTitleMatch(r, item.title, item.year);
-    if (score > bestScore) {
-      bestScore = score;
-      bestResult = r;
-    }
-  }
-
-  if (bestResult && bestScore >= 50) {
-    return {
-      tmdbId: bestResult.externalId,
-      resolvedType: bestResult.type as "movie" | "show",
-    };
-  }
-
-  return null;
 }

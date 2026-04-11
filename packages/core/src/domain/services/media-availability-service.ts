@@ -1,12 +1,13 @@
 import type { Database } from "@canto/db/client";
-import { findSyncItemsWithEpisodes } from "../../infrastructure/repositories/sync-repository";
+import { findMediaVersionsWithEpisodes } from "../../infrastructure/repositories/media-version-repository";
 
 /**
  * Get media availability across all sources (downloads, Jellyfin, Plex).
- * Returns source-level info + episode-level availability for shows.
+ * Returns source-level info + episode-level availability for shows. Each
+ * media_version is one physical file on one server — we surface them 1:1.
  */
 export async function getMediaAvailability(db: Database, mediaId: string) {
-  const items = await findSyncItemsWithEpisodes(db, mediaId);
+  const versions = await findMediaVersionsWithEpisodes(db, mediaId);
 
   const sources: Array<{
     type: "jellyfin" | "plex";
@@ -17,47 +18,34 @@ export async function getMediaAvailability(db: Database, mediaId: string) {
 
   const episodeMap: Record<string, Array<{ type: string; resolution?: string | null }>> = {};
 
-  for (const item of items) {
-    if (item.episodes.length === 0) continue;
+  for (const version of versions) {
+    const srcType = version.source as "jellyfin" | "plex";
 
-    // Group episodes by their source (unified items may have episodes from both servers)
-    const episodesBySource = new Map<string, typeof item.episodes>();
-    for (const ep of item.episodes) {
-      // ep.source is authoritative; fall back to item.source for legacy rows
-      const src = ep.source ?? item.source;
-      if (!src) continue;
-      if (!episodesBySource.has(src)) episodesBySource.set(src, []);
-      episodesBySource.get(src)!.push(ep);
-    }
-
-    for (const [src, eps] of episodesBySource) {
-      const srcType = src as "jellyfin" | "plex";
-
-      // For movies: single episode entry with no season/episode number
-      const movieEp = eps.find((e) => e.seasonNumber == null && e.episodeNumber == null);
-      if (movieEp) {
-        sources.push({
-          type: srcType,
-          resolution: movieEp.resolution,
-          videoCodec: movieEp.videoCodec,
-        });
-        continue;
-      }
-
-      // For shows
+    // Movies carry their quality directly on the version row; episodes, if
+    // any, live in media_version_episode children.
+    if (version.episodes.length === 0) {
       sources.push({
         type: srcType,
-        resolution: eps[0]?.resolution,
-        videoCodec: eps[0]?.videoCodec,
-        episodeCount: eps.length,
+        resolution: version.resolution,
+        videoCodec: version.videoCodec,
       });
+      continue;
+    }
 
-      for (const ep of eps) {
-        if (ep.seasonNumber == null || ep.episodeNumber == null) continue;
-        const key = `S${String(ep.seasonNumber).padStart(2, "0")}E${String(ep.episodeNumber).padStart(2, "0")}`;
-        if (!episodeMap[key]) episodeMap[key] = [];
-        episodeMap[key].push({ type: srcType, resolution: ep.resolution });
-      }
+    // Show: summarize with the first episode's quality.
+    const first = version.episodes[0];
+    sources.push({
+      type: srcType,
+      resolution: first?.resolution ?? version.resolution,
+      videoCodec: first?.videoCodec ?? version.videoCodec,
+      episodeCount: version.episodes.length,
+    });
+
+    for (const ep of version.episodes) {
+      if (ep.seasonNumber == null || ep.episodeNumber == null) continue;
+      const key = `S${String(ep.seasonNumber).padStart(2, "0")}E${String(ep.episodeNumber).padStart(2, "0")}`;
+      if (!episodeMap[key]) episodeMap[key] = [];
+      episodeMap[key].push({ type: srcType, resolution: ep.resolution });
     }
   }
 

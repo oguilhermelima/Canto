@@ -1,9 +1,10 @@
 import { getSetting } from "@canto/db/settings";
 import {
   getByMediaIdInput,
-  listSyncedItemsInput,
-  searchForSyncItemInput,
-  resolveSyncItemInput,
+  listMediaVersionGroupsInput,
+  searchForMediaVersionInput,
+  resolveMediaVersionInput,
+  deleteMediaVersionInput,
   discoverServerLibrariesInput,
 } from "@canto/validators";
 import { SETTINGS } from "@canto/core/lib/settings-keys";
@@ -11,15 +12,20 @@ import { SETTINGS } from "@canto/core/lib/settings-keys";
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
 import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
 import {
-  findSyncItemsByMediaId,
-  findSyncItemsPaginated,
-} from "@canto/core/infrastructure/repositories/sync-repository";
+  findMediaVersionsByMediaId,
+  getMediaVersionCounts,
+  deleteMediaVersionById,
+} from "@canto/core/infrastructure/repositories/media-version-repository";
 import { dispatchJellyfinSync, dispatchPlexSync, dispatchFolderScan } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
 
 // ── Extracted use-cases & services ──
-import { resolveSyncItem } from "@canto/core/domain/use-cases/resolve-sync-item";
+import {
+  resolveMediaVersion,
+  resolveMediaVersionPreview,
+} from "@canto/core/domain/use-cases/resolve-media-version";
 import { discoverServerLibraries } from "@canto/core/domain/use-cases/discover-server-libraries";
 import { getMediaAvailability } from "@canto/core/domain/services/media-availability-service";
+import { listMediaVersionGroups } from "@canto/core/domain/services/media-version-groups-service";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                     */
@@ -58,69 +64,127 @@ export const syncRouter = createTRPCRouter({
     return { jellyfin: jellyfin ?? null, plex: plex ?? null };
   }),
 
-  listSyncedItems: protectedProcedure
-    .input(listSyncedItemsInput)
-    .query(async ({ ctx, input }) => {
-      const { items, total } = await findSyncItemsPaginated(
+  /**
+   * Grouped view used by the admin "Sync items" dialog. Matched versions
+   * cluster under their media row; unmatched orphans (media_id NULL) are
+   * returned as singleton groups with media=null. Tab filter is applied at
+   * the group level — e.g. "imported" matches groups where every version is
+   * imported or skipped, "failed" matches groups with any failed version.
+   */
+  listMediaVersionGroups: protectedProcedure
+    .input(listMediaVersionGroupsInput)
+    .query(({ ctx, input }) =>
+      listMediaVersionGroups(
         ctx.db,
-        { libraryId: input.libraryId, server: input.server, result: input.result },
+        { server: input.server, tab: input.tab, search: input.search },
+        input.page,
         input.pageSize,
-        (input.page - 1) * input.pageSize,
-      );
-      return { items, total, page: input.page, pageSize: input.pageSize };
-    }),
+      ),
+    ),
 
-  searchForSyncItem: protectedProcedure
-    .input(searchForSyncItemInput)
+  getMediaVersionCounts: protectedProcedure.query(({ ctx }) =>
+    getMediaVersionCounts(ctx.db),
+  ),
+
+  getServerDeepLinkConfig: adminProcedure.query(async () => {
+    const [plexUrl, plexMachineId, jellyfinUrl] = await Promise.all([
+      getSetting<string>(SETTINGS.PLEX_URL),
+      getSetting<string>(SETTINGS.PLEX_MACHINE_ID),
+      getSetting<string>(SETTINGS.JELLYFIN_URL),
+    ]);
+    return {
+      plexUrl: plexUrl ?? null,
+      plexMachineId: plexMachineId ?? null,
+      jellyfinUrl: jellyfinUrl ?? null,
+    };
+  }),
+
+  searchForMediaVersion: protectedProcedure
+    .input(searchForMediaVersionInput)
     .query(async ({ input }) => {
       const tmdb = await getTmdbProvider();
       return tmdb.search(input.query, input.type ?? "movie");
     }),
 
-  resolveSyncItem: adminProcedure
-    .input(resolveSyncItemInput)
+  /**
+   * Dry-run preview of a resolve action — returns how many versions would
+   * move and which old media rows would be garbage-collected.
+   */
+  getResolveMediaVersionPreview: adminProcedure
+    .input(resolveMediaVersionInput)
+    .query(async ({ ctx, input }) => {
+      const tmdb = await getTmdbProvider();
+      const scope = input.versionId
+        ? { versionId: input.versionId, tmdbId: input.tmdbId, type: input.type }
+        : { mediaId: input.mediaId!, tmdbId: input.tmdbId, type: input.type };
+      return resolveMediaVersionPreview(ctx.db, scope, tmdb);
+    }),
+
+  resolveMediaVersion: adminProcedure
+    .input(resolveMediaVersionInput)
     .mutation(async ({ ctx, input }) => {
       const tmdb = await getTmdbProvider();
-      const result = await resolveSyncItem(ctx.db, input, tmdb);
+      const scope = input.versionId
+        ? { versionId: input.versionId, tmdbId: input.tmdbId, type: input.type }
+        : { mediaId: input.mediaId!, tmdbId: input.tmdbId, type: input.type };
 
-      if (input.updateMediaServer && result.mediaId) {
-        const { updateMediaServerMetadata } = await import("@canto/core/domain/use-cases/update-media-server-metadata");
-        await updateMediaServerMetadata(ctx.db, result.mediaId).catch((err) =>
-          console.warn("[resolveSyncItem] Server update failed:", err instanceof Error ? err.message : err),
+      const result = await resolveMediaVersion(ctx.db, scope, tmdb, {
+        dryRun: input.dryRun,
+      });
+
+      // dryRun path → ResolutionPreview, no side-effects.
+      if (input.dryRun) return result;
+
+      const mutated = result as { mediaId: string; suggestedName: string };
+      if (input.updateMediaServer && mutated.mediaId) {
+        const { updateMediaServerMetadata } = await import(
+          "@canto/core/domain/use-cases/update-media-server-metadata"
+        );
+        await updateMediaServerMetadata(ctx.db, mutated.mediaId).catch((err) =>
+          console.warn(
+            "[resolveMediaVersion] Server update failed:",
+            err instanceof Error ? err.message : err,
+          ),
         );
       }
 
       return result;
     }),
 
+  deleteMediaVersion: adminProcedure
+    .input(deleteMediaVersionInput)
+    .mutation(async ({ ctx, input }) => {
+      await deleteMediaVersionById(ctx.db, input.versionId);
+      return { ok: true };
+    }),
+
   mediaServers: protectedProcedure
     .input(getByMediaIdInput)
     .query(async ({ ctx, input }) => {
-      const items = await findSyncItemsByMediaId(ctx.db, input.mediaId);
+      const versions = await findMediaVersionsByMediaId(ctx.db, input.mediaId);
 
       const result: {
         jellyfin?: { url: string };
         plex?: { url: string };
       } = {};
 
-      // With unified items, jellyfinItemId and plexRatingKey can both be set on the same row
-      const jellyfinItem = items.find((i) => !!i.jellyfinItemId);
-      if (jellyfinItem) {
+      const jellyfinVersion = versions.find((v) => v.source === "jellyfin");
+      if (jellyfinVersion) {
         const jellyfinUrl = await getSetting<string>(SETTINGS.JELLYFIN_URL);
         if (jellyfinUrl) {
           result.jellyfin = {
-            url: `${jellyfinUrl}/web/index.html#!/details?id=${jellyfinItem.jellyfinItemId}`,
+            url: `${jellyfinUrl}/web/index.html#!/details?id=${jellyfinVersion.serverItemId}`,
           };
         }
       }
 
-      const plexItem = items.find((i) => !!i.plexRatingKey);
-      if (plexItem) {
+      const plexVersion = versions.find((v) => v.source === "plex");
+      if (plexVersion) {
         const plexUrl = await getSetting<string>(SETTINGS.PLEX_URL);
         const machineId = await getSetting<string>(SETTINGS.PLEX_MACHINE_ID);
         if (plexUrl && machineId) {
           result.plex = {
-            url: `${plexUrl}/web/index.html#!/server/${machineId}/details?key=%2Flibrary%2Fmetadata%2F${plexItem.plexRatingKey}`,
+            url: `${plexUrl}/web/index.html#!/server/${machineId}/details?key=%2Flibrary%2Fmetadata%2F${plexVersion.serverItemId}`,
           };
         }
       }

@@ -6,13 +6,19 @@ import type { Database } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
 import { SETTINGS } from "../../lib/settings-keys";
 import { findMediaById } from "../../infrastructure/repositories/media-repository";
-import { findSyncItemsByMediaId, updateSyncItem } from "../../infrastructure/repositories/sync-repository";
 import {
-  updateJellyfinProviderIds,
-  refreshJellyfinItem,
+  findMediaVersionsByMediaId,
+  updateMediaVersion,
+} from "../../infrastructure/repositories/media-version-repository";
+import {
+  applyJellyfinRemoteMatch,
   getJellyfinItem,
 } from "../../infrastructure/adapters/jellyfin";
-import { refreshPlexItem, getPlexItem } from "../../infrastructure/adapters/plex";
+import {
+  matchPlexItem,
+  lockPlexFields,
+  getPlexItem,
+} from "../../infrastructure/adapters/plex";
 
 export interface ServerUpdateResult {
   jellyfin: boolean;
@@ -30,8 +36,8 @@ export async function updateMediaServerMetadata(
   const mediaRow = await findMediaById(db, mediaId);
   if (!mediaRow) return result;
 
-  const syncItems = await findSyncItemsByMediaId(db, mediaId);
-  if (syncItems.length === 0) return result;
+  const versions = await findMediaVersionsByMediaId(db, mediaId);
+  if (versions.length === 0) return result;
 
   const jellyfinEnabled = await getSetting<boolean>(SETTINGS.JELLYFIN_ENABLED);
   const jellyfinUrl = await getSetting<string>(SETTINGS.JELLYFIN_URL);
@@ -41,41 +47,33 @@ export async function updateMediaServerMetadata(
   const plexUrl = await getSetting<string>(SETTINGS.PLEX_URL);
   const plexToken = await getSetting<string>(SETTINGS.PLEX_TOKEN);
 
-  for (const item of syncItems) {
-    // Jellyfin update — works regardless of source column (unified items have both IDs)
-    if (
-      item.jellyfinItemId &&
-      jellyfinEnabled &&
-      jellyfinUrl &&
-      jellyfinKey
-    ) {
+  // The media row's `type` drives which Jellyfin/Plex endpoints we call.
+  const mediaType = mediaRow.type === "show" ? "show" : "movie";
+  const plexType: 1 | 2 = mediaType === "movie" ? 1 : 2;
+
+  for (const version of versions) {
+    // ── Jellyfin ──────────────────────────────────────────────────────────
+    // `applyJellyfinRemoteMatch` runs RemoteSearch → RemoteSearch/Apply,
+    // which is what the Jellyfin web UI does when a user picks a match in
+    // the "Identify…" dialog. No more patch-POST or ReplaceAllMetadata
+    // refresh (which used to actively undo the fix).
+    if (version.source === "jellyfin" && jellyfinEnabled && jellyfinUrl && jellyfinKey) {
       try {
-        const providerIds: Record<string, string> = {
-          Tmdb: String(mediaRow.externalId),
-        };
-        if (mediaRow.tvdbId) providerIds.Tvdb = String(mediaRow.tvdbId);
-        if (mediaRow.imdbId) providerIds.Imdb = mediaRow.imdbId;
-
-        await updateJellyfinProviderIds(
-          jellyfinUrl as string,
-          jellyfinKey as string,
-          item.jellyfinItemId,
-          providerIds,
-        );
-        await refreshJellyfinItem(
-          jellyfinUrl as string,
-          jellyfinKey as string,
-          item.jellyfinItemId,
+        await applyJellyfinRemoteMatch(
+          jellyfinUrl,
+          jellyfinKey,
+          version.serverItemId,
+          mediaType,
+          mediaRow.externalId,
         );
 
-        // Re-fetch item to confirm the update and sync the title back
         const updated = await getJellyfinItem(
-          jellyfinUrl as string,
-          jellyfinKey as string,
-          item.jellyfinItemId,
+          jellyfinUrl,
+          jellyfinKey,
+          version.serverItemId,
         );
         if (updated) {
-          await updateSyncItem(db, item.id, {
+          await updateMediaVersion(db, version.id, {
             serverItemTitle: updated.name,
             serverItemYear: updated.year ?? null,
           });
@@ -85,34 +83,33 @@ export async function updateMediaServerMetadata(
         result.jellyfin = true;
       } catch (err) {
         console.warn(
-          `[update-metadata] Jellyfin update failed for item ${item.jellyfinItemId}:`,
+          `[update-metadata] Jellyfin match update failed for item ${version.serverItemId}:`,
           err instanceof Error ? err.message : err,
         );
       }
+      continue;
     }
 
-    // Plex update — works regardless of source column (unified items have both IDs)
-    if (
-      item.plexRatingKey &&
-      plexEnabled &&
-      plexUrl &&
-      plexToken
-    ) {
+    // ── Plex ──────────────────────────────────────────────────────────────
+    // `matchPlexItem` hits `/library/metadata/:id/match` with the legacy
+    // themoviedb guid (`com.plexapp.agents.themoviedb://<id>?lang=en`),
+    // which modern Plex still accepts across both legacy and the new
+    // tv.plex.agents.movie/show agents. Then we lock the core fields so a
+    // future library scan can't stomp the correction.
+    if (version.source === "plex" && plexEnabled && plexUrl && plexToken) {
       try {
-        await refreshPlexItem(
-          plexUrl as string,
-          plexToken as string,
-          item.plexRatingKey,
+        await matchPlexItem(
+          plexUrl,
+          plexToken,
+          version.serverItemId,
+          mediaRow.externalId,
+          { name: mediaRow.title },
         );
+        await lockPlexFields(plexUrl, plexToken, version.serverItemId, plexType);
 
-        // Re-fetch item to confirm and sync title back
-        const updated = await getPlexItem(
-          plexUrl as string,
-          plexToken as string,
-          item.plexRatingKey,
-        );
+        const updated = await getPlexItem(plexUrl, plexToken, version.serverItemId);
         if (updated) {
-          await updateSyncItem(db, item.id, {
+          await updateMediaVersion(db, version.id, {
             serverItemTitle: updated.title,
             serverItemYear: updated.year ?? null,
           });
@@ -122,7 +119,7 @@ export async function updateMediaServerMetadata(
         result.plex = true;
       } catch (err) {
         console.warn(
-          `[update-metadata] Plex refresh failed for item ${item.plexRatingKey}:`,
+          `[update-metadata] Plex match update failed for item ${version.serverItemId}:`,
           err instanceof Error ? err.message : err,
         );
       }
