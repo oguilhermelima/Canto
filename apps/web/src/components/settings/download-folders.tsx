@@ -21,7 +21,6 @@ import { Switch } from "@canto/ui/switch";
 import { Badge } from "@canto/ui/badge";
 import {
   Popover,
-  PopoverAnchor,
   PopoverContent,
   PopoverTrigger,
 } from "@canto/ui/popover";
@@ -678,7 +677,7 @@ function RulesEditorDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl">Auto-routing Rules</DialogTitle>
+          <DialogTitle>Auto-routing Rules</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground leading-relaxed">
           Define when Canto should automatically select this folder for a download.
@@ -943,80 +942,199 @@ function MediaPathsSection({ folderId, isLocal }: { folderId: string; isLocal: b
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Combo input — free text with dropdown suggestions                          */
+/*  qBittorrent path select — dropdown-only with "create new" modal            */
 /* -------------------------------------------------------------------------- */
 
-function ComboInput({
+type QbitPathOption = { category: string; savePath: string };
+
+const CREATE_SENTINEL = "__create_new__";
+
+function QbitPathSelect({
   value,
   onChange,
+  onCategoryChange,
   placeholder,
   className,
-  suggestions,
+  options,
+  showCategoryHint = true,
 }: {
   value: string;
   onChange: (value: string) => void;
+  /** When set, called with the category name whenever the selection changes. */
+  onCategoryChange?: (category: string) => void;
   placeholder?: string;
   className?: string;
-  suggestions: Array<{ label: string; path: string }>;
+  options: QbitPathOption[];
+  /** Show the category name under each option in the dropdown list. Trigger always shows path only. */
+  showCategoryHint?: boolean;
 }): React.JSX.Element {
-  const [open, setOpen] = useState(false);
-  const filtered = suggestions.filter(
-    (s) => !value || s.path.toLowerCase().includes(value.toLowerCase()) || s.label.toLowerCase().includes(value.toLowerCase()),
-  );
-  const hasSuggestions = suggestions.length > 0;
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Ensure the current value appears as an option even if it's not in the
+  // live qBit list (e.g. saved previously, category renamed, offline).
+  const augmented: QbitPathOption[] = value && !options.some((o) => o.savePath === value)
+    ? [{ category: "current", savePath: value }, ...options]
+    : options;
+
+  const handleSelect = (savePath: string): void => {
+    onChange(savePath);
+    if (onCategoryChange) {
+      const match = augmented.find((o) => o.savePath === savePath);
+      if (match && match.category !== "current") {
+        onCategoryChange(match.category);
+      }
+    }
+  };
+
+  const handleCreated = (savePath: string, category: string): void => {
+    onChange(savePath);
+    if (onCategoryChange) onCategoryChange(category);
+  };
 
   return (
-    <Popover open={open && filtered.length > 0} onOpenChange={setOpen}>
-      <PopoverAnchor asChild>
-        <div className="relative">
-          <Input
-            value={value}
-            onChange={(e) => { onChange(e.target.value); setOpen(true); }}
-            onFocus={() => setOpen(true)}
-            placeholder={placeholder}
-            className={cn(className, hasSuggestions && "pr-10")}
-          />
-          {hasSuggestions && (
-            <button
-              type="button"
-              tabIndex={-1}
-              onClick={() => setOpen(!open)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
-            >
-              <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", open && filtered.length > 0 && "rotate-180")} />
-            </button>
-          )}
-        </div>
-      </PopoverAnchor>
-      <PopoverContent
-        align="start"
-        className="w-[--radix-popover-trigger-width] p-1.5"
-        onOpenAutoFocus={(e) => e.preventDefault()}
+    <>
+      <Select
+        value={value || undefined}
+        onValueChange={(v) => {
+          if (v === CREATE_SENTINEL) {
+            setDialogOpen(true);
+            return;
+          }
+          handleSelect(v);
+        }}
       >
-        <p className="px-2.5 py-1.5 text-xs font-medium text-muted-foreground/50">Existing qBittorrent paths</p>
-        {filtered.map((s) => {
-          const isSelected = value === s.path;
-          return (
-            <button
-              key={s.path}
-              type="button"
-              onClick={() => { onChange(s.path); setOpen(false); }}
-              className={cn(
-                "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-sm transition-colors text-left",
-                isSelected ? "bg-primary/5 text-foreground" : "text-foreground hover:bg-accent",
-              )}
-            >
-              <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">{s.path}</p>
-                {s.label !== s.path && <p className="text-xs text-muted-foreground/50 truncate">{s.label}</p>}
+        <SelectTrigger className={className}>
+          {value ? (
+            <span className="truncate">{value}</span>
+          ) : (
+            <span className="truncate text-muted-foreground">
+              {placeholder ?? "Select a qBittorrent path"}
+            </span>
+          )}
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={CREATE_SENTINEL}>
+            <div className="flex items-center gap-2 text-primary">
+              <Plus className="h-4 w-4" />
+              <span className="font-medium">Create new qBittorrent path</span>
+            </div>
+          </SelectItem>
+          {augmented.length > 0 && (
+            <div className="my-1 h-px bg-border/40" aria-hidden="true" />
+          )}
+          {augmented.map((opt) => (
+            <SelectItem key={`${opt.category}:${opt.savePath}`} value={opt.savePath}>
+              <div className="flex min-w-0 flex-col">
+                <span className="truncate font-medium">{opt.savePath}</span>
+                {showCategoryHint && opt.category !== "current" && (
+                  <span className="truncate text-xs text-muted-foreground/60">
+                    {opt.category}
+                  </span>
+                )}
               </div>
-              {isSelected && <Check className="h-4 w-4 shrink-0 text-primary" />}
-            </button>
-          );
-        })}
-      </PopoverContent>
-    </Popover>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <CreateQbitCategoryDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onCreated={handleCreated}
+      />
+    </>
+  );
+}
+
+function CreateQbitCategoryDialog({
+  open,
+  onOpenChange,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: (savePath: string, category: string) => void;
+}): React.JSX.Element {
+  const [name, setName] = useState("");
+  const [savePath, setSavePath] = useState("");
+  const utils = trpc.useUtils();
+
+  const createCat = trpc.folder.createQbitCategory.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Category "${data.name}" created and validated`);
+      void utils.folder.qbitCategories.invalidate();
+      onCreated(data.savePath, data.name);
+      onOpenChange(false);
+      setName("");
+      setSavePath("");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const canSubmit = name.trim().length > 0 && savePath.trim().length > 0 && !createCat.isPending;
+
+  const handleSubmit = (): void => {
+    if (!canSubmit) return;
+    createCat.mutate({ name: name.trim(), savePath: savePath.trim() });
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (createCat.isPending) return;
+        onOpenChange(next);
+        if (!next) {
+          setName("");
+          setSavePath("");
+        }
+      }}
+    >
+      <DialogContent className="sm:max-w-[440px]">
+        <DialogHeader>
+          <DialogTitle>Create qBittorrent category</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-muted-foreground">Category name</label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. movies"
+              autoFocus
+              disabled={createCat.isPending}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-muted-foreground">Save path</label>
+            <Input
+              value={savePath}
+              onChange={(e) => setSavePath(e.target.value)}
+              placeholder="/data/downloads/movies"
+              disabled={createCat.isPending}
+            />
+            <p className="text-xs text-muted-foreground/70">
+              Must be an absolute path writable by the qBittorrent server. The category is validated immediately — invalid paths are rolled back.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={createCat.isPending}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit} disabled={!canSubmit}>
+              {createCat.isPending ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Validating</>
+              ) : (
+                <>Create & validate</>
+              )}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1152,15 +1270,15 @@ function FolderCard({
   onToggle,
   onRefresh,
   importMethod = "local",
-  qbitPaths,
+  qbitOptions,
 }: {
   folder: FolderData;
   expanded: boolean;
   onToggle: () => void;
   onRefresh: () => void;
   importMethod?: "local" | "remote";
-  /** Available qBittorrent paths for download path dropdown (API mode only) */
-  qbitPaths?: Array<{ label: string; path: string }>;
+  /** qBittorrent category options for the path dropdown (remote mode only) */
+  qbitOptions?: QbitPathOption[];
 }): React.JSX.Element {
   const isLocal = importMethod === "local";
   const [name, setName] = useState(folder.name);
@@ -1283,7 +1401,14 @@ function FolderCard({
                     isLocal ? (
                       <PathInput value={dlPath} onChange={setDlPath} placeholder="/data/downloads/movies" className={cardInputCn} />
                     ) : (
-                      <ComboInput value={dlPath} onChange={setDlPath} placeholder="/downloads/movies" className={cardInputCn} suggestions={qbitPaths ?? []} />
+                      <QbitPathSelect
+                        value={dlPath}
+                        onChange={setDlPath}
+                        onCategoryChange={setQbitCat}
+                        placeholder="Select a qBittorrent path"
+                        className={cardInputCn}
+                        options={qbitOptions ?? []}
+                      />
                     )
                   ) : (
                     <button
@@ -1300,7 +1425,22 @@ function FolderCard({
               <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-4">
                 <label className="text-sm font-medium text-muted-foreground sm:w-28 sm:shrink-0 sm:text-right">qBit category</label>
                 <div className="sm:w-48">
-                  <Input value={qbitCat} onChange={(e) => setQbitCat(e.target.value)} placeholder="e.g. movies" className={cardInputCn} />
+                  {isLocal ? (
+                    <Input
+                      value={qbitCat}
+                      onChange={(e) => setQbitCat(e.target.value)}
+                      placeholder="e.g. movies"
+                      className={cardInputCn}
+                    />
+                  ) : (
+                    <Input
+                      value={qbitCat}
+                      readOnly
+                      placeholder="Auto from path"
+                      className={cn(cardInputCn, "bg-muted/20 text-muted-foreground cursor-default")}
+                      title="Category is derived from the selected qBittorrent path"
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -1324,7 +1464,14 @@ function FolderCard({
                     isLocal ? (
                       <PathInput value={libPath} onChange={setLibPath} placeholder="/data/media/movies" className={cardInputCn} />
                     ) : (
-                      <ComboInput value={libPath} onChange={setLibPath} placeholder="/media/movies" className={cardInputCn} suggestions={qbitPaths ?? []} />
+                      <QbitPathSelect
+                        value={libPath}
+                        onChange={setLibPath}
+                        placeholder="Select a qBittorrent path"
+                        className={cardInputCn}
+                        options={qbitOptions ?? []}
+                        showCategoryHint={false}
+                      />
                     )
                   ) : (
                     <button
@@ -1351,11 +1498,11 @@ function FolderCard({
             </p>
 
             {/* Rules */}
-            <div className="mt-4 rounded-xl border border-border/30 p-4">
+            <div className="mt-4 rounded-xl border border-border/60 bg-card p-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-foreground/80">Rules</p>
-                <Button size="sm" variant="outline" className="rounded-lg gap-1.5 text-xs h-7" onClick={() => setRulesOpen(true)}>
-                  <Pencil className="h-3 w-3" />
+                <Button size="sm" variant="outline" className="h-8 gap-1.5 rounded-xl text-xs" onClick={() => setRulesOpen(true)}>
+                  <Pencil className="h-3.5 w-3.5" />
                   Edit rules
                 </Button>
               </div>
@@ -1693,19 +1840,21 @@ export function DownloadFolders({ mode = "settings", importMethod: importMethodP
   const allFolders = folders ?? [];
   const existingNames = new Set(allFolders.map((f) => f.name.toLowerCase()));
 
-  // Build qBittorrent path options for API mode dropdown
-  const qbitPaths = (() => {
+  // Build qBittorrent category options for the dropdown (remote mode).
+  // Only include categories with a non-empty savePath — paths without one
+  // cannot be validated and would lead to the same bug this dropdown fixes.
+  const qbitOptions: QbitPathOption[] = (() => {
     if (!qbitData) return [];
-    const defaultPath = qbitData.defaultSavePath.replace(/\/+$/, "");
-    const paths: Array<{ label: string; path: string }> = [];
-    if (defaultPath) paths.push({ label: `${defaultPath} (default)`, path: defaultPath });
+    const out: QbitPathOption[] = [];
+    const seen = new Set<string>();
     for (const [catName, cat] of Object.entries(qbitData.categories)) {
-      const p = cat.savePath || (defaultPath ? `${defaultPath}/${catName}` : "");
-      if (p && !paths.some((x) => x.path === p)) {
-        paths.push({ label: `${p} (${catName})`, path: p });
-      }
+      if (!cat.savePath) continue;
+      const key = `${catName}:${cat.savePath}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ category: catName, savePath: cat.savePath });
     }
-    return paths;
+    return out;
   })();
 
   const handleGeneratePaths = (): void => {
@@ -1887,7 +2036,7 @@ export function DownloadFolders({ mode = "settings", importMethod: importMethodP
             onToggle={() => setExpandedId(expandedId === folder.id ? null : folder.id)}
             onRefresh={refresh}
             importMethod={effectiveMethod}
-            qbitPaths={qbitPaths}
+            qbitOptions={qbitOptions}
           />
         ))}
       </div>
