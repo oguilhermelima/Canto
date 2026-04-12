@@ -3,6 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@canto/db/client";
 import * as schema from "@canto/db/schema";
 import { count, sql } from "drizzle-orm";
+import { DEFAULT_HOME_SECTIONS } from "@canto/db/home-section-defaults";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -65,6 +66,11 @@ export const auth = betterAuth({
             type: "watchlist",
             isSystem: true,
           });
+
+          // Seed default homepage sections
+          await db.insert(schema.homeSection).values(
+            DEFAULT_HOME_SECTIONS.map((s) => ({ ...s, userId: user.id })),
+          );
         },
       },
     },

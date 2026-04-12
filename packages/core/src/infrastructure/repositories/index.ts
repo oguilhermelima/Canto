@@ -12,3 +12,4 @@ export * from "./user-recommendation-repository";
 export * from "./user-connection-repository";
 export * from "./user-media-repository";
 export * from "./user-media-library-repository";
+export * from "./home-section-repository";
