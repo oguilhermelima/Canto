@@ -7,7 +7,23 @@ import {
   SETTINGS_REGISTRY,
   type SettingKey,
   type SettingValue,
-} from "@canto/core/lib/settings-registry";
+} from "./settings-registry";
+
+// Re-export the registry surface so consumers can treat `@canto/db/settings`
+// as the single entry point for everything settings-related. This keeps the
+// registry file path internal to @canto/db and frees @canto/core from any
+// dependency on the persistence layer (no workspace cycle).
+export {
+  SETTINGS_REGISTRY,
+  allSettingKeys,
+  visibleSettingKeys,
+  isSettingKey,
+  type SettingKey,
+  type SettingValue,
+  type SettingDef,
+  type SettingInputType,
+  type SettingSelectOption,
+} from "./settings-registry";
 
 import { db } from "./client";
 import { systemSetting } from "./schema";

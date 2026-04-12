@@ -20,6 +20,10 @@
       "types": "./src/settings.ts",
       "default": "./src/settings.ts"
     },
+    "./settings-registry": {
+      "types": "./src/settings-registry.ts",
+      "default": "./src/settings-registry.ts"
+    },
     "./persist-media": {
       "types": "./src/persist-media.ts",
       "default": "./src/persist-media.ts"
@@ -36,7 +40,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@canto/core": "workspace:*",
     "@canto/providers": "workspace:*",
     "drizzle-orm": "catalog:",
     "postgres": "^3.4.5",

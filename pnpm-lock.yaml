@@ -304,9 +304,6 @@ importers:
 
   packages/db:
     dependencies:
-      '@canto/core':
-        specifier: workspace:*
-        version: link:../core
       '@canto/providers':
         specifier: workspace:*
         version: link:../providers
