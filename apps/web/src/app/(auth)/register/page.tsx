@@ -52,7 +52,7 @@ export default function RegisterPage(): React.JSX.Element {
         return;
       }
 
-      router.push("/");
+      router.push("/setup");
       router.refresh();
     } catch {
       setError("An unexpected error occurred");

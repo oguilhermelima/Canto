@@ -118,7 +118,7 @@ export default function OnboardingPage(): React.JSX.Element {
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(PROGRESS_KEY);
     }
-    router.replace("/");
+    router.replace("/setup");
   }, [completeOnboarding, router]);
 
   const skipLibraries = useCallback(() => skipTo("jellyfin"), [skipTo]);

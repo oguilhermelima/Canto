@@ -13,6 +13,7 @@ import {
   Send,
   User,
   Settings,
+  Palette,
   Bell,
   LogOut,
   Sun,
@@ -185,6 +186,7 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
 
   const actions: MenuAction[] = [
     { href: "/profile/me", label: "Profile", icon: User },
+    { href: "/personalize", label: "Personalize", icon: Palette },
     { href: "/manage", label: "Manage", icon: Settings },
     { href: "/notifications", label: "Notifications", icon: Bell },
     {
