@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { StateMessage } from "~/components/layout/state-message";
+import { SettingField } from "~/components/settings/_primitives";
 import { SettingsSection } from "~/components/settings/shared";
 import { SyncItemsDialog } from "~/components/settings/sync-items-dialog";
 
@@ -283,17 +284,8 @@ function ServerLibraryGroup({
 /* -------------------------------------------------------------------------- */
 
 export function FolderScanSection(): React.JSX.Element {
-  const utils = trpc.useUtils();
   const { data: allSettings } = trpc.settings.getAll.useQuery();
   const folderScanEnabled = allSettings?.["sync.folderScan.enabled"] === true;
-
-  const setSetting = trpc.settings.set.useMutation({
-    onSuccess: () => {
-      void utils.settings.getAll.invalidate();
-      toast.success("Folder scan setting updated");
-    },
-    onError: () => toast.error("Failed to update setting"),
-  });
 
   const scanFolders = trpc.sync.scanFolders.useMutation({
     onSuccess: (data) => {
@@ -321,11 +313,7 @@ export function FolderScanSection(): React.JSX.Element {
                 </p>
               </div>
             </div>
-            <Switch
-              checked={folderScanEnabled}
-              onCheckedChange={(checked) => setSetting.mutate({ key: "sync.folderScan.enabled", value: checked })}
-              disabled={setSetting.isPending}
-            />
+            <SettingField settingKey="sync.folderScan.enabled" hideLabel hideHelp />
           </div>
 
           <div className="flex items-center justify-between border-t border-border/40 px-5 py-3.5">
