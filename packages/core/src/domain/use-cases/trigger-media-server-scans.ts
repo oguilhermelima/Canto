@@ -3,8 +3,7 @@
 /* -------------------------------------------------------------------------- */
 
 import type { Database } from "@canto/db/client";
-import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "../../lib/settings-keys";
+import { getSetting, getSettings } from "@canto/db/settings";
 import { findAllServerLinks } from "../../infrastructure/repositories";
 import {
   triggerJellyfinScan,
@@ -24,7 +23,7 @@ export interface ImportedMedia {
 }
 
 async function isAutoMergeEnabled(): Promise<boolean> {
-  const value = await getSetting<boolean>(SETTINGS.AUTO_MERGE_VERSIONS);
+  const value = await getSetting("autoMergeVersions");
   if (value === undefined || value === null) return true;
   return value === true;
 }
@@ -68,10 +67,17 @@ export async function triggerMediaServerScans(
   const links = await findAllServerLinks(db);
   if (links.length === 0) return;
 
-  const jellyfinUrl = await getSetting<string>(SETTINGS.JELLYFIN_URL);
-  const jellyfinKey = await getSetting<string>(SETTINGS.JELLYFIN_API_KEY);
-  const plexUrl = await getSetting<string>(SETTINGS.PLEX_URL);
-  const plexToken = await getSetting<string>(SETTINGS.PLEX_TOKEN);
+  const {
+    "jellyfin.url": jellyfinUrl,
+    "jellyfin.apiKey": jellyfinKey,
+    "plex.url": plexUrl,
+    "plex.token": plexToken,
+  } = await getSettings([
+    "jellyfin.url",
+    "jellyfin.apiKey",
+    "plex.url",
+    "plex.token",
+  ]);
 
   for (const link of links) {
     if (link.serverType === "jellyfin" && jellyfinUrl && jellyfinKey) {

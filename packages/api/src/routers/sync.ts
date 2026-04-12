@@ -1,4 +1,4 @@
-import { getSetting } from "@canto/db/settings";
+import { getSetting, getSettings, getSettingRaw } from "@canto/db/settings";
 import {
   getByMediaIdInput,
   listMediaVersionGroupsInput,
@@ -7,7 +7,6 @@ import {
   deleteMediaVersionInput,
   discoverServerLibrariesInput,
 } from "@canto/validators";
-import { SETTINGS } from "@canto/core/lib/settings-keys";
 
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
 import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
@@ -58,8 +57,8 @@ export const syncRouter = createTRPCRouter({
       startedAt: string; completedAt?: string;
     };
     const [jellyfin, plex] = await Promise.all([
-      getSetting<SyncStatus>(`${SETTINGS.SYNC_MEDIA_IMPORT_STATUS}.jellyfin-sync`),
-      getSetting<SyncStatus>(`${SETTINGS.SYNC_MEDIA_IMPORT_STATUS}.plex-sync`),
+      getSettingRaw("sync.mediaImport.status.jellyfin-sync") as Promise<SyncStatus | null>,
+      getSettingRaw("sync.mediaImport.status.plex-sync") as Promise<SyncStatus | null>,
     ]);
     return { jellyfin: jellyfin ?? null, plex: plex ?? null };
   }),
@@ -87,11 +86,11 @@ export const syncRouter = createTRPCRouter({
   ),
 
   getServerDeepLinkConfig: adminProcedure.query(async () => {
-    const [plexUrl, plexMachineId, jellyfinUrl] = await Promise.all([
-      getSetting<string>(SETTINGS.PLEX_URL),
-      getSetting<string>(SETTINGS.PLEX_MACHINE_ID),
-      getSetting<string>(SETTINGS.JELLYFIN_URL),
-    ]);
+    const {
+      "plex.url": plexUrl,
+      "plex.machineId": plexMachineId,
+      "jellyfin.url": jellyfinUrl,
+    } = await getSettings(["plex.url", "plex.machineId", "jellyfin.url"]);
     return {
       plexUrl: plexUrl ?? null,
       plexMachineId: plexMachineId ?? null,
@@ -170,7 +169,7 @@ export const syncRouter = createTRPCRouter({
 
       const jellyfinVersion = versions.find((v) => v.source === "jellyfin");
       if (jellyfinVersion) {
-        const jellyfinUrl = await getSetting<string>(SETTINGS.JELLYFIN_URL);
+        const jellyfinUrl = await getSetting("jellyfin.url");
         if (jellyfinUrl) {
           result.jellyfin = {
             url: `${jellyfinUrl}/web/index.html#!/details?id=${jellyfinVersion.serverItemId}`,
@@ -180,8 +179,8 @@ export const syncRouter = createTRPCRouter({
 
       const plexVersion = versions.find((v) => v.source === "plex");
       if (plexVersion) {
-        const plexUrl = await getSetting<string>(SETTINGS.PLEX_URL);
-        const machineId = await getSetting<string>(SETTINGS.PLEX_MACHINE_ID);
+        const plexUrl = await getSetting("plex.url");
+        const machineId = await getSetting("plex.machineId");
         if (plexUrl && machineId) {
           result.plex = {
             url: `${plexUrl}/web/index.html#!/server/${machineId}/details?key=%2Flibrary%2Fmetadata%2F${plexVersion.serverItemId}`,

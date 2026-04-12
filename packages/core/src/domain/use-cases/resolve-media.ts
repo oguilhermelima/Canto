@@ -3,7 +3,6 @@ import type { MediaProviderPort } from "../ports/media-provider.port";
 import type { MediaType, NormalizedMedia, NormalizedSeason, ProviderName } from "@canto/providers";
 import { getSetting } from "@canto/db/settings";
 import { getSupportedLanguageCodes } from "@canto/db/persist-media";
-import { SETTINGS } from "../../lib/settings-keys";
 import { findMediaByExternalId } from "../../infrastructure/repositories/media-repository";
 import { getEffectiveProviderSync } from "../rules/effective-provider";
 import { fetchMediaMetadata } from "./fetch-media-metadata";
@@ -29,7 +28,7 @@ export async function resolveMedia(
   userId: string,
   providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort },
 ) {
-  const globalTvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+  const globalTvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
 
   const existing = await findMediaByExternalId(db, input.externalId, input.provider);
 

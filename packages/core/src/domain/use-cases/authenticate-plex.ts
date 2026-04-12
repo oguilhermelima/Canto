@@ -1,6 +1,5 @@
 import { randomUUID } from "crypto";
 import { getSetting, setSetting } from "@canto/db/settings";
-import { SETTINGS } from "../../lib/settings-keys";
 import { validateServiceUrl } from "../rules/validate-service-url";
 
 /* -------------------------------------------------------------------------- */
@@ -9,10 +8,10 @@ import { validateServiceUrl } from "../rules/validate-service-url";
 
 /** Get or create a stable Plex client identifier (persisted in settings). */
 async function getOrCreatePlexClientId(): Promise<string> {
-  const existing = await getSetting<string>(SETTINGS.PLEX_CLIENT_ID);
+  const existing = await getSetting("plex.clientId");
   if (existing) return existing;
   const id = randomUUID();
-  await setSetting(SETTINGS.PLEX_CLIENT_ID, id);
+  await setSetting("plex.clientId", id);
   return id;
 }
 

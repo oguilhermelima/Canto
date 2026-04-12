@@ -7,7 +7,6 @@ import { getSetting } from "@canto/db/settings";
 import type { DownloadClientPort, TorrentFileInfo } from "../ports/download-client";
 import { isVideoFile, sanitizeName, buildMediaDir, buildFileName } from "../rules/naming";
 import { EP_PATTERN, BARE_EP_PATTERN, parseFileEpisodes, isSubtitleFile, parseSubtitleLanguage } from "../rules/parsing";
-import { SETTINGS } from "../../lib/settings-keys";
 import { getEffectiveProviderSync } from "../rules/effective-provider";
 import { createNotification } from "./create-notification";
 import {
@@ -632,7 +631,7 @@ export async function autoImportTorrent(
 
   // ── Determine import method ──
 
-  const rawMethod = (await getSetting<string>(SETTINGS.IMPORT_METHOD)) ?? "local";
+  const rawMethod = (await getSetting("download.importMethod")) ?? "local";
   const importMethod: ImportMethod = rawMethod === "remote" ? "remote" : "local";
 
   // ── Resolve library ──
@@ -668,7 +667,7 @@ export async function autoImportTorrent(
   }
 
   const globalTvdbEnabled =
-    (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+    (await getSetting("tvdb.defaultShows")) === true;
   const effectiveProvider = getEffectiveProviderSync(mediaRow, globalTvdbEnabled);
   const namingExternalId =
     effectiveProvider === "tvdb" && mediaRow.tvdbId

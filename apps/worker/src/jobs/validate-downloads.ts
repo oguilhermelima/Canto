@@ -5,7 +5,6 @@ import { eq, and } from "drizzle-orm";
 import { db } from "@canto/db/client";
 import { media, mediaFile } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "@canto/core/lib/settings-keys";
 import { updateMedia } from "@canto/core/infrastructure/repositories";
 import { createNotification } from "@canto/core/domain/use-cases/create-notification";
 
@@ -17,7 +16,7 @@ import { createNotification } from "@canto/core/domain/use-cases/create-notifica
  * Runs every 6 hours.
  */
 export async function handleValidateDownloads(): Promise<void> {
-  const importMethod = (await getSetting<string>(SETTINGS.IMPORT_METHOD)) ?? "local";
+  const importMethod = (await getSetting("download.importMethod")) ?? "local";
 
   // Only validate local imports — remote imports can't be checked from Canto's filesystem
   if (importMethod === "remote") return;

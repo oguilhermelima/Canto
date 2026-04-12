@@ -1,5 +1,4 @@
-import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "../../lib/settings-keys";
+import { getSettings } from "@canto/db/settings";
 import type { DownloadClientPort, TorrentInfo, TorrentFileInfo } from "../../domain/ports/download-client";
 
 export class QBittorrentClient implements DownloadClientPort {
@@ -273,10 +272,16 @@ let qbClient: QBittorrentClient | null = null;
 
 export async function getQBClient(): Promise<QBittorrentClient> {
   if (!qbClient) {
-    const url = (await getSetting(SETTINGS.QBITTORRENT_URL)) ?? "";
-    const user = (await getSetting(SETTINGS.QBITTORRENT_USERNAME)) ?? "";
-    const pass = (await getSetting(SETTINGS.QBITTORRENT_PASSWORD)) ?? "";
-    qbClient = new QBittorrentClient(url, user, pass);
+    const {
+      "qbittorrent.url": url,
+      "qbittorrent.username": user,
+      "qbittorrent.password": pass,
+    } = await getSettings([
+      "qbittorrent.url",
+      "qbittorrent.username",
+      "qbittorrent.password",
+    ]);
+    qbClient = new QBittorrentClient(url ?? "", user ?? "", pass ?? "");
   }
   return qbClient;
 }

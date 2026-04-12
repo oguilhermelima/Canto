@@ -11,7 +11,6 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { createPlexPin, checkPlexPin, authenticatePlex } from "@canto/core/domain/use-cases/authenticate-plex";
 import { authenticateJellyfin } from "@canto/core/domain/use-cases/authenticate-jellyfin";
 import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "@canto/core/lib/settings-keys";
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                    */
@@ -85,7 +84,7 @@ export const userConnectionRouter = createTRPCRouter({
       let externalUserId: string | undefined;
 
       if (input.provider === "plex") {
-        const url = await getSetting<string>(SETTINGS.PLEX_URL);
+        const url = await getSetting("plex.url");
         if (!url) {
           throw new TRPCError({
             code: "BAD_REQUEST",
@@ -102,7 +101,7 @@ export const userConnectionRouter = createTRPCRouter({
         token = result.token;
         externalUserId = result.userId;
       } else if (input.provider === "jellyfin") {
-        const url = await getSetting<string>(SETTINGS.JELLYFIN_URL);
+        const url = await getSetting("jellyfin.url");
         if (!url) {
           throw new TRPCError({
             code: "BAD_REQUEST",
@@ -201,7 +200,7 @@ export const userConnectionRouter = createTRPCRouter({
   plexPinCheck: protectedProcedure
     .input(z.object({ pinId: z.number(), clientId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const serverUrl = (await getSetting<string>(SETTINGS.PLEX_URL)) ?? undefined;
+      const serverUrl = (await getSetting("plex.url")) ?? undefined;
       const result = await checkPlexPin({ ...input, serverUrl });
 
       if (result.authenticated && result.token) {

@@ -3,8 +3,7 @@
 /* -------------------------------------------------------------------------- */
 
 import type { Database } from "@canto/db/client";
-import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "../../lib/settings-keys";
+import { getSettings } from "@canto/db/settings";
 import { findMediaById } from "../../infrastructure/repositories/media-repository";
 import {
   findMediaVersionsByMediaId,
@@ -39,13 +38,21 @@ export async function updateMediaServerMetadata(
   const versions = await findMediaVersionsByMediaId(db, mediaId);
   if (versions.length === 0) return result;
 
-  const jellyfinEnabled = await getSetting<boolean>(SETTINGS.JELLYFIN_ENABLED);
-  const jellyfinUrl = await getSetting<string>(SETTINGS.JELLYFIN_URL);
-  const jellyfinKey = await getSetting<string>(SETTINGS.JELLYFIN_API_KEY);
-
-  const plexEnabled = await getSetting<boolean>(SETTINGS.PLEX_ENABLED);
-  const plexUrl = await getSetting<string>(SETTINGS.PLEX_URL);
-  const plexToken = await getSetting<string>(SETTINGS.PLEX_TOKEN);
+  const {
+    "jellyfin.enabled": jellyfinEnabled,
+    "jellyfin.url": jellyfinUrl,
+    "jellyfin.apiKey": jellyfinKey,
+    "plex.enabled": plexEnabled,
+    "plex.url": plexUrl,
+    "plex.token": plexToken,
+  } = await getSettings([
+    "jellyfin.enabled",
+    "jellyfin.url",
+    "jellyfin.apiKey",
+    "plex.enabled",
+    "plex.url",
+    "plex.token",
+  ]);
 
   // The media row's `type` drives which Jellyfin/Plex endpoints we call.
   const mediaType = mediaRow.type === "show" ? "show" : "movie";

@@ -3,7 +3,6 @@ import type { MediaProviderPort } from "../ports/media-provider.port";
 import type { MediaType, ProviderName } from "@canto/providers";
 import { persistMedia } from "@canto/db/persist-media";
 import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "../../lib/settings-keys";
 import { logAndSwallow } from "../../lib/log-error";
 import {
   findMediaByExternalId,
@@ -31,7 +30,7 @@ export async function getByExternal(
   providerFactory: (name: "tmdb" | "tvdb") => Promise<MediaProviderPort>,
   getSupportedLangs: () => Promise<string[]>,
 ) {
-  const tvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+  const tvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
 
   const existing = tvdbEnabled
     ? await findMediaByAnyReference(db, input.externalId, input.provider)

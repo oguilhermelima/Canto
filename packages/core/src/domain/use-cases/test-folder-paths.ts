@@ -19,7 +19,7 @@ async function testPath(p: string | null): Promise<{ ok: boolean; error?: string
  * Respects the import method setting (local vs remote).
  */
 export async function testFolderPaths(db: Database) {
-  const importMethod = (await getSetting<string>("download.importMethod")) ?? "local";
+  const importMethod = (await getSetting("download.importMethod")) ?? "local";
   const folders = await findAllFolders(db);
 
   const results: Array<{

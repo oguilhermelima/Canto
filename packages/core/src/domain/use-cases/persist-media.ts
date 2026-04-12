@@ -3,7 +3,6 @@ import type { MediaProviderPort } from "../ports/media-provider.port";
 import type { MediaType, ProviderName } from "@canto/providers";
 import { getSetting } from "@canto/db/settings";
 import { getSupportedLanguageCodes, persistFullMedia } from "@canto/db/persist-media";
-import { SETTINGS } from "../../lib/settings-keys";
 import { logAndSwallow } from "../../lib/log-error";
 import { getEffectiveProviderSync } from "../rules/effective-provider";
 import {
@@ -29,7 +28,7 @@ export async function persistMediaUseCase(
   input: PersistMediaInput,
   providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort },
 ) {
-  const globalTvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+  const globalTvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
 
   const existing = globalTvdbEnabled
     ? await findMediaByAnyReference(db, input.externalId, input.provider)

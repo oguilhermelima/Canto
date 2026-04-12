@@ -1,5 +1,4 @@
 import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "../../lib/settings-keys";
 
 export type EffectiveProvider = "tmdb" | "tvdb";
 
@@ -35,6 +34,6 @@ export async function getEffectiveProvider(
   media: ProviderInput,
 ): Promise<EffectiveProvider> {
   const globalTvdbEnabled =
-    (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+    (await getSetting("tvdb.defaultShows")) === true;
   return getEffectiveProviderSync(media, globalTvdbEnabled);
 }

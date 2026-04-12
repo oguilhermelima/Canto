@@ -102,14 +102,13 @@ export const providerRouter = createTRPCRouter({
 /* -------------------------------------------------------------------------- */
 
 import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "@canto/core/lib/settings-keys";
 
 async function fetchFromTmdb<T>(
   _tmdb: unknown,
   path: string,
   params?: Record<string, string>,
 ): Promise<T> {
-  const apiKey = (await getSetting(SETTINGS.TMDB_API_KEY)) ?? "";
+  const apiKey = (await getSetting("tmdb.apiKey")) ?? "";
   const url = new URL(`https://api.themoviedb.org/3${path}`);
   url.searchParams.set("api_key", apiKey);
   if (params) {

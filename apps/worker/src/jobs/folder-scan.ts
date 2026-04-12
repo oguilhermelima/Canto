@@ -1,11 +1,10 @@
 import { db } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "@canto/core/lib/settings-keys";
 import { findAllFolders, findMediaPathsByFolder } from "@canto/core/infrastructure/repositories";
 import { scanFolderForMedia } from "@canto/core/domain/use-cases/scan-folder-for-media";
 
 export async function handleFolderScan(): Promise<void> {
-  const enabled = await getSetting<boolean>(SETTINGS.SYNC_FOLDER_SCAN_ENABLED);
+  const enabled = await getSetting("sync.folderScan.enabled");
   if (!enabled) {
     console.log("[folder-scan] Disabled, skipping");
     return;

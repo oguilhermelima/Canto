@@ -10,9 +10,8 @@
 import type { Database } from "@canto/db/client";
 import type { TmdbProvider } from "@canto/providers";
 import { persistMedia, getSupportedLanguageCodes } from "@canto/db/persist-media";
-import { getSetting, setSetting } from "@canto/db/settings";
+import { getSetting, getSettings, setSettingRaw } from "@canto/db/settings";
 
-import { SETTINGS } from "../../lib/settings-keys";
 import { dispatchMediaPipeline } from "../../infrastructure/queue/bullmq-dispatcher";
 import { logAndSwallow } from "../../lib/log-error";
 import {
@@ -72,7 +71,8 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function persistStatus(tag: string, summary: SyncSummary): Promise<void> {
-  await setSetting(`${STATUS_KEY_PREFIX}.${tag}`, summary);
+  // Dynamic per-tag keys aren't in the registry — use the raw escape hatch.
+  await setSettingRaw(`${STATUS_KEY_PREFIX}.${tag}`, summary);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -337,11 +337,17 @@ async function persistEpisodesFor(
 /* -------------------------------------------------------------------------- */
 
 async function loadServerConfig(): Promise<ServerConfig> {
+  const s = await getSettings([
+    "jellyfin.url",
+    "jellyfin.apiKey",
+    "plex.url",
+    "plex.token",
+  ]);
   return {
-    jellyfinUrl: await getSetting<string>("jellyfin.url"),
-    jellyfinKey: await getSetting<string>("jellyfin.apiKey"),
-    plexUrl: await getSetting<string>("plex.url"),
-    plexToken: await getSetting<string>("plex.token"),
+    jellyfinUrl: s["jellyfin.url"],
+    jellyfinKey: s["jellyfin.apiKey"],
+    plexUrl: s["plex.url"],
+    plexToken: s["plex.token"],
   };
 }
 
@@ -372,7 +378,7 @@ export async function runSyncPipeline(
   }
 
   const syncRunStart = new Date();
-  const tvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+  const tvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
   const config = await loadServerConfig();
   const supportedLangs = [...(await getSupportedLanguageCodes(db))];
 

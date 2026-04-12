@@ -1,26 +1,31 @@
-import { getSetting, setSetting } from "@canto/db/settings";
+import { getSettings, setSetting } from "@canto/db/settings";
 import { TvdbProvider } from "@canto/providers";
-import { SETTINGS } from "./settings-keys";
 
 /**
  * Read the TVDB API key + cached token from settings and return a configured
  * TvdbProvider. The onTokenRefresh callback persists new tokens back to the DB.
  */
 export async function getTvdbProvider(): Promise<TvdbProvider> {
-  const apiKey = (await getSetting(SETTINGS.TVDB_API_KEY)) ?? "";
-  const token = await getSetting<string>(SETTINGS.TVDB_TOKEN);
-  const tokenExpires = await getSetting<number>(SETTINGS.TVDB_TOKEN_EXPIRES);
-
-  const language = (await getSetting(SETTINGS.LANGUAGE)) ?? "en-US";
+  const {
+    "tvdb.apiKey": apiKey,
+    "tvdb.token": token,
+    "tvdb.tokenExpires": tokenExpires,
+    "general.language": language,
+  } = await getSettings([
+    "tvdb.apiKey",
+    "tvdb.token",
+    "tvdb.tokenExpires",
+    "general.language",
+  ]);
 
   return new TvdbProvider({
-    apiKey,
+    apiKey: apiKey ?? "",
     token,
     tokenExpires,
-    language,
+    language: language ?? "en-US",
     onTokenRefresh: async (newToken: string, expires: number) => {
-      await setSetting(SETTINGS.TVDB_TOKEN, newToken);
-      await setSetting(SETTINGS.TVDB_TOKEN_EXPIRES, expires);
+      await setSetting("tvdb.token", newToken);
+      await setSetting("tvdb.tokenExpires", expires);
     },
   });
 }

@@ -21,7 +21,6 @@ import {
 import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure } from "../trpc";
 import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
 import { getTvdbProvider } from "@canto/core/lib/tvdb-client";
-import { SETTINGS } from "@canto/core/lib/settings-keys";
 import { dispatchRefreshExtras, dispatchEnrichMedia, dispatchRebuildUserRecs } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
 import { cached } from "@canto/core/infrastructure/cache/redis";
 import { logAndSwallow } from "@canto/core/lib/log-error";
@@ -72,7 +71,7 @@ export const mediaRouter = createTRPCRouter({
           throw new TRPCError({ code: "BAD_REQUEST", message: "Query is required for search mode" });
         }
 
-        const searchLang = (await getSetting(SETTINGS.LANGUAGE)) ?? "en-US";
+        const searchLang = (await getSetting("general.language")) ?? "en-US";
         const searchResults = await cached(
           `browse:search:${input.provider}:${input.type}:${input.query}:${page}:${searchLang}`,
           1800,
@@ -84,7 +83,7 @@ export const mediaRouter = createTRPCRouter({
         return enrichBrowseWithLogos(appDb, searchResults);
       }
 
-      const settingsLang = (await getSetting(SETTINGS.LANGUAGE)) ?? "en-US";
+      const settingsLang = (await getSetting("general.language")) ?? "en-US";
       const cacheKey = `browse:${input.type}:${input.mode}:${input.genres ?? ""}:${input.language ?? ""}:${input.sortBy ?? ""}:${input.dateFrom ?? ""}:${input.dateTo ?? ""}:${input.keywords ?? ""}:${input.scoreMin ?? ""}:${input.runtimeMax ?? ""}:${input.certification ?? ""}:${input.status ?? ""}:${input.watchProviders ?? ""}:${input.watchRegion ?? ""}:${input.runtimeMin ?? ""}:${page}:${settingsLang}`;
 
       const browseResults = await cached(cacheKey, 1800, async () => {
@@ -188,7 +187,7 @@ export const mediaRouter = createTRPCRouter({
       const row = await findMediaById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
 
-      const settingsLang = (await getSetting(SETTINGS.LANGUAGE)) ?? "en-US";
+      const settingsLang = (await getSetting("general.language")) ?? "en-US";
       const extras = await loadExtrasFromDB(ctx.db, input.id, settingsLang);
 
       // If extras tables have data, return them

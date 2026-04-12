@@ -3,7 +3,6 @@ import { rename, mkdir, rmdir } from "node:fs/promises";
 
 import type { Database } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "../../lib/settings-keys";
 import { getEffectiveProvider } from "../rules/effective-provider";
 import {
   buildMediaDir,
@@ -193,7 +192,7 @@ export async function executeReorganizeMediaFiles(
   }
 
   const importMethod =
-    (await getSetting<string>(SETTINGS.IMPORT_METHOD)) ?? "local";
+    (await getSetting("download.importMethod")) ?? "local";
   const result: ReorganizeResult = { renamed: 0, skipped, failed: [] };
 
   if (importMethod === "local") {

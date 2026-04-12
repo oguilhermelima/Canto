@@ -2,8 +2,7 @@ import { unlink, rmdir } from "node:fs/promises";
 import path from "node:path";
 
 import { db } from "@canto/db/client";
-import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "@canto/core/lib/settings-keys";
+import { getSettings } from "@canto/db/settings";
 import { getDownloadClient } from "@canto/core/infrastructure/adapters/download-client-factory";
 import {
   findTorrentByHash,
@@ -16,10 +15,14 @@ import {
  * source files in the downloads folder (safe when hardlinks are used).
  */
 export async function handleSeedManagement(): Promise<void> {
-  const [ratioLimit, timeLimitHours, cleanupFiles] = await Promise.all([
-    getSetting<number>(SETTINGS.SEED_RATIO_LIMIT),
-    getSetting<number>(SETTINGS.SEED_TIME_LIMIT_HOURS),
-    getSetting<boolean>(SETTINGS.SEED_CLEANUP_FILES),
+  const {
+    "download.seedRatioLimit": ratioLimit,
+    "download.seedTimeLimitHours": timeLimitHours,
+    "download.seedCleanupFiles": cleanupFiles,
+  } = await getSettings([
+    "download.seedRatioLimit",
+    "download.seedTimeLimitHours",
+    "download.seedCleanupFiles",
   ]);
 
   // No limits configured — nothing to do

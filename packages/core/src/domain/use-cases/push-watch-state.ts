@@ -86,7 +86,7 @@ async function pushJellyfin(
     );
     return;
   }
-  const jellyfinUrl = await getSetting<string>("jellyfin.url");
+  const jellyfinUrl = await getSetting("jellyfin.url");
   if (!jellyfinUrl) return;
   if (mediaRow.provider !== "tmdb" && mediaRow.provider !== "tvdb") {
     // We can only resolve items on the server when the Canto media row has
@@ -140,7 +140,7 @@ async function pushPlex(
   watched: boolean,
 ): Promise<void> {
   if (!conn.token) return;
-  const plexUrl = await getSetting<string>("plex.url");
+  const plexUrl = await getSetting("plex.url");
   if (!plexUrl) return;
 
   // Prefer the serverItemId already persisted by reverse-sync.

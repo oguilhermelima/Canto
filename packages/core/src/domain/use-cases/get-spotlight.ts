@@ -2,7 +2,6 @@ import type { Database } from "@canto/db/client";
 import type { MediaProviderPort } from "../ports/media-provider.port";
 import type { SearchResult } from "@canto/providers";
 import { getSetting, setSetting } from "@canto/db/settings";
-import { SETTINGS } from "../../lib/settings-keys";
 import { buildExclusionSet } from "../services/recommendation-service";
 import { translateMediaItems } from "../services/translation-service";
 import { getUserLanguage } from "../services/user-service";
@@ -48,10 +47,9 @@ export async function getSpotlight(
   }
 
   // Path 3: TMDB trending fallback (fresh install)
-  const CACHE_KEY = SETTINGS.CACHE_SPOTLIGHT;
   const ONE_HOUR_MS = 60 * 60 * 1000;
 
-  const cachedData = await getSetting<{ data: unknown[]; updatedAt: string }>(CACHE_KEY);
+  const cachedData = await getSetting("cache.spotlight");
   if (cachedData && Date.now() - new Date(cachedData.updatedAt).getTime() < ONE_HOUR_MS) {
     return cachedData.data as Array<{
       externalId: number; provider: string; type: "movie" | "show";
@@ -112,7 +110,7 @@ export async function getSpotlight(
 
   const spotlightResults = results.filter((r): r is NonNullable<typeof r> => r !== null);
 
-  await setSetting(CACHE_KEY, { data: spotlightResults, updatedAt: new Date().toISOString() });
+  await setSetting("cache.spotlight", { data: spotlightResults, updatedAt: new Date().toISOString() });
 
   return translateMediaItems(db, spotlightResults, userLang);
 }

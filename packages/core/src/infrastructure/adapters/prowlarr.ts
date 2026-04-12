@@ -1,5 +1,4 @@
-import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "../../lib/settings-keys";
+import { getSettings } from "@canto/db/settings";
 import type { IndexerResult, SearchContext } from "../../domain/types/torrent";
 import type { IndexerPort } from "../../domain/ports/indexer";
 import { parseTorznabXml } from "./torznab-parser";
@@ -202,11 +201,18 @@ export class ProwlarrClient implements IndexerPort {
 
   async search(ctx: SearchContext): Promise<IndexerResult[]> {
     // Read configurable limits from settings
-    const [maxIndexers, timeoutMs, concurrency] = await Promise.all([
-      getSetting<number>(SETTINGS.SEARCH_MAX_INDEXERS).then((v) => v ?? ProwlarrClient.DEFAULT_MAX_INDEXERS),
-      getSetting<number>(SETTINGS.SEARCH_TIMEOUT).then((v) => v ?? ProwlarrClient.DEFAULT_TIMEOUT),
-      getSetting<number>(SETTINGS.SEARCH_CONCURRENCY).then((v) => v ?? ProwlarrClient.DEFAULT_CONCURRENCY),
+    const {
+      "search.maxIndexers": maxIndexersRaw,
+      "search.timeout": timeoutRaw,
+      "search.concurrency": concurrencyRaw,
+    } = await getSettings([
+      "search.maxIndexers",
+      "search.timeout",
+      "search.concurrency",
     ]);
+    const maxIndexers = maxIndexersRaw ?? ProwlarrClient.DEFAULT_MAX_INDEXERS;
+    const timeoutMs = timeoutRaw ?? ProwlarrClient.DEFAULT_TIMEOUT;
+    const concurrency = concurrencyRaw ?? ProwlarrClient.DEFAULT_CONCURRENCY;
 
     const indexers = await this.fetchIndexers();
 
@@ -274,9 +280,11 @@ let prowlarrClient: ProwlarrClient | null = null;
 
 export async function getProwlarrClient(): Promise<ProwlarrClient> {
   if (!prowlarrClient) {
-    const url = (await getSetting(SETTINGS.PROWLARR_URL)) ?? "";
-    const apiKey = (await getSetting(SETTINGS.PROWLARR_API_KEY)) ?? "";
-    prowlarrClient = new ProwlarrClient(url, apiKey);
+    const { "prowlarr.url": url, "prowlarr.apiKey": apiKey } = await getSettings([
+      "prowlarr.url",
+      "prowlarr.apiKey",
+    ]);
+    prowlarrClient = new ProwlarrClient(url ?? "", apiKey ?? "");
   }
   return prowlarrClient;
 }

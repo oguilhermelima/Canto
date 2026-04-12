@@ -149,7 +149,7 @@ async function pushJellyfin(
     );
     return;
   }
-  const jellyfinUrl = await getSetting<string>("jellyfin.url");
+  const jellyfinUrl = await getSetting("jellyfin.url");
   if (!jellyfinUrl) return;
 
   const itemId = resolveServerItemId(versions, "jellyfin", episodeNumbers);
@@ -187,7 +187,7 @@ async function pushPlex(
   isCompleted: boolean,
 ): Promise<void> {
   if (!conn.token) return;
-  const plexUrl = await getSetting<string>("plex.url");
+  const plexUrl = await getSetting("plex.url");
   if (!plexUrl) return;
 
   const ratingKey = resolveServerItemId(versions, "plex", episodeNumbers);

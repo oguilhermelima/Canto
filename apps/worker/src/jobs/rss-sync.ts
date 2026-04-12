@@ -2,7 +2,6 @@ import { db } from "@canto/db/client";
 import { eq, and } from "drizzle-orm";
 import { media } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "@canto/core/lib/settings-keys";
 import { downloadTorrent } from "@canto/core/domain/use-cases/download-torrent";
 import { detectQuality } from "@canto/core/domain/rules/quality";
 import { calculateConfidence } from "@canto/core/domain/rules/scoring";
@@ -26,7 +25,7 @@ import {
  * 4. For undownloaded episodes, auto-download the best match
  */
 export async function handleRssSync(): Promise<void> {
-  const prowlarrEnabled = (await getSetting<boolean>(SETTINGS.PROWLARR_ENABLED)) === true;
+  const prowlarrEnabled = (await getSetting("prowlarr.enabled")) === true;
   if (!prowlarrEnabled) return;
 
   // 1. Find monitored shows

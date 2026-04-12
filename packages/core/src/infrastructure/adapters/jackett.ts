@@ -1,5 +1,4 @@
-import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "../../lib/settings-keys";
+import { getSettings } from "@canto/db/settings";
 import type { IndexerResult, SearchContext } from "../../domain/types/torrent";
 import type { IndexerPort } from "../../domain/ports/indexer";
 import { parseTorznabXml } from "./torznab-parser";
@@ -50,9 +49,11 @@ let jackettClient: JackettClient | null = null;
 
 export async function getJackettClient(): Promise<JackettClient> {
   if (!jackettClient) {
-    const url = (await getSetting(SETTINGS.JACKETT_URL)) ?? "";
-    const apiKey = (await getSetting(SETTINGS.JACKETT_API_KEY)) ?? "";
-    jackettClient = new JackettClient(url, apiKey);
+    const { "jackett.url": url, "jackett.apiKey": apiKey } = await getSettings([
+      "jackett.url",
+      "jackett.apiKey",
+    ]);
+    jackettClient = new JackettClient(url ?? "", apiKey ?? "");
   }
   return jackettClient;
 }

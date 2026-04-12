@@ -26,7 +26,6 @@ import { findMediaById } from "@canto/core/infrastructure/repositories";
 import { dispatchRebuildUserRecs, dispatchTranslateEpisodes } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
 import type { MediaPipelineJob } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
 import { jobDispatcher } from "@canto/core/infrastructure/adapters/job-dispatcher.adapter";
-import { SETTINGS } from "@canto/core/lib/settings-keys";
 import { db } from "@canto/db/client";
 import { seedLanguages } from "@canto/db";
 import { getSetting } from "@canto/db/settings";
@@ -266,7 +265,7 @@ const workers = [
   new Worker("media-pipeline", async (job) => {
     const data = job.data as MediaPipelineJob;
     const { getEffectiveProviderSync } = await import("@canto/core/domain/rules/effective-provider");
-    const globalTvdbEnabled = (await getSetting<boolean>(SETTINGS.TVDB_DEFAULT_SHOWS)) === true;
+    const globalTvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
     const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
     const supportedLangs = [...await getSupportedLanguageCodes(db)];
 

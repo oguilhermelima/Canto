@@ -6,13 +6,11 @@ import {
   episodeTranslation,
   mediaFile,
 } from "@canto/db/schema";
-import { getSetting } from "@canto/db/settings";
 import {
   getSupportedLanguageCodes,
   persistSeasons,
   persistTranslations,
 } from "@canto/db/persist-media";
-import { SETTINGS } from "../../lib/settings-keys";
 import {
   findMediaById,
   updateMedia,

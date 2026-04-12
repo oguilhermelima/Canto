@@ -1,12 +1,13 @@
-import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "./settings-keys";
+import { getSettings } from "@canto/db/settings";
 
 export async function getJellyfinCredentials(): Promise<{
   url: string;
   apiKey: string;
 } | null> {
-  const url = await getSetting(SETTINGS.JELLYFIN_URL);
-  const apiKey = await getSetting(SETTINGS.JELLYFIN_API_KEY);
+  const { "jellyfin.url": url, "jellyfin.apiKey": apiKey } = await getSettings([
+    "jellyfin.url",
+    "jellyfin.apiKey",
+  ]);
   if (!url || !apiKey) return null;
   return { url, apiKey };
 }
@@ -15,8 +16,10 @@ export async function getPlexCredentials(): Promise<{
   url: string;
   token: string;
 } | null> {
-  const url = await getSetting(SETTINGS.PLEX_URL);
-  const token = await getSetting(SETTINGS.PLEX_TOKEN);
+  const { "plex.url": url, "plex.token": token } = await getSettings([
+    "plex.url",
+    "plex.token",
+  ]);
   if (!url || !token) return null;
   return { url, token };
 }

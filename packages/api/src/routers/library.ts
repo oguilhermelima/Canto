@@ -6,10 +6,9 @@ import {
   setPreferenceInput,
   setDownloadSettingsInput,
 } from "@canto/validators";
-import { getSetting, setSetting } from "@canto/db/settings";
+import { deleteSetting, getSetting, getSettings, setSetting } from "@canto/db/settings";
 
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
-import { SETTINGS } from "@canto/core/lib/settings-keys";
 import {
   findUserPreferences,
   upsertUserPreference,
@@ -89,14 +88,19 @@ export const libraryRouter = createTRPCRouter({
   /* ────────────────────────────────────────────────────────────────────────── */
 
   getDownloadSettings: adminProcedure.query(async () => {
-    const [importMethod, seedRatio, seedTime, seedCleanup] = await Promise.all([
-      getSetting<string>(SETTINGS.IMPORT_METHOD),
-      getSetting<number>(SETTINGS.SEED_RATIO_LIMIT),
-      getSetting<number>(SETTINGS.SEED_TIME_LIMIT_HOURS),
-      getSetting<boolean>(SETTINGS.SEED_CLEANUP_FILES),
+    const {
+      "download.importMethod": importMethod,
+      "download.seedRatioLimit": seedRatio,
+      "download.seedTimeLimitHours": seedTime,
+      "download.seedCleanupFiles": seedCleanup,
+    } = await getSettings([
+      "download.importMethod",
+      "download.seedRatioLimit",
+      "download.seedTimeLimitHours",
+      "download.seedCleanupFiles",
     ]);
     return {
-      importMethod: (importMethod ?? "local") as "local" | "remote",
+      importMethod: importMethod ?? "local",
       seedRatioLimit: seedRatio ?? null,
       seedTimeLimitHours: seedTime ?? null,
       seedCleanupFiles: seedCleanup ?? false,
@@ -106,11 +110,17 @@ export const libraryRouter = createTRPCRouter({
   setDownloadSettings: adminProcedure
     .input(setDownloadSettingsInput)
     .mutation(async ({ input }) => {
+      // null means "no limit" — reset to the registry default instead of
+      // writing an invalid number through setSetting.
       await Promise.all([
-        setSetting(SETTINGS.IMPORT_METHOD, input.importMethod),
-        setSetting(SETTINGS.SEED_RATIO_LIMIT, input.seedRatioLimit),
-        setSetting(SETTINGS.SEED_TIME_LIMIT_HOURS, input.seedTimeLimitHours),
-        setSetting(SETTINGS.SEED_CLEANUP_FILES, input.seedCleanupFiles),
+        setSetting("download.importMethod", input.importMethod),
+        input.seedRatioLimit === null
+          ? deleteSetting("download.seedRatioLimit")
+          : setSetting("download.seedRatioLimit", input.seedRatioLimit),
+        input.seedTimeLimitHours === null
+          ? deleteSetting("download.seedTimeLimitHours")
+          : setSetting("download.seedTimeLimitHours", input.seedTimeLimitHours),
+        setSetting("download.seedCleanupFiles", input.seedCleanupFiles),
       ]);
       return { success: true };
     }),
@@ -120,14 +130,14 @@ export const libraryRouter = createTRPCRouter({
   /* ────────────────────────────────────────────────────────────────────────── */
 
   getAutoMergeVersions: adminProcedure.query(async () => {
-    const value = await getSetting<boolean>(SETTINGS.AUTO_MERGE_VERSIONS);
+    const value = await getSetting("autoMergeVersions");
     return value ?? true;
   }),
 
   setAutoMergeVersions: adminProcedure
     .input(z.boolean())
     .mutation(async ({ input }) => {
-      await setSetting(SETTINGS.AUTO_MERGE_VERSIONS, input);
+      await setSetting("autoMergeVersions", input);
       return { success: true };
     }),
 });

@@ -3,8 +3,13 @@ import { TRPCError } from "@trpc/server";
 import {
   getAllSettings,
   getSetting,
+  getSettingRaw,
   setSetting,
+  setSettingRaw,
   deleteSetting,
+  deleteSettingRaw,
+  isSettingKey,
+  type SettingKey,
 } from "@canto/db/settings";
 import {
   serviceEnum,
@@ -26,7 +31,6 @@ import type { ServiceEnum } from "@canto/validators";
 import { and, eq } from "drizzle-orm";
 import { media, user, supportedLanguage } from "@canto/db/schema";
 import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure, t } from "../trpc";
-import { SETTINGS } from "@canto/core/lib/settings-keys";
 import { dispatchRefreshAllLanguage, dispatchMediaPipeline } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
 
 // ── Extracted use-cases & services ──
@@ -36,7 +40,7 @@ import { authenticatePlex, loginPlex, createPlexPin, checkPlexPin } from "@canto
 import { validateServiceUrl } from "@canto/core/domain/rules/validate-service-url";
 
 const setupOrAdminProcedure = t.procedure.use(async ({ ctx, next }) => {
-  const completed = await getSetting<boolean>("onboarding.completed");
+  const completed = await getSetting("onboarding.completed");
   if (completed) {
     if (!ctx.session || ctx.session.user.role !== "admin") {
       throw new TRPCError({ code: "UNAUTHORIZED", message: "Onboarding is already completed" });
@@ -47,14 +51,14 @@ const setupOrAdminProcedure = t.procedure.use(async ({ ctx, next }) => {
 
 const ALL_SERVICES = serviceEnum.options;
 
-const SERVICE_ENABLED_KEY: Record<ServiceEnum, string> = {
-  jellyfin: SETTINGS.JELLYFIN_ENABLED,
-  plex: SETTINGS.PLEX_ENABLED,
-  qbittorrent: SETTINGS.QBITTORRENT_ENABLED,
-  prowlarr: SETTINGS.PROWLARR_ENABLED,
-  jackett: SETTINGS.JACKETT_ENABLED,
-  tvdb: SETTINGS.TVDB_ENABLED,
-  tmdb: SETTINGS.TMDB_API_KEY,
+const SERVICE_ENABLED_KEY: Record<ServiceEnum, SettingKey> = {
+  jellyfin: "jellyfin.enabled",
+  plex: "plex.enabled",
+  qbittorrent: "qbittorrent.enabled",
+  prowlarr: "prowlarr.enabled",
+  jackett: "jackett.enabled",
+  tvdb: "tvdb.enabled",
+  tmdb: "tmdb.enabled",
 };
 
 export const settingsRouter = createTRPCRouter({
@@ -62,19 +66,34 @@ export const settingsRouter = createTRPCRouter({
 
   get: adminProcedure
     .input(getSettingInput)
-    .query(({ input }) => getSetting(input.key)),
+    .query(({ input }) =>
+      isSettingKey(input.key)
+        ? getSetting(input.key)
+        : getSettingRaw(input.key),
+    ),
 
   set: adminProcedure
     .input(setSettingInput)
     .mutation(async ({ input }) => {
-      await setSetting(input.key, input.value);
+      if (isSettingKey(input.key)) {
+        // TODO: the generic dispatch here can't be proven at compile time
+        // because `input.key` is narrowed to the full SettingKey union.
+        // The registry still validates the value on write.
+        await setSetting(input.key, input.value as never);
+      } else {
+        await setSettingRaw(input.key, input.value);
+      }
       return { success: true };
     }),
 
   delete: adminProcedure
     .input(deleteSettingInput)
     .mutation(async ({ input }) => {
-      await deleteSetting(input.key);
+      if (isSettingKey(input.key)) {
+        await deleteSetting(input.key);
+      } else {
+        await deleteSettingRaw(input.key);
+      }
       return { success: true };
     }),
 
@@ -82,7 +101,12 @@ export const settingsRouter = createTRPCRouter({
     .input(setManySettingsInput)
     .mutation(async ({ input }) => {
       for (const { key, value } of input.settings) {
-        await setSetting(key, value);
+        if (isSettingKey(key)) {
+          // TODO: untyped generic dispatch — registry validates at write time.
+          await setSetting(key, value as never);
+        } else {
+          await setSettingRaw(key, value);
+        }
       }
       return { success: true };
     }),
@@ -149,19 +173,19 @@ export const settingsRouter = createTRPCRouter({
     }),
 
   isOnboardingCompleted: publicProcedure.query(async () => {
-    const val = await getSetting<boolean>(SETTINGS.ONBOARDING_COMPLETED);
+    const val = await getSetting("onboarding.completed");
     return val === true;
   }),
 
   completeOnboarding: adminProcedure.mutation(async () => {
-    await setSetting(SETTINGS.ONBOARDING_COMPLETED, true);
+    await setSetting("onboarding.completed", true);
     return { success: true };
   }),
 
   getEnabledServices: publicProcedure.query(async () => {
     const result: Record<string, boolean> = {};
     for (const s of ALL_SERVICES) {
-      const val = await getSetting<boolean>(SERVICE_ENABLED_KEY[s]);
+      const val = await getSetting(SERVICE_ENABLED_KEY[s]);
       result[s] = val === true;
     }
     return result;

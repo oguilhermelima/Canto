@@ -1,14 +1,17 @@
 import { Queue } from "bullmq";
-import { getSetting } from "@canto/db/settings";
-import { SETTINGS } from "../../lib/settings-keys";
+import { getSettings } from "@canto/db/settings";
 
 function createQueueGetter(name: string): () => Promise<Queue> {
   let queue: Queue | null = null;
   return async () => {
     if (!queue) {
-      const host = (await getSetting(SETTINGS.REDIS_HOST)) ?? process.env.REDIS_HOST ?? "localhost";
-      const port = parseInt((await getSetting(SETTINGS.REDIS_PORT)) ?? process.env.REDIS_PORT ?? "6379", 10);
-      queue = new Queue(name, { connection: { host, port } });
+      const { "redis.host": host, "redis.port": port } = await getSettings([
+        "redis.host",
+        "redis.port",
+      ]);
+      queue = new Queue(name, {
+        connection: { host: host ?? "localhost", port: port ?? 6379 },
+      });
     }
     return queue;
   };

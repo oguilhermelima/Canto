@@ -1,5 +1,4 @@
-import { getSetting, setSetting } from "@canto/db/settings";
-import { SETTINGS } from "../../lib/settings-keys";
+import { setSetting } from "@canto/db/settings";
 
 type ServiceType = "jellyfin" | "plex" | "qbittorrent" | "prowlarr" | "jackett" | "tvdb" | "tmdb";
 
@@ -24,8 +23,8 @@ function validateServiceUrl(url: string): void {
 }
 
 async function testJellyfin(v: Record<string, string>): Promise<TestResult> {
-  const url = v[SETTINGS.JELLYFIN_URL];
-  const apiKey = v[SETTINGS.JELLYFIN_API_KEY];
+  const url = v["jellyfin.url"];
+  const apiKey = v["jellyfin.apiKey"];
   if (!url || !apiKey) return { connected: false, error: "URL or API key not configured" };
   validateServiceUrl(url);
   try {
@@ -39,8 +38,8 @@ async function testJellyfin(v: Record<string, string>): Promise<TestResult> {
 }
 
 async function testPlex(v: Record<string, string>): Promise<TestResult> {
-  const url = v[SETTINGS.PLEX_URL];
-  const token = v[SETTINGS.PLEX_TOKEN];
+  const url = v["plex.url"];
+  const token = v["plex.token"];
   if (!url || !token) return { connected: false, error: "URL or token not configured" };
   validateServiceUrl(url);
   try {
@@ -54,9 +53,9 @@ async function testPlex(v: Record<string, string>): Promise<TestResult> {
 }
 
 async function testQbittorrent(v: Record<string, string>): Promise<TestResult> {
-  const url = v[SETTINGS.QBITTORRENT_URL];
-  const username = v[SETTINGS.QBITTORRENT_USERNAME] ?? "";
-  const password = v[SETTINGS.QBITTORRENT_PASSWORD] ?? "";
+  const url = v["qbittorrent.url"];
+  const username = v["qbittorrent.username"] ?? "";
+  const password = v["qbittorrent.password"] ?? "";
   if (!url) return { connected: false, error: "URL not configured" };
   validateServiceUrl(url);
   try {
@@ -74,8 +73,8 @@ async function testQbittorrent(v: Record<string, string>): Promise<TestResult> {
 }
 
 async function testProwlarr(v: Record<string, string>): Promise<TestResult> {
-  const url = v[SETTINGS.PROWLARR_URL];
-  const apiKey = v[SETTINGS.PROWLARR_API_KEY];
+  const url = v["prowlarr.url"];
+  const apiKey = v["prowlarr.apiKey"];
   if (!url || !apiKey) return { connected: false, error: "URL or API key not configured" };
   validateServiceUrl(url);
   try {
@@ -88,8 +87,8 @@ async function testProwlarr(v: Record<string, string>): Promise<TestResult> {
 }
 
 async function testJackett(v: Record<string, string>): Promise<TestResult> {
-  const url = v[SETTINGS.JACKETT_URL];
-  const apiKey = v[SETTINGS.JACKETT_API_KEY];
+  const url = v["jackett.url"];
+  const apiKey = v["jackett.apiKey"];
   if (!url || !apiKey) return { connected: false, error: "URL or API key not configured" };
   validateServiceUrl(url);
   try {
@@ -102,7 +101,7 @@ async function testJackett(v: Record<string, string>): Promise<TestResult> {
 }
 
 async function testTvdb(v: Record<string, string>): Promise<TestResult> {
-  const apiKey = v[SETTINGS.TVDB_API_KEY];
+  const apiKey = v["tvdb.apiKey"];
   if (!apiKey) return { connected: false, error: "API key not configured" };
   try {
     const res = await fetch("https://api4.thetvdb.com/v4/login", {
@@ -112,8 +111,8 @@ async function testTvdb(v: Record<string, string>): Promise<TestResult> {
     });
     if (!res.ok) return { connected: false, error: `HTTP ${res.status}` };
     const body = (await res.json()) as { data: { token: string } };
-    await setSetting(SETTINGS.TVDB_TOKEN, body.data.token);
-    await setSetting(SETTINGS.TVDB_TOKEN_EXPIRES, new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString());
+    await setSetting("tvdb.token", body.data.token);
+    await setSetting("tvdb.tokenExpires", Date.now() + 28 * 24 * 60 * 60 * 1000);
     return { connected: true };
   } catch {
     return { connected: false, error: "Connection failed" };
@@ -121,7 +120,7 @@ async function testTvdb(v: Record<string, string>): Promise<TestResult> {
 }
 
 async function testTmdb(v: Record<string, string>): Promise<TestResult> {
-  const apiKey = v[SETTINGS.TMDB_API_KEY];
+  const apiKey = v["tmdb.apiKey"];
   if (!apiKey) return { connected: false, error: "API key not configured" };
   try {
     const res = await fetch(`https://api.themoviedb.org/3/configuration?api_key=${apiKey}`);

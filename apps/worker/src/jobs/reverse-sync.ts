@@ -64,7 +64,7 @@ async function scanForConnection(
   externalUserId: string | undefined,
 ): Promise<ScannedMediaItem[]> {
   if (provider === "jellyfin") {
-    const jellyfinUrl = await getSetting<string>("jellyfin.url");
+    const jellyfinUrl = await getSetting("jellyfin.url");
     if (!jellyfinUrl) return [];
     const refs: JellyfinLibraryRef[] = libs.map((l) => ({
       jellyfinLibraryId: l.id,
@@ -75,7 +75,7 @@ async function scanForConnection(
     return scanJellyfinLibraries(jellyfinUrl, token, refs, externalUserId);
   }
 
-  const plexUrl = await getSetting<string>("plex.url");
+  const plexUrl = await getSetting("plex.url");
   if (!plexUrl) return [];
   const refs: PlexLibraryRef[] = libs.map((l) => ({
     plexLibraryId: l.id,
@@ -283,7 +283,7 @@ export async function runReverseSync(options: ReverseSyncOptions = {}): Promise<
   const connections = options.userId
     ? allConnections.filter((c) => c.userId === options.userId)
     : allConnections;
-  const tmdbApiKey = await getSetting<string>("tmdb.apiKey");
+  const tmdbApiKey = await getSetting("tmdb.apiKey");
   if (!tmdbApiKey) throw new Error("TMDB API key not configured");
   const tmdb = new TmdbProvider(tmdbApiKey);
 
