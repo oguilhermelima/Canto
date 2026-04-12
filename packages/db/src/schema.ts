@@ -191,6 +191,58 @@ export const folderServerLink = pgTable(
   ],
 );
 
+// ─── Home Section types (used by homeSection.config JSONB) ───
+
+export interface TmdbSectionConfig {
+  type?: "movie" | "show";
+  mode?: "trending" | "discover";
+  genres?: string;
+  language?: string;
+  sortBy?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  keywords?: string;
+  scoreMin?: number;
+  runtimeMin?: number;
+  runtimeMax?: number;
+  certification?: string;
+  status?: string;
+  watchProviders?: string;
+  watchRegion?: string;
+}
+
+export interface DbSectionConfig {
+  mediaType?: "movie" | "show";
+  limit?: number;
+}
+
+export type HomeSectionConfig = TmdbSectionConfig | DbSectionConfig;
+
+// ─── Home Sections (per-user homepage layout) ───
+
+export const homeSection = pgTable(
+  "home_section",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    title: varchar("title", { length: 200 }).notNull(),
+    style: varchar("style", { length: 20 }).notNull(), // spotlight | large_video | card | cover
+    sourceType: varchar("source_type", { length: 10 }).notNull(), // db | tmdb
+    sourceKey: varchar("source_key", { length: 50 }).notNull(),
+    config: jsonb("config").$type<HomeSectionConfig>().notNull().default({}),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_home_section_user").on(table.userId),
+    uniqueIndex("uq_home_section_user_position").on(table.userId, table.position),
+  ],
+);
+
 // ─── Rule types (used by downloadFolder.rules JSONB) ───
 
 export type RuleCondition =
@@ -1026,11 +1078,19 @@ export const userRelations = relations(user, ({ many }) => ({
   mediaStates: many(userMediaState),
   playbackProgress: many(userPlaybackProgress),
   watchHistory: many(userWatchHistory),
+  homeSections: many(homeSection),
 }));
 
 export const userPreferenceRelations = relations(userPreference, ({ one }) => ({
   user: one(user, {
     fields: [userPreference.userId],
+    references: [user.id],
+  }),
+}));
+
+export const homeSectionRelations = relations(homeSection, ({ one }) => ({
+  user: one(user, {
+    fields: [homeSection.userId],
     references: [user.id],
   }),
 }));
