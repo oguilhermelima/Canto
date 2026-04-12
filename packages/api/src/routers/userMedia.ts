@@ -242,6 +242,11 @@ export const userMediaRouter = createTRPCRouter({
         title: string;
         posterPath: string | null;
         backdropPath: string | null;
+        logoPath: string | null;
+        overview: string | null;
+        voteAverage: number | null;
+        genres: unknown;
+        genreIds: unknown;
         year: number | null;
         externalId: number;
         provider: string;
@@ -283,6 +288,11 @@ export const userMediaRouter = createTRPCRouter({
           title: row.title,
           posterPath: row.posterPath,
           backdropPath: row.backdropPath,
+          logoPath: row.logoPath,
+          overview: row.overview,
+          voteAverage: row.voteAverage,
+          genres: row.genres,
+          genreIds: row.genreIds,
           year: row.year,
           externalId: row.externalId,
           provider: row.provider,
@@ -559,6 +569,11 @@ export const userMediaRouter = createTRPCRouter({
           title: item.title,
           posterPath: item.posterPath,
           backdropPath: item.backdropPath,
+          logoPath: "logoPath" in item ? (item as { logoPath: string | null }).logoPath : null,
+          overview: "overview" in item ? (item as { overview: string | null }).overview : null,
+          voteAverage: "voteAverage" in item ? (item as { voteAverage: number | null }).voteAverage : null,
+          genres: "genres" in item ? (item as { genres: unknown }).genres : null,
+          genreIds: "genreIds" in item ? (item as { genreIds: unknown }).genreIds : null,
           year: item.year,
           externalId: item.externalId,
           provider: item.provider,

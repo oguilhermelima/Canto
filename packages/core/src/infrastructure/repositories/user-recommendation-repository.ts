@@ -320,6 +320,7 @@ export async function findUserSpotlightItems(
       mediaType: media.type,
       title: media.title,
       overview: media.overview,
+      posterPath: media.posterPath,
       backdropPath: media.backdropPath,
       logoPath: media.logoPath,
       releaseDate: media.releaseDate,

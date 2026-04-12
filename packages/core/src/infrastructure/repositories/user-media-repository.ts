@@ -274,6 +274,11 @@ export interface UserPlaybackProgressFeedRow {
   title: string;
   posterPath: string | null;
   backdropPath: string | null;
+  logoPath: string | null;
+  overview: string | null;
+  voteAverage: number | null;
+  genres: unknown;
+  genreIds: unknown;
   year: number | null;
   mediaRuntime: number | null;
   externalId: number;
@@ -308,6 +313,11 @@ export async function findUserPlaybackProgressFeed(
       title: media.title,
       posterPath: media.posterPath,
       backdropPath: media.backdropPath,
+      logoPath: media.logoPath,
+      overview: media.overview,
+      voteAverage: media.voteAverage,
+      genres: media.genres,
+      genreIds: media.genreIds,
       year: media.year,
       mediaRuntime: media.runtime,
       externalId: media.externalId,

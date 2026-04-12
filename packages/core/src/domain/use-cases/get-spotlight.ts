@@ -103,6 +103,7 @@ export async function getSpotlight(
           type: item.type, title: item.title,
           overview: item.overview, year: item.year,
           voteAverage: item.voteAverage, backdropPath, logoPath,
+          posterPath: metadata.posterPath ?? null,
         };
       } catch { return null; }
     }),
