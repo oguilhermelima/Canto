@@ -5,7 +5,7 @@ const publicPaths = ["/login", "/register", "/api/auth", "/api/trpc", "/api/avat
 
 /** Routes that require the admin role — non-admins see a 404. */
 const ADMIN_ROUTES = ["/manage", "/torrents"];
-const ADMIN_ROUTE_PATTERNS = [/^\/(?:movies|shows)\/[^/]+\/manage/];
+const ADMIN_ROUTE_PATTERNS: RegExp[] = [];
 
 function isAdminRoute(pathname: string): boolean {
   if (ADMIN_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"))) return true;
