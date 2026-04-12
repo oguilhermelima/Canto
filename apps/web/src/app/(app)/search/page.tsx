@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useDebounceCallback } from "usehooks-ts";
-import { type FilterOutput } from "~/components/layout/browse-layout";
+import type {FilterOutput} from "~/components/layout/browse-layout";
 import { useDocumentTitle } from "~/hooks/use-document-title";
 import { MobileSearchInput, DesktopSearchInput } from "./_components/search-input";
 import { SearchResults } from "./_components/search-results";

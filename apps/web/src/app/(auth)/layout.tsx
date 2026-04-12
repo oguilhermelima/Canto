@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Film, Clapperboard, Popcorn, Tv, Play, Sparkles, Heart, Star, type LucideIcon } from "lucide-react";
+import { Film, Clapperboard, Popcorn, Tv, Play, Sparkles, Heart, Star  } from "lucide-react";
+import type {LucideIcon} from "lucide-react";
 
 const ICONS: LucideIcon[] = [Film, Clapperboard, Popcorn, Tv, Play, Sparkles, Heart, Star];
 const SLOT_SIZE = 40;

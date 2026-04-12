@@ -8,7 +8,8 @@ import { MediaGrid } from "~/components/media/media-grid";
 import { MediaListView } from "~/components/media/media-list-view";
 import { StateMessage } from "~/components/layout/state-message";
 import { FilterButton } from "~/components/layout/filter-button";
-import { ViewModeToggle, type ViewMode } from "~/components/layout/view-mode-toggle";
+import { ViewModeToggle  } from "~/components/layout/view-mode-toggle";
+import type {ViewMode} from "~/components/layout/view-mode-toggle";
 
 const TYPE_OPTIONS = [
   { value: "all", label: "All" },

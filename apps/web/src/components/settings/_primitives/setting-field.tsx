@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState  } from "react";
+import type {ReactNode} from "react";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@canto/ui/button";
 import { cn } from "@canto/ui/cn";
 import {
-  SETTINGS_REGISTRY,
-  type SettingDef,
-  type SettingKey,
+  SETTINGS_REGISTRY
+  
+  
 } from "@canto/db/settings-registry";
+import type {SettingDef, SettingKey} from "@canto/db/settings-registry";
 import type { z } from "zod";
 
 import { trpc } from "~/lib/trpc/client";

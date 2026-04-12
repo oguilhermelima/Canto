@@ -27,18 +27,21 @@ import { TabBar } from "~/components/layout/tab-bar";
 import { StateMessage } from "~/components/layout/state-message";
 
 import {
-  MediaVersionGroupRow,
-  type MediaVersionGroupData,
+  MediaVersionGroupRow
+  
 } from "./media-version-group-row";
+import type {MediaVersionGroupData} from "./media-version-group-row";
 import {
-  UnmatchedVersionRow,
-  type UnmatchedVersionRowData,
+  UnmatchedVersionRow
+  
 } from "./unmatched-version-row";
+import type {UnmatchedVersionRowData} from "./unmatched-version-row";
 import type { MediaVersionRowData } from "./media-version-row";
 import {
-  EditMatchDialog,
-  type EditMatchTarget,
+  EditMatchDialog
+  
 } from "./edit-match-dialog";
+import type {EditMatchTarget} from "./edit-match-dialog";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */

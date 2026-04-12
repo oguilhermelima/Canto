@@ -1,4 +1,5 @@
-import { type NextRequest, NextResponse } from "next/server";
+import {  NextResponse } from "next/server";
+import type {NextRequest} from "next/server";
 
 const publicPaths = ["/login", "/register", "/api/auth", "/api/trpc", "/api/avatar", "/icon"];
 

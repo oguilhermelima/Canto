@@ -4,9 +4,10 @@ import type { ReactNode } from "react";
 
 import { cn } from "@canto/ui/cn";
 import {
-  SETTINGS_REGISTRY,
-  type SettingKey,
+  SETTINGS_REGISTRY
+  
 } from "@canto/db/settings-registry";
+import type {SettingKey} from "@canto/db/settings-registry";
 
 import { SettingField } from "./setting-field";
 

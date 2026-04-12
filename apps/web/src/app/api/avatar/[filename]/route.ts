@@ -1,4 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse  } from "next/server";
+import type {NextRequest} from "next/server";
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 

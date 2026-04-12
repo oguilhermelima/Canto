@@ -1,7 +1,8 @@
 "use client";
 
 import { Film, Tv } from "lucide-react";
-import { BrowseLayout, type FilterOutput } from "~/components/layout/browse-layout";
+import { BrowseLayout  } from "~/components/layout/browse-layout";
+import type {FilterOutput} from "~/components/layout/browse-layout";
 import { TabBar } from "~/components/layout/tab-bar";
 import { StateMessage } from "~/components/layout/state-message";
 

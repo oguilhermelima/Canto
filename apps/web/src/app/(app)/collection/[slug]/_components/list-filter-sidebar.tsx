@@ -2,9 +2,10 @@
 
 import { cn } from "@canto/ui/cn";
 import {
-  FilterSidebar,
-  type FilterOutput,
+  FilterSidebar
+  
 } from "~/components/media/filter-sidebar";
+import type {FilterOutput} from "~/components/media/filter-sidebar";
 
 interface ListFilterSidebarProps {
   mediaType: "all" | "movie" | "show";

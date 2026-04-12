@@ -7,7 +7,8 @@ import { Search, Download } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { resolveState } from "~/lib/torrent-utils";
-import { TorrentCard, type TorrentWithLive } from "./torrent-card";
+import { TorrentCard  } from "./torrent-card";
+import type {TorrentWithLive} from "./torrent-card";
 import { DeleteTorrentDialog } from "./delete-torrent-dialog";
 
 interface DownloadsTabProps {

@@ -12,9 +12,10 @@ import {
 } from "lucide-react";
 
 import {
-  MediaVersionRow,
-  type MediaVersionRowData,
+  MediaVersionRow
+  
 } from "./media-version-row";
+import type {MediaVersionRowData} from "./media-version-row";
 
 function posterUrlFor(path: string | null): string | null {
   if (!path) return null;

@@ -7,7 +7,8 @@ import { MediaGrid } from "~/components/media/media-grid";
 import { PageHeader } from "~/components/layout/page-header";
 import { TabBar } from "~/components/layout/tab-bar";
 import { StateMessage } from "~/components/layout/state-message";
-import { FilterSidebar, type FilterOutput } from "~/components/media/filter-sidebar";
+import { FilterSidebar  } from "~/components/media/filter-sidebar";
+import type {FilterOutput} from "~/components/media/filter-sidebar";
 
 export type { FilterOutput };
 

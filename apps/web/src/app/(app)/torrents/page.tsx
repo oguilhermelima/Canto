@@ -11,7 +11,8 @@ import { authClient } from "~/lib/auth-client";
 import { useDocumentTitle } from "~/hooks/use-document-title";
 import { resolveState } from "~/lib/torrent-utils";
 import { TorrentCard } from "./_components/torrent-card";
-import { DeleteDialog, type DeleteTarget } from "./_components/delete-dialog";
+import { DeleteDialog  } from "./_components/delete-dialog";
+import type {DeleteTarget} from "./_components/delete-dialog";
 
 const PAGE_SIZE = 20;
 

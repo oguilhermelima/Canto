@@ -1,6 +1,7 @@
 "use client";
 
-import Image, { type ImageProps } from "next/image";
+import Image from "next/image";
+import type {ImageProps} from "next/image";
 import { useState, useCallback, useRef } from "react";
 import { cn } from "@canto/ui/cn";
 

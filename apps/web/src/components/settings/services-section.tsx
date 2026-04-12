@@ -36,9 +36,10 @@ import { useDirectSearch } from "~/hooks/use-direct-search";
 import { SectionCard, SettingsSection } from "~/components/settings/shared";
 import { FieldInput } from "~/components/settings/_primitives";
 import {
-  SETTINGS_REGISTRY,
-  type SettingKey,
+  SETTINGS_REGISTRY
+  
 } from "@canto/db/settings-registry";
+import type {SettingKey} from "@canto/db/settings-registry";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 

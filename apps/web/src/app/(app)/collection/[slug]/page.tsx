@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@canto/ui/dialog";
-import { type FilterOutput } from "~/components/media/filter-sidebar";
+import type {FilterOutput} from "~/components/media/filter-sidebar";
 import type { ViewMode } from "~/components/layout/view-mode-toggle";
 import { trpc } from "~/lib/trpc/client";
 import { useDocumentTitle } from "~/hooks/use-document-title";

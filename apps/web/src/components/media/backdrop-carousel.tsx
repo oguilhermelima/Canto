@@ -5,9 +5,10 @@ import { cn } from "@canto/ui/cn";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   BackdropCard,
-  BackdropCardSkeleton,
-  type BadgeType,
+  BackdropCardSkeleton
+  
 } from "./backdrop-card";
+import type {BadgeType} from "./backdrop-card";
 import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
 
 interface BackdropItem {

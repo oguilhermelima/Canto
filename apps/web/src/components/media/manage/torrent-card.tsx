@@ -21,9 +21,10 @@ import {
   formatDownloadLabel,
   qualityBadge,
   sourceBadge,
-  resolveState,
-  type ResolvedState,
+  resolveState
+  
 } from "~/lib/torrent-utils";
+import type {ResolvedState} from "~/lib/torrent-utils";
 
 interface TorrentLive {
   state: string;

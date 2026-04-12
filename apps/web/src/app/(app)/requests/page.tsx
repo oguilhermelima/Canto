@@ -16,7 +16,8 @@ import { useDocumentTitle } from "~/hooks/use-document-title";
 import { mediaDetailHref } from "~/lib/media-href";
 import { STATUS_TABS, TYPE_TABS } from "./_components/constants";
 import { RequestCard } from "./_components/request-card";
-import { ResolveDialog, type ResolveTarget } from "./_components/resolve-dialog";
+import { ResolveDialog  } from "./_components/resolve-dialog";
+import type {ResolveTarget} from "./_components/resolve-dialog";
 
 export default function RequestsPage(): React.JSX.Element {
   const router = useRouter();
