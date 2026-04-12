@@ -35,10 +35,6 @@ export function IndexerStep({
   const setMany = trpc.settings.setMany.useMutation();
   const testService = trpc.settings.testService.useMutation();
 
-  useEffect(() => {
-    configureFooter({ onPrimary: handleSave, primaryLabel: "Connect & continue", primaryDisabled: !choice || !url || !apiKey, primaryLoading: testing, onSkip: onNext });
-  }, [choice, url, apiKey, testing]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const handleSave = async (): Promise<void> => {
     if (!choice) return;
     setTesting(true);
@@ -68,6 +64,10 @@ export function IndexerStep({
     }
   };
 
+  useEffect(() => {
+    configureFooter({ onPrimary: () => void handleSave(), primaryLabel: "Connect & continue", primaryDisabled: !choice || !url || !apiKey, primaryLoading: testing, onSkip: onNext });
+  }, [choice, url, apiKey, testing]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="flex flex-col items-center gap-8 text-center">
       <div className="flex gap-3">
@@ -94,7 +94,7 @@ export function IndexerStep({
             choice === "prowlarr" ? "border-primary/50 bg-primary/5" : "border-border hover:bg-accent/50",
           )}
         >
-          <img src="/prowlarr.svg" alt="" className="h-8 w-8" />
+          <ServiceLogo src="/prowlarr.svg" alt="" size={32} />
           <span className="text-sm font-medium">Prowlarr</span>
         </button>
         <button

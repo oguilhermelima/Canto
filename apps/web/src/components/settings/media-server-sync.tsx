@@ -236,7 +236,7 @@ function LibraryLinkingSection({ source }: { source: "jellyfin" | "plex" }): Rea
 /*  Server library group                                                       */
 /* -------------------------------------------------------------------------- */
 
-function ServerLibraryGroup({
+function _ServerLibraryGroup({
   source,
   enabled,
   isSyncingLibraries,

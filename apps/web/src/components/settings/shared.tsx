@@ -1,5 +1,5 @@
 export function SectionCard({
-  title,
+  title: _title,
   children,
 }: {
   title: string;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Image from "next/image";
 import { Skeleton } from "@canto/ui/skeleton";
 import { Button } from "@canto/ui/button";
 import { Badge } from "@canto/ui/badge";
@@ -16,8 +17,6 @@ import {
   Save,
   Check,
   Loader2,
-  CheckCircle,
-  XCircle,
   ExternalLink,
   ChevronDown,
 } from "lucide-react";
@@ -75,7 +74,7 @@ function AnimatedCollapse({
 /*  Shared                                                                     */
 /* -------------------------------------------------------------------------- */
 
-function OrDivider(): React.JSX.Element {
+function _OrDivider(): React.JSX.Element {
   return (
     <div className="flex items-center gap-3 py-1">
       <div className="h-px flex-1 bg-border/40" />
@@ -191,7 +190,7 @@ function ServiceRow({
       const v: Record<string, string> = {};
       let hasValues = false;
       for (const f of fields) {
-        v[f.key] = (allSettings[f.key] as string) ?? "";
+        v[f.key] = (allSettings[f.key] as string | undefined) ?? "";
         if (v[f.key]) hasValues = true;
       }
       setValues(v);
@@ -363,8 +362,8 @@ function MediaServerRow({
 
   useEffect(() => {
     if (allSettings) {
-      setUrl((allSettings[urlField.key] as string) ?? "");
-      setApiKey((allSettings[apiKeyField.key] as string) ?? "");
+      setUrl((allSettings[urlField.key] as string | undefined) ?? "");
+      setApiKey((allSettings[apiKeyField.key] as string | undefined) ?? "");
       setDirty(false);
       if (isEnabled && !allSettings[urlField.key]) setExpanded(true);
     }
@@ -673,7 +672,7 @@ function TvdbApiKeySection(): React.JSX.Element {
 
   useEffect(() => {
     if (allSettings) {
-      setApiKey((allSettings["tvdb.apiKey"] as string) ?? "");
+      setApiKey((allSettings["tvdb.apiKey"] as string | undefined) ?? "");
       setDirty(false);
       if (!allSettings["tvdb.apiKey"]) setExpanded(true);
     }
@@ -692,7 +691,7 @@ function TvdbApiKeySection(): React.JSX.Element {
       {
         onSuccess: (data) => {
           if (!data.connected) {
-            toast.error(data.error ?? "Connection failed");
+            toast.error(data.error);
             return;
           }
           setMany.mutate(
@@ -835,7 +834,7 @@ function WatchRegionSection(): React.JSX.Element {
             ) : watchProviders && watchProviders.length > 0 ? (
               <div className="flex flex-wrap gap-2.5">
                 {watchProviders.slice(0, 30).map((p) => (
-                  <img key={p.providerId} src={`${TMDB_IMAGE_BASE}/w92${p.logoPath}`} alt={p.providerName} title={p.providerName} className="h-11 w-11 rounded-xl border border-border/60 object-cover" />
+                  <Image key={p.providerId} src={`${TMDB_IMAGE_BASE}/w92${p.logoPath}`} alt={p.providerName} title={p.providerName} width={44} height={44} className="h-11 w-11 rounded-xl border border-border/60 object-cover" />
                 ))}
               </div>
             ) : <p className="text-xs text-muted-foreground">No providers found.</p>}
@@ -1117,7 +1116,7 @@ function PlexServerSection(): React.JSX.Element {
 
   useEffect(() => {
     if (allSettings) {
-      setUrl((allSettings["plex.url"] as string) ?? "");
+      setUrl((allSettings["plex.url"] as string | undefined) ?? "");
       setDirty(false);
       if (isEnabled && !allSettings["plex.url"]) setExpanded(true);
     }

@@ -21,10 +21,6 @@ export function LibrariesTransferStep({
   const [importMethod, setImportMethod] = useState<"local" | "remote">("local");
   const setDownloadSettings = trpc.library.setDownloadSettings.useMutation();
 
-  useEffect(() => {
-    configureFooter({ onPrimary: handleContinue, primaryLoading: setDownloadSettings.isPending, onSkip });
-  }, [importMethod, setDownloadSettings.isPending]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const handleContinue = (): void => {
     setDownloadSettings.mutate({
       importMethod,
@@ -34,6 +30,10 @@ export function LibrariesTransferStep({
     });
     onNext();
   };
+
+  useEffect(() => {
+    configureFooter({ onPrimary: handleContinue, primaryLoading: setDownloadSettings.isPending, onSkip });
+  }, [importMethod, setDownloadSettings.isPending]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex flex-col items-center gap-10 text-center pt-16 md:pt-0">

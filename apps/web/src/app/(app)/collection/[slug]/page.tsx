@@ -41,7 +41,7 @@ export default function ListDetailPage(): React.JSX.Element {
   const [filters, setFilters] = useState<FilterOutput>({});
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window === "undefined") return "grid";
-    return (localStorage.getItem(VIEW_MODE_KEY) as ViewMode) ?? "grid";
+    return (localStorage.getItem(VIEW_MODE_KEY) as ViewMode | null) ?? "grid";
   });
   const [shareListId, setShareListId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
@@ -83,7 +83,7 @@ export default function ListDetailPage(): React.JSX.Element {
       },
       {
         getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-          const currentOffset = (lastPageParam as number) ?? 0;
+          const currentOffset = lastPageParam as number;
           const nextOffset = currentOffset + PAGE_SIZE;
           if (nextOffset >= lastPage.total) return undefined;
           return nextOffset;
@@ -166,7 +166,6 @@ export default function ListDetailPage(): React.JSX.Element {
   }
 
   const listRow = data?.pages[0]?.list;
-  const canEdit = listRow && listRow.type === "custom";
 
   return (
     <div className="w-full pb-12">
@@ -174,7 +173,7 @@ export default function ListDetailPage(): React.JSX.Element {
         title={listRow?.name ?? "List"}
         subtitle={listRow?.description ?? undefined}
         action={
-          canEdit && listRow ? (
+          listRow && listRow.type === "custom" ? (
             <CollectionEditPopover
               list={{
                 id: listRow.id,
@@ -208,7 +207,7 @@ export default function ListDetailPage(): React.JSX.Element {
           onViewModeChange={handleViewModeChange}
           sentinelRef={sentinelRef}
           isFetchingNextPage={isFetchingNextPage}
-          hasNextPage={hasNextPage ?? false}
+          hasNextPage={hasNextPage}
         />
       </div>
 

@@ -48,7 +48,7 @@ export function MediaCard({
 
   const handlePrefetch = useCallback(() => {
     const eid = externalId ?? id;
-    if (eid && type) {
+    if (eid) {
       void utils.media.resolve.prefetch({
         provider: (provider ?? "tmdb") as "tmdb" | "tvdb",
         externalId: parseInt(eid, 10),

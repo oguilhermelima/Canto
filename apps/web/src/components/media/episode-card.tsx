@@ -21,7 +21,7 @@ export interface EpisodeDownloadInfo {
 
 export function EpisodeCard({
   episode,
-  seasonNumber,
+  seasonNumber: _seasonNumber,
   isSelected,
   isMuted,
   onToggle,

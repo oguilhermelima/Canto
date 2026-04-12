@@ -47,7 +47,7 @@ export default function RequestsPage(): React.JSX.Element {
     { limit: PAGE_SIZE },
     {
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const currentOffset = (lastPageParam as number) ?? 0;
+        const currentOffset = lastPageParam as number;
         const nextOffset = currentOffset + PAGE_SIZE;
         if (nextOffset >= lastPage.total) return undefined;
         return nextOffset;
@@ -104,14 +104,13 @@ export default function RequestsPage(): React.JSX.Element {
   });
 
   const filtered = useMemo(() => {
-    if (!requests) return [];
     return requests
       .filter((req) => {
         if (statusFilter !== "all" && req.status !== statusFilter) return false;
-        if (typeFilter !== "all" && req.media?.type !== typeFilter) return false;
+        if (typeFilter !== "all" && req.media.type !== typeFilter) return false;
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
-          const title = (req.media?.title ?? "").toLowerCase();
+          const title = req.media.title.toLowerCase();
           const userName = ("user" in req && req.user != null)
             ? ((req.user as { name: string | null }).name ?? (req.user as { email: string }).email).toLowerCase()
             : "";
@@ -121,14 +120,13 @@ export default function RequestsPage(): React.JSX.Element {
       })
       .sort((a, b) => {
         if (sortBy === "title") {
-          return (a.media?.title ?? "").localeCompare(b.media?.title ?? "");
+          return a.media.title.localeCompare(b.media.title);
         }
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
   }, [requests, statusFilter, typeFilter, searchQuery, sortBy]);
 
   const counts = useMemo(() => {
-    if (!requests) return { all: 0, pending: 0, approved: 0, rejected: 0, downloaded: 0 };
     return {
       all: requests.length,
       pending: requests.filter((r) => r.status === "pending").length,
@@ -211,7 +209,7 @@ export default function RequestsPage(): React.JSX.Element {
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          requests && requests.length > 0 ? (
+          requests.length > 0 ? (
             <StateMessage preset="emptyFiltered" />
           ) : (
             <StateMessage preset={isAdmin ? "emptyRequests" : "emptyRequestsUser"} />

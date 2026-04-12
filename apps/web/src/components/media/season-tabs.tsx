@@ -12,7 +12,6 @@ import {
   Minus,
   ChevronRight,
   Download,
-  Settings2,
   Search as SearchIcon,
 } from "lucide-react";
 import { EpisodeCard } from "./episode-card";
@@ -72,7 +71,7 @@ export function SeasonTabs({
   hideFloatingBar = false,
   downloadedEpisodes,
   mediaConfig,
-  onOpenPreferences,
+  onOpenPreferences: _onOpenPreferences,
   episodeAvailability,
   serverLinks,
   className,
@@ -139,22 +138,6 @@ export function SeasonTabs({
     setSelectedEpisodes(new Set());
   }, []);
 
-  if (filteredSeasons.length === 0) return <></>;
-
-  const selectable = !!(onDownloadSeasons || onDownloadEpisodes);
-  const totalSeasons = selectedSeasons.size;
-  const totalEpisodes = selectedEpisodes.size;
-  const hasSelection = totalSeasons > 0 || totalEpisodes > 0;
-  const summaryParts: string[] = [];
-  if (totalSeasons > 0)
-    summaryParts.push(
-      `${totalSeasons} season${totalSeasons !== 1 ? "s" : ""}`,
-    );
-  if (totalEpisodes > 0)
-    summaryParts.push(
-      `${totalEpisodes} episode${totalEpisodes !== 1 ? "s" : ""}`,
-    );
-
   const allSeasonsSelected =
     filteredSeasons.length > 0 &&
     filteredSeasons.every((s) => selectedSeasons.has(s.seasonNumber));
@@ -170,6 +153,22 @@ export function SeasonTabs({
       setSelectedEpisodes(new Set());
     }
   }, [allSeasonsSelected, filteredSeasons]);
+
+  if (filteredSeasons.length === 0) return <></>;
+
+  const selectable = !!(onDownloadSeasons || onDownloadEpisodes);
+  const totalSeasons = selectedSeasons.size;
+  const totalEpisodes = selectedEpisodes.size;
+  const hasSelection = totalSeasons > 0 || totalEpisodes > 0;
+  const summaryParts: string[] = [];
+  if (totalSeasons > 0)
+    summaryParts.push(
+      `${totalSeasons} season${totalSeasons !== 1 ? "s" : ""}`,
+    );
+  if (totalEpisodes > 0)
+    summaryParts.push(
+      `${totalEpisodes} episode${totalEpisodes !== 1 ? "s" : ""}`,
+    );
 
   return (
     <section className={cn("relative", className)}>
@@ -384,7 +383,7 @@ function SeasonBlock({
         return episodeAvailability[key]?.some((a) => a.type === "plex");
       }).length
     : 0;
-  const availableEpCount = Math.max(jellyfinEpCount, plexEpCount);
+  const _availableEpCount = Math.max(jellyfinEpCount, plexEpCount);
 
   const isSpecials = season.seasonNumber === 0;
   const sNum = String(season.seasonNumber).padStart(2, "0");

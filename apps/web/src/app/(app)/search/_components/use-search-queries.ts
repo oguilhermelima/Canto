@@ -36,7 +36,7 @@ const pageParam = {
     _allPages: unknown[],
     lastPageParam: unknown,
   ) => {
-    const currentPage = (lastPageParam as number) ?? 1;
+    const currentPage = lastPageParam as number;
     if (currentPage >= lastPage.totalPages) return undefined;
     return currentPage + 1;
   },
@@ -144,13 +144,13 @@ export function useSearchQueries({
 
   const hasNextPage = isSearching
     ? searchType === "multi"
-      ? (multiMovieQuery.hasNextPage ?? false) || (multiShowQuery.hasNextPage ?? false)
-      : (singleQuery.hasNextPage ?? false)
+      ? multiMovieQuery.hasNextPage || multiShowQuery.hasNextPage
+      : singleQuery.hasNextPage
     : searchType === "multi"
-      ? (trendingMovies.hasNextPage ?? false) || (trendingShows.hasNextPage ?? false)
+      ? trendingMovies.hasNextPage || trendingShows.hasNextPage
       : searchType === "movie"
-        ? (trendingMovies.hasNextPage ?? false)
-        : (trendingShows.hasNextPage ?? false);
+        ? trendingMovies.hasNextPage
+        : trendingShows.hasNextPage;
 
   const { results, totalResults } = useMemo(() => {
     if (isSearching) {
@@ -182,8 +182,8 @@ export function useSearchQueries({
       const showTotal = showPages[0]?.totalResults ?? 0;
       return { results: merged, totalResults: movieTotal + showTotal };
     }
-    const source = searchType === "movie" ? trendingMovies : trendingShows;
-    const pages = source.data?.pages ?? [];
+    const sourceData = searchType === "movie" ? trendingMovies.data : trendingShows.data;
+    const pages = sourceData?.pages ?? [];
     const flat = pages.flatMap((p) => p.results);
     return { results: flat, totalResults: pages[0]?.totalResults ?? 0 };
   }, [isSearching, searchType, singleQuery.data, multiMovieQuery.data, multiShowQuery.data, trendingMovies.data, trendingShows.data]);

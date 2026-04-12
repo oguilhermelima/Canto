@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Image from "next/image";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { cn } from "@canto/ui/cn";
 import { Input } from "@canto/ui/input";
@@ -206,7 +207,7 @@ export function FilterSidebar({
 
   // Local state — seeded from URL params
   const [selectedGenres, setSelectedGenres] = useState<Set<number>>(() => parseSet(searchParams.get("genre")));
-  const [genreMode, setGenreMode] = useState<"and" | "or">((searchParams.get("genreMode") as "and" | "or") || "or");
+  const [genreMode, setGenreMode] = useState<"and" | "or">((searchParams.get("genreMode") ?? "or") as "and" | "or");
   const [sortBy, setSortBy] = useState(searchParams.get("sort") ?? "popularity.desc");
   const [language, setLanguage] = useState(searchParams.get("language") ?? "");
   const [scoreMin, setScoreMin] = useState(searchParams.get("score") ? Number(searchParams.get("score")) : 0);
@@ -218,7 +219,7 @@ export function FilterSidebar({
   const [certification, setCertification] = useState(searchParams.get("certification") ?? "");
   const [status, setStatus] = useState(searchParams.get("status") ?? "");
   const [selectedProviders, setSelectedProviders] = useState<Set<number>>(() => parseSet(searchParams.get("providers")));
-  const [providerMode, setProviderMode] = useState<"and" | "or">((searchParams.get("providerMode") as "and" | "or") || "or");
+  const [providerMode, setProviderMode] = useState<"and" | "or">((searchParams.get("providerMode") ?? "or") as "and" | "or");
   const { region: watchRegion } = useWatchRegion();
 
   // Watch providers for the region
@@ -610,9 +611,12 @@ export function FilterSidebar({
                           });
                         }}
                       >
-                        <img
+                        <Image
                           src={`https://image.tmdb.org/t/p/w92${p.logoPath}`}
                           alt={p.providerName}
+                          width={40}
+                          height={40}
+                          unoptimized
                           className="h-full w-full object-cover"
                         />
                       </button>

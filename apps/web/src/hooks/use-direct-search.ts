@@ -25,7 +25,7 @@ export function useDirectSearch(): {
   // Sync DB value to localStorage when query resolves
   const syncedRef = useRef(false);
   useEffect(() => {
-    if (isSuccess && data && !syncedRef.current) {
+    if (isSuccess && !syncedRef.current) {
       syncedRef.current = true;
       localStorage.setItem(STORAGE_KEY, String(data.directSearchEnabled));
     }

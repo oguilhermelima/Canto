@@ -16,10 +16,10 @@ export type Step =
 export type Settings = Record<string, unknown>;
 
 export const str = (s: Settings | undefined, key: string): string =>
-  (s?.[key] as string) ?? "";
+  (s?.[key] as string | undefined) ?? "";
 
 export const bool = (s: Settings | undefined, key: string): boolean =>
-  (s?.[key] as boolean) ?? false;
+  (s?.[key] as boolean | undefined) ?? false;
 
 /** Shared primary button className */
 export const btnCn = "rounded-xl min-w-[200px]";

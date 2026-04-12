@@ -69,8 +69,8 @@ export default function ProfilePage(): React.JSX.Element {
   }
 
   const tabs = TABS.map((t) => {
-    const countKey = COUNT_MAP[t.value] as keyof typeof counts | undefined;
-    const count = countKey && counts ? counts[countKey] : undefined;
+    const countKey = COUNT_MAP[t.value] as keyof NonNullable<typeof counts> | undefined;
+    const count = countKey ? counts?.[countKey] : undefined;
     return { value: t.value, label: t.label, icon: t.icon, count };
   });
 

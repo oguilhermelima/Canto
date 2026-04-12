@@ -61,7 +61,7 @@ export function DownloadClientStep({
   };
 
   useEffect(() => {
-    configureFooter({ onPrimary: handleSave, primaryLabel: "Connect & continue", primaryDisabled: !url, primaryLoading: testing, onSkip });
+    configureFooter({ onPrimary: () => void handleSave(), primaryLabel: "Connect & continue", primaryDisabled: !url, primaryLoading: testing, onSkip });
   }, [url, username, password, testing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

@@ -29,7 +29,6 @@ import {
   Plus,
   Check,
   Loader2,
-  FolderDown,
   FolderOpen,
   Trash2,
   Pencil,
@@ -122,9 +121,9 @@ function describeCondition(c: RuleCondition): string {
   }
 }
 
-function describeGroup(g: RuleGroup): string {
+function _describeGroup(g: RuleGroup): string {
   const parts = g.conditions.map((c) => {
-    if ("operator" in c) return `(${describeGroup(c as RuleGroup)})`;
+    if ("operator" in c) return `(${_describeGroup(c as RuleGroup)})`;
     return describeCondition(c as RuleCondition);
   });
   return parts.join(g.operator === "AND" ? " + " : " or ");
@@ -708,7 +707,7 @@ function RulesEditorDialog({
 
 type RuleTemplate = { label: string; rules: RuleGroup; qbitCategory: string; priority: number };
 
-const RULE_TEMPLATES: RuleTemplate[] = [
+const _RULE_TEMPLATES: RuleTemplate[] = [
   {
     label: "Movies",
     rules: { operator: "AND", conditions: [{ field: "type", op: "eq", value: "movie" }] },
@@ -784,6 +783,7 @@ const SOURCE_BADGE_COLORS: Record<string, string> = {
 /*  Media Paths section (inside FolderCard)                                    */
 /* -------------------------------------------------------------------------- */
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- planned for future use
 function MediaPathsSection({ folderId, isLocal }: { folderId: string; isLocal: boolean }): React.JSX.Element {
   const utils = trpc.useUtils();
   const [open, setOpen] = useState(false);
@@ -1565,7 +1565,7 @@ function CustomFolderDialog({
   onOpenChange,
   onCreated,
   basePath,
-  importMethod = "local",
+  importMethod: _importMethod = "local",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -1575,7 +1575,6 @@ function CustomFolderDialog({
 }): React.JSX.Element {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
-  const isLocal = importMethod === "local";
 
   const createFolder = trpc.folder.create.useMutation({
     onSuccess: () => {
@@ -1663,7 +1662,7 @@ function ScanFoldersDialog({
     if (open) setSelected(new Set());
   }, [open, scanPath]);
 
-  const toggle = (path: string, name: string): void => {
+  const toggle = (path: string, _name: string): void => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(path)) next.delete(path); else next.add(path);
@@ -1792,7 +1791,8 @@ export function DownloadFolders({ mode = "settings", importMethod: importMethodP
   const effectiveMethod = importMethodProp ?? (dlSettings?.importMethod as "local" | "remote" | undefined) ?? "local";
   const utils = trpc.useUtils();
   const [basePath, setBasePath] = useState("/data");
-  const showBasePath = false;
+  // eslint-disable-next-line prefer-const -- kept as toggle for future use
+  let showBasePath = false;
   const [customOpen, setCustomOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [scanPathType, setScanPathType] = useState<"download" | "library">("library");
@@ -1838,7 +1838,6 @@ export function DownloadFolders({ mode = "settings", importMethod: importMethodP
 
 
   const allFolders = folders ?? [];
-  const existingNames = new Set(allFolders.map((f) => f.name.toLowerCase()));
 
   // Build qBittorrent category options for the dropdown (remote mode).
   // Only include categories with a non-empty savePath — paths without one
@@ -1874,7 +1873,7 @@ export function DownloadFolders({ mode = "settings", importMethod: importMethodP
     else toast.info("All paths already match");
   };
 
-  const handleAddPreset = (template: RuleTemplate): void => {
+  const _handleAddPreset = (template: RuleTemplate): void => {
     const root = basePath.replace(/\/+$/, "");
     createFolder.mutate({
       name: template.label,
@@ -1921,6 +1920,7 @@ export function DownloadFolders({ mode = "settings", importMethod: importMethodP
     return (
       <div className="space-y-6">
         {/* Base path — only when not provided externally */}
+        {/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- toggle for future use */}
         {showBasePath && (
           <div className="rounded-2xl border border-border/40 bg-muted/5 p-4 sm:p-5 space-y-3">
             <div className="flex items-center gap-2">
@@ -1956,8 +1956,8 @@ export function DownloadFolders({ mode = "settings", importMethod: importMethodP
             <Plus className="h-4 w-4" />
             Custom library
           </Button>
-          <Button variant="outline" className="rounded-xl gap-2" onClick={() => seedFolders.mutate()} disabled={seedFolders.isPending}>
-            {seedFolders.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+          <Button variant="outline" className="rounded-xl gap-2" onClick={() => seedFolders.mutate()}>
+            <Wand2 className="h-4 w-4" />
             Create suggested libraries
           </Button>
         </div>
@@ -1971,6 +1971,7 @@ export function DownloadFolders({ mode = "settings", importMethod: importMethodP
   return (
     <div className="space-y-4">
       {/* Base path + generate — only when not provided externally */}
+      {/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- toggle for future use */}
       {showBasePath && (
         <div className="rounded-2xl border border-border/40 bg-muted/5 p-5 space-y-3">
           <div className="flex items-center gap-2">

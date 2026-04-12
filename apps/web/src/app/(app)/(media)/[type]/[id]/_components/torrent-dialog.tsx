@@ -43,12 +43,30 @@ import {
 } from "~/lib/torrent-utils";
 import { FolderSelector } from "./folder-selector";
 
+interface TorrentResult {
+  guid: string;
+  title: string;
+  magnetUrl: string | null;
+  downloadUrl: string | null;
+  quality: string;
+  source: string;
+  confidence: number;
+  seeders: number;
+  leechers: number;
+  size: number;
+  age: number;
+  indexer: string;
+  indexerLanguage?: string | null;
+  languages: string[];
+  flags: string[];
+}
+
 interface TorrentDialogProps {
   media: {
     id: string;
     title: string;
     type: string;
-    seasons?: any[];
+    seasons?: Array<{ number: number }>;
   };
   isAdmin: boolean;
   torrentDialogOpen: boolean;
@@ -91,8 +109,8 @@ interface TorrentDialogProps {
     error?: { message: string } | null;
     refetch: () => void;
   };
-  paginatedTorrents: any[];
-  allFilteredTorrents: any[];
+  paginatedTorrents: TorrentResult[];
+  allFilteredTorrents: TorrentResult[];
   hasMore: boolean;
   handleDownload: (url: string, title: string) => void;
   downloadTorrent: { isPending: boolean };
@@ -602,9 +620,9 @@ export function TorrentDialog({
                     All
                   </button>
                   {media.seasons
-                    .filter((s: any) => s.number > 0)
-                    .sort((a: any, b: any) => a.number - b.number)
-                    .map((s: any) => (
+                    .filter((s) => s.number > 0)
+                    .sort((a, b) => a.number - b.number)
+                    .map((s) => (
                       <button
                         key={s.number}
                         className={cn(

@@ -83,8 +83,8 @@ export function RatingsTab(): React.JSX.Element {
   return (
     <>
       <div className={GRID_CLASSES}>
-        {items.map((item, i) => (
-          <div key={item.id ?? `${item.provider}-${item.externalId}-${i}`} className="relative">
+        {items.map((item) => (
+          <div key={item.id} className="relative">
             <MediaCard
               id={item.id}
               externalId={item.externalId}

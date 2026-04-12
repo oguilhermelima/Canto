@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useEffect } from "react";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
@@ -39,8 +40,8 @@ export function ProfileSection(): React.JSX.Element {
 
   useEffect(() => {
     if (user) {
-      setName(user.name ?? "");
-      setEmail(user.email ?? "");
+      setName(user.name);
+      setEmail(user.email);
     }
   }, [user]);
 
@@ -70,14 +71,16 @@ export function ProfileSection(): React.JSX.Element {
             onClick={() => setPickerOpen(true)}
           >
             {user?.image ? (
-              <img
+              <Image
                 src={user.image}
-                alt={user.name ?? ""}
+                alt={user.name}
+                width={64}
+                height={64}
                 className="h-16 w-16 rounded-full object-cover"
               />
             ) : (
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground">
-                {user?.name?.charAt(0).toUpperCase() ?? "?"}
+                {user?.name.charAt(0).toUpperCase()}
               </div>
             )}
             <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">

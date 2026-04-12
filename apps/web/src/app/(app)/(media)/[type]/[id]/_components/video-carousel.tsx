@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
+import Image from "next/image";
 import { ChevronLeft, ChevronRight, Play } from "lucide-react";
 import { Skeleton } from "@canto/ui/skeleton";
 
@@ -78,14 +79,14 @@ export function VideoCarousel({
               rel="noopener noreferrer"
               className="group relative aspect-video w-[300px] shrink-0 overflow-hidden rounded-xl bg-muted transition-transform duration-300 ease-out hover:scale-[1.03] sm:w-[340px] lg:w-[380px]"
             >
-              <img
+              <Image
                 src={`https://img.youtube.com/vi/${video.key}/hqdefault.jpg`}
                 alt={video.name ?? "Video"}
                 width={480}
                 height={360}
+                unoptimized
                 className="h-full w-full object-cover opacity-0 transition-opacity duration-500"
                 onLoad={(e) => { e.currentTarget.classList.remove("opacity-0"); e.currentTarget.classList.add("opacity-100"); }}
-                onError={(e) => { e.currentTarget.src = `https://img.youtube.com/vi/${video.key}/mqdefault.jpg`; }}
               />
               <div className="absolute inset-0 flex items-center justify-center bg-black/30 transition-colors duration-300 group-hover:bg-black/10">
                 <Play className="h-10 w-10 text-white drop-shadow-lg transition-transform duration-300 group-hover:scale-110" />

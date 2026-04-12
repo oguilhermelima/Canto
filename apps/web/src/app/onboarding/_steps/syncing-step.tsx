@@ -45,24 +45,6 @@ export function SyncingStep({
     });
   }, [allDone]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-
-    const initial: SyncTask[] = [];
-    if (jellyfinEnabled) initial.push({ id: "jellyfin", label: "Syncing Jellyfin library", icon: Tv, status: "pending" });
-    if (plexEnabled) initial.push({ id: "plex", label: "Syncing Plex library", icon: Film, status: "pending" });
-    initial.push({ id: "recs", label: "Building recommendations", icon: Sparkles, status: "pending" });
-
-    if (initial.length === 1) {
-      // Only recs, no media servers
-      initial.unshift({ id: "organize", label: "Organizing your library", icon: FolderSync, status: "skipped" });
-    }
-
-    setTasks(initial);
-    runTasks(initial);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const updateTask = (
     id: string,
     status: TaskStatus,
@@ -98,6 +80,24 @@ export function SyncingStep({
 
     setAllDone(true);
   };
+
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+
+    const initial: SyncTask[] = [];
+    if (jellyfinEnabled) initial.push({ id: "jellyfin", label: "Syncing Jellyfin library", icon: Tv, status: "pending" });
+    if (plexEnabled) initial.push({ id: "plex", label: "Syncing Plex library", icon: Film, status: "pending" });
+    initial.push({ id: "recs", label: "Building recommendations", icon: Sparkles, status: "pending" });
+
+    if (initial.length === 1) {
+      // Only recs, no media servers
+      initial.unshift({ id: "organize", label: "Organizing your library", icon: FolderSync, status: "skipped" });
+    }
+
+    setTasks(initial);
+    void runTasks(initial);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex flex-col items-center gap-10 text-center pt-16 md:pt-0">

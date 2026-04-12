@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 const SERVICE_BRAND: Record<string, { background: string; mask: string }> = {
   jellyfin: {
     background: "linear-gradient(135deg, #a95ce0, #4bb8e8)",
@@ -38,5 +40,5 @@ export function ServiceLogo({
       />
     );
   }
-  return <img src={src} alt={alt} width={size} height={size} className="shrink-0" />;
+  return <Image src={src ?? ""} alt={alt} width={size} height={size} className="shrink-0" />;
 }

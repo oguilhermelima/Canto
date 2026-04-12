@@ -266,8 +266,6 @@ export function ConnectionsSection(): React.JSX.Element {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [addProvider, setAddProvider] = useState<Provider>("plex");
 
-  const connectedProviders = new Set(connections?.map((c) => c.provider) ?? []);
-
   const openAdd = (provider: Provider) => {
     setAddProvider(provider);
     setAddDialogOpen(true);
@@ -496,7 +494,7 @@ function AddConnectionForm({
         )}
       </div>
 
-      {(provider === "jellyfin" || (provider === "plex" && authMode === "token")) && (
+      {(provider === "jellyfin" || authMode === "token") && (
         <DialogFooter>
           <Button
             type="submit"

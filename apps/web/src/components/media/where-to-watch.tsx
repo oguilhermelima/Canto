@@ -20,7 +20,7 @@ function getProviderSearchUrl(
 }
 
 export function WhereToWatch({
-  mediaId,
+  mediaId: _mediaId,
   mediaTitle,
   flatrateProviders,
   rentBuyProviders,

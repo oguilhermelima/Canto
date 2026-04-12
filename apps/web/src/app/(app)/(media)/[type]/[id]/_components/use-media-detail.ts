@@ -82,7 +82,7 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
     { staleTime: Infinity, enabled: directSearchEnabled },
   );
 
-  const isMovieInLibrary = media?.type === "movie" && !!media?.libraryId;
+  const isMovieInLibrary = media?.type === "movie" && !!media.libraryId;
   const mediaTorrentsQuery = trpc.torrent.listByMedia.useQuery(
     { mediaId: mediaId ?? "" },
     { enabled: !!mediaId && isMovieInLibrary },
@@ -241,7 +241,7 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
   };
 
   // Derived state: credits, similar, recommendations, videos
-  const credits = (extras.data?.credits?.cast ?? []).map((c) => ({
+  const credits = (extras.data?.credits.cast ?? []).map((c) => ({
     id: String(c.id),
     name: c.name,
     character: c.character,

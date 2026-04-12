@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@canto/ui/cn";
@@ -17,7 +18,6 @@ import {
   Search,
   Download,
   UserRound,
-  LayoutDashboard,
   Settings,
   Bell,
   LogOut,
@@ -77,8 +77,8 @@ export function BottomNavbar(): React.JSX.Element {
         <SheetTrigger asChild>
           <button className="flex flex-col items-center gap-1 px-3 py-2 text-xs text-muted-foreground transition-colors">
             <div className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full bg-muted">
-              {session?.user?.image ? (
-                <img src={session.user.image} alt="" className="h-5 w-5 rounded-full object-cover" />
+              {session?.user.image ? (
+                <Image src={session.user.image} alt="" width={20} height={20} className="h-5 w-5 rounded-full object-cover" />
               ) : (
                 <UserRound size={14} />
               )}
@@ -91,21 +91,23 @@ export function BottomNavbar(): React.JSX.Element {
             <SheetTitle className="sr-only">Menu</SheetTitle>
             <div className="flex items-center gap-3 px-1">
               <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-muted">
-                {session?.user?.image ? (
-                  <img
+                {session?.user.image ? (
+                  <Image
                     src={session.user.image}
-                    alt={session.user.name ?? ""}
+                    alt={session.user.name}
+                    width={40}
+                    height={40}
                     className="h-10 w-10 rounded-full object-cover"
                   />
-                ) : session?.user?.name ? (
+                ) : session?.user.name ? (
                   <span className="text-sm font-medium">{session.user.name.charAt(0).toUpperCase()}</span>
                 ) : (
                   <UserRound className="h-5 w-5" />
                 )}
               </div>
               <div className="flex-1 text-left text-sm leading-tight">
-                <p className="font-semibold">{session?.user?.name ?? "User"}</p>
-                <p className="text-xs text-muted-foreground">{session?.user?.email ?? ""}</p>
+                <p className="font-semibold">{session?.user.name}</p>
+                <p className="text-xs text-muted-foreground">{session?.user.email}</p>
               </div>
             </div>
           </SheetHeader>

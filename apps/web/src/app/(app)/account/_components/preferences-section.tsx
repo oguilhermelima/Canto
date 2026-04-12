@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { Button } from "@canto/ui/button";
 import { Switch } from "@canto/ui/switch";
@@ -22,7 +23,7 @@ const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
 export function PreferencesSection(): React.JSX.Element {
   const utils = trpc.useUtils();
-  const { data: allSettings } = trpc.settings.getAll.useQuery();
+  const { data: _allSettings } = trpc.settings.getAll.useQuery();
   const setMany = trpc.settings.setMany.useMutation({
     onSuccess: () => void utils.settings.getAll.invalidate(),
   });
@@ -163,11 +164,13 @@ export function PreferencesSection(): React.JSX.Element {
               ) : watchProviders && watchProviders.length > 0 ? (
                 <div className="flex flex-wrap gap-2.5">
                   {watchProviders.slice(0, 30).map((p) => (
-                    <img
+                    <Image
                       key={p.providerId}
                       src={`${TMDB_IMAGE_BASE}/w92${p.logoPath}`}
                       alt={p.providerName}
                       title={p.providerName}
+                      width={44}
+                      height={44}
                       className="h-11 w-11 rounded-xl border border-border/60 object-cover"
                     />
                   ))}

@@ -274,7 +274,7 @@ export function SyncItemsDialog({
       mode: "media",
       mediaId: group.media.id,
       title: group.media.title,
-      type: (group.media.type as "movie" | "show") ?? "movie",
+      type: group.media.type as "movie" | "show",
       tmdbId: group.media.externalId,
     });
   }
@@ -375,7 +375,7 @@ export function SyncItemsDialog({
                       handleEditVersion(
                         v,
                         group.media.title,
-                        (group.media.type as "movie" | "show") ?? "movie",
+                        group.media.type as "movie" | "show",
                       )
                     }
                     onDeleteVersion={(v) =>

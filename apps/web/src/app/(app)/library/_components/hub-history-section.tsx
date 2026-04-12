@@ -136,7 +136,10 @@ export function HubHistorySection(): React.JSX.Element {
   const { data, isLoading, isError, refetch } =
     trpc.userMedia.getLibraryHistory.useQuery({ limit: 8 });
 
-  const entries = (data?.items ?? []) as LibraryPlaybackEntry[];
+  const entries = useMemo(
+    () => (data?.items ?? []) as LibraryPlaybackEntry[],
+    [data?.items],
+  );
 
   const groups = useMemo((): DateGroup[] => {
     const result: DateGroup[] = [];

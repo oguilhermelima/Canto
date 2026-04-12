@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { FadeImage } from "~/components/ui/fade-image";
+import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
@@ -68,7 +69,7 @@ export default function DiscoverPage(): React.JSX.Element {
       allPages: unknown[],
       lastPageParam: unknown,
     ) => {
-      const currentPage = (lastPageParam as number) ?? 1;
+      const currentPage = lastPageParam as number;
       if (currentPage >= MAX_CAROUSEL_PAGES || currentPage >= lastPage.totalPages) return undefined;
       return currentPage + 1;
     },
@@ -222,7 +223,7 @@ export default function DiscoverPage(): React.JSX.Element {
       {/* Mobile logo */}
       <div className="relative z-10 flex h-16 items-center px-4 md:hidden">
         <Link href="/" className="flex items-center gap-2.5">
-          <img src="/canto.svg" alt="Canto" className="h-9 w-9 dark:invert" />
+          <Image src="/canto.svg" alt="Canto" width={36} height={36} className="h-9 w-9 dark:invert" />
           <span className="text-lg font-bold tracking-tight text-foreground">Canto</span>
         </Link>
       </div>
@@ -349,7 +350,7 @@ export default function DiscoverPage(): React.JSX.Element {
                     <span>{currentItem.year}</span>
                   </>
                 )}
-                {currentItem.genres && currentItem.genres.length > 0 && (
+                {currentItem.genres.length > 0 && (
                   <>
                     <span className="text-foreground/30">|</span>
                     {currentItem.genres.map((genre, i) => {

@@ -13,12 +13,14 @@ function useReverseSyncOnFocus(): void {
   const lastRunRef = useRef(0);
   const triggerRef = useRef<() => void>(() => {});
 
-  triggerRef.current = () => {
-    const now = Date.now();
-    if (now - lastRunRef.current < SYNC_DEBOUNCE_MS) return;
-    lastRunRef.current = now;
-    syncNow.mutate();
-  };
+  useEffect(() => {
+    triggerRef.current = () => {
+      const now = Date.now();
+      if (now - lastRunRef.current < SYNC_DEBOUNCE_MS) return;
+      lastRunRef.current = now;
+      syncNow.mutate();
+    };
+  });
 
   useEffect(() => {
     const fire = (): void => triggerRef.current();

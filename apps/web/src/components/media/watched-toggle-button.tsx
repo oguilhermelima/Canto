@@ -612,9 +612,12 @@ export function WatchTrackingButton({
     [allEpisodes],
   );
 
-  const currentSeasonEpisodes =
-    releasedSeasons.find((season) => season.number === seasonNumber)?.episodes ??
-    [];
+  const currentSeasonEpisodes = useMemo(
+    () =>
+      releasedSeasons.find((season) => season.number === seasonNumber)?.episodes ??
+      [],
+    [releasedSeasons, seasonNumber],
+  );
 
   const scopedEpisodes = useMemo(() => {
     if (mediaType !== "show") return [];
@@ -893,7 +896,10 @@ export function WatchTrackingButton({
   };
 
   const normalizedStatus = normalizeStatus(trackingStatus);
-  const historyEntries = (historyQuery.data ?? []) as WatchHistoryEntry[];
+  const historyEntries = useMemo(
+    () => (historyQuery.data ?? []) as WatchHistoryEntry[],
+    [historyQuery.data],
+  );
   const historyGroups = useMemo<HistoryGroup[]>(() => {
     if (historyEntries.length === 0) return [];
 

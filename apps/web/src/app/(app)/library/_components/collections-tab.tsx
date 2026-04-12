@@ -242,13 +242,14 @@ export function CollectionsTab({
     [orderedLists, showHidden, hiddenSet],
   );
 
+  const visibleListIds = visibleLists.map((list) => list.id).join("|");
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
   }, [
     showHidden,
     searchQuery,
     visibleLists.length,
-    visibleLists.map((list) => list.id).join("|"),
+    visibleListIds,
   ]);
 
   const renderedLists = useMemo(
@@ -442,7 +443,7 @@ export function CollectionsTab({
                       className="flex min-w-0 flex-1 items-center gap-4"
                     >
                       <ListPreviewStack
-                        posters={list.previewPosters ?? []}
+                        posters={list.previewPosters}
                         type={list.type}
                       />
 

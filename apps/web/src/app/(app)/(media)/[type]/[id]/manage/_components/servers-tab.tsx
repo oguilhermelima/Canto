@@ -138,7 +138,7 @@ export function ServersTab({
         <div className="space-y-2">
           {seasons.map((season) => {
             const isOpen = expanded.has(season.number);
-            const eps = season.episodes ?? [];
+            const eps = season.episodes;
             const availableEps = eps.filter((ep) => {
               const key = epKey(season.number, ep.number);
               return availableServers.some((s) =>

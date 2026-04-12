@@ -7,6 +7,7 @@ import { trpc } from "~/lib/trpc/client";
 import type { ConfigureFooter } from "../_components/onboarding-footer";
 import type { Settings } from "../_components/constants";
 import { str, bool } from "../_components/constants";
+import Image from "next/image";
 import { PasswordInput } from "@canto/ui/password-input";
 import { StepHeader } from "../_components/step-header";
 
@@ -54,12 +55,12 @@ export function TvdbStep({
   };
 
   useEffect(() => {
-    configureFooter({ onPrimary: handleSave, primaryDisabled: !apiKey || testing, primaryLoading: testing, onSkip: onNext });
+    configureFooter({ onPrimary: () => void handleSave(), primaryDisabled: !apiKey || testing, primaryLoading: testing, onSkip: onNext });
   }, [apiKey, defaultShows, testing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex flex-col items-center gap-8 text-center pt-16 md:pt-0">
-      <img src="/tvdb.svg" alt="TVDB" width={48} height={48} className="shrink-0 dark:invert" />
+      <Image src="/tvdb.svg" alt="TVDB" width={48} height={48} className="shrink-0 dark:invert" />
       <StepHeader
         title="Episode Metadata"
         description="TMDB sometimes gets season and episode numbering wrong — especially for anime, specials, and shows with different regional airing orders. TVDB provides more accurate episode structures while Canto keeps using TMDB for everything else."

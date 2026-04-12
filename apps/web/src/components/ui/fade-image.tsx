@@ -61,7 +61,7 @@ export function FadeImage({
         className,
       )}
       style={{
-        ...((rest.style as React.CSSProperties) ?? {}),
+        ...(rest.style as React.CSSProperties | undefined),
         transitionDuration: `${fadeDuration}ms`,
       }}
       onLoad={handleLoad}

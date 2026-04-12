@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
@@ -56,7 +57,7 @@ export function CollectionMembersDialog({
       void utils.list.getMembers.invalidate({ listId: listId! });
       setInviteEmail("");
       toast.success("Invitation created");
-      if (invitation?.token) {
+      if (invitation.token) {
         const link = `${window.location.origin}/invite/${invitation.token}`;
         void navigator.clipboard.writeText(link);
         setCopiedToken(invitation.token);
@@ -161,9 +162,9 @@ export function CollectionMembersDialog({
                   <div className="flex items-center gap-3 rounded-lg px-2 py-2">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
                       {data.owner.image ? (
-                        <img src={data.owner.image} alt="" className="h-8 w-8 rounded-full object-cover" />
+                        <Image src={data.owner.image} alt="" width={32} height={32} className="h-8 w-8 rounded-full object-cover" />
                       ) : (
-                        data.owner.name?.charAt(0).toUpperCase() ?? "?"
+                        data.owner.name.charAt(0).toUpperCase()
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -182,9 +183,9 @@ export function CollectionMembersDialog({
                   <div key={member.id} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent/30">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
                       {member.userImage ? (
-                        <img src={member.userImage} alt="" className="h-8 w-8 rounded-full object-cover" />
+                        <Image src={member.userImage} alt="" width={32} height={32} className="h-8 w-8 rounded-full object-cover" />
                       ) : (
-                        member.userName?.charAt(0).toUpperCase() ?? "?"
+                        member.userName.charAt(0).toUpperCase()
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -214,7 +215,7 @@ export function CollectionMembersDialog({
                   </div>
                 ))}
 
-                {data?.members.length === 0 && !data?.owner && (
+                {data?.members.length === 0 && (
                   <p className="py-4 text-center text-sm text-muted-foreground">
                     No members yet. Invite someone to get started.
                   </p>

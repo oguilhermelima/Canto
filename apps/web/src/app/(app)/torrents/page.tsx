@@ -46,7 +46,7 @@ export default function DownloadsPage(): React.JSX.Element {
     {
       refetchInterval: 3000,
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const currentOffset = (lastPageParam as number) ?? 0;
+        const currentOffset = lastPageParam as number;
         if (currentOffset + lastPage.items.length >= lastPage.total) return undefined;
         return currentOffset + lastPage.items.length;
       },

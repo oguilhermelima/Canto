@@ -98,7 +98,7 @@ export function ContentSeasonList({
     <div className="space-y-2">
       {seasons.map((season) => {
         const isOpen = expanded.has(season.number);
-        const eps = season.episodes ?? [];
+        const eps = season.episodes;
         const epsWithData = eps.filter((ep) => {
           const { files, torrents } = getEpisodeItems(
             season.number,

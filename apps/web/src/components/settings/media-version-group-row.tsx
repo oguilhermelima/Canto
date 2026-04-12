@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { cn } from "@canto/ui/cn";
 import { Button } from "@canto/ui/button";
 import {
@@ -113,9 +114,11 @@ export function MediaVersionGroupRow({
             )}
           />
           {posterUrl ? (
-            <img
+            <Image
               src={posterUrl}
               alt=""
+              width={40}
+              height={56}
               className="h-14 w-10 shrink-0 rounded-md object-cover"
             />
           ) : (

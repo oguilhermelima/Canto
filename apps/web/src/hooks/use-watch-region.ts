@@ -26,7 +26,7 @@ export function useWatchRegion(): {
   // Sync DB value to localStorage when query resolves
   const syncedRef = useRef(false);
   useEffect(() => {
-    if (isSuccess && data && !syncedRef.current) {
+    if (isSuccess && !syncedRef.current) {
       syncedRef.current = true;
       if (data.watchRegion) {
         localStorage.setItem(STORAGE_KEY, data.watchRegion);

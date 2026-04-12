@@ -4,19 +4,41 @@ import { useRouter } from "next/navigation";
 import { cn } from "@canto/ui/cn";
 import { SeasonTabs } from "~/components/media/season-tabs";
 
+interface SeasonEpisode {
+  id: string;
+  number: number;
+  title: string | null;
+  overview: string | null;
+  stillPath: string | null;
+  airDate: string | null;
+  runtime: number | null;
+  voteAverage: number | null;
+}
+
+interface SeasonItem {
+  id: string;
+  number: number;
+  name: string | null;
+  overview: string | null;
+  episodeCount: number | null;
+  airDate: string | null;
+  posterPath: string | null;
+  episodes: SeasonEpisode[];
+}
+
 interface SeasonsSectionProps {
   media: {
     id: string;
     type: string;
     externalId: number | null;
-    seasons?: any[];
+    seasons: SeasonItem[];
     libraryId: string | null;
     libraryPath: string | null;
     continuousDownload: boolean | null;
   };
   isAdmin: boolean;
-  availability: { data?: { episodes?: any } };
-  mediaServers: { data?: any };
+  availability: { data?: { episodes?: Record<string, Array<{ type: string; resolution?: string | null }>> } };
+  mediaServers: { data?: { jellyfin?: { url: string }; plex?: { url: string } } };
   allLibraries: { id: string; name: string }[] | undefined;
   openTorrentDialog: (context?: {
     seasonNumber?: number;
@@ -56,7 +78,7 @@ export function SeasonsSection({
 }: SeasonsSectionProps): React.JSX.Element | null {
   const router = useRouter();
 
-  if (media.type !== "show" || !media.seasons) return null;
+  if (media.type !== "show") return null;
 
   return (
     <div
@@ -67,7 +89,7 @@ export function SeasonsSection({
       )}
     >
       <SeasonTabs
-        seasons={media.seasons.map((s: any) => ({
+        seasons={media.seasons.map((s) => ({
           id: s.id,
           seasonNumber: s.number,
           name: s.name ?? `Season ${s.number}`,
@@ -75,7 +97,7 @@ export function SeasonsSection({
           episodeCount: s.episodeCount,
           airDate: s.airDate,
           posterPath: s.posterPath,
-          episodes: s.episodes?.map((e: any) => ({
+          episodes: s.episodes.map((e) => ({
             id: e.id,
             episodeNumber: e.number,
             title: e.title ?? `Episode ${e.number}`,

@@ -27,7 +27,9 @@ export default function SearchPage(): React.JSX.Element {
   const [filters, setFilters] = useState<FilterOutput>({});
 
   const searchTypeRef = useRef(searchType);
-  searchTypeRef.current = searchType;
+  useEffect(() => {
+    searchTypeRef.current = searchType;
+  });
 
   const debouncedUpdateSearch = useDebounceCallback((value: string) => {
     setQuery(value);
@@ -52,7 +54,7 @@ export default function SearchPage(): React.JSX.Element {
       setQuery(q);
       setInputValue(q);
     }
-  }, [searchParams]);
+  }, [searchParams, query]);
 
   useDocumentTitle(query ? `"${query}"` : "Search");
 

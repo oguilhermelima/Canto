@@ -71,7 +71,7 @@ export function BackdropCard({
   const logoResolved = logoPath !== undefined;
 
   const handlePrefetch = useCallback(() => {
-    if (externalId && type) {
+    if (externalId) {
       void utils.media.resolve.prefetch({
         provider: (provider ?? "tmdb") as "tmdb" | "tvdb",
         externalId: parseInt(externalId, 10),

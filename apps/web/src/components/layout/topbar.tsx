@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@canto/ui/cn";
@@ -11,7 +12,6 @@ import {
   Search,
   Send,
   User,
-  LayoutDashboard,
   Settings,
   Bell,
   LogOut,
@@ -195,10 +195,11 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
     {
       label: "Log Out",
       icon: LogOut,
-      onClick: async () => {
-        await authClient.signOut();
-        router.push("/login");
-        router.refresh();
+      onClick: () => {
+        void authClient.signOut().then(() => {
+          router.push("/login");
+          router.refresh();
+        });
       },
     },
   ];
@@ -211,13 +212,15 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
         onClick={() => setOpen((o) => !o)}
         className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-muted/60 transition-colors hover:bg-muted focus:outline-none"
       >
-        {session?.user?.image ? (
-          <img
+        {session?.user.image ? (
+          <Image
             src={session.user.image}
-            alt={session.user.name ?? ""}
+            alt={session.user.name}
+            width={32}
+            height={32}
             className="h-8 w-8 rounded-full object-cover"
           />
-        ) : session?.user?.name ? (
+        ) : session?.user.name ? (
           <span className="text-xs font-medium">
             {session.user.name.charAt(0).toUpperCase()}
           </span>
@@ -297,7 +300,7 @@ export function Topbar(): React.JSX.Element {
       >
         {/* Left: Logo */}
         <Link href="/" className="flex shrink-0 items-center gap-2">
-          <img src="/canto.svg" alt="Canto" className="h-9 w-9 dark:invert" />
+          <Image src="/canto.svg" alt="Canto" width={36} height={36} className="h-9 w-9 dark:invert" />
           <span className="text-lg font-bold tracking-tight text-foreground">
             Canto
           </span>

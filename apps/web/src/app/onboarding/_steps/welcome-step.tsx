@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Image from "next/image";
 import type { ConfigureFooter } from "../_components/onboarding-footer";
 import { authClient } from "~/lib/auth-client";
 
@@ -31,7 +32,7 @@ export function WelcomeStep({
 
   return (
     <div className="flex flex-col items-center gap-8 text-center">
-      <img src="/canto.svg" alt="Canto" className="h-16 w-16 dark:invert" />
+      <Image src="/canto.svg" alt="Canto" width={64} height={64} className="h-16 w-16 dark:invert" />
       <div className="space-y-3">
         <h1 className="text-2xl font-semibold text-foreground">Welcome to Canto</h1>
         <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">

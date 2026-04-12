@@ -179,7 +179,7 @@ export function useManageMedia(id: string, mediaType: "movie" | "show") {
     const map = new Map<string, NonNullable<typeof mediaFiles>>();
     if (!mediaFiles) return map;
     for (const f of mediaFiles) {
-      const sn = f.episode?.season?.number;
+      const sn = f.episode?.season.number;
       const en = f.episode?.number;
       if (sn == null || en == null) continue;
       const key = epKey(sn, en);

@@ -60,7 +60,7 @@ export function FilesTab({ mediaId, drawerOpen }: FilesTabProps) {
   const seasonGroups = new Map<number | null, FileItem[]>();
   if (files) {
     for (const file of files) {
-      const sn = file.episode?.season?.number ?? null;
+      const sn = file.episode?.season.number ?? null;
       if (!seasonGroups.has(sn)) seasonGroups.set(sn, []);
       seasonGroups.get(sn)!.push(file);
     }
@@ -204,7 +204,7 @@ function FileRow({
       }
     | undefined;
 }) {
-  const sn = file.episode?.season?.number;
+  const sn = file.episode?.season.number;
   const en = file.episode?.number;
   const quality = file.quality ?? file.torrent?.quality ?? "unknown";
   const source = file.source ?? file.torrent?.source ?? "unknown";
@@ -216,7 +216,7 @@ function FileRow({
       ? `S${String(sn).padStart(2, "0")}E${String(en).padStart(2, "0")}`
       : null;
 
-  const epAvailability = epKey ? availability?.episodes?.[epKey] : undefined;
+  const epAvailability = epKey ? availability?.episodes[epKey] : undefined;
   const hasJellyfin = epAvailability?.some((a) => a.type === "jellyfin");
   const hasPlex = epAvailability?.some((a) => a.type === "plex");
 

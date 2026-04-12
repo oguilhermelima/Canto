@@ -49,7 +49,7 @@ export function MediaListTab({
       },
       {
         getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-          const currentOffset = (lastPageParam as number) ?? 0;
+          const currentOffset = lastPageParam as number;
           const nextOffset = currentOffset + PAGE_SIZE;
           if (nextOffset >= lastPage.total) return undefined;
           return nextOffset;

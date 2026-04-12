@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
 import {
   Eye,
@@ -129,9 +127,9 @@ function WatchingSection(): React.JSX.Element | null {
                   className="w-[150px] shrink-0 sm:w-[170px]"
                 />
               ))
-            : data?.items.map((item, i) => (
+            : data?.items.map((item) => (
                 <MediaCard
-                  key={item.mediaId ?? `watching-${i}`}
+                  key={item.mediaId}
                   id={item.mediaId}
                   externalId={String(item.externalId)}
                   provider={item.provider}
@@ -211,9 +209,9 @@ function RecentRatingsSection(): React.JSX.Element | null {
                   className="w-[150px] shrink-0 sm:w-[170px]"
                 />
               ))
-            : data?.items.map((item, i) => (
+            : data?.items.map((item) => (
                 <div
-                  key={item.mediaId ?? `rated-${i}`}
+                  key={item.mediaId}
                   className="relative w-[150px] shrink-0 sm:w-[170px]"
                 >
                   <MediaCard

@@ -1,9 +1,6 @@
-import { ArrowLeft } from "lucide-react";
-
 export function StepHeader({
   title,
   description,
-  onBack,
 }: {
   title: string;
   description?: React.ReactNode;

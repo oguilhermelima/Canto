@@ -104,7 +104,7 @@ export function MediaDetailHero({
   title,
   overview,
   backdropPath,
-  year,
+  year: _year,
   releaseDate,
   voteAverage,
   genres,
@@ -114,7 +114,7 @@ export function MediaDetailHero({
   logoPath,
   externalId,
   provider,
-  isAdmin,
+  isAdmin: _isAdmin,
   children,
   servers,
   flatrateProviders,
@@ -159,7 +159,7 @@ export function MediaDetailHero({
   const isWatched = trackingStatus === "completed";
 
   // Trailers (top 4)
-  const trailers = (videos ?? []).slice(0, 4);
+  const _trailers = (videos ?? []).slice(0, 4);
 
   // Watch providers
   const hasServers = servers?.jellyfin || servers?.plex;

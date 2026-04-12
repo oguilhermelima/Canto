@@ -50,11 +50,6 @@ import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import {
   formatBytes,
-  formatSpeed,
-  formatEta,
-  formatDownloadLabel,
-  qualityBadge,
-  sourceBadge,
   resolveState,
 } from "~/lib/torrent-utils";
 
@@ -227,7 +222,7 @@ export function PreferencesModal({
     const map = new Map<string, NonNullable<typeof mediaFiles>>();
     if (!mediaFiles) return map;
     for (const f of mediaFiles) {
-      const sn = f.episode?.season?.number;
+      const sn = f.episode?.season.number;
       const en = f.episode?.number;
       if (sn == null || en == null) continue;
       const key = epKey(sn, en);
@@ -727,7 +722,7 @@ function ContentSeasonList({
     <div className="space-y-2">
       {seasons.map((season) => {
         const isOpen = expanded.has(season.number);
-        const eps = season.episodes ?? [];
+        const eps = season.episodes;
         const epsWithData = eps.filter((ep) => {
           const { files, torrents } = getEpisodeItems(season.number, ep.number);
           return files.length > 0 || torrents.length > 0;
@@ -858,7 +853,7 @@ function ServerSeasonList({
         <div className="space-y-2">
           {seasons.map((season) => {
             const isOpen = expanded.has(season.number);
-            const eps = season.episodes ?? [];
+            const eps = season.episodes;
             const availableEps = eps.filter((ep) => {
               const key = epKey(season.number, ep.number);
               return episodes?.[key]?.some((a) => a.type === serverType);

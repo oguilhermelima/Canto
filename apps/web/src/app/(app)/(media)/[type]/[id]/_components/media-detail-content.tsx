@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import {
   MediaDetailHero,
@@ -57,9 +58,11 @@ export function MediaDetailContent({
       {/* Mobile logo */}
       <div className="relative z-10 flex h-16 items-center px-4 md:hidden">
         <Link href="/" className="flex items-center gap-2.5">
-          <img
+          <Image
             src="/canto.svg"
             alt="Canto"
+            width={36}
+            height={36}
             className="h-9 w-9 dark:invert"
           />
           <span className="text-lg font-bold tracking-tight text-foreground">
@@ -92,7 +95,7 @@ export function MediaDetailContent({
         watchLink={detail.watchLink}
         watchProviderLinks={detail.watchProviderLinks.data ?? {}}
         videos={detail.videos}
-        crew={detail.extras.data?.credits?.crew?.map((c) => ({
+        crew={detail.extras.data?.credits.crew.map((c) => ({
           personId: c.id,
           name: c.name,
           job: c.job,
@@ -101,17 +104,17 @@ export function MediaDetailContent({
         trackingStatus={detail.userMediaState.data?.trackingStatus as "none" | "planned" | "watching" | "completed" | "dropped" | undefined}
         rating={detail.userMediaState.data?.rating}
         watchTrackingSeasons={
-          media.seasons?.map((season) => ({
+          media.seasons.map((season) => ({
             number: season.number,
                 episodes:
-                  season.episodes?.map((episode) => ({
+                  season.episodes.map((episode) => ({
                     id: episode.id,
                     seasonNumber: season.number,
                     number: episode.number,
                     title: episode.title ?? null,
                     airDate: episode.airDate ?? null,
-                  })) ?? [],
-              })) ?? []
+                  })),
+              }))
         }
         playbackProgress={
           detail.userMediaState.data
@@ -193,8 +196,8 @@ export function MediaDetailContent({
           mediaId={media.id}
           mediaType={media.type as "movie" | "show"}
           mediaTitle={media.title}
-          currentLibraryId={media.libraryId ?? null}
-          continuousDownload={media.continuousDownload ?? false}
+          currentLibraryId={media.libraryId}
+          continuousDownload={media.continuousDownload}
         />
       )}
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import {
   Dialog,
   DialogContent,
@@ -244,9 +245,11 @@ export function EditMatchDialog({
                         )}
                       >
                         {result.posterPath ? (
-                          <img
+                          <Image
                             src={`https://image.tmdb.org/t/p/w92${result.posterPath}`}
                             alt=""
+                            width={32}
+                            height={48}
                             className="h-12 w-8 rounded object-cover"
                           />
                         ) : (

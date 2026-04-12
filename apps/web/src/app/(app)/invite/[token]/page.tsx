@@ -12,7 +12,7 @@ export default function InvitePage(): React.JSX.Element {
   const router = useRouter();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
-  const [listId, setListId] = useState<string | null>(null);
+  const [_listId, setListId] = useState<string | null>(null);
 
   useDocumentTitle("Accept Invitation");
 
