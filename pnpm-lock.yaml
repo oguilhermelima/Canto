@@ -304,6 +304,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@canto/core':
+        specifier: workspace:*
+        version: link:../core
       '@canto/providers':
         specifier: workspace:*
         version: link:../providers
@@ -313,6 +316,9 @@ importers:
       postgres:
         specifier: ^3.4.5
         version: 3.4.8
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
     devDependencies:
       '@canto/tsconfig':
         specifier: workspace:*

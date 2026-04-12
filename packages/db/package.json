@@ -36,9 +36,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@canto/core": "workspace:*",
     "@canto/providers": "workspace:*",
     "drizzle-orm": "catalog:",
-    "postgres": "^3.4.5"
+    "postgres": "^3.4.5",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@canto/tsconfig": "workspace:*",

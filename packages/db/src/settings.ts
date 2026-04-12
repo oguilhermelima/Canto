@@ -1,5 +1,13 @@
 import { createCipheriv, createDecipheriv, pbkdf2Sync, randomBytes } from "crypto";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
+import { z } from "zod";
+
+import {
+  allSettingKeys,
+  SETTINGS_REGISTRY,
+  type SettingKey,
+  type SettingValue,
+} from "@canto/core/lib/settings-registry";
 
 import { db } from "./client";
 import { systemSetting } from "./schema";
@@ -23,8 +31,8 @@ const KEY_VERSIONS = {
 const CURRENT_KEY_VERSION = 2;
 const KEY_VERSION_LENGTH = 1;
 // Version prefix byte for new writes — using 0xC1/0xC2 to avoid collision with random IV first bytes
-const VERSION_PREFIX: Record<number, number> = { 2: 0xC2 };
-const PREFIX_TO_VERSION: Record<number, number> = { 0xC2: 2 };
+const VERSION_PREFIX: Record<number, number> = { 2: 0xc2 };
+const PREFIX_TO_VERSION: Record<number, number> = { 0xc2: 2 };
 
 function getDerivedKey(version: number): Buffer {
   const secret = process.env.BETTER_AUTH_SECRET;
@@ -81,90 +89,217 @@ function decrypt(encoded: string): string {
   return decipher.update(ciphertext, undefined, "utf8") + decipher.final("utf8");
 }
 
-/** Keys that store non-sensitive data — stored as plain JSONB. */
-const PLAINTEXT_KEYS = new Set([
-  "jellyfin.enabled",
-  "plex.enabled",
-  "qbittorrent.enabled",
-  "prowlarr.enabled",
-  "jackett.enabled",
-  "tmdb.enabled",
-  "tvdb.enabled",
-  "tvdb.defaultShows",
-  "autoMergeVersions",
-  "sync.mediaImport.status",
-  "cache.spotlight",
-  "search.maxIndexers",
-  "search.timeout",
-  "search.concurrency",
-  "sync.folderScan.enabled",
-  "onboarding.completed",
-  "general.language",
-  "paths.rootDataPath",
-  "download.importMethod",
-  "download.seedRatioLimit",
-  "download.seedTimeLimitHours",
-  "download.seedCleanupFiles",
-]);
-
-function isSensitive(key: string): boolean {
-  return !PLAINTEXT_KEYS.has(key);
-}
-
-function encryptValue(key: string, value: unknown): unknown {
-  if (!isSensitive(key)) return value;
-  return encrypt(JSON.stringify(value));
-}
-
 function looksEncrypted(value: unknown): boolean {
   if (typeof value !== "string") return false;
   // Plaintext JSONB values are booleans, numbers, objects, or short strings — not long base64
   return /^[A-Za-z0-9+/]+=*$/.test(value) && value.length > 20;
 }
 
-function decryptValue(key: string, stored: unknown): unknown {
-  if (!isSensitive(key)) {
-    // Key was recently added to PLAINTEXT_KEYS but DB still has encrypted value from before
-    if (looksEncrypted(stored)) {
-      try { return JSON.parse(decrypt(stored as string)); } catch { return stored; }
-    }
-    return stored;
+/* -------------------------------------------------------------------------- */
+/*  Errors                                                                    */
+/* -------------------------------------------------------------------------- */
+
+export class SettingValidationError extends Error {
+  constructor(
+    public readonly key: string,
+    public readonly zodError: z.ZodError,
+  ) {
+    super(`Setting "${key}" failed validation: ${zodError.message}`);
+    this.name = "SettingValidationError";
   }
-  if (typeof stored !== "string") {
-    throw new Error(`Setting "${key}" has invalid encrypted format`);
-  }
-  return JSON.parse(decrypt(stored));
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Public API                                                                */
+/*  Cache (30s TTL, invalidated on every write/delete)                        */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Get a setting value from the DB and decrypt if sensitive.
- */
-export async function getSetting<T = string>(
-  key: string,
-): Promise<T | null> {
+const CACHE_TTL_MS = 30_000;
+interface CacheEntry {
+  value: unknown;
+  expires: number;
+}
+const valueCache = new Map<string, CacheEntry>();
+
+function getCached(key: string): { hit: true; value: unknown } | { hit: false } {
+  const entry = valueCache.get(key);
+  if (!entry) return { hit: false };
+  if (entry.expires < Date.now()) {
+    valueCache.delete(key);
+    return { hit: false };
+  }
+  return { hit: true, value: entry.value };
+}
+
+function setCached(key: string, value: unknown): void {
+  valueCache.set(key, { value, expires: Date.now() + CACHE_TTL_MS });
+}
+
+function invalidateCache(key: string): void {
+  valueCache.delete(key);
+}
+
+export function clearSettingsCache(): void {
+  valueCache.clear();
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Decode / encode                                                           */
+/* -------------------------------------------------------------------------- */
+
+function decodeStoredValue<K extends SettingKey>(
+  key: K,
+  raw: unknown,
+): SettingValue<K> | null {
+  const def = SETTINGS_REGISTRY[key];
+  let payload: unknown;
+
+  if (def.secret) {
+    if (typeof raw !== "string") {
+      console.error(
+        `[settings] ${key}: expected encrypted string but got ${typeof raw} — re-enter via admin UI`,
+      );
+      return null;
+    }
+    try {
+      payload = JSON.parse(decrypt(raw));
+    } catch {
+      console.error(
+        `[settings] ${key}: decryption failed — re-enter via admin UI`,
+      );
+      return null;
+    }
+  } else if (looksEncrypted(raw)) {
+    // Legacy fallback: key was previously encrypted but is now plaintext in the registry.
+    // Try to decrypt; if that fails, assume it's already plaintext and fall through.
+    try {
+      payload = JSON.parse(decrypt(raw as string));
+    } catch {
+      payload = raw;
+    }
+  } else {
+    payload = raw;
+  }
+
+  const parsed = def.schema.safeParse(payload);
+  if (!parsed.success) {
+    if (def.secret) {
+      console.error(`[settings] ${key}: stored value failed schema validation`);
+    } else {
+      console.error(
+        `[settings] ${key}: stored value failed schema validation`,
+        parsed.error.issues,
+      );
+    }
+    return null;
+  }
+  return parsed.data as SettingValue<K>;
+}
+
+function encodeWriteValue<K extends SettingKey>(
+  key: K,
+  value: SettingValue<K>,
+): unknown {
+  const def = SETTINGS_REGISTRY[key];
+  const parsed = def.schema.safeParse(value);
+  if (!parsed.success) {
+    throw new SettingValidationError(key, parsed.error);
+  }
+  if (def.secret) {
+    return encrypt(JSON.stringify(parsed.data));
+  }
+  return parsed.data;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Env var override (string/number keys only — boolean envs are a footgun)  */
+/* -------------------------------------------------------------------------- */
+
+function readEnvOverride<K extends SettingKey>(
+  key: K,
+): SettingValue<K> | undefined {
+  const def = SETTINGS_REGISTRY[key];
+  if (!def.envVar) return undefined;
+  const raw = process.env[def.envVar];
+  if (raw === undefined) return undefined;
+  const parsed = def.schema.safeParse(raw);
+  if (!parsed.success) {
+    console.warn(
+      `[settings] env var ${def.envVar} for ${key} failed schema validation; falling through to DB`,
+    );
+    return undefined;
+  }
+  return parsed.data as SettingValue<K>;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Typed single-key API                                                      */
+/* -------------------------------------------------------------------------- */
+
+export async function getSetting<K extends SettingKey>(
+  key: K,
+): Promise<SettingValue<K> | null> {
+  const envValue = readEnvOverride(key);
+  if (envValue !== undefined) return envValue;
+
+  const cached = getCached(key);
+  if (cached.hit) return cached.value as SettingValue<K> | null;
+
   const row = await db.query.systemSetting.findFirst({
     where: eq(systemSetting.key, key),
   });
 
-  if (row) {
-    return decryptValue(key, row.value) as T;
-  }
-
-  return null;
+  const decoded = row ? decodeStoredValue(key, row.value) : null;
+  setCached(key, decoded);
+  return decoded;
 }
 
-/**
- * Upsert a setting value (encrypts sensitive values before storing).
- */
-export async function setSetting(
-  key: string,
-  value: unknown,
+export async function getSettingOrThrow<K extends SettingKey>(
+  key: K,
+): Promise<SettingValue<K>> {
+  const value = await getSetting(key);
+  if (value === null) {
+    throw new Error(`Setting "${key}" is not configured`);
+  }
+  return value;
+}
+
+export async function getSettings<K extends SettingKey>(
+  keys: readonly K[],
+): Promise<{ [P in K]: SettingValue<P> | null }> {
+  const result: Record<string, unknown> = {};
+  const misses: K[] = [];
+
+  for (const key of keys) {
+    const cached = getCached(key);
+    if (cached.hit) {
+      result[key] = cached.value;
+    } else {
+      misses.push(key);
+    }
+  }
+
+  if (misses.length > 0) {
+    const rows = await db
+      .select()
+      .from(systemSetting)
+      .where(inArray(systemSetting.key, misses as unknown as string[]));
+    const byKey = new Map(rows.map((r) => [r.key, r.value] as const));
+    for (const key of misses) {
+      const raw = byKey.get(key);
+      const decoded = raw === undefined ? null : decodeStoredValue(key, raw);
+      setCached(key, decoded);
+      result[key] = decoded;
+    }
+  }
+
+  return result as { [P in K]: SettingValue<P> | null };
+}
+
+export async function setSetting<K extends SettingKey>(
+  key: K,
+  value: SettingValue<K>,
 ): Promise<void> {
-  const stored = encryptValue(key, value);
+  const stored = encodeWriteValue(key, value);
   await db
     .insert(systemSetting)
     .values({ key, value: stored, updatedAt: new Date() })
@@ -172,25 +307,72 @@ export async function setSetting(
       target: systemSetting.key,
       set: { value: stored, updatedAt: new Date() },
     });
+  invalidateCache(key);
 }
 
-/**
- * Delete a setting.
- */
-export async function deleteSetting(key: string): Promise<void> {
+export async function deleteSetting<K extends SettingKey>(key: K): Promise<void> {
   await db.delete(systemSetting).where(eq(systemSetting.key, key));
+  invalidateCache(key);
 }
 
-/**
- * Get all settings as a key-value record (decrypted).
- */
-export async function getAllSettings(): Promise<Record<string, unknown>> {
-  const rows = await db.query.systemSetting.findMany();
-  const result: Record<string, unknown> = {};
+/* -------------------------------------------------------------------------- */
+/*  Snapshot / listing                                                        */
+/* -------------------------------------------------------------------------- */
 
-  for (const row of rows) {
-    result[row.key] = decryptValue(row.key, row.value);
+export interface SettingSnapshot {
+  key: SettingKey;
+  value: unknown;
+  hasValue: boolean;
+  secret: boolean;
+  def: (typeof SETTINGS_REGISTRY)[SettingKey];
+}
+
+export async function listAllSettings(): Promise<SettingSnapshot[]> {
+  const snapshots: SettingSnapshot[] = [];
+  for (const key of allSettingKeys()) {
+    const def = SETTINGS_REGISTRY[key];
+    if (def.hidden) continue;
+    const value = await getSetting(key);
+    snapshots.push({
+      key,
+      value: def.secret ? null : value,
+      hasValue: value !== null,
+      secret: def.secret,
+      def: def as (typeof SETTINGS_REGISTRY)[SettingKey],
+    });
   }
+  return snapshots;
+}
 
+export async function getAllSettings(): Promise<Record<string, unknown>> {
+  const result: Record<string, unknown> = {};
+  for (const key of allSettingKeys()) {
+    result[key] = await getSetting(key);
+  }
   return result;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Raw escape hatch — dynamic keys, bypasses registry + cache + encryption  */
+/* -------------------------------------------------------------------------- */
+
+export async function getSettingRaw(key: string): Promise<unknown | null> {
+  const row = await db.query.systemSetting.findFirst({
+    where: eq(systemSetting.key, key),
+  });
+  return row ? row.value : null;
+}
+
+export async function setSettingRaw(key: string, value: unknown): Promise<void> {
+  await db
+    .insert(systemSetting)
+    .values({ key, value, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: systemSetting.key,
+      set: { value, updatedAt: new Date() },
+    });
+}
+
+export async function deleteSettingRaw(key: string): Promise<void> {
+  await db.delete(systemSetting).where(eq(systemSetting.key, key));
 }
