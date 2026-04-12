@@ -6,11 +6,13 @@ import {
   getSettingRaw,
   setSetting,
   setSettingRaw,
+  setManySettings,
   deleteSetting,
   deleteSettingRaw,
   isSettingKey,
   type SettingKey,
 } from "@canto/db/settings";
+import { invalidateServiceClients } from "@canto/core/infrastructure/adapters/service-clients";
 import {
   serviceEnum,
   getSettingInput,
@@ -83,6 +85,9 @@ export const settingsRouter = createTRPCRouter({
       } else {
         await setSettingRaw(input.key, input.value);
       }
+      // Any cached service client built from this key must be rebuilt with
+      // the new credentials on the next use.
+      invalidateServiceClients([input.key]);
       return { success: true };
     }),
 
@@ -94,20 +99,18 @@ export const settingsRouter = createTRPCRouter({
       } else {
         await deleteSettingRaw(input.key);
       }
+      invalidateServiceClients([input.key]);
       return { success: true };
     }),
 
   setMany: adminProcedure
     .input(setManySettingsInput)
     .mutation(async ({ input }) => {
-      for (const { key, value } of input.settings) {
-        if (isSettingKey(key)) {
-          // TODO: untyped generic dispatch — registry validates at write time.
-          await setSetting(key, value as never);
-        } else {
-          await setSettingRaw(key, value);
-        }
-      }
+      // Atomic batch write: either every setting lands or none do, so a
+      // half-applied service config (e.g. enabled=true without a password)
+      // is impossible.
+      await setManySettings(input.settings);
+      invalidateServiceClients(input.settings.map((s) => s.key));
       return { success: true };
     }),
 
@@ -154,7 +157,9 @@ export const settingsRouter = createTRPCRouter({
   toggleService: adminProcedure
     .input(toggleServiceInput)
     .mutation(async ({ input }) => {
-      await setSetting(SERVICE_ENABLED_KEY[input.service], input.enabled);
+      const key = SERVICE_ENABLED_KEY[input.service];
+      await setSetting(key, input.enabled);
+      invalidateServiceClients([key]);
       return { success: true };
     }),
 
@@ -178,6 +183,18 @@ export const settingsRouter = createTRPCRouter({
   }),
 
   completeOnboarding: adminProcedure.mutation(async () => {
+    // The middleware lets anything past /onboarding as long as this flag is
+    // true, so flipping it unguarded meant an admin who spam-clicked through
+    // the wizard could land in a broken app with zero metadata. TMDB is the
+    // one hard requirement (every provider path depends on it); everything
+    // else is optional and can be added later from Settings.
+    const tmdbKey = await getSetting("tmdb.apiKey");
+    if (!tmdbKey) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "TMDB must be configured before completing onboarding",
+      });
+    }
     await setSetting("onboarding.completed", true);
     return { success: true };
   }),

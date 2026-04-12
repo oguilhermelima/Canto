@@ -103,7 +103,7 @@ export const libraryRouter = createTRPCRouter({
       importMethod: importMethod ?? "local",
       seedRatioLimit: seedRatio ?? null,
       seedTimeLimitHours: seedTime ?? null,
-      seedCleanupFiles: seedCleanup ?? false,
+      seedCleanupFiles: seedCleanup ?? true,
     };
   }),
 

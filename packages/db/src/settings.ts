@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import {
   allSettingKeys,
+  isSettingKey,
   SETTINGS_REGISTRY,
   type SettingKey,
   type SettingValue,
@@ -324,6 +325,49 @@ export async function setSetting<K extends SettingKey>(
       set: { value: stored, updatedAt: new Date() },
     });
   invalidateCache(key);
+}
+
+/**
+ * Atomic batch write. All entries are validated + encoded first, then written
+ * inside a single transaction. Either every value lands or none do — no more
+ * half-applied config (e.g. qbittorrent.enabled=true without a password).
+ *
+ * Accepts both typed and dynamic keys; typed keys go through Zod + encryption,
+ * dynamic keys fall through like `setSettingRaw`.
+ */
+export async function setManySettings(
+  entries: readonly { key: string; value?: unknown }[],
+): Promise<void> {
+  // Phase 1: validate + encode every entry before touching the DB so a bad
+  // value rejects the whole batch up front.
+  const encoded = entries.map(({ key, value }) => {
+    if (isSettingKey(key)) {
+      return {
+        key,
+        stored: encodeWriteValue(key, value as SettingValue<SettingKey>),
+        typed: true,
+      };
+    }
+    return { key, stored: value, typed: false };
+  });
+
+  // Phase 2: single transaction — all writes commit together or roll back.
+  await db.transaction(async (tx) => {
+    for (const { key, stored } of encoded) {
+      await tx
+        .insert(systemSetting)
+        .values({ key, value: stored, updatedAt: new Date() })
+        .onConflictDoUpdate({
+          target: systemSetting.key,
+          set: { value: stored, updatedAt: new Date() },
+        });
+    }
+  });
+
+  // Phase 3: invalidate cache for keys we actually cache (typed only).
+  for (const { key, typed } of encoded) {
+    if (typed) invalidateCache(key);
+  }
 }
 
 export async function deleteSetting<K extends SettingKey>(key: K): Promise<void> {

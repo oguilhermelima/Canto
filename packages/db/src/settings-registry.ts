@@ -330,15 +330,6 @@ export const SETTINGS_REGISTRY = {
   }),
 
   // ── Downloads: library paths and seeding ─────────────────────────────────
-  "paths.rootDataPath": def({
-    group: "downloads.library",
-    label: "Root Data Path",
-    help: "Absolute path to the shared data root (torrents, library, config)",
-    schema: z.string().startsWith("/"),
-    default: "/data",
-    secret: false,
-    inputType: "text",
-  }),
   "download.importMethod": def({
     group: "downloads.library",
     label: "Import Method",
