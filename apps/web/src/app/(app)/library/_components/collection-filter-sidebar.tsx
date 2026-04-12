@@ -68,13 +68,13 @@ export function CollectionFilterSidebar({
             <span className="text-[15px] font-semibold text-foreground">Search</span>
           </button>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-foreground/30" />
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={filters.searchQuery}
               onChange={(e) => update({ searchQuery: e.target.value })}
               placeholder="Search lists..."
               variant="ghost"
-              className="h-9 pl-9 text-[13px] font-medium text-foreground/70 placeholder:text-foreground/30"
+              className="h-9 pl-9 text-[13px] font-medium text-foreground placeholder:text-muted-foreground"
             />
           </div>
         </div>
@@ -92,7 +92,7 @@ export function CollectionFilterSidebar({
               value={filters.sortBy}
               onValueChange={(value) => update({ sortBy: value as "name" | "date" })}
             >
-              <SelectTrigger className="h-9 flex-1 rounded-xl border-0 bg-accent px-3 text-[13px] text-foreground/70">
+              <SelectTrigger className="h-9 flex-1 rounded-xl border-0 bg-accent px-3 text-[13px] text-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

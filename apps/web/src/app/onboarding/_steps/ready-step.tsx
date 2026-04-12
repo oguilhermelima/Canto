@@ -27,7 +27,7 @@ export function ReadyStep({
       </div>
       <div className="space-y-3">
         <h1 className="text-3xl font-bold text-foreground">You're all set</h1>
-        <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
+        <p className="mx-auto max-w-2xl text-base text-muted-foreground leading-relaxed">
           Everything is connected and ready to go. Start exploring — search for a movie,
           browse what's trending, or dive straight into downloading. All your settings
           can be adjusted anytime from the Settings page.

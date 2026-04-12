@@ -15,12 +15,10 @@ import { StepHeader } from "../_components/step-header";
 
 export function IndexerStep({
   onNext,
-  onBack,
   settings,
   configureFooter,
 }: {
   onNext: () => void;
-  onBack: () => void;
   settings?: Settings;
   configureFooter: ConfigureFooter;
 }): React.JSX.Element {
@@ -40,6 +38,14 @@ export function IndexerStep({
     setTesting(true);
     try {
       const prefix = choice;
+      const result = await testService.mutateAsync({
+        service: choice,
+        values: { [`${prefix}.url`]: url, [`${prefix}.apiKey`]: apiKey },
+      });
+      if (!result.connected) {
+        toast.error("Connection failed. Check your URL and API key.");
+        return;
+      }
       await setMany.mutateAsync({
         settings: [
           { key: `${prefix}.url`, value: url },
@@ -47,16 +53,8 @@ export function IndexerStep({
           { key: `${prefix}.enabled`, value: true },
         ],
       });
-      const result = await testService.mutateAsync({
-        service: choice,
-        values: { [`${prefix}.url`]: url, [`${prefix}.apiKey`]: apiKey },
-      });
-      if (result.connected) {
-        toast.success(`${choice === "prowlarr" ? "Prowlarr" : "Jackett"} connected`);
-        onNext();
-      } else {
-        toast.error("Connection failed. Check your URL and API key.");
-      }
+      toast.success(`${choice === "prowlarr" ? "Prowlarr" : "Jackett"} connected`);
+      onNext();
     } catch {
       toast.error("Failed to connect");
     } finally {
@@ -82,7 +80,6 @@ export function IndexerStep({
             Connect Prowlarr or Jackett to aggregate your torrent trackers — when you hit download, Canto searches all of them at once.
           </>
         }
-        onBack={onBack}
       />
 
       <div className="flex w-full max-w-md gap-3">

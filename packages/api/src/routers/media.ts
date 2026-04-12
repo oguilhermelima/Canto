@@ -341,7 +341,7 @@ export const mediaRouter = createTRPCRouter({
       return findMediaById(ctx.db, input.id);
     }),
 
-  listFiles: publicProcedure
+  listFiles: protectedProcedure
     .input(getByMediaIdInput)
     .query(({ ctx, input }) => findMediaFilesByMediaId(ctx.db, input.mediaId)),
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@canto/ui/button";
 import { Switch } from "@canto/ui/switch";
 import { Skeleton } from "@canto/ui/skeleton";
@@ -54,7 +54,12 @@ export function PreferencesSection(): React.JSX.Element {
   const { region, setRegion } = useWatchRegion();
   const [regionSaved, setRegionSaved] = useState(false);
   const [pendingRegion, setPendingRegion] = useState<string | null>(null);
+  const regionTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const displayRegion = pendingRegion ?? region;
+
+  useEffect(() => {
+    return () => { if (regionTimerRef.current) clearTimeout(regionTimerRef.current); };
+  }, []);
 
   const { data: regionsRaw, isLoading: regionsLoading } = trpc.provider.filterOptions.useQuery({ type: "regions" });
   const regions = regionsRaw as Array<{ code: string; englishName: string; nativeName: string }> | undefined;
@@ -70,7 +75,8 @@ export function PreferencesSection(): React.JSX.Element {
     setRegion(pendingRegion ?? region);
     setPendingRegion(null);
     setRegionSaved(true);
-    setTimeout(() => setRegionSaved(false), 2000);
+    if (regionTimerRef.current) clearTimeout(regionTimerRef.current);
+    regionTimerRef.current = setTimeout(() => setRegionSaved(false), 2000);
   };
   const hasRegionChange = pendingRegion !== null && pendingRegion !== region;
 

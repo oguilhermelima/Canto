@@ -41,7 +41,7 @@ export function PasswordSection(): React.JSX.Element {
             onChange={(e) => setCurrentPassword(e.target.value)}
             placeholder="Enter current password"
             variant="ghost"
-            className="text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border"
+            className="text-sm placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-border"
           />
         </div>
         <div className="space-y-1.5">
@@ -54,7 +54,7 @@ export function PasswordSection(): React.JSX.Element {
             onChange={(e) => setNewPassword(e.target.value)}
             placeholder="Enter new password"
             variant="ghost"
-            className="text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border"
+            className="text-sm placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-border"
           />
         </div>
       </div>

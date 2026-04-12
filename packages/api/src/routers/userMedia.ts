@@ -824,6 +824,7 @@ export const userMediaRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(200).default(40),
         cursor: z.number().int().min(0).nullish(),
         mediaType: z.enum(["movie", "show"]).optional(),
+        completedOnly: z.boolean().optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -956,6 +957,7 @@ export const userMediaRouter = createTRPCRouter({
         const key = `${entry.mediaId}:${entry.episode?.id ?? "movie"}:${toMinuteKey(entry.watchedAt)}`;
         if (seen.has(key)) continue;
         seen.add(key);
+        if (input.completedOnly && !entry.isCompleted) continue;
         deduped.push(entry);
       }
 

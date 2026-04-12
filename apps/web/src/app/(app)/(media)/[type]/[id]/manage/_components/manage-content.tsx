@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { authClient } from "~/lib/auth-client";
 import { PageHeader } from "~/components/layout/page-header";
 import { TabBar } from "~/components/layout/tab-bar";
 import { useManageMedia } from "./use-manage-media";
@@ -29,23 +28,9 @@ export function ManageContent({
   id,
   mediaType,
 }: ManageContentProps): React.JSX.Element {
-  const { data: session } = authClient.useSession();
-  const isAdmin =
-    (session?.user as { role?: string } | undefined)?.role === "admin";
-
   const [activeTab, setActiveTab] = useState<Tab>("preferences");
 
   const manage = useManageMedia(id, mediaType);
-
-  if (!isAdmin) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">
-          This page is only available to administrators.
-        </p>
-      </div>
-    );
-  }
 
   if (manage.isLoading || !manage.media) {
     return (
@@ -59,15 +44,13 @@ export function ManageContent({
     <div className="w-full">
       <PageHeader title={manage.media.title} subtitle="Manage media settings" />
 
-      <div className="px-4 pt-6 pb-8 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+      <div className="px-4 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         <TabBar
           tabs={TABS.map((t) => ({ value: t.value, label: t.label }))}
           value={activeTab}
           onChange={(v) => setActiveTab(v as Tab)}
         />
-      </div>
 
-      <div className="px-4 pb-12 pt-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         <div className="w-full">
           {activeTab === "preferences" && (
             <PreferencesTab

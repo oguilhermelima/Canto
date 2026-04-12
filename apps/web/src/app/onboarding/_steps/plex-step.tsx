@@ -16,12 +16,10 @@ import { StepHeader } from "../_components/step-header";
 
 export function PlexStep({
   onNext,
-  onBack,
   settings,
   configureFooter,
 }: {
   onNext: () => void;
-  onBack: () => void;
   settings?: Settings;
   configureFooter: ConfigureFooter;
 }): React.JSX.Element {
@@ -135,11 +133,11 @@ export function PlexStep({
 
   useEffect(() => {
     configureFooter({
-      onPrimary: connected ? onNext : authMode === "oauth" ? onNext : handleToken,
-      primaryLabel: connected ? "Continue" : authMode === "oauth" ? "Skip for now" : "Connect & continue",
+      onPrimary: connected ? onNext : authMode === "oauth" ? undefined : handleToken,
+      primaryLabel: connected ? "Continue" : "Connect & continue",
       primaryDisabled: !connected && authMode === "token" && (testing || !canSubmitToken),
       primaryLoading: testing || saveSettings.isPending,
-      onSkip: onNext,
+      onSkip: connected ? undefined : onNext,
     });
   }, [connected, authMode, testing, url, token, saveSettings.isPending]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -149,7 +147,6 @@ export function PlexStep({
       <StepHeader
         title="Plex"
         description="Connecting your Plex account imports your entire library into Canto and keeps watch progress in sync."
-        onBack={onBack}
       />
 
       {connected ? (

@@ -7,7 +7,6 @@ import { PageHeader } from "~/components/layout/page-header";
 import { TabBar } from "~/components/layout/tab-bar";
 import { StateMessage } from "~/components/layout/state-message";
 import { trpc } from "~/lib/trpc/client";
-import { authClient } from "~/lib/auth-client";
 import { useDocumentTitle } from "~/hooks/use-document-title";
 import { resolveState } from "~/lib/torrent-utils";
 import { TorrentCard } from "./_components/torrent-card";
@@ -27,9 +26,6 @@ export default function DownloadsPage(): React.JSX.Element {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
-
-  const { data: session } = authClient.useSession();
-  const isAdmin = (session?.user as { role?: string } | undefined)?.role === "admin";
 
   useDocumentTitle("Downloads");
 
@@ -114,14 +110,6 @@ export default function DownloadsPage(): React.JSX.Element {
       return r.canResume && !r.isDownloaded;
     }).length,
   };
-
-  if (!isAdmin) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">This page is only available to administrators.</p>
-      </div>
-    );
-  }
 
   return (
     <div className="w-full">

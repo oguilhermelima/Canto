@@ -13,12 +13,10 @@ import { StepHeader } from "../_components/step-header";
 
 export function JellyfinStep({
   onNext,
-  onBack,
   settings,
   configureFooter,
 }: {
   onNext: () => void;
-  onBack: () => void;
   settings?: Settings;
   configureFooter: ConfigureFooter;
 }): React.JSX.Element {
@@ -43,7 +41,7 @@ export function JellyfinStep({
       primaryLabel: connected ? "Continue" : "Connect & continue",
       primaryDisabled: !connected && (testing || !canSubmit),
       primaryLoading: testing || saveSettings.isPending || addConnection.isPending,
-      onSkip: onNext,
+      onSkip: connected ? undefined : onNext,
     });
   }, [connected, testing, url, username, password, saveSettings.isPending, addConnection.isPending]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -85,7 +83,6 @@ export function JellyfinStep({
       <StepHeader
         title="Jellyfin"
         description="Connecting your Jellyfin account imports your entire library into Canto and keeps watch progress in sync."
-        onBack={onBack}
       />
 
       {connected ? (

@@ -11,7 +11,7 @@ import { StateMessage } from "~/components/layout/state-message";
 import { TabBar } from "~/components/layout/tab-bar";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
-import { authClient } from "~/lib/auth-client";
+import { useIsAdmin } from "~/hooks/use-is-admin";
 import { useDocumentTitle } from "~/hooks/use-document-title";
 import { mediaDetailHref } from "~/lib/media-href";
 import { STATUS_TABS, TYPE_TABS } from "./_components/constants";
@@ -21,8 +21,7 @@ import type {ResolveTarget} from "./_components/resolve-dialog";
 
 export default function RequestsPage(): React.JSX.Element {
   const router = useRouter();
-  const { data: session } = authClient.useSession();
-  const isAdmin = (session?.user as { role?: string } | undefined)?.role === "admin";
+  const isAdmin = useIsAdmin();
 
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -228,7 +227,7 @@ export default function RequestsPage(): React.JSX.Element {
                   setResolveTarget({ id, title, action: "rejected", media })
                 }
                 onCancel={(id) => cancelMutation.mutate({ id })}
-                cancelPending={cancelMutation.isPending}
+                cancelPending={cancelMutation.isPending && cancelMutation.variables.id === req.id}
               />
             ))}
 

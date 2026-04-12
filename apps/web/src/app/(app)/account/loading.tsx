@@ -7,6 +7,13 @@ export default function AccountLoading(): React.JSX.Element {
       <Skeleton className="mb-1 h-9 w-32" />
       <Skeleton className="mb-8 h-5 w-80" />
 
+      {/* Tabs */}
+      <div className="mb-8 flex gap-1">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-8 w-24 rounded-xl" />
+        ))}
+      </div>
+
       {/* Settings sections */}
       {Array.from({ length: 3 }).map((_, s) => (
         <div key={s} className="mb-8">

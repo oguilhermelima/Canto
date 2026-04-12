@@ -85,7 +85,7 @@ function ServiceRow({
       </div>
       <div className="flex items-center gap-2">
         <div className={cn("h-2 w-2 rounded-full", enabled ? "bg-emerald-500" : "bg-muted-foreground/30")} />
-        <span className={cn("text-xs", enabled ? "text-emerald-500" : "text-muted-foreground/50")}>
+        <span className={cn("text-xs", enabled ? "text-emerald-500" : "text-muted-foreground")}>
           {enabled ? "Connected" : "Not configured"}
         </span>
       </div>
@@ -176,7 +176,7 @@ export function StatusTab(): React.JSX.Element {
           )}
 
           {!torrentsLoading && activeTorrents.length === 0 && errorTorrents.length === 0 && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground/50">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               {seedingTorrents.length > 0 ? (
                 <>
                   <Upload className="h-4 w-4" />

@@ -579,7 +579,7 @@ export function CollectionsTab({
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-muted-foreground">
                 Description{" "}
-                <span className="text-muted-foreground/50">(optional)</span>
+                <span className="text-muted-foreground">(optional)</span>
               </label>
               <Input
                 value={description}
@@ -681,7 +681,7 @@ function ListPreviewStack({
                 sizes="58px"
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-muted-foreground/40">
+              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                 <Icon className="h-4 w-4" />
               </div>
             )}

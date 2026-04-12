@@ -9,12 +9,10 @@ import { DownloadFolders } from "~/components/settings/download-folders";
 
 export function LibrariesConfigureStep({
   onNext,
-  onBack,
   onSkip,
   configureFooter,
 }: {
   onNext: () => void;
-  onBack: () => void;
   onSkip: () => void;
   configureFooter: ConfigureFooter;
 }): React.JSX.Element {
@@ -37,7 +35,6 @@ export function LibrariesConfigureStep({
             Set the <strong className="text-blue-400">download</strong> and <strong className="text-emerald-400">library</strong> paths for each library.
           </>
         }
-        onBack={onBack}
       />
 
       <div className="w-full max-w-2xl text-left">

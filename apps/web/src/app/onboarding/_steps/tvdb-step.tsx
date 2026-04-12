@@ -13,12 +13,10 @@ import { StepHeader } from "../_components/step-header";
 
 export function TvdbStep({
   onNext,
-  onBack,
   settings,
   configureFooter,
 }: {
   onNext: () => void;
-  onBack: () => void;
   settings?: Settings;
   configureFooter: ConfigureFooter;
 }): React.JSX.Element {
@@ -64,7 +62,6 @@ export function TvdbStep({
       <StepHeader
         title="Episode Metadata"
         description="TMDB sometimes gets season and episode numbering wrong — especially for anime, specials, and shows with different regional airing orders. TVDB provides more accurate episode structures while Canto keeps using TMDB for everything else."
-        onBack={onBack}
       />
       <p className="mx-auto max-w-2xl text-sm text-muted-foreground leading-relaxed">
         Recommended for anime and multi-season shows. Get a free key at{" "}

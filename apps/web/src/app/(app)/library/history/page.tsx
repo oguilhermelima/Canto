@@ -143,6 +143,10 @@ export default function HistoryPage(): React.JSX.Element {
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
             )}
+
+            {!hasNextPage && !isFetchingNextPage && filteredEntries.length > 0 && (
+              <StateMessage preset="endOfItems" inline />
+            )}
           </>
         )}
       </div>

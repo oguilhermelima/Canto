@@ -315,7 +315,7 @@ export function TorrentDialog({
             <div className="flex items-center">
               <button
                 onClick={() => setMobileFiltersOpen((o: boolean) => !o)}
-                className="flex flex-1 items-center gap-2 px-4 py-3 text-xs font-medium text-foreground/70"
+                className="flex flex-1 items-center gap-2 px-4 py-3 text-xs font-medium text-muted-foreground"
               >
                 <SlidersHorizontal size={14} />
                 Filters & Sort
@@ -329,7 +329,7 @@ export function TorrentDialog({
               </button>
               <div className="mr-3 h-5 w-px bg-border/30" />
               <label className="mr-3 flex cursor-pointer items-center gap-2">
-                <span className="text-xs text-foreground/70">
+                <span className="text-xs text-muted-foreground">
                   Advanced Search
                 </span>
                 <button
@@ -449,7 +449,7 @@ export function TorrentDialog({
                     </Select>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="mr-0.5 text-xs text-foreground/50">
+                    <span className="mr-0.5 text-xs text-muted-foreground">
                       Sort
                     </span>
                     {(["confidence", "seeders", "size", "age"] as const).map(
@@ -461,7 +461,7 @@ export function TorrentDialog({
                             "inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-xl text-xs transition-colors",
                             torrentSort === col
                               ? "bg-background font-medium text-foreground"
-                              : "text-foreground/40",
+                              : "text-muted-foreground",
                           )}
                         >
                           {
@@ -560,7 +560,7 @@ export function TorrentDialog({
                 </SelectContent>
               </Select>
               <div className="mx-1 h-4 w-px bg-border/50" />
-              <span className="text-xs text-muted-foreground/60">Sort</span>
+              <span className="text-xs text-muted-foreground">Sort</span>
               <div className="flex items-center gap-0.5">
                 {(["confidence", "seeders", "size", "age"] as const).map(
                   (col) => (
@@ -571,7 +571,7 @@ export function TorrentDialog({
                         "inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-xs transition-colors",
                         torrentSort === col
                           ? "bg-muted/60 font-medium text-foreground"
-                          : "text-muted-foreground/60 hover:text-muted-foreground",
+                          : "text-muted-foreground hover:text-muted-foreground",
                       )}
                     >
                       {
@@ -718,7 +718,7 @@ export function TorrentDialog({
                       <span>
                         {t.indexer || "Unknown"}
                         {t.indexerLanguage && (
-                          <span className="ml-1 text-muted-foreground/60">
+                          <span className="ml-1 text-muted-foreground">
                             ({t.indexerLanguage})
                           </span>
                         )}
@@ -750,28 +750,28 @@ export function TorrentDialog({
                         </p>
                         <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-muted-foreground">
                           {qLabel && (
-                            <span className="flex items-center gap-1.5 font-medium text-foreground/80">
+                            <span className="flex items-center gap-1.5 font-medium text-foreground">
                               <Monitor
                                 size={12}
-                                className="text-muted-foreground/50"
+                                className="text-muted-foreground"
                               />
                               {qLabel}
                             </span>
                           )}
                           {sLabel && (
-                            <span className="flex items-center gap-1.5 font-medium text-foreground/70">
+                            <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
                               <FilmIcon
                                 size={12}
-                                className="text-muted-foreground/50"
+                                className="text-muted-foreground"
                               />
                               {sLabel}
                             </span>
                           )}
                           {t.size > 0 && (
-                            <span className="flex items-center gap-1.5 font-medium text-foreground/70">
+                            <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
                               <HardDrive
                                 size={12}
-                                className="text-muted-foreground/50"
+                                className="text-muted-foreground"
                               />
                               {formatBytes(t.size)}
                             </span>
@@ -792,25 +792,25 @@ export function TorrentDialog({
 
                     {/* Footer */}
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border/50 px-5 py-2.5 text-xs font-medium text-muted-foreground">
-                      <span className="flex items-center gap-1.5 text-foreground/70">
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
                         <ArrowUp
                           size={12}
-                          className="text-muted-foreground/50"
+                          className="text-muted-foreground"
                         />
                         {t.seeders} seeders
                       </span>
-                      <span className="flex items-center gap-1.5 text-foreground/60">
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
                         <ArrowDown
                           size={12}
-                          className="text-muted-foreground/50"
+                          className="text-muted-foreground"
                         />
                         {t.leechers} peers
                       </span>
                       {t.languages.length > 0 && (
-                        <span className="flex items-center gap-1.5 text-foreground/60">
+                        <span className="flex items-center gap-1.5 text-muted-foreground">
                           <Globe
                             size={12}
-                            className="text-muted-foreground/50"
+                            className="text-muted-foreground"
                           />
                           {t.languages
                             .map((l: string) => l.toUpperCase())
@@ -832,11 +832,11 @@ export function TorrentDialog({
             <div className="flex min-h-[200px] items-center justify-center px-5 py-12 text-center">
               {advancedSearch && !committedQuery ? (
                 <div>
-                  <Search className="mx-auto mb-3 h-8 w-8 text-muted-foreground/20" />
+                  <Search className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
                   <p className="text-sm font-medium text-muted-foreground">
                     Type a query and press Enter
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground/60">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Search across all indexers with a custom query.
                   </p>
                 </div>
@@ -845,7 +845,7 @@ export function TorrentDialog({
                   <p className="text-sm font-medium text-muted-foreground">
                     No results found
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground/60">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Check your indexer configuration in Prowlarr.
                   </p>
                 </div>

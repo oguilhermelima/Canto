@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { TabBar } from "~/components/layout/tab-bar";
-import { authClient } from "~/lib/auth-client";
 import { useDocumentTitle } from "~/hooks/use-document-title";
 import { PageHeader } from "~/components/layout/page-header";
 import { MetadataProvidersSection } from "~/components/settings/services-section";
@@ -31,9 +30,6 @@ type NavKey = (typeof NAV_ITEMS)[number]["key"];
 export default function ManagePage(): React.JSX.Element {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { data: session, isPending } = authClient.useSession();
-  const isAdmin = (session?.user as { role?: string } | undefined)?.role === "admin";
-
   const tabParam = searchParams.get("tab");
   const resolvedTab = tabParam === "jellyfin" || tabParam === "plex" ? "media-servers" as const : tabParam as NavKey | null;
   const activeNav = resolvedTab && NAV_ITEMS.some((i) => i.key === resolvedTab) ? resolvedTab : "status";
@@ -43,14 +39,6 @@ export default function ManagePage(): React.JSX.Element {
   }, [router]);
 
   useDocumentTitle("Manage");
-
-  useEffect(() => {
-    if (!isPending && session && !isAdmin) {
-      router.replace("/account");
-    }
-  }, [isPending, session, isAdmin, router]);
-
-  if (isPending || !isAdmin) return <div />;
 
   return (
     <div className="w-full">

@@ -4,7 +4,6 @@ export function StepHeader({
 }: {
   title: string;
   description?: React.ReactNode;
-  onBack?: () => void;
 }): React.JSX.Element {
   return (
     <div className="space-y-3">

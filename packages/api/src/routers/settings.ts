@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import {
   getAllSettings,
   getSetting,
+  getSettings,
   getSettingRaw,
   setSetting,
   setSettingRaw,
@@ -200,10 +201,11 @@ export const settingsRouter = createTRPCRouter({
   }),
 
   getEnabledServices: publicProcedure.query(async () => {
+    const keys = ALL_SERVICES.map((s) => SERVICE_ENABLED_KEY[s]);
+    const values = await getSettings(keys);
     const result: Record<string, boolean> = {};
     for (const s of ALL_SERVICES) {
-      const val = await getSetting(SERVICE_ENABLED_KEY[s]);
-      result[s] = val === true;
+      result[s] = values[SERVICE_ENABLED_KEY[s]] === true;
     }
     return result;
   }),

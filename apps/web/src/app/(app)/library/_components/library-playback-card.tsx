@@ -182,7 +182,7 @@ export function LibraryPlaybackCard({
               sizes="(max-width: 640px) 56px, 64px"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-muted-foreground/40">
+            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
               {entry.mediaType === "show" ? (
                 <Tv className="h-4 w-4" />
               ) : (
@@ -211,8 +211,8 @@ export function LibraryPlaybackCard({
             {episodeLabel(entry)}
           </p>
 
-          <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground/90">
-            <Clock3 className="h-3.5 w-3.5 text-muted-foreground/70" />
+          <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock3 className="h-3.5 w-3.5 text-muted-foreground" />
             {formatWatchedDate(new Date(entry.watchedAt))} ·{" "}
             {sourceLabel(entry.source)}
           </p>

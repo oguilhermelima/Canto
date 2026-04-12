@@ -7,12 +7,10 @@ import { StepHeader } from "../_components/step-header";
 
 export function LibrariesIntroStep({
   onNext,
-  onBack,
   onSkip,
   configureFooter,
 }: {
   onNext: () => void;
-  onBack: () => void;
   onSkip: () => void;
   configureFooter: ConfigureFooter;
 }): React.JSX.Element {
@@ -34,7 +32,6 @@ export function LibrariesIntroStep({
             A library organizes one type of content — Movies, Shows, Anime — and handles the entire flow automatically.
           </>
         }
-        onBack={onBack}
       />
 
       <div className="w-full max-w-lg text-left">

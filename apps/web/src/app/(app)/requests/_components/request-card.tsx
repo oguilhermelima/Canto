@@ -61,7 +61,7 @@ export function RequestCard({
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
-              {media?.type === "show" ? <Tv size={20} className="text-muted-foreground/30" /> : <Film size={20} className="text-muted-foreground/30" />}
+              {media?.type === "show" ? <Tv size={20} className="text-muted-foreground" /> : <Film size={20} className="text-muted-foreground" />}
             </div>
           )}
         </Link>
@@ -86,12 +86,12 @@ export function RequestCard({
             )}
             {isAdmin && req.user != null && (
               <span className="flex items-center gap-1.5">
-                <User size={13} className="text-muted-foreground/50" />
+                <User size={13} className="text-muted-foreground" />
                 {req.user.name ?? req.user.email}
               </span>
             )}
             <span className="flex items-center gap-1.5">
-              <Clock size={13} className="text-muted-foreground/50" />
+              <Clock size={13} className="text-muted-foreground" />
               {formatDate(req.createdAt)}
             </span>
           </div>
@@ -101,7 +101,7 @@ export function RequestCard({
             <p className="mt-2 text-sm text-muted-foreground">{req.note}</p>
           )}
           {req.adminNote && (
-            <p className="mt-1 text-sm italic text-muted-foreground/70">Admin: {req.adminNote}</p>
+            <p className="mt-1 text-sm italic text-muted-foreground">Admin: {req.adminNote}</p>
           )}
         </div>
 

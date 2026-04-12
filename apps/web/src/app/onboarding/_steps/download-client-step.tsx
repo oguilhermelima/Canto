@@ -13,13 +13,11 @@ import { StepHeader } from "../_components/step-header";
 
 export function DownloadClientStep({
   onNext,
-  onBack,
   onSkip,
   settings,
   configureFooter,
 }: {
   onNext: () => void;
-  onBack: () => void;
   onSkip: () => void;
   settings?: Settings;
   configureFooter: ConfigureFooter;
@@ -35,6 +33,14 @@ export function DownloadClientStep({
   const handleSave = async (): Promise<void> => {
     setTesting(true);
     try {
+      const result = await testService.mutateAsync({
+        service: "qbittorrent",
+        values: { "qbittorrent.url": url, "qbittorrent.username": username, "qbittorrent.password": password },
+      });
+      if (!result.connected) {
+        toast.error("Connection failed. Check your URL and credentials.");
+        return;
+      }
       await setMany.mutateAsync({
         settings: [
           { key: "qbittorrent.url", value: url },
@@ -43,16 +49,8 @@ export function DownloadClientStep({
           { key: "qbittorrent.enabled", value: true },
         ],
       });
-      const result = await testService.mutateAsync({
-        service: "qbittorrent",
-        values: { "qbittorrent.url": url, "qbittorrent.username": username, "qbittorrent.password": password },
-      });
-      if (result.connected) {
-        toast.success("Connected to qBittorrent");
-        onNext();
-      } else {
-        toast.error("Connection failed. Check your URL and credentials.");
-      }
+      toast.success("Connected to qBittorrent");
+      onNext();
     } catch {
       toast.error("Failed to connect to qBittorrent");
     } finally {
@@ -70,10 +68,9 @@ export function DownloadClientStep({
       <StepHeader
         title="Download Client"
         description="Connect your torrent client so Canto can send downloads and manage files automatically. Just point us to the WebUI — Canto handles the rest."
-        onBack={onBack}
       />
       <p className="text-sm text-muted-foreground">
-        Currently supported: <span className="text-foreground/70">qBittorrent</span>. More clients coming soon.
+        Currently supported: <span className="text-foreground">qBittorrent</span>. More clients coming soon.
       </p>
 
       <div className="w-full max-w-md space-y-3">

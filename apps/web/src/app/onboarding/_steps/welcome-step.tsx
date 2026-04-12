@@ -22,7 +22,7 @@ export function WelcomeStep({
         <button
           type="button"
           onClick={() => authClient.signOut().then(() => window.location.replace("/login"))}
-          className="text-sm text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+          className="text-sm text-muted-foreground hover:text-muted-foreground transition-colors"
         >
           Sign out
         </button>
@@ -35,7 +35,7 @@ export function WelcomeStep({
       <Image src="/canto.svg" alt="Canto" width={64} height={64} className="h-16 w-16 dark:invert" />
       <div className="space-y-3">
         <h1 className="text-2xl font-semibold text-foreground">Welcome to Canto</h1>
-        <p className="mx-auto max-w-2xl text-base text-foreground/70 leading-relaxed">
+        <p className="mx-auto max-w-2xl text-base text-muted-foreground leading-relaxed">
           Your all-in-one media manager. Search for movies, shows, and anime across multiple
           torrent indexers, download them with one click, and automatically organize everything
           into your media library — ready for Jellyfin or Plex to pick up.

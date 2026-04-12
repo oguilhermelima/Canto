@@ -12,12 +12,10 @@ import { StepHeader } from "../_components/step-header";
 
 export function TmdbStep({
   onNext,
-  onBack,
   settings,
   configureFooter,
 }: {
   onNext: () => void;
-  onBack: () => void;
   settings?: Settings;
   configureFooter: ConfigureFooter;
 }): React.JSX.Element {
@@ -30,17 +28,17 @@ export function TmdbStep({
   const handleSave = async (): Promise<void> => {
     setTesting(true);
     try {
-      await setSetting.mutateAsync({ key: "tmdb.apiKey", value: apiKey });
       const result = await testService.mutateAsync({
         service: "tmdb",
         values: { "tmdb.apiKey": apiKey },
       });
-      if (result.connected) {
-        toast.success("TMDB connected");
-        onNext();
-      } else {
+      if (!result.connected) {
         toast.error("Invalid API key. Check your TMDB key and try again.");
+        return;
       }
+      await setSetting.mutateAsync({ key: "tmdb.apiKey", value: apiKey });
+      toast.success("TMDB connected");
+      onNext();
     } catch {
       toast.error("Failed to validate TMDB key");
     } finally {
@@ -66,7 +64,6 @@ export function TmdbStep({
             </a>.
           </>
         }
-        onBack={onBack}
       />
 
       <div className="w-full max-w-md">

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
-import { authClient } from "~/lib/auth-client";
+import { useIsAdmin } from "~/hooks/use-is-admin";
 import { useWatchRegion } from "~/hooks/use-watch-region";
 import { useDocumentTitle } from "~/hooks/use-document-title";
 import { useDirectSearch } from "~/hooks/use-direct-search";
@@ -11,9 +11,7 @@ import { useDirectSearch } from "~/hooks/use-direct-search";
 const TORRENTS_PER_PAGE = 30;
 
 export function useMediaDetail(id: string, mediaType: "movie" | "show") {
-  const { data: session } = authClient.useSession();
-  const isAdmin =
-    (session?.user as { role?: string } | undefined)?.role === "admin";
+  const isAdmin = useIsAdmin();
 
   const [torrentDialogOpen, setTorrentDialogOpen] = useState(false);
   const [seasonsHighlight, setSeasonsHighlight] = useState(false);
@@ -362,7 +360,6 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
   return {
     // Session
     isAdmin,
-    session,
 
     // Media data
     media,

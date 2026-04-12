@@ -136,7 +136,7 @@ export function SyncingStep({
               ) : task.status === "failed" ? (
                 <AlertTriangle className="h-5 w-5 text-amber-400" />
               ) : task.status === "skipped" ? (
-                <task.icon className="h-5 w-5 text-muted-foreground/30" />
+                <task.icon className="h-5 w-5 text-muted-foreground" />
               ) : (
                 <task.icon className="h-5 w-5 text-muted-foreground" />
               )}
@@ -146,7 +146,7 @@ export function SyncingStep({
                 task.status === "done" ? "text-foreground" :
                 task.status === "running" ? "text-foreground" :
                 task.status === "failed" ? "text-foreground" :
-                task.status === "skipped" ? "text-muted-foreground/40" :
+                task.status === "skipped" ? "text-muted-foreground" :
                 "text-muted-foreground"
               }`}>
                 {task.status === "done"

@@ -762,7 +762,7 @@ function ContentSeasonList({
                           E{String(ep.number).padStart(2, "0")}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className={cn("text-sm leading-snug", hasData ? "font-medium" : "text-muted-foreground/40")}>
+                          <p className={cn("text-sm leading-snug", hasData ? "font-medium" : "text-muted-foreground")}>
                             {ep.title ?? `Episode ${ep.number}`}
                           </p>
                           {hasData && (
@@ -912,7 +912,7 @@ function ServerSeasonList({
                           <span className="w-10 shrink-0 text-xs font-medium text-muted-foreground">
                             E{String(ep.number).padStart(2, "0")}
                           </span>
-                          <p className={cn("min-w-0 flex-1 text-sm leading-snug", isAvailable ? "font-medium" : "text-muted-foreground/40")}>
+                          <p className={cn("min-w-0 flex-1 text-sm leading-snug", isAvailable ? "font-medium" : "text-muted-foreground")}>
                             {ep.title ?? `Episode ${ep.number}`}
                           </p>
                           {isAvailable && (
@@ -946,7 +946,7 @@ function ServerSeasonList({
 function EmptyState({ text }: { text: string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border py-16 text-center">
-      <Download className="h-8 w-8 text-muted-foreground/40" />
+      <Download className="h-8 w-8 text-muted-foreground" />
       <p className="text-sm text-muted-foreground">{text}</p>
     </div>
   );

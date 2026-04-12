@@ -23,7 +23,7 @@ export interface FileItem {
 function EmptyState({ text }: { text: string }): React.JSX.Element {
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border py-16 text-center">
-      <Download className="h-8 w-8 text-muted-foreground/40" />
+      <Download className="h-8 w-8 text-muted-foreground" />
       <p className="text-sm text-muted-foreground">{text}</p>
     </div>
   );
@@ -167,7 +167,7 @@ export function ContentSeasonList({
                               "text-sm leading-snug",
                               hasData
                                 ? "font-medium"
-                                : "text-muted-foreground/40",
+                                : "text-muted-foreground",
                             )}
                           >
                             {ep.title ?? `Episode ${ep.number}`}

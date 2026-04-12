@@ -128,7 +128,7 @@ function WatchNextCard({
             sizes="(max-width: 640px) 80vw, (max-width: 1024px) 40vw, 25vw"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted-foreground/30">
+          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
             {item.mediaType === "show" ? (
               <Tv className="h-10 w-10" />
             ) : (
@@ -327,7 +327,7 @@ export function WatchNextTab({
         {canScrollLeft && (
           <button
             aria-label="Scroll left"
-            className="absolute left-0 top-0 z-20 hidden h-full w-14 items-center justify-center bg-gradient-to-r from-background/80 to-transparent text-foreground/60 opacity-0 transition-opacity hover:text-foreground group-hover/carousel:opacity-100 md:flex lg:w-20"
+            className="absolute left-0 top-0 z-20 hidden h-full w-14 items-center justify-center bg-gradient-to-r from-background/80 to-transparent text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/carousel:opacity-100 md:flex lg:w-20"
             onClick={scrollLeft}
           >
             <ChevronLeft size={24} />
@@ -337,7 +337,7 @@ export function WatchNextTab({
         {canScrollRight && (
           <button
             aria-label="Scroll right"
-            className="absolute right-0 top-0 z-20 hidden h-full w-14 items-center justify-center bg-gradient-to-l from-background/80 to-transparent text-foreground/60 opacity-0 transition-opacity hover:text-foreground group-hover/carousel:opacity-100 md:flex lg:w-20"
+            className="absolute right-0 top-0 z-20 hidden h-full w-14 items-center justify-center bg-gradient-to-l from-background/80 to-transparent text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/carousel:opacity-100 md:flex lg:w-20"
             onClick={scrollRight}
           >
             <ChevronRight size={24} />

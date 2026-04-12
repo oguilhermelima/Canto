@@ -54,11 +54,12 @@ export const authRouter = createTRPCRouter({
         updates.directSearchEnabled = input.directSearchEnabled;
       if (input.isPublic !== undefined) updates.isPublic = input.isPublic;
 
-      if (Object.keys(updates).length === 0) return;
+      if (Object.keys(updates).length === 0) return { success: true };
 
       await ctx.db
         .update(user)
         .set(updates)
         .where(eq(user.id, ctx.session.user.id));
+      return { success: true };
     }),
 });

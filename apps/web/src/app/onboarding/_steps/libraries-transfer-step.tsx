@@ -9,12 +9,10 @@ import { StepHeader } from "../_components/step-header";
 
 export function LibrariesTransferStep({
   onNext,
-  onBack,
   onSkip,
   configureFooter,
 }: {
   onNext: () => void;
-  onBack: () => void;
   onSkip: () => void;
   configureFooter: ConfigureFooter;
 }): React.JSX.Element {
@@ -47,7 +45,6 @@ export function LibrariesTransferStep({
             How should Canto organize files from the <strong className="text-blue-400">download path</strong> into the <strong className="text-emerald-400">library path</strong>?
           </>
         }
-        onBack={onBack}
       />
 
       <div className="mx-auto grid w-full max-w-2xl grid-cols-1 gap-4 text-left">

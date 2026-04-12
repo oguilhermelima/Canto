@@ -56,7 +56,7 @@ export function UsersTab(): React.JSX.Element {
                 ) : (
                   <Badge variant="outline" className="rounded-lg px-2.5 py-1">User</Badge>
                 )}
-                <span className="text-xs text-muted-foreground/50 hidden sm:block">{formatDate(u.createdAt)}</span>
+                <span className="text-xs text-muted-foreground hidden sm:block">{formatDate(u.createdAt)}</span>
               </div>
             </div>
           ))}

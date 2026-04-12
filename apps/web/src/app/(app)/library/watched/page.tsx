@@ -39,24 +39,18 @@ export default function WatchedPage(): React.JSX.Element {
     isFetchingNextPage,
     fetchNextPage,
   } = trpc.userMedia.getLibraryHistory.useInfiniteQuery(
-    { limit: PAGE_SIZE, mediaType: queryMediaType },
+    { limit: PAGE_SIZE, mediaType: queryMediaType, completedOnly: true },
     {
       getNextPageParam: (lastPage) => lastPage.nextCursor,
       initialCursor: 0,
     },
   );
 
-  const entries = useMemo(
+  const watchedItems = useMemo(
     () =>
       (data?.pages.flatMap((page) => page.items) ?? []) as LibraryPlaybackEntry[],
     [data],
   );
-
-  const watchedItems = useMemo(() => {
-    return entries.filter(
-      (entry) => entry.isCompleted === true || (entry.progressPercent ?? 0) >= 100,
-    );
-  }, [entries]);
 
   const handleFetchNextPage = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -113,6 +107,10 @@ export default function WatchedPage(): React.JSX.Element {
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
+            )}
+
+            {!hasNextPage && !isFetchingNextPage && watchedItems.length > 0 && (
+              <StateMessage preset="endOfItems" inline />
             )}
           </>
         )}

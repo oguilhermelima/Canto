@@ -107,7 +107,7 @@ export function TorrentCard({
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
-              {t.media?.type === "show" ? <Tv size={26} className="text-muted-foreground/30" /> : <Film size={26} className="text-muted-foreground/30" />}
+              {t.media?.type === "show" ? <Tv size={26} className="text-muted-foreground" /> : <Film size={26} className="text-muted-foreground" />}
             </div>
           )}
           {qualityLabel && (
@@ -124,7 +124,7 @@ export function TorrentCard({
               {mediaTitle || fileName}
               {dlLabel && <span className="ml-2 text-sm font-normal text-muted-foreground">{dlLabel}</span>}
             </p>
-            <p className="mt-1 truncate text-sm text-muted-foreground/60">
+            <p className="mt-1 truncate text-sm text-muted-foreground">
               {fileName}
             </p>
           </div>
@@ -147,7 +147,7 @@ export function TorrentCard({
                     {formatEta(t.live.eta)}
                   </span>
                 )}
-                <span className="text-muted-foreground/50">
+                <span className="text-muted-foreground">
                   {t.live.seeds} seeds · {t.live.peers} peers
                 </span>
               </>
@@ -157,7 +157,7 @@ export function TorrentCard({
                   {resolved.seedingLabel}
                 </span>
                 {t.live && (
-                  <span className="text-muted-foreground/50">
+                  <span className="text-muted-foreground">
                     {t.live.seeds} seeds · {t.live.peers} peers
                     {t.live.ratio > 0 && ` · Ratio ${t.live.ratio.toFixed(2)}`}
                   </span>
@@ -166,7 +166,7 @@ export function TorrentCard({
             ) : null}
             {size > 0 && (
               <span className="flex items-center gap-1.5">
-                <HardDrive size={14} className="text-muted-foreground/50" />
+                <HardDrive size={14} className="text-muted-foreground" />
                 {formatBytes(size)}
               </span>
             )}

@@ -171,12 +171,11 @@ export default function OnboardingPage(): React.JSX.Element {
               <WelcomeStep onNext={next} configureFooter={setFooterConfig} />
             )}
             {step === "overview" && (
-              <OverviewStep onNext={next} onBack={back} configureFooter={setFooterConfig} />
+              <OverviewStep onNext={next} configureFooter={setFooterConfig} />
             )}
             {step === "tmdb" && (
               <TmdbStep
                 onNext={next}
-                onBack={back}
                 settings={allSettings}
                 configureFooter={setFooterConfig}
               />
@@ -184,7 +183,6 @@ export default function OnboardingPage(): React.JSX.Element {
             {step === "tvdb" && (
               <TvdbStep
                 onNext={next}
-                onBack={back}
                 settings={allSettings}
                 configureFooter={setFooterConfig}
               />
@@ -192,7 +190,6 @@ export default function OnboardingPage(): React.JSX.Element {
             {step === "indexer" && (
               <IndexerStep
                 onNext={next}
-                onBack={back}
                 settings={allSettings}
                 configureFooter={setFooterConfig}
               />
@@ -203,7 +200,6 @@ export default function OnboardingPage(): React.JSX.Element {
                   setTorrentConnected(true);
                   next();
                 }}
-                onBack={back}
                 onSkip={next}
                 settings={allSettings}
                 configureFooter={setFooterConfig}
@@ -212,7 +208,6 @@ export default function OnboardingPage(): React.JSX.Element {
             {step === "libraries-intro" && (
               <LibrariesIntroStep
                 onNext={next}
-                onBack={back}
                 onSkip={skipLibraries}
                 configureFooter={setFooterConfig}
               />
@@ -220,7 +215,6 @@ export default function OnboardingPage(): React.JSX.Element {
             {step === "libraries-transfer" && (
               <LibrariesTransferStep
                 onNext={next}
-                onBack={back}
                 onSkip={skipLibraries}
                 configureFooter={setFooterConfig}
               />
@@ -228,7 +222,6 @@ export default function OnboardingPage(): React.JSX.Element {
             {step === "libraries-configure" && (
               <LibrariesConfigureStep
                 onNext={next}
-                onBack={back}
                 onSkip={skipLibraries}
                 configureFooter={setFooterConfig}
               />
@@ -236,7 +229,6 @@ export default function OnboardingPage(): React.JSX.Element {
             {step === "jellyfin" && (
               <JellyfinStep
                 onNext={next}
-                onBack={back}
                 settings={allSettings}
                 configureFooter={setFooterConfig}
               />
@@ -244,7 +236,6 @@ export default function OnboardingPage(): React.JSX.Element {
             {step === "plex" && (
               <PlexStep
                 onNext={next}
-                onBack={back}
                 settings={allSettings}
                 configureFooter={setFooterConfig}
               />

@@ -26,7 +26,7 @@ async function testJellyfin(v: Record<string, string>): Promise<TestResult> {
   if (!url || !apiKey) return { connected: false, error: "URL or API key not configured" };
   validateServiceUrl(url);
   try {
-    const res = await fetch(`${url}/System/Info`, { headers: { "X-Emby-Token": apiKey } });
+    const res = await fetch(`${url}/System/Info`, { headers: { "X-Emby-Token": apiKey }, signal: AbortSignal.timeout(15_000) });
     if (!res.ok) return { connected: false, error: `HTTP ${res.status}` };
     const info = (await res.json()) as { ServerName: string; Version: string };
     return { connected: true, serverName: info.ServerName, version: info.Version };
@@ -41,7 +41,7 @@ async function testPlex(v: Record<string, string>): Promise<TestResult> {
   if (!url || !token) return { connected: false, error: "URL or token not configured" };
   validateServiceUrl(url);
   try {
-    const res = await fetch(`${url}/?X-Plex-Token=${token}`, { headers: { Accept: "application/json" } });
+    const res = await fetch(`${url}/?X-Plex-Token=${token}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(15_000) });
     if (!res.ok) return { connected: false, error: `HTTP ${res.status}` };
     const data = (await res.json()) as { MediaContainer: { friendlyName: string; version: string } };
     return { connected: true, serverName: data.MediaContainer.friendlyName, version: data.MediaContainer.version };
@@ -60,6 +60,7 @@ async function testQbittorrent(v: Record<string, string>): Promise<TestResult> {
     const body = new URLSearchParams({ username, password });
     const res = await fetch(`${url}/api/v2/auth/login`, {
       method: "POST", body, headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) return { connected: false, error: `HTTP ${res.status}` };
     const text = await res.text();
@@ -76,7 +77,7 @@ async function testProwlarr(v: Record<string, string>): Promise<TestResult> {
   if (!url || !apiKey) return { connected: false, error: "URL or API key not configured" };
   validateServiceUrl(url);
   try {
-    const res = await fetch(`${url}/api/v1/health?apikey=${apiKey}`);
+    const res = await fetch(`${url}/api/v1/health?apikey=${apiKey}`, { signal: AbortSignal.timeout(15_000) });
     if (!res.ok) return { connected: false, error: `HTTP ${res.status}` };
     return { connected: true };
   } catch {
@@ -90,7 +91,7 @@ async function testJackett(v: Record<string, string>): Promise<TestResult> {
   if (!url || !apiKey) return { connected: false, error: "URL or API key not configured" };
   validateServiceUrl(url);
   try {
-    const res = await fetch(`${url}/api/v2.0/indexers/all/results/torznab/api?apikey=${apiKey}&t=caps`);
+    const res = await fetch(`${url}/api/v2.0/indexers/all/results/torznab/api?apikey=${apiKey}&t=caps`, { signal: AbortSignal.timeout(15_000) });
     if (!res.ok) return { connected: false, error: `HTTP ${res.status}` };
     return { connected: true };
   } catch {
@@ -124,7 +125,7 @@ async function testTmdb(v: Record<string, string>): Promise<TestResult> {
   const apiKey = v["tmdb.apiKey"];
   if (!apiKey) return { connected: false, error: "API key not configured" };
   try {
-    const res = await fetch(`https://api.themoviedb.org/3/configuration?api_key=${apiKey}`);
+    const res = await fetch(`https://api.themoviedb.org/3/configuration?api_key=${apiKey}`, { signal: AbortSignal.timeout(15_000) });
     if (!res.ok) return { connected: false, error: `Invalid API key (HTTP ${res.status})` };
     return { connected: true };
   } catch {

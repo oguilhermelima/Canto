@@ -125,7 +125,7 @@ function CompactHistoryEntry({
       <div className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
         <Clock3 className="h-3 w-3" />
         <span>{formatTime(watchedAt)}</span>
-        <span className="text-muted-foreground/50">·</span>
+        <span className="text-muted-foreground">·</span>
         <span>{sourceLabel(entry.source)}</span>
       </div>
     </Link>

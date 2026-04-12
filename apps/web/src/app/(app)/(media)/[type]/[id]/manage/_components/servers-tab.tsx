@@ -214,7 +214,7 @@ export function ServersTab({
                               "min-w-0 flex-1 text-sm leading-snug",
                               isAvailable
                                 ? "font-medium"
-                                : "text-muted-foreground/40",
+                                : "text-muted-foreground",
                             )}
                           >
                             {ep.title ?? `Episode ${ep.number}`}

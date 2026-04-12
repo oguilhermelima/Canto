@@ -237,7 +237,7 @@ function ProviderSlot({
         <p className="text-sm font-medium text-muted-foreground group-hover:text-foreground">
           {brand.label}
         </p>
-        <p className="mt-0.5 text-xs text-muted-foreground/60">Not connected</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">Not connected</p>
       </div>
       <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground">
         <Plus className="h-3.5 w-3.5" />

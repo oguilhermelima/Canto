@@ -7,11 +7,9 @@ import { StepHeader } from "../_components/step-header";
 
 export function OverviewStep({
   onNext,
-  onBack,
   configureFooter,
 }: {
   onNext: () => void;
-  onBack: () => void;
   configureFooter: ConfigureFooter;
 }): React.JSX.Element {
   useEffect(() => {
@@ -27,7 +25,6 @@ export function OverviewStep({
       <StepHeader
         title="From search to screen"
         description="Canto handles everything behind the scenes so you can focus on what matters — watching. Here's what happens when you pick something."
-        onBack={onBack}
       />
 
       {/* Horizontal pipeline — desktop */}
@@ -40,7 +37,7 @@ export function OverviewStep({
           accent="text-blue-400"
           bg="bg-blue-500/10"
         />
-        <div className="flex items-center pt-10 text-muted-foreground/30">
+        <div className="flex items-center pt-10 text-muted-foreground">
           <ChevronRight className="h-5 w-5" />
         </div>
         <PipelineCard
@@ -51,7 +48,7 @@ export function OverviewStep({
           accent="text-amber-400"
           bg="bg-amber-500/10"
         />
-        <div className="flex items-center pt-10 text-muted-foreground/30">
+        <div className="flex items-center pt-10 text-muted-foreground">
           <ChevronRight className="h-5 w-5" />
         </div>
         <PipelineCard

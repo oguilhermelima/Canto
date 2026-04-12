@@ -9,7 +9,7 @@ export default function ManageLoading(): React.JSX.Element {
 
       {/* Tabs */}
       <div className="mb-8 flex gap-1">
-        {Array.from({ length: 6 }).map((_, i) => (
+        {Array.from({ length: 8 }).map((_, i) => (
           <Skeleton key={i} className="h-8 w-20 rounded-xl" />
         ))}
       </div>
