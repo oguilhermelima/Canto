@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Download, Settings2 } from "lucide-react";
 
 interface AdminActionsProps {
@@ -17,6 +16,7 @@ interface AdminActionsProps {
     episodeNumbers?: number[];
   }) => void;
   setSeasonsHighlight: (v: boolean) => void;
+  onOpenManage?: () => void;
 }
 
 export function AdminActions({
@@ -25,6 +25,7 @@ export function AdminActions({
   mediaType,
   openTorrentDialog,
   setSeasonsHighlight,
+  onOpenManage,
 }: AdminActionsProps): React.JSX.Element | null {
   if (!isAdmin || !media.id) return null;
 
@@ -60,14 +61,15 @@ export function AdminActions({
           <Download className="h-4 w-4" />
           {media.inLibrary ? "Download Variant" : "Download"}
         </button>
-        {media.inLibrary && (
-          <Link
-            href={`/${mediaType === "show" ? "shows" : "movies"}/${media.externalId}/manage`}
+        {media.inLibrary && onOpenManage && (
+          <button
+            type="button"
+            onClick={onOpenManage}
             className="inline-flex h-10 items-center gap-2 rounded-xl bg-foreground/15 px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/25"
           >
             <Settings2 className="h-4 w-4" />
             Manage
-          </Link>
+          </button>
         )}
       </div>
     </section>

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { cn } from "@canto/ui/cn";
 import { SeasonTabs } from "~/components/media/season-tabs";
 
@@ -57,6 +56,7 @@ interface SeasonsSectionProps {
   torrentDialogOpen: boolean;
   seasonsHighlight: boolean;
   mediaType: "movie" | "show";
+  onOpenManage?: () => void;
 }
 
 export function SeasonsSection({
@@ -75,8 +75,8 @@ export function SeasonsSection({
   torrentDialogOpen,
   seasonsHighlight,
   mediaType,
+  onOpenManage,
 }: SeasonsSectionProps): React.JSX.Element | null {
-  const router = useRouter();
 
   if (media.type !== "show") return null;
 
@@ -153,14 +153,7 @@ export function SeasonsSection({
               }
             : undefined
         }
-        onOpenPreferences={
-          isAdmin
-            ? () =>
-                router.push(
-                  `/${mediaType === "show" ? "shows" : "movies"}/${media.externalId}/manage`,
-                )
-            : undefined
-        }
+        onOpenPreferences={isAdmin ? onOpenManage : undefined}
         episodeAvailability={availability.data?.episodes}
         serverLinks={mediaServers.data}
       />

@@ -8,7 +8,7 @@ import {
 } from "~/components/media/media-detail-hero";
 import { CastSection } from "~/components/media/cast-section";
 import { SimilarSection } from "~/components/media/similar-section";
-import { PreferencesModal } from "~/components/media/manage/preferences-modal";
+import { ManageModal } from "~/components/media/manage/manage-modal";
 import { useMediaDetail } from "./use-media-detail";
 import { AdminActions } from "./admin-actions";
 import { RequestSection } from "./request-section";
@@ -135,6 +135,7 @@ export function MediaDetailContent({
             mediaType={mediaType}
             openTorrentDialog={detail.openTorrentDialog}
             setSeasonsHighlight={detail.setSeasonsHighlight}
+            onOpenManage={() => detail.setPreferencesOpen(true)}
           />
 
           {/* Request Download — non-admin users */}
@@ -170,6 +171,7 @@ export function MediaDetailContent({
               torrentDialogOpen={detail.torrentDialogOpen}
               seasonsHighlight={detail.seasonsHighlight}
               mediaType={mediaType}
+              onOpenManage={() => detail.setPreferencesOpen(true)}
             />
 
             {/* Cast */}
@@ -188,18 +190,14 @@ export function MediaDetailContent({
         </div>
       </MediaDetailHero>
 
-      {/* Preferences modal */}
-      {media.libraryId && (
-        <PreferencesModal
-          open={detail.preferencesOpen}
-          onOpenChange={detail.setPreferencesOpen}
-          mediaId={media.id}
-          mediaType={media.type as "movie" | "show"}
-          mediaTitle={media.title}
-          currentLibraryId={media.libraryId}
-          continuousDownload={media.continuousDownload}
-        />
-      )}
+      {/* Manage modal */}
+      <ManageModal
+        open={detail.preferencesOpen}
+        onOpenChange={detail.setPreferencesOpen}
+        mediaId={media.id}
+        mediaType={media.type as "movie" | "show"}
+        mediaTitle={media.title}
+      />
 
       {/* Remove from library dialog */}
       <RemoveDialog
