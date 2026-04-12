@@ -185,6 +185,7 @@ export class TvdbProvider implements MetadataProvider {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ apikey: this.apiKey }),
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!res.ok) {
@@ -221,6 +222,7 @@ export class TvdbProvider implements MetadataProvider {
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
       },
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (res.status === 401 && retry) {

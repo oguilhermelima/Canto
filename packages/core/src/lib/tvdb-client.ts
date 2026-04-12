@@ -1,4 +1,4 @@
-import { getSettings, setSetting } from "@canto/db/settings";
+import { getSettings, setManySettings } from "@canto/db/settings";
 import { TvdbProvider } from "@canto/providers";
 
 /**
@@ -24,8 +24,12 @@ export async function getTvdbProvider(): Promise<TvdbProvider> {
     tokenExpires,
     language: language ?? "en-US",
     onTokenRefresh: async (newToken: string, expires: number) => {
-      await setSetting("tvdb.token", newToken);
-      await setSetting("tvdb.tokenExpires", expires);
+      // Single transaction — if the second write failed in the old two-call
+      // shape, we'd cache a token with a stale expiry and never re-auth.
+      await setManySettings([
+        { key: "tvdb.token", value: newToken },
+        { key: "tvdb.tokenExpires", value: expires },
+      ]);
     },
   });
 }

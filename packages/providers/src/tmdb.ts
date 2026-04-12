@@ -158,6 +158,7 @@ export class TmdbProvider implements MetadataProvider {
       headers: {
         Accept: "application/json",
       },
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!response.ok) {

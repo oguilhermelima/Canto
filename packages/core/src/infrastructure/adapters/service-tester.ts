@@ -1,5 +1,3 @@
-import { setSetting } from "@canto/db/settings";
-
 type ServiceType = "jellyfin" | "plex" | "qbittorrent" | "prowlarr" | "jackett" | "tvdb" | "tmdb";
 
 type TestResult =
@@ -104,15 +102,18 @@ async function testTvdb(v: Record<string, string>): Promise<TestResult> {
   const apiKey = v["tvdb.apiKey"];
   if (!apiKey) return { connected: false, error: "API key not configured" };
   try {
+    // Read-only probe: we deliberately do NOT persist the returned token here.
+    // The token is picked up organically by TvdbProvider the next time it runs
+    // getToken() + onTokenRefresh — that path is the single writer for
+    // `tvdb.token` / `tvdb.tokenExpires`. Writing here caused races when the
+    // admin clicked "Test" twice or when a background refresh was in flight.
     const res = await fetch("https://api4.thetvdb.com/v4/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ apikey: apiKey }),
+      signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) return { connected: false, error: `HTTP ${res.status}` };
-    const body = (await res.json()) as { data: { token: string } };
-    await setSetting("tvdb.token", body.data.token);
-    await setSetting("tvdb.tokenExpires", Date.now() + 28 * 24 * 60 * 60 * 1000);
     return { connected: true };
   } catch {
     return { connected: false, error: "Connection failed" };

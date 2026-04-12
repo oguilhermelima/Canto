@@ -6,6 +6,7 @@ import { parseTorznabXml } from "./torznab-parser";
 export class JackettClient implements IndexerPort {
   private baseUrl: string;
   private apiKey: string;
+  private static DEFAULT_TIMEOUT_MS = 15_000;
 
   constructor(baseUrl: string, apiKey: string) {
     this.baseUrl = baseUrl;
@@ -33,7 +34,14 @@ export class JackettClient implements IndexerPort {
       url.searchParams.set("offset", String(ctx.offset));
     }
 
-    const response = await fetch(url.toString());
+    // Respect the admin-configured search.timeout; fall back if unset so
+    // a Jackett instance that takes forever can't block the whole job queue.
+    const { "search.timeout": timeoutRaw } = await getSettings(["search.timeout"]);
+    const timeoutMs = timeoutRaw ?? JackettClient.DEFAULT_TIMEOUT_MS;
+
+    const response = await fetch(url.toString(), {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
     if (!response.ok) {
       throw new Error(`Jackett search failed: ${response.status}`);
     }
