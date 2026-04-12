@@ -5,7 +5,6 @@ import { Skeleton } from "@canto/ui/skeleton";
 import { Button } from "@canto/ui/button";
 import { Badge } from "@canto/ui/badge";
 import { Switch } from "@canto/ui/switch";
-import { Input } from "@canto/ui/input";
 import {
   Select,
   SelectContent,
@@ -17,8 +16,6 @@ import {
   Save,
   Check,
   Loader2,
-  Eye,
-  EyeOff,
   CheckCircle,
   XCircle,
   ExternalLink,
@@ -37,10 +34,7 @@ import { trpc } from "~/lib/trpc/client";
 import { useWatchRegion } from "~/hooks/use-watch-region";
 import { useDirectSearch } from "~/hooks/use-direct-search";
 import { SectionCard, SettingsSection } from "~/components/settings/shared";
-import {
-  FieldInput,
-  SettingField,
-} from "~/components/settings/_primitives";
+import { FieldInput } from "~/components/settings/_primitives";
 import {
   SETTINGS_REGISTRY,
   type SettingKey,
@@ -363,7 +357,6 @@ function MediaServerRow({
   const isEnabled = enabledServices?.[serviceKey] === true;
   const [url, setUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
-  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [dirty, setDirty] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -462,30 +455,28 @@ function MediaServerRow({
           <div className="space-y-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-muted-foreground">{urlField.label}</label>
-              <Input
+              <FieldInput
+                inputType="url"
                 value={url}
+                onChange={(v) => {
+                  setUrl(typeof v === "string" ? v : "");
+                  setDirty(true);
+                }}
                 placeholder={urlField.placeholder}
-                onChange={(e) => { setUrl(e.target.value); setDirty(true); }}
-                className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
               />
             </div>
 
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-muted-foreground">{apiKeyField.label}</label>
-              <div className="relative">
-                <Input
-                  type={apiKeyField.secret && !showSecrets[apiKeyField.key] ? "password" : "text"}
-                  value={apiKey}
-                  placeholder={apiKeyField.placeholder}
-                  onChange={(e) => { setApiKey(e.target.value); setDirty(true); }}
-                  className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
-                />
-                {apiKeyField.secret && (
-                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors" onClick={() => setShowSecrets((p) => ({ ...p, [apiKeyField.key]: !p[apiKeyField.key] }))}>
-                    {showSecrets[apiKeyField.key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                )}
-              </div>
+              <FieldInput
+                inputType={apiKeyField.secret ? "password" : "text"}
+                value={apiKey}
+                onChange={(v) => {
+                  setApiKey(typeof v === "string" ? v : "");
+                  setDirty(true);
+                }}
+                placeholder={apiKeyField.placeholder}
+              />
               <p className="px-1 text-xs text-muted-foreground">
                 {isJellyfin
                   ? "System-wide API Key for background tasks and metadata."
@@ -558,11 +549,22 @@ function PlexOAuthSection({ serverUrl, disabled, onSuccess, isConnected }: { ser
 /* -------------------------------------------------------------------------- */
 
 function TmdbSection(): React.JSX.Element {
+  const utils = trpc.useUtils();
   const { data: allSettings, isLoading } = trpc.settings.getAll.useQuery();
+  const setMany = trpc.settings.setMany.useMutation({
+    onSuccess: () => void utils.settings.getAll.invalidate(),
+  });
+
+  const [tmdbKey, setTmdbKey] = useState("");
+  const [dirty, setDirty] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
-    if (allSettings && !allSettings["tmdb.apiKey"]) {
+    if (allSettings?.["tmdb.apiKey"]) {
+      setTmdbKey(allSettings["tmdb.apiKey"] as string);
+      setDirty(false);
+    } else if (allSettings) {
+      // Auto-expand when no key is configured
       setExpanded(true);
     }
   }, [allSettings]);
@@ -570,6 +572,26 @@ function TmdbSection(): React.JSX.Element {
   if (isLoading) return <div className="px-5 py-5"><Skeleton className="h-10 w-full" /></div>;
 
   const hasKey = !!allSettings?.["tmdb.apiKey"];
+
+  const handleSave = (): void => {
+    // Atomic save: persist the key AND flip enabled=true in a single write so
+    // the admin never ends up with a saved key that isn't active yet.
+    setMany.mutate(
+      {
+        settings: [
+          { key: "tmdb.apiKey", value: tmdbKey },
+          { key: "tmdb.enabled", value: true },
+        ],
+      },
+      {
+        onSuccess: () => {
+          setDirty(false);
+          toast.success("Saved");
+        },
+        onError: () => toast.error("Failed to save"),
+      },
+    );
+  };
 
   return (
     <div>
@@ -591,6 +613,19 @@ function TmdbSection(): React.JSX.Element {
             <Badge variant="secondary" className="rounded-lg border-green-500/20 bg-green-500/10 px-2 py-0 text-xs text-green-500">Connected</Badge>
           )}
         </div>
+        <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+          {dirty && (
+            <Button
+              size="sm"
+              className="h-8 rounded-xl text-xs"
+              onClick={handleSave}
+              disabled={setMany.isPending}
+            >
+              {setMany.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1 h-3.5 w-3.5" />}
+              Save
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Content — collapsible */}
@@ -603,14 +638,16 @@ function TmdbSection(): React.JSX.Element {
           </a>
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-muted-foreground">API Key (v3 auth)</label>
-            <SettingField
-              settingKey="tmdb.apiKey"
-              hideLabel
-              hideHelp
+            <FieldInput
+              inputType="password"
+              value={tmdbKey}
+              onChange={(v) => {
+                setTmdbKey(typeof v === "string" ? v : "");
+                setDirty(true);
+              }}
               placeholder="Enter your TMDB API key"
             />
           </div>
-          {hasKey && <SettingField settingKey="tmdb.enabled" hideHelp />}
         </div>
       </AnimatedCollapse>
     </div>
@@ -622,29 +659,59 @@ function TmdbSection(): React.JSX.Element {
 /* -------------------------------------------------------------------------- */
 
 function TvdbApiKeySection(): React.JSX.Element {
+  const utils = trpc.useUtils();
   const { data: allSettings, isLoading } = trpc.settings.getAll.useQuery();
+  const setMany = trpc.settings.setMany.useMutation({
+    onSuccess: () => void utils.settings.getAll.invalidate(),
+  });
   const testService = trpc.settings.testService.useMutation();
+
+  const [apiKey, setApiKey] = useState("");
+  const [dirty, setDirty] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
-    if (allSettings && !allSettings["tvdb.apiKey"]) {
-      setExpanded(true);
+    if (allSettings) {
+      setApiKey((allSettings["tvdb.apiKey"] as string) ?? "");
+      setDirty(false);
+      if (!allSettings["tvdb.apiKey"]) setExpanded(true);
     }
   }, [allSettings]);
 
   if (isLoading) return <div className="px-5 py-5"><Skeleton className="h-10 w-full" /></div>;
 
+  const isPending = testService.isPending || setMany.isPending;
   const hasKey = !!allSettings?.["tvdb.apiKey"];
 
-  const handleTest = (): void => {
-    const savedKey = (allSettings?.["tvdb.apiKey"] as string | undefined) ?? "";
-    if (!savedKey) {
-      toast.error("Save an API key before testing");
-      return;
-    }
+  const handleSave = (): void => {
+    // Atomic flow: test the key first; only persist (and flip enabled=true)
+    // on a successful connection. Keeps the admin from landing broken creds.
     testService.mutate(
-      { service: "tvdb", values: { "tvdb.apiKey": savedKey } },
-      { onSuccess: (data) => showTestResult(data) },
+      { service: "tvdb", values: { "tvdb.apiKey": apiKey } },
+      {
+        onSuccess: (data) => {
+          if (!data.connected) {
+            toast.error(data.error ?? "Connection failed");
+            return;
+          }
+          setMany.mutate(
+            {
+              settings: [
+                { key: "tvdb.apiKey", value: apiKey },
+                { key: "tvdb.enabled", value: true },
+              ],
+            },
+            {
+              onSuccess: () => {
+                setDirty(false);
+                toast.success("TVDB connected and saved");
+              },
+              onError: () => toast.error("Failed to save settings"),
+            },
+          );
+        },
+        onError: () => toast.error("Connection test failed"),
+      },
     );
   };
 
@@ -668,6 +735,19 @@ function TvdbApiKeySection(): React.JSX.Element {
             <Badge variant="secondary" className="rounded-lg border-green-500/20 bg-green-500/10 px-2 py-0 text-xs text-green-500">Connected</Badge>
           )}
         </div>
+        <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+          {dirty && (
+            <Button
+              size="sm"
+              className="h-8 rounded-xl text-xs"
+              onClick={handleSave}
+              disabled={isPending}
+            >
+              {isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1 h-3.5 w-3.5" />}
+              Save & Test
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Content — collapsible */}
@@ -680,30 +760,16 @@ function TvdbApiKeySection(): React.JSX.Element {
           </a>
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-muted-foreground">API Key</label>
-            <SettingField
-              settingKey="tvdb.apiKey"
-              hideLabel
-              hideHelp
+            <FieldInput
+              inputType="password"
+              value={apiKey}
+              onChange={(v) => {
+                setApiKey(typeof v === "string" ? v : "");
+                setDirty(true);
+              }}
               placeholder="Enter your TVDB API key"
             />
           </div>
-          {hasKey && <SettingField settingKey="tvdb.enabled" hideHelp />}
-          {hasKey && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 rounded-xl text-xs"
-              onClick={handleTest}
-              disabled={testService.isPending}
-            >
-              {testService.isPending ? (
-                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Check className="mr-1 h-3.5 w-3.5" />
-              )}
-              Test connection
-            </Button>
-          )}
         </div>
       </AnimatedCollapse>
     </div>
@@ -1035,24 +1101,43 @@ function PlexServerSection(): React.JSX.Element {
   const utils = trpc.useUtils();
   const { data: allSettings, isLoading } = trpc.settings.getAll.useQuery();
   const { data: enabledServices } = trpc.settings.getEnabledServices.useQuery();
+  const setMany = trpc.settings.setMany.useMutation({
+    onSuccess: () => void utils.settings.getAll.invalidate(),
+  });
   const toggleService = trpc.settings.toggleService.useMutation({
     onSuccess: () => void utils.settings.getEnabledServices.invalidate(),
   });
 
   const isEnabled = enabledServices?.plex === true;
   const isConnected = !!allSettings?.["plex.token"];
-  const savedUrl = (allSettings?.["plex.url"] as string | undefined) ?? "";
+  const [url, setUrl] = useState("");
+  const [dirty, setDirty] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
-    if (allSettings && isEnabled && !allSettings["plex.url"]) {
-      setExpanded(true);
+    if (allSettings) {
+      setUrl((allSettings["plex.url"] as string) ?? "");
+      setDirty(false);
+      if (isEnabled && !allSettings["plex.url"]) setExpanded(true);
     }
   }, [allSettings, isEnabled]);
 
   const handleToggle = (): void => {
     toggleService.mutate({ service: "plex", enabled: !isEnabled });
     if (!isEnabled) setExpanded(true);
+  };
+
+  const handleSave = (): void => {
+    setMany.mutate(
+      { settings: [{ key: "plex.url", value: url }] },
+      {
+        onSuccess: () => {
+          setDirty(false);
+          toast.success("Settings saved");
+        },
+        onError: () => toast.error("Failed to save settings"),
+      },
+    );
   };
 
   if (isLoading) return <div className="px-5 py-5"><Skeleton className="h-10 w-full" /></div>;
@@ -1079,6 +1164,17 @@ function PlexServerSection(): React.JSX.Element {
           )}
         </div>
         <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+          {isEnabled && dirty && (
+            <Button
+              size="sm"
+              className="h-8 rounded-xl text-xs"
+              onClick={handleSave}
+              disabled={setMany.isPending}
+            >
+              {setMany.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1 h-3.5 w-3.5" />}
+              Save
+            </Button>
+          )}
           <Switch checked={isEnabled} onCheckedChange={() => handleToggle()} />
         </div>
       </div>
@@ -1094,16 +1190,19 @@ function PlexServerSection(): React.JSX.Element {
           )}
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-muted-foreground">Server URL</label>
-            <SettingField
-              settingKey="plex.url"
-              hideLabel
-              hideHelp
+            <FieldInput
+              inputType="url"
+              value={url}
+              onChange={(v) => {
+                setUrl(typeof v === "string" ? v : "");
+                setDirty(true);
+              }}
               placeholder="http://192.168.1.100:32400"
             />
           </div>
           <PlexOAuthSection
-            serverUrl={savedUrl}
-            disabled={!isEnabled || !savedUrl}
+            serverUrl={url}
+            disabled={!isEnabled || !url}
             onSuccess={() => void utils.settings.getAll.invalidate()}
             isConnected={isConnected}
           />
