@@ -30,7 +30,7 @@ export function LibrariesTransferStep({
       importMethod,
       seedRatioLimit: null,
       seedTimeLimitHours: null,
-      seedCleanupFiles: false,
+      seedCleanupFiles: true,
     });
     onNext();
   };

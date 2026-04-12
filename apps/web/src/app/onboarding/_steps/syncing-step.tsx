@@ -1,18 +1,19 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Loader2, Check, Tv, Film, Sparkles, FolderSync } from "lucide-react";
+import { Loader2, Check, Tv, Film, Sparkles, FolderSync, AlertTriangle } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import type { ConfigureFooter } from "../_components/onboarding-footer";
 import type { Settings } from "../_components/constants";
 
-type TaskStatus = "pending" | "running" | "done" | "skipped";
+type TaskStatus = "pending" | "running" | "done" | "skipped" | "failed";
 
 interface SyncTask {
   id: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   status: TaskStatus;
+  error?: string;
 }
 
 export function SyncingStep({
@@ -62,8 +63,13 @@ export function SyncingStep({
     runTasks(initial);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const updateTask = (id: string, status: TaskStatus, prev: SyncTask[]): SyncTask[] => {
-    const next = prev.map((t) => (t.id === id ? { ...t, status } : t));
+  const updateTask = (
+    id: string,
+    status: TaskStatus,
+    prev: SyncTask[],
+    error?: string,
+  ): SyncTask[] => {
+    const next = prev.map((t) => (t.id === id ? { ...t, status, error } : t));
     setTasks(next);
     return next;
   };
@@ -71,30 +77,24 @@ export function SyncingStep({
   const runTasks = async (taskList: SyncTask[]): Promise<void> => {
     let current = [...taskList];
 
-    // Sync Jellyfin
-    if (jellyfinEnabled) {
-      current = updateTask("jellyfin", "running", current);
+    // Each step is best-effort but its outcome is recorded so a failed sync
+    // shows as "failed" (with a toast-style inline error) instead of silently
+    // flipping to green. Onboarding still completes — the user can retry from
+    // Settings — but they know something went wrong.
+    const runStep = async (id: string, fn: () => Promise<unknown>): Promise<void> => {
+      current = updateTask(id, "running", current);
       try {
-        await syncJellyfin.mutateAsync();
-      } catch { /* non-fatal */ }
-      current = updateTask("jellyfin", "done", current);
-    }
+        await fn();
+        current = updateTask(id, "done", current);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        current = updateTask(id, "failed", current, message);
+      }
+    };
 
-    // Sync Plex
-    if (plexEnabled) {
-      current = updateTask("plex", "running", current);
-      try {
-        await syncPlex.mutateAsync();
-      } catch { /* non-fatal */ }
-      current = updateTask("plex", "done", current);
-    }
-
-    // Build recommendations
-    current = updateTask("recs", "running", current);
-    try {
-      await rebuildRecs.mutateAsync();
-    } catch { /* non-fatal */ }
-    current = updateTask("recs", "done", current);
+    if (jellyfinEnabled) await runStep("jellyfin", () => syncJellyfin.mutateAsync());
+    if (plexEnabled) await runStep("plex", () => syncPlex.mutateAsync());
+    await runStep("recs", () => rebuildRecs.mutateAsync());
 
     setAllDone(true);
   };
@@ -126,27 +126,39 @@ export function SyncingStep({
         {tasks.map((task) => (
           <div
             key={task.id}
-            className="flex items-center gap-4 rounded-xl bg-accent/30 px-4 py-3"
+            className="flex items-start gap-4 rounded-xl bg-accent/30 px-4 py-3"
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center">
               {task.status === "running" ? (
                 <Loader2 className="h-5 w-5 animate-spin text-primary" />
               ) : task.status === "done" ? (
                 <Check className="h-5 w-5 text-emerald-400" />
+              ) : task.status === "failed" ? (
+                <AlertTriangle className="h-5 w-5 text-amber-400" />
               ) : task.status === "skipped" ? (
                 <task.icon className="h-5 w-5 text-muted-foreground/30" />
               ) : (
                 <task.icon className="h-5 w-5 text-muted-foreground" />
               )}
             </div>
-            <p className={`text-sm text-left ${
-              task.status === "done" ? "text-foreground" :
-              task.status === "running" ? "text-foreground" :
-              task.status === "skipped" ? "text-muted-foreground/40" :
-              "text-muted-foreground"
-            }`}>
-              {task.status === "done" ? task.label.replace("Syncing", "Synced").replace("Building", "Built").replace("Organizing", "Organized") : task.label}
-            </p>
+            <div className="flex flex-col text-left">
+              <p className={`text-sm ${
+                task.status === "done" ? "text-foreground" :
+                task.status === "running" ? "text-foreground" :
+                task.status === "failed" ? "text-foreground" :
+                task.status === "skipped" ? "text-muted-foreground/40" :
+                "text-muted-foreground"
+              }`}>
+                {task.status === "done"
+                  ? task.label.replace("Syncing", "Synced").replace("Building", "Built").replace("Organizing", "Organized")
+                  : task.status === "failed"
+                    ? task.label.replace("Syncing", "Couldn't sync").replace("Building", "Couldn't build")
+                    : task.label}
+              </p>
+              {task.status === "failed" && task.error && (
+                <p className="text-xs text-amber-400/80">{task.error} — retry from Settings later.</p>
+              )}
+            </div>
           </div>
         ))}
       </div>

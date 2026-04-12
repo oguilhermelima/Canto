@@ -58,7 +58,7 @@ export function ImportMethodSection(): React.JSX.Element {
       importMethod,
       seedRatioLimit: dlSettingsQuery.data?.seedRatioLimit ?? null,
       seedTimeLimitHours: dlSettingsQuery.data?.seedTimeLimitHours ?? null,
-      seedCleanupFiles: dlSettingsQuery.data?.seedCleanupFiles ?? false,
+      seedCleanupFiles: dlSettingsQuery.data?.seedCleanupFiles ?? true,
     });
   };
 

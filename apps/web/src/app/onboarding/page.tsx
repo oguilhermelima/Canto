@@ -8,9 +8,10 @@ import type { Step } from "./_components/constants";
 import { LIBRARY_STEPS } from "./_components/constants";
 import { FadeIn } from "./_components/fade-in";
 import {
-  OnboardingFooter,
-  type FooterConfig,
+  OnboardingFooter
+  
 } from "./_components/onboarding-footer";
+import type {FooterConfig} from "./_components/onboarding-footer";
 import { WelcomeStep } from "./_steps/welcome-step";
 import { OverviewStep } from "./_steps/overview-step";
 import { TmdbStep } from "./_steps/tmdb-step";
@@ -47,6 +48,8 @@ function buildSteps(torrentConnected: boolean): Step[] {
 /*  Main Onboarding Page                                                       */
 /* -------------------------------------------------------------------------- */
 
+const PROGRESS_KEY = "canto.onboarding.step";
+
 export default function OnboardingPage(): React.JSX.Element {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
@@ -58,6 +61,19 @@ export default function OnboardingPage(): React.JSX.Element {
   const { data: allSettings, isLoading: settingsLoading } =
     trpc.settings.getAll.useQuery();
   const completeOnboarding = trpc.settings.completeOnboarding.useMutation();
+
+  // Rehydrate step index on mount so a refresh mid-flow doesn't throw the
+  // user back to the welcome screen. Settings themselves are already persisted
+  // server-side, so the inputs are pre-filled — only the position is lost
+  // without this.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(PROGRESS_KEY);
+    if (saved) {
+      const parsed = parseInt(saved, 10);
+      if (Number.isFinite(parsed) && parsed >= 0) setCurrentStep(parsed);
+    }
+  }, []);
 
   // Detect if torrent client was already configured before onboarding
   useEffect(() => {
@@ -73,9 +89,12 @@ export default function OnboardingPage(): React.JSX.Element {
     if (isCompleted === true) router.replace("/");
   }, [isCompleted, router]);
 
-  // Reset footer config when step changes
+  // Reset footer config when step changes + persist progress
   useEffect(() => {
     setFooterConfig({});
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(PROGRESS_KEY, String(currentStep));
+    }
   }, [currentStep]);
 
   const next = useCallback(() => {
@@ -96,6 +115,9 @@ export default function OnboardingPage(): React.JSX.Element {
 
   const finish = useCallback(async () => {
     await completeOnboarding.mutateAsync();
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(PROGRESS_KEY);
+    }
     router.replace("/");
   }, [completeOnboarding, router]);
 

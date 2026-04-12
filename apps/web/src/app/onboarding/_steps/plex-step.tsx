@@ -45,6 +45,18 @@ export function PlexStep({
     { enabled: polling && pinData !== null, refetchInterval: 2000 },
   );
 
+  // Hard-stop the OAuth polling after 5min so a user who closed the Plex
+  // popup doesn't leave us spinning for 15min with no visible timer.
+  useEffect(() => {
+    if (!polling) return;
+    const id = setTimeout(() => {
+      setPolling(false);
+      setPinData(null);
+      toast.error("Plex sign-in timed out — try again");
+    }, 5 * 60 * 1000);
+    return () => clearTimeout(id);
+  }, [polling]);
+
   useEffect(() => {
     if (plexPinCheck.data?.authenticated) {
       setPolling(false);

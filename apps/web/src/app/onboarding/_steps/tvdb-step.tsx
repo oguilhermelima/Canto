@@ -23,22 +23,39 @@ export function TvdbStep({
 }): React.JSX.Element {
   const [apiKey, setApiKey] = useState(str(settings, "tvdb.apiKey"));
   const [defaultShows, setDefaultShows] = useState(bool(settings, "tvdb.defaultShows"));
-  const setMany = trpc.settings.setMany.useMutation({
-    onSuccess: () => { toast.success("TVDB connected"); onNext(); },
-    onError: () => toast.error("Failed to save TVDB key"),
-  });
+  const setMany = trpc.settings.setMany.useMutation();
+  const testService = trpc.settings.testService.useMutation();
+  const testing = testService.isPending || setMany.isPending;
 
-  const handleSave = (): void => {
-    setMany.mutate({ settings: [
-      { key: "tvdb.apiKey", value: apiKey },
-      { key: "tvdb.enabled", value: true },
-      { key: "tvdb.defaultShows", value: defaultShows },
-    ] });
+  const handleSave = async (): Promise<void> => {
+    // Probe before persisting — the old version saved blindly and a typo only
+    // surfaced later when a metadata job failed deep in the worker.
+    try {
+      const result = await testService.mutateAsync({
+        service: "tvdb",
+        values: { "tvdb.apiKey": apiKey },
+      });
+      if (!result.connected) {
+        toast.error(`Invalid TVDB API key — ${"error" in result ? result.error : "connection failed"}`);
+        return;
+      }
+      await setMany.mutateAsync({
+        settings: [
+          { key: "tvdb.apiKey", value: apiKey },
+          { key: "tvdb.enabled", value: true },
+          { key: "tvdb.defaultShows", value: defaultShows },
+        ],
+      });
+      toast.success("TVDB connected");
+      onNext();
+    } catch {
+      toast.error("Failed to save TVDB key");
+    }
   };
 
   useEffect(() => {
-    configureFooter({ onPrimary: handleSave, primaryDisabled: !apiKey, primaryLoading: setMany.isPending, onSkip: onNext });
-  }, [apiKey, defaultShows, setMany.isPending]); // eslint-disable-line react-hooks/exhaustive-deps
+    configureFooter({ onPrimary: handleSave, primaryDisabled: !apiKey || testing, primaryLoading: testing, onSkip: onNext });
+  }, [apiKey, defaultShows, testing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex flex-col items-center gap-8 text-center pt-16 md:pt-0">
