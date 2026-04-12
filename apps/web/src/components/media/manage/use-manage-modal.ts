@@ -4,7 +4,6 @@ import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
-import { useDocumentTitle } from "~/hooks/use-document-title";
 import { resolveState } from "~/lib/torrent-utils";
 
 function epKey(sn: number, en: number): string {
@@ -13,38 +12,39 @@ function epKey(sn: number, en: number): string {
 
 export { epKey };
 
-export function useManageMedia(id: string, mediaType: "movie" | "show") {
+export function useManageModal(
+  mediaId: string,
+  mediaType: "movie" | "show",
+  open: boolean,
+  onClose: () => void,
+) {
   const router = useRouter();
   const utils = trpc.useUtils();
 
-  // Resolve TMDB external ID to internal media
-  const { data: media, isLoading } = trpc.media.getByExternal.useQuery({
-    externalId: parseInt(id, 10),
-    provider: "tmdb",
-    type: mediaType,
-  });
-
-  const mediaId = media?.id;
-
-  useDocumentTitle(media?.title ? `Manage: ${media.title}` : undefined);
+  // Media is already resolved — fetch by internal ID
+  const { data: media, isLoading } = trpc.media.getById.useQuery(
+    { id: mediaId },
+    { enabled: open },
+  );
 
   // ── Queries ──
   const { data: libraries } = trpc.folder.list.useQuery(undefined, {
     staleTime: Infinity,
+    enabled: open,
   });
   const { data: availability } = trpc.sync.mediaAvailability.useQuery(
-    { mediaId: mediaId! },
-    { enabled: !!mediaId, staleTime: Infinity },
+    { mediaId },
+    { enabled: open, staleTime: Infinity },
   );
   const { data: mediaServers } = trpc.sync.mediaServers.useQuery(
-    { mediaId: mediaId! },
-    { enabled: !!mediaId, staleTime: Infinity },
+    { mediaId },
+    { enabled: open, staleTime: Infinity },
   );
   const { data: liveTorrents, isLoading: torrentsLoading } =
     trpc.torrent.listLiveByMedia.useQuery(
-      { mediaId: mediaId! },
+      { mediaId },
       {
-        enabled: !!mediaId,
+        enabled: open,
         refetchInterval: (query) => {
           const items = query.state.data;
           if (!items) return 3000;
@@ -62,23 +62,21 @@ export function useManageMedia(id: string, mediaType: "movie" | "show") {
       },
     );
   const { data: mediaFiles } = trpc.media.listFiles.useQuery(
-    { mediaId: mediaId! },
-    { enabled: !!mediaId, staleTime: 60_000 },
+    { mediaId },
+    { enabled: open, staleTime: 60_000 },
   );
   const { data: mediaTorrents } = trpc.torrent.listByMedia.useQuery(
-    { mediaId: mediaId! },
-    { enabled: !!mediaId },
+    { mediaId },
+    { enabled: open },
   );
 
   // ── Invalidation helpers ──
   const invalidateMedia = useCallback(() => {
-    if (!mediaId) return;
     void utils.media.getById.invalidate({ id: mediaId });
     void utils.media.getByExternal.invalidate();
   }, [utils, mediaId]);
 
   const invalidateTorrents = useCallback(() => {
-    if (!mediaId) return;
     void utils.torrent.listLiveByMedia.invalidate({ mediaId });
     void utils.torrent.listByMedia.invalidate({ mediaId });
     void utils.media.listFiles.invalidate({ mediaId });
@@ -111,7 +109,7 @@ export function useManageMedia(id: string, mediaType: "movie" | "show") {
       invalidateMedia();
       void utils.library.list.invalidate();
       toast.success("Removed from server");
-      router.push(`/${mediaType === "show" ? "shows" : "movies"}/${id}`);
+      onClose();
     },
     onError: (err: { message: string }) => toast.error(err.message),
   });
@@ -136,6 +134,7 @@ export function useManageMedia(id: string, mediaType: "movie" | "show") {
       invalidateMedia();
       void utils.library.list.invalidate();
       toast.success("Media deleted");
+      onClose();
       router.push("/");
     },
     onError: (err) => toast.error(err.message),

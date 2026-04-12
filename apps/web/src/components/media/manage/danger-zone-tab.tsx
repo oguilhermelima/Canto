@@ -5,9 +5,9 @@ import { Button } from "@canto/ui/button";
 import { Separator } from "@canto/ui/separator";
 import { Check, Loader2, Trash2 } from "lucide-react";
 import { SettingsRow } from "./settings-row";
-import type { useManageMedia } from "./use-manage-media";
+import type { useManageModal } from "./use-manage-modal";
 
-type ManageData = ReturnType<typeof useManageMedia>;
+type ManageData = ReturnType<typeof useManageModal>;
 
 interface DangerZoneTabProps {
   media: NonNullable<ManageData["media"]>;

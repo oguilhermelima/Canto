@@ -10,11 +10,11 @@ import {
   Server,
 } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
-import { epKey } from "./use-manage-media";
+import { epKey } from "./use-manage-modal";
 import type { SeasonData } from "./content-season-list";
-import type { useManageMedia } from "./use-manage-media";
+import type { useManageModal } from "./use-manage-modal";
 
-type ManageData = ReturnType<typeof useManageMedia>;
+type ManageData = ReturnType<typeof useManageModal>;
 
 const SERVERS = {
   jellyfin: { name: "Jellyfin", color: "blue" },

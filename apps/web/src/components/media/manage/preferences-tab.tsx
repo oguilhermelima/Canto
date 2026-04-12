@@ -14,9 +14,9 @@ import {
 import { RefreshCw } from "lucide-react";
 import { SettingsRow } from "./settings-row";
 import { ProviderOverrideDialog } from "./provider-override-dialog";
-import type { useManageMedia } from "./use-manage-media";
+import type { useManageModal } from "./use-manage-modal";
 
-type ManageData = ReturnType<typeof useManageMedia>;
+type ManageData = ReturnType<typeof useManageModal>;
 
 interface PreferencesTabProps {
   media: NonNullable<ManageData["media"]>;
