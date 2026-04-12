@@ -1,170 +1,162 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@canto/ui/button";
-import { Skeleton } from "@canto/ui/skeleton";
-import { Search, Download } from "lucide-react";
+import { Badge } from "@canto/ui/badge";
+import { HardDrive } from "lucide-react";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
-import { resolveState } from "~/lib/torrent-utils";
-import { TorrentCard  } from "./torrent-card";
-import type {TorrentWithLive} from "./torrent-card";
-import { DeleteTorrentDialog } from "./delete-torrent-dialog";
+import { formatBytes } from "~/lib/torrent-utils";
+import { ContentSeasonList } from "./content-season-list";
+import type { FileItem, SeasonData } from "./content-season-list";
+import { TorrentMiniRow, SeasonActions } from "./torrent-row";
+import type { TorrentItem } from "./torrent-row";
+import { epKey } from "./use-manage-modal";
+import type { useManageModal } from "./use-manage-modal";
+
+type ManageData = ReturnType<typeof useManageModal>;
 
 interface DownloadsTabProps {
-  mediaId: string;
-  drawerOpen: boolean;
-  onSearchTorrent: () => void;
+  mediaType: "movie" | "show";
+  seasons: SeasonData[];
+  torrentsLoading: boolean;
+  filesByEpKey: ManageData["filesByEpKey"];
+  movieFiles: ManageData["movieFiles"];
+  liveTorrents: ManageData["liveTorrents"];
+  torrentsBySeason: ManageData["torrentsBySeason"];
+  torrentPause: ManageData["torrentPause"];
+  torrentResume: ManageData["torrentResume"];
+  torrentDelete: ManageData["torrentDelete"];
+  torrentRetry: ManageData["torrentRetry"];
+  torrentRename: ManageData["torrentRename"];
+  torrentMove: ManageData["torrentMove"];
 }
 
 export function DownloadsTab({
-  mediaId,
-  drawerOpen,
-  onSearchTorrent,
-}: DownloadsTabProps) {
-  const [deleteTarget, setDeleteTarget] = useState<{
-    id: string;
-    title: string;
-  } | null>(null);
+  mediaType,
+  seasons,
+  torrentsLoading,
+  filesByEpKey,
+  movieFiles,
+  liveTorrents,
+  torrentsBySeason,
+  torrentPause,
+  torrentResume,
+  torrentDelete,
+  torrentRetry,
+  torrentRename,
+  torrentMove,
+}: DownloadsTabProps): React.JSX.Element {
+  const handleRenameTorrent = (
+    torrentId: string,
+    currentTitle: string,
+  ): void => {
+    const newName = window.prompt("Rename to:", currentTitle);
+    if (!newName || newName === currentTitle) return;
+    torrentRename.mutate({ id: torrentId, newName });
+  };
 
-  const utils = trpc.useUtils();
-
-  const { data, isLoading } = trpc.torrent.listLiveByMedia.useQuery(
-    { mediaId },
-    {
-      enabled: drawerOpen,
-      refetchInterval: (query) => {
-        const items = query.state.data;
-        if (!items) return 3000;
-        const hasActive = items.some(
-          (t) =>
-            !resolveState(
-              t.status,
-              t.live?.state,
-              t.live?.progress ?? t.progress,
-            ).isDownloaded,
-        );
-        return hasActive ? 3000 : 30000;
-      },
-    },
-  );
-
-  const invalidate = () => utils.torrent.listLiveByMedia.invalidate();
-
-  const pauseMutation = trpc.torrent.pause.useMutation({
-    onSuccess: () => invalidate(),
-    onError: (err) => toast.error(err.message),
-  });
-
-  const resumeMutation = trpc.torrent.resume.useMutation({
-    onSuccess: () => invalidate(),
-    onError: (err) => toast.error(err.message),
-  });
-
-  const deleteMutation = trpc.torrent.delete.useMutation({
-    onSuccess: () => {
-      invalidate();
-      setDeleteTarget(null);
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const retryMutation = trpc.torrent.retry.useMutation({
-    onSuccess: () => invalidate(),
-    onError: (err) => toast.error(err.message),
-  });
-
-  const importMutation = trpc.torrent.import.useMutation({
-    onSuccess: () => {
-      invalidate();
-      toast.success("Import started");
-    },
-    onError: (err) => toast.error(err.message),
-  });
+  const handleMoveTorrent = (
+    torrentId: string,
+    currentPath?: string | null,
+  ): void => {
+    const newPath = window.prompt("Move to:", currentPath ?? "");
+    if (!newPath) return;
+    torrentMove.mutate({ id: torrentId, newPath });
+  };
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-foreground">Downloads</h3>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 gap-1.5 text-xs"
-          onClick={onSearchTorrent}
+    <ContentSeasonList
+      mediaType={mediaType}
+      seasons={seasons}
+      loading={torrentsLoading}
+      emptyText="No downloads for this title"
+      getEpisodeItems={(sn, en) => {
+        const key = epKey(sn, en);
+        const files = (filesByEpKey.get(key) ?? []) as FileItem[];
+        const torrents =
+          liveTorrents?.filter(
+            (t) =>
+              t.seasonNumber === sn &&
+              t.episodeNumbers?.includes(en),
+          ) ?? [];
+        return { files, torrents };
+      }}
+      getMovieItems={() => ({
+        files: movieFiles as FileItem[],
+        torrents: (liveTorrents ?? []) as TorrentItem[],
+      })}
+      renderFileRow={(f) => (
+        <div
+          key={f.id}
+          className="flex items-center gap-2 text-xs text-muted-foreground"
         >
-          <Search className="h-3 w-3" />
-          Search Torrent
-        </Button>
-      </div>
-
-      {/* Loading */}
-      {isLoading && (
-        <div className="flex flex-col gap-3">
-          <Skeleton className="h-32 rounded-xl" />
-          <Skeleton className="h-32 rounded-xl" />
+          <HardDrive className="h-3 w-3 shrink-0 text-green-500" />
+          <span className="min-w-0 flex-1 truncate">
+            {f.filePath.split("/").pop()}
+          </span>
+          {f.sizeBytes ? <span>{formatBytes(f.sizeBytes)}</span> : null}
+          {f.quality && f.quality !== "unknown" && (
+            <Badge variant="outline" className="h-4 px-1 text-[9px]">
+              {f.quality}
+            </Badge>
+          )}
         </div>
       )}
-
-      {/* Empty state */}
-      {!isLoading && data?.length === 0 && (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border py-10 text-center">
-          <Download className="h-8 w-8 text-muted-foreground" />
-          <div>
-            <p className="text-sm font-medium text-foreground">
-              No downloads yet
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Search for a torrent to start downloading.
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-1 gap-1.5 text-xs"
-            onClick={onSearchTorrent}
-          >
-            <Search className="h-3 w-3" />
-            Search Torrent
-          </Button>
-        </div>
-      )}
-
-      {/* Torrent list */}
-      {!isLoading && data && data.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {data.map((torrent: TorrentWithLive) => (
-            <TorrentCard
-              key={torrent.id}
-              torrent={torrent}
-              onPause={(id) => pauseMutation.mutate({ id })}
-              onResume={(id) => resumeMutation.mutate({ id })}
-              onDelete={(id, title) => setDeleteTarget({ id, title })}
-              onRetry={(id) => retryMutation.mutate({ id })}
-              onImport={(id) => importMutation.mutate({ id })}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Delete confirmation dialog */}
-      <DeleteTorrentDialog
-        open={deleteTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
-        }}
-        title={deleteTarget?.title ?? ""}
-        onConfirm={(deleteFiles, removeTorrent) => {
-          if (deleteTarget) {
-            deleteMutation.mutate({
-              id: deleteTarget.id,
-              deleteFiles,
-              removeTorrent,
-            });
-          }
-        }}
-        isPending={deleteMutation.isPending}
-      />
-    </div>
+      renderTorrentRow={(t) => {
+        const torrent = t as TorrentItem;
+        return (
+          <TorrentMiniRow
+            key={torrent.id}
+            torrent={torrent}
+            onPause={() => torrentPause.mutate({ id: torrent.id })}
+            onResume={() => torrentResume.mutate({ id: torrent.id })}
+            onRetry={() => torrentRetry.mutate({ id: torrent.id })}
+            onDelete={() =>
+              torrentDelete.mutate({
+                id: torrent.id,
+                deleteFiles: true,
+                removeTorrent: true,
+              })
+            }
+            onRename={() => handleRenameTorrent(torrent.id, torrent.title)}
+            onMove={() => handleMoveTorrent(torrent.id, torrent.contentPath)}
+          />
+        );
+      }}
+      seasonActions={(sn) => {
+        const seasonTorrents = torrentsBySeason.get(sn) ?? [];
+        return (
+          <SeasonActions
+            hasContent={seasonTorrents.length > 0}
+            onDelete={() => {
+              for (const t of seasonTorrents)
+                torrentDelete.mutate({
+                  id: t.id,
+                  deleteFiles: true,
+                  removeTorrent: true,
+                });
+              if (seasonTorrents.length > 0)
+                toast.success(
+                  `Deleting ${seasonTorrents.length} torrent(s)`,
+                );
+            }}
+            onRename={() => {
+              for (const t of seasonTorrents)
+                handleRenameTorrent(t.id, t.title);
+            }}
+            onMove={() => {
+              if (seasonTorrents.length === 0) return;
+              const currentPath =
+                seasonTorrents[0]?.contentPath ?? "";
+              const newPath = window.prompt(
+                "Move season to:",
+                currentPath,
+              );
+              if (!newPath || newPath === currentPath) return;
+              for (const t of seasonTorrents)
+                torrentMove.mutate({ id: t.id, newPath });
+            }}
+          />
+        );
+      }}
+    />
   );
 }
