@@ -247,6 +247,7 @@ export const userMediaRouter = createTRPCRouter({
         voteAverage: number | null;
         genres: unknown;
         genreIds: unknown;
+        trailerKey: string | null;
         year: number | null;
         externalId: number;
         provider: string;
@@ -293,6 +294,7 @@ export const userMediaRouter = createTRPCRouter({
           voteAverage: row.voteAverage,
           genres: row.genres,
           genreIds: row.genreIds,
+          trailerKey: row.trailerKey,
           year: row.year,
           externalId: row.externalId,
           provider: row.provider,
@@ -574,6 +576,7 @@ export const userMediaRouter = createTRPCRouter({
           voteAverage: "voteAverage" in item ? (item as { voteAverage: number | null }).voteAverage : null,
           genres: "genres" in item ? (item as { genres: unknown }).genres : null,
           genreIds: "genreIds" in item ? (item as { genreIds: unknown }).genreIds : null,
+          trailerKey: "trailerKey" in item ? (item as { trailerKey: string | null }).trailerKey : null,
           year: item.year,
           externalId: item.externalId,
           provider: item.provider,

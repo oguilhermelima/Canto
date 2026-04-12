@@ -1,10 +1,11 @@
-import { and, asc, count, desc, eq, gt, gte, inArray, isNull, or, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
   episode,
   list,
   listItem,
   media,
+  mediaVideo,
   season,
   userMediaState,
   userPlaybackProgress,
@@ -279,6 +280,7 @@ export interface UserPlaybackProgressFeedRow {
   voteAverage: number | null;
   genres: unknown;
   genreIds: unknown;
+  trailerKey: string | null;
   year: number | null;
   mediaRuntime: number | null;
   externalId: number;
@@ -318,6 +320,7 @@ export async function findUserPlaybackProgressFeed(
       voteAverage: media.voteAverage,
       genres: media.genres,
       genreIds: media.genreIds,
+      trailerKey: sql<string | null>`(SELECT ${mediaVideo.externalKey} FROM ${mediaVideo} WHERE ${mediaVideo.mediaId} = ${media.id} AND ${mediaVideo.type} = 'Trailer' AND ${mediaVideo.site} = 'YouTube' LIMIT 1)`,
       year: media.year,
       mediaRuntime: media.runtime,
       externalId: media.externalId,
@@ -707,6 +710,13 @@ export interface UserMediaPaginatedRow {
   mediaType: string;
   title: string;
   posterPath: string | null;
+  backdropPath: string | null;
+  logoPath: string | null;
+  overview: string | null;
+  voteAverage: number | null;
+  genres: unknown;
+  genreIds: unknown;
+  trailerKey: string | null;
   year: number | null;
   externalId: number;
   provider: string;
@@ -762,6 +772,13 @@ export async function findUserMediaPaginated(
     mediaType: media.type,
     title: media.title,
     posterPath: media.posterPath,
+    backdropPath: media.backdropPath,
+    logoPath: media.logoPath,
+    overview: media.overview,
+    voteAverage: media.voteAverage,
+    genres: media.genres,
+    genreIds: media.genreIds,
+    trailerKey: sql<string | null>`(SELECT ${mediaVideo.externalKey} FROM ${mediaVideo} WHERE ${mediaVideo.mediaId} = ${media.id} AND ${mediaVideo.type} = 'Trailer' AND ${mediaVideo.site} = 'YouTube' LIMIT 1)`,
     year: media.year,
     externalId: media.externalId,
     provider: media.provider,
