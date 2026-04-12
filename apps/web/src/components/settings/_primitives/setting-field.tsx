@@ -10,7 +10,7 @@ import {
   SETTINGS_REGISTRY,
   type SettingDef,
   type SettingKey,
-} from "@canto/db/settings";
+} from "@canto/db/settings-registry";
 import type { z } from "zod";
 
 import { trpc } from "~/lib/trpc/client";

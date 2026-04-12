@@ -16,7 +16,7 @@ import { cn } from "@canto/ui/cn";
 import type {
   SettingInputType,
   SettingSelectOption,
-} from "@canto/db/settings";
+} from "@canto/db/settings-registry";
 
 export interface FieldInputProps {
   inputType: SettingInputType;

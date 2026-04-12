@@ -38,7 +38,7 @@ import { FieldInput } from "~/components/settings/_primitives";
 import {
   SETTINGS_REGISTRY,
   type SettingKey,
-} from "@canto/db/settings";
+} from "@canto/db/settings-registry";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 

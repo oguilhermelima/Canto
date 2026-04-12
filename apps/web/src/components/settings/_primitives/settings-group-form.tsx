@@ -6,7 +6,7 @@ import { cn } from "@canto/ui/cn";
 import {
   SETTINGS_REGISTRY,
   type SettingKey,
-} from "@canto/db/settings";
+} from "@canto/db/settings-registry";
 
 import { SettingField } from "./setting-field";
 
