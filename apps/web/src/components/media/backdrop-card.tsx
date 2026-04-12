@@ -121,7 +121,7 @@ export function BackdropCard({
           <div className="absolute right-2.5 top-2.5 z-10">
             <span
               className={cn(
-                "rounded-sm px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-md",
+                "rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-md",
                 BADGE_CONFIG[badge].className,
               )}
             >
@@ -139,12 +139,12 @@ export function BackdropCard({
               {title}
             </p>
           )}
-          <div className="mt-3 flex items-center gap-2 text-xs text-white/60">
+          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-white/70">
             <span>{type === "movie" ? "Movie" : "TV Show"}</span>
             {voteAverage != null && voteAverage > 0 && (
               <>
                 <span className="text-white/30">·</span>
-                <span className="text-yellow-500">
+                <span className="text-yellow-400">
                   {voteAverage.toFixed(1)}
                 </span>
               </>

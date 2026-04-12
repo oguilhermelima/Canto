@@ -310,17 +310,17 @@ function FeaturedCard({
             <h3 className="text-lg font-bold text-white drop-shadow-lg">{item.title}</h3>
           )}
 
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/70">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/70">
             <span>{item.type === "movie" ? "Movie" : "TV Show"}</span>
             {item.voteAverage != null && item.voteAverage > 0 && (
               <>
-                <span className="text-white/30">|</span>
-                <span className="text-yellow-500">{item.voteAverage.toFixed(1)}</span>
+                <span className="text-white/30">·</span>
+                <span className="text-yellow-400">{item.voteAverage.toFixed(1)}</span>
               </>
             )}
             {item.year && (
               <>
-                <span className="text-white/30">|</span>
+                <span className="text-white/30">·</span>
                 <span>{item.year}</span>
               </>
             )}

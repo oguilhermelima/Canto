@@ -137,11 +137,14 @@ function WatchNextCard({
           </div>
         )}
 
-        <div className="absolute right-2.5 top-2.5 rounded-sm bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-black shadow-md">
+        <div className={cn(
+          "absolute right-2.5 top-2.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-md",
+          view === "continue" ? "bg-white/90 text-black" : "bg-sky-500 text-white",
+        )}>
           {view === "continue" ? "CONTINUE" : "UP NEXT"}
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent px-3 pb-3 pt-14">
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3.5 pb-3 pt-14">
           {logoPath ? (
             <MediaLogo
               src={`${TMDB_IMAGE_BASE}/w500${logoPath}`}
@@ -150,29 +153,24 @@ function WatchNextCard({
               className="max-w-[70%]"
             />
           ) : (
-            <p className="line-clamp-2 text-sm font-semibold leading-tight text-white">
+            <p className="line-clamp-2 text-sm font-semibold leading-tight text-white drop-shadow-lg">
               {item.title}
             </p>
           )}
-          <p
-            className={cn(
-              "line-clamp-2 text-xs text-white/75",
-              logoPath ? "mt-2" : "mt-1",
-            )}
-          >
-            {itemLabel(item)}
-          </p>
+          <div className={cn("flex items-center gap-1.5", logoPath ? "mt-2" : "mt-1.5")}>
+            <span className="text-xs font-medium text-white/90">{itemLabel(item)}</span>
+          </div>
           {item.progressPercent !== null && (
-            <div className="mt-2.5 space-y-1">
-              <div className="h-1.5 overflow-hidden rounded-full bg-black/20 dark:bg-white/20">
+            <div className="mt-2.5 flex items-center gap-2.5">
+              <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/20">
                 <div
-                  className="h-full rounded-full bg-black/70 dark:bg-white/70"
+                  className="h-full rounded-full bg-white/80"
                   style={{ width: `${item.progressPercent}%` }}
                 />
               </div>
-              <p className="text-[10px] text-white/70">
-                {progressText ?? `${item.progressPercent}% complete`}
-              </p>
+              <span className="shrink-0 text-xs tabular-nums text-white/70">
+                {progressText ?? `${item.progressPercent}%`}
+              </span>
             </div>
           )}
         </div>

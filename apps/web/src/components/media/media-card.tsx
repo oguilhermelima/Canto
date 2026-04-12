@@ -95,17 +95,17 @@ export function MediaCard({
             <p className="line-clamp-4 text-sm font-semibold leading-tight text-white">
               {title}
             </p>
-            <div className="mt-1.5 flex items-center gap-2 text-[11px] text-white/60">
+            <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-white/70">
               <span>{type === "movie" ? "Movie" : "TV Show"}</span>
               {voteAverage != null && voteAverage > 0 && (
                 <>
-                  <span className="text-white/30">|</span>
-                  <span className="text-yellow-500">{voteAverage.toFixed(1)}</span>
+                  <span className="text-white/30">·</span>
+                  <span className="text-yellow-400">{voteAverage.toFixed(1)}</span>
                 </>
               )}
               {year && (
                 <>
-                  <span className="text-white/30">|</span>
+                  <span className="text-white/30">·</span>
                   <span>{year}</span>
                 </>
               )}
