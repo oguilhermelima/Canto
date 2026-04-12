@@ -37,7 +37,14 @@ import { trpc } from "~/lib/trpc/client";
 import { useWatchRegion } from "~/hooks/use-watch-region";
 import { useDirectSearch } from "~/hooks/use-direct-search";
 import { SectionCard, SettingsSection } from "~/components/settings/shared";
-import { SettingField } from "~/components/settings/_primitives";
+import {
+  FieldInput,
+  SettingField,
+} from "~/components/settings/_primitives";
+import {
+  SETTINGS_REGISTRY,
+  type SettingKey,
+} from "@canto/db/settings";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -72,51 +79,6 @@ function AnimatedCollapse({
 /* -------------------------------------------------------------------------- */
 /*  Shared                                                                     */
 /* -------------------------------------------------------------------------- */
-
-function SettingsFields({
-  fields,
-  values,
-  onChange,
-  showSecrets,
-  onToggleSecret,
-  disabled,
-}: {
-  fields: Array<{ key: string; label: string; placeholder: string; secret?: boolean }>;
-  values: Record<string, string>;
-  onChange: (key: string, value: string) => void;
-  showSecrets: Record<string, boolean>;
-  onToggleSecret: (key: string) => void;
-  disabled?: boolean;
-}): React.JSX.Element {
-  return (
-    <div className="space-y-4">
-      {fields.map((f) => (
-        <div key={f.key} className="space-y-1.5">
-          <label className={cn("text-sm font-medium", disabled ? "text-muted-foreground/40" : "text-muted-foreground")}>{f.label}</label>
-          <div className="relative">
-            <Input
-              type={f.secret && !showSecrets[f.key] ? "password" : "text"}
-              value={values[f.key] ?? ""}
-              placeholder={f.placeholder}
-              onChange={(e) => onChange(f.key, e.target.value)}
-              disabled={disabled}
-              className="h-10 rounded-xl border-none bg-muted/50 text-sm placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-border focus-visible:ring-offset-0"
-            />
-            {f.secret && !disabled && (
-              <button
-                type="button"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
-                onClick={() => onToggleSecret(f.key)}
-              >
-                {showSecrets[f.key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function OrDivider(): React.JSX.Element {
   return (
@@ -226,7 +188,6 @@ function ServiceRow({
 
   const isEnabled = enabledServices?.[serviceKey] === true;
   const [values, setValues] = useState<Record<string, string>>({});
-  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [dirty, setDirty] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -327,13 +288,30 @@ function ServiceRow({
             </a>
           )}
           {fields && (
-            <SettingsFields
-              fields={fields}
-              values={values}
-              onChange={(key, value) => { setValues((p) => ({ ...p, [key]: value })); setDirty(true); }}
-              showSecrets={showSecrets}
-              onToggleSecret={(key) => setShowSecrets((p) => ({ ...p, [key]: !p[key] }))}
-            />
+            <div className="space-y-4">
+              {fields.map((f) => {
+                const def = SETTINGS_REGISTRY[f.key as SettingKey];
+                return (
+                  <div key={f.key} className="space-y-1.5">
+                    <label className="text-sm font-medium text-muted-foreground">
+                      {f.label}
+                    </label>
+                    <FieldInput
+                      inputType={def.inputType}
+                      value={values[f.key] ?? ""}
+                      placeholder={f.placeholder}
+                      onChange={(next) => {
+                        setValues((p) => ({
+                          ...p,
+                          [f.key]: typeof next === "string" ? next : "",
+                        }));
+                        setDirty(true);
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           )}
           {info?.apiKeyHint && (
             <p className="text-sm text-muted-foreground">
