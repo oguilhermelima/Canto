@@ -345,7 +345,27 @@ process.on("SIGINT", shutdown);
 /*  Startup                                                                   */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Eagerly probe Redis before we accept jobs. BullMQ uses lazyConnect, so
+ * without this check the worker process happily boots, schedulers silently
+ * fail to register, and only the first dispatched job surfaces the outage —
+ * usually much later, from a completely unrelated stack trace. Fail fast
+ * instead so `docker-compose up` / systemd immediately flags a bad Redis.
+ *
+ * We piggyback on an existing Queue's Redis connection (reuses bullmq's own
+ * ioredis instance) so we don't need ioredis as a direct dependency.
+ */
+async function probeRedis(): Promise<void> {
+  const client = await queues.importTorrents.client;
+  const pong = await client.ping();
+  if (pong !== "PONG") {
+    throw new Error(`unexpected PING response: ${pong}`);
+  }
+  console.log(`[worker] Redis reachable at ${redisConnection.host}:${redisConnection.port}`);
+}
+
 async function main(): Promise<void> {
+  await probeRedis();
   await setupSchedules();
   await seedLanguages(db);
   console.log("Workers started. Waiting for jobs...");
