@@ -2,7 +2,6 @@
 
 import { useMemo, useCallback } from "react";
 import { trpc } from "~/lib/trpc/client";
-import { WatchNextTab } from "~/app/(app)/library/_components/watch-next-tab";
 import type { SectionItem } from "../section-item";
 import { DynamicSection } from "../dynamic-section";
 
@@ -13,10 +12,6 @@ interface ContinueWatchingSourceProps {
 }
 
 export function ContinueWatchingSource({ title, style, isFirstSection }: ContinueWatchingSourceProps): React.JSX.Element {
-  if (style === "large_video") {
-    return <WatchNextTab view="continue" title={title} seeAllHref="/library/watched" />;
-  }
-
   return <ContinueWatchingDynamic title={title} style={style} isFirstSection={isFirstSection} />;
 }
 
