@@ -1,0 +1,81 @@
+"use client";
+
+import { useMemo, useCallback, useRef, useEffect } from "react";
+import { trpc } from "~/lib/trpc/client";
+import type { SectionItem } from "../section-item";
+import { DynamicSection } from "../dynamic-section";
+
+interface RecommendationsSourceProps {
+  title: string;
+  style: string;
+  isFirstSection?: boolean;
+}
+
+export function RecommendationsSource({ title, style, isFirstSection }: RecommendationsSourceProps): React.JSX.Element | null {
+  const utils = trpc.useUtils();
+  const recsVersionRef = useRef<number | null>(null);
+
+  const query = trpc.media.recommendations.useInfiniteQuery(
+    { pageSize: 10 },
+    {
+      staleTime: 5 * 60 * 1000,
+      refetchInterval: 30 * 1000,
+      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+      initialCursor: 0,
+    },
+  );
+
+  const currentVersion = query.data?.pages[0]?.version;
+  useEffect(() => {
+    if (currentVersion === undefined) return;
+    if (recsVersionRef.current !== null && recsVersionRef.current !== currentVersion) {
+      void utils.media.recommendations.invalidate();
+    }
+    recsVersionRef.current = currentVersion;
+  }, [currentVersion, utils.media.recommendations]);
+
+  const items = useMemo<SectionItem[]>(() => {
+    const seen = new Set<string>();
+    return (query.data?.pages ?? [])
+      .flatMap((p) => p.items)
+      .filter((r) => {
+        const key = `${r.provider}-${r.externalId}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .map((r) => ({
+        externalId: r.externalId,
+        provider: r.provider,
+        type: r.type as "movie" | "show",
+        title: r.title,
+        posterPath: r.posterPath ?? null,
+        backdropPath: r.backdropPath ?? null,
+        logoPath: r.logoPath,
+        trailerKey: r.trailerKey,
+        year: r.year,
+        voteAverage: r.voteAverage,
+        overview: r.overview,
+      }));
+  }, [query.data]);
+
+  const handleLoadMore = useCallback(() => {
+    if (query.hasNextPage) void query.fetchNextPage();
+  }, [query]);
+
+  return (
+    <DynamicSection
+      style={style}
+      title={title}
+      seeAllHref="/search"
+      items={items}
+      isLoading={query.isLoading}
+      isError={query.isError}
+      isFetchingMore={query.isFetchingNextPage}
+      onLoadMore={query.hasNextPage ? handleLoadMore : undefined}
+      onRetry={() => query.refetch()}
+      emptyPreset="emptyWatchlist"
+      isFirstSection={isFirstSection}
+    />
+  );
+}
