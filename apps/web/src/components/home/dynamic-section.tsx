@@ -58,6 +58,7 @@ function toBackdropItems(items: SectionItem[]) {
       voteAverage: item.voteAverage ?? undefined,
       popularity: item.popularity,
       releaseDate: item.releaseDate,
+      progress: item.progress,
     }));
 }
 
@@ -88,6 +89,7 @@ function toPosterItems(items: SectionItem[]) {
     externalId: String(item.externalId),
     provider: item.provider,
     href: mediaHref(item.provider, item.externalId, item.type),
+    progress: item.progress,
   }));
 }
 

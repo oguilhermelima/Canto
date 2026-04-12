@@ -23,6 +23,7 @@ interface BackdropItem {
   popularity?: number | null;
   releaseDate?: string | null;
   badge?: BadgeType | null;
+  progress?: { percent: number; value: number; total: number; unit: "seconds" | "episodes" } | null;
 }
 
 interface BackdropCarouselProps {

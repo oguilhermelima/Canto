@@ -24,6 +24,7 @@ interface MediaCardProps {
   showRating?: boolean;
   showYear?: boolean;
   showTitle?: boolean;
+  progress?: { percent: number; value: number; total: number; unit: "seconds" | "episodes" } | null;
   href?: string;
   className?: string;
 }
@@ -38,6 +39,7 @@ export function MediaCard({
   year,
   voteAverage,
   showTitle = true,
+  progress,
   href,
   className,
 }: MediaCardProps): React.JSX.Element {
@@ -112,6 +114,16 @@ export function MediaCard({
             </div>
           </div>
         </div>
+
+        {/* Progress bar */}
+        {progress && (
+          <div className="absolute inset-x-0 bottom-0 h-1 bg-white/15">
+            <div
+              className="h-full bg-white/80"
+              style={{ width: `${progress.percent}%` }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Title below poster */}

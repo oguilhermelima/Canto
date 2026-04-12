@@ -15,6 +15,7 @@ interface MediaItem {
   posterPath: string | null;
   year?: number | null;
   voteAverage?: number | null;
+  progress?: { percent: number; value: number; total: number; unit: "seconds" | "episodes" } | null;
 }
 
 interface MediaCarouselProps {

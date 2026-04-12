@@ -14,6 +14,13 @@ import { useLogo } from "~/hooks/use-logos";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
+function formatDuration(seconds: number): string {
+  if (seconds <= 0) return "0m";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
 export type BadgeType = "trending" | "new" | "top-rated";
 
 interface BackdropCardProps {
@@ -26,6 +33,7 @@ interface BackdropCardProps {
   year?: number | null;
   voteAverage?: number | null;
   badge?: BadgeType | null;
+  progress?: { percent: number; value: number; total: number; unit: "seconds" | "episodes" } | null;
   className?: string;
 }
 
@@ -49,6 +57,7 @@ export function BackdropCard({
   year,
   voteAverage,
   badge,
+  progress,
   className,
 }: BackdropCardProps): React.JSX.Element {
   const href = mediaHref(provider ?? "tmdb", externalId ?? "0", type);
@@ -156,6 +165,21 @@ export function BackdropCard({
               </>
             )}
           </div>
+          {progress && (
+            <div className="mt-2 flex items-center gap-2">
+              <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/15">
+                <div
+                  className="h-full rounded-full bg-white/80"
+                  style={{ width: `${progress.percent}%` }}
+                />
+              </div>
+              <span className="shrink-0 text-[10px] tabular-nums text-white/60">
+                {progress.unit === "seconds"
+                  ? `${formatDuration(progress.value)} / ${formatDuration(progress.total)}`
+                  : `${progress.value}/${progress.total}`}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </Link>

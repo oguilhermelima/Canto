@@ -18,4 +18,11 @@ export interface SectionItem {
   releaseDate?: string;
   genres?: string[];
   genreIds?: number[];
+  /** Watch progress. Present only for continue-watching / watch-next items. */
+  progress?: {
+    percent: number;
+    value: number;
+    total: number;
+    unit: "seconds" | "episodes";
+  } | null;
 }
