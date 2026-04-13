@@ -54,7 +54,10 @@ export default function SearchPage(): React.JSX.Element {
       setQuery(q);
       setInputValue(q);
     }
-  }, [searchParams, query]);
+    // Only react to external URL changes — excluding `query` from deps
+    // prevents the reset-then-restore flash when our own debounce fires
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useDocumentTitle(query ? `"${query}"` : "Search");
 
