@@ -8,6 +8,26 @@ import { DynamicSection } from "../dynamic-section";
 
 const MAX_CAROUSEL_PAGES = 3;
 
+function buildSearchHref(config: Record<string, unknown>): string {
+  const params = new URLSearchParams();
+
+  if (config.type) params.set("type", config.type as string);
+  if (config.genres) params.set("genre", config.genres as string);
+
+  if (config.sortBy) params.set("sort", config.sortBy as string);
+  else if (config.mode === "trending") params.set("sort", "popularity.desc");
+
+  if (config.language) params.set("language", config.language as string);
+  if (config.scoreMin) params.set("score", String(config.scoreMin));
+  if (config.runtimeMin) params.set("runtimeMin", String(config.runtimeMin));
+  if (config.runtimeMax) params.set("runtimeMax", String(config.runtimeMax));
+  if (config.certification) params.set("certification", config.certification as string);
+  if (config.status) params.set("status", config.status as string);
+
+  const qs = params.toString();
+  return qs ? `/search?${qs}` : "/search";
+}
+
 interface BrowseSourceProps {
   title: string;
   style: string;
@@ -72,6 +92,7 @@ export function BrowseSource({ title, style, config }: BrowseSourceProps): React
     <DynamicSection
       style={style}
       title={title}
+      seeAllHref={buildSearchHref(c)}
       items={items}
       isLoading={query.isLoading}
       isError={query.isError}
