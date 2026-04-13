@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Plus } from "lucide-react";
@@ -102,10 +103,36 @@ function NewCollectionCard(): React.JSX.Element {
   );
 }
 
+function applyLayoutOrder<T extends { id: string }>(
+  items: T[],
+  orderedIds: string[],
+  hiddenIds: string[],
+): T[] {
+  const hiddenSet = new Set(hiddenIds);
+  const visible = items.filter((item) => !hiddenSet.has(item.id));
+  if (orderedIds.length === 0) return visible;
+  const itemMap = new Map(visible.map((item) => [item.id, item] as const));
+  const ordered = orderedIds
+    .map((id) => itemMap.get(id))
+    .filter((item): item is T => !!item);
+  const rest = visible.filter((item) => !orderedIds.includes(item.id));
+  return [...ordered, ...rest];
+}
+
 export function HubCollectionsSection(): React.JSX.Element {
   const { data: lists, isLoading, isError, refetch } = trpc.list.getAll.useQuery();
+  const layoutQuery = trpc.list.getCollectionLayout.useQuery();
 
-  if (isLoading) {
+  const visibleLists = useMemo(() => {
+    const layout = layoutQuery.data;
+    return applyLayoutOrder(
+      lists ?? [],
+      layout?.orderedListIds ?? [],
+      layout?.hiddenListIds ?? [],
+    );
+  }, [lists, layoutQuery.data]);
+
+  if (isLoading || layoutQuery.isLoading) {
     return (
       <section className="relative">
         <SectionTitle title="Collections" seeMorePath="/library/collections" />
@@ -140,8 +167,6 @@ export function HubCollectionsSection(): React.JSX.Element {
       </section>
     );
   }
-
-  const visibleLists = (lists ?? []).slice(0, 6);
 
   if (visibleLists.length === 0) {
     return (
