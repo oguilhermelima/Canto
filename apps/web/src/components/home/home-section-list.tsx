@@ -38,9 +38,16 @@ export function HomeSectionList({ sections }: HomeSectionListProps): React.JSX.E
         </div>
       )}
 
-      <div className={cn("space-y-12 pb-12", firstIsSpotlight && "-mt-16")}>
-        {enabled.map((section) => (
-          <HomeSectionRenderer key={section.id} section={section} />
+      <div className={cn("pb-8 md:pb-12", firstIsSpotlight && "-mt-16")}>
+        {enabled.map((section, i) => (
+          <div
+            key={section.id}
+            className={cn(
+              i > 0 && (firstIsSpotlight && i === 1 ? "mt-4 md:mt-12" : "mt-8 md:mt-12"),
+            )}
+          >
+            <HomeSectionRenderer section={section} />
+          </div>
         ))}
       </div>
     </div>
