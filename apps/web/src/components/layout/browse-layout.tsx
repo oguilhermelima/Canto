@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { cn } from "@canto/ui/cn";
-import { Film, Loader2, Settings2, Tv } from "lucide-react";
+import { Film, Loader2, Tv } from "lucide-react";
 import { MediaGrid } from "~/components/media/media-grid";
 import { PageHeader } from "~/components/layout/page-header";
 import { TabBar } from "~/components/layout/tab-bar";
@@ -67,7 +67,7 @@ export function BrowseLayout({
   header,
   allowedMediaTypes,
 }: BrowseLayoutProps): React.JSX.Element {
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const handleFilterChange = useCallback(
@@ -137,23 +137,8 @@ export function BrowseLayout({
               : MEDIA_TYPE_TABS;
             const showTypeTabs = onMediaTypeChange && visibleTabs.length >= 1;
 
-            const filterButton = (
-              <button
-                type="button"
-                className={cn(
-                  "hidden h-[38px] w-[38px] items-center justify-center rounded-xl transition-all md:flex",
-                  showFilters
-                    ? "bg-foreground text-background"
-                    : "bg-muted/60 text-muted-foreground hover:text-foreground",
-                )}
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <Settings2 className={cn("h-4 w-4 transition-transform duration-300", showFilters && "rotate-90")} />
-              </button>
-            );
-
             const resultsCount = totalResults > 0 && !isLoading ? (
-              <span className="text-sm text-muted-foreground">
+              <span className="hidden text-sm text-muted-foreground md:inline">
                 {totalResults.toLocaleString()} results
               </span>
             ) : undefined;
@@ -163,7 +148,9 @@ export function BrowseLayout({
                 tabs={visibleTabs}
                 value={mediaType}
                 onChange={(v) => onMediaTypeChange!(v as "movie" | "show" | "all")}
-                leading={<div className="flex items-center gap-2">{filterButton}{toolbar}</div>}
+                onFilter={() => setShowFilters(!showFilters)}
+                filterActive={showFilters}
+                leading={toolbar}
                 trailing={resultsCount}
               />
             ) : (
@@ -171,7 +158,9 @@ export function BrowseLayout({
                 tabs={[]}
                 value=""
                 onChange={() => {}}
-                leading={<div className="flex items-center gap-2">{filterButton}{toolbar}</div>}
+                onFilter={() => setShowFilters(!showFilters)}
+                filterActive={showFilters}
+                leading={toolbar}
                 trailing={resultsCount}
               />
             );
