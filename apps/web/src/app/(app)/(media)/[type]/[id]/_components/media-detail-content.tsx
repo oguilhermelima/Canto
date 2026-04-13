@@ -40,7 +40,7 @@ export function MediaDetailContent({
     return (
       <div className="flex min-h-[60vh] items-center justify-center bg-background">
         <div className="text-center">
-          <h2 className="mb-2 text-xl font-semibold text-foreground">
+          <h2 className="mb-2 text-base font-semibold text-foreground md:text-xl">
             Media not found
           </h2>
           <p className="text-muted-foreground">

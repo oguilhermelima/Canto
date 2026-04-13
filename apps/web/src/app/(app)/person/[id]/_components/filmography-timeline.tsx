@@ -130,7 +130,7 @@ export function FilmographyTimeline({
 
   return (
     <div className="mx-auto mt-16 w-full px-4 md:mt-20 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-      <h2 className="mb-10 text-xl font-semibold text-foreground">
+      <h2 className="mb-10 text-base font-semibold text-foreground md:text-xl">
         Filmography
       </h2>
 

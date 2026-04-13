@@ -5,6 +5,7 @@ import { FadeImage } from "~/components/ui/fade-image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { ChevronLeft, ChevronRight, Film, Tv, Volume2, VolumeOff } from "lucide-react";
+import { SectionTitle } from "~/components/layout/section-title";
 import { AddToListButton } from "~/components/media/add-to-list-button";
 import { Skeleton } from "@canto/ui/skeleton";
 import { tmdbPosterLoader, tmdbBackdropLoader } from "~/lib/tmdb-image";
@@ -82,18 +83,7 @@ export function FeaturedCarousel({
 
   return (
     <section className={cn("relative", className)}>
-      <div className="mb-0 flex items-center justify-between pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24">
-        <h2 className="text-xl font-semibold text-foreground">{title}</h2>
-        {seeAllHref && (
-          <Link
-            href={seeAllHref}
-            className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            See more
-            <ChevronRight className="h-4 w-4" />
-          </Link>
-        )}
-      </div>
+      <SectionTitle title={title} seeMorePath={seeAllHref} />
 
       <div className="group/carousel relative">
         {canScrollLeft && (

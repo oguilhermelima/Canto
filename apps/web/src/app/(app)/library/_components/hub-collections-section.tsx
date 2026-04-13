@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronRight, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
+import { SectionTitle } from "~/components/layout/section-title";
 import { trpc } from "~/lib/trpc/client";
 
 function posterSrc(path: string): string {
@@ -107,17 +108,8 @@ export function HubCollectionsSection(): React.JSX.Element {
   if (isLoading) {
     return (
       <section className="relative">
-        <div className="mb-0 flex items-center justify-between pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24">
-          <h2 className="text-xl font-semibold text-foreground">Collections</h2>
-          <Link
-            href="/library/collections"
-            className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            See more
-            <ChevronRight className="h-4 w-4" />
-          </Link>
-        </div>
-        <div className="mt-4 flex gap-4 overflow-x-auto pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+        <SectionTitle title="Collections" seeMorePath="/library/collections" />
+        <div className="mt-2 flex gap-4 overflow-x-auto md:mt-4 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
           {Array.from({ length: 4 }).map((_, index) => (
             <div
               key={index}
@@ -153,11 +145,9 @@ export function HubCollectionsSection(): React.JSX.Element {
 
   if (visibleLists.length === 0) {
     return (
-      <section className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-foreground">Collections</h2>
-        </div>
-        <div className="mt-4 rounded-2xl border border-border/50 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
+      <section>
+        <SectionTitle title="Collections" />
+        <div className="mt-2 md:mt-4 rounded-2xl px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24 border border-border/50 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
           No collections yet. Launch your first collection to organize your galaxy of titles.
         </div>
       </section>
@@ -166,18 +156,9 @@ export function HubCollectionsSection(): React.JSX.Element {
 
   return (
     <section className="relative">
-      <div className="mb-0 flex items-center justify-between pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24">
-        <h2 className="text-xl font-semibold text-foreground">Collections</h2>
-        <Link
-          href="/library/collections"
-          className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          See more
-          <ChevronRight className="h-4 w-4" />
-        </Link>
-      </div>
+      <SectionTitle title="Collections" seeMorePath="/library/collections" />
 
-      <div className="mt-4 flex gap-4 overflow-x-auto overflow-y-visible pt-1 pb-2 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+      <div className="mt-2 flex gap-4 overflow-x-auto md:mt-4 overflow-y-visible pt-1 pb-2 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
         {visibleLists.map((list) => (
           <CollectionCard key={list.id} list={list} />
         ))}

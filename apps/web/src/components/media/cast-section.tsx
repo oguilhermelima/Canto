@@ -54,7 +54,7 @@ export function CastSection({
   return (
     <section className={className}>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-foreground">Cast</h2>
+        <h2 className="text-base font-semibold text-foreground md:text-xl">Cast</h2>
         {hasMore && (
           <button
             type="button"

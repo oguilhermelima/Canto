@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import Link from "next/link";
+import { SectionTitle } from "~/components/layout/section-title";
 import Image from "next/image";
 import {
   Bookmark,
@@ -162,7 +163,7 @@ export function UpcomingScheduleSection(): React.JSX.Element {
   return (
     <UpcomingScheduleSectionContent
       title="Upcoming Schedule"
-      seeAllHref="/library/collections"
+      seeAllHref="/library/upcoming"
     />
   );
 }
@@ -219,19 +220,8 @@ export function UpcomingScheduleSectionContent({
   if (isLoading) {
     return (
       <section className="relative">
-        <div className="mb-0 flex items-center justify-between pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24">
-          <h2 className="text-xl font-semibold text-foreground">{title}</h2>
-          {seeAllHref ? (
-            <Link
-              href={seeAllHref}
-              className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              See more
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          ) : null}
-        </div>
-        <div className="mt-4 flex gap-4 overflow-x-auto pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+        <SectionTitle title={title} seeMorePath={seeAllHref} />
+        <div className="mt-2 flex gap-4 overflow-x-auto md:mt-4 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
           {Array.from({ length: 5 }).map((_, index) => (
             <div
               key={index}
@@ -247,18 +237,7 @@ export function UpcomingScheduleSectionContent({
   if (isError) {
     return (
       <section className="relative">
-        <div className="mb-0 flex items-center justify-between pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24">
-          <h2 className="text-xl font-semibold text-foreground">{title}</h2>
-          {seeAllHref ? (
-            <Link
-              href={seeAllHref}
-              className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              See more
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          ) : null}
-        </div>
+        <SectionTitle title={title} seeMorePath={seeAllHref} />
         <div className="mt-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
           <StateMessage preset="error" onRetry={() => void refetch()} minHeight="200px" />
         </div>
@@ -269,18 +248,7 @@ export function UpcomingScheduleSectionContent({
   if (items.length === 0) {
     return (
       <section className="relative">
-        <div className="mb-0 flex items-center justify-between pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24">
-          <h2 className="text-xl font-semibold text-foreground">{title}</h2>
-          {seeAllHref ? (
-            <Link
-              href={seeAllHref}
-              className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              See more
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          ) : null}
-        </div>
+        <SectionTitle title={title} seeMorePath={seeAllHref} />
         <div className="mt-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
           <StateMessage preset="emptyUpcoming" minHeight="200px" />
         </div>
@@ -290,18 +258,7 @@ export function UpcomingScheduleSectionContent({
 
   return (
     <section className="relative">
-      <div className="mb-0 flex items-center justify-between pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24">
-        <h2 className="text-xl font-semibold text-foreground">{title}</h2>
-        {seeAllHref ? (
-          <Link
-            href={seeAllHref}
-            className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            See more
-            <ChevronRight className="h-4 w-4" />
-          </Link>
-        ) : null}
-      </div>
+      <SectionTitle title={title} seeMorePath={seeAllHref} />
 
       <div className="group/carousel relative mt-4">
         {canScrollLeft && (

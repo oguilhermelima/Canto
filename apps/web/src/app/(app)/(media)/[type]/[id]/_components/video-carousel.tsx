@@ -43,7 +43,7 @@ export function VideoCarousel({
 
   return (
     <section className="relative">
-      <h2 className="mb-4 pl-4 text-xl font-semibold text-foreground md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+      <h2 className="mb-4 pl-4 text-base font-semibold text-foreground md:text-xl md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
         Videos
       </h2>
       <div className="group/carousel relative">

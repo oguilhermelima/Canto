@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { SectionTitle } from "~/components/layout/section-title";
 import { MediaCard, MediaCardSkeleton } from "./media-card";
 import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
 
@@ -55,19 +55,7 @@ export function MediaCarousel({
 
   return (
     <section className={cn("relative", className)}>
-      {/* Header */}
-      <div className="mb-0 flex items-center justify-between pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24">
-        <h2 className="text-xl font-semibold text-foreground">{title}</h2>
-        {seeAllHref && (
-          <Link
-            href={seeAllHref}
-            className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            See more
-            <ChevronRight className="h-4 w-4" />
-          </Link>
-        )}
-      </div>
+      <SectionTitle title={title} seeMorePath={seeAllHref} />
 
       {/* Scroll container */}
       <div className="group/carousel relative">
@@ -96,7 +84,7 @@ export function MediaCarousel({
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="flex gap-6 overflow-x-auto overflow-y-visible pt-4 pb-6 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
+          className="flex gap-6 overflow-x-auto overflow-y-visible pt-2 pb-6 pl-4 scrollbar-none md:pt-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
         >
           {isLoading
             ? Array.from({ length: 8 }).map((_, i) => (

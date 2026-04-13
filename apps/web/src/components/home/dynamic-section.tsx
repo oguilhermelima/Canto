@@ -6,6 +6,7 @@ import type { SpotlightItem } from "./spotlight-hero";
 import { FeaturedCarousel } from "~/components/media/featured-carousel";
 import { BackdropCarousel } from "~/components/media/backdrop-carousel";
 import { MediaCarousel } from "~/components/media/media-carousel";
+import { SectionTitle } from "~/components/layout/section-title";
 import { StateMessage } from "~/components/layout/state-message";
 import { mediaHref } from "~/lib/media-href";
 
@@ -107,9 +108,11 @@ export function DynamicSection({
 }: DynamicSectionProps): React.JSX.Element | null {
   if (isError) {
     return (
-      <section className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        <h2 className="text-xl font-semibold text-foreground">{title}</h2>
-        <StateMessage preset="error" onRetry={onRetry} minHeight="200px" />
+      <section>
+        <SectionTitle title={title} />
+        <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+          <StateMessage preset="error" onRetry={onRetry} minHeight="200px" />
+        </div>
       </section>
     );
   }
@@ -117,9 +120,11 @@ export function DynamicSection({
   if (!isLoading && items.length === 0) {
     if (emptyPreset) {
       return (
-        <section className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-          <h2 className="text-xl font-semibold text-foreground">{title}</h2>
-          <StateMessage preset={emptyPreset as "emptyWatchlist"} minHeight="200px" />
+        <section>
+          <SectionTitle title={title} />
+          <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+            <StateMessage preset={emptyPreset as "emptyWatchlist"} minHeight="200px" />
+          </div>
         </section>
       );
     }

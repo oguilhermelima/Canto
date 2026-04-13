@@ -3,7 +3,8 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Bookmark, ChevronRight, Clock3, Tv } from "lucide-react";
+import { Bookmark, Clock3, Tv } from "lucide-react";
+import { SectionTitle } from "~/components/layout/section-title";
 import { cn } from "@canto/ui/cn";
 import { trpc } from "~/lib/trpc/client";
 import { mediaHref } from "~/lib/media-href";
@@ -157,20 +158,9 @@ export function HubHistorySection(): React.JSX.Element {
 
   if (isLoading) {
     return (
-      <section className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-foreground">
-            Recent Activity
-          </h2>
-          <Link
-            href="/library/history"
-            className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            See more
-            <ChevronRight className="h-4 w-4" />
-          </Link>
-        </div>
-        <div className="mt-4 space-y-2">
+      <section>
+        <SectionTitle title="Recent Activity" seeMorePath="/library/history" />
+        <div className="mt-2 space-y-2 px-4 md:mt-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
           {Array.from({ length: 4 }).map((_, index) => (
             <div
               key={index}
@@ -203,13 +193,9 @@ export function HubHistorySection(): React.JSX.Element {
 
   if (entries.length === 0) {
     return (
-      <section className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-foreground">
-            Recent Activity
-          </h2>
-        </div>
-        <div className="mt-4 rounded-2xl border border-border/50 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
+      <section>
+        <SectionTitle title="Recent Activity" />
+        <div className="mt-2 rounded-2xl px-4 md:mt-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24 border border-border/50 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
           No activity in the log yet. Your journey through the stars begins with
           the first play.
         </div>
@@ -218,21 +204,10 @@ export function HubHistorySection(): React.JSX.Element {
   }
 
   return (
-    <section className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-foreground">
-          Recent Activity
-        </h2>
-        <Link
-          href="/library/history"
-          className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          See more
-          <ChevronRight className="h-4 w-4" />
-        </Link>
-      </div>
+    <section>
+      <SectionTitle title="Recent Activity" seeMorePath="/library/history" />
 
-      <div className="mt-4 space-y-5">
+      <div className="mt-2 space-y-5 px-4 md:mt-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {groups.map((group) => (
           <div key={group.label}>
             <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
