@@ -9,10 +9,9 @@ interface UserMediaSourceProps {
   title: string;
   style: string;
   filter: { status?: string; isFavorite?: boolean };
-  isFirstSection?: boolean;
 }
 
-export function UserMediaSource({ title, style, filter, isFirstSection }: UserMediaSourceProps): React.JSX.Element | null {
+export function UserMediaSource({ title, style, filter }: UserMediaSourceProps): React.JSX.Element | null {
   const query = trpc.userMedia.getUserMedia.useInfiniteQuery(
     {
       limit: 20,
@@ -61,7 +60,6 @@ export function UserMediaSource({ title, style, filter, isFirstSection }: UserMe
       isFetchingMore={query.isFetchingNextPage}
       onLoadMore={query.hasNextPage ? handleLoadMore : undefined}
       onRetry={() => query.refetch()}
-      isFirstSection={isFirstSection}
     />
   );
 }

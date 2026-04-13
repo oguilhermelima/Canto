@@ -8,14 +8,13 @@ import { DynamicSection } from "../dynamic-section";
 interface WatchNextSourceProps {
   title: string;
   style: string;
-  isFirstSection?: boolean;
 }
 
-export function WatchNextSource({ title, style, isFirstSection }: WatchNextSourceProps): React.JSX.Element {
-  return <WatchNextDynamic title={title} style={style} isFirstSection={isFirstSection} />;
+export function WatchNextSource({ title, style }: WatchNextSourceProps): React.JSX.Element {
+  return <WatchNextDynamic title={title} style={style} />;
 }
 
-function WatchNextDynamic({ title, style, isFirstSection }: WatchNextSourceProps): React.JSX.Element | null {
+function WatchNextDynamic({ title, style }: WatchNextSourceProps): React.JSX.Element | null {
   const query = trpc.userMedia.getLibraryWatchNext.useInfiniteQuery(
     { limit: 24, view: "watch_next" as const },
     { getNextPageParam: (lp) => lp.nextCursor, initialCursor: 0 },
@@ -68,7 +67,6 @@ function WatchNextDynamic({ title, style, isFirstSection }: WatchNextSourceProps
       isFetchingMore={query.isFetchingNextPage}
       onLoadMore={query.hasNextPage ? handleLoadMore : undefined}
       onRetry={() => query.refetch()}
-      isFirstSection={isFirstSection}
     />
   );
 }

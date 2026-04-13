@@ -20,8 +20,6 @@ interface DynamicSectionProps {
   onLoadMore?: () => void;
   onRetry?: () => void;
   emptyPreset?: string;
-  /** Pass true when this is the first section on the page (spotlight extends behind topbar) */
-  isFirstSection?: boolean;
 }
 
 /* ── Mappers: SectionItem[] → component-specific shapes ── */
@@ -106,7 +104,6 @@ export function DynamicSection({
   onLoadMore,
   onRetry,
   emptyPreset,
-  isFirstSection = false,
 }: DynamicSectionProps): React.JSX.Element | null {
   if (isError) {
     return (
@@ -137,7 +134,6 @@ export function DynamicSection({
           isLoading={isLoading}
           isError={isError}
           onRetry={onRetry}
-          extendBehindTopbar={isFirstSection}
         />
       );
 

@@ -8,10 +8,9 @@ import { DynamicSection } from "../dynamic-section";
 interface SpotlightSourceProps {
   style: string;
   title: string;
-  isFirstSection?: boolean;
 }
 
-export function SpotlightSource({ style, title, isFirstSection }: SpotlightSourceProps): React.JSX.Element {
+export function SpotlightSource({ style, title }: SpotlightSourceProps): React.JSX.Element {
   const query = trpc.provider.spotlight.useQuery(undefined, {
     staleTime: 30 * 60 * 1000,
   });
@@ -46,7 +45,6 @@ export function SpotlightSource({ style, title, isFirstSection }: SpotlightSourc
       isLoading={query.isLoading}
       isError={query.isError}
       onRetry={() => query.refetch()}
-      isFirstSection={isFirstSection}
     />
   );
 }

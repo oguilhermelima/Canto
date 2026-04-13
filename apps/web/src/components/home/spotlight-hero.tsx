@@ -57,8 +57,7 @@ interface SpotlightHeroProps {
   isLoading: boolean;
   isError?: boolean;
   onRetry?: () => void;
-  /** When true, pulls up behind the topbar with -mt-16. Only for position 0. */
-  extendBehindTopbar?: boolean;
+  className?: string;
 }
 
 export function SpotlightHero({
@@ -66,7 +65,7 @@ export function SpotlightHero({
   isLoading,
   isError = false,
   onRetry,
-  extendBehindTopbar = false,
+  className,
 }: SpotlightHeroProps): React.JSX.Element {
   const [currentSpotlight, setCurrentSpotlight] = useState(0);
   const [spotlightPaused, setSpotlightPaused] = useState(false);
@@ -111,7 +110,7 @@ export function SpotlightHero({
   }, [spotlightPaused, items.length, nextSpotlight, currentSpotlight]);
 
   return (
-    <div className={cn("group/spotlight spotlight relative min-h-[90vh] w-full xl:min-h-[80vh]", extendBehindTopbar && "-mt-16")}>
+    <div className={cn("group/spotlight spotlight relative min-h-[90vh] w-full xl:min-h-[80vh]", className)}>
       {/* Backdrop */}
       {currentItem?.backdropPath ? (
         <div
@@ -159,7 +158,7 @@ export function SpotlightHero({
 
       {/* Content */}
       <div
-        className="relative mx-auto flex min-h-[90vh] w-full flex-col justify-end px-4 pb-16 pt-24 md:px-8 lg:px-12 xl:min-h-[80vh] xl:px-16 2xl:px-24"
+        className="relative mx-auto flex min-h-[90vh] w-full flex-col justify-end px-4 pb-8 pt-24 md:px-8 lg:px-12 xl:min-h-[80vh] xl:px-16 2xl:px-24"
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === "ArrowLeft") prevSpotlight();

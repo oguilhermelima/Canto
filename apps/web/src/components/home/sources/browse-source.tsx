@@ -12,10 +12,9 @@ interface BrowseSourceProps {
   title: string;
   style: string;
   config: HomeSectionConfig;
-  isFirstSection?: boolean;
 }
 
-export function BrowseSource({ title, style, config, isFirstSection }: BrowseSourceProps): React.JSX.Element | null {
+export function BrowseSource({ title, style, config }: BrowseSourceProps): React.JSX.Element | null {
   const c = config as Record<string, unknown>;
 
   const query = trpc.media.browse.useInfiniteQuery(
@@ -79,7 +78,6 @@ export function BrowseSource({ title, style, config, isFirstSection }: BrowseSou
       isFetchingMore={query.isFetchingNextPage}
       onLoadMore={query.hasNextPage ? handleLoadMore : undefined}
       onRetry={() => query.refetch()}
-      isFirstSection={isFirstSection}
     />
   );
 }

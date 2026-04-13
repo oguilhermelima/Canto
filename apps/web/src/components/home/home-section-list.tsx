@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
 import { HomeSectionRenderer } from "./home-section-renderer";
 import type { HomeSectionConfig } from "@canto/db/schema";
@@ -37,34 +38,11 @@ export function HomeSectionList({ sections }: HomeSectionListProps): React.JSX.E
         </div>
       )}
 
-      {enabled.map((section, i) => {
-        const isSpotlight = section.style === "spotlight";
-        const isFirst = i === 0;
-
-        // ── Spotlight at position 0: extends behind topbar, no wrapper
-        if (isSpotlight && isFirst) {
-          return <HomeSectionRenderer key={section.id} section={section} isFirstSection />;
-        }
-
-        // ── Spotlight mid-page: treat as regular section with vertical gap
-        if (isSpotlight) {
-          return (
-            <div key={section.id} className="mt-12">
-              <HomeSectionRenderer section={section} />
-            </div>
-          );
-        }
-
-        // ── All non-spotlight sections: uniform mt-12
-        // Handles: position 0 without spotlight, after spotlight, standard gap
-        return (
-          <div key={section.id} className="mt-12">
-            <HomeSectionRenderer section={section} />
-          </div>
-        );
-      })}
-
-      <div className="pb-12" />
+      <div className={cn("space-y-12 pb-12", firstIsSpotlight && "-mt-16")}>
+        {enabled.map((section) => (
+          <HomeSectionRenderer key={section.id} section={section} />
+        ))}
+      </div>
     </div>
   );
 }

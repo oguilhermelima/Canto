@@ -8,10 +8,9 @@ import { DynamicSection } from "../dynamic-section";
 interface RecommendationsSourceProps {
   title: string;
   style: string;
-  isFirstSection?: boolean;
 }
 
-export function RecommendationsSource({ title, style, isFirstSection }: RecommendationsSourceProps): React.JSX.Element | null {
+export function RecommendationsSource({ title, style }: RecommendationsSourceProps): React.JSX.Element | null {
   const utils = trpc.useUtils();
   const recsVersionRef = useRef<number | null>(null);
 
@@ -75,7 +74,6 @@ export function RecommendationsSource({ title, style, isFirstSection }: Recommen
       onLoadMore={query.hasNextPage ? handleLoadMore : undefined}
       onRetry={() => query.refetch()}
       emptyPreset="emptyWatchlist"
-      isFirstSection={isFirstSection}
     />
   );
 }

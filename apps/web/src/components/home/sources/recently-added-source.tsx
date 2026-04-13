@@ -8,10 +8,9 @@ import { DynamicSection } from "../dynamic-section";
 interface RecentlyAddedSourceProps {
   title: string;
   style: string;
-  isFirstSection?: boolean;
 }
 
-export function RecentlyAddedSource({ title, style, isFirstSection }: RecentlyAddedSourceProps): React.JSX.Element | null {
+export function RecentlyAddedSource({ title, style }: RecentlyAddedSourceProps): React.JSX.Element | null {
   const query = trpc.library.list.useQuery({
     page: 1,
     pageSize: 20,
@@ -44,7 +43,6 @@ export function RecentlyAddedSource({ title, style, isFirstSection }: RecentlyAd
       isLoading={query.isLoading}
       isError={query.isError}
       onRetry={() => query.refetch()}
-      isFirstSection={isFirstSection}
     />
   );
 }
