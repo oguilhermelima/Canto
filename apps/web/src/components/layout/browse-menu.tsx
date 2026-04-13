@@ -51,20 +51,9 @@ export function BrowseMenu({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-[11rem]">
-            <DropdownMenuLabel className="text-xs text-muted-foreground">View</DropdownMenuLabel>
-            {viewItems.map((item) => (
-              <DropdownMenuItem
-                key={item.value}
-                onClick={() => onViewModeChange(item.value)}
-                className={cn(viewMode === item.value && "text-foreground font-medium")}
-              >
-                <item.icon className="mr-2 h-4 w-4" />
-                {item.label} view
-              </DropdownMenuItem>
-            ))}
-            {groups?.map((group) => (
+            {groups?.map((group, gi) => (
               <div key={group.label}>
-                <DropdownMenuSeparator />
+                {gi > 0 && <DropdownMenuSeparator />}
                 <DropdownMenuLabel className="text-xs text-muted-foreground">{group.label}</DropdownMenuLabel>
                 {group.items.map((item) => (
                   <DropdownMenuItem
@@ -77,6 +66,18 @@ export function BrowseMenu({
                   </DropdownMenuItem>
                 ))}
               </div>
+            ))}
+            {groups && groups.length > 0 && <DropdownMenuSeparator />}
+            <DropdownMenuLabel className="text-xs text-muted-foreground">View</DropdownMenuLabel>
+            {viewItems.map((item) => (
+              <DropdownMenuItem
+                key={item.value}
+                onClick={() => onViewModeChange(item.value)}
+                className={cn(viewMode === item.value && "text-foreground font-medium")}
+              >
+                <item.icon className="mr-2 h-4 w-4" />
+                {item.label} view
+              </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -93,34 +94,10 @@ export function BrowseMenu({
               <SheetTitle>Options</SheetTitle>
             </SheetHeader>
 
-            {/* View section */}
-            <div className="grid grid-cols-3">
-              {viewItems.map((item) => {
-                const active = viewMode === item.value;
-                return (
-                  <button
-                    key={item.value}
-                    type="button"
-                    onClick={() => { onViewModeChange(item.value); setSheetOpen(false); }}
-                    className="flex flex-col items-center gap-2.5"
-                  >
-                    <div className={cn(
-                      "flex h-16 w-16 items-center justify-center rounded-full transition-colors active:bg-muted",
-                      active ? "bg-foreground" : "bg-muted/60",
-                    )}>
-                      <item.icon className={cn("h-[22px] w-[22px]", active ? "text-background" : "text-foreground/80")} />
-                    </div>
-                    <span className="text-center text-xs leading-tight text-foreground/80">
-                      {item.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Extra groups */}
-            {groups?.map((group) => (
-              <div key={group.label} className="mt-5 border-t border-border/50 pt-5">
+            {/* Extra groups first */}
+            {groups?.map((group, gi) => (
+              <div key={group.label} className={gi > 0 ? "mt-5 border-t border-border/50 pt-5" : ""}>
+                <p className="mb-3 text-xs font-medium text-muted-foreground">{group.label}</p>
                 <div className="grid grid-cols-3">
                   {group.items.map((item) => (
                     <button
@@ -151,6 +128,34 @@ export function BrowseMenu({
                 </div>
               </div>
             ))}
+
+            {/* View section last */}
+            <div className={cn(groups && groups.length > 0 ? "mt-5 border-t border-border/50 pt-5" : "")}>
+              <p className="mb-3 text-xs font-medium text-muted-foreground">View</p>
+              <div className="grid grid-cols-3">
+                {viewItems.map((item) => {
+                  const active = viewMode === item.value;
+                  return (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => { onViewModeChange(item.value); setSheetOpen(false); }}
+                      className="flex flex-col items-center gap-2.5"
+                    >
+                      <div className={cn(
+                        "flex h-16 w-16 items-center justify-center rounded-full transition-colors active:bg-muted",
+                        active ? "bg-foreground" : "bg-muted/60",
+                      )}>
+                        <item.icon className={cn("h-[22px] w-[22px]", active ? "text-background" : "text-foreground/80")} />
+                      </div>
+                      <span className="text-center text-xs leading-tight text-foreground/80">
+                        {item.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </SheetContent>
         </Sheet>
       </div>
