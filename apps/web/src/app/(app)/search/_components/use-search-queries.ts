@@ -52,18 +52,25 @@ export function useSearchQueries({
 
   /* ─── Search queries (when typing) ─── */
 
+  const searchFilters = {
+    genres: filters.genres,
+    language: filters.language,
+    scoreMin: filters.scoreMin,
+    scoreMax: filters.scoreMax,
+  };
+
   const singleQuery = trpc.media.browse.useInfiniteQuery(
-    { mode: "search", query, type: searchType === "multi" ? "movie" : searchType, provider: "tmdb" },
+    { mode: "search", query, type: searchType === "multi" ? "movie" : searchType, provider: "tmdb", ...searchFilters },
     { enabled: isSearching && searchType !== "multi", ...pageParam },
   );
 
   const multiMovieQuery = trpc.media.browse.useInfiniteQuery(
-    { mode: "search", query, type: "movie", provider: "tmdb" },
+    { mode: "search", query, type: "movie", provider: "tmdb", ...searchFilters },
     { enabled: isSearching && searchType === "multi", ...pageParam },
   );
 
   const multiShowQuery = trpc.media.browse.useInfiniteQuery(
-    { mode: "search", query, type: "show", provider: "tmdb" },
+    { mode: "search", query, type: "show", provider: "tmdb", ...searchFilters },
     { enabled: isSearching && searchType === "multi", ...pageParam },
   );
 
@@ -79,6 +86,7 @@ export function useSearchQueries({
       language: filters.language,
       sortBy: filters.sortBy,
       scoreMin: filters.scoreMin,
+      scoreMax: filters.scoreMax,
       runtimeMin: filters.runtimeMin,
       runtimeMax: filters.runtimeMax,
       certification: filters.certification,
@@ -98,6 +106,7 @@ export function useSearchQueries({
       language: filters.language,
       sortBy: filters.sortBy,
       scoreMin: filters.scoreMin,
+      scoreMax: filters.scoreMax,
       runtimeMin: filters.runtimeMin,
       runtimeMax: filters.runtimeMax,
       certification: filters.certification,

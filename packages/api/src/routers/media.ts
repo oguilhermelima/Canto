@@ -80,11 +80,41 @@ export const mediaRouter = createTRPCRouter({
             return provider.search(input.query!, input.type, { page });
           },
         );
+
+        // Post-filter search results by genre/language/score (TMDB search API doesn't support these)
+        const genreSet = input.genres
+          ? new Set(input.genres.split(/[|,]/).map(Number).filter(Boolean))
+          : null;
+        const genreMode = input.genres?.includes(",") ? "and" : "or";
+
+        if (genreSet || input.language || input.scoreMin != null || input.scoreMax != null) {
+          const filtered = searchResults.results.filter((r) => {
+            if (genreSet && r.genreIds) {
+              if (genreMode === "and") {
+                if (!([...genreSet].every((g) => r.genreIds!.includes(g)))) return false;
+              } else {
+                if (!r.genreIds.some((g) => genreSet.has(g))) return false;
+              }
+            } else if (genreSet && !r.genreIds) {
+              return false;
+            }
+            if (input.language && r.originalLanguage !== input.language) return false;
+            if (input.scoreMin != null && (r.voteAverage ?? 0) < input.scoreMin) return false;
+            if (input.scoreMax != null && (r.voteAverage ?? 0) > input.scoreMax) return false;
+            return true;
+          });
+          return enrichBrowseWithLogos(appDb, {
+            ...searchResults,
+            results: filtered,
+            totalResults: filtered.length,
+          });
+        }
+
         return enrichBrowseWithLogos(appDb, searchResults);
       }
 
       const settingsLang = (await getSetting("general.language")) ?? "en-US";
-      const cacheKey = `browse:${input.type}:${input.mode}:${input.genres ?? ""}:${input.language ?? ""}:${input.sortBy ?? ""}:${input.dateFrom ?? ""}:${input.dateTo ?? ""}:${input.keywords ?? ""}:${input.scoreMin ?? ""}:${input.runtimeMax ?? ""}:${input.certification ?? ""}:${input.status ?? ""}:${input.watchProviders ?? ""}:${input.watchRegion ?? ""}:${input.runtimeMin ?? ""}:${page}:${settingsLang}`;
+      const cacheKey = `browse:${input.type}:${input.mode}:${input.genres ?? ""}:${input.language ?? ""}:${input.sortBy ?? ""}:${input.dateFrom ?? ""}:${input.dateTo ?? ""}:${input.keywords ?? ""}:${input.scoreMin ?? ""}:${input.scoreMax ?? ""}:${input.runtimeMax ?? ""}:${input.certification ?? ""}:${input.status ?? ""}:${input.watchProviders ?? ""}:${input.watchRegion ?? ""}:${input.runtimeMin ?? ""}:${page}:${settingsLang}`;
 
       const browseResults = await cached(cacheKey, 1800, async () => {
         const provider = await getTmdbProvider();
@@ -96,7 +126,7 @@ export const mediaRouter = createTRPCRouter({
         });
 
         if (input.mode === "trending") {
-          const hasFilters = input.genres || input.language || input.keywords || input.scoreMin != null || input.runtimeMax != null || input.certification || input.status || input.watchProviders || input.runtimeMin != null;
+          const hasFilters = input.genres || input.language || input.keywords || input.scoreMin != null || input.scoreMax != null || input.runtimeMax != null || input.certification || input.status || input.watchProviders || input.runtimeMin != null;
           if (hasFilters) {
             return filterReleased(await provider.discover(input.type, {
               page,
@@ -104,6 +134,7 @@ export const mediaRouter = createTRPCRouter({
               with_original_language: input.language,
               with_keywords: input.keywords,
               vote_average_gte: input.scoreMin,
+              vote_average_lte: input.scoreMax,
               with_runtime_lte: input.runtimeMax,
               sort_by: input.sortBy ?? "popularity.desc",
               first_air_date_gte: input.type === "show" ? input.dateFrom : undefined,
@@ -381,6 +412,7 @@ export const mediaRouter = createTRPCRouter({
         genreMode: input?.genreMode ?? "or",
         language: input?.language,
         scoreMin: input?.scoreMin,
+        scoreMax: input?.scoreMax,
         yearMin: input?.yearMin,
         yearMax: input?.yearMax,
         runtimeMin: input?.runtimeMin,
