@@ -456,7 +456,7 @@ export function AddToListButton({
               />
             </button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="rounded-t-2xl">
+          <SheetContent side="bottom">
             <SheetHeader className="sr-only">
               <SheetTitle>Save to list</SheetTitle>
             </SheetHeader>

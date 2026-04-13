@@ -108,7 +108,7 @@ export function BottomNavbar(): React.JSX.Element {
             </div>
           </button>
         </SheetTrigger>
-        <SheetContent side="bottom" className="rounded-t-2xl bg-background px-6 pb-8">
+        <SheetContent side="bottom" className="px-6 pb-8">
           <SheetHeader className="text-left">
             <SheetTitle className="sr-only">Menu</SheetTitle>
             <div className="flex items-center gap-3">
