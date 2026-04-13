@@ -187,13 +187,13 @@ function statusButtonClass(status: TrackingStatus): string {
   const normalized = normalizeStatus(status);
   switch (normalized) {
     case "completed":
-      return "bg-emerald-600 text-white hover:bg-emerald-500";
+      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20";
     case "watching":
-      return "bg-gradient-to-r from-emerald-500 via-emerald-500 to-emerald-400 text-emerald-950 hover:opacity-95 dark:text-emerald-50";
+      return "border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/15";
     case "dropped":
-      return "bg-red-500/20 text-red-200 hover:bg-red-500/30";
+      return "border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20";
     default:
-      return "bg-black text-white hover:bg-black/85 dark:bg-white dark:text-black dark:hover:bg-white/85";
+      return "border-foreground/10 bg-foreground/15 text-foreground hover:bg-foreground/25";
   }
 }
 
@@ -950,7 +950,7 @@ export function WatchTrackingButton({
       <button
         type="button"
         className={cn(
-          "inline-flex h-11 min-w-[190px] items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40",
+          "inline-flex h-11 min-w-[190px] items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold backdrop-blur-md transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40",
           statusButtonClass(normalizedStatus),
           className,
         )}

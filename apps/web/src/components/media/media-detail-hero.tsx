@@ -393,6 +393,12 @@ export function MediaDetailHero({
                   seasons={watchTrackingSeasons}
                 />
               )}
+              {persistedId && (
+                <FavoriteButton
+                  mediaId={persistedId}
+                  isFavorite={isFavorite ?? false}
+                />
+              )}
               <AddToListButton
                 mediaId={persistedId}
                 externalId={externalId ?? undefined}
@@ -403,12 +409,6 @@ export function MediaDetailHero({
                 showWatchlistToggle={false}
                 includeWatchlistInMenu
               />
-              {persistedId && (
-                <FavoriteButton
-                  mediaId={persistedId}
-                  isFavorite={isFavorite ?? false}
-                />
-              )}
             </div>
             {persistedId && isWatched && (
               <div className="inline-flex items-center gap-3 rounded-2xl border border-foreground/10 bg-black/30 px-3 py-2 backdrop-blur-md">

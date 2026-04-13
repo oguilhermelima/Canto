@@ -371,13 +371,13 @@ export function AddToListButton({
       {showWatchlistToggle && (
         <button
           className={cn(
-            "group/wl inline-flex items-center gap-2 rounded-xl font-medium transition-all duration-200",
+            "group/wl inline-flex items-center gap-2 rounded-xl border font-medium backdrop-blur-md transition-all duration-200",
             btnHeight,
             btnPx,
             btnText,
             isInWatchlist
-              ? "bg-green-500/20 text-green-500 hover:bg-red-500/20 hover:text-red-500"
-              : "bg-foreground text-background hover:bg-foreground/90",
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-500"
+              : "border-foreground/10 bg-foreground/15 text-foreground hover:bg-foreground/25",
           )}
           onClick={() => void toggleWatchlist()}
           disabled={!watchlist || isLoading}
@@ -408,10 +408,10 @@ export function AddToListButton({
           <PopoverTrigger asChild>
             <button
               className={cn(
-                "inline-flex items-center justify-center rounded-xl transition-colors",
+                "inline-flex items-center justify-center rounded-xl border backdrop-blur-md transition-all",
                 hasSavedToAnyList
-                  ? "bg-foreground/25 hover:bg-foreground/30"
-                  : "bg-foreground/15 hover:bg-foreground/25",
+                  ? "border-foreground/20 bg-foreground/10 hover:bg-foreground/15"
+                  : "border-foreground/10 bg-foreground/15 hover:bg-foreground/25",
                 btnHeight,
                 isSmall ? "w-8" : "w-11",
               )}
@@ -420,8 +420,8 @@ export function AddToListButton({
             >
               <Bookmark
                 className={cn(
-                  "h-4 w-4 text-foreground",
-                  hasSavedToAnyList && "fill-foreground",
+                  "h-5 w-5",
+                  hasSavedToAnyList ? "text-foreground fill-foreground" : "text-foreground/70",
                 )}
               />
             </button>
@@ -438,10 +438,10 @@ export function AddToListButton({
           <SheetTrigger asChild>
             <button
               className={cn(
-                "inline-flex items-center justify-center rounded-xl transition-colors",
+                "inline-flex items-center justify-center rounded-xl border backdrop-blur-md transition-all",
                 hasSavedToAnyList
-                  ? "bg-foreground/25 hover:bg-foreground/30"
-                  : "bg-foreground/15 hover:bg-foreground/25",
+                  ? "border-foreground/20 bg-foreground/10 hover:bg-foreground/15"
+                  : "border-foreground/10 bg-foreground/15 hover:bg-foreground/25",
                 btnHeight,
                 isSmall ? "w-8" : "w-11",
               )}
@@ -450,8 +450,8 @@ export function AddToListButton({
             >
               <Bookmark
                 className={cn(
-                  "h-4 w-4 text-foreground",
-                  hasSavedToAnyList && "fill-foreground",
+                  "h-5 w-5",
+                  hasSavedToAnyList ? "text-foreground fill-foreground" : "text-foreground/70",
                 )}
               />
             </button>
