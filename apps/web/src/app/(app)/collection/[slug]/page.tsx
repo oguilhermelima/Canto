@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@canto/ui/select";
-import { Globe, Loader2, Lock, Pencil, Trash2, Users } from "lucide-react";
+import { Eye, EyeOff, Globe, Loader2, Lock, Pencil, Trash2, Users } from "lucide-react";
 import { BrowseLayout } from "~/components/layout/browse-layout";
 import type { FilterOutput, BrowseItem, BrowseMenuGroup } from "~/components/layout/browse-layout";
 import { collectionStrategy } from "~/components/layout/card-strategies";
@@ -51,6 +51,13 @@ export default function ListDetailPage(): React.JSX.Element {
   const [editOpen, setEditOpen] = useState(false);
 
   const utils = trpc.useUtils();
+  const layoutQuery = trpc.list.getCollectionLayout.useQuery();
+  const updateLayoutMutation = trpc.list.updateCollectionLayout.useMutation({
+    onSuccess: (next) => {
+      utils.list.getCollectionLayout.setData(undefined, next);
+    },
+  });
+
   const deleteMutation = trpc.list.delete.useMutation({
     onSuccess: () => {
       void utils.list.getAll.invalidate();
@@ -151,19 +158,49 @@ export default function ListDetailPage(): React.JSX.Element {
 
   const listRow = data?.pages[0]?.list;
 
-  const menuGroups: BrowseMenuGroup[] | undefined =
-    listRow && listRow.type === "custom"
-      ? [
-          {
-            label: "Manage Collection",
-            items: [
-              { label: "Edit collection", icon: Pencil, onClick: () => setEditOpen(true) },
-              { label: "Manage members", icon: Users, onClick: () => setShareListId(listRow.id) },
-              { label: "Delete collection", icon: Trash2, onClick: () => setDeleteTarget({ id: listRow.id, name: listRow.name }), className: "text-red-400" },
-            ],
-          },
-        ]
-      : undefined;
+  const hiddenIds = layoutQuery.data?.hiddenListIds ?? [];
+  const isHidden = listRow ? hiddenIds.includes(listRow.id) : false;
+
+  const toggleHidden = (): void => {
+    if (!listRow) return;
+    const nextHidden = isHidden
+      ? hiddenIds.filter((id) => id !== listRow.id)
+      : [...hiddenIds, listRow.id];
+    const next = {
+      hiddenListIds: [...new Set(nextHidden)],
+      orderedListIds: layoutQuery.data?.orderedListIds ?? [],
+    };
+    utils.list.getCollectionLayout.setData(undefined, next);
+    updateLayoutMutation.mutate(next);
+    toast.success(isHidden ? "Collection visible" : "Collection hidden");
+  };
+
+  const menuGroups: BrowseMenuGroup[] | undefined = listRow
+    ? [
+        ...(listRow.type === "custom"
+          ? [
+              {
+                label: "Manage Collection",
+                items: [
+                  { label: "Edit collection", icon: Pencil, onClick: () => setEditOpen(true) },
+                  { label: "Manage members", icon: Users, onClick: () => setShareListId(listRow.id) },
+                  { label: "Delete collection", icon: Trash2, onClick: () => setDeleteTarget({ id: listRow.id, name: listRow.name }), className: "text-red-400" },
+                ],
+              },
+            ]
+          : []),
+        {
+          label: "Collection",
+          items: [
+            {
+              label: isHidden ? "Show collection" : "Hide collection",
+              icon: isHidden ? Eye : EyeOff,
+              onClick: toggleHidden,
+            },
+          ],
+        },
+      ]
+    : undefined;
 
   return (
     <>
