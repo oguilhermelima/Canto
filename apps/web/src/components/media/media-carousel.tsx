@@ -21,6 +21,7 @@ interface MediaItem {
 interface MediaCarouselProps {
   title: string;
   seeAllHref?: string;
+  titleAction?: React.ReactNode;
   items: MediaItem[];
   isLoading?: boolean;
   isFetchingMore?: boolean;
@@ -31,6 +32,7 @@ interface MediaCarouselProps {
 export function MediaCarousel({
   title,
   seeAllHref,
+  titleAction,
   items,
   isLoading = false,
   isFetchingMore = false,
@@ -55,7 +57,7 @@ export function MediaCarousel({
 
   return (
     <section className={cn("relative", className)}>
-      <SectionTitle title={title} seeMorePath={seeAllHref} />
+      <SectionTitle title={title} seeMorePath={seeAllHref} action={titleAction} />
 
       {/* Scroll container */}
       <div className="group/carousel relative">
