@@ -6,7 +6,7 @@ import { Film, Loader2, Tv } from "lucide-react";
 import { PageHeader } from "~/components/layout/page-header";
 import { TabBar } from "~/components/layout/tab-bar";
 import { StateMessage } from "~/components/layout/state-message";
-import { ViewModeToggle } from "~/components/layout/view-mode-toggle";
+import { BrowseMenu } from "~/components/layout/browse-menu";
 import { AdvancedFilter } from "~/components/layout/advanced-filter";
 import { useIsMobile } from "~/hooks/use-is-mobile";
 import type { FilterOutput } from "~/components/media/filter-sidebar";
@@ -57,6 +57,8 @@ interface BrowseLayoutProps {
   emptyState?: React.ReactNode;
   errorState?: React.ReactNode;
   sidebarClassName?: string;
+  /** Extra items rendered inside the 3-dot menu (below grid/list toggle) */
+  menuContent?: React.ReactNode;
 }
 
 export function BrowseLayout({
@@ -83,6 +85,7 @@ export function BrowseLayout({
   emptyState,
   errorState,
   sidebarClassName,
+  menuContent,
 }: BrowseLayoutProps): React.JSX.Element {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -140,10 +143,12 @@ export function BrowseLayout({
     </span>
   ) : undefined;
 
-  // View mode toggle + results count trailing element
+  // 3-dot menu + results count trailing element
   const trailing = (
     <div className="flex items-center gap-3">
-      <ViewModeToggle value={viewMode} onChange={onViewModeChange} className="hidden md:flex" />
+      <BrowseMenu viewMode={viewMode} onViewModeChange={onViewModeChange}>
+        {menuContent}
+      </BrowseMenu>
       {resultsCount}
     </div>
   );
@@ -195,11 +200,6 @@ export function BrowseLayout({
               trailing={trailing}
             />
           )}
-
-          {/* Mobile view mode toggle */}
-          <div className="mb-4 -mt-2 flex justify-end md:hidden">
-            <ViewModeToggle value={viewMode} onChange={onViewModeChange} />
-          </div>
 
           {/* Error state */}
           {errorState ? (
