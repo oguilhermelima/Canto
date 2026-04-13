@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { Plus, RotateCcw, Save, Loader2 } from "lucide-react";
+import { Button } from "@canto/ui/button";
 import { trpc } from "~/lib/trpc/client";
 import { toast } from "sonner";
 import { SectionRow } from "./section-row";
@@ -161,36 +162,39 @@ export function HomeSectionsEditor(): React.JSX.Element {
       description="Customize your homepage layout. Drag to reorder, toggle visibility, or add new sections."
     >
       {/* Toolbar */}
-      <div className="mb-4 flex items-center gap-2">
-        <button
-          type="button"
+      <div className="mb-4 flex items-center justify-between">
+        <Button
           onClick={handleAddOpen}
           disabled={sections.length >= 30}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="rounded-xl"
         >
           <Plus size={15} />
           Add Section
-        </button>
-        <button
-          type="button"
-          onClick={handleReset}
-          disabled={resetMutation.isPending}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-muted/60 px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-        >
-          <RotateCcw size={14} />
-          Reset
-        </button>
-        {dirty && (
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saveMutation.isPending}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+        </Button>
+        <div className="flex items-center gap-2">
+          {sections.length > 0 && (
+            <span className="text-xs text-muted-foreground">{sections.length}/30</span>
+          )}
+          <Button
+            variant="ghost"
+            onClick={handleReset}
+            disabled={resetMutation.isPending}
+            className="rounded-xl text-muted-foreground"
           >
-            {saveMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            Save Changes
-          </button>
-        )}
+            <RotateCcw size={14} />
+            Reset
+          </Button>
+          {dirty && (
+            <Button
+              onClick={handleSave}
+              disabled={saveMutation.isPending}
+              className="rounded-xl"
+            >
+              {saveMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              Save Changes
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Section List */}
@@ -231,11 +235,6 @@ export function HomeSectionsEditor(): React.JSX.Element {
         </div>
       )}
 
-      {sections.length > 0 && (
-        <p className="mt-2 text-xs text-muted-foreground">
-          {sections.length}/30 sections
-        </p>
-      )}
 
       <SectionEditorDialog
         open={editorOpen}
