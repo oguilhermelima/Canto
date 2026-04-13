@@ -117,9 +117,9 @@ export function MediaCard({
 
         {/* Progress bar */}
         {progress && (
-          <div className="absolute inset-x-0 bottom-0 h-1 bg-white/15">
+          <div className="absolute inset-x-0 bottom-0 h-1.5 bg-white/20">
             <div
-              className="h-full bg-white/80"
+              className="h-full bg-white"
               style={{ width: `${progress.percent}%` }}
             />
           </div>

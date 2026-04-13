@@ -21,7 +21,7 @@ function formatDuration(seconds: number): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-export type BadgeType = "trending" | "new" | "top-rated";
+export type BadgeType = "trending" | "new" | "top-rated" | "continue";
 
 interface BackdropCardProps {
   externalId?: string;
@@ -38,6 +38,7 @@ interface BackdropCardProps {
 }
 
 const BADGE_CONFIG: Record<BadgeType, { label: string; className: string }> = {
+  continue: { label: "CONTINUE", className: "bg-white text-black" },
   trending: { label: "TRENDING", className: "bg-amber-500 text-black" },
   new: { label: "NEW", className: "bg-emerald-500 text-white" },
   "top-rated": { label: "TOP RATED", className: "bg-blue-500 text-white" },
@@ -140,7 +141,7 @@ export function BackdropCard({
         )}
 
         {/* Bottom gradient + logo or title */}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3 pb-3 pt-12">
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pb-3 pt-12">
           {logoPath ? (
             <MediaLogo src={`${TMDB_IMAGE_BASE}/w500${logoPath}`} alt={title} size="card" />
           ) : (
@@ -148,7 +149,7 @@ export function BackdropCard({
               {title}
             </p>
           )}
-          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-white/70">
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-white">
             <span>{type === "movie" ? "Movie" : "TV Show"}</span>
             {voteAverage != null && voteAverage > 0 && (
               <>
@@ -167,13 +168,13 @@ export function BackdropCard({
           </div>
           {progress && (
             <div className="mt-2 flex items-center gap-2">
-              <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/15">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/20">
                 <div
-                  className="h-full rounded-full bg-white/80"
+                  className="h-full rounded-full bg-white"
                   style={{ width: `${progress.percent}%` }}
                 />
               </div>
-              <span className="shrink-0 text-[10px] tabular-nums text-white/60">
+              <span className="shrink-0 text-xs tabular-nums text-white">
                 {progress.unit === "seconds"
                   ? `${formatDuration(progress.value)} / ${formatDuration(progress.total)}`
                   : `${progress.value}/${progress.total}`}

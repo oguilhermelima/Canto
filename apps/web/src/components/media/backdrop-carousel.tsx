@@ -40,6 +40,7 @@ interface BackdropCarouselProps {
 
 function deriveBadge(item: BackdropItem): BadgeType | null {
   if (item.badge) return item.badge;
+  if (item.progress) return "continue";
   if (item.popularity && item.popularity > 200) return "trending";
   if (item.releaseDate) {
     const days =
