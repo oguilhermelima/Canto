@@ -76,11 +76,11 @@ export default function ProfilePage(): React.JSX.Element {
 
   return (
     <div className="w-full">
-      <ProfileHeader />
-
-      <div className="px-4 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+      <ProfileHeader>
         <TabBar tabs={tabs} value={activeTab} onChange={setActiveTab} />
+      </ProfileHeader>
 
+      <div className="px-5 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {activeTab === "overview" && <OverviewTab />}
         {activeTab === "ratings" && <RatingsTab />}
         {activeTab === "watchlist" && <MediaStatusTab status="planned" />}
