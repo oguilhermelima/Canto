@@ -280,11 +280,11 @@ function EditCollectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md max-md:fixed max-md:inset-0 max-md:flex max-md:h-full max-md:w-full max-md:max-w-full max-md:translate-x-0 max-md:translate-y-0 max-md:flex-col max-md:rounded-none max-md:border-0">
-        <DialogHeader>
+      <DialogContent className="flex max-w-md flex-col max-md:fixed max-md:inset-0 max-md:h-full max-md:w-full max-md:max-w-full max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:border-0">
+        <DialogHeader className="text-left">
           <DialogTitle>Edit Collection</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="flex-1 space-y-4">
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Name</label>
             <Input
@@ -323,13 +323,13 @@ function EditCollectionDialog({
             </Select>
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={!editName.trim() || updateMutation.isPending}>
+        <div className="flex flex-col gap-2 pt-4">
+          <Button className="w-full rounded-xl" onClick={handleSave} disabled={!editName.trim() || updateMutation.isPending}>
             {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save changes
           </Button>
-        </DialogFooter>
+          <Button variant="outline" className="w-full rounded-xl" onClick={() => onOpenChange(false)}>Cancel</Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

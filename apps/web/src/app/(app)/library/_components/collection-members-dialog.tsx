@@ -22,6 +22,7 @@ import {
   Copy,
   Check,
   Crown,
+  Link2,
   Loader2,
   Mail,
   Trash2,
@@ -93,6 +94,11 @@ export function CollectionMembersDialog({
     });
   };
 
+  const handleInviteByLink = (): void => {
+    if (!listId) return;
+    createInvitation.mutate({ listId, role: inviteRole });
+  };
+
   const handleCopyLink = (token: string): void => {
     const link = `${window.location.origin}/invite/${token}`;
     void navigator.clipboard.writeText(link);
@@ -103,28 +109,29 @@ export function CollectionMembersDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-md:fixed max-md:inset-0 max-md:flex max-md:h-full max-md:w-full max-md:max-w-full max-md:translate-x-0 max-md:translate-y-0 max-md:flex-col max-md:rounded-none max-md:border-0">
-        <DialogHeader>
+      <DialogContent className="flex max-w-lg flex-col max-md:fixed max-md:inset-0 max-md:h-full max-md:w-full max-md:max-w-full max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:border-0">
+        <DialogHeader className="text-left">
           <DialogTitle>Manage Members</DialogTitle>
           <DialogDescription>
             Invite users to collaborate on this collection. Editors can add and remove items. Admins can manage members and settings.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 pt-2">
-          {/* Invite form */}
+        <div className="flex-1 space-y-4 overflow-y-auto pt-2">
+          {/* Invite by email */}
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground">Invite by email</label>
             <div className="flex gap-2">
               <Input
+                variant="ghost"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="user@example.com"
-                className="h-9 flex-1 text-sm"
+                className="flex-1"
                 onKeyDown={(e) => { if (e.key === "Enter") handleInvite(); }}
               />
               <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as "viewer" | "editor" | "admin")}>
-                <SelectTrigger className="h-9 w-28 rounded-xl border-none bg-accent text-xs">
+                <SelectTrigger className="w-28 rounded-xl border-none bg-accent text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -133,7 +140,7 @@ export function CollectionMembersDialog({
                   <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
               </Select>
-              <Button size="sm" className="h-9 rounded-xl" onClick={handleInvite} disabled={createInvitation.isPending}>
+              <Button size="sm" className="h-10 rounded-xl px-3" onClick={handleInvite} disabled={createInvitation.isPending}>
                 {createInvitation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
@@ -142,6 +149,17 @@ export function CollectionMembersDialog({
               </Button>
             </div>
           </div>
+
+          {/* Invite by link */}
+          <Button
+            variant="outline"
+            className="w-full rounded-xl"
+            onClick={handleInviteByLink}
+            disabled={createInvitation.isPending}
+          >
+            <Link2 className="mr-2 h-4 w-4" />
+            Invite by link
+          </Button>
 
           <div className="h-px bg-border/40" />
 
@@ -157,7 +175,6 @@ export function CollectionMembersDialog({
               </div>
             ) : (
               <div className="space-y-1">
-                {/* Owner */}
                 {data?.owner && (
                   <div className="flex items-center gap-3 rounded-lg px-2 py-2">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
@@ -178,7 +195,6 @@ export function CollectionMembersDialog({
                   </div>
                 )}
 
-                {/* Members */}
                 {data?.members.map((member) => (
                   <div key={member.id} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent/30">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
@@ -245,7 +261,6 @@ export function CollectionMembersDialog({
                       <button
                         type="button"
                         onClick={() => handleCopyLink(
-                          // Token is on the invitation object from the API
                           (inv as unknown as { token?: string }).token ?? inv.id
                         )}
                         className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
