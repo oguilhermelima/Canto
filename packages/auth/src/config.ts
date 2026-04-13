@@ -6,6 +6,7 @@ import { count, sql } from "drizzle-orm";
 import { DEFAULT_HOME_SECTIONS } from "@canto/db/home-section-defaults";
 
 export const auth = betterAuth({
+  trustedOrigins: ["http://192.168.0.210:3000"],
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: {
