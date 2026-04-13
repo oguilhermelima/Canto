@@ -16,7 +16,7 @@ export default function UpcomingSchedulePage(): React.JSX.Element {
 
   const [mediaType, setMediaType] = useState<"all" | "movie" | "show">("all");
   const [filters, setFilters] = useState<FilterOutput>({});
-  const [viewMode, setViewMode] = useViewMode("canto.browse.viewMode.upcoming");
+  const [viewMode, setViewMode] = useViewMode("canto.browse.viewMode.upcoming", "grid");
 
   const { data, isLoading, isError, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
     trpc.userMedia.getUpcomingSchedule.useInfiniteQuery(

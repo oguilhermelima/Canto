@@ -64,6 +64,13 @@ export interface CardStrategy {
   gridCols?: { default: string; compact: string };
 }
 
+/* ─── Grid Columns ─── */
+
+export const GRID_COLS = {
+  default: "grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 5xl:grid-cols-7 7xl:grid-cols-10",
+  compact: "grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 5xl:grid-cols-6 7xl:grid-cols-9",
+};
+
 /* ─── Filter Preset ─── */
 
 export type FilterPreset = "tmdb" | "library";

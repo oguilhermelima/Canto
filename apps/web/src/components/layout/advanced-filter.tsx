@@ -14,8 +14,6 @@ import { FilterSidebar } from "~/components/media/filter-sidebar";
 import type { FilterOutput, FilterSidebarHandle } from "~/components/media/filter-sidebar";
 import type { FilterPreset } from "~/components/layout/browse-layout.types";
 
-export type { FilterOutput };
-
 interface AdvancedFilterProps {
   preset: FilterPreset;
   mediaType: "movie" | "show" | "all";

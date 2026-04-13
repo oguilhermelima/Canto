@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { cn } from "@canto/ui/cn";
-import { Separator } from "@canto/ui/separator";
 import {
   DropdownMenu,
   DropdownMenuContent,

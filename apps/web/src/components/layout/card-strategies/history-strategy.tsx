@@ -6,10 +6,8 @@ import {
 } from "~/app/(app)/library/_components/library-playback-card";
 import type { LibraryPlaybackEntry } from "~/app/(app)/library/_components/library-playback-card";
 import { BaseGridCard, BaseGridCardSkeleton } from "./base-grid-card";
+import { GRID_COLS } from "~/components/layout/browse-layout.types";
 import type { CardStrategy, BrowseItem } from "~/components/layout/browse-layout.types";
-
-const DEFAULT_COLS = "grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 5xl:grid-cols-7 7xl:grid-cols-10";
-const COMPACT_COLS = "grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 5xl:grid-cols-6 7xl:grid-cols-9";
 
 function toPlaybackEntry(item: BrowseItem): LibraryPlaybackEntry {
   return {
@@ -92,5 +90,5 @@ export const historyStrategy: CardStrategy = {
   listCard: (item) => <ListCard item={item} />,
   gridSkeleton: () => <BaseGridCardSkeleton />,
   listSkeleton: () => <ListSkeleton />,
-  gridCols: { default: DEFAULT_COLS, compact: COMPACT_COLS },
+  gridCols: GRID_COLS,
 };

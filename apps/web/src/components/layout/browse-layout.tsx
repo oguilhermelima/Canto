@@ -10,6 +10,7 @@ import { BrowseMenu } from "~/components/layout/browse-menu";
 import { AdvancedFilter } from "~/components/layout/advanced-filter";
 import { useIsMobile } from "~/hooks/use-is-mobile";
 import type { FilterOutput } from "~/components/media/filter-sidebar";
+import { GRID_COLS } from "~/components/layout/browse-layout.types";
 import type { BrowseItem, BrowseMenuItem, BrowseMenuGroup, CardStrategy, FilterPreset, ViewMode } from "~/components/layout/browse-layout.types";
 
 export type { FilterOutput, BrowseItem, BrowseMenuItem, BrowseMenuGroup, CardStrategy, FilterPreset, ViewMode };
@@ -19,9 +20,6 @@ const MEDIA_TYPE_TABS = [
   { value: "movie", label: "Movies", icon: Film },
   { value: "show", label: "TV Shows", icon: Tv },
 ];
-
-const DEFAULT_GRID_COLS = "grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 5xl:grid-cols-7 7xl:grid-cols-10";
-const DEFAULT_COMPACT_COLS = "grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 5xl:grid-cols-6 7xl:grid-cols-9";
 
 interface BrowseLayoutProps {
   title: string;
@@ -125,7 +123,7 @@ export function BrowseLayout({
   }, [hasNextPage, isFetchingNextPage, onFetchNextPage]);
 
   // Grid column classes
-  const gridCols = strategy.gridCols ?? { default: DEFAULT_GRID_COLS, compact: DEFAULT_COMPACT_COLS };
+  const gridCols = strategy.gridCols ?? GRID_COLS;
   const cols = sidebarOpen && !isMobile ? gridCols.compact : gridCols.default;
 
   // Tabs
