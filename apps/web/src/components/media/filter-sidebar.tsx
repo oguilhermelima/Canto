@@ -9,6 +9,7 @@ import { Slider } from "@canto/ui/slider";
 import { ChevronDown, ArrowDown, ArrowUp, RotateCcw } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { useWatchRegion } from "~/hooks/use-watch-region";
+import type { FilterPreset } from "~/components/layout/browse-layout.types";
 
 /* ─── Output Type ─── */
 
@@ -30,6 +31,9 @@ export interface FilterOutput {
   watchRegion?: string;
   // DB filtering (lists / recommendations)
   genreIds?: number[];
+  // Library filtering
+  source?: "jellyfin" | "plex" | "manual";
+  watchStatus?: "in_progress" | "completed" | "not_started";
 }
 
 /* ─── Constants ─── */
@@ -80,10 +84,32 @@ const TV_CERTIFICATIONS = [
   { value: "TV-MA", label: "TV-MA" },
 ];
 
-type SectionId = "sort" | "genres" | "year" | "score" | "runtime" | "language" | "status" | "certification" | "watchProviders";
+/* ─── Library preset constants ─── */
+
+const LIBRARY_SORT_OPTIONS = [
+  { value: "recently_watched", label: "Recently Watched" },
+  { value: "name_asc", label: "Name A-Z" },
+  { value: "name_desc", label: "Name Z-A" },
+  { value: "year_desc", label: "Year (New → Old)" },
+  { value: "year_asc", label: "Year (Old → New)" },
+];
+
+const SOURCE_OPTIONS = [
+  { value: "jellyfin", label: "Jellyfin" },
+  { value: "plex", label: "Plex" },
+  { value: "manual", label: "Manual" },
+] as const;
+
+const WATCH_STATUS_OPTIONS = [
+  { value: "in_progress", label: "In Progress" },
+  { value: "completed", label: "Completed" },
+  { value: "not_started", label: "Not Started" },
+] as const;
+
+type SectionId = "sort" | "genres" | "year" | "score" | "runtime" | "language" | "status" | "certification" | "watchProviders" | "source" | "watchStatus";
 
 /** URL param keys owned by FilterSidebar — everything else is preserved. */
-const FILTER_KEYS = ["genre", "genreMode", "sort", "language", "score", "scoreMode", "yearMin", "yearMax", "runtimeMin", "runtimeMax", "certification", "status", "providers", "providerMode"] as const;
+const FILTER_KEYS = ["genre", "genreMode", "sort", "language", "score", "scoreMode", "yearMin", "yearMax", "runtimeMin", "runtimeMax", "certification", "status", "providers", "providerMode", "source", "watchStatus"] as const;
 
 /* ─── Sub-components ─── */
 
@@ -157,17 +183,30 @@ function Pill({
 
 /* ─── Main Component ─── */
 
+export interface FilterSidebarHandle {
+  reset: () => void;
+}
+
 interface FilterSidebarProps {
   mediaType: "movie" | "show" | "all";
   onFilterChange: (filters: FilterOutput) => void;
   hideSections?: SectionId[];
+  preset?: FilterPreset;
+  hideHeader?: boolean;
+  className?: string;
+  resetRef?: React.MutableRefObject<FilterSidebarHandle | null>;
 }
 
 export function FilterSidebar({
   mediaType,
   onFilterChange,
   hideSections = [],
+  preset = "tmdb",
+  hideHeader = false,
+  className,
+  resetRef,
 }: FilterSidebarProps): React.JSX.Element {
+  const isLibrary = preset === "library";
   const show = (id: SectionId): boolean => !hideSections.includes(id);
 
   // Genres from TMDB — cached forever
@@ -182,19 +221,19 @@ export function FilterSidebar({
   );
 
   const genreList = mediaType === "movie"
-    ? movieGenres
-    : mediaType === "show"
-      ? tvGenres
-      : (() => {
-          // Merge movie + tv, dedupe by id
-          const all = [...(movieGenres ?? []), ...(tvGenres ?? [])];
-          const seen = new Set<number>();
-          return all.filter((g) => {
-            if (seen.has(g.id)) return false;
-            seen.add(g.id);
-            return true;
-          });
-        })();
+      ? movieGenres
+      : mediaType === "show"
+        ? tvGenres
+        : (() => {
+            // Merge movie + tv, dedupe by id
+            const all = [...(movieGenres ?? []), ...(tvGenres ?? [])];
+            const seen = new Set<number>();
+            return all.filter((g) => {
+              if (seen.has(g.id)) return false;
+              seen.add(g.id);
+              return true;
+            });
+          })();
 
   // ── URL ↔ State sync ──────────────────────────────────────────────
   const searchParams = useSearchParams();
@@ -209,7 +248,7 @@ export function FilterSidebar({
   // Local state — seeded from URL params
   const [selectedGenres, setSelectedGenres] = useState<Set<number>>(() => parseSet(searchParams.get("genre")));
   const [genreMode, setGenreMode] = useState<"and" | "or">((searchParams.get("genreMode") ?? "or") as "and" | "or");
-  const [sortBy, setSortBy] = useState(searchParams.get("sort") ?? "popularity.desc");
+  const [sortBy, setSortBy] = useState(searchParams.get("sort") ?? (isLibrary ? "recently_watched" : "popularity.desc"));
   const [language, setLanguage] = useState(searchParams.get("language") ?? "");
   const [scoreMode, setScoreMode] = useState<"higher" | "lower">((searchParams.get("scoreMode") ?? "higher") as "higher" | "lower");
   const [scoreMin, setScoreMin] = useState(searchParams.get("score") ? Number(searchParams.get("score")) : 0);
@@ -223,6 +262,10 @@ export function FilterSidebar({
   const [selectedProviders, setSelectedProviders] = useState<Set<number>>(() => parseSet(searchParams.get("providers")));
   const [providerMode, setProviderMode] = useState<"and" | "or">((searchParams.get("providerMode") ?? "or") as "and" | "or");
   const { region: watchRegion } = useWatchRegion();
+
+  // Library-specific state
+  const [source, setSource] = useState<"jellyfin" | "plex" | "manual" | "">((searchParams.get("source") ?? "") as "jellyfin" | "plex" | "manual" | "");
+  const [watchStatus, setWatchStatus] = useState<"in_progress" | "completed" | "not_started" | "">((searchParams.get("watchStatus") ?? "") as "in_progress" | "completed" | "not_started" | "");
 
   // Watch providers for the region
   const { data: watchProvidersList } = trpc.provider.filterOptions.useQuery(
@@ -255,15 +298,19 @@ export function FilterSidebar({
       f.watchProviders = [...selectedProviders].join(providerMode === "or" ? "|" : ",");
       f.watchRegion = watchRegion;
     }
+    // Library-specific fields
+    if (source) f.source = source as "jellyfin" | "plex" | "manual";
+    if (watchStatus) f.watchStatus = watchStatus as "in_progress" | "completed" | "not_started";
     return f;
-  }, [selectedGenres, genreMode, sortBy, language, scoreMode, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion]);
+  }, [selectedGenres, genreMode, sortBy, language, scoreMode, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion, source, watchStatus]);
 
   // Sync state → URL + emit to parent
   const emitRef = useRef<ReturnType<typeof setTimeout>>(null);
   const firstRender = useRef(true);
 
   useEffect(() => {
-    const hasParams = selectedGenres.size > 0 || language || sortBy !== "popularity.desc" || yearMin || yearMax || scoreMin > 0 || scoreMode !== "higher" || runtimeMin || runtimeMax || certification || status || selectedProviders.size > 0;
+    const defaultSort = isLibrary ? "recently_watched" : "popularity.desc";
+    const hasParams = selectedGenres.size > 0 || language || sortBy !== defaultSort || yearMin || yearMax || scoreMin > 0 || scoreMode !== "higher" || runtimeMin || runtimeMax || certification || status || selectedProviders.size > 0 || source || watchStatus;
 
     if (firstRender.current) {
       firstRender.current = false;
@@ -300,13 +347,15 @@ export function FilterSidebar({
       if (status) params.set("status", status);
       if (selectedProviders.size > 0) params.set("providers", [...selectedProviders].join(","));
       if (providerMode !== "or") params.set("providerMode", providerMode);
+      if (source) params.set("source", source);
+      if (watchStatus) params.set("watchStatus", watchStatus);
 
       const qs = params.toString();
       router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
     }, 300);
 
     return () => { if (emitRef.current) clearTimeout(emitRef.current); };
-  }, [selectedGenres, genreMode, sortBy, language, scoreMode, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion, onFilterChange, buildOutput, searchParams, router, pathname]);
+  }, [selectedGenres, genreMode, sortBy, language, scoreMode, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion, source, watchStatus, onFilterChange, buildOutput, searchParams, router, pathname, isLibrary]);
 
   // Handlers
   const toggleGenre = (id: number): void => {
@@ -321,7 +370,7 @@ export function FilterSidebar({
   const handleReset = (): void => {
     setSelectedGenres(new Set());
     setGenreMode("or");
-    setSortBy("popularity.desc");
+    setSortBy(isLibrary ? "recently_watched" : "popularity.desc");
     setLanguage("");
     setScoreMode("higher");
     setScoreMin(0);
@@ -334,7 +383,12 @@ export function FilterSidebar({
     setStatus("");
     setSelectedProviders(new Set());
     setProviderMode("or");
+    setSource("");
+    setWatchStatus("");
   };
+
+  // Expose reset to parent via ref
+  if (resetRef) resetRef.current = { reset: handleReset };
 
   const isDesc = sortBy.endsWith(".desc");
   const SortIcon = isDesc ? ArrowDown : ArrowUp;
@@ -349,19 +403,21 @@ export function FilterSidebar({
   const certOptions = mediaType === "show" ? TV_CERTIFICATIONS : MOVIE_CERTIFICATIONS;
 
   return (
-    <div className="pt-8">
+    <div className={cn(hideHeader ? "" : "pt-3", className)}>
       {/* Header */}
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xl font-bold tracking-tight text-foreground">Filter</h2>
-        <button
-          type="button"
-          className="flex items-center gap-1.5 text-[13px] text-foreground/70 transition-colors hover:text-foreground"
-          onClick={handleReset}
-        >
-          <RotateCcw size={13} />
-          Clear
-        </button>
-      </div>
+      {!hideHeader && (
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-xl font-bold tracking-tight text-foreground">Filter</h2>
+          <button
+            type="button"
+            className="flex items-center gap-1.5 text-[13px] text-foreground/70 transition-colors hover:text-foreground"
+            onClick={handleReset}
+          >
+            <RotateCcw size={13} />
+            Clear
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col">
         {/* Sort By */}
@@ -373,17 +429,19 @@ export function FilterSidebar({
                 onChange={(e) => setSortBy(e.target.value)}
                 className="h-9 flex-1 appearance-none rounded-xl border-0 bg-accent px-3 text-[13px] text-foreground/70 outline-none"
               >
-                {SORT_OPTIONS.map((opt) => (
+                {(isLibrary ? LIBRARY_SORT_OPTIONS : SORT_OPTIONS).map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
-              <button
-                type="button"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-0 bg-accent text-muted-foreground transition-colors hover:text-foreground"
-                onClick={toggleSortOrder}
-              >
-                <SortIcon size={14} />
-              </button>
+              {!isLibrary && (
+                <button
+                  type="button"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-0 bg-accent text-muted-foreground transition-colors hover:text-foreground"
+                  onClick={toggleSortOrder}
+                >
+                  <SortIcon size={14} />
+                </button>
+              )}
             </div>
           </Section>
         )}
@@ -462,6 +520,40 @@ export function FilterSidebar({
                 onChange={(e) => setYearMax(e.target.value)}
                 className="!h-9 !rounded-xl !border-0 !bg-accent !text-[13px] !font-medium !text-foreground/70 !placeholder:text-foreground/30"
               />
+            </div>
+          </Section>
+        )}
+
+        {/* Source (library only) */}
+        {isLibrary && show("source") && (
+          <Section label="Source" defaultOpen>
+            <div className="flex flex-wrap gap-1">
+              <Pill label="All" active={source === ""} onClick={() => setSource("")} />
+              {SOURCE_OPTIONS.map((s) => (
+                <Pill
+                  key={s.value}
+                  label={s.label}
+                  active={source === s.value}
+                  onClick={() => setSource(source === s.value ? "" : s.value)}
+                />
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* Watch Status (library only) */}
+        {isLibrary && show("watchStatus") && (
+          <Section label="Watch Status" defaultOpen>
+            <div className="flex flex-wrap gap-1">
+              <Pill label="All" active={watchStatus === ""} onClick={() => setWatchStatus("")} />
+              {WATCH_STATUS_OPTIONS.map((ws) => (
+                <Pill
+                  key={ws.value}
+                  label={ws.label}
+                  active={watchStatus === ws.value}
+                  onClick={() => setWatchStatus(watchStatus === ws.value ? "" : ws.value)}
+                />
+              ))}
             </div>
           </Section>
         )}
