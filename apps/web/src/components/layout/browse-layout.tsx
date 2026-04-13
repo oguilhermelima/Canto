@@ -10,9 +10,9 @@ import { BrowseMenu } from "~/components/layout/browse-menu";
 import { AdvancedFilter } from "~/components/layout/advanced-filter";
 import { useIsMobile } from "~/hooks/use-is-mobile";
 import type { FilterOutput } from "~/components/media/filter-sidebar";
-import type { BrowseItem, CardStrategy, FilterPreset, ViewMode } from "~/components/layout/browse-layout.types";
+import type { BrowseItem, BrowseMenuItem, CardStrategy, FilterPreset, ViewMode } from "~/components/layout/browse-layout.types";
 
-export type { FilterOutput, BrowseItem, CardStrategy, FilterPreset, ViewMode };
+export type { FilterOutput, BrowseItem, BrowseMenuItem, CardStrategy, FilterPreset, ViewMode };
 
 const MEDIA_TYPE_TABS = [
   { value: "all", label: "All" },
@@ -58,7 +58,7 @@ interface BrowseLayoutProps {
   errorState?: React.ReactNode;
   sidebarClassName?: string;
   /** Extra items rendered inside the 3-dot menu (below grid/list toggle) */
-  menuContent?: React.ReactNode;
+  menuItems?: BrowseMenuItem[];
 }
 
 export function BrowseLayout({
@@ -85,7 +85,7 @@ export function BrowseLayout({
   emptyState,
   errorState,
   sidebarClassName,
-  menuContent,
+  menuItems,
 }: BrowseLayoutProps): React.JSX.Element {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -143,13 +143,14 @@ export function BrowseLayout({
     </span>
   ) : undefined;
 
-  // 3-dot menu + results count trailing element
-  const trailing = (
-    <div className="flex items-center gap-3">
-      <BrowseMenu viewMode={viewMode} onViewModeChange={onViewModeChange}>
-        {menuContent}
-      </BrowseMenu>
-      {resultsCount}
+  // Trailing element for TabBar
+  const trailing = resultsCount;
+
+  // 3-dot menu beside the title
+  const browseMenuNode = (
+    <div className="flex items-center gap-2">
+      {titleAction}
+      <BrowseMenu viewMode={viewMode} onViewModeChange={onViewModeChange} items={menuItems} />
     </div>
   );
 
@@ -158,7 +159,7 @@ export function BrowseLayout({
 
   return (
     <div className="w-full pb-12">
-      {!hideTitle && <PageHeader title={title} subtitle={subtitle} action={titleAction} />}
+      {!hideTitle && <PageHeader title={title} subtitle={subtitle} action={browseMenuNode} />}
 
       <div className="flex px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {/* Filter (desktop sidebar + mobile dialog) */}

@@ -12,10 +12,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@canto/ui/dialog";
-import { DropdownMenuItem } from "@canto/ui/dropdown-menu";
 import { Trash2, Users } from "lucide-react";
 import { BrowseLayout } from "~/components/layout/browse-layout";
-import type { FilterOutput, BrowseItem } from "~/components/layout/browse-layout";
+import type { FilterOutput, BrowseItem, BrowseMenuItem } from "~/components/layout/browse-layout";
 import { collectionStrategy } from "~/components/layout/card-strategies";
 import { StateMessage } from "~/components/layout/state-message";
 import { trpc } from "~/lib/trpc/client";
@@ -159,22 +158,11 @@ export default function ListDetailPage(): React.JSX.Element {
             />
           ) : undefined
         }
-        menuContent={
-          listRow && listRow.type === "custom" ? (
-            <>
-              <DropdownMenuItem onClick={() => setShareListId(listRow.id)}>
-                <Users className="mr-2 h-4 w-4" />
-                Manage members
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setDeleteTarget({ id: listRow.id, name: listRow.name })}
-                className="text-red-400 focus:text-red-300"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete collection
-              </DropdownMenuItem>
-            </>
-          ) : undefined
+        menuItems={
+          listRow && listRow.type === "custom" ? [
+            { label: "Manage members", icon: Users, onClick: () => setShareListId(listRow.id) },
+            { label: "Delete collection", icon: Trash2, onClick: () => setDeleteTarget({ id: listRow.id, name: listRow.name }), className: "text-red-400" },
+          ] : undefined
         }
         items={items}
         strategy={collectionStrategy}
