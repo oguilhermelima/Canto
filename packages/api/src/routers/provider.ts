@@ -26,9 +26,6 @@ export const providerRouter = createTRPCRouter({
 
       if (input.type === "regions") {
         return cached("provider:regions", 86400, async () => {
-          const extras = await tmdb.getExtras(0, "movie");
-          // Regions come from the watchProviders field — use direct TMDB call for now
-          // TODO: This should be a dedicated provider method
           const data = await fetchFromTmdb<{
             results: Array<{ iso_3166_1: string; english_name: string; native_name: string }>;
           }>(tmdb, "/watch/providers/regions");

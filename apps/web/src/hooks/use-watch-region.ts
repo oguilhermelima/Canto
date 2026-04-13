@@ -8,7 +8,7 @@ const DEFAULT_REGION = "US";
 
 function readLocalStorage(): string {
   if (typeof window === "undefined") return DEFAULT_REGION;
-  return localStorage.getItem(STORAGE_KEY) ?? DEFAULT_REGION;
+  return localStorage.getItem(STORAGE_KEY) || DEFAULT_REGION;
 }
 
 export function useWatchRegion(): {
@@ -35,7 +35,7 @@ export function useWatchRegion(): {
   }, [isSuccess, data]);
 
   // Derive region: prefer DB value once loaded, fall back to localStorage
-  const region = data?.watchRegion ?? readLocalStorage();
+  const region = data?.watchRegion || readLocalStorage();
 
   const setRegion = useCallback(
     (newRegion: string) => {
