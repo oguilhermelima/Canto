@@ -30,7 +30,7 @@ interface MediaListViewProps {
   className?: string;
 }
 
-function MediaListItem({ item }: { item: MediaItem }): React.JSX.Element {
+export function MediaListItem({ item }: { item: MediaItem }): React.JSX.Element {
   const href = mediaHref(
     item.provider ?? "tmdb",
     item.externalId ?? item.id ?? "0",
@@ -106,7 +106,7 @@ function MediaListItem({ item }: { item: MediaItem }): React.JSX.Element {
   );
 }
 
-function MediaListItemSkeleton(): React.JSX.Element {
+export function MediaListItemSkeleton(): React.JSX.Element {
   return (
     <div className="flex gap-4 p-2">
       <Skeleton className="h-24 w-16 shrink-0 rounded-lg" />
