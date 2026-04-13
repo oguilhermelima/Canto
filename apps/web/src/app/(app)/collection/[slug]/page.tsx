@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@canto/ui/button";
+import { Input } from "@canto/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -12,18 +13,30 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@canto/ui/dialog";
-import { Trash2, Users } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@canto/ui/select";
+import { Globe, Loader2, Lock, Pencil, Trash2, Users } from "lucide-react";
 import { BrowseLayout } from "~/components/layout/browse-layout";
-import type { FilterOutput, BrowseItem, BrowseMenuItem } from "~/components/layout/browse-layout";
+import type { FilterOutput, BrowseItem, BrowseMenuGroup } from "~/components/layout/browse-layout";
 import { collectionStrategy } from "~/components/layout/card-strategies";
 import { StateMessage } from "~/components/layout/state-message";
 import { trpc } from "~/lib/trpc/client";
 import { useDocumentTitle } from "~/hooks/use-document-title";
 import { useViewMode } from "~/hooks/use-view-mode";
-import { CollectionEditPopover } from "../../library/_components/collection-edit-popover";
 import { CollectionMembersDialog } from "../../library/_components/collection-members-dialog";
 
 const PAGE_SIZE = 20;
+
+const VISIBILITY_OPTIONS = [
+  { value: "private", label: "Private", icon: Lock },
+  { value: "shared", label: "Shared", icon: Users },
+  { value: "public", label: "Public", icon: Globe },
+] as const;
 
 export default function ListDetailPage(): React.JSX.Element {
   const params = useParams<{ slug: string }>();
@@ -35,6 +48,7 @@ export default function ListDetailPage(): React.JSX.Element {
   const [viewMode, setViewMode] = useViewMode("canto.collection.viewMode");
   const [shareListId, setShareListId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   const utils = trpc.useUtils();
   const deleteMutation = trpc.list.delete.useMutation({
@@ -100,7 +114,6 @@ export default function ListDetailPage(): React.JSX.Element {
     return typeFilter === "all" ? all : all.filter((i) => i.type === typeFilter);
   }, [data, typeFilter]);
 
-  // Fetch vote aggregation for visible items
   const mediaIds = useMemo(() => baseItems.map((i) => i.id).filter(Boolean), [baseItems]);
   const { data: votes } = trpc.list.getVotes.useQuery(
     { listId: listId!, mediaIds },
@@ -138,32 +151,26 @@ export default function ListDetailPage(): React.JSX.Element {
 
   const listRow = data?.pages[0]?.list;
 
+  const menuGroups: BrowseMenuGroup[] | undefined =
+    listRow && listRow.type === "custom"
+      ? [
+          {
+            label: "Manage Collection",
+            items: [
+              { label: "Edit collection", icon: Pencil, onClick: () => setEditOpen(true) },
+              { label: "Manage members", icon: Users, onClick: () => setShareListId(listRow.id) },
+              { label: "Delete collection", icon: Trash2, onClick: () => setDeleteTarget({ id: listRow.id, name: listRow.name }), className: "text-red-400" },
+            ],
+          },
+        ]
+      : undefined;
+
   return (
     <>
       <BrowseLayout
         title={listRow?.name ?? "List"}
         subtitle={listRow?.description ?? undefined}
-        titleAction={
-          listRow && listRow.type === "custom" ? (
-            <CollectionEditPopover
-              list={{
-                id: listRow.id,
-                name: listRow.name,
-                description: listRow.description,
-                visibility: listRow.visibility,
-              }}
-              onDelete={(id, nameValue) => setDeleteTarget({ id, name: nameValue })}
-              onShare={(id) => setShareListId(id)}
-              triggerClassName="relative right-auto top-auto flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-foreground hover:bg-accent/70"
-            />
-          ) : undefined
-        }
-        menuItems={
-          listRow && listRow.type === "custom" ? [
-            { label: "Manage members", icon: Users, onClick: () => setShareListId(listRow.id) },
-            { label: "Delete collection", icon: Trash2, onClick: () => setDeleteTarget({ id: listRow.id, name: listRow.name }), className: "text-red-400" },
-          ] : undefined
-        }
+        menuGroups={menuGroups}
         items={items}
         strategy={collectionStrategy}
         viewMode={viewMode}
@@ -183,6 +190,15 @@ export default function ListDetailPage(): React.JSX.Element {
           />
         }
       />
+
+      {/* Edit collection dialog */}
+      {listRow && listRow.type === "custom" && (
+        <EditCollectionDialog
+          list={listRow}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+        />
+      )}
 
       <CollectionMembersDialog
         listId={shareListId}
@@ -211,5 +227,110 @@ export default function ListDetailPage(): React.JSX.Element {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+/* ─── Edit Collection Dialog ─── */
+
+function EditCollectionDialog({
+  list,
+  open,
+  onOpenChange,
+}: {
+  list: { id: string; name: string; description: string | null; visibility?: string };
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}): React.JSX.Element {
+  const [editName, setEditName] = useState(list.name);
+  const [editDescription, setEditDescription] = useState(list.description ?? "");
+  const [editVisibility, setEditVisibility] = useState(list.visibility ?? "private");
+  const utils = trpc.useUtils();
+
+  const updateMutation = trpc.list.update.useMutation({
+    onSuccess: () => {
+      void utils.list.getAll.invalidate();
+      void utils.list.getBySlug.invalidate();
+      onOpenChange(false);
+      toast.success("Collection updated");
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const handleSave = (): void => {
+    const trimmedName = editName.trim();
+    if (!trimmedName) return;
+    const changes: { id: string; name?: string; description?: string; visibility?: "public" | "private" | "shared" } = { id: list.id };
+    if (trimmedName !== list.name) changes.name = trimmedName;
+    const trimmedDesc = editDescription.trim();
+    if (trimmedDesc !== (list.description ?? "")) changes.description = trimmedDesc;
+    if (editVisibility !== (list.visibility ?? "private")) changes.visibility = editVisibility as "public" | "private" | "shared";
+    if (!changes.name && !changes.description && !changes.visibility) { onOpenChange(false); return; }
+    updateMutation.mutate(changes);
+  };
+
+  // Reset fields when dialog opens
+  const handleOpenChange = (v: boolean): void => {
+    if (v) {
+      setEditName(list.name);
+      setEditDescription(list.description ?? "");
+      setEditVisibility(list.visibility ?? "private");
+    }
+    onOpenChange(v);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Collection</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Name</label>
+            <Input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="h-9 text-sm"
+              onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Description</label>
+            <Input
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              placeholder="Optional description"
+              className="h-9 text-sm"
+              onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Visibility</label>
+            <Select value={editVisibility} onValueChange={setEditVisibility}>
+              <SelectTrigger className="h-9 rounded-xl border-none bg-accent text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {VISIBILITY_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    <div className="flex items-center gap-2">
+                      <opt.icon className="h-3.5 w-3.5" />
+                      {opt.label}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSave} disabled={!editName.trim() || updateMutation.isPending}>
+            {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Save changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

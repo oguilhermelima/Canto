@@ -68,11 +68,16 @@ export interface CardStrategy {
 
 export type FilterPreset = "tmdb" | "library";
 
-/* ─── Browse Menu Item ─── */
+/* ─── Browse Menu ─── */
 
 export interface BrowseMenuItem {
   label: string;
   icon?: React.ComponentType<{ className?: string }>;
   onClick: () => void;
   className?: string;
+}
+
+export interface BrowseMenuGroup {
+  label: string;
+  items: BrowseMenuItem[];
 }

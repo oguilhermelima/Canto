@@ -10,9 +10,9 @@ import { BrowseMenu } from "~/components/layout/browse-menu";
 import { AdvancedFilter } from "~/components/layout/advanced-filter";
 import { useIsMobile } from "~/hooks/use-is-mobile";
 import type { FilterOutput } from "~/components/media/filter-sidebar";
-import type { BrowseItem, BrowseMenuItem, CardStrategy, FilterPreset, ViewMode } from "~/components/layout/browse-layout.types";
+import type { BrowseItem, BrowseMenuItem, BrowseMenuGroup, CardStrategy, FilterPreset, ViewMode } from "~/components/layout/browse-layout.types";
 
-export type { FilterOutput, BrowseItem, BrowseMenuItem, CardStrategy, FilterPreset, ViewMode };
+export type { FilterOutput, BrowseItem, BrowseMenuItem, BrowseMenuGroup, CardStrategy, FilterPreset, ViewMode };
 
 const MEDIA_TYPE_TABS = [
   { value: "all", label: "All" },
@@ -51,14 +51,13 @@ interface BrowseLayoutProps {
 
   // Slots
   hideTitle?: boolean;
-  titleAction?: React.ReactNode;
   toolbar?: React.ReactNode;
   header?: React.ReactNode;
   emptyState?: React.ReactNode;
   errorState?: React.ReactNode;
   sidebarClassName?: string;
-  /** Extra items rendered inside the 3-dot menu (below grid/list toggle) */
-  menuItems?: BrowseMenuItem[];
+  /** Extra groups rendered inside the 3-dot menu (below View section) */
+  menuGroups?: BrowseMenuGroup[];
 }
 
 export function BrowseLayout({
@@ -79,13 +78,12 @@ export function BrowseLayout({
   onMediaTypeChange,
   allowedMediaTypes,
   hideTitle = false,
-  titleAction,
   toolbar,
   header,
   emptyState,
   errorState,
   sidebarClassName,
-  menuItems,
+  menuGroups,
 }: BrowseLayoutProps): React.JSX.Element {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -147,19 +145,18 @@ export function BrowseLayout({
   const trailing = resultsCount;
 
   // 3-dot menu beside the title
-  const browseMenuNode = (
-    <div className="flex items-center gap-2">
-      {titleAction}
-      <BrowseMenu viewMode={viewMode} onViewModeChange={onViewModeChange} items={menuItems} />
-    </div>
-  );
-
   // Skeleton count
   const skeletonCount = viewMode === "grid" ? 18 : 8;
 
   return (
     <div className="w-full pb-12">
-      {!hideTitle && <PageHeader title={title} subtitle={subtitle} action={browseMenuNode} />}
+      {!hideTitle && (
+        <PageHeader
+          title={title}
+          subtitle={subtitle}
+          action={<BrowseMenu viewMode={viewMode} onViewModeChange={onViewModeChange} groups={menuGroups} />}
+        />
+      )}
 
       <div className="flex px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {/* Filter (desktop sidebar + mobile dialog) */}

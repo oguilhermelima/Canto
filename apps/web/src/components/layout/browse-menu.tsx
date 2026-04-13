@@ -6,6 +6,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@canto/ui/dropdown-menu";
@@ -16,12 +17,12 @@ import {
   SheetTitle,
 } from "@canto/ui/sheet";
 import { EllipsisVertical, LayoutGrid, List } from "lucide-react";
-import type { ViewMode, BrowseMenuItem } from "~/components/layout/browse-layout.types";
+import type { ViewMode, BrowseMenuGroup } from "~/components/layout/browse-layout.types";
 
 interface BrowseMenuProps {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
-  items?: BrowseMenuItem[];
+  groups?: BrowseMenuGroup[];
 }
 
 const triggerClass = "flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:text-foreground";
@@ -29,7 +30,7 @@ const triggerClass = "flex h-10 w-10 items-center justify-center rounded-xl text
 export function BrowseMenu({
   viewMode,
   onViewModeChange,
-  items,
+  groups,
 }: BrowseMenuProps): React.JSX.Element {
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -43,7 +44,8 @@ export function BrowseMenu({
               <EllipsisVertical className="h-5 w-5" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-[10rem]">
+          <DropdownMenuContent align="end" className="min-w-[11rem]">
+            <DropdownMenuLabel className="text-xs text-muted-foreground">View</DropdownMenuLabel>
             <DropdownMenuItem
               onClick={() => onViewModeChange("grid")}
               className={cn(viewMode === "grid" && "text-foreground font-medium")}
@@ -58,10 +60,11 @@ export function BrowseMenu({
               <List className="mr-2 h-4 w-4" />
               List view
             </DropdownMenuItem>
-            {items && items.length > 0 && (
-              <>
+            {groups?.map((group) => (
+              <div key={group.label}>
                 <DropdownMenuSeparator />
-                {items.map((item) => (
+                <DropdownMenuLabel className="text-xs text-muted-foreground">{group.label}</DropdownMenuLabel>
+                {group.items.map((item) => (
                   <DropdownMenuItem
                     key={item.label}
                     onClick={item.onClick}
@@ -71,8 +74,8 @@ export function BrowseMenu({
                     {item.label}
                   </DropdownMenuItem>
                 ))}
-              </>
-            )}
+              </div>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -83,11 +86,12 @@ export function BrowseMenu({
           <EllipsisVertical className="h-5 w-5" />
         </button>
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          <SheetContent side="bottom" className="rounded-t-2xl">
+          <SheetContent side="bottom">
             <SheetHeader className="sr-only">
               <SheetTitle>Options</SheetTitle>
             </SheetHeader>
-            <div className="flex flex-col gap-1 py-2">
+            <div className="flex flex-col py-2">
+              <p className="px-4 pb-1 text-xs font-medium text-muted-foreground">View</p>
               <button
                 type="button"
                 onClick={() => { onViewModeChange("grid"); setSheetOpen(false); }}
@@ -110,10 +114,11 @@ export function BrowseMenu({
                 <List className="h-4 w-4" />
                 List view
               </button>
-              {items && items.length > 0 && (
-                <>
-                  <div className="mx-4 border-t border-border/40" />
-                  {items.map((item) => (
+              {groups?.map((group) => (
+                <div key={group.label}>
+                  <div className="mx-4 my-1 border-t border-border/40" />
+                  <p className="px-4 pb-1 pt-2 text-xs font-medium text-muted-foreground">{group.label}</p>
+                  {group.items.map((item) => (
                     <button
                       key={item.label}
                       type="button"
@@ -127,8 +132,8 @@ export function BrowseMenu({
                       {item.label}
                     </button>
                   ))}
-                </>
-              )}
+                </div>
+              ))}
             </div>
           </SheetContent>
         </Sheet>
