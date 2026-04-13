@@ -214,6 +214,7 @@ export interface TmdbSectionConfig {
 export interface DbSectionConfig {
   mediaType?: "movie" | "show";
   limit?: number;
+  listId?: string;
 }
 
 export type HomeSectionConfig = TmdbSectionConfig | DbSectionConfig;

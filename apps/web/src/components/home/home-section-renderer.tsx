@@ -7,7 +7,7 @@ import { RecommendationsSource } from "./sources/recommendations-source";
 import { ContinueWatchingSource } from "./sources/continue-watching-source";
 import { WatchNextSource } from "./sources/watch-next-source";
 import { RecentlyAddedSource } from "./sources/recently-added-source";
-import { UserMediaSource } from "./sources/user-media-source";
+import { CollectionSource } from "./sources/collection-source";
 
 interface HomeSectionRendererProps {
   section: {
@@ -35,10 +35,11 @@ export function HomeSectionRenderer({ section }: HomeSectionRendererProps): Reac
         return <WatchNextSource title={title} style={style} />;
       case "recently_added":
         return <RecentlyAddedSource title={title} style={style} />;
-      case "favorites":
-        return <UserMediaSource title={title} style={style} filter={{ isFavorite: true }} />;
-      case "planned":
-        return <UserMediaSource title={title} style={style} filter={{ status: "planned" }} />;
+      case "collection": {
+        const cfg = config as Record<string, unknown>;
+        const listId = String(cfg?.listId || "");
+        return listId ? <CollectionSource title={title} style={style} listId={listId} /> : null;
+      }
       default:
         return null;
     }

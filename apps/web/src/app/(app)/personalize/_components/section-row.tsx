@@ -17,8 +17,7 @@ const SOURCE_LABELS: Record<string, string> = {
   continue_watching: "Continue Watching",
   watch_next: "Watch Next",
   recently_added: "Recently Added",
-  favorites: "Favorites",
-  planned: "Planned",
+  collection: "Collection",
   trending: "Trending",
   discover: "Discover",
 };

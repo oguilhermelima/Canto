@@ -12,8 +12,7 @@ export const dbSourceKey = z.enum([
   "continue_watching",
   "recently_added",
   "watch_next",
-  "favorites",
-  "planned",
+  "collection",
 ]);
 export type DbSourceKey = z.infer<typeof dbSourceKey>;
 
@@ -42,6 +41,7 @@ export type TmdbSectionConfigInput = z.infer<typeof tmdbSectionConfig>;
 export const dbSectionConfig = z.object({
   mediaType: z.enum(["movie", "show"]).optional(),
   limit: z.number().int().min(1).max(50).optional(),
+  listId: z.string().optional(),
 });
 export type DbSectionConfigInput = z.infer<typeof dbSectionConfig>;
 
