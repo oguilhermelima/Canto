@@ -13,6 +13,7 @@ export function buildRecsFilterConditions(filters: RecsFilters): SQL[] {
     genreMode = "or",
     language,
     scoreMin,
+    scoreMax,
     yearMin,
     yearMax,
     runtimeMin,
@@ -34,6 +35,7 @@ export function buildRecsFilterConditions(filters: RecsFilters): SQL[] {
   }
   if (language) conditions.push(sql`${media.originalLanguage} = ${language}`);
   if (scoreMin != null) conditions.push(sql`${media.voteAverage} >= ${scoreMin}`);
+  if (scoreMax != null) conditions.push(sql`${media.voteAverage} <= ${scoreMax}`);
   if (yearMin) conditions.push(sql`${media.releaseDate} >= ${yearMin + "-01-01"}`);
   if (yearMax) conditions.push(sql`${media.releaseDate} <= ${yearMax + "-12-31"}`);
   if (runtimeMin != null) conditions.push(sql`${media.runtime} >= ${runtimeMin}`);

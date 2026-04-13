@@ -535,6 +535,7 @@ export class TmdbProvider implements MetadataProvider {
     }
     if (opts?.with_keywords) params.with_keywords = opts.with_keywords;
     if (opts?.vote_average_gte != null) params["vote_average.gte"] = String(opts.vote_average_gte);
+    if (opts?.vote_average_lte != null) params["vote_average.lte"] = String(opts.vote_average_lte);
     if (opts?.with_runtime_lte != null) params["with_runtime.lte"] = String(opts.with_runtime_lte);
     if (type === "show" && opts?.first_air_date_lte) params["first_air_date.lte"] = opts.first_air_date_lte;
     if (type === "movie" && opts?.release_date_lte) params["release_date.lte"] = opts.release_date_lte;

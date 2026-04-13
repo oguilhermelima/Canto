@@ -170,6 +170,7 @@ export const listRouter = createTRPCRouter({
         genreMode: input.genreMode ?? "or",
         language: input.language,
         scoreMin: input.scoreMin,
+        scoreMax: input.scoreMax,
         yearMin: input.yearMin,
         yearMax: input.yearMax,
         runtimeMin: input.runtimeMin,

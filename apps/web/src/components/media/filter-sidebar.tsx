@@ -19,6 +19,7 @@ export interface FilterOutput {
   language?: string;
   sortBy?: string;
   scoreMin?: number;
+  scoreMax?: number;
   runtimeMin?: number;
   runtimeMax?: number;
   yearMin?: string;
@@ -82,7 +83,7 @@ const TV_CERTIFICATIONS = [
 type SectionId = "sort" | "genres" | "year" | "score" | "runtime" | "language" | "status" | "certification" | "watchProviders";
 
 /** URL param keys owned by FilterSidebar — everything else is preserved. */
-const FILTER_KEYS = ["genre", "genreMode", "sort", "language", "score", "yearMin", "yearMax", "runtimeMin", "runtimeMax", "certification", "status", "providers", "providerMode"] as const;
+const FILTER_KEYS = ["genre", "genreMode", "sort", "language", "score", "scoreMode", "yearMin", "yearMax", "runtimeMin", "runtimeMax", "certification", "status", "providers", "providerMode"] as const;
 
 /* ─── Sub-components ─── */
 
@@ -210,6 +211,7 @@ export function FilterSidebar({
   const [genreMode, setGenreMode] = useState<"and" | "or">((searchParams.get("genreMode") ?? "or") as "and" | "or");
   const [sortBy, setSortBy] = useState(searchParams.get("sort") ?? "popularity.desc");
   const [language, setLanguage] = useState(searchParams.get("language") ?? "");
+  const [scoreMode, setScoreMode] = useState<"higher" | "lower">((searchParams.get("scoreMode") ?? "higher") as "higher" | "lower");
   const [scoreMin, setScoreMin] = useState(searchParams.get("score") ? Number(searchParams.get("score")) : 0);
   const [scoreDisplay, setScoreDisplay] = useState(searchParams.get("score") ? Number(searchParams.get("score")) : 0);
   const [yearMin, setYearMin] = useState(searchParams.get("yearMin") ?? "");
@@ -239,7 +241,10 @@ export function FilterSidebar({
     }
     if (sortBy !== "popularity.desc") f.sortBy = sortBy;
     if (language) f.language = language;
-    if (scoreMin > 0) f.scoreMin = scoreMin;
+    if (scoreMin > 0) {
+      if (scoreMode === "higher") f.scoreMin = scoreMin;
+      else f.scoreMax = scoreMin;
+    }
     if (yearMin) f.yearMin = yearMin;
     if (yearMax) f.yearMax = yearMax;
     if (runtimeMin) f.runtimeMin = Number(runtimeMin);
@@ -251,14 +256,14 @@ export function FilterSidebar({
       f.watchRegion = watchRegion;
     }
     return f;
-  }, [selectedGenres, genreMode, sortBy, language, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion]);
+  }, [selectedGenres, genreMode, sortBy, language, scoreMode, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion]);
 
   // Sync state → URL + emit to parent
   const emitRef = useRef<ReturnType<typeof setTimeout>>(null);
   const firstRender = useRef(true);
 
   useEffect(() => {
-    const hasParams = selectedGenres.size > 0 || language || sortBy !== "popularity.desc" || yearMin || yearMax || scoreMin > 0 || runtimeMin || runtimeMax || certification || status || selectedProviders.size > 0;
+    const hasParams = selectedGenres.size > 0 || language || sortBy !== "popularity.desc" || yearMin || yearMax || scoreMin > 0 || scoreMode !== "higher" || runtimeMin || runtimeMax || certification || status || selectedProviders.size > 0;
 
     if (firstRender.current) {
       firstRender.current = false;
@@ -286,6 +291,7 @@ export function FilterSidebar({
       if (sortBy !== "popularity.desc") params.set("sort", sortBy);
       if (language) params.set("language", language);
       if (scoreMin > 0) params.set("score", String(scoreMin));
+      if (scoreMode !== "higher") params.set("scoreMode", scoreMode);
       if (yearMin) params.set("yearMin", yearMin);
       if (yearMax) params.set("yearMax", yearMax);
       if (runtimeMin) params.set("runtimeMin", runtimeMin);
@@ -300,7 +306,7 @@ export function FilterSidebar({
     }, 300);
 
     return () => { if (emitRef.current) clearTimeout(emitRef.current); };
-  }, [selectedGenres, genreMode, sortBy, language, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion, onFilterChange, buildOutput, searchParams, router, pathname]);
+  }, [selectedGenres, genreMode, sortBy, language, scoreMode, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion, onFilterChange, buildOutput, searchParams, router, pathname]);
 
   // Handlers
   const toggleGenre = (id: number): void => {
@@ -317,6 +323,7 @@ export function FilterSidebar({
     setGenreMode("or");
     setSortBy("popularity.desc");
     setLanguage("");
+    setScoreMode("higher");
     setScoreMin(0);
     setScoreDisplay(0);
     setYearMin("");
@@ -342,7 +349,7 @@ export function FilterSidebar({
   const certOptions = mediaType === "show" ? TV_CERTIFICATIONS : MOVIE_CERTIFICATIONS;
 
   return (
-    <div className="pt-2">
+    <div className="pt-8">
       {/* Header */}
       <div className="mb-2 flex items-center justify-between">
         <h2 className="text-xl font-bold tracking-tight text-foreground">Filter</h2>
@@ -461,7 +468,37 @@ export function FilterSidebar({
 
         {/* Score */}
         {show("score") && (
-          <Section label="Public Rating">
+          <Section
+            label="Public Rating"
+            trailing={
+              <div className="flex items-center rounded-lg bg-muted/50 p-0.5">
+                <button
+                  type="button"
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                    scoreMode === "higher"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                  onClick={() => setScoreMode("higher")}
+                >
+                  Higher
+                </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                    scoreMode === "lower"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                  onClick={() => setScoreMode("lower")}
+                >
+                  Lower
+                </button>
+              </div>
+            }
+          >
             <div className="flex flex-col gap-1 pb-4">
               <Slider
                 value={[scoreDisplay]}

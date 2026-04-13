@@ -71,6 +71,7 @@ export default function ListDetailPage(): React.JSX.Element {
         genreMode: filters.genreMode,
         language: filters.language,
         scoreMin: filters.scoreMin,
+        scoreMax: filters.scoreMax,
         yearMin: filters.yearMin,
         yearMax: filters.yearMax,
         runtimeMin: filters.runtimeMin,

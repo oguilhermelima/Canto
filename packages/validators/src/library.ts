@@ -10,6 +10,7 @@ export const listInput = z.object({
   yearMax: z.number().int().optional(),
   language: z.string().optional(),
   scoreMin: z.number().min(0).max(10).optional(),
+  scoreMax: z.number().min(0).max(10).optional(),
   runtimeMax: z.number().int().positive().optional(),
   contentRating: z.string().optional(),
   network: z.string().optional(),

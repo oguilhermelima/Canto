@@ -9,6 +9,7 @@ export const getListBySlugInput = z.object({
   genreMode: z.enum(["and", "or"]).default("or").optional(),
   language: z.string().optional(),
   scoreMin: z.number().optional(),
+  scoreMax: z.number().optional(),
   yearMin: z.string().optional(),
   yearMax: z.string().optional(),
   runtimeMin: z.number().optional(),

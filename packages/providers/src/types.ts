@@ -209,6 +209,7 @@ export interface DiscoverOpts {
   release_date_gte?: string;
   with_keywords?: string;
   vote_average_gte?: number;
+  vote_average_lte?: number;
   with_runtime_lte?: number;
   first_air_date_lte?: string;
   release_date_lte?: string;

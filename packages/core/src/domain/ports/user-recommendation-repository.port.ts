@@ -3,6 +3,7 @@ export interface RecsFilters {
   genreMode?: "and" | "or";
   language?: string;
   scoreMin?: number;
+  scoreMax?: number;
   yearMin?: string;
   yearMax?: string;
   runtimeMin?: number;

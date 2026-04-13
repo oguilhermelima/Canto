@@ -258,6 +258,7 @@ function buildLibraryFilters(input: ListInput): SQL {
   if (input.yearMax) conditions.push(lte(media.year, input.yearMax));
   if (input.language) conditions.push(eq(media.originalLanguage, input.language));
   if (input.scoreMin) conditions.push(gte(media.voteAverage, input.scoreMin));
+  if (input.scoreMax) conditions.push(lte(media.voteAverage, input.scoreMax));
   if (input.runtimeMax) conditions.push(lte(media.runtime, input.runtimeMax));
   if (input.contentRating) conditions.push(eq(media.contentRating, input.contentRating));
 
