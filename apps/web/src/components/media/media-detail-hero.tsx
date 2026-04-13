@@ -281,103 +281,108 @@ export function MediaDetailHero({
             </div>
           )}
 
-          {/* Where to Watch row */}
+          {/* Where to Watch row — edge-to-edge scroll on mobile */}
           {(hasServers || hasProviders || playbackProgress) && (
-            <div className="flex items-center gap-3 overflow-x-auto scrollbar-none">
-              {(hasServers || hasProviders) && (
-                <span className="shrink-0 text-xs font-medium capitalize text-foreground/40">
-                  Where to watch
-                </span>
-              )}
-              {/* Jellyfin */}
-              {servers?.jellyfin && (
-                <a
-                  href={servers.jellyfin.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[#a95ce0]/25 bg-[#a95ce0]/10 px-3.5 text-sm font-medium transition-colors hover:bg-[#a95ce0]/20"
-                >
-                  <span
-                    className="inline-block h-4 w-4 shrink-0"
-                    style={{
-                      background:
-                        "linear-gradient(135deg, #a95ce0, #4bb8e8)",
-                      mask: "url(/jellyfin-logo.svg) center/contain no-repeat",
-                      WebkitMask:
-                        "url(/jellyfin-logo.svg) center/contain no-repeat",
-                    }}
-                  />
-                  <span className="bg-gradient-to-r from-[#a95ce0] to-[#4bb8e8] bg-clip-text text-transparent">
-                    Jellyfin
+            <div className="-mx-4 md:mx-0">
+              <div className="flex items-center gap-2.5 overflow-x-auto px-4 pb-1 scrollbar-none md:px-0">
+                {(hasServers || hasProviders) && (
+                  <span className="shrink-0 text-xs font-medium capitalize text-foreground/40">
+                    Where to watch
                   </span>
-                </a>
-              )}
+                )}
+                {/* Jellyfin */}
+                {servers?.jellyfin && (
+                  <a
+                    href={servers.jellyfin.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex h-9 shrink-0 items-center gap-2 rounded-xl border border-[#a95ce0]/25 bg-[#a95ce0]/10 px-3 text-sm font-medium transition-colors hover:bg-[#a95ce0]/20"
+                  >
+                    <span
+                      className="inline-block h-4 w-4 shrink-0"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, #a95ce0, #4bb8e8)",
+                        mask: "url(/jellyfin-logo.svg) center/contain no-repeat",
+                        WebkitMask:
+                          "url(/jellyfin-logo.svg) center/contain no-repeat",
+                      }}
+                    />
+                    <span className="bg-gradient-to-r from-[#a95ce0] to-[#4bb8e8] bg-clip-text text-transparent">
+                      Jellyfin
+                    </span>
+                  </a>
+                )}
 
-              {/* Plex */}
-              {servers?.plex && (
-                <a
-                  href={servers.plex.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[#e5a00d]/25 bg-[#e5a00d]/10 px-3.5 text-sm font-medium text-[#e5a00d] transition-colors hover:bg-[#e5a00d]/20"
-                >
-                  <span
-                    className="inline-block h-4 w-4 shrink-0 bg-[#e5a00d]"
-                    style={{
-                      mask: "url(/plex-logo.svg) center/contain no-repeat",
-                      WebkitMask:
-                        "url(/plex-logo.svg) center/contain no-repeat",
-                    }}
+                {/* Plex */}
+                {servers?.plex && (
+                  <a
+                    href={servers.plex.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex h-9 shrink-0 items-center gap-2 rounded-xl border border-[#e5a00d]/25 bg-[#e5a00d]/10 px-3 text-sm font-medium text-[#e5a00d] transition-colors hover:bg-[#e5a00d]/20"
+                  >
+                    <span
+                      className="inline-block h-4 w-4 shrink-0 bg-[#e5a00d]"
+                      style={{
+                        mask: "url(/plex-logo.svg) center/contain no-repeat",
+                        WebkitMask:
+                          "url(/plex-logo.svg) center/contain no-repeat",
+                      }}
+                    />
+                    Plex
+                  </a>
+                )}
+
+                {/* All streaming providers */}
+                {(flatrateProviders ?? []).map((p) => (
+                  <a
+                    key={p.providerId}
+                    href={getProviderUrl(p.providerId)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex h-9 shrink-0 items-center gap-2 rounded-xl bg-white/10 px-3 backdrop-blur-sm transition-colors hover:bg-white/15"
+                  >
+                    {p.logoPath && (
+                      <div className="relative h-5 w-5 shrink-0 overflow-hidden rounded">
+                        <Image
+                          src={`${TMDB_IMAGE_BASE}/w92${p.logoPath}`}
+                          alt=""
+                          fill
+                          className="object-cover"
+                          sizes="20px"
+                        />
+                      </div>
+                    )}
+                    <span className="text-sm text-foreground/80">
+                      {p.providerName}
+                    </span>
+                  </a>
+                ))}
+
+                {/* Rent/Buy popover — only when rent/buy providers exist */}
+                {(rentBuyProviders ?? []).length > 0 && (
+                  <MoreProvidersPopover
+                    flatrate={[]}
+                    rentBuy={rentBuyProviders ?? []}
+                    getUrl={getProviderUrl}
                   />
-                  Plex
-                </a>
-              )}
+                )}
 
-              {/* Top streaming (first 2 flatrate) */}
-              {(flatrateProviders ?? []).slice(0, 2).map((p) => (
-                <a
-                  key={p.providerId}
-                  href={getProviderUrl(p.providerId)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex h-10 shrink-0 items-center gap-2 rounded-xl bg-white/10 px-3 backdrop-blur-sm transition-colors hover:bg-white/15"
-                >
-                  {p.logoPath && (
-                    <div className="relative h-5 w-5 shrink-0 overflow-hidden rounded">
-                      <Image
-                        src={`${TMDB_IMAGE_BASE}/w92${p.logoPath}`}
-                        alt=""
-                        fill
-                        className="object-cover"
-                        sizes="20px"
-                      />
-                    </div>
-                  )}
-                  <span className="text-sm text-foreground/80">
-                    {p.providerName}
-                  </span>
-                </a>
-              ))}
+                {playbackProgress && (
+                  <div className="ml-auto shrink-0 border-l border-foreground/10 pl-4">
+                    <PlaybackProgressInfo
+                      progressSeconds={playbackProgress.progressSeconds}
+                      lastWatchedAt={playbackProgress.lastWatchedAt}
+                      source={playbackProgress.source}
+                      isCompleted={playbackProgress.isCompleted}
+                    />
+                  </div>
+                )}
 
-              {/* All providers popover */}
-              {allProviders.length > 0 && (
-                <MoreProvidersPopover
-                  flatrate={flatrateProviders ?? []}
-                  rentBuy={rentBuyProviders ?? []}
-                  getUrl={getProviderUrl}
-                />
-              )}
-
-              {playbackProgress && (
-                <div className="ml-auto pl-4 border-l border-foreground/10 shrink-0">
-                  <PlaybackProgressInfo
-                    progressSeconds={playbackProgress.progressSeconds}
-                    lastWatchedAt={playbackProgress.lastWatchedAt}
-                    source={playbackProgress.source}
-                    isCompleted={playbackProgress.isCompleted}
-                  />
-                </div>
-              )}
+                {/* Right spacer for mobile scroll */}
+                <div className="w-4 shrink-0 md:hidden" />
+              </div>
             </div>
           )}
 
@@ -450,8 +455,8 @@ function MoreProvidersPopover({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button className="flex h-10 items-center gap-1.5 rounded-xl bg-white/10 px-3 text-sm text-foreground/70 backdrop-blur-sm transition-colors hover:bg-white/15 hover:text-foreground">
-          All
+        <button className="flex h-9 items-center gap-1.5 rounded-xl bg-white/10 px-3 text-sm text-foreground/70 backdrop-blur-sm transition-colors hover:bg-white/15 hover:text-foreground">
+          Rent / Buy
           <ChevronRight className="h-3.5 w-3.5" />
         </button>
       </PopoverTrigger>
