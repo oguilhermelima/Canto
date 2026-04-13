@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, gte, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
   episode,
@@ -291,16 +291,57 @@ export interface UserPlaybackProgressFeedRow {
   episodeRuntime: number | null;
 }
 
+export interface LibraryFeedFilterOptions {
+  source?: "jellyfin" | "plex" | "manual";
+  yearMin?: number;
+  yearMax?: number;
+  genreIds?: number[];
+  sortBy?: "recently_watched" | "name_asc" | "name_desc" | "year_desc" | "year_asc";
+  scoreMin?: number;
+  scoreMax?: number;
+  runtimeMin?: number;
+  runtimeMax?: number;
+  language?: string;
+  certification?: string;
+  tvStatus?: string;
+}
+
 export async function findUserPlaybackProgressFeed(
   db: Database,
   userId: string,
   mediaType?: "movie" | "show",
+  filters?: LibraryFeedFilterOptions,
 ): Promise<UserPlaybackProgressFeedRow[]> {
   const conditions = [
     eq(userPlaybackProgress.userId, userId),
     isNull(userPlaybackProgress.deletedAt),
   ];
   if (mediaType) conditions.push(eq(media.type, mediaType));
+  if (filters?.source) conditions.push(eq(userPlaybackProgress.source, filters.source));
+  if (filters?.yearMin !== undefined) conditions.push(gte(media.year, filters.yearMin));
+  if (filters?.yearMax !== undefined) conditions.push(lte(media.year, filters.yearMax));
+  if (filters?.genreIds && filters.genreIds.length > 0) {
+    conditions.push(sql`${media.genreIds}::jsonb @> ${JSON.stringify(filters.genreIds)}::jsonb`);
+  }
+  if (filters?.scoreMin !== undefined) conditions.push(gte(media.voteAverage, filters.scoreMin));
+  if (filters?.scoreMax !== undefined) conditions.push(lte(media.voteAverage, filters.scoreMax));
+  if (filters?.runtimeMin !== undefined) conditions.push(gte(media.runtime, filters.runtimeMin));
+  if (filters?.runtimeMax !== undefined) conditions.push(lte(media.runtime, filters.runtimeMax));
+  if (filters?.language) conditions.push(eq(media.originalLanguage, filters.language));
+  if (filters?.certification) conditions.push(eq(media.contentRating, filters.certification));
+  if (filters?.tvStatus) conditions.push(eq(media.status, filters.tvStatus));
+
+  const orderClauses = (() => {
+    switch (filters?.sortBy) {
+      case "name_asc": return [asc(media.title), desc(userPlaybackProgress.id)];
+      case "name_desc": return [desc(media.title), desc(userPlaybackProgress.id)];
+      case "year_asc": return [asc(media.year), desc(userPlaybackProgress.id)];
+      case "year_desc": return [desc(media.year), desc(userPlaybackProgress.id)];
+      case "recently_watched":
+      default:
+        return [desc(userPlaybackProgress.lastWatchedAt), desc(userPlaybackProgress.id)];
+    }
+  })();
 
   return db
     .select({
@@ -335,7 +376,7 @@ export async function findUserPlaybackProgressFeed(
     .leftJoin(episode, eq(userPlaybackProgress.episodeId, episode.id))
     .leftJoin(season, eq(episode.seasonId, season.id))
     .where(and(...conditions))
-    .orderBy(desc(userPlaybackProgress.lastWatchedAt), desc(userPlaybackProgress.id));
+    .orderBy(...orderClauses);
 }
 
 export interface UserWatchHistoryFeedRow {
@@ -360,12 +401,38 @@ export async function findUserWatchHistoryFeed(
   userId: string,
   limit = 100,
   mediaType?: "movie" | "show",
+  filters?: LibraryFeedFilterOptions,
 ): Promise<UserWatchHistoryFeedRow[]> {
   const conditions = [
     eq(userWatchHistory.userId, userId),
     isNull(userWatchHistory.deletedAt),
   ];
   if (mediaType) conditions.push(eq(media.type, mediaType));
+  if (filters?.source) conditions.push(eq(userWatchHistory.source, filters.source));
+  if (filters?.yearMin !== undefined) conditions.push(gte(media.year, filters.yearMin));
+  if (filters?.yearMax !== undefined) conditions.push(lte(media.year, filters.yearMax));
+  if (filters?.genreIds && filters.genreIds.length > 0) {
+    conditions.push(sql`${media.genreIds}::jsonb @> ${JSON.stringify(filters.genreIds)}::jsonb`);
+  }
+  if (filters?.scoreMin !== undefined) conditions.push(gte(media.voteAverage, filters.scoreMin));
+  if (filters?.scoreMax !== undefined) conditions.push(lte(media.voteAverage, filters.scoreMax));
+  if (filters?.runtimeMin !== undefined) conditions.push(gte(media.runtime, filters.runtimeMin));
+  if (filters?.runtimeMax !== undefined) conditions.push(lte(media.runtime, filters.runtimeMax));
+  if (filters?.language) conditions.push(eq(media.originalLanguage, filters.language));
+  if (filters?.certification) conditions.push(eq(media.contentRating, filters.certification));
+  if (filters?.tvStatus) conditions.push(eq(media.status, filters.tvStatus));
+
+  const orderClauses = (() => {
+    switch (filters?.sortBy) {
+      case "name_asc": return [asc(media.title), desc(userWatchHistory.id)];
+      case "name_desc": return [desc(media.title), desc(userWatchHistory.id)];
+      case "year_asc": return [asc(media.year), desc(userWatchHistory.id)];
+      case "year_desc": return [desc(media.year), desc(userWatchHistory.id)];
+      case "recently_watched":
+      default:
+        return [desc(userWatchHistory.watchedAt), desc(userWatchHistory.id)];
+    }
+  })();
 
   return db
     .select({
@@ -389,7 +456,7 @@ export async function findUserWatchHistoryFeed(
     .leftJoin(episode, eq(userWatchHistory.episodeId, episode.id))
     .leftJoin(season, eq(episode.seasonId, season.id))
     .where(and(...conditions))
-    .orderBy(desc(userWatchHistory.watchedAt), desc(userWatchHistory.id))
+    .orderBy(...orderClauses)
     .limit(limit);
 }
 
@@ -846,4 +913,61 @@ export async function findUserMediaCounts(
     favorites: favoritesRow?.total ?? 0,
     rated: ratedRow?.total ?? 0,
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Library Genres                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Find all distinct genres across media the user has interacted with
+ * (has playback progress or watch history).
+ * Returns deduplicated genre {id, name} pairs sorted alphabetically.
+ */
+export async function findLibraryGenres(
+  db: Database,
+  userId: string,
+): Promise<Array<{ id: number; name: string }>> {
+  // Get distinct media IDs the user has any activity for
+  const rows = await db
+    .select({
+      genres: media.genres,
+      genreIds: media.genreIds,
+    })
+    .from(media)
+    .where(
+      or(
+        sql`${media.id} IN (
+          SELECT DISTINCT ${userPlaybackProgress.mediaId}
+          FROM ${userPlaybackProgress}
+          WHERE ${userPlaybackProgress.userId} = ${userId}
+            AND ${userPlaybackProgress.deletedAt} IS NULL
+        )`,
+        sql`${media.id} IN (
+          SELECT DISTINCT ${userWatchHistory.mediaId}
+          FROM ${userWatchHistory}
+          WHERE ${userWatchHistory.userId} = ${userId}
+            AND ${userWatchHistory.deletedAt} IS NULL
+        )`,
+      ),
+    );
+
+  // Aggregate genres across all media, deduplicate by id
+  const genreMap = new Map<number, string>();
+  for (const row of rows) {
+    const ids = row.genreIds as number[] | null;
+    const names = row.genres as string[] | null;
+    if (!ids || !names) continue;
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const name = names[i];
+      if (id !== undefined && name !== undefined && !genreMap.has(id)) {
+        genreMap.set(id, name);
+      }
+    }
+  }
+
+  return [...genreMap.entries()]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }

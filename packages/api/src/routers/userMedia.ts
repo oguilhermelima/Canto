@@ -6,6 +6,7 @@ import {
   deleteUserWatchHistoryByIds,
   findDistinctPlaybackMediaPairs,
   findEpisodesByMediaIds,
+  findLibraryGenres,
   findUserCompletedPlaybackByMediaIds,
   findUserListMediaCandidates,
   findMediaByIdWithSeasons,
@@ -23,6 +24,7 @@ import {
   softDeleteUserPlaybackProgress,
   upsertUserMediaState,
 } from "@canto/core/infrastructure/repositories";
+import type { LibraryFeedFilterOptions } from "@canto/core/infrastructure/repositories";
 import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/use-cases/promote-user-media-state-from-playback";
 import { pushWatchStateToServers } from "@canto/core/domain/use-cases/push-watch-state";
 
@@ -97,6 +99,22 @@ function toProgressPercent(current: number, total: number): number | null {
   const percentage = Math.round((current / total) * 100);
   return Math.max(0, Math.min(100, percentage));
 }
+
+const libraryFilterSchema = z.object({
+  source: z.enum(["jellyfin", "plex", "manual"]).optional(),
+  sortBy: z.enum(["recently_watched", "name_asc", "name_desc", "year_desc", "year_asc"]).optional(),
+  yearMin: z.number().optional(),
+  yearMax: z.number().optional(),
+  watchStatus: z.enum(["in_progress", "completed", "not_started"]).optional(),
+  genreIds: z.array(z.number()).optional(),
+  scoreMin: z.number().optional(),
+  scoreMax: z.number().optional(),
+  runtimeMin: z.number().optional(),
+  runtimeMax: z.number().optional(),
+  language: z.string().optional(),
+  certification: z.string().optional(),
+  tvStatus: z.string().optional(),
+});
 
 function computeTrackingStatus(params: {
   mediaType: MediaType;
@@ -209,6 +227,10 @@ export const userMediaRouter = createTRPCRouter({
     findUserMediaCounts(ctx.db, ctx.session.user.id),
   ),
 
+  getLibraryGenres: protectedProcedure.query(async ({ ctx }) => {
+    return findLibraryGenres(ctx.db, ctx.session.user.id);
+  }),
+
   getLibraryWatchNext: protectedProcedure
     .input(
       z.object({
@@ -216,7 +238,7 @@ export const userMediaRouter = createTRPCRouter({
         cursor: z.number().int().min(0).nullish(),
         view: z.enum(["all", "continue", "watch_next"]).default("all"),
         mediaType: z.enum(["movie", "show"]).optional(),
-      }),
+      }).merge(libraryFilterSchema),
     )
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
@@ -225,8 +247,23 @@ export const userMediaRouter = createTRPCRouter({
       const view = input.view;
       const now = new Date();
 
+      const filters: LibraryFeedFilterOptions = {
+        source: input.source,
+        yearMin: input.yearMin,
+        yearMax: input.yearMax,
+        genreIds: input.genreIds,
+        sortBy: input.sortBy,
+        scoreMin: input.scoreMin,
+        scoreMax: input.scoreMax,
+        runtimeMin: input.runtimeMin,
+        runtimeMax: input.runtimeMax,
+        language: input.language,
+        certification: input.certification,
+        tvStatus: input.tvStatus,
+      };
+
       const [playbackRows, listMediaRows, watchingShows] = await Promise.all([
-        findUserPlaybackProgressFeed(ctx.db, userId, input.mediaType),
+        findUserPlaybackProgressFeed(ctx.db, userId, input.mediaType, filters),
         findUserListMediaCandidates(ctx.db, userId, input.mediaType),
         input.mediaType === "movie"
           ? Promise.resolve([])
@@ -592,12 +629,27 @@ export const userMediaRouter = createTRPCRouter({
           fromLists: item.fromLists,
         }));
 
-      const filtered =
+      let filtered =
         view === "continue"
           ? merged.filter((item) => item.kind === "continue")
           : view === "watch_next"
             ? merged.filter((item) => item.kind !== "continue")
             : merged;
+
+      if (input.watchStatus) {
+        filtered = filtered.filter((item) => {
+          switch (input.watchStatus) {
+            case "in_progress":
+              return item.kind === "continue" || (item.progressPercent !== null && item.progressPercent > 0 && item.progressPercent < 100);
+            case "completed":
+              return item.progressPercent === 100;
+            case "not_started":
+              return item.kind !== "continue" && (item.progressPercent === null || item.progressPercent === 0);
+            default:
+              return true;
+          }
+        });
+      }
 
       const items = filtered.slice(cursor, cursor + limit);
       const nextCursor = cursor + limit < filtered.length ? cursor + limit : undefined;
@@ -843,7 +895,7 @@ export const userMediaRouter = createTRPCRouter({
         cursor: z.number().int().min(0).nullish(),
         mediaType: z.enum(["movie", "show"]).optional(),
         completedOnly: z.boolean().optional(),
-      }),
+      }).merge(libraryFilterSchema),
     )
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
@@ -851,9 +903,24 @@ export const userMediaRouter = createTRPCRouter({
       const cursor = input.cursor ?? 0;
       const fetchLimit = Math.max(300, (cursor + limit) * 3);
 
+      const filters: LibraryFeedFilterOptions = {
+        source: input.source,
+        yearMin: input.yearMin,
+        yearMax: input.yearMax,
+        genreIds: input.genreIds,
+        sortBy: input.sortBy,
+        scoreMin: input.scoreMin,
+        scoreMax: input.scoreMax,
+        runtimeMin: input.runtimeMin,
+        runtimeMax: input.runtimeMax,
+        language: input.language,
+        certification: input.certification,
+        tvStatus: input.tvStatus,
+      };
+
       const [historyRows, playbackRows] = await Promise.all([
-        findUserWatchHistoryFeed(ctx.db, userId, fetchLimit, input.mediaType),
-        findUserPlaybackProgressFeed(ctx.db, userId, input.mediaType),
+        findUserWatchHistoryFeed(ctx.db, userId, fetchLimit, input.mediaType, filters),
+        findUserPlaybackProgressFeed(ctx.db, userId, input.mediaType, filters),
       ]);
 
       const timelineEntries: Array<{
@@ -965,9 +1032,21 @@ export const userMediaRouter = createTRPCRouter({
         });
       }
 
-      timelineEntries.sort(
-        (a, b) => b.watchedAt.getTime() - a.watchedAt.getTime(),
-      );
+      timelineEntries.sort((a, b) => {
+        switch (input.sortBy) {
+          case "name_asc":
+            return a.title.localeCompare(b.title);
+          case "name_desc":
+            return b.title.localeCompare(a.title);
+          case "year_asc":
+            return (a.year ?? 0) - (b.year ?? 0);
+          case "year_desc":
+            return (b.year ?? 0) - (a.year ?? 0);
+          case "recently_watched":
+          default:
+            return b.watchedAt.getTime() - a.watchedAt.getTime();
+        }
+      });
 
       const deduped: typeof timelineEntries = [];
       const seen = new Set<string>();
@@ -976,6 +1055,21 @@ export const userMediaRouter = createTRPCRouter({
         if (seen.has(key)) continue;
         seen.add(key);
         if (input.completedOnly && !entry.isCompleted) continue;
+        if (input.watchStatus) {
+          const completed = entry.isCompleted === true;
+          const hasProgress = (entry.progressSeconds ?? 0) > 0;
+          switch (input.watchStatus) {
+            case "in_progress":
+              if (completed || !hasProgress) continue;
+              break;
+            case "completed":
+              if (!completed) continue;
+              break;
+            case "not_started":
+              if (completed || hasProgress) continue;
+              break;
+          }
+        }
         deduped.push(entry);
       }
 
