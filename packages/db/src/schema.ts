@@ -41,6 +41,8 @@ export const user = pgTable("user", {
     .references(() => supportedLanguage.code),
   watchRegion: varchar("watch_region", { length: 10 }),
   isPublic: boolean("is_public").notNull().default(false),
+  bio: varchar("bio", { length: 500 }),
+  headerImage: varchar("header_image", { length: 500 }),
   directSearchEnabled: boolean("direct_search_enabled").notNull().default(true),
   recsVersion: integer("recs_version").notNull().default(0),
   recsUpdatedAt: timestamp("recs_updated_at", { withTimezone: true }),
@@ -241,6 +243,33 @@ export const homeSection = pgTable(
   (table) => [
     index("idx_home_section_user").on(table.userId),
     uniqueIndex("uq_home_section_user_position").on(table.userId, table.position),
+  ],
+);
+
+// ─── Profile Sections (per-user profile layout) ───
+
+export type ProfileSectionConfig = {
+  widgets?: string[];
+};
+
+export const profileSection = pgTable(
+  "profile_section",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    sectionKey: varchar("section_key", { length: 50 }).notNull(),
+    title: varchar("title", { length: 200 }).notNull(),
+    config: jsonb("config").$type<ProfileSectionConfig>().notNull().default({}),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_profile_section_user").on(table.userId),
+    uniqueIndex("uq_profile_section_user_position").on(table.userId, table.position),
   ],
 );
 
@@ -1080,6 +1109,7 @@ export const userRelations = relations(user, ({ many }) => ({
   playbackProgress: many(userPlaybackProgress),
   watchHistory: many(userWatchHistory),
   homeSections: many(homeSection),
+  profileSections: many(profileSection),
 }));
 
 export const userPreferenceRelations = relations(userPreference, ({ one }) => ({
@@ -1092,6 +1122,13 @@ export const userPreferenceRelations = relations(userPreference, ({ one }) => ({
 export const homeSectionRelations = relations(homeSection, ({ one }) => ({
   user: one(user, {
     fields: [homeSection.userId],
+    references: [user.id],
+  }),
+}));
+
+export const profileSectionRelations = relations(profileSection, ({ one }) => ({
+  user: one(user, {
+    fields: [profileSection.userId],
     references: [user.id],
   }),
 }));
