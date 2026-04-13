@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from "react";
 import { cn } from "@canto/ui/cn";
+import { Settings2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export interface TabItem {
@@ -19,10 +20,14 @@ export interface TabBarProps {
   leading?: React.ReactNode;
   /** Content rendered to the right of the tabs (e.g. result count) */
   trailing?: React.ReactNode;
+  /** Show a filter button inline with the tabs. Receives the toggle callback. */
+  onFilter?: () => void;
+  /** Whether the filter is currently active (controls button style) */
+  filterActive?: boolean;
   className?: string;
 }
 
-export function TabBar({ tabs, value, onChange, leading, trailing, className }: TabBarProps): React.JSX.Element {
+export function TabBar({ tabs, value, onChange, leading, trailing, onFilter, filterActive, className }: TabBarProps): React.JSX.Element {
   const scrollRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -61,27 +66,37 @@ export function TabBar({ tabs, value, onChange, leading, trailing, className }: 
   }, [updateIndicator]);
 
   return (
-    <div className={cn("mb-4 flex flex-wrap items-center gap-2 py-3 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]", className)}>
+    <div className={cn("mb-4 flex flex-wrap items-center gap-1.5 py-3 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]", className)}>
+      {onFilter && (
+        <button
+          type="button"
+          className={cn(
+            "-order-1 flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl transition-all",
+            filterActive
+              ? "bg-foreground text-background"
+              : "bg-muted/60 text-muted-foreground hover:text-foreground",
+          )}
+          onClick={onFilter}
+        >
+          <Settings2 className={cn("h-4 w-4 transition-transform duration-300", filterActive && "rotate-90")} />
+        </button>
+      )}
       {leading && <div className="shrink-0">{leading}</div>}
       {tabs.length > 0 && (
         <div
           ref={scrollRef}
           className={cn(
             "overflow-x-auto overflow-y-hidden scrollbar-none",
-            // Mobile: transparent scroll area, edge-to-edge
-            "order-last -mx-4 w-[calc(100%+2rem)]",
-            // Desktop: inline, no overflow tricks
-            "md:order-none md:mx-0 md:w-auto",
+            onFilter
+              ? "w-auto"
+              : "order-last -mx-4 w-[calc(100%+2rem)] md:order-none md:mx-0 md:w-auto",
           )}
         >
           <div
             ref={innerRef}
             className={cn(
               "relative inline-flex items-center gap-0.5 rounded-xl bg-muted/60 p-1",
-              // Mobile: margins inside scroll area — visible at start/end, hidden mid-scroll
-              "mx-4",
-              // Desktop: no extra margins
-              "md:mx-0",
+              !onFilter && "mx-4 md:mx-0",
             )}
           >
             {/* Sliding pill indicator */}

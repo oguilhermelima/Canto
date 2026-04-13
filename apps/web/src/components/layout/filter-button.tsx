@@ -6,9 +6,11 @@ import { cn } from "@canto/ui/cn";
 export function FilterButton({
   active,
   onClick,
+  className,
 }: {
   active: boolean;
   onClick: () => void;
+  className?: string;
 }): React.JSX.Element {
   return (
     <button
@@ -18,6 +20,7 @@ export function FilterButton({
         active
           ? "bg-foreground text-background"
           : "bg-muted/60 text-muted-foreground hover:text-foreground",
+        className,
       )}
       onClick={onClick}
     >

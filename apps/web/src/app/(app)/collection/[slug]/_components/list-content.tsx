@@ -7,7 +7,6 @@ import { TabBar } from "~/components/layout/tab-bar";
 import { MediaGrid } from "~/components/media/media-grid";
 import { MediaListView } from "~/components/media/media-list-view";
 import { StateMessage } from "~/components/layout/state-message";
-import { FilterButton } from "~/components/layout/filter-button";
 import { ViewModeToggle  } from "~/components/layout/view-mode-toggle";
 import type {ViewMode} from "~/components/layout/view-mode-toggle";
 
@@ -64,14 +63,13 @@ export function ListContent({
         tabs={TYPE_OPTIONS}
         value={typeFilter}
         onChange={(v) => onTypeChange(v as "all" | "movie" | "show")}
-        leading={
-          <FilterButton
-            active={showFilters}
-            onClick={onToggleFilters}
-          />
-        }
-        trailing={<ViewModeToggle value={viewMode} onChange={onViewModeChange} />}
+        onFilter={onToggleFilters}
+        filterActive={showFilters}
+        trailing={<ViewModeToggle value={viewMode} onChange={onViewModeChange} className="hidden md:flex" />}
       />
+      <div className="mb-4 -mt-2 flex justify-end md:hidden">
+        <ViewModeToggle value={viewMode} onChange={onViewModeChange} />
+      </div>
 
       {!isLoading && items.length === 0 ? (
         <StateMessage
