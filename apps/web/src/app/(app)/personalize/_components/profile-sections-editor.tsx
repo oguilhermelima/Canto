@@ -6,7 +6,6 @@ import { Button } from "@canto/ui/button";
 import { trpc } from "~/lib/trpc/client";
 import { toast } from "sonner";
 import { ProfileSectionRow } from "./profile-section-row";
-import { SettingsSection } from "~/components/settings/shared";
 import type { ProfileSectionConfig } from "@canto/db/schema";
 
 interface SectionMeta {
@@ -158,10 +157,7 @@ export function ProfileSectionsEditor(): React.JSX.Element {
   }, [resetMutation]);
 
   return (
-    <SettingsSection
-      title="Profile Sections"
-      description="Customize your profile overview. Drag to reorder, toggle visibility, or add sections."
-    >
+    <div className="py-6">
       {/* Toolbar */}
       <div className="mb-4 flex items-center justify-between">
         <div className="relative">
@@ -242,6 +238,6 @@ export function ProfileSectionsEditor(): React.JSX.Element {
           ))}
         </div>
       )}
-    </SettingsSection>
+    </div>
   );
 }

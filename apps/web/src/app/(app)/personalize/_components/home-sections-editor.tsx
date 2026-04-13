@@ -7,7 +7,6 @@ import { trpc } from "~/lib/trpc/client";
 import { toast } from "sonner";
 import { SectionRow } from "./section-row";
 import { SectionEditorDialog } from "./section-editor-dialog";
-import { SettingsSection } from "~/components/settings/shared";
 import type { HomeSectionConfig } from "@canto/db/schema";
 
 interface Section {
@@ -157,10 +156,7 @@ export function HomeSectionsEditor(): React.JSX.Element {
   }, [resetMutation]);
 
   return (
-    <SettingsSection
-      title="Home Sections"
-      description="Customize your homepage layout. Drag to reorder, toggle visibility, or add new sections."
-    >
+    <div className="py-6">
       {/* Toolbar */}
       <div className="mb-4 flex items-center justify-between">
         <Button
@@ -242,6 +238,6 @@ export function HomeSectionsEditor(): React.JSX.Element {
         section={editingSection}
         onSave={handleEditorSave}
       />
-    </SettingsSection>
+    </div>
   );
 }
