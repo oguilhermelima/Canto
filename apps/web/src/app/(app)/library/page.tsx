@@ -14,7 +14,7 @@ export default function LibraryPage(): React.JSX.Element {
     <div className="w-full pb-12">
       <PageHeader title="Library" subtitle="Your personal collection and watch history." />
 
-      <div className="flex flex-col gap-12">
+      <div className="flex flex-col gap-8 md:gap-12">
         <HubWatchNextSection />
         <HubUpcomingSection />
         <HubCollectionsSection />
