@@ -21,6 +21,11 @@ import {
   findUserLibraryStats,
   findUserMediaPaginated,
   findUserMediaCounts,
+  findUserRatingDistribution,
+  findUserTopGenres,
+  findUserWatchTimeStats,
+  findUserRecentActivity,
+  findUserProfileInsights,
   softDeleteUserPlaybackProgress,
   upsertUserMediaState,
 } from "@canto/core/infrastructure/repositories";
@@ -163,6 +168,7 @@ export const userMediaRouter = createTRPCRouter({
         mediaId: input.mediaId,
         trackingStatus: state?.status ?? "none",
         rating: state?.rating ?? null,
+        isFavorite: state?.isFavorite ?? false,
         progress: progress?.positionSeconds ?? 0,
         isCompleted: progress?.isCompleted ?? false,
         lastWatchedAt: progress?.lastWatchedAt ?? null,
@@ -1213,6 +1219,20 @@ export const userMediaRouter = createTRPCRouter({
       return { success: true };
     }),
 
+  toggleFavorite: protectedProcedure
+    .input(z.object({
+      mediaId: z.string(),
+      isFavorite: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await upsertUserMediaState(ctx.db, {
+        userId: ctx.session.user.id,
+        mediaId: input.mediaId,
+        isFavorite: input.isFavorite,
+      });
+      return { success: true };
+    }),
+
   track: protectedProcedure
     .input(z.object({
       mediaId: z.string(),
@@ -1711,4 +1731,24 @@ export const userMediaRouter = createTRPCRouter({
       errors: errors.slice(0, 10),
     };
   }),
+
+  getRatingDistribution: protectedProcedure.query(({ ctx }) =>
+    findUserRatingDistribution(ctx.db, ctx.session.user.id),
+  ),
+
+  getTopGenres: protectedProcedure.query(({ ctx }) =>
+    findUserTopGenres(ctx.db, ctx.session.user.id),
+  ),
+
+  getWatchTimeStats: protectedProcedure.query(({ ctx }) =>
+    findUserWatchTimeStats(ctx.db, ctx.session.user.id),
+  ),
+
+  getRecentActivity: protectedProcedure.query(({ ctx }) =>
+    findUserRecentActivity(ctx.db, ctx.session.user.id),
+  ),
+
+  getProfileInsights: protectedProcedure.query(({ ctx }) =>
+    findUserProfileInsights(ctx.db, ctx.session.user.id),
+  ),
 });

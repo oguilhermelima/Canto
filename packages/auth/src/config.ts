@@ -4,6 +4,7 @@ import { db } from "@canto/db/client";
 import * as schema from "@canto/db/schema";
 import { count, sql } from "drizzle-orm";
 import { DEFAULT_HOME_SECTIONS } from "@canto/db/home-section-defaults";
+import { DEFAULT_PROFILE_SECTIONS } from "@canto/db/profile-section-defaults";
 
 export const auth = betterAuth({
   trustedOrigins: ["http://192.168.0.210:3000"],
@@ -29,6 +30,14 @@ export const auth = betterAuth({
         type: "string",
         defaultValue: "user",
         input: false,
+      },
+      bio: {
+        type: "string",
+        required: false,
+      },
+      headerImage: {
+        type: "string",
+        required: false,
       },
     },
   },
@@ -71,6 +80,11 @@ export const auth = betterAuth({
           // Seed default homepage sections
           await db.insert(schema.homeSection).values(
             DEFAULT_HOME_SECTIONS.map((s) => ({ ...s, userId: user.id })),
+          );
+
+          // Seed default profile sections
+          await db.insert(schema.profileSection).values(
+            DEFAULT_PROFILE_SECTIONS.map((s) => ({ ...s, userId: user.id })),
           );
         },
       },
