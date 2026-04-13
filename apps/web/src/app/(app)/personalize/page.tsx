@@ -6,9 +6,11 @@ import { PageHeader } from "~/components/layout/page-header";
 import { TabBar } from "~/components/layout/tab-bar";
 import { AppearanceSection } from "../account/_components/appearance-section";
 import { HomeSectionsEditor } from "./_components/home-sections-editor";
+import { ProfileSectionsEditor } from "./_components/profile-sections-editor";
 
 const TABS = [
   { value: "sections", label: "Home Sections" },
+  { value: "profile", label: "Profile Sections" },
   { value: "appearance", label: "Appearance" },
 ];
 
@@ -24,6 +26,7 @@ export default function PersonalizePage(): React.JSX.Element {
         <TabBar tabs={TABS} value={tab} onChange={setTab} />
 
         {tab === "sections" && <HomeSectionsEditor />}
+        {tab === "profile" && <ProfileSectionsEditor />}
         {tab === "appearance" && <AppearanceSection />}
       </div>
     </div>
