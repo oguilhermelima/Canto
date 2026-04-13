@@ -26,30 +26,22 @@ import { authClient } from "~/lib/auth-client";
 
 /* ─── Constants ─── */
 
-const userNavLinks: Array<{ href: string; label: string; icon: LucideIcon }> = [
+const navLinks: Array<{ href: string; label: string; icon: LucideIcon }> = [
   { href: "/", label: "Discover", icon: Compass },
   { href: "/library", label: "Library", icon: GalleryVerticalEnd },
-  { href: "/requests", label: "Requests", icon: Send },
-];
-
-const adminNavLinks: Array<{ href: string; label: string; icon: LucideIcon }> = [
-  { href: "/", label: "Discover", icon: Compass },
-  { href: "/library", label: "Library", icon: GalleryVerticalEnd },
-  { href: "/requests", label: "Requests", icon: Send },
-  { href: "/torrents", label: "Downloads", icon: Download },
+  { href: "/search", label: "Search", icon: Search },
 ];
 
 /* ─── Nav Links ─── */
 
-const NavLinks = memo(function NavLinks({ role, scrolled }: { role?: string; scrolled?: boolean }): React.JSX.Element {
+const NavLinks = memo(function NavLinks({ scrolled }: { scrolled?: boolean }): React.JSX.Element {
   const pathname = usePathname();
-  const links = role === "admin" ? adminNavLinks : userNavLinks;
   const containerRef = useRef<HTMLElement>(null);
   const linkRefs = useRef<Map<string, HTMLAnchorElement>>(new Map());
   const [indicator, setIndicator] = useState({ left: 0, width: 0 });
   const [ready, setReady] = useState(false);
 
-  const activeHref = links.find(({ href }) =>
+  const activeHref = navLinks.find(({ href }) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href),
   )?.href;
 
@@ -92,7 +84,7 @@ const NavLinks = memo(function NavLinks({ role, scrolled }: { role?: string; scr
         style={{ left: indicator.left, width: indicator.width }}
       />
 
-      {links.map(({ href, label, icon: Icon }) => {
+      {navLinks.map(({ href, label, icon: Icon }) => {
         const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);
         return (
           <Link
@@ -112,33 +104,6 @@ const NavLinks = memo(function NavLinks({ role, scrolled }: { role?: string; scr
         );
       })}
     </nav>
-  );
-});
-
-/* ─── Search Button ─── */
-
-const TopbarSearch = memo(function TopbarSearch(): React.JSX.Element {
-  const router = useRouter();
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent): void => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        router.push("/search");
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [router]);
-
-  return (
-    <Link
-      href="/search"
-      aria-label="Search"
-      className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted/60 transition-colors hover:bg-muted"
-    >
-      <Search className="h-[18px] w-[18px] text-foreground/80" />
-    </Link>
   );
 });
 
@@ -184,26 +149,42 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
     );
   }
 
-  const actions: MenuAction[] = [
-    { href: "/profile/me", label: "Profile", icon: User },
-    { href: "/personalize", label: "Personalize", icon: Palette },
-    { href: "/manage", label: "Manage", icon: Settings },
-    { href: "/notifications", label: "Notifications", icon: Bell },
-    {
-      label: theme === "dark" ? "Light Mode" : "Dark Mode",
-      icon: theme === "dark" ? Sun : Moon,
-      onClick: () => setTheme(theme === "dark" ? "light" : "dark"),
-    },
-    {
-      label: "Log Out",
-      icon: LogOut,
-      onClick: () => {
-        void authClient.signOut().then(() => {
-          router.push("/login");
-          router.refresh();
-        });
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  const isAdmin = role === "admin";
+
+  const groups: MenuAction[][] = [
+    // Account
+    [
+      { href: "/profile/me", label: "Profile", icon: User },
+      { href: "/personalize", label: "Personalize", icon: Palette },
+      { href: "/manage", label: "Manage", icon: Settings },
+    ],
+    // Activity
+    [
+      { href: "/notifications", label: "Notifications", icon: Bell },
+      { href: "/requests", label: "Requests", icon: Send },
+      ...(isAdmin
+        ? [{ href: "/torrents", label: "Downloads", icon: Download } as MenuAction]
+        : []),
+    ],
+    // System
+    [
+      {
+        label: theme === "dark" ? "Light" : "Dark",
+        icon: theme === "dark" ? Sun : Moon,
+        onClick: () => setTheme(theme === "dark" ? "light" : "dark"),
       },
-    },
+      {
+        label: "Log Out",
+        icon: LogOut,
+        onClick: () => {
+          void authClient.signOut().then(() => {
+            router.push("/login");
+            router.refresh();
+          });
+        },
+      },
+    ],
   ];
 
   return (
@@ -235,42 +216,68 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
       <div
         ref={menuRef}
         className={cn(
-          "absolute right-0 top-full z-50 mt-4 w-56 overflow-hidden rounded-xl border border-border/50 bg-background/80 py-1 shadow-xl backdrop-blur-xl transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]",
+          "absolute right-0 top-full z-50 mt-5 w-80 overflow-hidden rounded-2xl border border-border/50 bg-background p-5 shadow-xl transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]",
           open
             ? "pointer-events-auto translate-y-0 scale-100 opacity-100"
             : "pointer-events-none -translate-y-3 scale-95 opacity-0",
         )}
       >
         {session?.user && (
-          <>
-            <div className="px-3 py-2">
-              <p className="text-sm font-semibold">{session.user.name}</p>
-              <p className="text-xs text-muted-foreground">{session.user.email}</p>
-            </div>
-            <div className="mx-2 my-1 h-px bg-border/50" />
-          </>
-        )}
-        {actions.map((action, i) => {
-          const Icon = action.icon;
-          const isLast = i === actions.length - 1;
-          const content = (
-            <div className="mx-1 flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-foreground/80 transition-colors hover:bg-foreground/5 hover:text-foreground">
-              <Icon className="h-4 w-4 text-muted-foreground" />
-              {action.label}
-            </div>
-          );
-
-          return (
-            <div key={action.label}>
-              {isLast && <div className="mx-2 my-1 h-px bg-border/50" />}
-              {action.href ? (
-                <Link href={action.href} onClick={() => setOpen(false)}>{content}</Link>
+          <div className="flex items-center gap-3 pb-5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
+              {session.user.image ? (
+                <Image
+                  src={session.user.image}
+                  alt={session.user.name}
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 rounded-full object-cover"
+                />
               ) : (
-                <button onClick={() => { action.onClick?.(); setOpen(false); }} className="w-full text-left">{content}</button>
+                <span className="text-sm font-medium">
+                  {session.user.name.charAt(0).toUpperCase()}
+                </span>
               )}
             </div>
-          );
-        })}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{session.user.name}</p>
+              <p className="truncate text-xs text-muted-foreground">{session.user.email}</p>
+            </div>
+          </div>
+        )}
+        {groups.map((group, gi) => (
+          <div
+            key={gi}
+            className={cn(
+              "grid grid-cols-3",
+              gi === 0 ? "border-t border-border/50 pt-5" : "mt-5 border-t border-border/50 pt-5",
+            )}
+          >
+            {group.map((action) => {
+              const Icon = action.icon;
+              const item = (
+                <div className="flex flex-col items-center gap-2.5">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/60 transition-colors hover:bg-muted">
+                    <Icon className="h-[22px] w-[22px] text-foreground/80" />
+                  </div>
+                  <span className="text-center text-xs leading-tight text-foreground/80">
+                    {action.label}
+                  </span>
+                </div>
+              );
+
+              return action.href ? (
+                <Link key={action.label} href={action.href} onClick={() => setOpen(false)} className="flex justify-center">
+                  {item}
+                </Link>
+              ) : (
+                <button key={action.label} onClick={() => { action.onClick?.(); setOpen(false); }} className="flex justify-center">
+                  {item}
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -280,8 +287,7 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
 
 export function Topbar(): React.JSX.Element {
   const [scrolled, setScrolled] = useState(false);
-  const { data: session } = authClient.useSession();
-  const role = (session?.user as { role?: string } | undefined)?.role;
+  const router = useRouter();
 
   useEffect(() => {
     const handler = (): void => setScrolled(window.scrollY > 0);
@@ -289,6 +295,18 @@ export function Topbar(): React.JSX.Element {
     window.addEventListener("scroll", handler, { passive: true });
     return () => window.removeEventListener("scroll", handler);
   }, []);
+
+  // Cmd/Ctrl+K → search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        router.push("/search");
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [router]);
 
   return (
     <header className="pointer-events-none fixed top-0 right-0 left-0 z-40 hidden justify-center pt-2 md:flex">
@@ -310,12 +328,11 @@ export function Topbar(): React.JSX.Element {
 
         {/* Center: Nav Links */}
         <div className="flex flex-1 items-center justify-center">
-          <NavLinks role={role} scrolled={scrolled} />
+          <NavLinks scrolled={scrolled} />
         </div>
 
-        {/* Right: Search + User */}
-        <div className="flex shrink-0 items-center gap-1">
-          <TopbarSearch />
+        {/* Right: User Menu */}
+        <div className="flex shrink-0 items-center">
           <UserMenu />
         </div>
       </nav>
