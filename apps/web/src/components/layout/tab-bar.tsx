@@ -23,7 +23,8 @@ export interface TabBarProps {
 }
 
 export function TabBar({ tabs, value, onChange, leading, trailing, className }: TabBarProps): React.JSX.Element {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const [indicator, setIndicator] = useState({ left: 0, width: 0 });
   const [ready, setReady] = useState(false);
@@ -32,19 +33,21 @@ export function TabBar({ tabs, value, onChange, leading, trailing, className }: 
     const el = tabRefs.current.get(value);
     if (!el) return;
 
-    // Use offsetLeft/offsetWidth — immune to scroll position
+    // offsetLeft is relative to the inner wrapper (positioned parent)
     setIndicator({ left: el.offsetLeft, width: el.offsetWidth });
     setReady(true);
   }, [value]);
 
   const scrollActiveIntoView = useCallback(() => {
     const el = tabRefs.current.get(value);
-    const container = containerRef.current;
-    if (!el || !container) return;
+    const scroll = scrollRef.current;
+    const inner = innerRef.current;
+    if (!el || !scroll || !inner) return;
 
-    // Center the active tab within the scrollable container
-    const scrollLeft = el.offsetLeft - container.clientWidth / 2 + el.offsetWidth / 2;
-    container.scrollTo({ left: scrollLeft, behavior: "smooth" });
+    // Tab position in scroll container = inner wrapper offset + tab offset within inner
+    const tabLeft = inner.offsetLeft + el.offsetLeft;
+    const scrollLeft = tabLeft - scroll.clientWidth / 2 + el.offsetWidth / 2;
+    scroll.scrollTo({ left: scrollLeft, behavior: "smooth" });
   }, [value]);
 
   useEffect(() => {
@@ -58,60 +61,79 @@ export function TabBar({ tabs, value, onChange, leading, trailing, className }: 
   }, [updateIndicator]);
 
   return (
-    <div className={cn("mb-4 flex items-center gap-2 py-3 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]", className)}>
+    <div className={cn("mb-4 flex flex-wrap items-center gap-2 py-3 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]", className)}>
       {leading && <div className="shrink-0">{leading}</div>}
-      {tabs.length > 0 && <div
-        ref={containerRef}
-        className="relative inline-flex items-center gap-0.5 overflow-x-auto rounded-2xl bg-muted/60 p-1 scrollbar-none"
-      >
-        {/* Sliding pill indicator */}
+      {tabs.length > 0 && (
         <div
+          ref={scrollRef}
           className={cn(
-            "absolute top-1 bottom-1 rounded-xl bg-foreground shadow-sm",
-            ready
-              ? "transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
-              : "opacity-0",
+            "overflow-x-auto overflow-y-hidden scrollbar-none",
+            // Mobile: transparent scroll area, edge-to-edge
+            "order-last -mx-4 w-[calc(100%+2rem)]",
+            // Desktop: inline, no overflow tricks
+            "md:order-none md:mx-0 md:w-auto",
           )}
-          style={{ left: indicator.left, width: indicator.width }}
-        />
-
-        {tabs.map((tab) => {
-          const isActive = value === tab.value;
-          const Icon = tab.icon;
-
-          return (
-            <button
-              key={tab.value}
-              ref={(el) => {
-                if (el) tabRefs.current.set(tab.value, el);
-              }}
-              type="button"
-              onClick={() => onChange(tab.value)}
+        >
+          <div
+            ref={innerRef}
+            className={cn(
+              "relative inline-flex items-center gap-0.5 rounded-xl bg-muted/60 p-1",
+              // Mobile: margins inside scroll area — visible at start/end, hidden mid-scroll
+              "mx-4",
+              // Desktop: no extra margins
+              "md:mx-0",
+            )}
+          >
+            {/* Sliding pill indicator */}
+            <div
               className={cn(
-                "relative z-10 flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-colors duration-200",
-                isActive
-                  ? "text-background"
-                  : "text-muted-foreground hover:text-foreground",
+                "absolute top-1 bottom-1 rounded-xl bg-foreground shadow-sm",
+                ready
+                  ? "transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
+                  : "opacity-0",
               )}
-            >
-              {Icon && <Icon className="h-4 w-4 shrink-0" />}
-              {tab.label}
-              {tab.count != null && tab.count > 0 && (
-                <span
+              style={{ left: indicator.left, width: indicator.width }}
+            />
+
+            {tabs.map((tab) => {
+              const isActive = value === tab.value;
+              const Icon = tab.icon;
+
+              return (
+                <button
+                  key={tab.value}
+                  ref={(el) => {
+                    if (el) tabRefs.current.set(tab.value, el);
+                  }}
+                  type="button"
+                  onClick={() => onChange(tab.value)}
                   className={cn(
-                    "min-w-5 rounded-full px-1.5 py-0.5 text-center text-xs font-semibold leading-none",
+                    "relative z-10 flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition-colors duration-200",
                     isActive
-                      ? "bg-background/20 text-background"
-                      : "bg-foreground/5 text-muted-foreground",
+                      ? "text-background"
+                      : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>}
+                  {Icon && <Icon className="h-4 w-4 shrink-0" />}
+                  {tab.label}
+                  {tab.count != null && tab.count > 0 && (
+                    <span
+                      className={cn(
+                        "min-w-5 rounded-full px-1.5 py-0.5 text-center text-xs font-semibold leading-none",
+                        isActive
+                          ? "bg-background/20 text-background"
+                          : "bg-foreground/5 text-muted-foreground",
+                      )}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {trailing && <div className="ml-auto shrink-0">{trailing}</div>}
     </div>
   );
