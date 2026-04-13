@@ -74,7 +74,7 @@ export function BottomNavbar(): React.JSX.Element {
   return (
     <nav
       className={cn(
-        "fixed bottom-0 left-0 right-0 z-40 flex items-center justify-center gap-10 border-t border-border/50 bg-background py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] transition-transform duration-400 ease-[cubic-bezier(0.25,1,0.5,1)] md:hidden",
+        "fixed bottom-0 left-0 right-0 z-40 flex items-center justify-center gap-14 border-t border-border/50 bg-background py-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] transition-transform duration-400 ease-[cubic-bezier(0.25,1,0.5,1)] md:hidden",
         hidden && "translate-y-full",
       )}
     >
@@ -90,7 +90,7 @@ export function BottomNavbar(): React.JSX.Element {
               active ? "text-foreground" : "text-muted-foreground",
             )}
           >
-            <Icon size={26} strokeWidth={active ? 2.5 : 1.5} />
+            <Icon size={22} strokeWidth={active ? 2.5 : 1.5} />
           </Link>
         );
       })}
@@ -99,9 +99,9 @@ export function BottomNavbar(): React.JSX.Element {
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetTrigger asChild>
           <button aria-label="Menu" className="flex items-center justify-center p-2">
-            <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-muted">
+            <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-muted">
               {session?.user.image ? (
-                <Image src={session.user.image} alt="" width={32} height={32} className="h-8 w-8 rounded-full object-cover" />
+                <Image src={session.user.image} alt="" width={28} height={28} className="h-7 w-7 rounded-full object-cover" />
               ) : (
                 <UserRound size={16} className="text-muted-foreground" />
               )}
