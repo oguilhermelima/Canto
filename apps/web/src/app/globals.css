@@ -77,10 +77,17 @@
 }
 
 @keyframes contentSlideIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateX(var(--slide-from, 30px)); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
+
+/* Custom breakpoints for large displays */
+@theme inline {
+  --breakpoint-3xl: 1792px;
+  --breakpoint-5xl: 2200px;
+  --breakpoint-7xl: 2800px;
+}
 
 /* Theme token indirection: @theme references CSS vars, vars change per theme */
 @theme inline {
