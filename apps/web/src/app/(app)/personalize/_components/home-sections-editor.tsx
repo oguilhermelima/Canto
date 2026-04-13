@@ -156,38 +156,42 @@ export function HomeSectionsEditor(): React.JSX.Element {
   }, [resetMutation]);
 
   return (
-    <div className="py-6">
+    <div className="pt-2">
       {/* Toolbar */}
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between">
         <Button
+          variant="ghost"
+          size="sm"
           onClick={handleAddOpen}
           disabled={sections.length >= 30}
-          className="rounded-xl"
+          className="rounded-lg text-xs text-muted-foreground"
         >
-          <Plus size={15} />
-          Add Section
+          <Plus size={14} />
+          Add
         </Button>
         <div className="flex items-center gap-2">
           {sections.length > 0 && (
-            <span className="text-xs text-muted-foreground">{sections.length}/30</span>
+            <span className="text-[10px] text-muted-foreground">{sections.length}/30</span>
           )}
           <Button
             variant="ghost"
+            size="sm"
             onClick={handleReset}
             disabled={resetMutation.isPending}
-            className="rounded-xl text-muted-foreground"
+            className="rounded-lg text-xs text-muted-foreground"
           >
-            <RotateCcw size={14} />
+            <RotateCcw size={12} />
             Reset
           </Button>
           {dirty && (
             <Button
+              size="sm"
               onClick={handleSave}
               disabled={saveMutation.isPending}
-              className="rounded-xl"
+              className="rounded-lg text-xs"
             >
-              {saveMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-              Save Changes
+              {saveMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+              Save
             </Button>
           )}
         </div>

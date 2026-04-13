@@ -157,15 +157,15 @@ export function ProfileSectionsEditor(): React.JSX.Element {
   }, [resetMutation]);
 
   return (
-    <div className="py-6">
+    <div className="pt-2">
       {/* Toolbar */}
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between">
         <div className="relative">
           {availableToAdd.length > 0 && (
             <div className="group relative">
-              <Button className="rounded-xl">
-                <Plus size={15} />
-                Add Section
+              <Button variant="ghost" size="sm" className="rounded-lg text-xs text-muted-foreground">
+                <Plus size={14} />
+                Add
               </Button>
               <div className="invisible absolute left-0 top-full z-30 mt-1 max-h-[320px] min-w-[260px] overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-lg group-focus-within:visible group-hover:visible">
                 {availableToAdd.map(([key, meta]) => (
@@ -190,21 +190,23 @@ export function ProfileSectionsEditor(): React.JSX.Element {
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
+            size="sm"
             onClick={handleReset}
             disabled={resetMutation.isPending}
-            className="rounded-xl text-muted-foreground"
+            className="rounded-lg text-xs text-muted-foreground"
           >
-            <RotateCcw size={14} />
+            <RotateCcw size={12} />
             Reset
           </Button>
           {dirty && (
             <Button
+              size="sm"
               onClick={handleSave}
               disabled={saveMutation.isPending}
-              className="rounded-xl"
+              className="rounded-lg text-xs"
             >
-              {saveMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-              Save Changes
+              {saveMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+              Save
             </Button>
           )}
         </div>
