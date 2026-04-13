@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { asc, eq } from "drizzle-orm";
 import { user } from "@canto/db/schema";
 import { setUserPreferencesInput } from "@canto/validators";
@@ -62,4 +63,30 @@ export const authRouter = createTRPCRouter({
         .where(eq(user.id, ctx.session.user.id));
       return { success: true };
     }),
+
+  /** Update profile (bio, headerImage) */
+  updateProfile: protectedProcedure
+    .input(z.object({
+      bio: z.string().max(500).nullable().optional(),
+      headerImage: z.string().max(500).nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const updates: Partial<{ bio: string | null; headerImage: string | null }> = {};
+      if (input.bio !== undefined) updates.bio = input.bio;
+      if (input.headerImage !== undefined) updates.headerImage = input.headerImage;
+
+      if (Object.keys(updates).length === 0) return { success: true };
+
+      await ctx.db.update(user).set(updates).where(eq(user.id, ctx.session.user.id));
+      return { success: true };
+    }),
+
+  /** Get profile (bio, headerImage) */
+  getProfile: protectedProcedure.query(async ({ ctx }) => {
+    const [row] = await ctx.db
+      .select({ bio: user.bio, headerImage: user.headerImage })
+      .from(user)
+      .where(eq(user.id, ctx.session.user.id));
+    return { bio: row?.bio ?? null, headerImage: row?.headerImage ?? null };
+  }),
 });

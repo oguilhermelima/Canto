@@ -48,6 +48,7 @@ export function AvatarPickerDialog({
       await authClient.updateUser({ image: src });
       toast.success("Avatar updated");
       onOpenChange(false);
+      window.location.reload();
     } catch {
       toast.error("Failed to update avatar");
     } finally {
@@ -88,6 +89,7 @@ export function AvatarPickerDialog({
 
       toast.success("Avatar uploaded");
       onOpenChange(false);
+      window.location.reload();
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to upload avatar",
