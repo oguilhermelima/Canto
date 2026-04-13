@@ -284,7 +284,7 @@ export function SpotlightHero({
               <Link
                 href={getPreviewUrl(currentItem)}
                 onMouseEnter={() => prefetchSpotlight(currentItem)}
-                className="inline-flex h-10 items-center gap-2 rounded-xl bg-foreground/15 px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/25"
+                className="inline-flex h-11 items-center gap-2 rounded-xl border border-foreground/10 bg-foreground/15 px-4 text-sm font-medium text-foreground backdrop-blur-md transition-all hover:bg-foreground/25"
               >
                 <Info className="h-4 w-4" />
                 More Info
