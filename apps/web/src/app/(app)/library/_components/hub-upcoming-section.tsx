@@ -6,7 +6,7 @@ export function HubUpcomingSection(): React.JSX.Element {
   return (
     <UpcomingScheduleSectionContent
       title="Upcoming Schedule"
-      seeAllHref="/library/collections"
+      seeAllHref="/library/upcoming"
     />
   );
 }

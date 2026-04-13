@@ -60,7 +60,7 @@ function WatchNextDynamic({ title, style }: WatchNextSourceProps): React.JSX.Ele
     <DynamicSection
       style={style}
       title={title}
-      seeAllHref="/library/watched"
+      seeAllHref="/library/watch-next"
       items={items}
       isLoading={query.isLoading}
       isError={query.isError}

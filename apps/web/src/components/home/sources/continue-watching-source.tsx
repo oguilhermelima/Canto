@@ -60,7 +60,7 @@ function ContinueWatchingDynamic({ title, style }: ContinueWatchingSourceProps):
     <DynamicSection
       style={style}
       title={title}
-      seeAllHref="/library/watched"
+      seeAllHref="/library/continue-watching"
       items={items}
       isLoading={query.isLoading}
       isError={query.isError}

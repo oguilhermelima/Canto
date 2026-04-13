@@ -66,7 +66,7 @@ export function RecommendationsSource({ title, style }: RecommendationsSourcePro
     <DynamicSection
       style={style}
       title={title}
-      seeAllHref="/search"
+      seeAllHref="/library/recommendations"
       items={items}
       isLoading={query.isLoading}
       isError={query.isError}

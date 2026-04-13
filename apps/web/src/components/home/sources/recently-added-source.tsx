@@ -38,7 +38,7 @@ export function RecentlyAddedSource({ title, style }: RecentlyAddedSourceProps):
     <DynamicSection
       style={style}
       title={title}
-      seeAllHref="/library/collections"
+      seeAllHref="/collection/server-library"
       items={items}
       isLoading={query.isLoading}
       isError={query.isError}

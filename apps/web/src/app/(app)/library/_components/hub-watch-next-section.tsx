@@ -7,7 +7,7 @@ export function HubWatchNextSection(): React.JSX.Element {
     <WatchNextTab
       view="watch_next"
       title="Watch Next"
-      seeAllHref="/library/collections"
+      seeAllHref="/library/watch-next"
     />
   );
 }
