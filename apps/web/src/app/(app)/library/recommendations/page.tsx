@@ -2,9 +2,11 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { BrowseLayout } from "~/components/layout/browse-layout";
-import type { FilterOutput } from "~/components/layout/browse-layout";
+import type { FilterOutput, BrowseItem } from "~/components/layout/browse-layout";
+import { browseStrategy } from "~/components/layout/card-strategies";
 import { StateMessage } from "~/components/layout/state-message";
 import { useDocumentTitle } from "~/hooks/use-document-title";
+import { useViewMode } from "~/hooks/use-view-mode";
 import { trpc } from "~/lib/trpc/client";
 
 const PAGE_SIZE = 20;
@@ -14,6 +16,7 @@ export default function RecommendationsPage(): React.JSX.Element {
 
   const [mediaType, setMediaType] = useState<"all" | "movie" | "show">("all");
   const [filters, setFilters] = useState<FilterOutput>({});
+  const [viewMode, setViewMode] = useViewMode("canto.browse.viewMode.recommendations");
 
   const { data, isLoading, isError, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
     trpc.media.recommendations.useInfiniteQuery(
@@ -42,7 +45,7 @@ export default function RecommendationsPage(): React.JSX.Element {
       },
     );
 
-  const allItems = useMemo(() => {
+  const allItems: BrowseItem[] = useMemo(() => {
     const seen = new Set<string>();
     return (data?.pages ?? [])
       .flatMap((p) => p.items)
@@ -53,6 +56,7 @@ export default function RecommendationsPage(): React.JSX.Element {
         return true;
       })
       .map((r) => ({
+        id: `${r.provider}-${r.externalId}`,
         externalId: r.externalId,
         provider: r.provider,
         type: r.type as "movie" | "show",
@@ -75,38 +79,25 @@ export default function RecommendationsPage(): React.JSX.Element {
     if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  if (isError) {
-    return (
-      <BrowseLayout
-        title="Recommendations"
-        subtitle="Personalized picks based on your library."
-        items={[]}
-        totalResults={0}
-        isLoading={false}
-        isFetchingNextPage={false}
-        hasNextPage={false}
-        onFetchNextPage={() => {}}
-        emptyState={
-          <StateMessage preset="error" onRetry={() => void refetch()} />
-        }
-      />
-    );
-  }
-
   return (
     <BrowseLayout
       title="Recommendations"
       subtitle="Personalized picks based on your library."
       items={items}
       totalResults={items.length}
+      strategy={browseStrategy}
+      viewMode={viewMode}
+      onViewModeChange={setViewMode}
       isLoading={isLoading}
       isFetchingNextPage={isFetchingNextPage}
       hasNextPage={hasNextPage}
       onFetchNextPage={handleFetchNextPage}
+      filterPreset="tmdb"
       onFilterChange={setFilters}
       mediaType={mediaType}
       onMediaTypeChange={setMediaType}
       emptyState={<StateMessage preset="emptyWatchlist" />}
+      errorState={isError ? <StateMessage preset="error" onRetry={() => void refetch()} /> : undefined}
     />
   );
 }

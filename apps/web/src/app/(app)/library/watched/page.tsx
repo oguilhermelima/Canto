@@ -1,34 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Film, Loader2, Tv } from "lucide-react";
-import { PageHeader } from "~/components/layout/page-header";
-import { TabBar  } from "~/components/layout/tab-bar";
-import type {TabItem} from "~/components/layout/tab-bar";
+import { useCallback, useMemo, useState } from "react";
+import { BrowseLayout } from "~/components/layout/browse-layout";
+import type { FilterOutput, BrowseItem } from "~/components/layout/browse-layout";
+import { historyStrategy } from "~/components/layout/card-strategies";
 import { StateMessage } from "~/components/layout/state-message";
 import { useDocumentTitle } from "~/hooks/use-document-title";
+import { useViewMode } from "~/hooks/use-view-mode";
 import { trpc } from "~/lib/trpc/client";
-import {
-  LibraryPlaybackCard
-  
-} from "../_components/library-playback-card";
-import type {LibraryPlaybackEntry} from "../_components/library-playback-card";
-
-const TYPE_TABS: TabItem[] = [
-  { value: "all", label: "All" },
-  { value: "movie", label: "Movies", icon: Film },
-  { value: "show", label: "TV Shows", icon: Tv },
-];
 
 const PAGE_SIZE = 40;
 
 export default function WatchedPage(): React.JSX.Element {
   useDocumentTitle("Watched");
 
-  const [mediaType, setMediaType] = useState("all");
-  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [mediaType, setMediaType] = useState<"all" | "movie" | "show">("all");
+  const [filters, setFilters] = useState<FilterOutput>({});
+  const [viewMode, setViewMode] = useViewMode("canto.browse.viewMode.watched", "list");
 
-  const queryMediaType = mediaType === "all" ? undefined : (mediaType as "movie" | "show");
+  const queryMediaType = mediaType === "all" ? undefined : mediaType;
 
   const {
     data,
@@ -39,82 +29,83 @@ export default function WatchedPage(): React.JSX.Element {
     isFetchingNextPage,
     fetchNextPage,
   } = trpc.userMedia.getLibraryHistory.useInfiniteQuery(
-    { limit: PAGE_SIZE, mediaType: queryMediaType, completedOnly: true },
+    {
+      limit: PAGE_SIZE,
+      mediaType: queryMediaType,
+      completedOnly: true,
+      source: filters.source,
+      sortBy: filters.sortBy as "recently_watched" | "name_asc" | "name_desc" | "year_desc" | "year_asc" | undefined,
+      yearMin: filters.yearMin ? Number(filters.yearMin) : undefined,
+      yearMax: filters.yearMax ? Number(filters.yearMax) : undefined,
+      genreIds: filters.genreIds,
+      scoreMin: filters.scoreMin,
+      scoreMax: filters.scoreMax,
+      runtimeMin: filters.runtimeMin,
+      runtimeMax: filters.runtimeMax,
+      language: filters.language,
+      certification: filters.certification,
+      tvStatus: filters.status,
+    },
     {
       getNextPageParam: (lastPage) => lastPage.nextCursor,
       initialCursor: 0,
     },
   );
 
-  const watchedItems = useMemo(
+  const items: BrowseItem[] = useMemo(
     () =>
-      (data?.pages.flatMap((page) => page.items) ?? []) as LibraryPlaybackEntry[],
+      (data?.pages.flatMap((page) => page.items) ?? []).map((entry) => ({
+        id: entry.id,
+        externalId: entry.externalId,
+        provider: entry.provider,
+        type: entry.mediaType as "movie" | "show",
+        title: entry.title,
+        posterPath: entry.posterPath,
+        year: entry.year ?? null,
+        entryType: entry.entryType as "history" | "playback",
+        watchedAt: entry.watchedAt,
+        source: entry.source,
+        episode: entry.episode,
+        progress: entry.progressPercent != null
+          ? {
+              percent: entry.progressPercent,
+              value: entry.progressValue ?? 0,
+              total: entry.progressTotal ?? 0,
+              unit: (entry.progressUnit ?? "seconds") as "seconds" | "episodes",
+            }
+          : null,
+        isCompleted: entry.isCompleted ?? null,
+      })),
     [data],
   );
 
   const handleFetchNextPage = useCallback(() => {
-    if (hasNextPage && !isFetchingNextPage) {
-      void fetchNextPage();
-    }
+    if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) handleFetchNextPage();
-      },
-      { rootMargin: "220px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [handleFetchNextPage]);
-
   return (
-    <div className="w-full pb-12">
-      <PageHeader title="Watched" subtitle="Everything you've finished watching." />
-      <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        <TabBar tabs={TYPE_TABS} value={mediaType} onChange={setMediaType} />
-
-        {isLoading ? (
-          <div className="space-y-2.5">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div
-                key={index}
-                className="h-[120px] animate-pulse rounded-2xl bg-muted"
-              />
-            ))}
-          </div>
-        ) : isError ? (
-          <StateMessage preset="error" onRetry={() => void refetch()} />
-        ) : watchedItems.length === 0 ? (
-          <StateMessage
-            title="Uncharted territory"
-            description="Your watched titles will appear here as you explore the cosmos of entertainment."
-          />
-        ) : (
-          <>
-            <div className="space-y-2.5">
-              {watchedItems.map((entry) => (
-                <LibraryPlaybackCard key={entry.id} entry={entry} mode="watched" />
-              ))}
-            </div>
-
-            <div ref={sentinelRef} className="h-1" />
-
-            {isFetchingNextPage && (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            )}
-
-            {!hasNextPage && !isFetchingNextPage && watchedItems.length > 0 && (
-              <StateMessage preset="endOfItems" inline />
-            )}
-          </>
-        )}
-      </div>
-    </div>
+    <BrowseLayout
+      title="Watched"
+      subtitle="Everything you've finished watching."
+      items={items}
+      strategy={historyStrategy}
+      viewMode={viewMode}
+      onViewModeChange={setViewMode}
+      isLoading={isLoading}
+      isFetchingNextPage={isFetchingNextPage}
+      hasNextPage={hasNextPage}
+      onFetchNextPage={handleFetchNextPage}
+      filterPreset="library"
+      onFilterChange={setFilters}
+      mediaType={mediaType}
+      onMediaTypeChange={setMediaType}
+      emptyState={
+        <StateMessage
+          title="Uncharted territory"
+          description="Your watched titles will appear here as you explore the cosmos of entertainment."
+        />
+      }
+      errorState={isError ? <StateMessage preset="error" onRetry={() => void refetch()} /> : undefined}
+    />
   );
 }

@@ -1,16 +1,19 @@
 "use client";
 
 import { Film, Tv } from "lucide-react";
-import { BrowseLayout  } from "~/components/layout/browse-layout";
-import type {FilterOutput} from "~/components/layout/browse-layout";
+import { BrowseLayout } from "~/components/layout/browse-layout";
+import type { FilterOutput, BrowseItem } from "~/components/layout/browse-layout";
+import { browseStrategy } from "~/components/layout/card-strategies";
 import { TabBar } from "~/components/layout/tab-bar";
 import { StateMessage } from "~/components/layout/state-message";
+import { useViewMode } from "~/hooks/use-view-mode";
 
 const TYPE_OPTIONS = [
   { value: "multi" as const, label: "All" },
   { value: "movie" as const, label: "Movies", icon: Film },
   { value: "show" as const, label: "TV Shows", icon: Tv },
 ];
+
 
 interface SearchResultsProps {
   header: React.ReactNode;
@@ -52,14 +55,33 @@ export function SearchResults({
   onFetchNextPage,
   onRefetchAll,
 }: SearchResultsProps): React.JSX.Element {
+  const [viewMode, setViewMode] = useViewMode("canto.browse.viewMode.search");
+
+  const browseItems: BrowseItem[] = items.map((r) => ({
+    id: `${r.provider}-${r.externalId}`,
+    externalId: r.externalId,
+    provider: r.provider,
+    type: r.type,
+    title: r.title,
+    posterPath: r.posterPath,
+    year: r.year,
+    voteAverage: r.voteAverage,
+    popularity: r.popularity,
+  }));
+
   return (
     <BrowseLayout
       title="Search"
       hideTitle
+      strategy={browseStrategy}
+      viewMode={viewMode}
+      onViewModeChange={setViewMode}
       mediaType={searchType === "multi" ? "all" : searchType}
+      filterPreset="tmdb"
       onFilterChange={onFilterChange}
+      sidebarClassName="pt-8"
       header={header}
-      items={items}
+      items={browseItems}
       totalResults={totalResults}
       isLoading={isLoading}
       isFetchingNextPage={isFetchingNextPage}
@@ -80,6 +102,7 @@ export function SearchResults({
           <StateMessage preset="emptySearch" minHeight="400px" />
         ) : undefined
       }
+      errorState={undefined}
     />
   );
 }

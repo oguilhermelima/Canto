@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useState, useMemo, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@canto/ui/button";
 import {
@@ -12,37 +12,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@canto/ui/dialog";
-import type {FilterOutput} from "~/components/media/filter-sidebar";
-import type { ViewMode } from "~/components/layout/view-mode-toggle";
+import { BrowseLayout } from "~/components/layout/browse-layout";
+import type { FilterOutput, BrowseItem } from "~/components/layout/browse-layout";
+import { collectionStrategy } from "~/components/layout/card-strategies";
+import { StateMessage } from "~/components/layout/state-message";
 import { trpc } from "~/lib/trpc/client";
 import { useDocumentTitle } from "~/hooks/use-document-title";
-import { StateMessage } from "~/components/layout/state-message";
-import { PageHeader } from "~/components/layout/page-header";
+import { useViewMode } from "~/hooks/use-view-mode";
 import { CollectionEditPopover } from "../../library/_components/collection-edit-popover";
 import { CollectionMembersDialog } from "../../library/_components/collection-members-dialog";
-import { ListFilterSidebar } from "./_components/list-filter-sidebar";
-import { ListContent } from "./_components/list-content";
 
 const PAGE_SIZE = 20;
-const VIEW_MODE_KEY = "canto.collection.viewMode";
 
 export default function ListDetailPage(): React.JSX.Element {
   const params = useParams<{ slug: string }>();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const slug = params.slug;
 
-  const initialTypeFilter = ((): "all" | "movie" | "show" => {
-    const t = searchParams.get("type");
-    return t === "movie" || t === "show" ? t : "all";
-  })();
-  const [typeFilter, setTypeFilter] = useState<"all" | "movie" | "show">(initialTypeFilter);
-  const [showFilters, setShowFilters] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<"all" | "movie" | "show">("all");
   const [filters, setFilters] = useState<FilterOutput>({});
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    if (typeof window === "undefined") return "grid";
-    return (localStorage.getItem(VIEW_MODE_KEY) as ViewMode | null) ?? "grid";
-  });
+  const [viewMode, setViewMode] = useViewMode("canto.collection.viewMode");
   const [shareListId, setShareListId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
@@ -55,12 +44,6 @@ export default function ListDetailPage(): React.JSX.Element {
     },
     onError: (err) => toast.error(err.message),
   });
-
-  const handleViewModeChange = useCallback((mode: ViewMode) => {
-    setViewMode(mode);
-    localStorage.setItem(VIEW_MODE_KEY, mode);
-  }, []);
-  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading, error, hasNextPage, isFetchingNextPage, fetchNextPage } =
     trpc.list.getBySlug.useInfiniteQuery(
@@ -95,8 +78,6 @@ export default function ListDetailPage(): React.JSX.Element {
 
   useDocumentTitle(data?.pages[0]?.list.name);
 
-  const handleFilterChange = useCallback((f: FilterOutput) => setFilters(f), []);
-
   const listId = data?.pages[0]?.list.id;
 
   const baseItems = useMemo(() => {
@@ -125,16 +106,17 @@ export default function ListDetailPage(): React.JSX.Element {
     { enabled: !!listId && mediaIds.length > 0 },
   );
 
-  const items = useMemo(() => {
-    if (!votes || votes.length === 0) return baseItems;
-    const voteMap = new Map(votes.map((v) => [v.mediaId, v]));
+  const items: BrowseItem[] = useMemo(() => {
+    const voteMap = votes && votes.length > 0
+      ? new Map(votes.map((v) => [v.mediaId, v]))
+      : null;
+
     return baseItems.map((item) => {
-      const vote = item.id ? voteMap.get(item.id) : undefined;
-      if (!vote) return item;
+      const vote = voteMap?.get(item.id);
       return {
         ...item,
-        totalRating: vote.totalRating,
-        voteCount: vote.voteCount,
+        totalRating: vote?.totalRating,
+        voteCount: vote?.voteCount,
       };
     });
   }, [baseItems, votes]);
@@ -142,19 +124,6 @@ export default function ListDetailPage(): React.JSX.Element {
   const handleFetchNextPage = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
-
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) handleFetchNextPage();
-      },
-      { rootMargin: "200px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [handleFetchNextPage]);
 
   if (error) {
     return (
@@ -169,11 +138,11 @@ export default function ListDetailPage(): React.JSX.Element {
   const listRow = data?.pages[0]?.list;
 
   return (
-    <div className="w-full pb-12">
-      <PageHeader
+    <>
+      <BrowseLayout
         title={listRow?.name ?? "List"}
         subtitle={listRow?.description ?? undefined}
-        action={
+        titleAction={
           listRow && listRow.type === "custom" ? (
             <CollectionEditPopover
               list={{
@@ -188,29 +157,25 @@ export default function ListDetailPage(): React.JSX.Element {
             />
           ) : undefined
         }
+        items={items}
+        strategy={collectionStrategy}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        isLoading={isLoading}
+        isFetchingNextPage={isFetchingNextPage}
+        hasNextPage={hasNextPage}
+        onFetchNextPage={handleFetchNextPage}
+        filterPreset="tmdb"
+        onFilterChange={setFilters}
+        mediaType={typeFilter}
+        onMediaTypeChange={setTypeFilter}
+        emptyState={
+          <StateMessage
+            preset="emptyList"
+            action={{ label: "Discover Media", onClick: () => router.push("/") }}
+          />
+        }
       />
-
-      <div className="flex px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        <ListFilterSidebar
-          mediaType={typeFilter}
-          visible={showFilters}
-          onFilterChange={handleFilterChange}
-        />
-
-        <ListContent
-          items={items}
-          isLoading={isLoading}
-          typeFilter={typeFilter}
-          onTypeChange={setTypeFilter}
-          showFilters={showFilters}
-          onToggleFilters={() => setShowFilters((v) => !v)}
-          viewMode={viewMode}
-          onViewModeChange={handleViewModeChange}
-          sentinelRef={sentinelRef}
-          isFetchingNextPage={isFetchingNextPage}
-          hasNextPage={hasNextPage}
-        />
-      </div>
 
       <CollectionMembersDialog
         listId={shareListId}
@@ -238,6 +203,6 @@ export default function ListDetailPage(): React.JSX.Element {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

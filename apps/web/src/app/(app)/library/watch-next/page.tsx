@@ -1,67 +1,72 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Film, Loader2, Tv } from "lucide-react";
-import { cn } from "@canto/ui/cn";
-import { PageHeader } from "~/components/layout/page-header";
-import { TabBar } from "~/components/layout/tab-bar";
-import type { TabItem } from "~/components/layout/tab-bar";
+import { useCallback, useMemo, useState } from "react";
+import { BrowseLayout } from "~/components/layout/browse-layout";
+import type { FilterOutput, BrowseItem } from "~/components/layout/browse-layout";
+import { progressStrategy } from "~/components/layout/card-strategies";
 import { StateMessage } from "~/components/layout/state-message";
-import { FilterSidebar } from "~/components/media/filter-sidebar";
 import { useDocumentTitle } from "~/hooks/use-document-title";
+import { useViewMode } from "~/hooks/use-view-mode";
 import { trpc } from "~/lib/trpc/client";
-import {
-  LibraryPlaybackCard,
-} from "../_components/library-playback-card";
-import type { LibraryPlaybackEntry } from "../_components/library-playback-card";
-
-const TYPE_TABS: TabItem[] = [
-  { value: "all", label: "All" },
-  { value: "movie", label: "Movies", icon: Film },
-  { value: "show", label: "TV Shows", icon: Tv },
-];
 
 const PAGE_SIZE = 40;
 
 export default function WatchNextPage(): React.JSX.Element {
   useDocumentTitle("Watch Next");
 
-  const [mediaType, setMediaType] = useState("all");
-  const [showFilters, setShowFilters] = useState(true);
-  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [mediaType, setMediaType] = useState<"all" | "movie" | "show">("all");
+  const [filters, setFilters] = useState<FilterOutput>({});
+  const [viewMode, setViewMode] = useViewMode("canto.browse.viewMode.watchNext", "list");
 
   const queryMediaType =
-    mediaType === "all" ? undefined : (mediaType as "movie" | "show");
+    mediaType === "all" ? undefined : mediaType;
 
   const { data, isLoading, isError, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
     trpc.userMedia.getLibraryWatchNext.useInfiniteQuery(
-      { limit: PAGE_SIZE, view: "watch_next", mediaType: queryMediaType },
+      {
+        limit: PAGE_SIZE,
+        view: "watch_next",
+        mediaType: queryMediaType,
+        source: filters.source,
+        sortBy: filters.sortBy as "recently_watched" | "name_asc" | "name_desc" | "year_desc" | "year_asc" | undefined,
+        yearMin: filters.yearMin ? Number(filters.yearMin) : undefined,
+        yearMax: filters.yearMax ? Number(filters.yearMax) : undefined,
+        genreIds: filters.genreIds,
+        scoreMin: filters.scoreMin,
+        scoreMax: filters.scoreMax,
+        runtimeMin: filters.runtimeMin,
+        runtimeMax: filters.runtimeMax,
+        language: filters.language,
+        certification: filters.certification,
+        tvStatus: filters.status,
+      },
       { getNextPageParam: (lp) => lp.nextCursor, initialCursor: 0 },
     );
 
-  const items = useMemo(
+  const items: BrowseItem[] = useMemo(
     () =>
-      (data?.pages.flatMap((p) => p.items) ?? []).map(
-        (item): LibraryPlaybackEntry => ({
-          id: item.id,
-          entryType: "playback",
-          mediaId: item.mediaId,
-          mediaType: item.mediaType,
-          title: item.title,
-          posterPath: item.posterPath,
-          year: item.year,
-          externalId: item.externalId,
-          provider: item.provider,
-          watchedAt: item.watchedAt ?? new Date(),
-          source: item.source,
-          episode: item.episode,
-          progressPercent: item.progressPercent,
-          progressValue: item.progressValue,
-          progressTotal: item.progressTotal,
-          progressUnit: item.progressUnit,
-          isCompleted: false,
-        }),
-      ),
+      (data?.pages.flatMap((p) => p.items) ?? []).map((item) => ({
+        id: item.id,
+        externalId: item.externalId,
+        provider: item.provider,
+        type: item.mediaType as "movie" | "show",
+        title: item.title,
+        posterPath: item.posterPath,
+        year: item.year,
+        entryType: "playback" as const,
+        watchedAt: item.watchedAt ?? new Date(),
+        source: item.source,
+        episode: item.episode,
+        progress: item.progressPercent != null
+          ? {
+              percent: item.progressPercent,
+              value: item.progressValue ?? 0,
+              total: item.progressTotal ?? 0,
+              unit: (item.progressUnit ?? "seconds") as "seconds" | "episodes",
+            }
+          : null,
+        isCompleted: false,
+      })),
     [data],
   );
 
@@ -69,87 +74,24 @@ export default function WatchNextPage(): React.JSX.Element {
     if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) handleFetchNextPage();
-      },
-      { rootMargin: "220px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [handleFetchNextPage]);
-
   return (
-    <div className="w-full pb-12">
-      <PageHeader
-        title="Watch Next"
-        subtitle="Your next episodes are ready."
-      />
-      <div className="flex px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        <div
-          className={cn(
-            "hidden w-[20rem] shrink-0 transition-[margin,opacity] duration-300 ease-in-out md:block",
-            showFilters ? "mr-4 opacity-100 lg:mr-8" : "-ml-[20rem] mr-0 opacity-0",
-          )}
-        >
-          <FilterSidebar
-            mediaType={mediaType as "all" | "movie" | "show"}
-            onFilterChange={() => {}}
-          />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <TabBar
-            tabs={TYPE_TABS}
-            value={mediaType}
-            onChange={setMediaType}
-            onFilter={() => setShowFilters(!showFilters)}
-            filterActive={showFilters}
-          />
-
-          {isLoading ? (
-            <div className="space-y-2.5">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-[120px] animate-pulse rounded-2xl bg-muted"
-                />
-              ))}
-            </div>
-          ) : isError ? (
-            <StateMessage preset="error" onRetry={() => void refetch()} />
-          ) : items.length === 0 ? (
-            <StateMessage preset="emptyWatchNext" />
-          ) : (
-            <>
-              <div className="space-y-2.5">
-                {items.map((entry) => (
-                  <LibraryPlaybackCard
-                    key={entry.id}
-                    entry={entry}
-                    mode="watched"
-                  />
-                ))}
-              </div>
-
-              <div ref={sentinelRef} className="h-1" />
-
-              {isFetchingNextPage && (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                </div>
-              )}
-
-              {!hasNextPage && !isFetchingNextPage && items.length > 0 && (
-                <StateMessage preset="endOfItems" inline />
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+    <BrowseLayout
+      title="Watch Next"
+      subtitle="Your next episodes are ready."
+      items={items}
+      strategy={progressStrategy}
+      viewMode={viewMode}
+      onViewModeChange={setViewMode}
+      isLoading={isLoading}
+      isFetchingNextPage={isFetchingNextPage}
+      hasNextPage={hasNextPage}
+      onFetchNextPage={handleFetchNextPage}
+      filterPreset="library"
+      onFilterChange={setFilters}
+      mediaType={mediaType}
+      onMediaTypeChange={setMediaType}
+      emptyState={<StateMessage preset="emptyWatchNext" />}
+      errorState={isError ? <StateMessage preset="error" onRetry={() => void refetch()} /> : undefined}
+    />
   );
 }
