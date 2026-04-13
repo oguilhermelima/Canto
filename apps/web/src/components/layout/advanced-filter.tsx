@@ -59,16 +59,7 @@ export function AdvancedFilter({
       {/* Mobile: full-screen dialog from bottom */}
       <Dialog open={mobileOpen} onOpenChange={onMobileOpenChange}>
         <DialogContent
-          className={cn(
-            "fixed inset-0 flex h-full w-full max-w-full flex-col gap-0 rounded-none border-0 p-0",
-            "left-0 top-0 translate-x-0 translate-y-0",
-            "data-[state=open]:animate-in data-[state=closed]:animate-out",
-            "data-[state=open]:slide-in-from-bottom data-[state=open]:fade-in-0 data-[state=open]:duration-300",
-            "data-[state=closed]:slide-out-to-bottom data-[state=closed]:fade-out-0 data-[state=closed]:duration-200",
-            "data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100",
-            "data-[state=open]:slide-in-from-top-0 data-[state=closed]:slide-out-to-top-0",
-            "[&>button:last-child]:hidden",
-          )}
+          className="fixed inset-0 flex h-full w-full max-w-full translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-0 p-0 [&>button:last-child]:hidden"
         >
           <DialogHeader bar>
             <div className="flex items-center justify-between">
