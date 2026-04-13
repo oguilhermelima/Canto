@@ -3,14 +3,16 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { cn } from "@canto/ui/cn";
 import { Film, Loader2, Tv } from "lucide-react";
-import { MediaGrid } from "~/components/media/media-grid";
 import { PageHeader } from "~/components/layout/page-header";
 import { TabBar } from "~/components/layout/tab-bar";
 import { StateMessage } from "~/components/layout/state-message";
-import { FilterSidebar  } from "~/components/media/filter-sidebar";
-import type {FilterOutput} from "~/components/media/filter-sidebar";
+import { ViewModeToggle } from "~/components/layout/view-mode-toggle";
+import { AdvancedFilter } from "~/components/layout/advanced-filter";
+import { useIsMobile } from "~/hooks/use-is-mobile";
+import type { FilterOutput } from "~/components/media/filter-sidebar";
+import type { BrowseItem, CardStrategy, FilterPreset, ViewMode } from "~/components/layout/browse-layout.types";
 
-export type { FilterOutput };
+export type { FilterOutput, BrowseItem, CardStrategy, FilterPreset, ViewMode };
 
 const MEDIA_TYPE_TABS = [
   { value: "all", label: "All" },
@@ -18,35 +20,43 @@ const MEDIA_TYPE_TABS = [
   { value: "show", label: "TV Shows", icon: Tv },
 ];
 
-interface MediaItem {
-  externalId: number;
-  provider: string;
-  type: "movie" | "show";
-  title: string;
-  posterPath: string | null;
-  year: number | undefined;
-  voteAverage: number | undefined;
-  popularity?: number | null;
-}
+const DEFAULT_GRID_COLS = "grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 5xl:grid-cols-7 7xl:grid-cols-10";
+const DEFAULT_COMPACT_COLS = "grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 3xl:grid-cols-5 5xl:grid-cols-6 7xl:grid-cols-9";
 
 interface BrowseLayoutProps {
   title: string;
   subtitle?: string;
-  items: MediaItem[];
-  totalResults: number;
+  items: BrowseItem[];
+  totalResults?: number;
+  strategy: CardStrategy;
+
+  // View mode
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
+
+  // Infinite scroll
   isLoading: boolean;
   isFetchingNextPage: boolean;
   hasNextPage: boolean;
   onFetchNextPage: () => void;
+
+  // Filters (optional — omit filterPreset to hide filter UI)
+  filterPreset?: FilterPreset;
   onFilterChange?: (filters: FilterOutput) => void;
+
+  // Media type tabs
   mediaType?: "movie" | "show" | "all";
   onMediaTypeChange?: (type: "movie" | "show" | "all") => void;
-  emptyState?: React.ReactNode;
+  allowedMediaTypes?: ("all" | "movie" | "show")[];
+
+  // Slots
   hideTitle?: boolean;
+  titleAction?: React.ReactNode;
   toolbar?: React.ReactNode;
   header?: React.ReactNode;
-  /** When set, only these media types appear in the tab bar. If ≤ 1 tab remains, the tab bar is hidden. */
-  allowedMediaTypes?: ("all" | "movie" | "show")[];
+  emptyState?: React.ReactNode;
+  errorState?: React.ReactNode;
+  sidebarClassName?: string;
 }
 
 export function BrowseLayout({
@@ -54,20 +64,29 @@ export function BrowseLayout({
   subtitle,
   items,
   totalResults,
+  strategy,
+  viewMode,
+  onViewModeChange,
   isLoading,
   isFetchingNextPage,
   hasNextPage,
   onFetchNextPage,
+  filterPreset,
   onFilterChange,
   mediaType = "all",
   onMediaTypeChange,
-  emptyState,
+  allowedMediaTypes,
   hideTitle = false,
+  titleAction,
   toolbar,
   header,
-  allowedMediaTypes,
+  emptyState,
+  errorState,
+  sidebarClassName,
 }: BrowseLayoutProps): React.JSX.Element {
-  const [showFilters, setShowFilters] = useState(true);
+  const isMobile = useIsMobile();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const handleFilterChange = useCallback(
@@ -77,15 +96,13 @@ export function BrowseLayout({
     [onFilterChange],
   );
 
-  const gridItems = items.map((r) => ({
-    externalId: String(r.externalId),
-    provider: r.provider,
-    type: r.type,
-    title: r.title,
-    posterPath: r.posterPath,
-    year: r.year,
-    voteAverage: r.voteAverage,
-  }));
+  const handleFilterToggle = useCallback(() => {
+    if (isMobile) {
+      setMobileFilterOpen(true);
+    } else {
+      setSidebarOpen((prev) => !prev);
+    }
+  }, [isMobile]);
 
   // Intersection observer for infinite scroll
   useEffect(() => {
@@ -106,77 +123,123 @@ export function BrowseLayout({
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, onFetchNextPage]);
 
+  // Grid column classes
+  const gridCols = strategy.gridCols ?? { default: DEFAULT_GRID_COLS, compact: DEFAULT_COMPACT_COLS };
+  const cols = sidebarOpen && !isMobile ? gridCols.compact : gridCols.default;
+
+  // Tabs
+  const visibleTabs = allowedMediaTypes
+    ? MEDIA_TYPE_TABS.filter((t) => allowedMediaTypes.includes(t.value as "all" | "movie" | "show"))
+    : MEDIA_TYPE_TABS;
+  const showTypeTabs = onMediaTypeChange && visibleTabs.length >= 1;
+
+  // Results count
+  const resultsCount = totalResults != null && totalResults > 0 && !isLoading ? (
+    <span className="hidden text-sm text-muted-foreground md:inline">
+      {totalResults.toLocaleString()} results
+    </span>
+  ) : undefined;
+
+  // View mode toggle + results count trailing element
+  const trailing = (
+    <div className="flex items-center gap-3">
+      <ViewModeToggle value={viewMode} onChange={onViewModeChange} className="hidden md:flex" />
+      {resultsCount}
+    </div>
+  );
+
+  // Skeleton count
+  const skeletonCount = viewMode === "grid" ? 18 : 8;
+
   return (
-    <div className="w-full">
-      {!hideTitle && <PageHeader title={title} subtitle={subtitle} />}
+    <div className="w-full pb-12">
+      {!hideTitle && <PageHeader title={title} subtitle={subtitle} action={titleAction} />}
 
       <div className="flex px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        {/* Sidebar */}
-        <div
-          className={cn(
-            "hidden w-[20rem] shrink-0 transition-[margin,opacity] duration-300 ease-in-out md:block",
-            showFilters
-              ? "mr-4 opacity-100 lg:mr-8"
-              : "-ml-[20rem] mr-0 opacity-0",
-          )}
-        >
-          <FilterSidebar
+        {/* Filter (desktop sidebar + mobile dialog) */}
+        {filterPreset && onFilterChange && (
+          <AdvancedFilter
+            preset={filterPreset}
             mediaType={mediaType}
+            sidebarOpen={sidebarOpen}
+            mobileOpen={mobileFilterOpen}
+            onMobileOpenChange={setMobileFilterOpen}
             onFilterChange={handleFilterChange}
+            sidebarClassName={sidebarClassName}
           />
-        </div>
+        )}
 
         {/* Main content */}
         <div className="min-w-0 flex-1">
           {header}
 
           {/* Toolbar */}
-          {(() => {
-            const visibleTabs = allowedMediaTypes
-              ? MEDIA_TYPE_TABS.filter((t) => allowedMediaTypes.includes(t.value as "all" | "movie" | "show"))
-              : MEDIA_TYPE_TABS;
-            const showTypeTabs = onMediaTypeChange && visibleTabs.length >= 1;
+          {showTypeTabs ? (
+            <TabBar
+              tabs={visibleTabs}
+              value={mediaType}
+              onChange={(v) => onMediaTypeChange!(v as "movie" | "show" | "all")}
+              onFilter={filterPreset ? handleFilterToggle : undefined}
+              filterActive={sidebarOpen && !isMobile}
+              leading={toolbar}
+              trailing={trailing}
+            />
+          ) : (
+            <TabBar
+              tabs={[]}
+              value=""
+              onChange={() => {}}
+              onFilter={filterPreset ? handleFilterToggle : undefined}
+              filterActive={sidebarOpen && !isMobile}
+              leading={toolbar}
+              trailing={trailing}
+            />
+          )}
 
-            const resultsCount = totalResults > 0 && !isLoading ? (
-              <span className="hidden text-sm text-muted-foreground md:inline">
-                {totalResults.toLocaleString()} results
-              </span>
-            ) : undefined;
+          {/* Mobile view mode toggle */}
+          <div className="mb-4 -mt-2 flex justify-end md:hidden">
+            <ViewModeToggle value={viewMode} onChange={onViewModeChange} />
+          </div>
 
-            return showTypeTabs ? (
-              <TabBar
-                tabs={visibleTabs}
-                value={mediaType}
-                onChange={(v) => onMediaTypeChange!(v as "movie" | "show" | "all")}
-                onFilter={() => setShowFilters(!showFilters)}
-                filterActive={showFilters}
-                leading={toolbar}
-                trailing={resultsCount}
-              />
+          {/* Error state */}
+          {errorState ? (
+            errorState
+          ) : /* Loading state */
+          isLoading ? (
+            viewMode === "grid" ? (
+              <div className={cn("grid gap-6", cols)}>
+                {Array.from({ length: skeletonCount }).map((_, i) => (
+                  <div key={i}>{strategy.gridSkeleton()}</div>
+                ))}
+              </div>
             ) : (
-              <TabBar
-                tabs={[]}
-                value=""
-                onChange={() => {}}
-                onFilter={() => setShowFilters(!showFilters)}
-                filterActive={showFilters}
-                leading={toolbar}
-                trailing={resultsCount}
-              />
-            );
-          })()}
-
-          {/* Content */}
-          {!isLoading && items.length === 0 && emptyState ? (
+              <div className="space-y-2.5">
+                {Array.from({ length: skeletonCount }).map((_, i) => (
+                  <div key={i}>{strategy.listSkeleton()}</div>
+                ))}
+              </div>
+            )
+          ) : /* Empty state */
+          items.length === 0 && emptyState ? (
             emptyState
+          ) : /* Content */
+          items.length === 0 ? (
+            <StateMessage preset="emptyGrid" minHeight="300px" />
           ) : (
             <>
-              <MediaGrid
-                items={gridItems}
-                isLoading={isLoading}
-                skeletonCount={18}
-                compact={showFilters}
-              />
+              {viewMode === "grid" ? (
+                <div className={cn("grid gap-6", cols)}>
+                  {items.map((item) => (
+                    <div key={item.id}>{strategy.gridCard(item)}</div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {items.map((item) => (
+                    <div key={item.id}>{strategy.listCard(item)}</div>
+                  ))}
+                </div>
+              )}
 
               <div ref={sentinelRef} className="h-1" />
 
@@ -186,7 +249,7 @@ export function BrowseLayout({
                 </div>
               )}
 
-              {!hasNextPage && !isFetchingNextPage && gridItems.length > 0 && !isLoading && (
+              {!hasNextPage && !isFetchingNextPage && items.length > 0 && (
                 <StateMessage preset="endOfItems" inline />
               )}
             </>
