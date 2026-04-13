@@ -103,6 +103,7 @@ export function MediaDetailContent({
         persistedId={detail.mediaId}
         trackingStatus={detail.userMediaState.data?.trackingStatus as "none" | "planned" | "watching" | "completed" | "dropped" | undefined}
         rating={detail.userMediaState.data?.rating}
+        isFavorite={detail.userMediaState.data?.isFavorite}
         watchTrackingSeasons={
           media.seasons.map((season) => ({
             number: season.number,

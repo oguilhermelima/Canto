@@ -17,6 +17,7 @@ import { MediaLogo } from "~/components/media/media-logo";
 import { RatingControl } from "~/components/media/RatingControl";
 import { PlaybackProgressInfo } from "~/components/media/PlaybackProgressInfo";
 import { WatchTrackingButton } from "~/components/media/watched-toggle-button";
+import { FavoriteButton } from "~/components/media/favorite-button";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -90,6 +91,7 @@ interface MediaDetailHeroProps {
   persistedId?: string;
   trackingStatus?: "none" | "planned" | "watching" | "completed" | "dropped";
   rating?: number | null;
+  isFavorite?: boolean;
   playbackProgress?: {
     progressSeconds: number;
     lastWatchedAt: Date | null;
@@ -126,6 +128,7 @@ export function MediaDetailHero({
   persistedId,
   trackingStatus,
   rating,
+  isFavorite,
   playbackProgress,
   watchTrackingSeasons,
 }: MediaDetailHeroProps): React.JSX.Element {
@@ -400,6 +403,12 @@ export function MediaDetailHero({
                 showWatchlistToggle={false}
                 includeWatchlistInMenu
               />
+              {persistedId && (
+                <FavoriteButton
+                  mediaId={persistedId}
+                  isFavorite={isFavorite ?? false}
+                />
+              )}
             </div>
             {persistedId && isWatched && (
               <div className="inline-flex items-center gap-3 rounded-2xl border border-foreground/10 bg-black/30 px-3 py-2 backdrop-blur-md">

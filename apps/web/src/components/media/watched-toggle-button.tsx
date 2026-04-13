@@ -58,6 +58,7 @@ interface UserMediaStatePayload {
   mediaId: string;
   trackingStatus: TrackingStatus;
   rating: number | null;
+  isFavorite: boolean;
   progress: number;
   isCompleted: boolean;
   lastWatchedAt: Date | null;
