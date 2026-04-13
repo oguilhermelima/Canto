@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@canto/ui/cn";
+import { Separator } from "@canto/ui/separator";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +35,11 @@ export function BrowseMenu({
 }: BrowseMenuProps): React.JSX.Element {
   const [sheetOpen, setSheetOpen] = useState(false);
 
+  const viewItems = [
+    { label: "Grid", icon: LayoutGrid, value: "grid" as const },
+    { label: "List", icon: List, value: "list" as const },
+  ];
+
   return (
     <>
       {/* Desktop: DropdownMenu */}
@@ -46,20 +52,16 @@ export function BrowseMenu({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-[11rem]">
             <DropdownMenuLabel className="text-xs text-muted-foreground">View</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => onViewModeChange("grid")}
-              className={cn(viewMode === "grid" && "text-foreground font-medium")}
-            >
-              <LayoutGrid className="mr-2 h-4 w-4" />
-              Grid view
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onViewModeChange("list")}
-              className={cn(viewMode === "list" && "text-foreground font-medium")}
-            >
-              <List className="mr-2 h-4 w-4" />
-              List view
-            </DropdownMenuItem>
+            {viewItems.map((item) => (
+              <DropdownMenuItem
+                key={item.value}
+                onClick={() => onViewModeChange(item.value)}
+                className={cn(viewMode === item.value && "text-foreground font-medium")}
+              >
+                <item.icon className="mr-2 h-4 w-4" />
+                {item.label} view
+              </DropdownMenuItem>
+            ))}
             {groups?.map((group) => (
               <div key={group.label}>
                 <DropdownMenuSeparator />
@@ -80,7 +82,7 @@ export function BrowseMenu({
         </DropdownMenu>
       </div>
 
-      {/* Mobile: Sheet from bottom */}
+      {/* Mobile: Sheet from bottom — round icon grid like user menu */}
       <div className="md:hidden">
         <button type="button" className={triggerClass} onClick={() => setSheetOpen(true)}>
           <EllipsisVertical className="h-5 w-5" />
@@ -90,51 +92,65 @@ export function BrowseMenu({
             <SheetHeader className="sr-only">
               <SheetTitle>Options</SheetTitle>
             </SheetHeader>
-            <div className="flex flex-col py-2">
-              <p className="px-4 pb-1 text-xs font-medium text-muted-foreground">View</p>
-              <button
-                type="button"
-                onClick={() => { onViewModeChange("grid"); setSheetOpen(false); }}
-                className={cn(
-                  "flex items-center gap-3 rounded-xl px-4 py-3 text-sm transition-colors",
-                  viewMode === "grid" ? "font-medium text-foreground" : "text-muted-foreground",
-                )}
-              >
-                <LayoutGrid className="h-4 w-4" />
-                Grid view
-              </button>
-              <button
-                type="button"
-                onClick={() => { onViewModeChange("list"); setSheetOpen(false); }}
-                className={cn(
-                  "flex items-center gap-3 rounded-xl px-4 py-3 text-sm transition-colors",
-                  viewMode === "list" ? "font-medium text-foreground" : "text-muted-foreground",
-                )}
-              >
-                <List className="h-4 w-4" />
-                List view
-              </button>
-              {groups?.map((group) => (
-                <div key={group.label}>
-                  <div className="mx-4 my-1 border-t border-border/40" />
-                  <p className="px-4 pb-1 pt-2 text-xs font-medium text-muted-foreground">{group.label}</p>
+
+            {/* View section */}
+            <div className="grid grid-cols-3">
+              {viewItems.map((item) => {
+                const active = viewMode === item.value;
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => { onViewModeChange(item.value); setSheetOpen(false); }}
+                    className="flex flex-col items-center gap-2.5"
+                  >
+                    <div className={cn(
+                      "flex h-16 w-16 items-center justify-center rounded-full transition-colors active:bg-muted",
+                      active ? "bg-foreground" : "bg-muted/60",
+                    )}>
+                      <item.icon className={cn("h-[22px] w-[22px]", active ? "text-background" : "text-foreground/80")} />
+                    </div>
+                    <span className="text-center text-xs leading-tight text-foreground/80">
+                      {item.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Extra groups */}
+            {groups?.map((group) => (
+              <div key={group.label} className="mt-5 border-t border-border/50 pt-5">
+                <div className="grid grid-cols-3">
                   {group.items.map((item) => (
                     <button
                       key={item.label}
                       type="button"
                       onClick={() => { item.onClick(); setSheetOpen(false); }}
-                      className={cn(
-                        "flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-muted-foreground transition-colors",
-                        item.className,
-                      )}
+                      className="flex flex-col items-center gap-2.5"
                     >
-                      {item.icon && <item.icon className="h-4 w-4" />}
-                      {item.label}
+                      <div className={cn(
+                        "flex h-16 w-16 items-center justify-center rounded-full bg-muted/60 transition-colors active:bg-muted",
+                        item.className?.includes("text-red") && "bg-red-500/10",
+                      )}>
+                        {item.icon && (
+                          <item.icon className={cn(
+                            "h-[22px] w-[22px]",
+                            item.className?.includes("text-red") ? "text-red-400" : "text-foreground/80",
+                          )} />
+                        )}
+                      </div>
+                      <span className={cn(
+                        "text-center text-xs leading-tight",
+                        item.className?.includes("text-red") ? "text-red-400" : "text-foreground/80",
+                      )}>
+                        {item.label}
+                      </span>
                     </button>
                   ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </SheetContent>
         </Sheet>
       </div>

@@ -288,26 +288,26 @@ function EditCollectionDialog({
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Name</label>
             <Input
+              variant="ghost"
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
-              className="h-9 text-sm"
               onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
             />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Description</label>
             <Input
+              variant="ghost"
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}
               placeholder="Optional description"
-              className="h-9 text-sm"
               onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
             />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Visibility</label>
             <Select value={editVisibility} onValueChange={setEditVisibility}>
-              <SelectTrigger className="h-9 rounded-xl border-none bg-accent text-sm">
+              <SelectTrigger className="rounded-xl border-none bg-accent">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
