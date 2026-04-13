@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import { cn } from "@canto/ui/cn";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { MediaCarousel } from "~/components/media/media-carousel";
 import { StateMessage } from "~/components/layout/state-message";
@@ -9,6 +11,16 @@ import { StateMessage } from "~/components/layout/state-message";
 interface LayoutPreferences {
   hiddenIds: string[];
   orderedIds: string[];
+}
+
+interface ListInfo {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  type: string;
+  visibility: string;
+  itemCount: number;
 }
 
 function applyManualOrder<T extends { id: string }>(
@@ -25,17 +37,15 @@ function applyManualOrder<T extends { id: string }>(
 }
 
 function CollectionSection({
-  slug,
-  name,
-  itemCount,
+  list,
+  isHidden,
 }: {
-  slug: string;
-  name: string;
-  itemCount: number;
+  list: ListInfo;
+  isHidden: boolean;
 }): React.JSX.Element | null {
   const { data, isLoading } = trpc.list.getBySlug.useQuery(
-    { slug, limit: 20 },
-    { enabled: itemCount > 0 },
+    { slug: list.slug, limit: 20 },
+    { enabled: list.itemCount > 0 },
   );
 
   const items = useMemo(
@@ -53,25 +63,35 @@ function CollectionSection({
     [data],
   );
 
-  if (itemCount === 0) return null;
+  if (list.itemCount === 0) return null;
 
   return (
-    <MediaCarousel
-      title={name}
-      seeAllHref={`/collection/${slug}`}
-      items={items}
-      isLoading={isLoading}
-    />
+    <div className={cn(isHidden && "opacity-50")}>
+      <MediaCarousel
+        title={list.name}
+        seeAllHref={`/collection/${list.slug}`}
+        items={items}
+        isLoading={isLoading}
+      />
+    </div>
   );
 }
 
+function uniqueIds(ids: string[]): string[] {
+  return [...new Set(ids)];
+}
+
 export function CollectionsSectionsView({
+  showHidden = false,
   onCreateCollection,
 }: {
+  showHidden?: boolean;
   onCreateCollection: () => void;
 }): React.JSX.Element {
   const { data: lists, isLoading, isError, refetch } = trpc.list.getAll.useQuery();
   const layoutQuery = trpc.list.getCollectionLayout.useQuery();
+  const updateLayoutMutation = trpc.list.updateCollectionLayout.useMutation();
+  const utils = trpc.useUtils();
 
   const layout = useMemo<LayoutPreferences>(() => {
     if (!layoutQuery.data) return { hiddenIds: [], orderedIds: [] };
@@ -83,11 +103,35 @@ export function CollectionsSectionsView({
 
   const allLists = useMemo(() => lists ?? [], [lists]);
 
+  const hiddenSet = useMemo(() => new Set(layout.hiddenIds), [layout.hiddenIds]);
+
   const visibleLists = useMemo(() => {
-    const hiddenSet = new Set(layout.hiddenIds);
-    const visible = allLists.filter((list) => !hiddenSet.has(list.id));
-    return applyManualOrder(visible, layout.orderedIds);
-  }, [allLists, layout]);
+    const filtered = showHidden
+      ? allLists
+      : allLists.filter((list) => !hiddenSet.has(list.id));
+    return applyManualOrder(filtered, layout.orderedIds);
+  }, [allLists, layout, showHidden, hiddenSet]);
+
+  const toggleHidden = useCallback(
+    (listId: string) => {
+      const isHidden = hiddenSet.has(listId);
+      const nextHidden = isHidden
+        ? layout.hiddenIds.filter((id) => id !== listId)
+        : [...layout.hiddenIds, listId];
+      const next = {
+        hiddenListIds: uniqueIds(nextHidden),
+        orderedListIds: layout.orderedIds,
+      };
+      utils.list.getCollectionLayout.setData(undefined, next);
+      updateLayoutMutation.mutate(next, {
+        onError: () => {
+          void layoutQuery.refetch();
+          toast.error("Failed to update");
+        },
+      });
+    },
+    [hiddenSet, layout, utils, updateLayoutMutation, layoutQuery],
+  );
 
   if (isLoading || layoutQuery.isLoading) {
     return (
@@ -134,9 +178,8 @@ export function CollectionsSectionsView({
       {visibleLists.map((list) => (
         <CollectionSection
           key={list.id}
-          slug={list.slug}
-          name={list.name}
-          itemCount={list.itemCount}
+          list={list}
+          isHidden={hiddenSet.has(list.id)}
         />
       ))}
 

@@ -11,14 +11,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@canto/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@canto/ui/dropdown-menu";
 import { Input } from "@canto/ui/input";
-import { ArrowUpDown, Check, EllipsisVertical, Loader2, Plus } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@canto/ui/tooltip";
+import { ArrowUpDown, Check, Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "~/components/layout/page-header";
 import { useDocumentTitle } from "~/hooks/use-document-title";
@@ -30,6 +25,7 @@ import { CollectionsSectionsView } from "../_components/collections-sections-vie
 export default function CollectionsPage(): React.JSX.Element {
   useDocumentTitle("Collections");
   const [isReordering, setIsReordering] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -74,33 +70,38 @@ export default function CollectionsPage(): React.JSX.Element {
               Done
             </Button>
           ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                  aria-label="Collection options"
-                >
-                  <EllipsisVertical className="h-5 w-5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="rounded-2xl">
-                <DropdownMenuItem
-                  className="cursor-pointer gap-2 rounded-xl px-3 py-2"
-                  onClick={() => setIsReordering(true)}
-                >
-                  <ArrowUpDown className="h-4 w-4" />
-                  Reorder
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="cursor-pointer gap-2 rounded-xl px-3 py-2"
-                  onClick={() => setCreateOpen(true)}
-                >
-                  <Plus className="h-4 w-4" />
-                  New Collection
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <TooltipProvider delayDuration={300}>
+              <div className="flex items-center gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      onClick={() => setShowHidden((v) => !v)}
+                      aria-label={showHidden ? "Hide hidden collections" : "Show hidden collections"}
+                    >
+                      {showHidden ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    {showHidden ? "Hide hidden" : "Show hidden"}
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      onClick={() => setIsReordering(true)}
+                      aria-label="Reorder collections"
+                    >
+                      <ArrowUpDown className="h-[18px] w-[18px]" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Reorder</TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
           )
         }
       />
@@ -111,6 +112,7 @@ export default function CollectionsPage(): React.JSX.Element {
         </div>
       ) : (
         <CollectionsSectionsView
+          showHidden={showHidden}
           onCreateCollection={() => setCreateOpen(true)}
         />
       )}
