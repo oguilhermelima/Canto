@@ -1,6 +1,6 @@
 import { FadeImage } from "~/components/ui/fade-image";
 import { cn } from "@canto/ui/cn";
-import { Check, Star, CheckCircle2, Download } from "lucide-react";
+import { Star, CheckCircle2, Download } from "lucide-react";
 
 export interface Episode {
   id: string;
@@ -22,26 +22,17 @@ export interface EpisodeDownloadInfo {
 export function EpisodeCard({
   episode,
   seasonNumber: _seasonNumber,
-  isSelected,
-  isMuted,
-  onToggle,
-  selectable,
   downloadInfo,
   serverAvailability,
 }: {
   episode: Episode;
   seasonNumber: number;
-  isSelected: boolean;
-  isMuted: boolean;
-  onToggle: () => void;
-  selectable: boolean;
   downloadInfo?: EpisodeDownloadInfo;
   serverAvailability?: Array<{ type: string; resolution?: string | null }>;
 }): React.JSX.Element {
   const num = String(episode.episodeNumber).padStart(2, "0");
   const isFuture =
     !!episode.airDate && new Date(episode.airDate) > new Date();
-  const isInteractive = selectable && !isFuture;
 
   const hasJellyfin = serverAvailability?.some((s) => s.type === "jellyfin");
   const hasPlex = serverAvailability?.some((s) => s.type === "plex");
@@ -51,8 +42,7 @@ export function EpisodeCard({
       className={cn(
         "group flex items-center gap-4 py-4 pr-3 pl-3 transition-colors sm:pr-4 sm:pl-4",
         isFuture && "pointer-events-none opacity-40",
-        !isFuture && !isMuted && "hover:bg-muted/40",
-        !isFuture && isMuted && "opacity-40",
+        !isFuture && "hover:bg-muted/40",
       )}
     >
       {/* Thumbnail */}
@@ -116,7 +106,7 @@ export function EpisodeCard({
         )}
       </div>
 
-      {/* Right side — badges + checkbox */}
+      {/* Right side — badges */}
       <div className="flex shrink-0 items-center gap-3">
         {/* Download status */}
         {downloadInfo?.status === "imported" && (
@@ -130,7 +120,7 @@ export function EpisodeCard({
           </div>
         )}
 
-        {/* Jellyfin badge — icon only */}
+        {/* Jellyfin badge */}
         {hasJellyfin && (
           <div className="flex h-6 w-6 items-center justify-center rounded-lg border border-[#a95ce0]/20 bg-gradient-to-r from-[#a95ce0]/10 to-[#4bb8e8]/10" title="Available on Jellyfin">
             <span
@@ -144,7 +134,7 @@ export function EpisodeCard({
           </div>
         )}
 
-        {/* Plex badge — icon only */}
+        {/* Plex badge */}
         {hasPlex && (
           <div className="flex h-6 w-6 items-center justify-center rounded-lg border border-[#e5a00d]/20 bg-[#e5a00d]/10" title="Available on Plex">
             <span
@@ -155,29 +145,6 @@ export function EpisodeCard({
               }}
             />
           </div>
-        )}
-
-        {/* Select checkbox */}
-        {isInteractive && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggle();
-            }}
-            className="flex shrink-0 items-center justify-center"
-          >
-            <div
-              className={cn(
-                "flex h-6 w-6 items-center justify-center rounded-lg border-2 transition-all",
-                isSelected && !isMuted
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-muted-foreground/30 hover:border-muted-foreground/50",
-              )}
-            >
-              {isSelected && !isMuted && <Check size={13} strokeWidth={3} />}
-            </div>
-          </button>
         )}
       </div>
     </div>
