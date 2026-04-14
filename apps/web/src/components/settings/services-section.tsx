@@ -962,7 +962,7 @@ function TvdbDefaultToggle(): React.JSX.Element {
 export function MetadataProvidersSection(): React.JSX.Element {
   return (
     <div>
-      <SettingsSection title="Metadata Providers" description="Configure your metadata provider API keys.">
+      <SettingsSection variant="grid" title="Metadata Providers" description="Configure your metadata provider API keys.">
         <SectionCard title="TMDB">
           <TmdbSection />
         </SectionCard>
@@ -971,7 +971,7 @@ export function MetadataProvidersSection(): React.JSX.Element {
         </SectionCard>
       </SettingsSection>
 
-      <SettingsSection title="Use TVDB for season/episode structure" description="Validate and fix the season and episode structure using TVDB data.">
+      <SettingsSection variant="grid" title="Use TVDB for season/episode structure" description="Validate and fix the season and episode structure using TVDB data.">
         <TvdbDefaultToggle />
       </SettingsSection>
     </div>
@@ -984,7 +984,7 @@ export function MetadataProvidersSection(): React.JSX.Element {
 
 export function DownloadClientSection(): React.JSX.Element {
   return (
-    <SettingsSection title="Download Client" description="Torrent client for downloading and managing media files.">
+    <SettingsSection variant="grid" title="Download Client" description="Torrent client for downloading and managing media files.">
       <SectionCard title="qBittorrent">
         <ServiceRow
           title="qBittorrent"
@@ -1007,7 +1007,7 @@ export function DownloadClientSection(): React.JSX.Element {
 
 export function IndexersSection(): React.JSX.Element {
   return (
-    <SettingsSection title="Indexers" description="Search aggregators for finding torrents across multiple trackers.">
+    <SettingsSection variant="grid" title="Indexers" description="Search aggregators for finding torrents across multiple trackers.">
       <SectionCard title="Prowlarr">
         <ServiceRow
           title="Prowlarr"
@@ -1045,7 +1045,7 @@ export function ServicesSection(): React.JSX.Element {
 
 export function MediaServerConnectionSection(): React.JSX.Element {
   return (
-    <SettingsSection title="Connection" description="Connect media servers to sync libraries and trigger scans after downloads.">
+    <SettingsSection variant="grid" title="Connection" description="Connect media servers to sync libraries and trigger scans after downloads.">
       <SectionCard title="Jellyfin">
         <MediaServerRow
           title="Jellyfin"
@@ -1070,7 +1070,7 @@ export function MediaServerConnectionSection(): React.JSX.Element {
 
 export function JellyfinConnectionSection(): React.JSX.Element {
   return (
-    <SettingsSection title="Connection" description="Connect Jellyfin to sync libraries and trigger scans after downloads.">
+    <SettingsSection variant="grid" title="Connection" description="Connect Jellyfin to sync libraries and trigger scans after downloads.">
       <SectionCard title="Jellyfin">
         <MediaServerRow
           title="Jellyfin"
@@ -1089,7 +1089,7 @@ export function JellyfinConnectionSection(): React.JSX.Element {
 
 export function PlexConnectionSection(): React.JSX.Element {
   return (
-    <SettingsSection title="Connection" description="Connect Plex to sync libraries and trigger scans after downloads.">
+    <SettingsSection variant="grid" title="Connection" description="Connect Plex to sync libraries and trigger scans after downloads.">
       <SectionCard title="Plex">
         <PlexServerSection />
       </SectionCard>
@@ -1260,7 +1260,7 @@ export function MetadataSettingsSection(): React.JSX.Element {
 
   return (
     <div>
-      <SettingsSection title="Language" description="Language used for metadata, titles, descriptions, and trailers from TMDB and TVDB.">
+      <SettingsSection variant="grid" title="Language" description="Language used for metadata, titles, descriptions, and trailers from TMDB and TVDB.">
         <div className="flex items-center gap-4">
           <Select value={currentLanguage ?? "en-US"} onValueChange={handleLanguageChange}>
             <SelectTrigger className="w-48">
@@ -1280,7 +1280,7 @@ export function MetadataSettingsSection(): React.JSX.Element {
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Use TVDB for season/episode structure" description="Validate and fix the season and episode structure using TVDB data.">
+      <SettingsSection variant="grid" title="Use TVDB for season/episode structure" description="Validate and fix the season and episode structure using TVDB data.">
         <div className="space-y-5">
           <div className="flex items-start justify-between gap-6">
             <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
@@ -1322,7 +1322,7 @@ export function MetadataSettingsSection(): React.JSX.Element {
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Direct Search on Streaming Apps" description="Controls what happens when you click a streaming provider on a media page.">
+      <SettingsSection variant="grid" title="Direct Search on Streaming Apps" description="Controls what happens when you click a streaming provider on a media page.">
         <div className="space-y-5">
           <div className="flex items-start justify-between gap-6">
             <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
@@ -1361,7 +1361,7 @@ export function MetadataSettingsSection(): React.JSX.Element {
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Watch Region" description="Controls which streaming providers appear on media detail pages.">
+      <SettingsSection variant="grid" title="Watch Region" description="Controls which streaming providers appear on media detail pages.">
         <WatchRegionSection />
       </SettingsSection>
     </div>

@@ -131,7 +131,7 @@ export function StatusTab(): React.JSX.Element {
   return (
     <div>
       {/* Library */}
-      <SettingsSection title="Library" description="Overview of your media collection and download activity.">
+      <SettingsSection variant="grid" title="Library" description="Overview of your media collection and download activity.">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard icon={Film} label="Movies" value={stats?.movies ?? 0} loading={statsLoading} href="/collection/server-library?type=movie" />
           <StatCard icon={Tv} label="Shows" value={stats?.shows ?? 0} loading={statsLoading} href="/collection/server-library?type=show" />
@@ -141,7 +141,7 @@ export function StatusTab(): React.JSX.Element {
       </SettingsSection>
 
       {/* Downloads */}
-      <SettingsSection title="Downloads" description="Current download and seeding activity across all folders.">
+      <SettingsSection variant="grid" title="Downloads" description="Current download and seeding activity across all folders.">
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <StatCard icon={Download} label="Downloading" value={activeTorrents.length} loading={torrentsLoading} color="text-blue-400" bgColor="bg-blue-500/10" />
@@ -194,7 +194,7 @@ export function StatusTab(): React.JSX.Element {
       </SettingsSection>
 
       {/* Services */}
-      <SettingsSection title="Services" description="Connection status for all configured external services.">
+      <SettingsSection variant="grid" title="Services" description="Connection status for all configured external services.">
         <div className="rounded-2xl border border-border/60 bg-card px-4">
           <ServiceRow name="TMDB" enabled={true} icon={Film} />
           <ServiceRow name="TVDB" enabled={services?.tvdb ?? false} icon={Tv} />
@@ -207,7 +207,7 @@ export function StatusTab(): React.JSX.Element {
       </SettingsSection>
 
       {/* System */}
-      <SettingsSection title="System" description="Version and instance information.">
+      <SettingsSection variant="grid" title="System" description="Version and instance information.">
         <div className="rounded-2xl border border-border/60 bg-card p-5">
           <div className="flex items-center gap-4">
             <Image src="/canto.svg" alt="Canto" width={40} height={40} className="h-10 w-10 dark:invert" />

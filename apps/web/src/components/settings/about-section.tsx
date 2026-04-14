@@ -4,7 +4,7 @@ import { SettingsSection } from "~/components/settings/shared";
 export function AboutSection(): React.JSX.Element {
   return (
     <div>
-      <SettingsSection title="Application" description="Details about this Canto instance.">
+      <SettingsSection variant="grid" title="Application" description="Details about this Canto instance.">
         <div className="space-y-2.5">
           {[["Version", "0.1.0"], ["Stack", "Next.js + tRPC + Drizzle"], ["Metadata", "TMDB"]].map(([label, value]) => (
             <div key={label} className="flex items-center justify-between rounded-xl bg-muted/20 px-3.5 py-2.5 text-sm">
@@ -15,7 +15,7 @@ export function AboutSection(): React.JSX.Element {
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Links" description="External resources and documentation.">
+      <SettingsSection variant="grid" title="Links" description="External resources and documentation.">
         <div className="divide-y divide-border/60 rounded-xl border border-border/60 bg-card overflow-hidden">
           {[
             { href: "https://github.com/oguilhermelima/canto", name: "GitHub", desc: "Source code and issue tracker" },

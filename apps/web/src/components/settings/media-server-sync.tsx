@@ -56,7 +56,7 @@ function SyncStatusSection(): React.JSX.Element {
   });
 
   return (
-    <SettingsSection
+    <SettingsSection variant="grid"
       title="Sync"
       description="Review and correct media matched from your server. Edit any item to fix incorrect matches."
     >
@@ -250,7 +250,7 @@ function _ServerLibraryGroup({
   if (!enabled) return null;
 
   return (
-    <SettingsSection
+    <SettingsSection variant="grid"
       title={`${source === "jellyfin" ? "Jellyfin" : "Plex"} Libraries`}
       description="Import your existing collection from this server into Canto. Enabled libraries are scanned every 5 minutes."
     >
@@ -296,7 +296,7 @@ export function FolderScanSection(): React.JSX.Element {
   });
 
   return (
-    <SettingsSection
+    <SettingsSection variant="grid"
       title="Folder Scan"
       description="Detect existing media files in your library paths and match them to TMDB."
     >
