@@ -106,7 +106,7 @@ const WATCH_STATUS_OPTIONS = [
   { value: "not_started", label: "Not Started" },
 ] as const;
 
-type SectionId = "sort" | "genres" | "year" | "score" | "runtime" | "language" | "status" | "certification" | "watchProviders" | "source" | "watchStatus";
+export type SectionId = "sort" | "genres" | "year" | "score" | "runtime" | "language" | "status" | "certification" | "watchProviders" | "source" | "watchStatus";
 
 /** URL param keys owned by FilterSidebar — everything else is preserved. */
 const FILTER_KEYS = ["genre", "genreMode", "sort", "language", "score", "scoreMode", "yearMin", "yearMax", "runtimeMin", "runtimeMax", "certification", "status", "providers", "providerMode", "source", "watchStatus"] as const;

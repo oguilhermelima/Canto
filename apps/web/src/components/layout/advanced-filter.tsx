@@ -11,7 +11,7 @@ import {
 } from "@canto/ui/dialog";
 import { RotateCcw, X } from "lucide-react";
 import { FilterSidebar } from "~/components/media/filter-sidebar";
-import type { FilterOutput, FilterSidebarHandle } from "~/components/media/filter-sidebar";
+import type { FilterOutput, FilterSidebarHandle, SectionId } from "~/components/media/filter-sidebar";
 import type { FilterPreset } from "~/components/layout/browse-layout.types";
 
 interface AdvancedFilterProps {
@@ -22,6 +22,7 @@ interface AdvancedFilterProps {
   onMobileOpenChange: (open: boolean) => void;
   onFilterChange: (filters: FilterOutput) => void;
   sidebarClassName?: string;
+  hideSections?: SectionId[];
 }
 
 export function AdvancedFilter({
@@ -32,6 +33,7 @@ export function AdvancedFilter({
   onMobileOpenChange,
   onFilterChange,
   sidebarClassName,
+  hideSections,
 }: AdvancedFilterProps): React.JSX.Element {
   const mobileResetRef = useRef<FilterSidebarHandle | null>(null);
 
@@ -50,6 +52,7 @@ export function AdvancedFilter({
           preset={preset}
           mediaType={mediaType}
           onFilterChange={onFilterChange}
+          hideSections={hideSections}
           className={sidebarClassName}
         />
       </div>
@@ -77,6 +80,7 @@ export function AdvancedFilter({
               preset={preset}
               mediaType={mediaType}
               onFilterChange={onFilterChange}
+              hideSections={hideSections}
               hideHeader
               resetRef={mobileResetRef}
             />

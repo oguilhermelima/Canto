@@ -9,11 +9,11 @@ import { StateMessage } from "~/components/layout/state-message";
 import { BrowseMenu } from "~/components/layout/browse-menu";
 import { AdvancedFilter } from "~/components/layout/advanced-filter";
 import { useIsMobile } from "~/hooks/use-is-mobile";
-import type { FilterOutput } from "~/components/media/filter-sidebar";
+import type { FilterOutput, SectionId } from "~/components/media/filter-sidebar";
 import { GRID_COLS } from "~/components/layout/browse-layout.types";
 import type { BrowseItem, BrowseMenuItem, BrowseMenuGroup, CardStrategy, FilterPreset, ViewMode } from "~/components/layout/browse-layout.types";
 
-export type { FilterOutput, BrowseItem, BrowseMenuItem, BrowseMenuGroup, CardStrategy, FilterPreset, ViewMode };
+export type { FilterOutput, SectionId, BrowseItem, BrowseMenuItem, BrowseMenuGroup, CardStrategy, FilterPreset, ViewMode };
 
 const MEDIA_TYPE_TABS = [
   { value: "all", label: "All" },
@@ -56,6 +56,8 @@ interface BrowseLayoutProps {
   sidebarClassName?: string;
   /** Extra groups rendered inside the 3-dot menu (below View section) */
   menuGroups?: BrowseMenuGroup[];
+  /** Filter sections to hide (e.g. when search mode can't support them) */
+  hideSections?: SectionId[];
 }
 
 export function BrowseLayout({
@@ -82,6 +84,7 @@ export function BrowseLayout({
   errorState,
   sidebarClassName,
   menuGroups,
+  hideSections,
 }: BrowseLayoutProps): React.JSX.Element {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -167,6 +170,7 @@ export function BrowseLayout({
             onMobileOpenChange={setMobileFilterOpen}
             onFilterChange={handleFilterChange}
             sidebarClassName={sidebarClassName}
+            hideSections={hideSections}
           />
         )}
 
