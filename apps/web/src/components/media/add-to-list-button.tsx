@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Image from "next/image";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
@@ -20,6 +20,29 @@ import { Bookmark, Check, Eye, Loader2, Plus, X } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { trpc } from "~/lib/trpc/client";
 import { toast } from "sonner";
+
+// ── Keyframes injected once ──
+let listAnimStylesInjected = false;
+function injectListAnimStyles(): void {
+  if (listAnimStylesInjected) return;
+  listAnimStylesInjected = true;
+  const style = document.createElement("style");
+  style.textContent = `
+    @keyframes list-pop {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(1.35); }
+      100% { transform: scale(1); }
+    }
+    @keyframes list-shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-2px); }
+      40% { transform: translateX(2px); }
+      60% { transform: translateX(-1px); }
+      80% { transform: translateX(1px); }
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 interface AddToListButtonProps {
   /** Internal media ID — if provided, used directly */
@@ -69,6 +92,9 @@ export function AddToListButton({
     initialMediaId,
   );
   const [resolving, setResolving] = useState(false);
+  const [watchlistAnim, setWatchlistAnim] = useState<"add" | "remove" | null>(null);
+  const [bookmarkAnim, setBookmarkAnim] = useState(false);
+  const bookmarkRef = useRef<HTMLButtonElement>(null);
   const utils = trpc.useUtils();
 
   const mediaId = resolvedMediaId ?? initialMediaId;
@@ -182,8 +208,11 @@ export function AddToListButton({
 
   const toggleWatchlist = async (): Promise<void> => {
     if (!watchlist) return;
+    injectListAnimStyles();
 
     if (isInWatchlist && mediaId) {
+      setWatchlistAnim("remove");
+      setTimeout(() => setWatchlistAnim(null), 500);
       setWatchlistState(false);
       removeItem.mutate(
         { listId: watchlist.id, mediaId },
@@ -197,6 +226,8 @@ export function AddToListButton({
         },
       );
     } else {
+      setWatchlistAnim("add");
+      setTimeout(() => setWatchlistAnim(null), 500);
       setWatchlistState(true);
       const id = await resolveMediaId();
       if (!id) {
@@ -221,6 +252,7 @@ export function AddToListButton({
     listId: string,
     listName: string,
   ): Promise<void> => {
+    injectListAnimStyles();
     if (inListIds.has(listId) && mediaId) {
       removeItem.mutate(
         { listId, mediaId },
@@ -229,6 +261,8 @@ export function AddToListButton({
     } else {
       const id = await resolveMediaId();
       if (!id) return;
+      setBookmarkAnim(true);
+      setTimeout(() => setBookmarkAnim(false), 500);
       addItem.mutate(
         { listId, mediaId: id },
         { onSuccess: () => toast.success(`Added to "${listName}"`) },
@@ -307,16 +341,16 @@ export function AddToListButton({
               {isWatchlistRow ? (
                 <Eye
                   className={cn(
-                    "h-5 w-5 shrink-0",
-                    saved ? "text-foreground" : "text-muted-foreground",
+                    "h-5 w-5 shrink-0 transition-colors",
+                    saved ? "text-emerald-400" : "text-muted-foreground",
                   )}
                 />
               ) : (
                 <Bookmark
                   className={cn(
-                    "h-5 w-5 shrink-0",
+                    "h-5 w-5 shrink-0 transition-colors",
                     saved
-                      ? "fill-foreground text-foreground"
+                      ? "fill-amber-500 text-amber-500"
                       : "text-muted-foreground",
                   )}
                 />
@@ -367,7 +401,7 @@ export function AddToListButton({
   );
 
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <div className={cn("flex items-center", showWatchlistToggle && "gap-2", className)}>
       {showWatchlistToggle && (
         <button
           className={cn(
@@ -376,7 +410,7 @@ export function AddToListButton({
             btnPx,
             btnText,
             isInWatchlist
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-500"
+              ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 hover:border-zinc-500/30 hover:bg-zinc-500/10 hover:text-zinc-400"
               : "border-foreground/10 bg-foreground/15 text-foreground hover:bg-foreground/25",
           )}
           onClick={() => void toggleWatchlist()}
@@ -386,11 +420,17 @@ export function AddToListButton({
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : isInWatchlist ? (
             <>
-              <Check className="h-4 w-4 transition-transform duration-200 group-hover/wl:hidden" />
+              <Check
+                className="h-4 w-4 transition-transform duration-200 group-hover/wl:hidden"
+                style={watchlistAnim === "add" ? { animation: "list-pop 400ms ease-out" } : undefined}
+              />
               <X className="hidden h-4 w-4 transition-transform duration-200 group-hover/wl:block" />
             </>
           ) : (
-            <Plus className="h-4 w-4 transition-transform duration-200" />
+            <Plus
+              className="h-4 w-4 transition-transform duration-200"
+              style={watchlistAnim === "remove" ? { animation: "list-shake 400ms ease-out" } : undefined}
+            />
           )}
           <span className={isInWatchlist ? "group-hover/wl:hidden" : ""}>
             {isInWatchlist ? "In Watchlist" : "Watchlist"}
@@ -407,10 +447,11 @@ export function AddToListButton({
         <Popover open={popoverOpen} onOpenChange={(open) => { setPopoverOpen(open); onOpenChange?.(open); }}>
           <PopoverTrigger asChild>
             <button
+              ref={bookmarkRef}
               className={cn(
                 "inline-flex items-center justify-center rounded-xl border backdrop-blur-md transition-all",
                 hasSavedToAnyList
-                  ? "border-foreground/20 bg-foreground/10 hover:bg-foreground/15"
+                  ? "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/15"
                   : "border-foreground/10 bg-foreground/15 hover:bg-foreground/25",
                 btnHeight,
                 isSmall ? "w-8" : "w-11",
@@ -420,9 +461,10 @@ export function AddToListButton({
             >
               <Bookmark
                 className={cn(
-                  "h-5 w-5",
-                  hasSavedToAnyList ? "text-foreground fill-foreground" : "text-foreground/70",
+                  "h-5 w-5 transition-all",
+                  hasSavedToAnyList ? "fill-amber-500 text-amber-500" : "text-foreground/70",
                 )}
+                style={bookmarkAnim ? { animation: "list-pop 400ms ease-out" } : undefined}
               />
             </button>
           </PopoverTrigger>
@@ -440,7 +482,7 @@ export function AddToListButton({
               className={cn(
                 "inline-flex items-center justify-center rounded-xl border backdrop-blur-md transition-all",
                 hasSavedToAnyList
-                  ? "border-foreground/20 bg-foreground/10 hover:bg-foreground/15"
+                  ? "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/15"
                   : "border-foreground/10 bg-foreground/15 hover:bg-foreground/25",
                 btnHeight,
                 isSmall ? "w-8" : "w-11",
@@ -450,9 +492,10 @@ export function AddToListButton({
             >
               <Bookmark
                 className={cn(
-                  "h-5 w-5",
-                  hasSavedToAnyList ? "text-foreground fill-foreground" : "text-foreground/70",
+                  "h-5 w-5 transition-all",
+                  hasSavedToAnyList ? "fill-amber-500 text-amber-500" : "text-foreground/70",
                 )}
+                style={bookmarkAnim ? { animation: "list-pop 400ms ease-out" } : undefined}
               />
             </button>
           </SheetTrigger>
