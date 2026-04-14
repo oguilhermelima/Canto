@@ -1,30 +1,13 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useDocumentTitle } from "~/hooks/use-document-title";
 import { PageHeader } from "~/components/layout/page-header";
-import { TabBar } from "~/components/layout/tab-bar";
 import { authClient } from "~/lib/auth-client";
-import { ProfileSection } from "./_components/profile-section";
-import { PasswordSection } from "./_components/password-section";
-import { AppearanceSection } from "./_components/appearance-section";
-import { PreferencesSection } from "./_components/preferences-section";
-import { ConnectionsSection } from "./_components/connections-section";
-import { HiddenSection } from "./_components/hidden-section";
-import { HomeSectionsEditor } from "./_components/home-sections-editor";
-import { ProfileSectionsEditor } from "./_components/profile-sections-editor";
-
-const TABS = [
-  { value: "profile", label: "Profile" },
-  { value: "connections", label: "Connections" },
-  { value: "general", label: "General" },
-  { value: "home", label: "Home" },
-  { value: "profile-sections", label: "Profile Sections" },
-  { value: "hidden", label: "Hidden" },
-] as const;
-
-type TabKey = (typeof TABS)[number]["value"];
+import { PreferencesSidebar, PreferencesMobileList } from "./_components/preferences-nav";
+import { PreferencesContent } from "./_components/preferences-content";
+import { ALL_SECTION_KEYS, DEFAULT_SECTION, PREFERENCES_SECTIONS } from "./_components/preferences-config";
 
 export default function PreferencesPage(): React.JSX.Element {
   const router = useRouter();
@@ -33,15 +16,18 @@ export default function PreferencesPage(): React.JSX.Element {
 
   useDocumentTitle("Preferences");
 
-  const tabParam = searchParams.get("tab") as TabKey | null;
-  const activeTab = tabParam && TABS.some((t) => t.value === tabParam) ? tabParam : "profile";
+  const sectionParam = searchParams.get("section");
+  const activeSection = sectionParam && ALL_SECTION_KEYS.includes(sectionParam)
+    ? sectionParam
+    : null;
 
-  const setActiveTab = useCallback(
-    (key: string) => {
-      router.replace(`/preferences?tab=${key}`, { scroll: false });
-    },
-    [router],
-  );
+  // Desktop always resolves to a section
+  const desktopSection = activeSection ?? DEFAULT_SECTION;
+
+  // Find active section metadata for mobile header
+  const activeSectionMeta = PREFERENCES_SECTIONS
+    .flatMap((g) => g.items)
+    .find((i) => i.key === activeSection);
 
   useEffect(() => {
     if (!isPending && !session) {
@@ -55,31 +41,38 @@ export default function PreferencesPage(): React.JSX.Element {
 
   return (
     <div className="w-full">
-      <PageHeader title="Preferences" subtitle="Manage your profile, connections, and homepage layout." />
+      {/* Desktop: always show page header */}
+      <div className={activeSection ? "hidden md:block" : ""}>
+        <PageHeader title="Preferences" subtitle="Manage your profile, connections, and homepage layout." />
+      </div>
+
+      {/* Mobile: section detail header (TitleBar inside is already md:hidden) */}
+      {activeSection && activeSectionMeta && (
+        <PageHeader
+          title={activeSectionMeta.label}
+          subtitle={activeSectionMeta.description}
+          onNavigate={() => router.replace("/preferences", { scroll: false })}
+          className="md:hidden"
+        />
+      )}
 
       <div className="px-4 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        <TabBar
-          tabs={TABS.map((t) => ({ value: t.value, label: t.label }))}
-          value={activeTab}
-          onChange={setActiveTab}
-        />
+        {/* Desktop: sidebar + content grid */}
+        <div className="hidden md:grid md:grid-cols-[240px_1fr] md:gap-10 lg:gap-16">
+          <PreferencesSidebar activeSection={desktopSection} />
+          <div className="min-w-0">
+            <PreferencesContent section={desktopSection} />
+          </div>
+        </div>
 
-        {activeTab === "profile" && (
-          <>
-            <ProfileSection />
-            <PasswordSection />
-          </>
-        )}
-        {activeTab === "connections" && <ConnectionsSection />}
-        {activeTab === "general" && (
-          <>
-            <AppearanceSection />
-            <PreferencesSection />
-          </>
-        )}
-        {activeTab === "home" && <HomeSectionsEditor />}
-        {activeTab === "profile-sections" && <ProfileSectionsEditor />}
-        {activeTab === "hidden" && <HiddenSection />}
+        {/* Mobile: list or section content */}
+        <div className="md:hidden">
+          {activeSection ? (
+            <PreferencesContent section={activeSection} />
+          ) : (
+            <PreferencesMobileList />
+          )}
+        </div>
       </div>
     </div>
   );
