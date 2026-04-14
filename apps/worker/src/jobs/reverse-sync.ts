@@ -195,7 +195,7 @@ async function syncUserPlaybackAndLibrary(
         provider,
       ).catch((err) => {
         console.error(
-          `[reverse-sync] pushPlaybackPositionToServers failed for user ${userId} media ${mediaId}:`,
+          `[reverse-sync] pushPlaybackPositionToServers failed for user ${userId} media ${mediaId}${episodeId ? ` episode ${episodeId}` : ""} (source: ${provider}, pos: ${newPosition}s, completed: ${newCompleted}):`,
           err instanceof Error ? err.message : err,
         );
       });
