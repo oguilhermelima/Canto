@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@canto/ui/dialog";
+import { ConfirmationDialog } from "@canto/ui/confirmation-dialog";
 import {
   X,
   Loader2,
@@ -192,6 +193,17 @@ export function DownloadModal({
           )}
         </div>
       </DialogContent>
+
+      {/* Replace confirmation */}
+      <ConfirmationDialog
+        open={!!modal.replaceConflict}
+        onOpenChange={(open) => { if (!open) modal.dismissReplace(); }}
+        title="Replace existing download?"
+        description={modal.replaceConflict?.message}
+        confirmLabel="Replace"
+        loading={modal.replaceTorrent.isPending}
+        onConfirm={() => modal.confirmReplace()}
+      />
     </Dialog>
   );
 }

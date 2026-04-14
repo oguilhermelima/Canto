@@ -60,6 +60,11 @@ export function useDownloadModal(
     url: string;
     title: string;
   } | null>(null);
+  const [replaceConflict, setReplaceConflict] = useState<{
+    message: string;
+    url: string;
+    title: string;
+  } | null>(null);
 
   // ── tRPC Queries ──
   const torrentSearch = trpc.torrent.search.useQuery(
@@ -101,28 +106,11 @@ export function useDownloadModal(
       toast.success("Download started");
     },
     onError: (error) => {
-      if (error.data?.code === "CONFLICT") {
-        toast.error(error.message, {
-          action: {
-            label: "Replace",
-            onClick: () => {
-              if (!lastDownloadAttempt || !mediaId) return;
-              const isMagnet =
-                lastDownloadAttempt.url.startsWith("magnet:");
-              replaceTorrent.mutate({
-                replaceFileIds: [],
-                mediaId,
-                ...(isMagnet
-                  ? { magnetUrl: lastDownloadAttempt.url }
-                  : { torrentUrl: lastDownloadAttempt.url }),
-                title: lastDownloadAttempt.title,
-                seasonNumber: torrentSearchContext?.seasonNumber,
-                episodeNumbers:
-                  torrentSearchContext?.episodeNumbers ?? undefined,
-              });
-            },
-          },
-          duration: 10000,
+      if (error.data?.code === "CONFLICT" && lastDownloadAttempt) {
+        setReplaceConflict({
+          message: error.message,
+          url: lastDownloadAttempt.url,
+          title: lastDownloadAttempt.title,
         });
       } else {
         toast.error(`Download failed: ${error.message}`);
@@ -131,6 +119,26 @@ export function useDownloadModal(
   });
 
   // ── Handlers ──
+  const confirmReplace = useCallback((): void => {
+    if (!replaceConflict || !mediaId) return;
+    const isMagnet = replaceConflict.url.startsWith("magnet:");
+    replaceTorrent.mutate({
+      replaceFileIds: [],
+      mediaId,
+      ...(isMagnet
+        ? { magnetUrl: replaceConflict.url }
+        : { torrentUrl: replaceConflict.url }),
+      title: replaceConflict.title,
+      seasonNumber: torrentSearchContext?.seasonNumber,
+      episodeNumbers: torrentSearchContext?.episodeNumbers ?? undefined,
+    });
+    setReplaceConflict(null);
+  }, [replaceConflict, mediaId, replaceTorrent, torrentSearchContext]);
+
+  const dismissReplace = useCallback((): void => {
+    setReplaceConflict(null);
+  }, []);
+
   const handleDownload = useCallback(
     (url: string, title: string): void => {
       if (!mediaId) return;
@@ -220,6 +228,7 @@ export function useDownloadModal(
     setMobileFiltersOpen(false);
     setSelectedFolderId(undefined);
     setLastDownloadAttempt(null);
+    setReplaceConflict(null);
   }, []);
 
   const toggleSort = useCallback(
@@ -343,5 +352,9 @@ export function useDownloadModal(
     setLastDownloadAttempt,
     handleDownload,
     downloadTorrent,
+    replaceConflict,
+    confirmReplace,
+    dismissReplace,
+    replaceTorrent,
   };
 }
