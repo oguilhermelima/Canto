@@ -256,6 +256,30 @@ export class QBittorrentClient implements DownloadClientPort {
     return (await response.text()).trim();
   }
 
+  async getTransferInfo(): Promise<{
+    dlSpeed: number;
+    upSpeed: number;
+    freeSpaceOnDisk: number;
+  }> {
+    const response = await this.request("/api/v2/sync/maindata");
+    if (!response.ok) {
+      throw new Error(`qBittorrent maindata failed: ${response.status}`);
+    }
+    const data = (await response.json()) as {
+      server_state?: {
+        dl_info_speed?: number;
+        up_info_speed?: number;
+        free_space_on_disk?: number;
+      };
+    };
+    const s = data.server_state;
+    return {
+      dlSpeed: s?.dl_info_speed ?? 0,
+      upSpeed: s?.up_info_speed ?? 0,
+      freeSpaceOnDisk: s?.free_space_on_disk ?? 0,
+    };
+  }
+
   async testConnection(): Promise<{ name: string; version: string }> {
     const response = await this.request("/api/v2/app/version");
     if (!response.ok) {

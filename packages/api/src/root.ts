@@ -15,6 +15,7 @@ import { userConnectionRouter } from "./routers/userConnection";
 import { userMediaRouter } from "./routers/userMedia";
 import { homeSectionRouter } from "./routers/homeSection";
 import { profileSectionRouter } from "./routers/profileSection";
+import { systemRouter } from "./routers/system";
 
 export const appRouter = createTRPCRouter({
   auth: authRouter,
@@ -33,6 +34,7 @@ export const appRouter = createTRPCRouter({
   userMedia: userMediaRouter,
   homeSection: homeSectionRouter,
   profileSection: profileSectionRouter,
+  system: systemRouter,
 });
 
 export type AppRouter = typeof appRouter;
