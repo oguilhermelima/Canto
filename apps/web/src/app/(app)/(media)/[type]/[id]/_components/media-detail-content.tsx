@@ -141,6 +141,7 @@ export function MediaDetailContent({
           {/* Request Download — non-admin users */}
           <RequestSection
             media={media}
+            mediaId={detail.mediaId}
             isAdmin={detail.isAdmin}
             existingRequest={detail.existingRequest}
             requestDownload={detail.requestDownload}
@@ -204,13 +205,15 @@ export function MediaDetailContent({
       />
 
       {/* Manage modal */}
-      <ManageModal
-        open={detail.preferencesOpen}
-        onOpenChange={detail.setPreferencesOpen}
-        mediaId={media.id}
-        mediaType={media.type as "movie" | "show"}
-        mediaTitle={media.title}
-      />
+      {detail.mediaId && (
+        <ManageModal
+          open={detail.preferencesOpen}
+          onOpenChange={detail.setPreferencesOpen}
+          mediaId={detail.mediaId}
+          mediaType={media.type as "movie" | "show"}
+          mediaTitle={media.title}
+        />
+      )}
 
       {/* Remove from library dialog */}
       <RemoveDialog

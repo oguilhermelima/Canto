@@ -5,7 +5,8 @@ import { Skeleton } from "@canto/ui/skeleton";
 import { Check, Download, Loader2, X } from "lucide-react";
 
 interface RequestSectionProps {
-  media: { id: string; inLibrary: boolean };
+  media: { inLibrary: boolean };
+  mediaId: string | undefined;
   isAdmin: boolean;
   existingRequest: {
     isLoading: boolean;
@@ -29,12 +30,13 @@ interface RequestSectionProps {
 
 export function RequestSection({
   media,
+  mediaId,
   isAdmin,
   existingRequest,
   requestDownload,
   cancelRequest,
 }: RequestSectionProps): React.JSX.Element | null {
-  if (isAdmin || !media.id || media.inLibrary) return null;
+  if (isAdmin || !mediaId || media.inLibrary) return null;
 
   if (existingRequest.isLoading) {
     return (
@@ -110,7 +112,7 @@ export function RequestSection({
       </div>
       <Button
         className="w-[120px] rounded-xl"
-        onClick={() => requestDownload.mutate({ mediaId: media.id })}
+        onClick={() => requestDownload.mutate({ mediaId: mediaId! })}
         disabled={requestDownload.isPending}
       >
         {requestDownload.isPending ? (
