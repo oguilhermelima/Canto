@@ -94,7 +94,7 @@ export function PreferencesSection(): React.JSX.Element {
   });
 
   return (
-    <SettingsSection title="Preferences" description="Language, streaming region, and playback behavior.">
+    <SettingsSection title="Content & Region" description="Language, streaming region, and playback behavior.">
       <div className="space-y-8">
         {/* Language */}
         <div className="space-y-3">

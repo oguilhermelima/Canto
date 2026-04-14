@@ -1,6 +1,6 @@
 import { Skeleton } from "@canto/ui/skeleton";
 
-export default function AccountLoading(): React.JSX.Element {
+export default function PreferencesLoading(): React.JSX.Element {
   return (
     <div className="px-4 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
       {/* Header */}
@@ -9,7 +9,7 @@ export default function AccountLoading(): React.JSX.Element {
 
       {/* Tabs */}
       <div className="mb-8 flex gap-1">
-        {Array.from({ length: 3 }).map((_, i) => (
+        {Array.from({ length: 6 }).map((_, i) => (
           <Skeleton key={i} className="h-8 w-24 rounded-xl" />
         ))}
       </div>
