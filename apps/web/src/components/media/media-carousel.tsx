@@ -1,10 +1,12 @@
 "use client";
 
+import { useMemo } from "react";
 import { cn } from "@canto/ui/cn";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { SectionTitle } from "~/components/layout/section-title";
 import { MediaCard, MediaCardSkeleton } from "./media-card";
 import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
+import { useHiddenMedia } from "~/hooks/use-hidden-media";
 
 interface MediaItem {
   id?: string;
@@ -26,6 +28,8 @@ interface MediaCarouselProps {
   isLoading?: boolean;
   isFetchingMore?: boolean;
   onLoadMore?: () => void;
+  /** Set to false to disable auto-hide functionality */
+  hideable?: boolean;
   className?: string;
 }
 
@@ -37,8 +41,11 @@ export function MediaCarousel({
   isLoading = false,
   isFetchingMore = false,
   onLoadMore,
+  hideable = true,
   className,
 }: MediaCarouselProps): React.JSX.Element | null {
+  const { isHidden, hide } = useHiddenMedia();
+
   const {
     containerRef,
     canScrollLeft,
@@ -53,7 +60,15 @@ export function MediaCarousel({
     scrollFraction: 0.8,
   });
 
-  if (!isLoading && items.length === 0) return null;
+  const visibleItems = useMemo(
+    () =>
+      hideable
+        ? items.filter((item) => !item.externalId || !isHidden(item.externalId, item.provider))
+        : items,
+    [items, isHidden, hideable],
+  );
+
+  if (!isLoading && visibleItems.length === 0) return null;
 
   return (
     <section className={cn("relative", className)}>
@@ -95,7 +110,7 @@ export function MediaCarousel({
                   className="w-[180px] shrink-0 sm:w-[200px] lg:w-[220px] 2xl:w-[240px]"
                 />
               ))
-            : items.map((item, i) => (
+            : visibleItems.map((item, i) => (
                 <MediaCard
                   key={item.id ?? `${item.provider}-${item.externalId}-${i}`}
                   {...item}
@@ -103,6 +118,18 @@ export function MediaCarousel({
                   showRating={false}
                   showYear={false}
                   showTitle={false}
+                  onHide={
+                    hideable && item.externalId
+                      ? () =>
+                          hide({
+                            externalId: item.externalId!,
+                            provider: item.provider ?? "tmdb",
+                            type: item.type,
+                            title: item.title,
+                            posterPath: item.posterPath,
+                          })
+                      : undefined
+                  }
                   className="w-[180px] shrink-0 sm:w-[200px] lg:w-[220px] 2xl:w-[240px]"
                 />
               ))}

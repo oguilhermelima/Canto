@@ -5,7 +5,7 @@ import { FadeImage } from "~/components/ui/fade-image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
-import { Film, Tv } from "lucide-react";
+import { EyeOff, Film, Tv } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { tmdbPosterLoader } from "~/lib/tmdb-image";
 import { mediaHref } from "~/lib/media-href";
@@ -25,6 +25,7 @@ interface MediaCardProps {
   showYear?: boolean;
   showTitle?: boolean;
   progress?: { percent: number; value: number; total: number; unit: "seconds" | "episodes" } | null;
+  onHide?: () => void;
   href?: string;
   className?: string;
 }
@@ -40,6 +41,7 @@ export function MediaCard({
   voteAverage,
   showTitle = true,
   progress,
+  onHide,
   href,
   className,
 }: MediaCardProps): React.JSX.Element {
@@ -114,6 +116,22 @@ export function MediaCard({
             </div>
           </div>
         </div>
+
+        {/* Hide button */}
+        {onHide && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onHide();
+            }}
+            className="absolute left-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-white/70 opacity-0 backdrop-blur-sm transition-all hover:bg-black/80 hover:text-white group-hover:opacity-100"
+            aria-label={`Hide ${title}`}
+          >
+            <EyeOff className="h-3.5 w-3.5" />
+          </button>
+        )}
 
         {/* Progress bar */}
         {progress && (

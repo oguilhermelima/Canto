@@ -1,10 +1,10 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useMemo } from "react";
 import { FadeImage } from "~/components/ui/fade-image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
-import { ChevronLeft, ChevronRight, Film, Tv, Volume2, VolumeOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, EyeOff, Film, Tv, Volume2, VolumeOff } from "lucide-react";
 import { SectionTitle } from "~/components/layout/section-title";
 import { AddToListButton } from "~/components/media/add-to-list-button";
 import { Skeleton } from "@canto/ui/skeleton";
@@ -12,6 +12,7 @@ import { tmdbPosterLoader, tmdbBackdropLoader } from "~/lib/tmdb-image";
 import { MediaLogo } from "~/components/media/media-logo";
 import { mediaHref } from "~/lib/media-href";
 import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
+import { useHiddenMedia } from "~/hooks/use-hidden-media";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -51,6 +52,13 @@ export function FeaturedCarousel({
   onLoadMore,
   className,
 }: FeaturedCarouselProps): React.JSX.Element | null {
+  const { isHidden, hide } = useHiddenMedia();
+
+  const visibleItems = useMemo(
+    () => items.filter((item) => !isHidden(item.externalId, item.provider)),
+    [items, isHidden],
+  );
+
   const {
     containerRef,
     canScrollLeft,
@@ -79,7 +87,7 @@ export function FeaturedCarousel({
     setHoveredIndex(null);
   }, []);
 
-  if (!isLoading && items.length === 0) return null;
+  if (!isLoading && visibleItems.length === 0) return null;
 
   return (
     <section className={cn("relative", className)}>
@@ -119,13 +127,22 @@ export function FeaturedCarousel({
                   className="shrink-0 rounded-xl h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px] w-[230px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]"
                 />
               ))
-            : items.map((item, i) => (
+            : visibleItems.map((item, i) => (
                 <FeaturedCard
                   key={`${item.provider}-${item.externalId}-${i}`}
                   item={item}
                   index={i}
                   isOpen={hoveredIndex === i}
                   onHover={() => handleCardHover(i)}
+                  onHide={() =>
+                    hide({
+                      externalId: item.externalId,
+                      provider: item.provider,
+                      type: item.type,
+                      title: item.title,
+                      posterPath: item.posterPath,
+                    })
+                  }
                 />
               ))}
           {isFetchingMore &&
@@ -147,11 +164,13 @@ function FeaturedCard({
   index,
   isOpen,
   onHover,
+  onHide,
 }: {
   item: FeaturedItem;
   index: number;
   isOpen: boolean;
   onHover: () => void;
+  onHide: () => void;
 }): React.JSX.Element {
   const [showTrailer, setShowTrailer] = useState(false);
   const [muted, setMuted] = useState(true);
@@ -279,6 +298,23 @@ function FeaturedCard({
           "absolute inset-0 transition-opacity duration-500",
           showTrailer ? "bg-gradient-to-r from-black/40 to-transparent" : "bg-gradient-to-r from-black/50 to-transparent",
         )} />
+
+        {/* Hide button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onHide();
+          }}
+          className={cn(
+            "absolute z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white/70 opacity-0 backdrop-blur-sm transition-all hover:bg-black/80 hover:text-white group-hover:opacity-100",
+            showTrailer ? "left-4 top-4" : "left-2.5 top-2.5",
+          )}
+          aria-label={`Hide ${item.title}`}
+        >
+          <EyeOff className="h-3.5 w-3.5" />
+        </button>
 
         {/* Mute button */}
         {showTrailer && item.trailerKey && (

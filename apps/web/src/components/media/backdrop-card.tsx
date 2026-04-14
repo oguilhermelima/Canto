@@ -5,7 +5,7 @@ import { FadeImage } from "~/components/ui/fade-image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
-import { Film, Tv } from "lucide-react";
+import { EyeOff, Film, Tv } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { tmdbBackdropLoader } from "~/lib/tmdb-image";
 import { mediaHref } from "~/lib/media-href";
@@ -34,6 +34,7 @@ interface BackdropCardProps {
   voteAverage?: number | null;
   badge?: BadgeType | null;
   progress?: { percent: number; value: number; total: number; unit: "seconds" | "episodes" } | null;
+  onHide?: () => void;
   className?: string;
 }
 
@@ -59,6 +60,7 @@ export function BackdropCard({
   voteAverage,
   badge,
   progress,
+  onHide,
   className,
 }: BackdropCardProps): React.JSX.Element {
   const href = mediaHref(provider ?? "tmdb", externalId ?? "0", type);
@@ -124,6 +126,22 @@ export function BackdropCard({
               <Tv className="h-10 w-10 text-muted-foreground/20" />
             )}
           </div>
+        )}
+
+        {/* Hide button */}
+        {onHide && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onHide();
+            }}
+            className="absolute left-2.5 top-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-white/70 opacity-0 backdrop-blur-sm transition-all hover:bg-black/80 hover:text-white group-hover:opacity-100"
+            aria-label={`Hide ${title}`}
+          >
+            <EyeOff className="h-3.5 w-3.5" />
+          </button>
         )}
 
         {/* Badge */}

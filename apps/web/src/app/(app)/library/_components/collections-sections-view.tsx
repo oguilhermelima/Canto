@@ -72,6 +72,7 @@ function CollectionSection({
         seeAllHref={`/collection/${list.slug}`}
         items={items}
         isLoading={isLoading}
+        hideable={false}
       />
     </div>
   );

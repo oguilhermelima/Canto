@@ -12,6 +12,7 @@ import { StateMessage } from "~/components/layout/state-message";
 import { MediaLogo } from "~/components/media/media-logo";
 import { mediaHref } from "~/lib/media-href";
 import { trpc } from "~/lib/trpc/client";
+import { useHiddenMedia } from "~/hooks/use-hidden-media";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -67,37 +68,43 @@ export function SpotlightHero({
   onRetry,
   className,
 }: SpotlightHeroProps): React.JSX.Element {
+  const { isHidden: isMediaHidden } = useHiddenMedia();
+  const visibleItems = useMemo(
+    () => items.filter((item) => !isMediaHidden(item.externalId, item.provider)),
+    [items, isMediaHidden],
+  );
+
   const [currentSpotlight, setCurrentSpotlight] = useState(0);
   const [spotlightPaused, setSpotlightPaused] = useState(false);
   const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
   const utils = trpc.useUtils();
 
-  const currentItem = items[currentSpotlight];
+  const currentItem = visibleItems[currentSpotlight];
 
   const nextSpotlight = useCallback(() => {
     setSlideDirection(1);
     setCurrentSpotlight((prev) =>
-      items.length === 0 ? 0 : (prev + 1) % items.length,
+      visibleItems.length === 0 ? 0 : (prev + 1) % visibleItems.length,
     );
-  }, [items.length]);
+  }, [visibleItems.length]);
 
   const prevSpotlight = useCallback(() => {
     setSlideDirection(-1);
     setCurrentSpotlight((prev) =>
-      items.length === 0
+      visibleItems.length === 0
         ? 0
-        : (prev - 1 + items.length) % items.length,
+        : (prev - 1 + visibleItems.length) % visibleItems.length,
     );
-  }, [items.length]);
+  }, [visibleItems.length]);
 
   const MAX_DOTS = 5;
   const visibleDots = useMemo(() => {
-    const total = items.length;
-    if (total <= MAX_DOTS) return items.map((_, i) => i);
+    const total = visibleItems.length;
+    if (total <= MAX_DOTS) return visibleItems.map((_, i) => i);
     const half = Math.floor(MAX_DOTS / 2);
     const start = Math.max(0, Math.min(currentSpotlight - half, total - MAX_DOTS));
     return Array.from({ length: MAX_DOTS }, (_, i) => start + i);
-  }, [items.length, currentSpotlight]);
+  }, [visibleItems.length, currentSpotlight]);
 
   const getPreviewUrl = (item: SpotlightItem): string => {
     return mediaHref(item.provider, item.externalId, item.type);
@@ -116,10 +123,10 @@ export function SpotlightHero({
 
   // Auto-rotate
   useEffect(() => {
-    if (spotlightPaused || items.length <= 1) return;
+    if (spotlightPaused || visibleItems.length <= 1) return;
     const timeout = setTimeout(nextSpotlight, 10000);
     return () => clearTimeout(timeout);
-  }, [spotlightPaused, items.length, nextSpotlight, currentSpotlight]);
+  }, [spotlightPaused, visibleItems.length, nextSpotlight, currentSpotlight]);
 
   return (
     <div className={cn("group/spotlight spotlight relative min-h-[80vh] w-full overflow-x-clip", className)}>
@@ -149,7 +156,7 @@ export function SpotlightHero({
       )}
 
       {/* Side arrows (desktop only) */}
-      {items.length > 1 && (
+      {visibleItems.length > 1 && (
         <>
           <button
             aria-label="Previous"
@@ -184,13 +191,13 @@ export function SpotlightHero({
           const startX = Number((e.currentTarget as HTMLElement).dataset.touchX ?? "0");
           const endX = e.changedTouches[0]?.clientX ?? 0;
           const diff = startX - endX;
-          if (Math.abs(diff) > 50 && items.length > 1) {
+          if (Math.abs(diff) > 50 && visibleItems.length > 1) {
             if (diff > 0) {
               setSlideDirection(1);
-              setCurrentSpotlight((p) => (p + 1) % items.length);
+              setCurrentSpotlight((p) => (p + 1) % visibleItems.length);
             } else {
               setSlideDirection(-1);
-              setCurrentSpotlight((p) => (p - 1 + items.length) % items.length);
+              setCurrentSpotlight((p) => (p - 1 + visibleItems.length) % visibleItems.length);
             }
           }
         }}
@@ -294,16 +301,16 @@ export function SpotlightHero({
         ) : null}
 
         {/* Progress indicators */}
-        {items.length > 1 && (
+        {visibleItems.length > 1 && (
           <div className="mt-4 flex items-center justify-center gap-1.5 md:absolute md:inset-x-0 md:bottom-[3.1rem] md:mt-0">
             {visibleDots.map((dotIndex) => {
               const isActive = dotIndex === currentSpotlight;
               const isPast = dotIndex < currentSpotlight;
               const isEdge =
-                items.length > MAX_DOTS &&
+                visibleItems.length > MAX_DOTS &&
                 ((dotIndex === visibleDots[0] && dotIndex > 0) ||
                   (dotIndex === visibleDots[visibleDots.length - 1] &&
-                    dotIndex < items.length - 1));
+                    dotIndex < visibleItems.length - 1));
 
               return (
                 <button

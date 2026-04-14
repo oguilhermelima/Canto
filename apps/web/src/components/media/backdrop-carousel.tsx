@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { cn } from "@canto/ui/cn";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { SectionTitle } from "~/components/layout/section-title";
@@ -10,6 +11,7 @@ import {
 } from "./backdrop-card";
 import type {BadgeType} from "./backdrop-card";
 import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
+import { useHiddenMedia } from "~/hooks/use-hidden-media";
 
 interface BackdropItem {
   externalId?: string;
@@ -61,6 +63,13 @@ export function BackdropCarousel({
   className,
   badgeStrategy = "none",
 }: BackdropCarouselProps): React.JSX.Element | null {
+  const { isHidden, hide } = useHiddenMedia();
+
+  const visibleItems = useMemo(
+    () => items.filter((item) => !item.externalId || !isHidden(item.externalId, item.provider)),
+    [items, isHidden],
+  );
+
   const {
     containerRef,
     canScrollLeft,
@@ -75,7 +84,7 @@ export function BackdropCarousel({
     scrollFraction: 0.8,
   });
 
-  if (!isLoading && items.length === 0) return null;
+  if (!isLoading && visibleItems.length === 0) return null;
 
   return (
     <section className={cn("relative", className)}>
@@ -115,12 +124,24 @@ export function BackdropCarousel({
                   className="w-[280px] shrink-0 sm:w-[300px] lg:w-[340px] 2xl:w-[380px]"
                 />
               ))
-            : items.map((item, i) => (
+            : visibleItems.map((item, i) => (
                 <BackdropCard
                   key={`${item.provider}-${item.externalId}-${i}`}
                   {...item}
                   badge={
                     badgeStrategy === "auto" ? deriveBadge(item) : item.badge
+                  }
+                  onHide={
+                    item.externalId
+                      ? () =>
+                          hide({
+                            externalId: item.externalId!,
+                            provider: item.provider ?? "tmdb",
+                            type: item.type,
+                            title: item.title,
+                            posterPath: null,
+                          })
+                      : undefined
                   }
                   className="w-[280px] shrink-0 sm:w-[300px] lg:w-[340px] 2xl:w-[380px]"
                 />
