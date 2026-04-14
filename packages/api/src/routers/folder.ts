@@ -290,7 +290,23 @@ export const folderRouter = createTRPCRouter({
   removeServerLink: protectedProcedure
     .input(removeServerLinkInput)
     .mutation(async ({ ctx, input }) => {
-      // For now, simple delete. In a more secure version, we'd verify ownership of the link here.
+      if (ctx.session.user.role !== "admin") {
+        const { findServerLinkById } = await import(
+          "@canto/core/infrastructure/repositories/folder-repository"
+        );
+        const link = await findServerLinkById(ctx.db, input.id);
+        if (!link) throw new TRPCError({ code: "NOT_FOUND" });
+        // Non-admins can only delete links owned by their own connections
+        const conn = link.userConnectionId
+          ? await ctx.db.query.userConnection.findFirst({
+              where: (uc, { eq, and: a }) =>
+                a(eq(uc.id, link.userConnectionId!), eq(uc.userId, ctx.session.user.id)),
+            })
+          : null;
+        if (!conn) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "You can only remove your own server links" });
+        }
+      }
       await removeServerLink(ctx.db, input.id);
       return { success: true };
     }),
