@@ -31,7 +31,7 @@ async function setupLibrariesForConnection(
     const { discoverServerLibraries } = await import(
       "@canto/core/domain/use-cases/discover-server-libraries"
     );
-    const { upsertServerLink, updateServerLink } = await import(
+    const { upsertServerLink } = await import(
       "@canto/core/infrastructure/repositories/folder-repository"
     );
     const { dispatchJellyfinSync, dispatchPlexSync } = await import(
@@ -41,19 +41,16 @@ async function setupLibrariesForConnection(
     const libraries = await discoverServerLibraries(db, provider, userId);
 
     for (const lib of libraries) {
-      if (!lib.linkId) {
-        await upsertServerLink(db, {
-          serverType: provider,
-          serverLibraryId: lib.serverLibraryId,
-          serverLibraryName: lib.serverLibraryName,
-          serverPath: lib.serverPath ?? undefined,
-          contentType: lib.contentType as "movies" | "shows",
-          syncEnabled: true,
-          userConnectionId: connectionId,
-        });
-      } else if (!lib.syncEnabled) {
-        await updateServerLink(db, lib.linkId, { syncEnabled: true });
-      }
+      // Always upsert per-user links — global (admin) links are left untouched
+      await upsertServerLink(db, {
+        serverType: provider,
+        serverLibraryId: lib.serverLibraryId,
+        serverLibraryName: lib.serverLibraryName,
+        serverPath: lib.serverPath ?? undefined,
+        contentType: lib.contentType as "movies" | "shows",
+        syncEnabled: true,
+        userConnectionId: connectionId,
+      });
     }
 
     if (provider === "jellyfin") {

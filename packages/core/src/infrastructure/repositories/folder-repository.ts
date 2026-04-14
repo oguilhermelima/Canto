@@ -187,7 +187,7 @@ export async function findAllServerLinks(db: Database, serverType?: string, user
   const conditions = [];
   if (serverType) conditions.push(eq(folderServerLink.serverType, serverType));
   if (userConnectionId) conditions.push(eq(folderServerLink.userConnectionId, userConnectionId));
-  
+
   return db.query.folderServerLink.findMany({
     where: conditions.length > 0 ? and(...conditions) : undefined,
   });
