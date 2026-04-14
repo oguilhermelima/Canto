@@ -2,32 +2,45 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Badge } from "@canto/ui/badge";
 import { Skeleton } from "@canto/ui/skeleton";
 import {
   Tv,
   Film,
   HardDrive,
   Download,
-  CheckCircle2,
-  AlertCircle,
-  Upload,
+  ArrowDown,
+  ArrowUp,
   Server,
   Search,
   Database,
+  Cpu,
+  MemoryStick,
 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { trpc } from "~/lib/trpc/client";
 import { SettingsSection } from "~/components/settings/shared";
 
-/* -------------------------------------------------------------------------- */
-/*  Stat card                                                                  */
-/* -------------------------------------------------------------------------- */
+/* ─── Helpers ─── */
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  const value = bytes / Math.pow(1024, i);
+  return `${value.toFixed(i > 1 ? 1 : 0)} ${units[i]}`;
+}
+
+function formatSpeed(bytesPerSec: number): string {
+  return `${formatBytes(bytesPerSec)}/s`;
+}
+
+/* ─── Stat card ─── */
 
 function StatCard({
   icon: Icon,
   label,
   value,
+  sub,
   loading,
   href,
   color = "text-primary",
@@ -36,6 +49,7 @@ function StatCard({
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: number | string;
+  sub?: string;
   loading?: boolean;
   href?: string;
   color?: string;
@@ -46,7 +60,7 @@ function StatCard({
       "rounded-2xl border border-border/60 bg-card p-5 transition-colors",
       href && "cursor-pointer hover:bg-muted/10",
     )}>
-      <div className="flex items-center gap-3 mb-3">
+      <div className="mb-3 flex items-center gap-3">
         <div className={cn("flex h-9 w-9 items-center justify-center rounded-xl", bgColor)}>
           <Icon className={cn("h-4 w-4", color)} />
         </div>
@@ -55,7 +69,10 @@ function StatCard({
       {loading ? (
         <Skeleton className="h-8 w-16" />
       ) : (
-        <p className="text-2xl font-bold text-foreground">{value}</p>
+        <>
+          <p className="text-2xl font-bold text-foreground">{value}</p>
+          {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
+        </>
       )}
     </div>
   );
@@ -64,9 +81,37 @@ function StatCard({
   return content;
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Service status row                                                         */
-/* -------------------------------------------------------------------------- */
+/* ─── Progress bar ─── */
+
+function UsageBar({ used, total, label, icon: Icon, color, format = formatBytes }: {
+  used: number;
+  total: number;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  format?: (v: number) => string;
+}): React.JSX.Element {
+  const pct = total > 0 ? Math.round((used / total) * 100) : 0;
+  return (
+    <div className="rounded-2xl border border-border/60 bg-card p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Icon className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium text-foreground">{label}</span>
+        </div>
+        <span className="text-sm text-muted-foreground">{pct}%</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-muted/60">
+        <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${pct}%` }} />
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {format(used)} used of {format(total)}
+      </p>
+    </div>
+  );
+}
+
+/* ─── Service row ─── */
 
 function ServiceRow({
   name,
@@ -78,7 +123,7 @@ function ServiceRow({
   icon: React.ComponentType<{ className?: string }>;
 }): React.JSX.Element {
   return (
-    <div className="flex items-center justify-between py-3 border-b border-border/20 last:border-0">
+    <div className="flex items-center justify-between border-b border-border/20 py-3 last:border-0">
       <div className="flex items-center gap-3">
         <Icon className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-medium text-foreground">{name}</span>
@@ -93,108 +138,112 @@ function ServiceRow({
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Torrent row                                                                */
-/* -------------------------------------------------------------------------- */
-
-function TorrentRow({ torrent }: { torrent: { id: string; title: string; quality: string | null; status: string } }): React.JSX.Element {
-  const statusColor = torrent.status === "downloading" ? "text-blue-400" : torrent.status === "completed" ? "text-emerald-400" : torrent.status === "error" ? "text-red-400" : "text-muted-foreground";
-  const statusBg = torrent.status === "downloading" ? "bg-blue-500/10" : torrent.status === "completed" ? "bg-emerald-500/10" : torrent.status === "error" ? "bg-red-500/10" : "bg-muted";
-
-  return (
-    <div className="flex items-center gap-3 py-3 border-b border-border/20 last:border-0">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">{torrent.title}</p>
-        {torrent.quality && <p className="text-xs text-muted-foreground">{torrent.quality}</p>}
-      </div>
-      <Badge variant="secondary" className={cn("shrink-0 text-xs", statusBg, statusColor)}>
-        {torrent.status}
-      </Badge>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Main dashboard                                                             */
-/* -------------------------------------------------------------------------- */
+/* ─── Main component ─── */
 
 export function StatusTab(): React.JSX.Element {
   const { data: stats, isLoading: statsLoading } = trpc.library.stats.useQuery();
   const { data: torrents, isLoading: torrentsLoading } = trpc.torrent.list.useQuery();
   const { data: services } = trpc.settings.getEnabledServices.useQuery();
-
-  const activeTorrents = torrents?.filter((t) => t.status === "downloading") ?? [];
-  const completedTorrents = torrents?.filter((t) => t.status === "completed") ?? [];
-  const errorTorrents = torrents?.filter((t) => t.status === "error") ?? [];
-  const seedingTorrents = torrents?.filter((t) => t.imported && t.status === "completed") ?? [];
+  const { data: sysInfo, isLoading: sysLoading } = trpc.system.info.useQuery(undefined, {
+    refetchInterval: 10_000,
+  });
 
   return (
     <div>
       {/* Library */}
-      <SettingsSection variant="grid" title="Library" description="Overview of your media collection and download activity.">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard icon={Film} label="Movies" value={stats?.movies ?? 0} loading={statsLoading} href="/collection/server-library?type=movie" />
-          <StatCard icon={Tv} label="Shows" value={stats?.shows ?? 0} loading={statsLoading} href="/collection/server-library?type=show" />
-          <StatCard icon={Database} label="Total Media" value={stats?.total ?? 0} loading={statsLoading} />
-          <StatCard icon={HardDrive} label="Torrents" value={torrents?.length ?? 0} loading={torrentsLoading} href="/torrents" />
+      <SettingsSection title="Library" description="Media collection overview.">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard icon={Film} label="Movies" value={stats?.movies ?? 0} loading={statsLoading} href="/collection/server-library?type=movie" color="text-blue-400" bgColor="bg-blue-500/10" />
+          <StatCard icon={Tv} label="Shows" value={stats?.shows ?? 0} loading={statsLoading} href="/collection/server-library?type=show" color="text-violet-400" bgColor="bg-violet-500/10" />
+          <StatCard icon={Database} label="Total Media" value={stats?.total ?? 0} loading={statsLoading} color="text-emerald-400" bgColor="bg-emerald-500/10" />
+          <StatCard icon={HardDrive} label="Torrents" value={torrents?.length ?? 0} loading={torrentsLoading} href="/torrents" color="text-amber-400" bgColor="bg-amber-500/10" />
         </div>
       </SettingsSection>
 
-      {/* Downloads */}
-      <SettingsSection variant="grid" title="Downloads" description="Current download and seeding activity across all folders.">
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <StatCard icon={Download} label="Downloading" value={activeTorrents.length} loading={torrentsLoading} color="text-blue-400" bgColor="bg-blue-500/10" />
-            <StatCard icon={CheckCircle2} label="Completed" value={completedTorrents.length} loading={torrentsLoading} color="text-emerald-400" bgColor="bg-emerald-500/10" />
-            <StatCard icon={AlertCircle} label="Failed" value={errorTorrents.length} loading={torrentsLoading} color="text-red-400" bgColor="bg-red-500/10" />
+      {/* System Resources */}
+      <SettingsSection title="System" description="Server resource usage.">
+        {sysLoading ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <Skeleton key={i} className="h-28 rounded-2xl" />
+            ))}
           </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {sysInfo && (
+              <>
+                <UsageBar
+                  icon={Cpu}
+                  label={`CPU · ${sysInfo.cpu.cores} cores`}
+                  used={sysInfo.cpu.usage}
+                  total={100}
+                  color="bg-blue-500"
+                  format={(v) => `${v}%`}
+                />
+                <UsageBar
+                  icon={MemoryStick}
+                  label="Memory"
+                  used={sysInfo.ram.used}
+                  total={sysInfo.ram.total}
+                  color="bg-violet-500"
+                />
+              </>
+            )}
+          </div>
+        )}
+      </SettingsSection>
 
-          {activeTorrents.length > 0 && (
-            <div className="rounded-2xl border border-border/60 bg-card px-4">
-              {activeTorrents.slice(0, 5).map((t) => (
-                <TorrentRow key={t.id} torrent={t} />
-              ))}
-              {activeTorrents.length > 5 && (
-                <Link href="/torrents" className="block py-3 text-sm text-primary hover:text-primary/80 transition-colors">
-                  View all {activeTorrents.length} downloads
-                </Link>
+      {/* Storage */}
+      <SettingsSection title="Storage" description="Disk usage for local library and download client.">
+        {sysLoading ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Skeleton className="h-28 rounded-2xl" />
+            <Skeleton className="h-28 rounded-2xl" />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {sysInfo?.localDisk && (
+                <UsageBar
+                  icon={HardDrive}
+                  label="Local Storage"
+                  used={sysInfo.localDisk.total - sysInfo.localDisk.free}
+                  total={sysInfo.localDisk.total}
+                  color="bg-emerald-500"
+                />
+              )}
+              {sysInfo?.qbitDisk && (
+                <div className="rounded-2xl border border-border/60 bg-card p-5">
+                  <div className="mb-3 flex items-center gap-3">
+                    <Download className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">qBittorrent</span>
+                  </div>
+                  <p className="text-2xl font-bold text-foreground">{formatBytes(sysInfo.qbitDisk.free)}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">free space</p>
+                  {(sysInfo.qbitDisk.dlSpeed > 0 || sysInfo.qbitDisk.upSpeed > 0) && (
+                    <div className="mt-3 flex items-center gap-4 border-t border-border/20 pt-3">
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <ArrowDown className="h-3 w-3 text-blue-400" />
+                        {formatSpeed(sysInfo.qbitDisk.dlSpeed)}
+                      </span>
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <ArrowUp className="h-3 w-3 text-emerald-400" />
+                        {formatSpeed(sysInfo.qbitDisk.upSpeed)}
+                      </span>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
-          )}
-
-          {errorTorrents.length > 0 && (
-            <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.02] px-4">
-              {errorTorrents.slice(0, 3).map((t) => (
-                <TorrentRow key={t.id} torrent={t} />
-              ))}
-              {errorTorrents.length > 3 && (
-                <Link href="/torrents" className="block py-3 text-sm text-red-400/80 hover:text-red-400 transition-colors">
-                  View all {errorTorrents.length} failed
-                </Link>
-              )}
-            </div>
-          )}
-
-          {!torrentsLoading && activeTorrents.length === 0 && errorTorrents.length === 0 && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              {seedingTorrents.length > 0 ? (
-                <>
-                  <Upload className="h-4 w-4" />
-                  {seedingTorrents.length} torrent{seedingTorrents.length !== 1 ? "s" : ""} seeding
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="h-4 w-4" />
-                  No active downloads
-                </>
-              )}
-            </div>
-          )}
-        </div>
+            {!sysInfo?.localDisk && !sysInfo?.qbitDisk && (
+              <p className="text-sm text-muted-foreground">No storage information available. Configure download folders or qBittorrent.</p>
+            )}
+          </div>
+        )}
       </SettingsSection>
 
       {/* Services */}
-      <SettingsSection variant="grid" title="Services" description="Connection status for all configured external services.">
+      <SettingsSection title="Services" description="Connection status for configured services.">
         <div className="rounded-2xl border border-border/60 bg-card px-4">
           <ServiceRow name="TMDB" enabled={true} icon={Film} />
           <ServiceRow name="TVDB" enabled={services?.tvdb ?? false} icon={Tv} />
@@ -206,8 +255,8 @@ export function StatusTab(): React.JSX.Element {
         </div>
       </SettingsSection>
 
-      {/* System */}
-      <SettingsSection variant="grid" title="System" description="Version and instance information.">
+      {/* Version */}
+      <SettingsSection title="Instance" description="Version and build information.">
         <div className="rounded-2xl border border-border/60 bg-card p-5">
           <div className="flex items-center gap-4">
             <Image src="/canto.svg" alt="Canto" width={40} height={40} className="h-10 w-10 dark:invert" />

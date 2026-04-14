@@ -1,28 +1,37 @@
+import Image from "next/image";
 import { ExternalLink } from "lucide-react";
 import { SettingsSection } from "~/components/settings/shared";
+
+const LINKS = [
+  { href: "https://github.com/oguilhermelima/canto", name: "GitHub", desc: "Source code and issue tracker" },
+  { href: "https://www.themoviedb.org/", name: "TMDB", desc: "Movie and TV show metadata" },
+  { href: "https://jellyfin.org/", name: "Jellyfin", desc: "Free software media system" },
+] as const;
 
 export function AboutSection(): React.JSX.Element {
   return (
     <div>
-      <SettingsSection variant="grid" title="Application" description="Details about this Canto instance.">
-        <div className="space-y-2.5">
-          {[["Version", "0.1.0"], ["Stack", "Next.js + tRPC + Drizzle"], ["Metadata", "TMDB"]].map(([label, value]) => (
-            <div key={label} className="flex items-center justify-between rounded-xl bg-muted/20 px-3.5 py-2.5 text-sm">
-              <span className="text-muted-foreground text-xs">{label}</span>
-              <span className="text-xs text-foreground">{value}</span>
+      <SettingsSection title="About" description="Instance information and resources.">
+        <div className="rounded-2xl border border-border/60 bg-card p-5">
+          <div className="flex items-center gap-4">
+            <Image src="/canto.svg" alt="Canto" width={48} height={48} className="h-12 w-12 dark:invert" />
+            <div>
+              <p className="font-semibold text-foreground">Canto</p>
+              <p className="text-sm text-muted-foreground">Version 0.1.0</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Next.js + tRPC + Drizzle + PostgreSQL</p>
             </div>
-          ))}
+          </div>
         </div>
-      </SettingsSection>
 
-      <SettingsSection variant="grid" title="Links" description="External resources and documentation.">
-        <div className="divide-y divide-border/60 rounded-xl border border-border/60 bg-card overflow-hidden">
-          {[
-            { href: "https://github.com/oguilhermelima/canto", name: "GitHub", desc: "Source code and issue tracker" },
-            { href: "https://www.themoviedb.org/", name: "TMDB", desc: "Movie and TV show metadata" },
-            { href: "https://jellyfin.org/", name: "Jellyfin", desc: "Free software media system" },
-          ].map((link) => (
-            <a key={link.name} href={link.href} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between px-5 py-4 transition-colors hover:bg-muted/20">
+        <div className="mt-4 divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/60 bg-card">
+          {LINKS.map((link) => (
+            <a
+              key={link.name}
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between px-5 py-4 transition-colors hover:bg-muted/20"
+            >
               <div>
                 <p className="text-sm font-medium text-foreground">{link.name}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">{link.desc}</p>
