@@ -7,6 +7,7 @@ import {
   media,
   mediaVideo,
   season,
+  userHiddenMedia,
   userMediaState,
   userPlaybackProgress,
   userWatchHistory,
@@ -796,6 +797,7 @@ export async function findUserMediaPaginated(
     status?: string;
     hasRating?: boolean;
     isFavorite?: boolean;
+    isHidden?: boolean;
     mediaType?: "movie" | "show";
     sortBy?: "updatedAt" | "rating" | "title" | "year";
     sortOrder?: "asc" | "desc";
@@ -813,6 +815,9 @@ export async function findUserMediaPaginated(
   }
   if (opts.isFavorite) {
     conditions.push(eq(userMediaState.isFavorite, true));
+  }
+  if (opts.isHidden !== undefined) {
+    conditions.push(eq(userMediaState.isHidden, opts.isHidden));
   }
   if (opts.mediaType) {
     conditions.push(eq(media.type, opts.mediaType));
@@ -881,6 +886,7 @@ export interface UserMediaCounts {
   dropped: number;
   favorites: number;
   rated: number;
+  hidden: number;
 }
 
 export async function findUserMediaCounts(
@@ -896,6 +902,7 @@ export async function findUserMediaCounts(
     [droppedRow],
     [favoritesRow],
     [ratedRow],
+    [hiddenRow],
   ] = await Promise.all([
     db.select({ total: count() }).from(userMediaState).where(and(base, eq(userMediaState.status, "planned"))),
     db.select({ total: count() }).from(userMediaState).where(and(base, eq(userMediaState.status, "watching"))),
@@ -903,6 +910,7 @@ export async function findUserMediaCounts(
     db.select({ total: count() }).from(userMediaState).where(and(base, eq(userMediaState.status, "dropped"))),
     db.select({ total: count() }).from(userMediaState).where(and(base, eq(userMediaState.isFavorite, true))),
     db.select({ total: count() }).from(userMediaState).where(and(base, gt(userMediaState.rating, 0))),
+    db.select({ total: count() }).from(userHiddenMedia).where(eq(userHiddenMedia.userId, userId)),
   ]);
 
   return {
@@ -912,6 +920,7 @@ export async function findUserMediaCounts(
     dropped: droppedRow?.total ?? 0,
     favorites: favoritesRow?.total ?? 0,
     rated: ratedRow?.total ?? 0,
+    hidden: hiddenRow?.total ?? 0,
   };
 }
 

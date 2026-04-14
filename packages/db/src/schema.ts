@@ -1028,11 +1028,32 @@ export const userMediaState = pgTable(
     status: varchar("status", { length: 20 }), // none, planned, watching, completed, dropped
     rating: integer("rating"),
     isFavorite: boolean("is_favorite").notNull().default(false),
+    isHidden: boolean("is_hidden").notNull().default(false),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.userId, table.mediaId] })],
+);
+
+// ─── User Hidden Media (externalId-based, works for any TMDB item) ───
+
+export const userHiddenMedia = pgTable(
+  "user_hidden_media",
+  {
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    externalId: integer("external_id").notNull(),
+    provider: varchar("provider", { length: 20 }).notNull().default("tmdb"),
+    type: varchar("type", { length: 10 }).notNull(),
+    title: varchar("title", { length: 500 }).notNull(),
+    posterPath: varchar("poster_path", { length: 255 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.externalId, table.provider] })],
 );
 
 // ─── User Playback Progress ───
@@ -1106,6 +1127,7 @@ export const userRelations = relations(user, ({ many }) => ({
   recommendations: many(userRecommendation),
   connections: many(userConnection),
   mediaStates: many(userMediaState),
+  hiddenMedia: many(userHiddenMedia),
   playbackProgress: many(userPlaybackProgress),
   watchHistory: many(userWatchHistory),
   homeSections: many(homeSection),
@@ -1425,6 +1447,13 @@ export const userMediaStateRelations = relations(userMediaState, ({ one }) => ({
   media: one(media, {
     fields: [userMediaState.mediaId],
     references: [media.id],
+  }),
+}));
+
+export const userHiddenMediaRelations = relations(userHiddenMedia, ({ one }) => ({
+  user: one(user, {
+    fields: [userHiddenMedia.userId],
+    references: [user.id],
   }),
 }));
 

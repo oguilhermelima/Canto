@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { and, count, desc, eq } from "drizzle-orm";
+import { userHiddenMedia } from "@canto/db/schema";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
@@ -169,6 +171,7 @@ export const userMediaRouter = createTRPCRouter({
         trackingStatus: state?.status ?? "none",
         rating: state?.rating ?? null,
         isFavorite: state?.isFavorite ?? false,
+        isHidden: state?.isHidden ?? false,
         progress: progress?.positionSeconds ?? 0,
         isCompleted: progress?.isCompleted ?? false,
         lastWatchedAt: progress?.lastWatchedAt ?? null,
@@ -205,6 +208,7 @@ export const userMediaRouter = createTRPCRouter({
         status: z.enum(["planned", "watching", "completed", "dropped"]).optional(),
         hasRating: z.boolean().optional(),
         isFavorite: z.boolean().optional(),
+        isHidden: z.boolean().optional(),
         mediaType: z.enum(["movie", "show"]).optional(),
         sortBy: z.enum(["updatedAt", "rating", "title", "year"]).default("updatedAt"),
         sortOrder: z.enum(["asc", "desc"]).default("desc"),
@@ -218,6 +222,7 @@ export const userMediaRouter = createTRPCRouter({
         status: input.status,
         hasRating: input.hasRating,
         isFavorite: input.isFavorite,
+        isHidden: input.isHidden,
         mediaType: input.mediaType,
         sortBy: input.sortBy,
         sortOrder: input.sortOrder,
@@ -1232,6 +1237,86 @@ export const userMediaRouter = createTRPCRouter({
       });
       return { success: true };
     }),
+
+  hideMedia: protectedProcedure
+    .input(z.object({
+      externalId: z.number(),
+      provider: z.string().default("tmdb"),
+      type: z.enum(["movie", "show"]),
+      title: z.string(),
+      posterPath: z.string().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .insert(userHiddenMedia)
+        .values({
+          userId: ctx.session.user.id,
+          externalId: input.externalId,
+          provider: input.provider,
+          type: input.type,
+          title: input.title,
+          posterPath: input.posterPath,
+        })
+        .onConflictDoNothing();
+      return { success: true };
+    }),
+
+  unhideMedia: protectedProcedure
+    .input(z.object({
+      externalId: z.number(),
+      provider: z.string().default("tmdb"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .delete(userHiddenMedia)
+        .where(
+          and(
+            eq(userHiddenMedia.userId, ctx.session.user.id),
+            eq(userHiddenMedia.externalId, input.externalId),
+            eq(userHiddenMedia.provider, input.provider),
+          ),
+        );
+      return { success: true };
+    }),
+
+  getHiddenMedia: protectedProcedure
+    .input(z.object({
+      limit: z.number().int().min(1).max(100).default(24),
+      cursor: z.number().int().min(0).nullish(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const offset = input.cursor ?? 0;
+
+      const [items, [countRow]] = await Promise.all([
+        ctx.db
+          .select()
+          .from(userHiddenMedia)
+          .where(eq(userHiddenMedia.userId, userId))
+          .orderBy(desc(userHiddenMedia.createdAt))
+          .limit(input.limit)
+          .offset(offset),
+        ctx.db
+          .select({ total: count() })
+          .from(userHiddenMedia)
+          .where(eq(userHiddenMedia.userId, userId)),
+      ]);
+
+      const total = countRow?.total ?? 0;
+      const nextCursor = offset + input.limit < total ? offset + input.limit : undefined;
+      return { items, total, nextCursor };
+    }),
+
+  getHiddenIds: protectedProcedure.query(async ({ ctx }) => {
+    const rows = await ctx.db
+      .select({
+        externalId: userHiddenMedia.externalId,
+        provider: userHiddenMedia.provider,
+      })
+      .from(userHiddenMedia)
+      .where(eq(userHiddenMedia.userId, ctx.session.user.id));
+    return rows;
+  }),
 
   track: protectedProcedure
     .input(z.object({
