@@ -1,63 +1,65 @@
 "use client";
 
-import { useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { TabBar } from "~/components/layout/tab-bar";
 import { useDocumentTitle } from "~/hooks/use-document-title";
 import { PageHeader } from "~/components/layout/page-header";
-import { MetadataProvidersSection } from "~/components/settings/services-section";
-import { AboutSection } from "~/components/settings/about-section";
-import { StatusTab } from "~/components/management/status-tab";
-import { UsersTab } from "~/components/management/users-tab";
-import { MediaServersSection } from "./_components/media-servers-section";
-import { DownloadsSection } from "./_components/downloads-section";
-import { SearchTabSection } from "./_components/search-tab-section";
-import { ManualScanSection } from "./_components/manual-scan-section";
-
-const NAV_ITEMS = [
-  { key: "status", label: "Status" },
-  { key: "users", label: "Users" },
-  { key: "metadata", label: "Metadata" },
-  { key: "search", label: "Indexers" },
-  { key: "downloads", label: "Libraries" },
-  { key: "media-servers", label: "Media Servers" },
-  { key: "manual-scan", label: "Manual Scan" },
-  { key: "about", label: "About" },
-] as const;
-
-type NavKey = (typeof NAV_ITEMS)[number]["key"];
+import { ManageSidebar, ManageMobileList } from "./_components/manage-nav";
+import { ManageContent } from "./_components/manage-content";
+import { ALL_MANAGE_KEYS, DEFAULT_MANAGE_SECTION, MANAGE_SECTIONS } from "./_components/manage-config";
 
 export default function ManagePage(): React.JSX.Element {
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const tabParam = searchParams.get("tab");
-  const resolvedTab = tabParam === "jellyfin" || tabParam === "plex" ? "media-servers" as const : tabParam as NavKey | null;
-  const activeNav = resolvedTab && NAV_ITEMS.some((i) => i.key === resolvedTab) ? resolvedTab : "status";
-
-  const setActiveNav = useCallback((key: string) => {
-    router.replace(`/manage?tab=${key}`, { scroll: false });
-  }, [router]);
+  const searchParams = useSearchParams();
 
   useDocumentTitle("Manage");
 
+  const sectionParam = searchParams.get("section");
+  const activeSection = sectionParam && ALL_MANAGE_KEYS.includes(sectionParam)
+    ? sectionParam
+    : null;
+
+  // Desktop always resolves to a section
+  const desktopSection = activeSection ?? DEFAULT_MANAGE_SECTION;
+
+  // Find active section metadata for mobile header
+  const activeSectionMeta = MANAGE_SECTIONS
+    .flatMap((g) => g.items)
+    .find((i) => i.key === activeSection);
+
   return (
     <div className="w-full">
-      <PageHeader title="Manage" subtitle="Server configuration and administration" />
+      {/* Desktop: always show page header */}
+      <div className={activeSection ? "hidden md:block" : ""}>
+        <PageHeader title="Manage" subtitle="Server configuration and administration." />
+      </div>
+
+      {/* Mobile: section detail header (TitleBar inside is already md:hidden) */}
+      {activeSection && activeSectionMeta && (
+        <PageHeader
+          title={activeSectionMeta.label}
+          subtitle={activeSectionMeta.description}
+          onNavigate={() => router.replace("/manage", { scroll: false })}
+          className="md:hidden"
+        />
+      )}
 
       <div className="px-4 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        <TabBar
-          tabs={NAV_ITEMS.map((item) => ({ value: item.key, label: item.label }))}
-          value={activeNav}
-          onChange={setActiveNav}
-        />
-        {activeNav === "status" && <StatusTab />}
-        {activeNav === "users" && <UsersTab />}
-        {activeNav === "metadata" && <MetadataProvidersSection />}
-        {activeNav === "downloads" && <DownloadsSection />}
-        {activeNav === "search" && <SearchTabSection />}
-        {activeNav === "media-servers" && <MediaServersSection />}
-        {activeNav === "manual-scan" && <ManualScanSection />}
-        {activeNav === "about" && <AboutSection />}
+        {/* Desktop: sidebar + content grid */}
+        <div className="hidden md:grid md:grid-cols-[240px_1fr] md:gap-10 lg:gap-16">
+          <ManageSidebar activeSection={desktopSection} />
+          <div className="min-w-0">
+            <ManageContent section={desktopSection} />
+          </div>
+        </div>
+
+        {/* Mobile: list or section content */}
+        <div className="md:hidden">
+          {activeSection ? (
+            <ManageContent section={activeSection} />
+          ) : (
+            <ManageMobileList />
+          )}
+        </div>
       </div>
     </div>
   );
