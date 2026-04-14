@@ -229,18 +229,13 @@ export class QBittorrentClient implements DownloadClientPort {
     }
   }
 
-  async ensureCategory(category: string, savePath?: string): Promise<void> {
-    try {
-      await this.createCategory(category, savePath);
-    } catch {
-      // Category likely already exists — ignore creation error
-    }
-
-    // Always update the save path so it stays in sync with folder settings.
-    // This MUST succeed — a wrong savePath means torrents land in the wrong
-    // directory and import will fail.
-    if (savePath) {
-      await this.editCategory(category, savePath);
+  async ensureCategory(category: string, _savePath?: string): Promise<void> {
+    // Validate that the category exists — categories are managed in Settings > Libraries
+    const existing = await this.listCategories();
+    if (!existing[category]) {
+      throw new Error(
+        `qBittorrent category "${category}" does not exist. Create it in Settings > Libraries or in qBittorrent.`,
+      );
     }
   }
 
