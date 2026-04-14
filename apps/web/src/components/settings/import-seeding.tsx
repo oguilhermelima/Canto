@@ -18,7 +18,7 @@ export function AutoMergeSection(): React.JSX.Element {
   });
 
   return (
-    <SettingsSection variant="grid" title="Post-import" description="Automatic actions after media files are imported.">
+    <SettingsSection title="Post-import" description="Automatic actions after media files are imported.">
       <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card px-4 py-3">
         <div>
           <p className="text-sm font-medium text-foreground">Auto-merge versions</p>
@@ -63,7 +63,7 @@ export function ImportMethodSection(): React.JSX.Element {
   };
 
   return (
-    <SettingsSection variant="grid"
+    <SettingsSection
       title="Transfer Mode"
       description="How completed downloads are moved from the download path to the storage path."
     >
@@ -151,7 +151,7 @@ export function SeedingSection(): React.JSX.Element {
   };
 
   return (
-    <SettingsSection variant="grid"
+    <SettingsSection
       title="Seeding"
       description="When to stop seeding and whether to clean up download files afterward."
     >

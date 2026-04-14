@@ -10,7 +10,7 @@ export function DownloadsSection(): React.JSX.Element {
     <div>
       <DownloadClientSection />
       <ImportMethodSection />
-      <SettingsSection variant="grid"
+      <SettingsSection
         title="Libraries"
         description="Each library defines where files are downloaded, where your media is stored, and how new downloads are routed."
       >

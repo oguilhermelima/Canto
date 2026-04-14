@@ -19,7 +19,7 @@ export function UsersTab(): React.JSX.Element {
   const { data: users, isLoading } = trpc.auth.list.useQuery();
 
   return (
-    <SettingsSection variant="grid"
+    <SettingsSection
       title="Users"
       description="People with access to this Canto instance. Admins can manage services, downloads, and media server connections."
     >

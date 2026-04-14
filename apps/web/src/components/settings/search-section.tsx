@@ -13,7 +13,7 @@ export function SearchSection(): React.JSX.Element {
 
   return (
     <div>
-      <SettingsSection variant="grid"
+      <SettingsSection
         title="Indexer Limits"
         description="Control how many indexers are queried and how long to wait for results. Lower values mean faster searches."
       >
