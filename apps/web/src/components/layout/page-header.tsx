@@ -10,9 +10,10 @@ export type PageHeaderProps = {
   children?: React.ReactNode;
   action?: React.ReactNode;
   className?: string;
+  onNavigate?: () => void;
 };
 
-export function PageHeader({ title, subtitle, children, action, className }: PageHeaderProps): React.JSX.Element {
+export function PageHeader({ title, subtitle, children, action, className, onNavigate }: PageHeaderProps): React.JSX.Element {
   const { ref: titleRef, isIntersecting: isTitleVisible } = useIntersectionObserver({
     initialIsIntersecting: true,
     threshold: 0.1,
@@ -24,6 +25,7 @@ export function PageHeader({ title, subtitle, children, action, className }: Pag
       <TitleBar
         title={!isTitleVisible ? title : ""}
         border={!isTitleVisible}
+        onNavigate={onNavigate}
       />
       <div className={cn("px-4 pt-16 pb-5 md:px-8 md:pt-8 md:pb-8 lg:px-12 xl:px-16 2xl:px-24", className)}>
         <div className="flex items-start justify-between gap-4">

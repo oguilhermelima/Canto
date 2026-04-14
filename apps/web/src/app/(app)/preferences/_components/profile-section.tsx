@@ -127,7 +127,7 @@ export function ProfileSection(): React.JSX.Element {
 
   return (
     <>
-      <SettingsSection title="Profile" description="Your account information and display name.">
+      <SettingsSection title="Account" description="Your account information and display name.">
         <div className="space-y-6">
           <div className="flex items-center gap-4">
             <button
