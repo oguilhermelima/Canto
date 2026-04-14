@@ -5,9 +5,9 @@ import { FadeImage } from "~/components/ui/fade-image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
-import { ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { tmdbBackdropLoader } from "~/lib/tmdb-image";
-import { AddToListButton } from "~/components/media/add-to-list-button";
+import { SpotlightActions } from "~/components/home/spotlight-actions";
 import { StateMessage } from "~/components/layout/state-message";
 import { MediaLogo } from "~/components/media/media-logo";
 import { mediaHref } from "~/lib/media-href";
@@ -280,22 +280,13 @@ export function SpotlightHero({
             )}
 
             <div className="flex items-center gap-2 pt-1">
-              <AddToListButton
+              <SpotlightActions
                 externalId={currentItem.externalId}
                 provider={currentItem.provider}
                 type={currentItem.type}
                 title={currentItem.title}
-                size="lg"
                 onOpenChange={setSpotlightPaused}
               />
-              <Link
-                href={getPreviewUrl(currentItem)}
-                onMouseEnter={() => prefetchSpotlight(currentItem)}
-                className="inline-flex h-11 items-center gap-2 rounded-xl border border-foreground/10 bg-foreground/15 px-4 text-sm font-medium text-foreground backdrop-blur-md transition-all hover:bg-foreground/25"
-              >
-                <Info className="h-4 w-4" />
-                More Info
-              </Link>
             </div>
           </div>
         ) : null}
