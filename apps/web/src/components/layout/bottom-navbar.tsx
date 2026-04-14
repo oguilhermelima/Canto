@@ -19,7 +19,7 @@ import {
   Download,
   UserRound,
   Settings,
-  Palette,
+  SlidersHorizontal,
   Bell,
   Send,
   LogOut,
@@ -138,7 +138,7 @@ export function BottomNavbar(): React.JSX.Element {
             // Account
             [
               { label: "Profile", icon: UserRound, onClick: () => router.push("/profile/me") },
-              { label: "Personalize", icon: Palette, onClick: () => router.push("/personalize") },
+              { label: "Preferences", icon: SlidersHorizontal, onClick: () => router.push("/preferences") },
               { label: "Manage", icon: Settings, onClick: () => router.push("/manage") },
             ],
             // Activity

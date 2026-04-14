@@ -13,7 +13,7 @@ import {
   Send,
   User,
   Settings,
-  Palette,
+  SlidersHorizontal,
   Bell,
   LogOut,
   Sun,
@@ -156,7 +156,7 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
     // Account
     [
       { href: "/profile/me", label: "Profile", icon: User },
-      { href: "/personalize", label: "Personalize", icon: Palette },
+      { href: "/preferences", label: "Preferences", icon: SlidersHorizontal },
       { href: "/manage", label: "Manage", icon: Settings },
     ],
     // Activity

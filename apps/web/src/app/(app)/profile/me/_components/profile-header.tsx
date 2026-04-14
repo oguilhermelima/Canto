@@ -74,7 +74,7 @@ export function ProfileHeader({ children }: ProfileHeaderProps): React.JSX.Eleme
                 <Pencil className="h-4 w-4" />
               </button>
               <Link
-                href="/account"
+                href="/preferences"
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white/80 backdrop-blur-sm transition-colors hover:bg-black/60 hover:text-white"
               >
                 <Settings className="h-4 w-4" />
@@ -147,7 +147,7 @@ export function ProfileHeader({ children }: ProfileHeaderProps): React.JSX.Eleme
                 <Pencil className="h-4 w-4" />
               </button>
               <Link
-                href="/account"
+                href="/preferences"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <Settings className="h-4 w-4" />
