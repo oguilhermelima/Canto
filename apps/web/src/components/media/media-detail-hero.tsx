@@ -130,6 +130,7 @@ export function MediaDetailHero({
   rating,
   isFavorite,
   playbackProgress,
+  posterPath,
   watchTrackingSeasons,
 }: MediaDetailHeroProps): React.JSX.Element {
   const resolveImage = (path: string, size: string): string =>
@@ -394,6 +395,8 @@ export function MediaDetailHero({
                   mediaId={persistedId}
                   mediaType={type}
                   title={title}
+                  posterPath={posterPath}
+                  backdropPath={backdropPath}
                   trackingStatus={trackingStatus}
                   seasons={watchTrackingSeasons}
                 />

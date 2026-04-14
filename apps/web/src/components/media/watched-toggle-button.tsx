@@ -1,18 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import {
-  Check,
+  Ban,
   CalendarDays,
   CalendarRange,
+  Check,
   CheckCircle2,
   CheckCheck,
   ChevronDown,
+  CircleDot,
   Clock3,
+  Eye,
   Film,
   HelpCircle,
   History,
   Loader2,
+  Star,
   Tv,
   X,
 } from "lucide-react";
@@ -32,12 +37,9 @@ import {
 } from "@canto/ui/popover";
 import { trpc } from "~/lib/trpc/client";
 import { toast } from "sonner";
-import { TabBar } from "~/components/layout/tab-bar";
-
 type TrackingStatus = "none" | "planned" | "watching" | "completed" | "dropped";
 type WatchScope = "movie" | "show" | "season" | "episode";
 type ModalTab = "track" | "history";
-type TrackingStep = "what" | "when";
 type WatchedAtMode = "just_now" | "release_date" | "other_date" | "unknown_date";
 type BulkSelectionMode = "all" | "select";
 
@@ -88,6 +90,8 @@ interface WatchTrackingButtonProps {
   mediaId: string;
   mediaType: "movie" | "show";
   title: string;
+  posterPath?: string | null;
+  backdropPath?: string | null;
   trackingStatus?: TrackingStatus;
   seasons?: WatchSeason[];
   className?: string;
@@ -104,15 +108,48 @@ const controlClassName =
 const smallControlClassName =
   "h-9 w-full appearance-none rounded-xl border-0 bg-accent px-3 text-sm text-foreground/80 outline-none transition-colors focus-visible:ring-1 focus-visible:ring-primary/30";
 
-const MODAL_TABS: Array<{ value: ModalTab; label: string; icon: typeof CheckCircle2 }> = [
-  { value: "track", label: "Track", icon: CheckCircle2 },
-  { value: "history", label: "History", icon: History },
-];
+const RATING_LABELS: Record<number, { emoji: string; label: string }> = {
+  1: { emoji: "😵", label: "Awful" },
+  2: { emoji: "😣", label: "Terrible" },
+  3: { emoji: "😕", label: "Bad" },
+  4: { emoji: "😐", label: "Meh" },
+  5: { emoji: "🙂", label: "Okay" },
+  6: { emoji: "😊", label: "Decent" },
+  7: { emoji: "😄", label: "Good" },
+  8: { emoji: "🤩", label: "Great" },
+  9: { emoji: "🔥", label: "Amazing" },
+  10: { emoji: "💎", label: "Masterpiece" },
+};
 
-const STEP_TABS: Array<{ value: TrackingStep; label: string }> = [
-  { value: "what", label: "1. What" },
-  { value: "when", label: "2. When" },
-];
+// Inject rating animation keyframes once
+let ratingStylesInjected = false;
+function injectRatingStyles(): void {
+  if (ratingStylesInjected) return;
+  ratingStylesInjected = true;
+  const style = document.createElement("style");
+  style.textContent = `
+    @keyframes star-fill {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.4); }
+      100% { transform: scale(1); }
+    }
+    @keyframes rating-glow {
+      0%   { filter: drop-shadow(0 0 0px transparent); }
+      50%  { filter: drop-shadow(0 0 6px rgba(234,179,8,0.4)); }
+      100% { filter: drop-shadow(0 0 2px rgba(234,179,8,0.2)); }
+    }
+    @keyframes emoji-pop {
+      0%   { transform: scale(0.3) rotate(-15deg); opacity: 0; }
+      60%  { transform: scale(1.15) rotate(3deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+    @keyframes sparkle {
+      0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+      50%  { opacity: 1; transform: scale(1) rotate(180deg); }
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 const DATE_MODE_OPTIONS: Array<{
   value: WatchedAtMode;
@@ -188,11 +225,11 @@ function statusButtonClass(status: TrackingStatus): string {
   const normalized = normalizeStatus(status);
   switch (normalized) {
     case "completed":
-      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20";
+      return "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25";
     case "watching":
-      return "border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/15";
+      return "border-emerald-500/30 bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/20";
     case "dropped":
-      return "border-red-500/30 bg-red-500/10 text-red-500 hover:bg-red-500/20";
+      return "border-zinc-500/30 bg-zinc-500/10 text-zinc-400 hover:bg-zinc-500/20";
     default:
       return "border-foreground/10 bg-foreground/15 text-foreground hover:bg-foreground/25";
   }
@@ -200,10 +237,16 @@ function statusButtonClass(status: TrackingStatus): string {
 
 function statusIcon(status: TrackingStatus): React.JSX.Element {
   const normalized = normalizeStatus(status);
-  if (normalized === "watching") {
-    return <Check className="h-4 w-4" />;
+  switch (normalized) {
+    case "watching":
+      return <CircleDot className="h-4 w-4" />;
+    case "completed":
+      return <CheckCheck className="h-4 w-4" />;
+    case "dropped":
+      return <Ban className="h-4 w-4" />;
+    default:
+      return <Eye className="h-4 w-4" />;
   }
-  return <CheckCheck className="h-4 w-4" />;
 }
 
 function isReleasedEpisode(airDate: string | null | undefined): boolean {
@@ -296,14 +339,14 @@ function ChipMultiSelect({
         <button
           type="button"
           className={cn(
-            "flex min-h-[40px] w-full cursor-pointer items-center justify-between gap-2 rounded-xl bg-accent px-3 py-2 text-left text-sm transition-colors hover:bg-accent/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30",
+            "flex min-h-[36px] w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-border/50 bg-accent px-3 py-1.5 text-left text-xs transition-colors hover:bg-accent/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/20",
             value.length === 0 && "text-muted-foreground",
           )}
         >
           {value.length === 0 ? (
             <span className="truncate">{placeholder ?? "Select..."}</span>
           ) : (
-            <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+            <div className="flex min-w-0 flex-1 flex-wrap gap-1">
               {value.map((selectedValue) => {
                 const label =
                   options.find((option) => option.value === selectedValue)?.label ??
@@ -311,7 +354,7 @@ function ChipMultiSelect({
                 return (
                   <span
                     key={selectedValue}
-                    className="inline-flex max-w-full items-center gap-1 rounded-lg bg-background px-2 py-1 text-sm font-medium text-foreground"
+                    className="inline-flex max-w-full items-center gap-1 rounded-md bg-foreground/10 px-1.5 py-0.5 text-xs font-medium text-foreground"
                   >
                     <span className="truncate">{label}</span>
                     <span
@@ -327,7 +370,7 @@ function ChipMultiSelect({
                           toggle(selectedValue);
                         }
                       }}
-                      className="cursor-pointer rounded-sm transition-colors hover:text-destructive"
+                      className="cursor-pointer rounded-sm text-muted-foreground transition-colors hover:text-foreground"
                     >
                       <X className="h-3 w-3" />
                     </span>
@@ -336,16 +379,16 @@ function ChipMultiSelect({
               })}
             </div>
           )}
-          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         </button>
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="w-[var(--radix-popover-trigger-width)] min-w-[var(--radix-popover-trigger-width)] rounded-xl border-border/60 bg-background p-0"
+        className="w-[var(--radix-popover-trigger-width)] min-w-[var(--radix-popover-trigger-width)] rounded-xl border-border/60 bg-background p-1"
         onWheel={(event) => event.stopPropagation()}
       >
         <div
-          className="max-h-[280px] overflow-y-auto p-1.5"
+          className="max-h-[240px] overflow-y-auto"
           onWheel={(event) => {
             event.stopPropagation();
             event.currentTarget.scrollTop += event.deltaY;
@@ -359,21 +402,21 @@ function ChipMultiSelect({
                 type="button"
                 onClick={() => toggle(option.value)}
                 className={cn(
-                  "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-sm transition-colors",
+                  "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs transition-colors",
                   selected
-                    ? "bg-primary/5 text-foreground"
-                    : "text-foreground hover:bg-accent",
+                    ? "bg-foreground/5 text-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
                 )}
               >
                 <div
                   className={cn(
-                    "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
+                    "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors",
                     selected
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-muted-foreground",
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-muted-foreground/50",
                   )}
                 >
-                  {selected && <Check className="h-2.5 w-2.5" />}
+                  {selected && <Check className="h-2 w-2" />}
                 </div>
                 <span className="truncate">{option.label}</span>
               </button>
@@ -550,6 +593,8 @@ export function WatchTrackingButton({
   mediaId,
   mediaType,
   title,
+  posterPath,
+  backdropPath,
   trackingStatus = "none",
   seasons = [],
   className,
@@ -558,7 +603,6 @@ export function WatchTrackingButton({
   const isMovie = mediaType === "movie";
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ModalTab>("track");
-  const [step, setStep] = useState<TrackingStep>(isMovie ? "when" : "what");
   const [scope, setScope] = useState<WatchScope>(
     mediaType === "movie" ? "movie" : "episode",
   );
@@ -572,6 +616,10 @@ export function WatchTrackingButton({
   const [selectedHistoryEntryIds, setSelectedHistoryEntryIds] = useState<string[]>(
     [],
   );
+  const [modalRating, setModalRating] = useState<number | null>(null);
+  const [hoverRating, setHoverRating] = useState<number | null>(null);
+  const [ratingBounce, setRatingBounce] = useState(false);
+  const [modalComment, setModalComment] = useState("");
 
   const orderedSeasons = useMemo(
     () =>
@@ -644,11 +692,14 @@ export function WatchTrackingButton({
   useEffect(() => {
     if (!open) return;
     setActiveTab("track");
-    setStep(isMovie ? "when" : "what");
     setDateMode("just_now");
     setCustomWatchedAt(toDatetimeLocalString(new Date()));
     setBulkMode("all");
     setSelectedHistoryEntryIds([]);
+    setModalRating(null);
+    setHoverRating(null);
+    setRatingBounce(false);
+    setModalComment("");
 
     if (mediaType === "movie") {
       setScope("movie");
@@ -850,27 +901,14 @@ export function WatchTrackingButton({
       payload.scope = "show";
     }
 
-    trackMutation.mutate(payload);
-  };
-
-  const handlePrimaryAction = (): void => {
-    if (step === "what") {
-      if (!canContinueWhat || pending) return;
-      setStep("when");
-      return;
+    if (modalRating) {
+      (payload as Record<string, unknown>).rating = modalRating;
+    }
+    if (modalComment.trim()) {
+      (payload as Record<string, unknown>).comment = modalComment.trim();
     }
 
-    const useSelectedEpisodes = requiresBulkChoice && bulkMode === "select";
-    if (!isDateValid) return;
-    if (useSelectedEpisodes && selectedEpisodeIds.length === 0) return;
-    submitTracking(useSelectedEpisodes);
-  };
-
-  const handleStepChange = (value: string): void => {
-    if (isMovie) return;
-    if (value !== "what" && value !== "when") return;
-    if (value === "when" && !canContinueWhat) return;
-    setStep(value);
+    trackMutation.mutate(payload);
   };
 
   const toggleEpisode = (episodeId: string): void => {
@@ -962,111 +1000,96 @@ export function WatchTrackingButton({
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="flex h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-border bg-background p-0 md:h-[56vh] md:max-h-[56vh] md:max-w-3xl md:rounded-[2rem] [&>button:last-child]:hidden">
-          <DialogHeader bar className="border-border/50">
-            <TabBar
-              tabs={MODAL_TABS}
-              value={activeTab}
-              onChange={(value) => setActiveTab(value as ModalTab)}
-              className="mb-2 py-0"
-            />
-            <DialogTitle>
-              {activeTab === "track" ? "Track watch history" : "Watch history"}
-            </DialogTitle>
-            <DialogDescription>
-              {activeTab === "track"
-                ? `Mark what you watched for ${title}.`
-                : `Review watched entries for ${title}.`}
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="flex h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-border/50 bg-background p-0 md:h-auto md:max-h-[85vh] md:max-w-lg md:rounded-3xl [&>button:last-child]:hidden">
+          {/* ── Cinematic header with backdrop ── */}
+          <div className="relative shrink-0 overflow-hidden">
+            {backdropPath && (
+              <>
+                <Image
+                  src={backdropPath.startsWith("http") ? backdropPath : `https://image.tmdb.org/t/p/w780${backdropPath}`}
+                  alt=""
+                  fill
+                  className="object-cover object-center"
+                  sizes="600px"
+                />
+                <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/70 to-background" />
+              </>
+            )}
+            <div className={cn("relative px-5 pb-5 md:px-6", backdropPath ? "pt-14" : "pt-5")}>
+              <div className="flex items-end justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <DialogTitle className="text-xl font-bold">
+                    {activeTab === "track" ? "I watched..." : "Watch history"}
+                  </DialogTitle>
+                  <DialogDescription className="mt-1 truncate text-sm text-foreground/70">
+                    {title}
+                  </DialogDescription>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(activeTab === "track" ? "history" : "track")}
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {activeTab === "track" ? (
+                    <><History className="h-3.5 w-3.5" /> History</>
+                  ) : (
+                    <><CheckCircle2 className="h-3.5 w-3.5" /> Track</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
 
           {activeTab === "track" ? (
             <>
-              <div className="flex-1 overflow-y-auto px-5 py-3 md:px-6 md:py-4">
-                {!isMovie && (
-                  <TabBar
-                    tabs={STEP_TABS}
-                    value={step}
-                    onChange={handleStepChange}
-                    className="mb-4 py-0"
-                  />
-                )}
+              <div className="flex-1 overflow-y-auto px-5 py-4 md:px-6">
+                <div className="space-y-5">
+                  {/* ── What did you watch? ── */}
+                  {!isMovie && (
+                    <section className="space-y-3">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">What</p>
 
-                {step === "what" ? (
-                  <div className="space-y-4">
-                    {mediaType === "movie" ? (
-                      <div className="flex items-center gap-2 rounded-xl bg-accent px-3 py-2.5 text-sm font-medium">
-                        <Film className="h-4 w-4 text-muted-foreground" />
-                        Movie
+                      {/* Scope as compact pills */}
+                      <div className="flex gap-2">
+                        {[
+                          { value: "show", label: "Entire show", icon: Tv },
+                          { value: "season", label: "Season", icon: Film },
+                          { value: "episode", label: "Episode", icon: CheckCircle2 },
+                        ].map((option) => {
+                          const Icon = option.icon;
+                          const isSelected = scope === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => {
+                                const nextScope = option.value as WatchScope;
+                                setScope(nextScope);
+                                if (nextScope === "episode") {
+                                  const latestSeason = releasedSeasons[releasedSeasons.length - 1];
+                                  const latestEpisode =
+                                    latestSeason?.episodes[latestSeason.episodes.length - 1];
+                                  setSeasonNumber(latestSeason?.number);
+                                  setSelectedEpisodeIds(latestEpisode ? [latestEpisode.id] : []);
+                                }
+                              }}
+                              className={cn(
+                                "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition-all duration-200 active:scale-95",
+                                isSelected
+                                  ? "border-foreground/20 bg-foreground/10 text-foreground"
+                                  : "border-border/50 text-muted-foreground hover:border-foreground/15 hover:text-foreground",
+                              )}
+                            >
+                              <Icon className="h-3.5 w-3.5" />
+                              {option.label}
+                            </button>
+                          );
+                        })}
                       </div>
-                    ) : (
-                      <>
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                            What did you watch?
-                          </label>
-                          <div className="grid gap-2 sm:grid-cols-3">
-                            {[
-                              {
-                                value: "show",
-                                title: "Entire show",
-                                description: "All released episodes",
-                                icon: Tv,
-                              },
-                              {
-                                value: "season",
-                                title: "One season",
-                                description: "A released season",
-                                icon: Film,
-                              },
-                              {
-                                value: "episode",
-                                title: "One episode",
-                                description: "Defaults to latest released",
-                                icon: CheckCircle2,
-                              },
-                            ].map((option) => {
-                              const Icon = option.icon;
-                              return (
-                                <button
-                                  key={option.value}
-                                  type="button"
-                                  onClick={() => {
-                                    const nextScope = option.value as WatchScope;
-                                    setScope(nextScope);
-                                    if (nextScope === "episode") {
-                                      const latestSeason = releasedSeasons[releasedSeasons.length - 1];
-                                      const latestEpisode =
-                                        latestSeason?.episodes[latestSeason.episodes.length - 1];
-                                      setSeasonNumber(latestSeason?.number);
-                                      setSelectedEpisodeIds(latestEpisode ? [latestEpisode.id] : []);
-                                    }
-                                  }}
-                                  className={cn(
-                                    "rounded-xl border border-transparent bg-accent px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30",
-                                    scope === option.value
-                                      ? "border-primary/30 bg-primary/10"
-                                      : "hover:bg-accent/80",
-                                  )}
-                                >
-                                  <div className="mb-1.5 flex items-center gap-2 text-sm font-medium">
-                                    <Icon className="h-4 w-4 text-muted-foreground" />
-                                    {option.title}
-                                  </div>
-                                  <p className="text-xs text-muted-foreground">
-                                    {option.description}
-                                  </p>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
 
                         {(scope === "season" || scope === "episode") && (
                           <div className="space-y-1.5">
-                            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                              Season
-                            </label>
+                            <label className="text-xs font-semibold text-muted-foreground">Season</label>
                             <div className="relative">
                               <select
                                 className={controlClassName}
@@ -1099,263 +1122,322 @@ export function WatchTrackingButton({
 
                         {scope === "episode" && (
                           <div className="space-y-1.5">
-                            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                              Episodes
-                            </label>
+                            <label className="text-xs font-semibold text-muted-foreground">Episodes</label>
                             <ChipMultiSelect
                               value={selectedEpisodeIds}
                               onChange={setSelectedEpisodeIds}
                               options={episodeOptions}
                               placeholder="Select one or more episodes"
                             />
+                            <p className="text-xs text-muted-foreground">
+                              Only released episodes are shown here.
+                            </p>
                           </div>
                         )}
 
-                        <p className="text-xs text-muted-foreground">
-                          Only released episodes are shown here.
-                        </p>
-
                         {releasedSeasons.length === 0 && (
-                          <div className="rounded-xl bg-accent px-3 py-2.5 text-sm text-muted-foreground">
+                          <div className="rounded-xl border border-foreground/[0.06] bg-foreground/[0.03] px-3 py-2.5 text-sm text-muted-foreground">
                             There are no released episodes available yet.
                           </div>
                         )}
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="rounded-xl bg-accent px-3 py-2.5">
-                      <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                        Selected scope
-                      </p>
-                      <p className="mt-1 flex items-center gap-2 text-sm font-medium">
-                        <CheckCircle2 className="h-4 w-4 text-primary" />
-                        {selectedScopeSummary}
-                      </p>
+                    </section>
+                  )}
+
+                  {/* ── When ── */}
+                  <section className={cn(
+                    "space-y-3 transition-all duration-300",
+                    !isMovie && !canContinueWhat && "pointer-events-none opacity-25",
+                  )}>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">When</p>
+
+                    <div className="flex flex-wrap gap-2">
+                      {DATE_MODE_OPTIONS.map((option) => {
+                        const Icon = option.icon;
+                        const selected = dateMode === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setDateMode(option.value)}
+                            className={cn(
+                              "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition-all duration-200 active:scale-95",
+                              selected
+                                ? "border-foreground/20 bg-foreground/10 text-foreground"
+                                : "border-border/50 text-muted-foreground hover:border-foreground/15 hover:text-foreground",
+                            )}
+                          >
+                            <Icon className="h-3.5 w-3.5" />
+                            {option.label}
+                          </button>
+                        );
+                      })}
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        When did you watch this?
-                      </label>
-                      <div className="space-y-2">
-                        {DATE_MODE_OPTIONS.map((option) => {
-                          const Icon = option.icon;
-                          const selected = dateMode === option.value;
-                          return (
+                      {dateMode === "other_date" && (
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-semibold text-muted-foreground">
+                            Exact date and time
+                          </label>
+                          <DateTimeValuePicker
+                            value={customWatchedAt}
+                            onChange={setCustomWatchedAt}
+                          />
+                        </div>
+                      )}
+
+                      {requiresBulkChoice && (
+                        <div className="space-y-3 rounded-2xl border border-border/50 bg-accent p-3.5">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-semibold text-muted-foreground">
+                              Episode selection
+                            </p>
+                            <span className="text-xs text-muted-foreground">
+                              {scopedEpisodes.length} available
+                            </span>
+                          </div>
+
+                          <div className="grid gap-2 sm:grid-cols-2">
                             <button
-                              key={option.value}
                               type="button"
-                              onClick={() => setDateMode(option.value)}
+                              onClick={() => setBulkMode("all")}
                               className={cn(
-                                "w-full rounded-xl border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30",
-                                selected
-                                  ? "border-primary/30 bg-primary/10"
-                                  : "border-transparent bg-accent hover:bg-accent/80",
+                                "rounded-xl border px-3 py-2 text-sm font-medium transition-all duration-200 active:scale-[0.98]",
+                                bulkMode === "all"
+                                  ? "border-foreground/20 bg-foreground/10 text-foreground"
+                                  : "border-border/50 text-muted-foreground hover:border-foreground/15 hover:text-foreground",
                               )}
                             >
-                              <div className="mb-1 flex items-center gap-2 text-sm font-medium">
-                                <Icon className="h-4 w-4 text-muted-foreground" />
-                                {option.label}
+                              Mark all episodes
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setBulkMode("select")}
+                              className={cn(
+                                "rounded-xl border px-3 py-2 text-sm font-medium transition-all duration-200 active:scale-[0.98]",
+                                bulkMode === "select"
+                                  ? "border-foreground/20 bg-foreground/10 text-foreground"
+                                  : "border-border/50 text-muted-foreground hover:border-foreground/15 hover:text-foreground",
+                              )}
+                            >
+                              Select individually
+                            </button>
+                          </div>
+
+                          {bulkMode === "select" && (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>
+                                  {selectedEpisodeIds.length} of {scopedEpisodes.length} selected
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    className="rounded-lg px-2 py-1 transition-colors hover:text-foreground"
+                                    onClick={() =>
+                                      setSelectedEpisodeIds(
+                                        scopedEpisodes.map((episode) => episode.id),
+                                      )
+                                    }
+                                  >
+                                    Select all
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="rounded-lg px-2 py-1 transition-colors hover:text-foreground"
+                                    onClick={() => setSelectedEpisodeIds([])}
+                                  >
+                                    Clear
+                                  </button>
+                                </div>
                               </div>
-                              <p className="text-xs text-muted-foreground">
-                                {option.description}
-                              </p>
+
+                              <div className="max-h-48 space-y-1.5 overflow-y-auto pr-1">
+                                {scopedEpisodes.map((episode) => {
+                                  const selected = selectedEpisodeIds.includes(episode.id);
+                                  return (
+                                    <button
+                                      key={episode.id}
+                                      type="button"
+                                      onClick={() => toggleEpisode(episode.id)}
+                                      className={cn(
+                                        "flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left transition-all duration-150 active:scale-[0.99]",
+                                        selected
+                                          ? "border-foreground/20 bg-foreground/10"
+                                          : "border-border/50 hover:border-foreground/15",
+                                      )}
+                                    >
+                                      <span className="truncate pr-2 text-sm">
+                                        {episodeLabel(episode)}
+                                      </span>
+                                      <span
+                                        className={cn(
+                                          "inline-flex shrink-0 items-center rounded-lg px-2 py-0.5 text-xs font-medium transition-colors",
+                                          selected
+                                            ? "bg-foreground/10 text-foreground"
+                                            : "text-muted-foreground",
+                                        )}
+                                      >
+                                        {selected && <Check className="mr-1 h-3 w-3" />}
+                                        {selected ? "Selected" : "Select"}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                  </section>
+
+                  {/* ── How was it? ── */}
+                  <section className={cn(
+                    "space-y-3 transition-all duration-300",
+                    !isMovie && !canContinueWhat && "pointer-events-none opacity-25",
+                  )}>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        How was it?
+                      </p>
+                      {(() => {
+                        const displayRating = hoverRating ?? modalRating;
+                        const info = displayRating ? RATING_LABELS[displayRating] : null;
+                        return info ? (
+                          <p
+                            key={displayRating}
+                            className="text-sm font-medium text-foreground"
+                            style={{ animation: "emoji-pop 250ms ease-out" }}
+                          >
+                            <span className="mr-1">{info.emoji}</span>
+                            {info.label}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">optional</p>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Stars */}
+                    <div className="flex items-center justify-between rounded-2xl border border-border/50 bg-accent px-3 py-2.5">
+                      <div className="flex items-center gap-0.5">
+                        {Array.from({ length: 10 }).map((_, i) => {
+                          const value = i + 1;
+                          const displayValue = hoverRating ?? modalRating ?? 0;
+                          const isActive = value <= displayValue;
+                          const isExact = value === displayValue;
+                          return (
+                            <button
+                              key={value}
+                              type="button"
+                              className="group/star p-0.5 transition-transform duration-150 hover:scale-[1.35] active:scale-90"
+                              onMouseEnter={() => { injectRatingStyles(); setHoverRating(value); }}
+                              onMouseLeave={() => setHoverRating(null)}
+                              onClick={() => {
+                                injectRatingStyles();
+                                const next = modalRating === value ? null : value;
+                                setModalRating(next);
+                                if (next) {
+                                  setRatingBounce(true);
+                                  setTimeout(() => setRatingBounce(false), 400);
+                                }
+                              }}
+                            >
+                              <Star
+                                className={cn(
+                                  "h-5 w-5 transition-all duration-150",
+                                  isActive
+                                    ? "fill-yellow-500 text-yellow-500"
+                                    : "text-muted-foreground/40 group-hover/star:text-muted-foreground",
+                                )}
+                                style={
+                                  isExact && ratingBounce
+                                    ? { animation: "star-fill 350ms ease-out" }
+                                    : isActive
+                                      ? { animation: "rating-glow 2s ease-in-out infinite" }
+                                      : undefined
+                                }
+                              />
                             </button>
                           );
                         })}
                       </div>
+                      {modalRating != null && (
+                        <span
+                          className="text-lg font-bold text-yellow-500"
+                          style={ratingBounce ? { animation: "emoji-pop 350ms ease-out" } : undefined}
+                        >
+                          {modalRating}<span className="text-xs font-normal text-muted-foreground">/10</span>
+                        </span>
+                      )}
                     </div>
 
-                    {dateMode === "other_date" && (
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                          Exact date and time
-                        </label>
-                        <DateTimeValuePicker
-                          value={customWatchedAt}
-                          onChange={setCustomWatchedAt}
-                        />
-                      </div>
-                    )}
-
-                    {requiresBulkChoice && (
-                      <div className="space-y-3 rounded-2xl border border-border/50 bg-muted/20 p-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                            Episode selection
-                          </p>
-                          <span className="text-xs text-muted-foreground">
-                            {scopedEpisodes.length} available
-                          </span>
-                        </div>
-
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <button
-                            type="button"
-                            onClick={() => setBulkMode("all")}
-                            className={cn(
-                              "rounded-xl px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30",
-                              bulkMode === "all"
-                                ? "bg-background text-foreground shadow-sm"
-                                : "bg-accent text-muted-foreground hover:text-foreground",
-                            )}
-                          >
-                            Mark all episodes
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setBulkMode("select")}
-                            className={cn(
-                              "rounded-xl px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30",
-                              bulkMode === "select"
-                                ? "bg-background text-foreground shadow-sm"
-                                : "bg-accent text-muted-foreground hover:text-foreground",
-                            )}
-                          >
-                            Select individually
-                          </button>
-                        </div>
-
-                        {bulkMode === "select" && (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>
-                                {selectedEpisodeIds.length} of {scopedEpisodes.length} selected
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  className="rounded-xl bg-accent px-2 py-1 hover:text-foreground"
-                                  onClick={() =>
-                                    setSelectedEpisodeIds(
-                                      scopedEpisodes.map((episode) => episode.id),
-                                    )
-                                  }
-                                >
-                                  Select all
-                                </button>
-                                <button
-                                  type="button"
-                                  className="rounded-xl bg-accent px-2 py-1 hover:text-foreground"
-                                  onClick={() => setSelectedEpisodeIds([])}
-                                >
-                                  Clear
-                                </button>
-                              </div>
-                            </div>
-
-                            <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
-                              {scopedEpisodes.map((episode) => {
-                                const selected = selectedEpisodeIds.includes(episode.id);
-                                return (
-                                  <button
-                                    key={episode.id}
-                                    type="button"
-                                    onClick={() => toggleEpisode(episode.id)}
-                                    className={cn(
-                                      "flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30",
-                                      selected
-                                        ? "border-primary/30 bg-primary/10"
-                                        : "border-transparent bg-accent hover:bg-accent/80",
-                                    )}
-                                  >
-                                    <span className="truncate pr-2 text-sm">
-                                      {episodeLabel(episode)}
-                                    </span>
-                                    <span
-                                      className={cn(
-                                        "inline-flex shrink-0 items-center rounded-xl px-2.5 py-1 text-xs font-medium",
-                                        selected
-                                          ? "bg-primary text-primary-foreground"
-                                          : "bg-background text-muted-foreground",
-                                      )}
-                                    >
-                                      {selected ? "Selected" : "Select"}
-                                    </span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
+                    {/* Review */}
+                    <textarea
+                      className="w-full resize-none rounded-2xl border border-border/50 bg-accent px-4 py-3 text-sm leading-relaxed text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-foreground/20 focus:bg-accent/80"
+                      placeholder="Share your thoughts..."
+                      rows={2}
+                      maxLength={5000}
+                      value={modalComment}
+                      onChange={(e) => setModalComment(e.target.value)}
+                    />
+                  </section>
+                </div>
               </div>
 
-              <div className="shrink-0 border-t border-border/50 px-5 py-3 md:px-6">
-                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-2">
-                    {normalizedStatus === "watching" && (
-                      <Button
-                        variant="ghost"
-                        className="rounded-xl text-red-300 hover:text-red-200"
-                        disabled={pending}
-                        onClick={() => markDroppedMutation.mutate({ mediaId })}
-                      >
-                        Mark as dropped
-                      </Button>
-                    )}
-                    {normalizedStatus === "dropped" && (
-                      <Button
-                        variant="ghost"
-                        className="rounded-xl"
-                        disabled={pending}
-                        onClick={() => clearTrackingMutation.mutate({ mediaId })}
-                      >
-                        Clear dropped status
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2">
-                    {step === "when" && !isMovie && (
-                      <Button
-                        variant="ghost"
-                        className="rounded-xl"
-                        onClick={() => setStep("what")}
-                        disabled={pending}
-                      >
-                        Back
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      className="rounded-xl"
-                      onClick={() => setOpen(false)}
+              <div className="shrink-0 px-5 pb-5 pt-2 md:px-6">
+                <div className="flex items-center gap-2">
+                  {normalizedStatus === "watching" && (
+                    <button
+                      type="button"
+                      className="rounded-full px-3 py-1.5 text-xs font-medium text-foreground/30 transition-colors hover:text-foreground/50 disabled:opacity-50"
                       disabled={pending}
+                      onClick={() => markDroppedMutation.mutate({ mediaId })}
                     >
-                      Cancel
-                    </Button>
-                    <Button
-                      className="rounded-xl"
-                      onClick={handlePrimaryAction}
-                      disabled={
-                        pending ||
-                        (step === "what" && !canContinueWhat) ||
-                        (step === "when" &&
-                          (!isDateValid ||
-                            (requiresBulkChoice &&
-                              bulkMode === "select" &&
-                              selectedEpisodeIds.length === 0)))
-                      }
+                      <Ban className="mr-1 inline h-3 w-3" />
+                      Drop
+                    </button>
+                  )}
+                  {normalizedStatus === "dropped" && (
+                    <button
+                      type="button"
+                      className="rounded-full px-3 py-1.5 text-xs font-medium text-foreground/30 transition-colors hover:text-foreground/50 disabled:opacity-50"
+                      disabled={pending}
+                      onClick={() => clearTrackingMutation.mutate({ mediaId })}
                     >
-                      {pending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : step === "what" ? (
-                        "Next: when"
-                      ) : requiresBulkChoice && bulkMode === "select" ? (
-                        "Mark selected as watched"
-                      ) : requiresBulkChoice ? (
-                        "Mark all as watched"
-                      ) : (
-                        "Mark as watched"
-                      )}
-                    </Button>
-                  </div>
+                      Clear status
+                    </button>
+                  )}
+                  <div className="flex-1" />
+                  <button
+                    type="button"
+                    className="rounded-full px-4 py-2 text-sm font-medium text-foreground/40 transition-colors hover:text-foreground/60 disabled:opacity-50"
+                    onClick={() => setOpen(false)}
+                    disabled={pending}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition-all duration-200 hover:scale-[1.03] hover:opacity-90 active:scale-[0.97] disabled:opacity-40"
+                    onClick={() => submitTracking(requiresBulkChoice && bulkMode === "select")}
+                    disabled={
+                      pending ||
+                      !canContinueWhat ||
+                      !isDateValid ||
+                      (requiresBulkChoice &&
+                        bulkMode === "select" &&
+                        selectedEpisodeIds.length === 0)
+                    }
+                  >
+                    {pending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <CheckCheck className="h-4 w-4" />
+                        Save
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </>
