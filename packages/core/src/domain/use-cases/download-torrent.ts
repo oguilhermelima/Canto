@@ -450,6 +450,7 @@ async function coreDownload(
       }
       if (!extractedHash) {
         console.warn(`[download] Could not detect hash for "${torrentRow.title}" after 15 attempts`);
+        await updateTorrent(db, torrentRow.id, { status: "failed" });
       }
     }
   } catch (qbErr) {
