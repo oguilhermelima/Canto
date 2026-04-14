@@ -87,7 +87,8 @@ export const mediaRouter = createTRPCRouter({
           : null;
         const genreMode = input.genres?.includes(",") ? "and" : "or";
 
-        if (genreSet || input.language || input.scoreMin != null || input.scoreMax != null) {
+        const hasPostFilters = genreSet || input.language || input.scoreMin != null || input.scoreMax != null || input.dateFrom || input.dateTo;
+        if (hasPostFilters) {
           const filtered = searchResults.results.filter((r) => {
             if (genreSet && r.genreIds) {
               if (genreMode === "and") {
@@ -101,6 +102,8 @@ export const mediaRouter = createTRPCRouter({
             if (input.language && r.originalLanguage !== input.language) return false;
             if (input.scoreMin != null && (r.voteAverage ?? 0) < input.scoreMin) return false;
             if (input.scoreMax != null && (r.voteAverage ?? 0) > input.scoreMax) return false;
+            if (input.dateFrom && r.releaseDate && r.releaseDate < input.dateFrom) return false;
+            if (input.dateTo && r.releaseDate && r.releaseDate > input.dateTo) return false;
             return true;
           });
           return enrichBrowseWithLogos(appDb, {
@@ -114,7 +117,7 @@ export const mediaRouter = createTRPCRouter({
       }
 
       const settingsLang = (await getSetting("general.language")) ?? "en-US";
-      const cacheKey = `browse:${input.type}:${input.mode}:${input.genres ?? ""}:${input.language ?? ""}:${input.sortBy ?? ""}:${input.dateFrom ?? ""}:${input.dateTo ?? ""}:${input.keywords ?? ""}:${input.scoreMin ?? ""}:${input.scoreMax ?? ""}:${input.runtimeMax ?? ""}:${input.certification ?? ""}:${input.status ?? ""}:${input.watchProviders ?? ""}:${input.watchRegion ?? ""}:${input.runtimeMin ?? ""}:${page}:${settingsLang}`;
+      const cacheKey = `browse:${input.type}:${input.mode}:${input.query ?? ""}:${input.genres ?? ""}:${input.language ?? ""}:${input.sortBy ?? ""}:${input.dateFrom ?? ""}:${input.dateTo ?? ""}:${input.keywords ?? ""}:${input.scoreMin ?? ""}:${input.scoreMax ?? ""}:${input.runtimeMax ?? ""}:${input.certification ?? ""}:${input.status ?? ""}:${input.watchProviders ?? ""}:${input.watchRegion ?? ""}:${input.runtimeMin ?? ""}:${page}:${settingsLang}`;
 
       const browseResults = await cached(cacheKey, 1800, async () => {
         const provider = await getTmdbProvider();
@@ -125,39 +128,15 @@ export const mediaRouter = createTRPCRouter({
           results: data.results.filter((r) => !r.releaseDate || r.releaseDate <= today),
         });
 
-        if (input.mode === "trending") {
-          const hasFilters = input.genres || input.language || input.keywords || input.scoreMin != null || input.scoreMax != null || input.runtimeMax != null || input.certification || input.status || input.watchProviders || input.runtimeMin != null;
-          if (hasFilters) {
-            return filterReleased(await provider.discover(input.type, {
-              page,
-              with_genres: input.genres,
-              with_original_language: input.language,
-              with_keywords: input.keywords,
-              vote_average_gte: input.scoreMin,
-              vote_average_lte: input.scoreMax,
-              with_runtime_lte: input.runtimeMax,
-              sort_by: input.sortBy ?? "popularity.desc",
-              first_air_date_gte: input.type === "show" ? input.dateFrom : undefined,
-              release_date_gte: input.type === "movie" ? input.dateFrom : undefined,
-              first_air_date_lte: input.type === "show" ? (input.dateTo ?? today) : undefined,
-              release_date_lte: input.type === "movie" ? (input.dateTo ?? today) : undefined,
-              certification: input.certification,
-              certification_country: input.certification ? "US" : undefined,
-              with_status: input.status,
-              with_watch_providers: input.watchProviders,
-              watch_region: input.watchRegion,
-              with_runtime_gte: input.runtimeMin,
-            }));
-          }
-          return filterReleased(await provider.getTrending(input.type, { page }));
-        }
-
-        return filterReleased(await provider.discover(input.type, {
+        const discoverOpts = {
           page,
+          with_text_query: input.query,
           with_genres: input.genres,
           with_original_language: input.language,
           with_keywords: input.keywords,
           vote_average_gte: input.scoreMin,
+          vote_average_lte: input.scoreMax,
+          with_runtime_gte: input.runtimeMin,
           with_runtime_lte: input.runtimeMax,
           sort_by: input.sortBy ?? "popularity.desc",
           first_air_date_gte: input.type === "show" ? input.dateFrom : undefined,
@@ -169,8 +148,17 @@ export const mediaRouter = createTRPCRouter({
           with_status: input.status,
           with_watch_providers: input.watchProviders,
           watch_region: input.watchRegion,
-          with_runtime_gte: input.runtimeMin,
-        }));
+        };
+
+        if (input.mode === "trending") {
+          const hasFilters = input.genres || input.language || input.keywords || input.scoreMin != null || input.scoreMax != null || input.runtimeMax != null || input.certification || input.status || input.watchProviders || input.runtimeMin != null;
+          if (hasFilters) {
+            return filterReleased(await provider.discover(input.type, discoverOpts));
+          }
+          return filterReleased(await provider.getTrending(input.type, { page }));
+        }
+
+        return filterReleased(await provider.discover(input.type, discoverOpts));
       });
       return enrichBrowseWithLogos(appDb, browseResults);
     }),
