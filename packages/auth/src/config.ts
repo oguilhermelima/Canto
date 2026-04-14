@@ -7,7 +7,7 @@ import { DEFAULT_HOME_SECTIONS } from "@canto/db/home-section-defaults";
 import { DEFAULT_PROFILE_SECTIONS } from "@canto/db/profile-section-defaults";
 
 export const auth = betterAuth({
-  trustedOrigins: ["http://192.168.0.210:3000"],
+  trustedOrigins: ["http://localhost:3000", "http://192.168.0.210:3000"],
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: {
