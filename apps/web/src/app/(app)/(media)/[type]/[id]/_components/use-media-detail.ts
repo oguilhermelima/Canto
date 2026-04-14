@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { useIsAdmin } from "~/hooks/use-is-admin";
@@ -32,9 +32,7 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
   const resolvedData = resolved.data;
   const media = resolvedData?.media;
   const mediaLoading = resolved.isLoading;
-  const mediaId = resolvedData?.persisted
-    ? (resolvedData.media as { id?: string }).id
-    : undefined;
+  const mediaId = (resolvedData as { mediaId?: string } | undefined)?.mediaId;
 
   const extras = {
     data: resolvedData?.extras,
@@ -73,7 +71,29 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
   );
 
   const deleteTorrentMutation = trpc.torrent.delete.useMutation();
-  const persistMedia = trpc.media.persist.useMutation();
+  const persistMedia = trpc.media.persist.useMutation({
+    onSuccess: () => {
+      void utils.media.resolve.invalidate();
+    },
+    onError: (err) => {
+      toast.error(`Failed to save media: ${err.message}`);
+    },
+  });
+
+  // Persist on visit: when resolve returns live data (not from DB), persist it
+  const resolvedSource = (resolvedData as { source?: string } | undefined)?.source;
+  const didPersist = useRef(false);
+  useEffect(() => {
+    if (resolvedData && resolvedSource === "live" && !didPersist.current && !persistMedia.isPending) {
+      didPersist.current = true;
+      persistMedia.mutate({
+        provider: "tmdb",
+        externalId: parseInt(id, 10),
+        type: mediaType,
+      });
+    }
+  }, [resolvedData, resolvedSource, id, mediaType, persistMedia]);
+
   const requestDownload = trpc.request.create.useMutation({
     onSuccess: () => {
       toast.success("Download requested");
