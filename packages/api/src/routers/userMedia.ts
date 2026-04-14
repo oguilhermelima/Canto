@@ -30,7 +30,13 @@ import {
   findUserProfileInsights,
   softDeleteUserPlaybackProgress,
   upsertUserMediaState,
+  upsertUserRating,
+  findUserRatingsByMedia,
+  deleteUserRating,
+  computeAndSyncSeasonRating,
+  computeAndSyncMediaRating,
 } from "@canto/core/infrastructure/repositories";
+import { rateInput, removeRatingInput } from "@canto/validators";
 import type { LibraryFeedFilterOptions } from "@canto/core/infrastructure/repositories";
 import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/use-cases/promote-user-media-state-from-playback";
 import { pushWatchStateToServers } from "@canto/core/domain/use-cases/push-watch-state";
@@ -1211,16 +1217,78 @@ export const userMediaRouter = createTRPCRouter({
     }),
 
   rate: protectedProcedure
-    .input(z.object({
-      mediaId: z.string(),
-      rating: z.number().min(0).max(10),
-    }))
+    .input(rateInput)
     .mutation(async ({ ctx, input }) => {
-      await upsertUserMediaState(ctx.db, {
-        userId: ctx.session.user.id,
+      const userId = ctx.session.user.id;
+
+      await upsertUserRating(ctx.db, {
+        userId,
         mediaId: input.mediaId,
+        seasonId: input.seasonId ?? null,
+        episodeId: input.episodeId ?? null,
         rating: input.rating,
+        comment: input.comment ?? null,
+        isOverride: true,
       });
+
+      // Cascade recomputation
+      if (input.episodeId) {
+        // Look up seasonId from the episode's season
+        const mediaData = await findMediaByIdWithSeasons(ctx.db, input.mediaId);
+        const seasonObj = mediaData?.seasons.find((s) =>
+          s.episodes.some((e) => e.id === input.episodeId),
+        );
+        if (seasonObj) {
+          await computeAndSyncSeasonRating(ctx.db, userId, input.mediaId, seasonObj.id);
+        }
+      } else if (input.seasonId) {
+        await computeAndSyncMediaRating(ctx.db, userId, input.mediaId);
+      } else {
+        // Direct media-level rating — sync to userMediaState
+        await upsertUserMediaState(ctx.db, {
+          userId,
+          mediaId: input.mediaId,
+          rating: input.rating,
+        });
+      }
+
+      return { success: true };
+    }),
+
+  getRatings: protectedProcedure
+    .input(z.object({ mediaId: z.string() }))
+    .query(({ ctx, input }) =>
+      findUserRatingsByMedia(ctx.db, ctx.session.user.id, input.mediaId),
+    ),
+
+  removeRating: protectedProcedure
+    .input(removeRatingInput)
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+
+      await deleteUserRating(
+        ctx.db,
+        userId,
+        input.mediaId,
+        input.seasonId ?? null,
+        input.episodeId ?? null,
+      );
+
+      // Cascade recomputation upward
+      if (input.episodeId) {
+        const mediaData = await findMediaByIdWithSeasons(ctx.db, input.mediaId);
+        const seasonObj = mediaData?.seasons.find((s) =>
+          s.episodes.some((e) => e.id === input.episodeId),
+        );
+        if (seasonObj) {
+          await computeAndSyncSeasonRating(ctx.db, userId, input.mediaId, seasonObj.id);
+        }
+      } else if (input.seasonId) {
+        await computeAndSyncMediaRating(ctx.db, userId, input.mediaId);
+      } else {
+        await computeAndSyncMediaRating(ctx.db, userId, input.mediaId);
+      }
+
       return { success: true };
     }),
 
@@ -1342,6 +1410,8 @@ export const userMediaRouter = createTRPCRouter({
       watchedAtMode: z.enum(["just_now", "release_date", "other_date", "unknown_date"]).default("just_now"),
       watchedAt: z.string().datetime().optional(),
       markDropped: z.boolean().default(false),
+      rating: z.number().int().min(1).max(10).optional(),
+      comment: z.string().max(5000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (input.markDropped && (input.scope || input.selectedEpisodeIds)) {
@@ -1587,6 +1657,61 @@ export const userMediaRouter = createTRPCRouter({
 
       const latestHistoryDate = history[0]?.watchedAt ?? null;
       const trackedItems = input.markDropped ? 0 : episodeIdsToLog.length;
+
+      // Upsert rating if provided
+      if (input.rating && !input.markDropped) {
+        const userId = ctx.session.user.id;
+        if (input.scope === "episode" && episodeIdsToLog.length === 1) {
+          const epId = episodeIdsToLog[0]!;
+          const seasonObj = mediaWithSeasons.seasons.find((s: { episodes: Array<{ id: string }> }) =>
+            s.episodes.some((e) => e.id === epId),
+          );
+          await upsertUserRating(ctx.db, {
+            userId,
+            mediaId: input.mediaId,
+            seasonId: seasonObj?.id ?? null,
+            episodeId: epId,
+            rating: input.rating,
+            comment: input.comment ?? null,
+            isOverride: true,
+          });
+          if (seasonObj) {
+            await computeAndSyncSeasonRating(ctx.db, userId, input.mediaId, seasonObj.id);
+          }
+        } else if (input.scope === "season" && input.seasonNumber !== undefined) {
+          const seasonObj = mediaWithSeasons.seasons.find(
+            (s: { number: number }) => s.number === input.seasonNumber,
+          );
+          if (seasonObj) {
+            await upsertUserRating(ctx.db, {
+              userId,
+              mediaId: input.mediaId,
+              seasonId: seasonObj.id,
+              episodeId: null,
+              rating: input.rating,
+              comment: input.comment ?? null,
+              isOverride: true,
+            });
+            await computeAndSyncMediaRating(ctx.db, userId, input.mediaId);
+          }
+        } else {
+          // Media-level (movie or show scope)
+          await upsertUserRating(ctx.db, {
+            userId,
+            mediaId: input.mediaId,
+            seasonId: null,
+            episodeId: null,
+            rating: input.rating,
+            comment: input.comment ?? null,
+            isOverride: true,
+          });
+          await upsertUserMediaState(ctx.db, {
+            userId,
+            mediaId: input.mediaId,
+            rating: input.rating,
+          });
+        }
+      }
 
       const [state, progress] = await Promise.all([
         findUserMediaState(ctx.db, ctx.session.user.id, input.mediaId),

@@ -16,6 +16,22 @@ export const updateMediaStatusInput = z.object({
 });
 export type UpdateMediaStatusInput = z.infer<typeof updateMediaStatusInput>;
 
+export const rateInput = z.object({
+  mediaId: z.string().uuid(),
+  seasonId: z.string().uuid().optional(),
+  episodeId: z.string().uuid().optional(),
+  rating: z.number().int().min(1).max(10),
+  comment: z.string().max(5000).optional(),
+});
+export type RateInput = z.infer<typeof rateInput>;
+
+export const removeRatingInput = z.object({
+  mediaId: z.string().uuid(),
+  seasonId: z.string().uuid().optional(),
+  episodeId: z.string().uuid().optional(),
+});
+export type RemoveRatingInput = z.infer<typeof removeRatingInput>;
+
 export const reportPlaybackProgressInput = z.object({
   mediaId: z.string().uuid(),
   episodeId: z.string().uuid().optional(),
