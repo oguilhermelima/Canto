@@ -36,7 +36,10 @@ export function SeasonTabs({
   className,
 }: SeasonTabsProps): React.JSX.Element {
   const filteredSeasons = useMemo(
-    () => [...seasons].sort((a, b) => a.seasonNumber - b.seasonNumber),
+    () =>
+      [...seasons]
+        .filter((s) => (s.episodes?.length ?? 0) > 0)
+        .sort((a, b) => a.seasonNumber - b.seasonNumber),
     [seasons],
   );
 
