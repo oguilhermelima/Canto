@@ -19,7 +19,6 @@ import { OverviewTab } from "./_components/overview-tab";
 import { MediaStatusTab } from "./_components/media-status-tab";
 import { RatingsTab } from "./_components/ratings-tab";
 import { FavoritesTab } from "./_components/favorites-tab";
-
 const TABS = [
   { value: "overview", label: "Overview", icon: LayoutGrid },
   { value: "ratings", label: "Ratings", icon: Star },

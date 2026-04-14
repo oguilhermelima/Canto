@@ -11,6 +11,7 @@ import { PasswordSection } from "./_components/password-section";
 import { AppearanceSection } from "./_components/appearance-section";
 import { PreferencesSection } from "./_components/preferences-section";
 import { ConnectionsSection } from "./_components/connections-section";
+import { HiddenSection } from "./_components/hidden-section";
 
 const TABS = [
   { value: "profile", label: "Profile" },
@@ -69,6 +70,7 @@ export default function AccountPage(): React.JSX.Element {
           <>
             <AppearanceSection />
             <PreferencesSection />
+            <HiddenSection />
           </>
         )}
       </div>
