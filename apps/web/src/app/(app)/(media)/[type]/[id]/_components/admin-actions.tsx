@@ -11,20 +11,15 @@ interface AdminActionsProps {
   };
   isAdmin: boolean;
   mediaType: "movie" | "show";
-  openTorrentDialog: (context?: {
-    seasonNumber?: number;
-    episodeNumbers?: number[];
-  }) => void;
-  setSeasonsHighlight: (v: boolean) => void;
+  onOpenDownload: () => void;
   onOpenManage?: () => void;
 }
 
 export function AdminActions({
   media,
   isAdmin,
-  mediaType,
-  openTorrentDialog,
-  setSeasonsHighlight,
+  mediaType: _mediaType,
+  onOpenDownload,
   onOpenManage,
 }: AdminActionsProps): React.JSX.Element | null {
   if (!isAdmin || !media.id) return null;
@@ -44,18 +39,7 @@ export function AdminActions({
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => {
-            if (media.type === "show") {
-              const el = document.getElementById("seasons-section");
-              if (el) {
-                el.scrollIntoView({ behavior: "smooth", block: "start" });
-                setSeasonsHighlight(true);
-                setTimeout(() => setSeasonsHighlight(false), 2000);
-              }
-            } else {
-              openTorrentDialog();
-            }
-          }}
+          onClick={onOpenDownload}
           className="inline-flex h-10 items-center gap-2 rounded-xl bg-foreground px-4 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
         >
           <Download className="h-4 w-4" />

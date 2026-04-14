@@ -9,13 +9,13 @@ import {
 import { CastSection } from "~/components/media/cast-section";
 import { SimilarSection } from "~/components/media/similar-section";
 import { ManageModal } from "~/components/media/manage/manage-modal";
+import { DownloadModal } from "~/components/media/download/download-modal";
 import { useMediaDetail } from "./use-media-detail";
 import { AdminActions } from "./admin-actions";
 import { RequestSection } from "./request-section";
 import { VideoCarouselSection } from "./video-carousel";
 import { SeasonsSection } from "./seasons-section";
 import { RemoveDialog } from "./remove-dialog";
-import { TorrentDialog } from "./torrent-dialog";
 
 interface MediaDetailContentProps {
   id: string;
@@ -134,8 +134,7 @@ export function MediaDetailContent({
             media={media}
             isAdmin={detail.isAdmin}
             mediaType={mediaType}
-            openTorrentDialog={detail.openTorrentDialog}
-            setSeasonsHighlight={detail.setSeasonsHighlight}
+            onOpenDownload={() => detail.setDownloadModalOpen(true)}
             onOpenManage={() => detail.setPreferencesOpen(true)}
           />
 
@@ -155,24 +154,11 @@ export function MediaDetailContent({
           />
 
           <div className="flex flex-col gap-12 px-4 md:gap-16 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-            {/* Seasons (TV Shows) */}
+            {/* Seasons (TV Shows) — browse only */}
             <SeasonsSection
               media={media}
-              isAdmin={detail.isAdmin}
               availability={detail.availability}
               mediaServers={detail.mediaServers}
-              allLibraries={detail.allLibraries}
-              openTorrentDialog={detail.openTorrentDialog}
-              setMediaLibrary={detail.setMediaLibrary}
-              setContinuousDownload={detail.setContinuousDownload}
-              setTorrentSearchQuery={detail.setTorrentSearchQuery}
-              setTorrentSearchContext={detail.setTorrentSearchContext}
-              setTorrentPage={detail.setTorrentPage}
-              setTorrentDialogOpen={detail.setTorrentDialogOpen}
-              torrentDialogOpen={detail.torrentDialogOpen}
-              seasonsHighlight={detail.seasonsHighlight}
-              mediaType={mediaType}
-              onOpenManage={() => detail.setPreferencesOpen(true)}
             />
 
             {/* Cast */}
@@ -191,6 +177,32 @@ export function MediaDetailContent({
         </div>
       </MediaDetailHero>
 
+      {/* Download modal */}
+      <DownloadModal
+        open={detail.downloadModalOpen}
+        onOpenChange={detail.setDownloadModalOpen}
+        mediaId={detail.mediaId}
+        mediaType={media.type as "movie" | "show"}
+        mediaTitle={media.title}
+        isAdmin={detail.isAdmin}
+        seasons={media.seasons.map((s) => ({
+          id: s.id,
+          number: s.number,
+          name: s.name,
+          episodeCount: s.episodeCount,
+          airDate: s.airDate,
+          episodes: s.episodes.map((e) => ({
+            id: e.id,
+            number: e.number,
+            title: e.title,
+            overview: e.overview,
+            stillPath: e.stillPath,
+            airDate: e.airDate,
+            runtime: e.runtime,
+          })),
+        }))}
+      />
+
       {/* Manage modal */}
       <ManageModal
         open={detail.preferencesOpen}
@@ -208,46 +220,6 @@ export function MediaDetailContent({
         setMediaLibrary={detail.setMediaLibrary}
         deleteTorrentMutation={detail.deleteTorrentMutation}
         utils={detail.utils}
-      />
-
-      {/* Torrent search dialog */}
-      <TorrentDialog
-        media={media}
-        isAdmin={detail.isAdmin}
-        torrentDialogOpen={detail.torrentDialogOpen}
-        setTorrentDialogOpen={detail.setTorrentDialogOpen}
-        torrentSearchContext={detail.torrentSearchContext}
-        setTorrentSearchContext={detail.setTorrentSearchContext}
-        torrentSearchQuery={detail.torrentSearchQuery}
-        setTorrentSearchQuery={detail.setTorrentSearchQuery}
-        torrentPage={detail.torrentPage}
-        setTorrentPage={detail.setTorrentPage}
-        torrentQualityFilter={detail.torrentQualityFilter}
-        setTorrentQualityFilter={detail.setTorrentQualityFilter}
-        torrentSourceFilter={detail.torrentSourceFilter}
-        setTorrentSourceFilter={detail.setTorrentSourceFilter}
-        torrentSizeFilter={detail.torrentSizeFilter}
-        setTorrentSizeFilter={detail.setTorrentSizeFilter}
-        torrentSort={detail.torrentSort}
-        torrentSortDir={detail.torrentSortDir}
-        toggleSort={detail.toggleSort}
-        advancedSearch={detail.advancedSearch}
-        setAdvancedSearch={detail.setAdvancedSearch}
-        advancedQuery={detail.advancedQuery}
-        setAdvancedQuery={detail.setAdvancedQuery}
-        committedQuery={detail.committedQuery}
-        setCommittedQuery={detail.setCommittedQuery}
-        mobileFiltersOpen={detail.mobileFiltersOpen}
-        setMobileFiltersOpen={detail.setMobileFiltersOpen}
-        selectedFolderId={detail.selectedFolderId}
-        setSelectedFolderId={detail.setSelectedFolderId}
-        torrentSearch={detail.torrentSearch}
-        paginatedTorrents={detail.paginatedTorrents}
-        allFilteredTorrents={detail.allFilteredTorrents}
-        hasMore={detail.hasMore}
-        handleDownload={detail.handleDownload}
-        downloadTorrent={detail.downloadTorrent}
-        setLastDownloadAttempt={detail.setLastDownloadAttempt}
       />
     </div>
   );

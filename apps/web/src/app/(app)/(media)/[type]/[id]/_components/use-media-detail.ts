@@ -8,38 +8,12 @@ import { useWatchRegion } from "~/hooks/use-watch-region";
 import { useDocumentTitle } from "~/hooks/use-document-title";
 import { useDirectSearch } from "~/hooks/use-direct-search";
 
-const TORRENTS_PER_PAGE = 30;
-
 export function useMediaDetail(id: string, mediaType: "movie" | "show") {
   const isAdmin = useIsAdmin();
 
-  const [torrentDialogOpen, setTorrentDialogOpen] = useState(false);
-  const [seasonsHighlight, setSeasonsHighlight] = useState(false);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
-  const [torrentSearchQuery, setTorrentSearchQuery] = useState("");
-  const [torrentPage, setTorrentPage] = useState(0);
-  const [torrentQualityFilter, setTorrentQualityFilter] =
-    useState<string>("all");
-  const [torrentSourceFilter, setTorrentSourceFilter] =
-    useState<string>("all");
-  const [torrentSizeFilter, setTorrentSizeFilter] = useState<string>("all");
-  const [torrentSort, setTorrentSort] = useState<
-    "seeders" | "peers" | "size" | "age" | "confidence"
-  >("confidence");
-  const [torrentSortDir, setTorrentSortDir] = useState<"asc" | "desc">("desc");
-
-  const [torrentSearchContext, setTorrentSearchContext] = useState<{
-    seasonNumber?: number;
-    episodeNumbers?: number[];
-  } | null>(null);
-  const [selectedFolderId, setSelectedFolderId] = useState<
-    string | undefined
-  >(undefined);
-  const [advancedSearch, setAdvancedSearch] = useState(false);
-  const [advancedQuery, setAdvancedQuery] = useState("");
-  const [committedQuery, setCommittedQuery] = useState("");
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false);
 
   const { region: watchRegion } = useWatchRegion();
   const { enabled: directSearchEnabled } = useDirectSearch();
@@ -87,87 +61,12 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
   );
   const mediaTorrents = mediaTorrentsQuery.data;
 
-  const torrentSearch = trpc.torrent.search.useQuery(
-    {
-      mediaId: mediaId ?? "",
-      query: advancedSearch && committedQuery ? committedQuery : undefined,
-      seasonNumber: advancedSearch
-        ? undefined
-        : torrentSearchContext?.seasonNumber,
-      episodeNumbers: advancedSearch
-        ? undefined
-        : torrentSearchContext?.episodeNumbers,
-      page: torrentPage,
-      pageSize: TORRENTS_PER_PAGE,
-    },
-    {
-      enabled:
-        torrentDialogOpen &&
-        !!mediaId &&
-        (!advancedSearch || committedQuery.length > 0),
-      retry: 1,
-      staleTime: 0,
-    },
-  );
-
-  const [lastDownloadAttempt, setLastDownloadAttempt] = useState<{
-    url: string;
-    title: string;
-  } | null>(null);
-
   const utils = trpc.useUtils();
 
   const userMediaState = trpc.userMedia.getState.useQuery(
     { mediaId: mediaId ?? "" },
     { enabled: !!mediaId },
   );
-
-  const replaceTorrent = trpc.torrent.replace.useMutation({
-    onSuccess: () => {
-      toast.success("Replacement download started");
-      setTorrentDialogOpen(false);
-      setLastDownloadAttempt(null);
-    },
-    onError: (error) => {
-      toast.error(`Replace failed: ${error.message}`);
-    },
-  });
-
-  const downloadTorrent = trpc.torrent.download.useMutation({
-    onSuccess: () => {
-      toast.success("Download started");
-      setTorrentDialogOpen(false);
-      setLastDownloadAttempt(null);
-    },
-    onError: (error) => {
-      if (error.data?.code === "CONFLICT") {
-        toast.error(error.message, {
-          action: {
-            label: "Replace",
-            onClick: () => {
-              if (!lastDownloadAttempt || !mediaId) return;
-              const isMagnet =
-                lastDownloadAttempt.url.startsWith("magnet:");
-              replaceTorrent.mutate({
-                replaceFileIds: [],
-                mediaId: mediaId!,
-                ...(isMagnet
-                  ? { magnetUrl: lastDownloadAttempt.url }
-                  : { torrentUrl: lastDownloadAttempt.url }),
-                title: lastDownloadAttempt.title,
-                seasonNumber: torrentSearchContext?.seasonNumber,
-                episodeNumbers:
-                  torrentSearchContext?.episodeNumbers ?? undefined,
-              });
-            },
-          },
-          duration: 10000,
-        });
-      } else {
-        toast.error(`Download failed: ${error.message}`);
-      }
-    },
-  });
 
   const deleteTorrentMutation = trpc.torrent.delete.useMutation();
   const persistMedia = trpc.media.persist.useMutation();
@@ -208,35 +107,6 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
       toast.error(`Failed to update library: ${error.message}`);
     },
   });
-
-  const handleDownload = (url: string, title: string): void => {
-    if (!mediaId) return;
-    setLastDownloadAttempt({ url, title });
-    const isMagnet = url.startsWith("magnet:");
-    downloadTorrent.mutate({
-      mediaId: mediaId!,
-      ...(isMagnet ? { magnetUrl: url } : { torrentUrl: url }),
-      title,
-      seasonNumber: torrentSearchContext?.seasonNumber,
-      episodeNumbers: torrentSearchContext?.episodeNumbers ?? undefined,
-      folderId: selectedFolderId,
-    });
-  };
-
-  const openTorrentDialog = (context?: {
-    seasonNumber?: number;
-    episodeNumbers?: number[];
-  }): void => {
-    setTorrentSearchContext(context ?? null);
-    setTorrentSearchQuery("");
-    setTorrentPage(0);
-    setTorrentQualityFilter("all");
-    setTorrentSourceFilter("all");
-    setTorrentSizeFilter("all");
-    setTorrentSort("confidence");
-    setTorrentSortDir("desc");
-    setTorrentDialogOpen(true);
-  };
 
   // Derived state: credits, similar, recommendations, videos
   const credits = (extras.data?.credits.cast ?? []).map((c) => ({
@@ -310,53 +180,6 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
       ),
   );
 
-  // Filter + sort torrent results
-  const hasMore = torrentSearch.data?.hasMore ?? false;
-  const allFilteredTorrents = (torrentSearch.data?.results ?? [])
-    .filter((t) => {
-      if (torrentSearchQuery.trim()) {
-        if (
-          !t.title.toLowerCase().includes(torrentSearchQuery.toLowerCase())
-        )
-          return false;
-      }
-      if (torrentQualityFilter !== "all" && t.quality !== torrentQualityFilter)
-        return false;
-      if (torrentSourceFilter !== "all" && t.source !== torrentSourceFilter)
-        return false;
-      if (torrentSizeFilter !== "all") {
-        const gb = t.size / (1024 * 1024 * 1024);
-        if (torrentSizeFilter === "small" && gb >= 2) return false;
-        if (torrentSizeFilter === "medium" && (gb < 2 || gb >= 10))
-          return false;
-        if (torrentSizeFilter === "large" && gb < 10) return false;
-      }
-      return true;
-    })
-    .sort((a, b) => {
-      const dir = torrentSortDir === "desc" ? -1 : 1;
-      if (torrentSort === "confidence")
-        return (a.confidence - b.confidence) * dir;
-      if (torrentSort === "seeders") return (a.seeders - b.seeders) * dir;
-      if (torrentSort === "peers") return (a.leechers - b.leechers) * dir;
-      if (torrentSort === "age") return (a.age - b.age) * dir;
-      return (a.size - b.size) * dir;
-    });
-  const paginatedTorrents =
-    advancedSearch && !committedQuery ? [] : allFilteredTorrents;
-
-  const toggleSort = (
-    col: "seeders" | "peers" | "size" | "age" | "confidence",
-  ): void => {
-    if (torrentSort === col) {
-      setTorrentSortDir((d) => (d === "desc" ? "asc" : "desc"));
-    } else {
-      setTorrentSort(col);
-      setTorrentSortDir("desc");
-    }
-    setTorrentPage(0);
-  };
-
   return {
     // Session
     isAdmin,
@@ -372,14 +195,11 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
     mediaServers,
     watchProviderLinks,
     mediaTorrents,
-    torrentSearch,
     existingRequest,
     allLibraries,
     userMediaState,
 
     // Mutations
-    downloadTorrent,
-    replaceTorrent,
     deleteTorrentMutation,
     persistMedia,
     requestDownload,
@@ -396,51 +216,13 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
     rentBuyProviders,
     watchLink,
 
-    // Torrent state
-    torrentDialogOpen,
-    setTorrentDialogOpen,
-    torrentSearchContext,
-    setTorrentSearchContext,
-    torrentSearchQuery,
-    setTorrentSearchQuery,
-    torrentPage,
-    setTorrentPage,
-    torrentQualityFilter,
-    setTorrentQualityFilter,
-    torrentSourceFilter,
-    setTorrentSourceFilter,
-    torrentSizeFilter,
-    setTorrentSizeFilter,
-    torrentSort,
-    torrentSortDir,
-    toggleSort,
-    advancedSearch,
-    setAdvancedSearch,
-    advancedQuery,
-    setAdvancedQuery,
-    committedQuery,
-    setCommittedQuery,
-    mobileFiltersOpen,
-    setMobileFiltersOpen,
-    selectedFolderId,
-    setSelectedFolderId,
-    paginatedTorrents,
-    allFilteredTorrents,
-    hasMore,
-    lastDownloadAttempt,
-    setLastDownloadAttempt,
-
-    // Handlers
-    handleDownload,
-    openTorrentDialog,
-
     // UI state
-    seasonsHighlight,
-    setSeasonsHighlight,
     removeDialogOpen,
     setRemoveDialogOpen,
     preferencesOpen,
     setPreferencesOpen,
+    downloadModalOpen,
+    setDownloadModalOpen,
 
     // Utils
     utils,
