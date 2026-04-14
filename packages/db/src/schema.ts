@@ -1115,6 +1115,40 @@ export const userWatchHistory = pgTable(
   ],
 );
 
+// ─── User Rating ───
+
+export const userRating = pgTable(
+  "user_rating",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    seasonId: uuid("season_id").references(() => season.id, {
+      onDelete: "cascade",
+    }),
+    episodeId: uuid("episode_id").references(() => episode.id, {
+      onDelete: "cascade",
+    }),
+    rating: integer("rating").notNull(),
+    comment: text("comment"),
+    isOverride: boolean("is_override").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_user_rating_user").on(table.userId),
+    index("idx_user_rating_media").on(table.mediaId),
+  ],
+);
+
 // ─── Relations ───
 
 export const userRelations = relations(user, ({ many }) => ({
@@ -1130,6 +1164,7 @@ export const userRelations = relations(user, ({ many }) => ({
   hiddenMedia: many(userHiddenMedia),
   playbackProgress: many(userPlaybackProgress),
   watchHistory: many(userWatchHistory),
+  ratings: many(userRating),
   homeSections: many(homeSection),
   profileSections: many(profileSection),
 }));
@@ -1211,6 +1246,7 @@ export const mediaRelations = relations(media, ({ many, one }) => ({
   userStates: many(userMediaState),
   playbackProgress: many(userPlaybackProgress),
   watchHistory: many(userWatchHistory),
+  ratings: many(userRating),
 }));
 
 export const seasonRelations = relations(season, ({ one, many }) => ({
@@ -1220,6 +1256,7 @@ export const seasonRelations = relations(season, ({ one, many }) => ({
   }),
   episodes: many(episode),
   translations: many(seasonTranslation),
+  ratings: many(userRating),
 }));
 
 export const episodeRelations = relations(episode, ({ one, many }) => ({
@@ -1231,6 +1268,26 @@ export const episodeRelations = relations(episode, ({ one, many }) => ({
   translations: many(episodeTranslation),
   playbackProgress: many(userPlaybackProgress),
   watchHistory: many(userWatchHistory),
+  ratings: many(userRating),
+}));
+
+export const userRatingRelations = relations(userRating, ({ one }) => ({
+  user: one(user, {
+    fields: [userRating.userId],
+    references: [user.id],
+  }),
+  media: one(media, {
+    fields: [userRating.mediaId],
+    references: [media.id],
+  }),
+  season: one(season, {
+    fields: [userRating.seasonId],
+    references: [season.id],
+  }),
+  episode: one(episode, {
+    fields: [userRating.episodeId],
+    references: [episode.id],
+  }),
 }));
 
 export const mediaTranslationRelations = relations(mediaTranslation, ({ one }) => ({
