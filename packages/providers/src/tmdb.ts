@@ -524,6 +524,7 @@ export class TmdbProvider implements MetadataProvider {
     const endpoint = type === "movie" ? "/discover/movie" : "/discover/tv";
     const params: Record<string, string> = {};
     if (opts?.page) params.page = String(opts.page);
+    if (opts?.with_text_query) params.with_text_query = opts.with_text_query;
     if (opts?.with_genres) params.with_genres = opts.with_genres;
     if (opts?.with_original_language) params.with_original_language = opts.with_original_language;
     params.sort_by = opts?.sort_by ?? "popularity.desc";
@@ -531,14 +532,14 @@ export class TmdbProvider implements MetadataProvider {
       params["first_air_date.gte"] = opts.first_air_date_gte;
     }
     if (type === "movie" && opts?.release_date_gte) {
-      params["release_date.gte"] = opts.release_date_gte;
+      params["primary_release_date.gte"] = opts.release_date_gte;
     }
     if (opts?.with_keywords) params.with_keywords = opts.with_keywords;
     if (opts?.vote_average_gte != null) params["vote_average.gte"] = String(opts.vote_average_gte);
     if (opts?.vote_average_lte != null) params["vote_average.lte"] = String(opts.vote_average_lte);
     if (opts?.with_runtime_lte != null) params["with_runtime.lte"] = String(opts.with_runtime_lte);
     if (type === "show" && opts?.first_air_date_lte) params["first_air_date.lte"] = opts.first_air_date_lte;
-    if (type === "movie" && opts?.release_date_lte) params["release_date.lte"] = opts.release_date_lte;
+    if (type === "movie" && opts?.release_date_lte) params["primary_release_date.lte"] = opts.release_date_lte;
     if (opts?.certification) params.certification = opts.certification;
     if (opts?.certification_country) params.certification_country = opts.certification_country;
     if (opts?.with_status) params.with_status = opts.with_status;

@@ -202,6 +202,7 @@ export interface SearchOpts {
 
 export interface DiscoverOpts {
   page?: number;
+  with_text_query?: string;
   with_genres?: string;
   with_original_language?: string;
   sort_by?: string;
