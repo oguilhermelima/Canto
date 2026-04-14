@@ -49,73 +49,61 @@ export function useSearchQueries({
   filters,
 }: UseSearchQueriesInput): UseSearchQueriesOutput {
   const isSearching = query.length >= 2;
+  const hasFilters = Object.keys(filters).length > 0;
+
+  // All discover-compatible filter params (shared by search+filters and browse)
+  const allFilters = {
+    query: isSearching ? query : undefined,
+    genres: filters.genres,
+    language: filters.language,
+    sortBy: filters.sortBy,
+    scoreMin: filters.scoreMin,
+    scoreMax: filters.scoreMax,
+    runtimeMin: filters.runtimeMin,
+    runtimeMax: filters.runtimeMax,
+    certification: filters.certification,
+    status: filters.status,
+    watchProviders: filters.watchProviders,
+    watchRegion: filters.watchRegion,
+    dateFrom: filters.yearMin ? `${filters.yearMin}-01-01` : undefined,
+    dateTo: filters.yearMax ? `${filters.yearMax}-12-31` : undefined,
+  };
+
+  // When searching with filters → discover + with_text_query (all filters work)
+  // When searching without filters → plain search (better relevance)
+  // When browsing → trending or discover
+  const searchMode = isSearching
+    ? hasFilters ? "discover" as const : "search" as const
+    : hasFilters ? "discover" as const : "trending" as const;
 
   /* ─── Search queries (when typing) ─── */
 
-  const searchFilters = {
-    genres: filters.genres,
-    language: filters.language,
-    scoreMin: filters.scoreMin,
-    scoreMax: filters.scoreMax,
-  };
-
   const singleQuery = trpc.media.browse.useInfiniteQuery(
-    { mode: "search", query, type: searchType === "multi" ? "movie" : searchType, provider: "tmdb", ...searchFilters },
+    { mode: searchMode, type: searchType === "multi" ? "movie" : searchType, provider: "tmdb", ...allFilters },
     { enabled: isSearching && searchType !== "multi", ...pageParam },
   );
 
   const multiMovieQuery = trpc.media.browse.useInfiniteQuery(
-    { mode: "search", query, type: "movie", provider: "tmdb", ...searchFilters },
+    { mode: searchMode, type: "movie", provider: "tmdb", ...allFilters },
     { enabled: isSearching && searchType === "multi", ...pageParam },
   );
 
   const multiShowQuery = trpc.media.browse.useInfiniteQuery(
-    { mode: "search", query, type: "show", provider: "tmdb", ...searchFilters },
+    { mode: searchMode, type: "show", provider: "tmdb", ...allFilters },
     { enabled: isSearching && searchType === "multi", ...pageParam },
   );
 
   /* ─── Trending/Discover queries (default, no search) ─── */
 
-  const hasFilters = Object.keys(filters).length > 0;
   const browseMode = hasFilters ? "discover" as const : "trending" as const;
 
   const trendingMovies = trpc.media.browse.useInfiniteQuery(
-    {
-      mode: browseMode, type: "movie",
-      genres: filters.genres,
-      language: filters.language,
-      sortBy: filters.sortBy,
-      scoreMin: filters.scoreMin,
-      scoreMax: filters.scoreMax,
-      runtimeMin: filters.runtimeMin,
-      runtimeMax: filters.runtimeMax,
-      certification: filters.certification,
-      status: filters.status,
-      watchProviders: filters.watchProviders,
-      watchRegion: filters.watchRegion,
-      dateFrom: filters.yearMin ? `${filters.yearMin}-01-01` : undefined,
-      dateTo: filters.yearMax ? `${filters.yearMax}-12-31` : undefined,
-    },
+    { mode: browseMode, type: "movie", ...allFilters },
     { enabled: !isSearching && searchType !== "show", staleTime: 10 * 60 * 1000, ...pageParam },
   );
 
   const trendingShows = trpc.media.browse.useInfiniteQuery(
-    {
-      mode: browseMode, type: "show",
-      genres: filters.genres,
-      language: filters.language,
-      sortBy: filters.sortBy,
-      scoreMin: filters.scoreMin,
-      scoreMax: filters.scoreMax,
-      runtimeMin: filters.runtimeMin,
-      runtimeMax: filters.runtimeMax,
-      certification: filters.certification,
-      status: filters.status,
-      watchProviders: filters.watchProviders,
-      watchRegion: filters.watchRegion,
-      dateFrom: filters.yearMin ? `${filters.yearMin}-01-01` : undefined,
-      dateTo: filters.yearMax ? `${filters.yearMax}-12-31` : undefined,
-    },
+    { mode: browseMode, type: "show", ...allFilters },
     { enabled: !isSearching && searchType !== "movie", staleTime: 10 * 60 * 1000, ...pageParam },
   );
 
