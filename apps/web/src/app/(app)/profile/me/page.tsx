@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import {
   LayoutGrid,
   Star,
-  Bookmark,
+  Library,
   CheckCircle2,
   Heart,
   XCircle,
@@ -19,10 +19,11 @@ import { OverviewTab } from "./_components/overview-tab";
 import { MediaStatusTab } from "./_components/media-status-tab";
 import { RatingsTab } from "./_components/ratings-tab";
 import { FavoritesTab } from "./_components/favorites-tab";
+import { CollectionsTab } from "./_components/collections-tab";
 const TABS = [
   { value: "overview", label: "Overview", icon: LayoutGrid },
   { value: "ratings", label: "Ratings", icon: Star },
-  { value: "watchlist", label: "Watchlist", icon: Bookmark },
+  { value: "collections", label: "Collections", icon: Library },
   { value: "completed", label: "Completed", icon: CheckCircle2 },
   { value: "favorites", label: "Favorites", icon: Heart },
   { value: "dropped", label: "Dropped", icon: XCircle },
@@ -32,7 +33,6 @@ type TabKey = (typeof TABS)[number]["value"];
 
 const COUNT_MAP: Partial<Record<TabKey, string>> = {
   ratings: "rated",
-  watchlist: "planned",
   completed: "completed",
   favorites: "favorites",
   dropped: "dropped",
@@ -82,7 +82,7 @@ export default function ProfilePage(): React.JSX.Element {
       <div className="px-5 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {activeTab === "overview" && <OverviewTab />}
         {activeTab === "ratings" && <RatingsTab />}
-        {activeTab === "watchlist" && <MediaStatusTab status="planned" />}
+        {activeTab === "collections" && <CollectionsTab />}
         {activeTab === "completed" && <MediaStatusTab status="completed" />}
         {activeTab === "favorites" && <FavoritesTab />}
         {activeTab === "dropped" && <MediaStatusTab status="dropped" />}

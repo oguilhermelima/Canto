@@ -29,7 +29,7 @@ export function WatchlistLaunchpadBlock({ title: _title }: { title: string }): R
           <p className="text-lg font-semibold text-foreground">{count} titles in the queue</p>
         </div>
         {count > 8 && (
-          <Link href="/profile/me?tab=watchlist" className="flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
+          <Link href="/library" className="flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
             See all <ChevronRightSmall size={16} />
           </Link>
         )}
