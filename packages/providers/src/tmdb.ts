@@ -353,7 +353,7 @@ export class TmdbProvider implements MetadataProvider {
   async getExtras(externalId: number, type: MediaType, opts?: { supportedLanguages?: string[] }): Promise<MediaExtras> {
     const prefix = type === "movie" ? "/movie" : "/tv";
     const videoLangs = opts?.supportedLanguages?.length
-      ? [...new Set(opts.supportedLanguages.map((l) => l.split("-")[0]))].join(",") + ",en,null"
+      ? [...new Set([...opts.supportedLanguages, ...opts.supportedLanguages.map((l) => l.split("-")[0])])].join(",") + ",en,null"
       : "en,null";
     const data = await this.fetch<Record<string, unknown>>(
       `${prefix}/${externalId}`,
@@ -1034,7 +1034,7 @@ export class TmdbProvider implements MetadataProvider {
     id: number,
     type: "movie" | "tv",
   ): Promise<{ logos: Array<{ file_path: string; iso_639_1: string | null }> }> {
-    return this.fetch(`/${type}/${id}/images`, { include_image_language: `${this.language.split("-")[0]},en,null` });
+    return this.fetch(`/${type}/${id}/images`, { include_image_language: `${this.language},${this.language.split("-")[0]},en,null` });
   }
 
   async getVideos(
@@ -1043,8 +1043,8 @@ export class TmdbProvider implements MetadataProvider {
     supportedLanguages?: string[],
   ): Promise<Array<{ key: string; site: string; type: string; language?: string }>> {
     const videoLangs = supportedLanguages?.length
-      ? [...new Set(supportedLanguages.map((l) => l.split("-")[0]))].join(",") + ",en,null"
-      : `${this.language.split("-")[0]},en,null`;
+      ? [...new Set([...supportedLanguages, ...supportedLanguages.map((l) => l.split("-")[0])])].join(",") + ",en,null"
+      : `${this.language},${this.language.split("-")[0]},en,null`;
     const data = await this.fetch<{
       results: Array<{ key: string; site: string; type: string; iso_639_1?: string }>;
     }>(`/${type}/${id}/videos`, { include_video_language: videoLangs });

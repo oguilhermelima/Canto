@@ -17,10 +17,6 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
 
   const { region: watchRegion } = useWatchRegion();
   const { enabled: directSearchEnabled } = useDirectSearch();
-  const { data: userLanguage } = trpc.settings.getUserLanguage.useQuery(
-    undefined,
-    { staleTime: Infinity },
-  );
 
   // Always use media.resolve — new routing always provides TMDB external ID + type
   const resolved = trpc.media.resolve.useQuery({
@@ -161,24 +157,7 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
     voteAverage: r.voteAverage,
   }));
 
-  const videos = (() => {
-    const all = extras.data?.videos ?? [];
-    // userLanguage is like "pt-BR", extract prefix "pt"
-    const langPrefix = userLanguage?.split("-")[0] ?? "en";
-    const allowed = new Set([langPrefix, "en", "ja"]);
-    const filtered = all.filter(
-      (v) => !v.language || allowed.has(v.language),
-    );
-    const source = filtered.length > 0 ? filtered : all;
-    return source.slice().sort((a, b) => {
-      const priority = (videoType: string | undefined): number => {
-        if (videoType === "Trailer") return 0;
-        if (videoType === "Teaser") return 1;
-        return 2;
-      };
-      return priority(a.type) - priority(b.type);
-    });
-  })();
+  const videos = extras.data?.videos ?? [];
 
   const watchProvidersByRegion = extras.data?.watchProviders ?? {};
   const regionData = watchProvidersByRegion[watchRegion];

@@ -42,7 +42,7 @@ export async function getByExternal(
     if (existing.processingStatus !== "ready") {
       void dispatchEnrichMedia(existing.id, true).catch(logAndSwallow("media:getByExternal dispatchEnrichMedia"));
     }
-    if (existing.downloaded && existing.processingStatus === "ready") {
+    if (existing.processingStatus === "ready") {
       const STALE_MS = 30 * 24 * 60 * 60 * 1000;
       const isStale = !existing.extrasUpdatedAt || Date.now() - existing.extrasUpdatedAt.getTime() > STALE_MS;
       if (isStale) void dispatchRefreshExtras(existing.id).catch(logAndSwallow("media:getByExternal dispatchRefreshExtras"));

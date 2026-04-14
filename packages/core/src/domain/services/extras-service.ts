@@ -82,17 +82,25 @@ export async function loadExtrasFromDB(db: Database, mediaId: string, lang: stri
     official: v.official,
     language: (v as { language?: string }).language ?? null,
   }));
-  mappedVideos.sort((a, b) => {
-    if (a.language === langPrefix && b.language !== langPrefix) return -1;
-    if (b.language === langPrefix && a.language !== langPrefix) return 1;
-    return 0;
+
+  // Prefer user's language; fallback to en + untagged only if nothing matches
+  const userLangVideos = mappedVideos.filter((v) => v.language === langPrefix);
+  const finalVideos = userLangVideos.length > 0
+    ? userLangVideos
+    : mappedVideos.filter((v) => !v.language || v.language === "en");
+
+  // Sort by type: Trailer > Teaser > rest
+  finalVideos.sort((a, b) => {
+    const typeScore = (v: typeof a) =>
+      v.type === "Trailer" ? 0 : v.type === "Teaser" ? 1 : 2;
+    return typeScore(a) - typeScore(b);
   });
 
   return {
     credits: { cast, crew },
     similar: translatedSimilar,
     recommendations: translatedRecs,
-    videos: mappedVideos,
+    videos: finalVideos,
     watchProviders: wpByRegion,
   };
 }

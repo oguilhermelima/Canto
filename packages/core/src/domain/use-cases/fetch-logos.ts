@@ -1,7 +1,8 @@
 import { eq, and, sql, isNotNull, or } from "drizzle-orm";
 
 import type { Database } from "@canto/db/client";
-import { media } from "@canto/db/schema";
+import { media, mediaTranslation } from "@canto/db/schema";
+import { getSupportedLanguageCodes } from "@canto/db/persist-media";
 import type { MediaProviderPort } from "../ports/media-provider.port";
 import type { SearchResult } from "@canto/providers";
 
@@ -64,6 +65,7 @@ export async function fetchLogos(
 
   // 3. Batch fetch logos from TMDB (groups of 10)
   const logoMap = new Map<number, string>();
+  const langLogoMap = new Map<number, Map<string, string>>();
 
   if (tmdb.getImages) {
     for (let i = 0; i < needsFetch.length; i += 10) {
@@ -77,7 +79,21 @@ export async function fetchLogos(
               existing = (async () => {
                 const tmdbType = item.type === "show" ? "tv" as const : "movie" as const;
                 const images = await tmdb.getImages!(item.externalId, tmdbType);
-                const enLogos = (images.logos ?? []).filter(
+                const logos = images.logos ?? [];
+
+                // Store best logo per language for translations
+                const byLang = new Map<string, string>();
+                for (const l of logos) {
+                  if (l.iso_639_1 && l.iso_639_1 !== "en" && !byLang.has(l.iso_639_1)) {
+                    byLang.set(l.iso_639_1, l.file_path);
+                  }
+                }
+                if (byLang.size > 0) {
+                  langLogoMap.set(item.externalId, byLang);
+                }
+
+                // Pick best English/null logo for base record
+                const enLogos = logos.filter(
                   (l) => l.iso_639_1 === "en" || l.iso_639_1 === null,
                 );
                 return enLogos.length > 0 ? enLogos[0]!.file_path : undefined;
@@ -97,22 +113,23 @@ export async function fetchLogos(
     }
   }
 
-  // 4. Upsert media records
+  // 4. Upsert media records and store language-specific logos
   for (const item of needsFetch) {
     const key = `${item.provider}-${item.externalId}`;
     const logo = logoMap.get(item.externalId) ?? null;
     result[key] = logo;
 
     const existing = existingByExtId.get(item.externalId);
+    let mediaId: string | undefined;
+
     if (existing) {
-      // Update logo if we fetched one and existing doesn't have it
+      mediaId = existing.id;
       if (logo && !existing.logoPath) {
         await db.update(media).set({ logoPath: logo }).where(eq(media.id, existing.id));
       }
     } else {
-      // Create minimal media record
       try {
-        await db.insert(media).values({
+        const [row] = await db.insert(media).values({
           type: item.type,
           externalId: item.externalId,
           provider: item.provider,
@@ -129,9 +146,38 @@ export async function fetchLogos(
           set: {
             logoPath: sql`CASE WHEN EXCLUDED.logo_path IS NOT NULL THEN EXCLUDED.logo_path ELSE ${media.logoPath} END`,
           },
-        });
+        }).returning({ id: media.id });
+        mediaId = row?.id;
       } catch (err) {
         console.warn(`[fetchLogos] Failed to upsert media ${item.type}/${item.externalId}:`, err);
+      }
+    }
+
+    // Store language-specific logos in media_translation
+    const langLogos = langLogoMap.get(item.externalId);
+    if (mediaId && langLogos) {
+      // Map 2-letter codes (from TMDB) to full supported language codes (e.g., "pt" → "pt-BR")
+      const supported = await getSupportedLanguageCodes(db);
+      const prefixToFull = new Map<string, string>();
+      for (const code of supported) {
+        const prefix = code.split("-")[0]!;
+        if (!prefixToFull.has(prefix)) prefixToFull.set(prefix, code);
+      }
+
+      for (const [langCode, logoPath] of langLogos) {
+        const fullCode = prefixToFull.get(langCode);
+        if (!fullCode) continue;
+        try {
+          await db
+            .insert(mediaTranslation)
+            .values({ mediaId, language: fullCode, logoPath })
+            .onConflictDoUpdate({
+              target: [mediaTranslation.mediaId, mediaTranslation.language],
+              set: { logoPath: sql`COALESCE(EXCLUDED.logo_path, ${mediaTranslation.logoPath})` },
+            });
+        } catch {
+          // Skip on constraint errors
+        }
       }
     }
   }
@@ -141,29 +187,47 @@ export async function fetchLogos(
 
 /**
  * Enrich browse results with logos from DB.
- * Single SELECT query — fast. Only adds logoPath to items that have logos persisted.
+ * Prefers translated logo for the given language, falls back to base English logo.
  */
 export async function enrichBrowseWithLogos<
   T extends { results: SearchResult[]; totalPages: number; totalResults: number },
->(db: Database, data: T): Promise<T> {
+>(db: Database, data: T, language?: string): Promise<T> {
   if (data.results.length === 0) return data;
 
   const providers = [...new Set(data.results.map((r) => r.provider))];
   const externalIds = data.results.map((r) => r.externalId);
+  const langPrefix = language?.split("-")[0];
+  const useLangJoin = langPrefix && !language?.startsWith("en");
+
   const rows = await db
-    .select({ externalId: media.externalId, logoPath: media.logoPath })
+    .select({
+      externalId: media.externalId,
+      logoPath: media.logoPath,
+      translatedLogoPath: useLangJoin ? mediaTranslation.logoPath : sql<string | null>`NULL`,
+    })
     .from(media)
+    .leftJoin(
+      mediaTranslation,
+      useLangJoin
+        ? and(
+            eq(mediaTranslation.mediaId, media.id),
+            sql`LEFT(${mediaTranslation.language}, 2) = ${langPrefix}`,
+          )
+        : sql`FALSE`,
+    )
     .where(
       and(
         sql`${media.externalId} IN (${sql.join(externalIds.map((id) => sql`${id}`), sql`, `)})`,
         sql`${media.provider} IN (${sql.join(providers.map((p) => sql`${p}`), sql`, `)})`,
-        isNotNull(media.logoPath),
+        or(isNotNull(media.logoPath), isNotNull(mediaTranslation.logoPath)),
       ),
     );
 
   if (rows.length === 0) return data;
 
-  const logoMap = new Map(rows.map((r) => [r.externalId, r.logoPath]));
+  const logoMap = new Map(
+    rows.map((r) => [r.externalId, r.translatedLogoPath ?? r.logoPath]),
+  );
 
   return {
     ...data,

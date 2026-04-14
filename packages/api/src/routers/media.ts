@@ -65,13 +65,14 @@ export const mediaRouter = createTRPCRouter({
     .input(browseMediaInput)
     .query(async ({ input }) => {
       const page = input.cursor ?? input.page;
+      const browseSettingsLang = (await getSetting("general.language")) ?? "en-US";
 
       if (input.mode === "search") {
         if (!input.query) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Query is required for search mode" });
         }
 
-        const searchLang = (await getSetting("general.language")) ?? "en-US";
+        const searchLang = browseSettingsLang;
         const searchResults = await cached(
           `browse:search:${input.provider}:${input.type}:${input.query}:${page}:${searchLang}`,
           1800,
@@ -110,14 +111,13 @@ export const mediaRouter = createTRPCRouter({
             ...searchResults,
             results: filtered,
             totalResults: filtered.length,
-          });
+          }, browseSettingsLang);
         }
 
-        return enrichBrowseWithLogos(appDb, searchResults);
+        return enrichBrowseWithLogos(appDb, searchResults, browseSettingsLang);
       }
 
-      const settingsLang = (await getSetting("general.language")) ?? "en-US";
-      const cacheKey = `browse:${input.type}:${input.mode}:${input.query ?? ""}:${input.genres ?? ""}:${input.language ?? ""}:${input.sortBy ?? ""}:${input.dateFrom ?? ""}:${input.dateTo ?? ""}:${input.keywords ?? ""}:${input.scoreMin ?? ""}:${input.scoreMax ?? ""}:${input.runtimeMax ?? ""}:${input.certification ?? ""}:${input.status ?? ""}:${input.watchProviders ?? ""}:${input.watchRegion ?? ""}:${input.runtimeMin ?? ""}:${page}:${settingsLang}`;
+      const cacheKey = `browse:${input.type}:${input.mode}:${input.query ?? ""}:${input.genres ?? ""}:${input.language ?? ""}:${input.sortBy ?? ""}:${input.dateFrom ?? ""}:${input.dateTo ?? ""}:${input.keywords ?? ""}:${input.scoreMin ?? ""}:${input.scoreMax ?? ""}:${input.runtimeMax ?? ""}:${input.certification ?? ""}:${input.status ?? ""}:${input.watchProviders ?? ""}:${input.watchRegion ?? ""}:${input.runtimeMin ?? ""}:${page}:${browseSettingsLang}`;
 
       const browseResults = await cached(cacheKey, 1800, async () => {
         const provider = await getTmdbProvider();
@@ -160,7 +160,7 @@ export const mediaRouter = createTRPCRouter({
 
         return filterReleased(await provider.discover(input.type, discoverOpts));
       });
-      return enrichBrowseWithLogos(appDb, browseResults);
+      return enrichBrowseWithLogos(appDb, browseResults, browseSettingsLang);
     }),
 
   getById: protectedProcedure.input(getByIdInput).query(async ({ ctx, input }) => {
