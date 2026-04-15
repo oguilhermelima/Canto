@@ -166,12 +166,9 @@ export default function ListDetailPage(): React.JSX.Element {
     const nextHidden = isHidden
       ? hiddenIds.filter((id) => id !== listRow.id)
       : [...hiddenIds, listRow.id];
-    const next = {
-      hiddenListIds: [...new Set(nextHidden)],
-      orderedListIds: layoutQuery.data?.orderedListIds ?? [],
-    };
-    utils.list.getCollectionLayout.setData(undefined, next);
-    updateLayoutMutation.mutate(next);
+    const dedupedHidden = [...new Set(nextHidden)];
+    utils.list.getCollectionLayout.setData(undefined, { hiddenListIds: dedupedHidden });
+    updateLayoutMutation.mutate({ hiddenListIds: dedupedHidden });
     toast.success(isHidden ? "Collection visible" : "Collection hidden");
   };
 

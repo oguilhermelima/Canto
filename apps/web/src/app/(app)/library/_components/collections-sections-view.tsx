@@ -1,17 +1,11 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import { cn } from "@canto/ui/cn";
 import { Plus } from "lucide-react";
-import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { MediaCarousel } from "~/components/media/media-carousel";
 import { StateMessage } from "~/components/layout/state-message";
-
-interface LayoutPreferences {
-  hiddenIds: string[];
-  orderedIds: string[];
-}
 
 interface ListInfo {
   id: string;
@@ -21,19 +15,6 @@ interface ListInfo {
   type: string;
   visibility: string;
   itemCount: number;
-}
-
-function applyManualOrder<T extends { id: string }>(
-  items: T[],
-  orderedIds: string[],
-): T[] {
-  if (orderedIds.length === 0) return items;
-  const itemMap = new Map(items.map((item) => [item.id, item] as const));
-  const ordered = orderedIds
-    .map((id) => itemMap.get(id))
-    .filter((item): item is T => !!item);
-  const rest = items.filter((item) => !orderedIds.includes(item.id));
-  return [...ordered, ...rest];
 }
 
 function CollectionSection({
@@ -78,10 +59,6 @@ function CollectionSection({
   );
 }
 
-function uniqueIds(ids: string[]): string[] {
-  return [...new Set(ids)];
-}
-
 export function CollectionsSectionsView({
   showHidden = false,
   onCreateCollection,
@@ -91,48 +68,17 @@ export function CollectionsSectionsView({
 }): React.JSX.Element {
   const { data: lists, isLoading, isError, refetch } = trpc.list.getAll.useQuery();
   const layoutQuery = trpc.list.getCollectionLayout.useQuery();
-  const updateLayoutMutation = trpc.list.updateCollectionLayout.useMutation();
-  const utils = trpc.useUtils();
 
-  const layout = useMemo<LayoutPreferences>(() => {
-    if (!layoutQuery.data) return { hiddenIds: [], orderedIds: [] };
-    return {
-      hiddenIds: layoutQuery.data.hiddenListIds,
-      orderedIds: layoutQuery.data.orderedListIds,
-    };
-  }, [layoutQuery.data]);
+  const hiddenIds = layoutQuery.data?.hiddenListIds ?? [];
+  const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
 
-  const allLists = useMemo(() => lists ?? [], [lists]);
-
-  const hiddenSet = useMemo(() => new Set(layout.hiddenIds), [layout.hiddenIds]);
-
+  // DB returns lists in position order — use directly
   const visibleLists = useMemo(() => {
-    const filtered = showHidden
-      ? allLists
-      : allLists.filter((list) => !hiddenSet.has(list.id));
-    return applyManualOrder(filtered, layout.orderedIds);
-  }, [allLists, layout, showHidden, hiddenSet]);
-
-  const toggleHidden = useCallback(
-    (listId: string) => {
-      const isHidden = hiddenSet.has(listId);
-      const nextHidden = isHidden
-        ? layout.hiddenIds.filter((id) => id !== listId)
-        : [...layout.hiddenIds, listId];
-      const next = {
-        hiddenListIds: uniqueIds(nextHidden),
-        orderedListIds: layout.orderedIds,
-      };
-      utils.list.getCollectionLayout.setData(undefined, next);
-      updateLayoutMutation.mutate(next, {
-        onError: () => {
-          void layoutQuery.refetch();
-          toast.error("Failed to update");
-        },
-      });
-    },
-    [hiddenSet, layout, utils, updateLayoutMutation, layoutQuery],
-  );
+    const all = lists ?? [];
+    return showHidden
+      ? all
+      : all.filter((list) => !hiddenSet.has(list.id));
+  }, [lists, showHidden, hiddenSet]);
 
   if (isLoading || layoutQuery.isLoading) {
     return (

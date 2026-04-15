@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -35,36 +35,7 @@ import { CollectionEditPopover } from "./collection-edit-popover";
 import { CollectionMembersDialog } from "./collection-members-dialog";
 import type { CollectionFilterState } from "./collection-filter-sidebar";
 
-interface LayoutPreferences {
-  hiddenIds: string[];
-  orderedIds: string[];
-}
-
-const DEFAULT_LAYOUT: LayoutPreferences = { hiddenIds: [], orderedIds: [] };
 const PAGE_SIZE = 12;
-
-function uniqueIds(ids: string[]): string[] {
-  return [...new Set(ids)];
-}
-
-function sameIds(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false;
-  return a.every((value, index) => value === b[index]);
-}
-
-function applyManualOrder<T extends { id: string }>(
-  items: T[],
-  orderedIds: string[],
-): T[] {
-  if (orderedIds.length === 0) return items;
-
-  const itemMap = new Map(items.map((item) => [item.id, item] as const));
-  const ordered = orderedIds
-    .map((id) => itemMap.get(id))
-    .filter((item): item is T => !!item);
-  const rest = items.filter((item) => !orderedIds.includes(item.id));
-  return [...ordered, ...rest];
-}
 
 export function CollectionsTab({
   filters,
@@ -79,8 +50,6 @@ export function CollectionsTab({
     name: string;
   } | null>(null);
   const [shareListId, setShareListId] = useState<string | null>(null);
-  const [layout, setLayout] = useState<LayoutPreferences>(DEFAULT_LAYOUT);
-  const [layoutReady, setLayoutReady] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
@@ -96,7 +65,6 @@ export function CollectionsTab({
   const createMutation = trpc.list.create.useMutation({
     onSuccess: (newList) => {
       void utils.list.getAll.invalidate();
-      void layoutQuery.refetch();
       setCreateOpen(false);
       setName("");
       setDescription("");
@@ -109,44 +77,25 @@ export function CollectionsTab({
   const deleteMutation = trpc.list.delete.useMutation({
     onSuccess: () => {
       void utils.list.getAll.invalidate();
-      void layoutQuery.refetch();
       setDeleteTarget(null);
       toast.success("Collection deleted");
     },
     onError: (err) => toast.error(err.message),
   });
 
+  const reorderMutation = trpc.list.reorderCollections.useMutation({
+    onError: () => {
+      void utils.list.getAll.invalidate();
+      toast.error("Failed to reorder");
+    },
+  });
+
   const updateLayoutMutation = trpc.list.updateCollectionLayout.useMutation({
     onSuccess: (nextLayout) => {
-      setLayout({
-        hiddenIds: nextLayout.hiddenListIds,
-        orderedIds: nextLayout.orderedListIds,
-      });
       utils.list.getCollectionLayout.setData(undefined, nextLayout);
     },
     onError: (err) => toast.error(err.message),
   });
-
-  useEffect(() => {
-    if (!layoutQuery.data) return;
-    setLayout({
-      hiddenIds: layoutQuery.data.hiddenListIds,
-      orderedIds: layoutQuery.data.orderedListIds,
-    });
-    setLayoutReady(true);
-  }, [layoutQuery.data]);
-
-  const persistLayout = useCallback(
-    (nextLayout: LayoutPreferences): void => {
-      setLayout(nextLayout);
-      if (!layoutReady) return;
-      updateLayoutMutation.mutate({
-        hiddenListIds: nextLayout.hiddenIds,
-        orderedListIds: nextLayout.orderedIds,
-      });
-    },
-    [layoutReady, updateLayoutMutation],
-  );
 
   const handleCreate = (): void => {
     if (!name.trim()) return;
@@ -197,49 +146,22 @@ export function CollectionsTab({
     return result.filter((list) => list.name.toLowerCase().includes(searchQuery));
   }, [watchlist, serverLibrary, searchQuery]);
 
+  // DB returns lists in position order — use directly
   const mergedLists = useMemo(
     () => [...systemLists, ...customLists],
     [systemLists, customLists],
   );
 
-  const validIds = useMemo(
-    () => new Set(mergedLists.map((list) => list.id)),
-    [mergedLists],
-  );
-
-  const normalizedLayout = useMemo(() => {
-    const hiddenIds = uniqueIds(layout.hiddenIds).filter((id) => validIds.has(id));
-    const orderedIds = uniqueIds(layout.orderedIds).filter((id) => validIds.has(id));
-    return { hiddenIds, orderedIds };
-  }, [layout.hiddenIds, layout.orderedIds, validIds]);
-
-  useEffect(() => {
-    if (
-      sameIds(layout.hiddenIds, normalizedLayout.hiddenIds) &&
-      sameIds(layout.orderedIds, normalizedLayout.orderedIds)
-    ) {
-      return;
-    }
-    setLayout(normalizedLayout);
-  }, [layout.hiddenIds, layout.orderedIds, normalizedLayout]);
-
-  const orderedLists = useMemo(
-    () => applyManualOrder(mergedLists, normalizedLayout.orderedIds),
-    [mergedLists, normalizedLayout.orderedIds],
-  );
-
-  const hiddenSet = useMemo(
-    () => new Set(normalizedLayout.hiddenIds),
-    [normalizedLayout.hiddenIds],
-  );
+  const hiddenIds = layoutQuery.data?.hiddenListIds ?? [];
+  const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
   const hiddenCount = useMemo(
-    () => orderedLists.filter((list) => hiddenSet.has(list.id)).length,
-    [orderedLists, hiddenSet],
+    () => mergedLists.filter((list) => hiddenSet.has(list.id)).length,
+    [mergedLists, hiddenSet],
   );
 
   const visibleLists = useMemo(
-    () => orderedLists.filter((list) => showHidden || !hiddenSet.has(list.id)),
-    [orderedLists, showHidden, hiddenSet],
+    () => mergedLists.filter((list) => showHidden || !hiddenSet.has(list.id)),
+    [mergedLists, showHidden, hiddenSet],
   );
 
   const visibleListIds = visibleLists.map((list) => list.id).join("|");
@@ -276,7 +198,7 @@ export function CollectionsTab({
     if (sourceId === targetId) return;
     if (!canReorder) return;
 
-    const currentIds = orderedLists.map((list) => list.id);
+    const currentIds = visibleLists.map((list) => list.id);
     const sourceIndex = currentIds.indexOf(sourceId);
     const targetIndex = currentIds.indexOf(targetId);
     if (sourceIndex < 0 || targetIndex < 0) return;
@@ -286,13 +208,16 @@ export function CollectionsTab({
     if (!moved) return;
     reordered.splice(targetIndex, 0, moved);
 
-    const trailingIds = normalizedLayout.orderedIds.filter(
-      (id) => !currentIds.includes(id),
-    );
-    persistLayout({
-      hiddenIds: normalizedLayout.hiddenIds,
-      orderedIds: [...reordered, ...trailingIds],
+    // Optimistic: reorder the getAll cache
+    utils.list.getAll.setData(undefined, (prev) => {
+      if (!prev) return prev;
+      const map = new Map(prev.map((l) => [l.id, l]));
+      return reordered
+        .map((id) => map.get(id))
+        .filter((l): l is NonNullable<typeof l> => !!l);
     });
+
+    reorderMutation.mutate({ orderedIds: reordered });
   };
 
   const handleDrop = (targetId: string): void => {
@@ -303,20 +228,20 @@ export function CollectionsTab({
   };
 
   const toggleHidden = (listId: string): void => {
-    const isHidden = normalizedLayout.hiddenIds.includes(listId);
+    const isHidden = hiddenSet.has(listId);
     const nextHidden = isHidden
-      ? normalizedLayout.hiddenIds.filter((id) => id !== listId)
-      : [...normalizedLayout.hiddenIds, listId];
+      ? hiddenIds.filter((id) => id !== listId)
+      : [...hiddenIds, listId];
 
-    persistLayout({
-      hiddenIds: uniqueIds(nextHidden),
-      orderedIds: normalizedLayout.orderedIds,
-    });
+    const dedupedHidden = [...new Set(nextHidden)];
+    utils.list.getCollectionLayout.setData(undefined, { hiddenListIds: dedupedHidden });
+    updateLayoutMutation.mutate({ hiddenListIds: dedupedHidden });
   };
 
   const resetLayout = (): void => {
     setShowHidden(false);
-    persistLayout(DEFAULT_LAYOUT);
+    utils.list.getCollectionLayout.setData(undefined, { hiddenListIds: [] });
+    updateLayoutMutation.mutate({ hiddenListIds: [] });
   };
 
   const hasAnyManagedList =

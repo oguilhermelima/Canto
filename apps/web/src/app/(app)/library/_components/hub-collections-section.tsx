@@ -103,33 +103,14 @@ function NewCollectionCard(): React.JSX.Element {
   );
 }
 
-function applyLayoutOrder<T extends { id: string }>(
-  items: T[],
-  orderedIds: string[],
-  hiddenIds: string[],
-): T[] {
-  const hiddenSet = new Set(hiddenIds);
-  const visible = items.filter((item) => !hiddenSet.has(item.id));
-  if (orderedIds.length === 0) return visible;
-  const itemMap = new Map(visible.map((item) => [item.id, item] as const));
-  const ordered = orderedIds
-    .map((id) => itemMap.get(id))
-    .filter((item): item is T => !!item);
-  const rest = visible.filter((item) => !orderedIds.includes(item.id));
-  return [...ordered, ...rest];
-}
-
 export function HubCollectionsSection(): React.JSX.Element {
   const { data: lists, isLoading, isError, refetch } = trpc.list.getAll.useQuery();
   const layoutQuery = trpc.list.getCollectionLayout.useQuery();
 
+  // DB returns lists in position order — filter hidden only
   const visibleLists = useMemo(() => {
-    const layout = layoutQuery.data;
-    return applyLayoutOrder(
-      lists ?? [],
-      layout?.orderedListIds ?? [],
-      layout?.hiddenListIds ?? [],
-    );
+    const hiddenSet = new Set(layoutQuery.data?.hiddenListIds ?? []);
+    return (lists ?? []).filter((l) => !hiddenSet.has(l.id));
   }, [lists, layoutQuery.data]);
 
   if (isLoading || layoutQuery.isLoading) {
