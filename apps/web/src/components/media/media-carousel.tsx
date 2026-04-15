@@ -107,6 +107,7 @@ export function MediaCarousel({
             ? Array.from({ length: 8 }).map((_, i) => (
                 <MediaCardSkeleton
                   key={i}
+                  showTitle={false}
                   className="w-[180px] shrink-0 sm:w-[200px] lg:w-[220px] 2xl:w-[240px]"
                 />
               ))
@@ -138,6 +139,7 @@ export function MediaCarousel({
             Array.from({ length: 4 }).map((_, i) => (
               <MediaCardSkeleton
                 key={`loading-${i}`}
+                showTitle={false}
                 className="w-[180px] shrink-0 sm:w-[200px] lg:w-[220px] 2xl:w-[240px]"
               />
             ))}

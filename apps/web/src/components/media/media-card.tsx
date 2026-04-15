@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { FadeImage } from "~/components/ui/fade-image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
@@ -49,6 +49,7 @@ export function MediaCard({
     href ?? mediaHref(provider ?? "tmdb", externalId ?? id ?? "0", type);
 
   const utils = trpc.useUtils();
+  const [imageReady, setImageReady] = useState(!posterPath);
 
   const handlePrefetch = useCallback(() => {
     const eid = externalId ?? id;
@@ -61,12 +62,31 @@ export function MediaCard({
     }
   }, [id, externalId, provider, type, utils]);
 
+  if (!imageReady) {
+    return (
+      <div className={cn("relative", className)}>
+        <MediaCardSkeleton showTitle={showTitle} />
+        {/* Render image offscreen to trigger preload */}
+        <FadeImage
+          loader={tmdbPosterLoader}
+          src={posterPath!}
+          alt=""
+          fill
+          className="pointer-events-none !absolute !h-0 !w-0 opacity-0"
+          onLoad={() => setImageReady(true)}
+          loading="lazy"
+          sizes="1px"
+        />
+      </div>
+    );
+  }
+
   return (
     <Link
       href={linkHref}
       onMouseEnter={handlePrefetch}
       className={cn(
-        "group relative flex flex-col rounded-xl transition-all duration-300 ease-out hover:z-10 hover:scale-105",
+        "group relative flex flex-col rounded-xl animate-in fade-in-0 zoom-in-95 duration-500 ease-out fill-mode-both transition-all hover:z-10 hover:scale-105",
         className,
       )}
     >
@@ -158,16 +178,20 @@ export function MediaCard({
 
 export function MediaCardSkeleton({
   className,
+  showTitle = true,
 }: {
   className?: string;
+  showTitle?: boolean;
 }): React.JSX.Element {
   return (
     <div className={cn("flex flex-col", className)}>
       <Skeleton className="aspect-[2/3] w-full rounded-xl" />
-      <div className="mt-2 space-y-1.5 px-0.5">
-        <Skeleton className="h-4 w-3/4" />
-        <Skeleton className="h-4 w-12" />
-      </div>
+      {showTitle && (
+        <div className="mt-2 space-y-1.5 px-0.5">
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-4 w-12" />
+        </div>
+      )}
     </div>
   );
 }

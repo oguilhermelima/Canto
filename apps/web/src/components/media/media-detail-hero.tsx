@@ -568,16 +568,35 @@ export function MediaDetailHeroSkeleton(): React.JSX.Element {
           <Skeleton className="aspect-video w-[300px] shrink-0 rounded-xl sm:w-[340px] lg:w-[380px]" />
         </div>
       </div>
-      {/* Section skeletons */}
+      {/* Cast skeleton */}
       <div className="flex flex-col gap-12 px-4 pt-12 md:gap-16 md:px-8 md:pt-16 lg:px-12 xl:px-16 2xl:px-24">
         <section>
-          <Skeleton className="mb-4 h-7 w-32" />
-          <div className="space-y-2">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-14 w-full rounded-xl" />
+          <Skeleton className="mb-4 h-7 w-16" />
+          <div className="grid grid-cols-4 gap-x-2 gap-y-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex flex-col items-center">
+                <Skeleton className="mb-2 aspect-square w-full max-w-[130px] rounded-full" />
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="mt-1 h-3 w-12" />
+              </div>
             ))}
           </div>
         </section>
+      </div>
+      {/* Similar/Recommended skeletons */}
+      <div className="flex flex-col gap-12 pt-12 md:gap-16 md:pt-16">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <section key={i}>
+            <div className="mb-4 pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+              <Skeleton className="h-7 w-32" />
+            </div>
+            <div className="flex gap-3 overflow-hidden pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+              {Array.from({ length: 7 }).map((_, j) => (
+                <Skeleton key={j} className="aspect-[2/3] w-[140px] shrink-0 rounded-xl sm:w-[160px] lg:w-[180px]" />
+              ))}
+            </div>
+          </section>
+        ))}
       </div>
     </div>
   );

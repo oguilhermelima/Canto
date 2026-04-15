@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { FadeImage } from "~/components/ui/fade-image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
@@ -81,6 +81,7 @@ export function BackdropCard({
 
   // undefined = still loading, null = no logo, string = logo path
   const logoResolved = logoPath !== undefined;
+  const [imageReady, setImageReady] = useState(!backdropPath);
 
   const handlePrefetch = useCallback(() => {
     if (externalId) {
@@ -92,9 +93,26 @@ export function BackdropCard({
     }
   }, [externalId, provider, type, utils]);
 
-  // Show skeleton until logo is resolved
-  if (!logoResolved) {
-    return <BackdropCardSkeleton className={className} />;
+  // Show skeleton until logo and image are both ready
+  if (!logoResolved || !imageReady) {
+    return (
+      <div className={cn("relative shrink-0", className)}>
+        <BackdropCardSkeleton />
+        {/* Render image offscreen to trigger preload */}
+        {backdropPath && !imageReady && (
+          <FadeImage
+            loader={tmdbBackdropLoader}
+            src={backdropPath}
+            alt=""
+            fill
+            className="pointer-events-none !absolute !h-0 !w-0 opacity-0"
+            onLoad={() => setImageReady(true)}
+            loading="lazy"
+            sizes="1px"
+          />
+        )}
+      </div>
+    );
   }
 
   return (

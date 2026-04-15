@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Bookmark, ChevronLeft, ChevronRight, Loader2, Tv } from "lucide-react";
+import { Skeleton } from "@canto/ui/skeleton";
 import { trpc } from "~/lib/trpc/client";
 import { mediaHref } from "~/lib/media-href";
 import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
@@ -113,11 +114,29 @@ function WatchNextCard({
       year: item.year,
     },
   );
+  const [imageReady, setImageReady] = useState(!cardImage);
+  const logoResolved = logoPath !== undefined;
+
+  if (!logoResolved || !imageReady) {
+    return (
+      <div className="relative w-[280px] shrink-0 sm:w-[300px] lg:w-[340px] 2xl:w-[380px]">
+        <Skeleton className="aspect-video w-full rounded-xl" />
+        {cardImage && !imageReady && (
+          <img
+            src={cardImage}
+            alt=""
+            onLoad={() => setImageReady(true)}
+            className="invisible absolute h-0 w-0"
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <Link
       href={mediaHref(item.provider, item.externalId, item.mediaType)}
-      className="group relative flex w-[280px] shrink-0 overflow-hidden rounded-xl transition-all duration-300 hover:z-10 hover:scale-[1.03] hover:ring-2 hover:ring-foreground/20 sm:w-[300px] lg:w-[340px] 2xl:w-[380px]"
+      className="group relative flex w-[280px] shrink-0 overflow-hidden rounded-xl animate-in fade-in-0 zoom-in-95 duration-500 ease-out fill-mode-both transition-all hover:z-10 hover:scale-[1.03] hover:ring-2 hover:ring-foreground/20 sm:w-[300px] lg:w-[340px] 2xl:w-[380px]"
     >
       <div className="relative aspect-video w-full overflow-hidden bg-muted">
         {cardImage ? (
