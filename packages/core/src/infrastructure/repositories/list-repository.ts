@@ -1,4 +1,4 @@
-import { and, eq, or, isNull, desc, count, sql, inArray } from "drizzle-orm";
+import { and, asc, eq, or, isNull, desc, count, sql, inArray, max } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { list, listItem, listMember, media, folderServerLink, userConnection, userMediaLibrary } from "@canto/db/schema";
 import type { RecsFilters } from "../../domain/types/recs-filters";
@@ -73,7 +73,7 @@ export async function findUserListsWithCounts(
         sql`, `,
       )})`,
     )
-    .orderBy(desc(listItem.addedAt));
+    .orderBy(asc(listItem.position), desc(listItem.addedAt));
 
   const previewMap = new Map<string, string[]>();
   for (const r of previewRows) {
@@ -115,11 +115,23 @@ export async function findListById(db: Database, id: string) {
   });
 }
 
+export async function getMaxListPosition(db: Database, userId: string | null): Promise<number> {
+  const condition = userId
+    ? or(eq(list.userId, userId), eq(list.type, "server"))
+    : eq(list.type, "server");
+  const [row] = await db
+    .select({ maxPos: max(list.position) })
+    .from(list)
+    .where(condition);
+  return row?.maxPos ?? -1;
+}
+
 export async function createList(
   db: Database,
   data: typeof list.$inferInsert,
 ) {
-  const [row] = await db.insert(list).values(data).returning();
+  const nextPos = await getMaxListPosition(db, data.userId ?? null) + 1;
+  const [row] = await db.insert(list).values({ ...data, position: nextPos }).returning();
   return row!;
 }
 
@@ -138,6 +150,26 @@ export async function updateList(
 
 export async function deleteList(db: Database, id: string) {
   await db.delete(list).where(eq(list.id, id));
+}
+
+export async function reorderLists(
+  db: Database,
+  userId: string,
+  orderedIds: string[],
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await tx
+        .update(list)
+        .set({ position: i, updatedAt: new Date() })
+        .where(
+          and(
+            eq(list.id, orderedIds[i]!),
+            or(eq(list.userId, userId), eq(list.type, "server")),
+          ),
+        );
+    }
+  });
 }
 
 export async function findServerLibrary(db: Database) {
@@ -189,7 +221,7 @@ export async function findListItems(
   ];
 
   const customSort = recsSortOrder(sortBy);
-  const orderByExpr = customSort ? [customSort] : [desc(listItem.addedAt)];
+  const orderByExpr = customSort ? [customSort] : [asc(listItem.position), desc(listItem.addedAt)];
 
   if (isServerLibrary && userId) {
     // Use the canonical user_media_library table to determine what's in this user's server library.
@@ -230,12 +262,38 @@ export async function addListItem(
   db: Database,
   data: typeof listItem.$inferInsert,
 ) {
+  const [maxRow] = await db
+    .select({ maxPos: max(listItem.position) })
+    .from(listItem)
+    .where(eq(listItem.listId, data.listId));
+  const nextPos = (maxRow?.maxPos ?? -1) + 1;
+
   const [row] = await db
     .insert(listItem)
-    .values(data)
+    .values({ ...data, position: nextPos })
     .onConflictDoNothing()
     .returning();
   return row;
+}
+
+export async function reorderListItems(
+  db: Database,
+  listId: string,
+  orderedItemIds: string[],
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < orderedItemIds.length; i++) {
+      await tx
+        .update(listItem)
+        .set({ position: i })
+        .where(
+          and(
+            eq(listItem.id, orderedItemIds[i]!),
+            eq(listItem.listId, listId),
+          ),
+        );
+    }
+  });
 }
 
 export async function removeListItem(

@@ -11,6 +11,8 @@ import {
   createListInput,
   updateListInput,
   updateCollectionLayoutInput,
+  reorderCollectionsInput,
+  reorderListItemsInput,
   addListItemInput,
   removeListItemInput,
   addListMemberInput,
@@ -29,8 +31,10 @@ import {
   createList,
   updateList,
   deleteList,
+  reorderLists,
   findListItems,
   addListItem,
+  reorderListItems,
   findMediaInLists,
 } from "@canto/core/infrastructure/repositories/list-repository";
 import {
@@ -58,7 +62,6 @@ const COLLECTION_LAYOUT_PREF_KEY = "library.collectionLayout.v1";
 
 export interface CollectionLayoutPreference {
   hiddenListIds: string[];
-  orderedListIds: string[];
 }
 
 function uniqueIds(ids: string[]): string[] {
@@ -69,21 +72,15 @@ function parseCollectionLayoutPreference(
   value: unknown,
 ): CollectionLayoutPreference {
   if (!value || typeof value !== "object") {
-    return { hiddenListIds: [], orderedListIds: [] };
+    return { hiddenListIds: [] };
   }
 
   const record = value as Record<string, unknown>;
   const hiddenListIds = Array.isArray(record.hiddenListIds)
     ? record.hiddenListIds.filter((id): id is string => typeof id === "string")
     : [];
-  const orderedListIds = Array.isArray(record.orderedListIds)
-    ? record.orderedListIds.filter((id): id is string => typeof id === "string")
-    : [];
 
-  return {
-    hiddenListIds: uniqueIds(hiddenListIds),
-    orderedListIds: uniqueIds(orderedListIds),
-  };
+  return { hiddenListIds: uniqueIds(hiddenListIds) };
 }
 
 function normalizeCollectionLayout(
@@ -92,7 +89,6 @@ function normalizeCollectionLayout(
 ): CollectionLayoutPreference {
   return {
     hiddenListIds: input.hiddenListIds.filter((id) => validListIds.has(id)),
-    orderedListIds: input.orderedListIds.filter((id) => validListIds.has(id)),
   };
 }
 
@@ -142,10 +138,7 @@ export const listRouter = createTRPCRouter({
       );
 
       const normalized = normalizeCollectionLayout(
-        {
-          hiddenListIds: uniqueIds(input.hiddenListIds),
-          orderedListIds: uniqueIds(input.orderedListIds),
-        },
+        { hiddenListIds: uniqueIds(input.hiddenListIds) },
         validListIds,
       );
 
@@ -157,6 +150,22 @@ export const listRouter = createTRPCRouter({
       );
 
       return normalized;
+    }),
+
+  reorderCollections: protectedProcedure
+    .input(reorderCollectionsInput)
+    .mutation(async ({ ctx, input }) => {
+      await reorderLists(ctx.db, ctx.session.user.id, input.orderedIds);
+      void ctx.db; // invalidate client-side via onSuccess
+    }),
+
+  reorderItems: protectedProcedure
+    .input(reorderListItemsInput)
+    .mutation(async ({ ctx, input }) => {
+      await verifyListOwnership(ctx.db, input.listId, ctx.session.user.id, ctx.session.user.role, {
+        requiredPermission: "edit",
+      });
+      await reorderListItems(ctx.db, input.listId, input.orderedItemIds);
     }),
 
   getBySlug: protectedProcedure

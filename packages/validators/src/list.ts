@@ -89,11 +89,21 @@ export type GetListVotesInput = z.infer<typeof getListVotesInput>;
 
 export const updateCollectionLayoutInput = z.object({
   hiddenListIds: z.array(z.string().uuid()).max(500).default([]),
-  orderedListIds: z.array(z.string().uuid()).max(500).default([]),
 });
 export type UpdateCollectionLayoutInput = z.infer<
   typeof updateCollectionLayoutInput
 >;
+
+export const reorderCollectionsInput = z.object({
+  orderedIds: z.array(z.string().uuid()).min(1).max(500),
+});
+export type ReorderCollectionsInput = z.infer<typeof reorderCollectionsInput>;
+
+export const reorderListItemsInput = z.object({
+  listId: z.string().uuid(),
+  orderedItemIds: z.array(z.string().uuid()).min(1).max(1000),
+});
+export type ReorderListItemsInput = z.infer<typeof reorderListItemsInput>;
 
 export const addListItemInput = z.object({
   listId: z.string().uuid(),
