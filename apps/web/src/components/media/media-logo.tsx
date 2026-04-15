@@ -23,9 +23,9 @@ const SIZE_CLASSES: Record<string, Record<Variant, string>> = {
     extreme: "max-h-40 sm:max-h-44 md:max-h-48 lg:max-h-52 xl:max-h-56 2xl:max-h-60",
   },
   spotlight: {
-    normal: "max-h-20 sm:max-h-22 md:max-h-24 lg:max-h-26 xl:max-h-28 2xl:max-h-32",
-    tall: "max-h-32 sm:max-h-40 md:max-h-42 lg:max-h-44 xl:max-h-48 2xl:max-h-52",
-    extreme: "max-h-40 sm:max-h-48 md:max-h-52 lg:max-h-56 xl:max-h-60 2xl:max-h-64",
+    normal: "max-h-28 sm:max-h-32 md:max-h-36 lg:max-h-40 xl:max-h-44 2xl:max-h-48",
+    tall: "max-h-44 sm:max-h-52 md:max-h-56 lg:max-h-60 xl:max-h-64 2xl:max-h-72",
+    extreme: "max-h-52 sm:max-h-60 md:max-h-64 lg:max-h-72 xl:max-h-80 2xl:max-h-88",
   },
   carousel: {
     normal: "max-h-20 max-w-[260px]",

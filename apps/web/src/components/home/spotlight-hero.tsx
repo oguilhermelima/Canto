@@ -129,7 +129,7 @@ export function SpotlightHero({
   }, [spotlightPaused, visibleItems.length, nextSpotlight, currentSpotlight]);
 
   return (
-    <div className={cn("group/spotlight spotlight relative min-h-[80vh] w-full overflow-x-clip", className)}>
+    <div className={cn("group/spotlight spotlight relative min-h-[70vh] w-full overflow-x-clip", className)}>
       {/* Backdrop */}
       {currentItem?.backdropPath ? (
         <div
@@ -141,7 +141,7 @@ export function SpotlightHero({
             src={currentItem.backdropPath}
             alt=""
             fill
-            className="object-cover object-center"
+            className="object-cover object-[50%_30%]"
             fadeDuration={800}
             priority
             sizes="100vw"
@@ -177,7 +177,7 @@ export function SpotlightHero({
 
       {/* Content */}
       <div
-        className="relative mx-auto flex min-h-[80vh] w-full flex-col justify-end px-4 pb-8 pt-24 md:px-8 lg:px-12 xl:px-16 2xl:px-24"
+        className="relative mx-auto flex min-h-[70vh] w-full flex-col justify-end px-4 pb-8 pt-24 md:px-8 lg:px-12 xl:px-16 2xl:px-24"
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === "ArrowLeft") prevSpotlight();
@@ -230,35 +230,35 @@ export function SpotlightHero({
           >
             <Link href={getPreviewUrl(currentItem)} onMouseEnter={() => prefetchSpotlight(currentItem)} className="flex flex-col gap-5">
               {currentItem.logoPath ? (
-                <MediaLogo src={`${TMDB_IMAGE_BASE}/w780${currentItem.logoPath}`} alt={currentItem.title} size="spotlight" className="max-w-[60vw]" />
+                <MediaLogo src={`${TMDB_IMAGE_BASE}/original${currentItem.logoPath}`} alt={currentItem.title} size="spotlight" className="max-w-[60vw]" />
               ) : (
                 <h1 className="text-2xl font-extrabold tracking-tight text-foreground drop-shadow-lg sm:text-3xl md:text-4xl xl:text-5xl">
                   {currentItem.title}
                 </h1>
               )}
             </Link>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-foreground/70 sm:text-sm">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground sm:text-sm">
               <span>{currentItem.type === "movie" ? "Movie" : "TV Show"}</span>
               {currentItem.voteAverage != null && currentItem.voteAverage > 0 && (
                 <>
-                  <span className="text-foreground/30">|</span>
+                  <span className="text-muted-foreground">|</span>
                   <span className="text-yellow-400">{currentItem.voteAverage.toFixed(1)}</span>
                 </>
               )}
               {currentItem.year && (
                 <>
-                  <span className="text-foreground/30">|</span>
+                  <span className="text-muted-foreground">|</span>
                   <span>{currentItem.year}</span>
                 </>
               )}
               {currentItem.genres.length > 0 && (
                 <>
-                  <span className="text-foreground/30">|</span>
+                  <span className="text-muted-foreground">|</span>
                   {currentItem.genres.map((genre, i) => {
                     const genreId = currentItem.genreIds[i];
                     return (
                       <span key={genre} className="flex items-center gap-x-3">
-                        {i > 0 && <span className="text-foreground/30">·</span>}
+                        {i > 0 && <span className="text-muted-foreground">·</span>}
                         <Link
                           href={`/search${genreId ? `?genre=${genreId}` : ""}`}
                           className="transition-colors hover:text-foreground"
@@ -273,7 +273,7 @@ export function SpotlightHero({
             </div>
             {currentItem.overview && (
               <Link href={getPreviewUrl(currentItem)} onMouseEnter={() => prefetchSpotlight(currentItem)}>
-                <p className="line-clamp-2 text-xs leading-relaxed text-foreground/70 sm:line-clamp-3 sm:text-sm md:text-base">
+                <p className="line-clamp-2 max-w-xl text-sm leading-relaxed text-muted-foreground sm:line-clamp-3 md:text-base">
                   {currentItem.overview}
                 </p>
               </Link>
