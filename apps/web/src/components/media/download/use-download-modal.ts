@@ -22,6 +22,16 @@ export function useDownloadModal(
   _mediaType: "movie" | "show",
   open: boolean,
 ) {
+  const utils = trpc.useUtils();
+
+  const invalidateTorrents = useCallback(() => {
+    if (!mediaId) return;
+    void utils.torrent.listLiveByMedia.invalidate({ mediaId });
+    void utils.torrent.listByMedia.invalidate({ mediaId });
+    void utils.torrent.listLive.invalidate();
+    void utils.media.listFiles.invalidate({ mediaId });
+  }, [utils, mediaId]);
+
   // ── Step ──
   const [step, setStep] = useState<1 | 2>(1);
 
@@ -95,6 +105,7 @@ export function useDownloadModal(
   const replaceTorrent = trpc.torrent.replace.useMutation({
     onSuccess: () => {
       toast.success("Replacement download started");
+      invalidateTorrents();
     },
     onError: (error) => {
       toast.error(`Replace failed: ${error.message}`);
@@ -104,6 +115,7 @@ export function useDownloadModal(
   const downloadTorrent = trpc.torrent.download.useMutation({
     onSuccess: () => {
       toast.success("Download started");
+      invalidateTorrents();
     },
     onError: (error) => {
       if (error.data?.code === "CONFLICT" && lastDownloadAttempt) {

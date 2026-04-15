@@ -44,6 +44,11 @@ export function PreferencesSection(): React.JSX.Element {
           setMany.mutate({ settings: [{ key: "general.language", value }] });
           toast.success("Language updated. Refreshing all metadata in background...");
           refreshLanguage.mutate();
+          // Invalidate media-related queries so UI reflects new language
+          void utils.media.resolve.invalidate();
+          void utils.library.list.invalidate();
+          void utils.homeSection.invalidate();
+          void utils.media.getById.invalidate();
         },
         onError: () => toast.error("Failed to update language"),
       },

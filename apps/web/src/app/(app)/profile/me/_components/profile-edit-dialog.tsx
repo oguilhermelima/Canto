@@ -47,7 +47,7 @@ export function ProfileEditDialog({
     onSuccess: () => {
       toast.success("Profile updated");
       onOpenChange(false);
-      window.location.reload();
+      void utils.auth.getProfile.invalidate();
     },
     onError: () => toast.error("Failed to save"),
   });
