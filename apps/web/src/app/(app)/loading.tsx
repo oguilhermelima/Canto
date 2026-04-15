@@ -4,8 +4,8 @@ export default function AppLoading(): React.JSX.Element {
   return (
     <div className="min-h-screen">
       {/* Spotlight hero skeleton */}
-      <div className="relative -mt-16 min-h-[70vh] w-full bg-gradient-to-b from-muted/20 to-background">
-        <div className="relative mx-auto flex min-h-[70vh] w-full flex-col justify-end px-4 pb-16 pt-24 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+      <div className="relative -mt-16 min-h-[90vh] w-full bg-gradient-to-b from-muted/20 to-background xl:min-h-[80vh]">
+        <div className="mx-auto flex min-h-[90vh] w-full flex-col justify-end px-4 pb-16 pt-24 md:px-8 lg:px-12 xl:min-h-[80vh] xl:px-16 2xl:px-24">
           <div className="flex max-w-2xl flex-col gap-5">
             <Skeleton className="h-24 w-96 max-w-full" />
             <div className="flex items-center gap-2.5">
@@ -22,27 +22,52 @@ export default function AppLoading(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Carousel skeletons */}
-      <div className="mt-4 flex w-full flex-col gap-12 px-4 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        {Array.from({ length: 2 }).map((_, section) => (
-          <section key={section}>
-            <Skeleton className="mb-4 h-7 w-48" />
-            <div className="flex gap-4 overflow-hidden">
-              {Array.from({ length: 7 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="w-[160px] shrink-0 overflow-hidden rounded-xl border border-border bg-card"
-                >
-                  <Skeleton className="aspect-[2/3] w-full" />
-                  <div className="space-y-2 p-3">
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-3 w-1/2" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        ))}
+      {/* Per-section skeletons */}
+      <div className="mt-4 flex w-full flex-col gap-8 pb-12 md:mt-12 md:gap-12">
+        {/* Featured carousel skeleton (tall poster cards) */}
+        <section>
+          <div className="mb-4 pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+            <Skeleton className="h-7 w-48" />
+          </div>
+          <div className="flex gap-6 overflow-hidden pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton
+                key={i}
+                className="h-[360px] w-[230px] shrink-0 rounded-xl sm:h-[400px] sm:w-[250px] lg:h-[440px] lg:w-[280px] 2xl:h-[500px] 2xl:w-[320px]"
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* Backdrop carousel skeleton (wide landscape cards) */}
+        <section>
+          <div className="mb-4 pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+            <Skeleton className="h-7 w-48" />
+          </div>
+          <div className="flex gap-4 overflow-hidden pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton
+                key={i}
+                className="aspect-video w-[280px] shrink-0 rounded-xl sm:w-[300px] lg:w-[340px] 2xl:w-[380px]"
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* Poster carousel skeleton (portrait poster cards) */}
+        <section>
+          <div className="mb-4 pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+            <Skeleton className="h-7 w-48" />
+          </div>
+          <div className="flex gap-3 overflow-hidden pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton
+                key={i}
+                className="aspect-[2/3] w-[140px] shrink-0 rounded-xl sm:w-[160px] lg:w-[180px]"
+              />
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );

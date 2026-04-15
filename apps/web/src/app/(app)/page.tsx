@@ -2,7 +2,7 @@
 
 import { trpc } from "~/lib/trpc/client";
 import { useDocumentTitle } from "~/hooks/use-document-title";
-import { HomeSectionList, HomeSectionListSkeleton } from "~/components/home/home-section-list";
+import { HomeSectionList } from "~/components/home/home-section-list";
 import { StateMessage } from "~/components/layout/state-message";
 
 export default function DiscoverPage(): React.JSX.Element {
@@ -12,8 +12,6 @@ export default function DiscoverPage(): React.JSX.Element {
     staleTime: 5 * 60 * 1000,
   });
 
-  if (isLoading) return <HomeSectionListSkeleton />;
-
   if (isError) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -22,5 +20,5 @@ export default function DiscoverPage(): React.JSX.Element {
     );
   }
 
-  return <HomeSectionList sections={data?.sections ?? []} />;
+  return <HomeSectionList sections={data?.sections ?? []} isLoading={isLoading} />;
 }
