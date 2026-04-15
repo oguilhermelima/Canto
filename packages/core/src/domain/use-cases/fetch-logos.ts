@@ -140,7 +140,6 @@ export async function fetchLogos(
           year: item.year ?? null,
           voteAverage: item.voteAverage ?? null,
           downloaded: false,
-          processingStatus: "pending",
         }).onConflictDoUpdate({
           target: [media.externalId, media.provider, media.type],
           set: {

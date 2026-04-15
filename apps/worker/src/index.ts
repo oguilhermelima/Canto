@@ -13,7 +13,6 @@ import { handleBackfillExtras } from "./jobs/backfill-extras";
 import { handleSeedManagement } from "./jobs/seed-management";
 import { handleFolderScan } from "./jobs/folder-scan";
 import { handleValidateDownloads } from "./jobs/validate-downloads";
-import { enrichMedia } from "@canto/core/domain/use-cases/enrich-media";
 import { refreshExtras } from "@canto/core/domain/use-cases/refresh-extras";
 import { replaceShowWithTvdb } from "@canto/core/domain/use-cases/replace-show-with-tvdb";
 import { rebuildUserRecs } from "@canto/core/domain/use-cases/rebuild-user-recs";
@@ -220,13 +219,6 @@ const workers = [
   }, { connection: redisConnection, concurrency: 1 }),
 
   // ── On-demand (dispatched by other code) ──
-
-  new Worker("enrich-media", async (job) => {
-    const { mediaId, full } = job.data as { mediaId: string; full?: boolean };
-    console.log(`[enrich-media] ${mediaId} (full=${full ?? true})`);
-    const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
-    await enrichMedia(db, mediaId, { tmdb, tvdb, dispatcher: jobDispatcher, full });
-  }, { connection: redisConnection, concurrency: 3 }),
 
   new Worker("refresh-extras", async (job) => {
     const { mediaId } = job.data as { mediaId: string };

@@ -21,7 +21,7 @@ import {
 import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure } from "../trpc";
 import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
 import { getTvdbProvider } from "@canto/core/lib/tvdb-client";
-import { dispatchRefreshExtras, dispatchEnrichMedia, dispatchRebuildUserRecs } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
+import { dispatchRefreshExtras, dispatchRebuildUserRecs } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
 import { cached } from "@canto/core/infrastructure/cache/redis";
 import { logAndSwallow } from "@canto/core/lib/log-error";
 import {

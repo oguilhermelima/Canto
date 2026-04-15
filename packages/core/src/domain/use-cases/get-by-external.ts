@@ -9,7 +9,7 @@ import {
   findMediaByAnyReference,
   findMediaByIdWithSeasons,
 } from "../../infrastructure/repositories/media-repository";
-import { dispatchEnrichMedia, dispatchRefreshExtras, dispatchReconcileShow } from "../../infrastructure/queue/bullmq-dispatcher";
+import { dispatchRefreshExtras, dispatchReconcileShow } from "../../infrastructure/queue/bullmq-dispatcher";
 import { applyMediaTranslation, applySeasonsTranslation } from "../services/translation-service";
 import { getUserLanguage } from "../services/user-service";
 
@@ -39,14 +39,9 @@ export async function getByExternal(
   const getUserLang = () => getUserLanguage(db, userId);
 
   if (existing) {
-    if (existing.processingStatus !== "ready") {
-      void dispatchEnrichMedia(existing.id, true).catch(logAndSwallow("media:getByExternal dispatchEnrichMedia"));
-    }
-    if (existing.processingStatus === "ready") {
-      const STALE_MS = 30 * 24 * 60 * 60 * 1000;
-      const isStale = !existing.extrasUpdatedAt || Date.now() - existing.extrasUpdatedAt.getTime() > STALE_MS;
-      if (isStale) void dispatchRefreshExtras(existing.id).catch(logAndSwallow("media:getByExternal dispatchRefreshExtras"));
-    }
+    const STALE_MS = 30 * 24 * 60 * 60 * 1000;
+    const isStale = !existing.extrasUpdatedAt || Date.now() - existing.extrasUpdatedAt.getTime() > STALE_MS;
+    if (isStale) void dispatchRefreshExtras(existing.id).catch(logAndSwallow("media:getByExternal dispatchRefreshExtras"));
     const lang = await getUserLang();
     const translated = await applyMediaTranslation(db, existing, lang);
     if (translated.seasons) {

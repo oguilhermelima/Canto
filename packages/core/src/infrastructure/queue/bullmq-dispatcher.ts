@@ -17,7 +17,6 @@ function createQueueGetter(name: string): () => Promise<Queue> {
   };
 }
 
-const getEnrichMediaQueue = createQueueGetter("enrich-media");
 const getRefreshExtrasQueue = createQueueGetter("refresh-extras");
 const getReplaceTvdbQueue = createQueueGetter("replace-tvdb");
 const getRebuildUserRecsQueue = createQueueGetter("rebuild-user-recs");
@@ -27,15 +26,6 @@ const getJellyfinSyncQueue = createQueueGetter("jellyfin-sync");
 const getPlexSyncQueue = createQueueGetter("plex-sync");
 const getReverseSyncUserQueue = createQueueGetter("reverse-sync-user");
 const getFolderScanQueue = createQueueGetter("folder-scan");
-
-export async function dispatchEnrichMedia(mediaId: string, full = false): Promise<void> {
-  const q = await getEnrichMediaQueue();
-  await q.add("enrich-media", { mediaId, full }, {
-    jobId: `enrich-media-${mediaId}`,
-    removeOnComplete: true,
-    removeOnFail: 100,
-  });
-}
 
 export async function dispatchRefreshExtras(mediaId: string): Promise<void> {
   const q = await getRefreshExtrasQueue();
