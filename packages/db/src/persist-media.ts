@@ -54,7 +54,7 @@ export async function persistMedia(
 ): Promise<typeof media.$inferSelect> {
   // Check for existing record — exact match + IMDB cross-reference always
   const conditions = [
-    and(eq(media.externalId, normalized.externalId), eq(media.provider, normalized.provider)),
+    and(eq(media.externalId, normalized.externalId), eq(media.provider, normalized.provider), eq(media.type, normalized.type)),
   ];
 
   // IMDB cross-reference is always active (universal dedup)

@@ -17,6 +17,7 @@ export interface MediaRepositoryPort {
   findMediaByExternalId(
     externalId: number,
     provider: string,
+    type: string,
   ): Promise<(MediaRow & { seasons: Array<{ number: number; episodes: Array<{ number: number }> }> }) | undefined>;
 
   findMediaByAnyReference(
@@ -24,6 +25,7 @@ export interface MediaRepositoryPort {
     provider: string,
     imdbId?: string,
     tvdbId?: number,
+    type?: string,
   ): Promise<(MediaRow & { seasons: Array<{ number: number; episodes: Array<{ number: number }> }> }) | null>;
 
   updateMedia(

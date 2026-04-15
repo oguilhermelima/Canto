@@ -384,7 +384,7 @@ export const mediaRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const tmdb = await getTmdbProvider();
       const result = await fetchLogos(ctx.db, tmdb, [input]);
-      const key = `${input.provider}-${input.externalId}`;
+      const key = `${input.provider}-${input.type}-${input.externalId}`;
       return { logoPath: result[key] ?? null };
     }),
 

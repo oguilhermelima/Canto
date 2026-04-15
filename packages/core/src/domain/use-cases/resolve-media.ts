@@ -32,7 +32,7 @@ export async function resolveMedia(
 ) {
   const globalTvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
 
-  const existing = await findMediaByExternalId(db, input.externalId, input.provider);
+  const existing = await findMediaByExternalId(db, input.externalId, input.provider, input.type);
 
   // Return from DB when metadata is complete — translations will be applied
   if (existing?.metadataUpdatedAt) {

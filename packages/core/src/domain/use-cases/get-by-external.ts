@@ -33,8 +33,8 @@ export async function getByExternal(
   const tvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
 
   const existing = tvdbEnabled
-    ? await findMediaByAnyReference(db, input.externalId, input.provider)
-    : await findMediaByExternalId(db, input.externalId, input.provider);
+    ? await findMediaByAnyReference(db, input.externalId, input.provider, undefined, undefined, input.type)
+    : await findMediaByExternalId(db, input.externalId, input.provider, input.type);
 
   const getUserLang = () => getUserLanguage(db, userId);
 

@@ -54,9 +54,12 @@ export async function findMediaByExternalId(
   db: Database,
   externalId: number,
   provider: string,
+  type?: string,
 ) {
   return db.query.media.findFirst({
-    where: and(eq(media.externalId, externalId), eq(media.provider, provider)),
+    where: type
+      ? and(eq(media.externalId, externalId), eq(media.provider, provider), eq(media.type, type))
+      : and(eq(media.externalId, externalId), eq(media.provider, provider)),
     with: withSeasonsAndEpisodes,
   });
 }
@@ -72,10 +75,13 @@ export async function findMediaByAnyReference(
   provider: string,
   imdbId?: string,
   tvdbId?: number,
+  type?: string,
 ) {
-  // 1. Direct match by externalId + provider
+  // 1. Direct match by externalId + provider (+ type when available)
   const direct = await db.query.media.findFirst({
-    where: and(eq(media.externalId, externalId), eq(media.provider, provider)),
+    where: type
+      ? and(eq(media.externalId, externalId), eq(media.provider, provider), eq(media.type, type))
+      : and(eq(media.externalId, externalId), eq(media.provider, provider)),
     with: withSeasonsAndEpisodes,
   });
   if (direct) return direct;

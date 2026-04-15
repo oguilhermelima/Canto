@@ -27,7 +27,7 @@ export interface FetchLogoItem {
  * 2. For items without logos, batch-fetch from TMDB getImages()
  * 3. Upsert minimal media records with the fetched logos
  *
- * Returns a map of "provider-externalId" → logoPath (or null if no logo).
+ * Returns a map of "provider-type-externalId" → logoPath (or null if no logo).
  */
 export async function fetchLogos(
   db: Database,
@@ -38,22 +38,22 @@ export async function fetchLogos(
 
   const result: Record<string, string | null> = {};
 
-  // 1. Query DB for existing records (match by externalId+provider pairs)
+  // 1. Query DB for existing records (match by externalId+provider+type triples)
   const conditions = items.map((i) =>
-    and(eq(media.externalId, i.externalId), eq(media.provider, i.provider)),
+    and(eq(media.externalId, i.externalId), eq(media.provider, i.provider), eq(media.type, i.type)),
   );
   const existingRows = await db.query.media.findMany({
     where: or(...conditions),
-    columns: { id: true, externalId: true, logoPath: true },
+    columns: { id: true, externalId: true, type: true, logoPath: true },
   });
 
-  const existingByExtId = new Map(existingRows.map((r) => [r.externalId, r]));
+  const existingByKey = new Map(existingRows.map((r) => [`${r.type}-${r.externalId}`, r]));
 
   // 2. Classify items
   const needsFetch: FetchLogoItem[] = [];
   for (const item of items) {
-    const key = `${item.provider}-${item.externalId}`;
-    const existing = existingByExtId.get(item.externalId);
+    const key = `${item.provider}-${item.type}-${item.externalId}`;
+    const existing = existingByKey.get(`${item.type}-${item.externalId}`);
     if (existing?.logoPath) {
       result[key] = existing.logoPath;
     } else {
@@ -64,8 +64,8 @@ export async function fetchLogos(
   if (needsFetch.length === 0) return result;
 
   // 3. Batch fetch logos from TMDB (groups of 10)
-  const logoMap = new Map<number, string>();
-  const langLogoMap = new Map<number, Map<string, string>>();
+  const logoMap = new Map<string, string>();
+  const langLogoMap = new Map<string, Map<string, string>>();
 
   if (tmdb.getImages) {
     for (let i = 0; i < needsFetch.length; i += 10) {
@@ -89,7 +89,7 @@ export async function fetchLogos(
                   }
                 }
                 if (byLang.size > 0) {
-                  langLogoMap.set(item.externalId, byLang);
+                  langLogoMap.set(`${item.type}-${item.externalId}`, byLang);
                 }
 
                 // Pick best English/null logo for base record
@@ -103,7 +103,7 @@ export async function fetchLogos(
             const logoPath = await existing;
             inflightFetches.delete(cacheKey);
             if (logoPath) {
-              logoMap.set(item.externalId, logoPath);
+              logoMap.set(`${item.type}-${item.externalId}`, logoPath);
             }
           } catch (err) {
             console.warn(`[fetchLogos] Failed to fetch logo for ${item.type}/${item.externalId}:`, err);
@@ -115,11 +115,11 @@ export async function fetchLogos(
 
   // 4. Upsert media records and store language-specific logos
   for (const item of needsFetch) {
-    const key = `${item.provider}-${item.externalId}`;
-    const logo = logoMap.get(item.externalId) ?? null;
+    const key = `${item.provider}-${item.type}-${item.externalId}`;
+    const logo = logoMap.get(`${item.type}-${item.externalId}`) ?? null;
     result[key] = logo;
 
-    const existing = existingByExtId.get(item.externalId);
+    const existing = existingByKey.get(`${item.type}-${item.externalId}`);
     let mediaId: string | undefined;
 
     if (existing) {
@@ -142,7 +142,7 @@ export async function fetchLogos(
           downloaded: false,
           processingStatus: "pending",
         }).onConflictDoUpdate({
-          target: [media.externalId, media.provider],
+          target: [media.externalId, media.provider, media.type],
           set: {
             logoPath: sql`CASE WHEN EXCLUDED.logo_path IS NOT NULL THEN EXCLUDED.logo_path ELSE ${media.logoPath} END`,
           },
@@ -154,18 +154,20 @@ export async function fetchLogos(
     }
 
     // Store language-specific logos in media_translation
-    const langLogos = langLogoMap.get(item.externalId);
+    const langLogos = langLogoMap.get(`${item.type}-${item.externalId}`);
     if (mediaId && langLogos) {
-      // Map 2-letter codes (from TMDB) to full supported language codes (e.g., "pt" → "pt-BR")
+      // Map TMDB language codes to full supported language codes
+      // Try exact match first (e.g., "pt-BR" → "pt-BR"), then 2-letter prefix (e.g., "pt" → "pt-BR")
       const supported = await getSupportedLanguageCodes(db);
-      const prefixToFull = new Map<string, string>();
+      const langToFull = new Map<string, string>();
       for (const code of supported) {
+        langToFull.set(code, code); // exact match (e.g., "pt-BR")
         const prefix = code.split("-")[0]!;
-        if (!prefixToFull.has(prefix)) prefixToFull.set(prefix, code);
+        if (!langToFull.has(prefix)) langToFull.set(prefix, code); // 2-letter fallback
       }
 
       for (const [langCode, logoPath] of langLogos) {
-        const fullCode = prefixToFull.get(langCode);
+        const fullCode = langToFull.get(langCode);
         if (!fullCode) continue;
         try {
           await db
@@ -202,6 +204,7 @@ export async function enrichBrowseWithLogos<
   const rows = await db
     .select({
       externalId: media.externalId,
+      type: media.type,
       logoPath: media.logoPath,
       translatedLogoPath: useLangJoin ? mediaTranslation.logoPath : sql<string | null>`NULL`,
     })
@@ -211,7 +214,10 @@ export async function enrichBrowseWithLogos<
       useLangJoin
         ? and(
             eq(mediaTranslation.mediaId, media.id),
-            sql`LEFT(${mediaTranslation.language}, 2) = ${langPrefix}`,
+            or(
+              eq(mediaTranslation.language, language!),
+              sql`LEFT(${mediaTranslation.language}, 2) = ${langPrefix}`,
+            ),
           )
         : sql`FALSE`,
     )
@@ -226,13 +232,13 @@ export async function enrichBrowseWithLogos<
   if (rows.length === 0) return data;
 
   const logoMap = new Map(
-    rows.map((r) => [r.externalId, r.translatedLogoPath ?? r.logoPath]),
+    rows.map((r) => [`${r.type}-${r.externalId}`, r.translatedLogoPath ?? r.logoPath]),
   );
 
   return {
     ...data,
     results: data.results.map((r) => {
-      const logo = logoMap.get(r.externalId);
+      const logo = logoMap.get(`${r.type}-${r.externalId}`);
       return logo ? { ...r, logoPath: logo } : r;
     }),
   };

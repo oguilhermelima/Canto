@@ -393,7 +393,7 @@ export const media = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex("idx_media_external").on(table.externalId, table.provider),
+    uniqueIndex("idx_media_external").on(table.externalId, table.provider, table.type),
     index("idx_media_type").on(table.type),
     index("idx_media_in_library").on(table.inLibrary),
     index("idx_media_downloaded").on(table.downloaded),

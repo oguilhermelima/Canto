@@ -31,8 +31,8 @@ export async function persistMediaUseCase(
   const globalTvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
 
   const existing = globalTvdbEnabled
-    ? await findMediaByAnyReference(db, input.externalId, input.provider)
-    : await findMediaByExternalId(db, input.externalId, input.provider);
+    ? await findMediaByAnyReference(db, input.externalId, input.provider, undefined, undefined, input.type)
+    : await findMediaByExternalId(db, input.externalId, input.provider, input.type);
 
   if (existing?.processingStatus === "ready") return existing;
 
