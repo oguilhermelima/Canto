@@ -32,6 +32,9 @@ import {
   upsertUserMediaState,
   upsertUserRating,
   findUserRatingsByMedia,
+  findMediaReviews,
+  findReviewById,
+  findEpisodeRatingsFromAllUsers,
   deleteUserRating,
   computeAndSyncSeasonRating,
   computeAndSyncMediaRating,
@@ -1239,20 +1242,8 @@ export const userMediaRouter = createTRPCRouter({
         isOverride: true,
       });
 
-      // Cascade recomputation
-      if (input.episodeId) {
-        // Look up seasonId from the episode's season
-        const mediaData = await findMediaByIdWithSeasons(ctx.db, input.mediaId);
-        const seasonObj = mediaData?.seasons.find((s) =>
-          s.episodes.some((e) => e.id === input.episodeId),
-        );
-        if (seasonObj) {
-          await computeAndSyncSeasonRating(ctx.db, userId, input.mediaId, seasonObj.id);
-        }
-      } else if (input.seasonId) {
-        await computeAndSyncMediaRating(ctx.db, userId, input.mediaId);
-      } else {
-        // Direct media-level rating — sync to userMediaState
+      // Sync to userMediaState for media-level ratings
+      if (!input.episodeId && !input.seasonId) {
         await upsertUserMediaState(ctx.db, {
           userId,
           mediaId: input.mediaId,
@@ -1269,6 +1260,28 @@ export const userMediaRouter = createTRPCRouter({
       findUserRatingsByMedia(ctx.db, ctx.session.user.id, input.mediaId),
     ),
 
+  getMediaReviews: protectedProcedure
+    .input(z.object({
+      mediaId: z.string().uuid(),
+      limit: z.number().int().min(1).max(100).default(50),
+      offset: z.number().int().min(0).default(0),
+      episodeId: z.string().uuid().optional(),
+      sortBy: z.enum(["date", "rating"]).default("date"),
+    }))
+    .query(({ ctx, input }) =>
+      findMediaReviews(ctx.db, input.mediaId, input),
+    ),
+
+  getReviewById: protectedProcedure
+    .input(z.object({ reviewId: z.string().uuid() }))
+    .query(({ ctx, input }) => findReviewById(ctx.db, input.reviewId)),
+
+  getEpisodeReviews: protectedProcedure
+    .input(z.object({ episodeId: z.string().uuid() }))
+    .query(({ ctx, input }) =>
+      findEpisodeRatingsFromAllUsers(ctx.db, input.episodeId),
+    ),
+
   removeRating: protectedProcedure
     .input(removeRatingInput)
     .mutation(async ({ ctx, input }) => {
@@ -1282,7 +1295,8 @@ export const userMediaRouter = createTRPCRouter({
         input.episodeId ?? null,
       );
 
-      // Cascade recomputation upward
+      // Cascade recomputation upward — only when deleting sub-level ratings.
+      // Media-level delete is intentional: don't recompute from episodes.
       if (input.episodeId) {
         const mediaData = await findMediaByIdWithSeasons(ctx.db, input.mediaId);
         const seasonObj = mediaData?.seasons.find((s) =>
@@ -1293,9 +1307,8 @@ export const userMediaRouter = createTRPCRouter({
         }
       } else if (input.seasonId) {
         await computeAndSyncMediaRating(ctx.db, userId, input.mediaId);
-      } else {
-        await computeAndSyncMediaRating(ctx.db, userId, input.mediaId);
       }
+      // else: media-level — user explicitly deleted, no cascade
 
       return { success: true };
     }),

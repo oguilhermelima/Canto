@@ -1,6 +1,6 @@
-import { and, avg, eq, isNull } from "drizzle-orm";
+import { and, avg, desc, eq, isNull, isNotNull, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { userMediaState, userRating } from "@canto/db/schema";
+import { episode, season, user, userMediaState, userRating } from "@canto/db/schema";
 
 /* -------------------------------------------------------------------------- */
 /*  CRUD                                                                      */
@@ -108,6 +108,161 @@ export async function deleteUserRating(
         episodeId ? eq(userRating.episodeId, episodeId) : isNull(userRating.episodeId),
       ),
     );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Community ratings                                                         */
+/* -------------------------------------------------------------------------- */
+
+export interface CommunityReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+  createdAt: Date;
+  seasonId: string | null;
+  episodeId: string | null;
+  seasonNumber: number | null;
+  episodeNumber: number | null;
+  episodeTitle: string | null;
+  user: { id: string; name: string | null; image: string | null };
+}
+
+export async function findMediaReviews(
+  db: Database,
+  mediaId: string,
+  opts?: { limit?: number; offset?: number; episodeId?: string; sortBy?: "date" | "rating" },
+): Promise<{ reviews: CommunityReview[]; total: number }> {
+  const { limit = 50, offset = 0, episodeId: filterEpisodeId, sortBy = "date" } = opts ?? {};
+
+  const conditions = [eq(userRating.mediaId, mediaId)];
+  if (filterEpisodeId) {
+    conditions.push(eq(userRating.episodeId, filterEpisodeId));
+  }
+  const where = and(...conditions);
+
+  const orderBy = sortBy === "rating"
+    ? [desc(userRating.rating), desc(userRating.createdAt)]
+    : [desc(userRating.createdAt)];
+
+  const [rows, [countRow]] = await Promise.all([
+    db
+      .select({
+        id: userRating.id,
+        rating: userRating.rating,
+        comment: userRating.comment,
+        createdAt: userRating.createdAt,
+        seasonId: userRating.seasonId,
+        episodeId: userRating.episodeId,
+        seasonNumber: season.number,
+        episodeNumber: episode.number,
+        episodeTitle: episode.title,
+        userId: user.id,
+        userName: user.name,
+        userImage: user.image,
+      })
+      .from(userRating)
+      .innerJoin(user, eq(userRating.userId, user.id))
+      .leftJoin(season, eq(userRating.seasonId, season.id))
+      .leftJoin(episode, eq(userRating.episodeId, episode.id))
+      .where(where)
+      .orderBy(...orderBy)
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(userRating)
+      .where(where),
+  ]);
+
+  return {
+    reviews: rows.map((r) => ({
+      id: r.id,
+      rating: r.rating,
+      comment: r.comment,
+      createdAt: r.createdAt,
+      seasonId: r.seasonId,
+      episodeId: r.episodeId,
+      seasonNumber: r.seasonNumber,
+      episodeNumber: r.episodeNumber,
+      episodeTitle: r.episodeTitle,
+      user: { id: r.userId, name: r.userName, image: r.userImage },
+    })),
+    total: countRow?.total ?? 0,
+  };
+}
+
+export async function findReviewById(
+  db: Database,
+  reviewId: string,
+): Promise<CommunityReview | null> {
+  const [row] = await db
+    .select({
+      id: userRating.id,
+      rating: userRating.rating,
+      comment: userRating.comment,
+      createdAt: userRating.createdAt,
+      seasonId: userRating.seasonId,
+      episodeId: userRating.episodeId,
+      seasonNumber: season.number,
+      episodeNumber: episode.number,
+      episodeTitle: episode.title,
+      userId: user.id,
+      userName: user.name,
+      userImage: user.image,
+    })
+    .from(userRating)
+    .innerJoin(user, eq(userRating.userId, user.id))
+    .leftJoin(season, eq(userRating.seasonId, season.id))
+    .leftJoin(episode, eq(userRating.episodeId, episode.id))
+    .where(eq(userRating.id, reviewId));
+
+  if (!row) return null;
+  return {
+    id: row.id,
+    rating: row.rating,
+    comment: row.comment,
+    createdAt: row.createdAt,
+    seasonId: row.seasonId,
+    episodeId: row.episodeId,
+    seasonNumber: row.seasonNumber,
+    episodeNumber: row.episodeNumber,
+    episodeTitle: row.episodeTitle,
+    user: { id: row.userId, name: row.userName, image: row.userImage },
+  };
+}
+
+export async function findEpisodeRatingsFromAllUsers(
+  db: Database,
+  episodeId: string,
+): Promise<Array<{
+  id: string;
+  rating: number;
+  comment: string | null;
+  createdAt: Date;
+  user: { id: string; name: string | null; image: string | null };
+}>> {
+  const rows = await db
+    .select({
+      id: userRating.id,
+      rating: userRating.rating,
+      comment: userRating.comment,
+      createdAt: userRating.createdAt,
+      userId: user.id,
+      userName: user.name,
+      userImage: user.image,
+    })
+    .from(userRating)
+    .innerJoin(user, eq(userRating.userId, user.id))
+    .where(eq(userRating.episodeId, episodeId))
+    .orderBy(desc(userRating.createdAt));
+
+  return rows.map((r) => ({
+    id: r.id,
+    rating: r.rating,
+    comment: r.comment,
+    createdAt: r.createdAt,
+    user: { id: r.userId, name: r.userName, image: r.userImage },
+  }));
 }
 
 /* -------------------------------------------------------------------------- */
