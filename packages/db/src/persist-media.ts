@@ -470,7 +470,7 @@ export async function persistTranslations(
       if (sNum !== undefined) episodeLookup.set(`${sNum}-${ep.number}`, ep.id);
     }
 
-    const epTransRows = normalized.episodeTranslations
+    const epTransRowsRaw = normalized.episodeTranslations
       .filter((t) => !t.language.startsWith("en-") && supported.has(t.language))
       .map((t) => {
         const epId = episodeLookup.get(`${t.seasonNumber}-${t.episodeNumber}`);
@@ -483,6 +483,15 @@ export async function persistTranslations(
         };
       })
       .filter((r): r is NonNullable<typeof r> => r !== null);
+
+    // Dedup by episodeId+language (Postgres rejects duplicates within same batch)
+    const epTransSeen = new Set<string>();
+    const epTransRows = epTransRowsRaw.filter((r) => {
+      const key = `${r.episodeId}-${r.language}`;
+      if (epTransSeen.has(key)) return false;
+      epTransSeen.add(key);
+      return true;
+    });
 
     for (let i = 0; i < epTransRows.length; i += 500) {
       await db
