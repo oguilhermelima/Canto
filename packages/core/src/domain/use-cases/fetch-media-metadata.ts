@@ -19,6 +19,8 @@ export interface MediaMetadata {
   extras: MediaExtras;
   tvdbSeasons?: NormalizedSeason[];
   tvdbId?: number;
+  /** True when TVDB season fetch was attempted but failed (API error, timeout, etc.) */
+  tvdbFailed?: boolean;
 }
 
 /**
@@ -57,6 +59,7 @@ export async function fetchMediaMetadata(
   // Phase 2: TVDB structure (shows only, when enabled)
   let tvdbSeasons: NormalizedSeason[] | undefined;
   let resolvedTvdbId: number | undefined;
+  let tvdbFailed = false;
 
   if (type === "show" && opts?.useTVDBSeasons && provider !== "tvdb") {
     // Resolve TVDB ID from metadata cross-refs or title search
@@ -65,7 +68,9 @@ export async function fetchMediaMetadata(
       try {
         const results = await deps.tvdb.search(media.title, "show");
         if (results.results.length > 0) resolvedTvdbId = results.results[0]!.externalId;
-      } catch { /* not found */ }
+      } catch {
+        tvdbFailed = true;
+      }
     }
 
     if (resolvedTvdbId) {
@@ -73,7 +78,8 @@ export async function fetchMediaMetadata(
         const tvdbData = await deps.tvdb.getMetadata(resolvedTvdbId, "show");
         tvdbSeasons = tvdbData.seasons;
       } catch (err) {
-        console.warn(`[fetchMediaMetadata] TVDB structure failed for ${media.title}:`, err instanceof Error ? err.message : err);
+        tvdbFailed = true;
+        console.warn(`[fetchMediaMetadata] TVDB structure failed for "${media.title}" (tvdbId=${resolvedTvdbId}):`, err instanceof Error ? err.message : err);
       }
     }
   }
@@ -89,6 +95,7 @@ export async function fetchMediaMetadata(
     extras,
     tvdbSeasons,
     tvdbId: resolvedTvdbId,
+    tvdbFailed,
   };
 }
 

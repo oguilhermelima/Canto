@@ -1,9 +1,9 @@
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { getProvider } from "@canto/providers";
 import type { SearchResult, MediaType, ProviderName } from "@canto/providers";
-import { user } from "@canto/db/schema";
+import { season, user } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
 import {
   getByExternalInput,
@@ -248,6 +248,22 @@ export const mediaRouter = createTRPCRouter({
       );
 
       await persistFullMedia(ctx.db, result, row.id);
+
+      // Fallback: if TVDB is effective but no TVDB seasons exist after persist
+      // (e.g. show created before TVDB was enabled, or TVDB fetch failed),
+      // trigger reconcileShowStructure to apply TVDB structure.
+      if (effectiveProvider === "tvdb" && row.type === "show") {
+        const hasTvdbSeasons = await ctx.db.query.season.findFirst({
+          where: and(eq(season.mediaId, row.id), inArray(season.seasonType, ["official", "default"])),
+          columns: { id: true },
+        });
+        if (!hasTvdbSeasons) {
+          const { reconcileShowStructure } = await import("@canto/core/domain/use-cases/reconcile-show-structure");
+          const { jobDispatcher } = await import("@canto/core/infrastructure/adapters/job-dispatcher.adapter");
+          await reconcileShowStructure(ctx.db, row.id, { tmdb, tvdb, dispatcher: jobDispatcher }, { force: true });
+        }
+      }
+
       return findMediaById(ctx.db, input.id);
     }),
 

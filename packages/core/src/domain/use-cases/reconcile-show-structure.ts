@@ -10,6 +10,8 @@ import {
   getSupportedLanguageCodes,
   persistSeasons,
   persistTranslations,
+  buildTmdbStillMap,
+  overlayTmdbStills,
 } from "@canto/db/persist-media";
 import {
   findMediaById,
@@ -375,33 +377,46 @@ export async function reconcileShowStructure(
 
   const supportedLangs = [...(await getSupportedLanguageCodes(db))];
 
-  // For TVDB-native shows, also fetch TMDB media translations (title, overview, posters, logos)
-  // since TVDB translations have poor image coverage
-  if (isAlreadyTvdb && row.imdbId && deps.tmdb.findByImdbId) {
+  // Fetch TMDB metadata for episode still images + translations
+  // TMDB-native: use row.externalId directly; TVDB-native: resolve via IMDB cross-ref
+  let tmdbExternalId: number | undefined;
+  if (!isAlreadyTvdb) {
+    tmdbExternalId = row.externalId;
+  } else if (row.imdbId && deps.tmdb.findByImdbId) {
     try {
       const found = await deps.tmdb.findByImdbId(row.imdbId);
       const match = found.find((r: { type: string }) => r.type === "show");
-      if (match) {
-        const tmdbData = await deps.tmdb.getMetadata(match.externalId, "show", { supportedLanguages: supportedLangs });
+      if (match) tmdbExternalId = match.externalId;
+    } catch { /* IMDB cross-ref failed */ }
+  }
 
-        // Update base images from TMDB (TVDB images may be in wrong language)
-        await updateMedia(db, mediaId, {
-          ...(tmdbData.posterPath ? { posterPath: tmdbData.posterPath } : {}),
-          ...(tmdbData.backdropPath ? { backdropPath: tmdbData.backdropPath } : {}),
-          ...(tmdbData.logoPath ? { logoPath: tmdbData.logoPath } : {}),
-        });
+  if (tmdbExternalId) {
+    try {
+      const tmdbData = await deps.tmdb.getMetadata(tmdbExternalId, "show", { supportedLanguages: supportedLangs });
 
-        // Persist TMDB media-level translations (title, overview, posters, logos) without touching seasons
-        if (tmdbData.translations) {
-          await persistTranslations(db, mediaId, {
-            ...tmdbData,
-            seasonTranslations: undefined,
-            episodeTranslations: undefined,
-          } as typeof tmdbData);
-        }
+      // Overlay TMDB still images onto TVDB episodes via absoluteNumber mapping
+      if (tmdbData.seasons) {
+        const tmdbStillMap = buildTmdbStillMap(tmdbData.seasons);
+        await overlayTmdbStills(db, mediaId, tmdbStillMap);
+      }
+
+      // Update base images from TMDB (TVDB images may be in wrong language)
+      await updateMedia(db, mediaId, {
+        ...(tmdbData.posterPath ? { posterPath: tmdbData.posterPath } : {}),
+        ...(tmdbData.backdropPath ? { backdropPath: tmdbData.backdropPath } : {}),
+        ...(tmdbData.logoPath ? { logoPath: tmdbData.logoPath } : {}),
+      });
+
+      // Persist TMDB media-level translations (title, overview, posters, logos) without touching seasons
+      if (tmdbData.translations) {
+        await persistTranslations(db, mediaId, {
+          ...tmdbData,
+          seasonTranslations: undefined,
+          episodeTranslations: undefined,
+        } as typeof tmdbData);
       }
     } catch (err) {
-      console.warn(`[reconcile] TMDB translation backfill failed for "${row.title}":`, err instanceof Error ? err.message : err);
+      console.warn(`[reconcile] TMDB backfill failed for "${row.title}":`, err instanceof Error ? err.message : err);
     }
   }
 

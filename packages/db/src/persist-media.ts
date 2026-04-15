@@ -8,6 +8,8 @@ export interface MediaMetadata {
   extras: MediaExtras;
   tvdbSeasons?: NormalizedSeason[];
   tvdbId?: number;
+  /** True when TVDB season fetch was attempted but failed (API error, timeout, etc.) */
+  tvdbFailed?: boolean;
 }
 
 import {
@@ -15,6 +17,7 @@ import {
   episodeTranslation,
   media,
   mediaCredit,
+  mediaFile,
   mediaRecommendation,
   mediaTranslation,
   mediaVideo,
@@ -22,6 +25,9 @@ import {
   season,
   seasonTranslation,
   supportedLanguage,
+  userPlaybackProgress,
+  userRating,
+  userWatchHistory,
 } from "./schema";
 import type { Database } from "./client";
 
@@ -123,9 +129,21 @@ export async function persistMedia(
       productionCountries: normalized.productionCountries,
       metadataUpdatedAt: new Date(),
     })
+    .onConflictDoNothing()
     .returning();
 
-  if (!inserted) throw new Error("Failed to insert media");
+  if (!inserted) {
+    // Concurrent insert won — re-fetch and update instead
+    const conflict = await db.query.media.findFirst({
+      where: and(
+        eq(media.externalId, normalized.externalId),
+        eq(media.provider, normalized.provider),
+        eq(media.type, normalized.type),
+      ),
+    });
+    if (conflict) return updateMediaFromNormalized(db, conflict.id, normalized);
+    throw new Error("Failed to insert media — conflict without existing row");
+  }
 
   await persistSeasons(db, inserted.id, normalized);
   await persistTranslations(db, inserted.id, normalized);
@@ -142,6 +160,19 @@ export async function updateMediaFromNormalized(
   mediaId: string,
   normalized: NormalizedMedia,
 ): Promise<typeof media.$inferSelect> {
+  // Check for TVDB seasons BEFORE the update — when present, preserve
+  // numberOfSeasons/numberOfEpisodes (managed by applyTvdbSeasons instead).
+  // TVDB seasons can have seasonType "official" or "default" depending on the show.
+  const hasTvdbSeasons = normalized.type === "show"
+    ? await db.query.season.findFirst({
+        where: and(
+          eq(season.mediaId, mediaId),
+          inArray(season.seasonType, ["official", "default"]),
+        ),
+        columns: { id: true },
+      })
+    : null;
+
   const [updated] = await db
     .update(media)
     .set({
@@ -170,8 +201,10 @@ export async function updateMediaFromNormalized(
       logoPath: normalized.logoPath,
       imdbId: normalized.imdbId,
       tvdbId: normalized.tvdbId,
-      numberOfSeasons: normalized.numberOfSeasons,
-      numberOfEpisodes: normalized.numberOfEpisodes,
+      ...(hasTvdbSeasons ? {} : {
+        numberOfSeasons: normalized.numberOfSeasons,
+        numberOfEpisodes: normalized.numberOfEpisodes,
+      }),
       inProduction: normalized.inProduction,
       nextAirDate: normalized.nextAirDate || null,
       networks: normalized.networks,
@@ -191,14 +224,8 @@ export async function updateMediaFromNormalized(
   // Upsert seasons + episodes (idempotent — never deletes existing data)
   // Skip if show has TVDB-reconciled seasons (season_type = 'official') to avoid
   // re-adding TMDB's flat season structure on top of TVDB's granular arcs.
-  if (normalized.type === "show" && normalized.seasons) {
-    const hasTvdbSeasons = await db.query.season.findFirst({
-      where: and(eq(season.mediaId, mediaId), eq(season.seasonType, "official")),
-      columns: { id: true },
-    });
-    if (!hasTvdbSeasons) {
-      await upsertSeasons(db, mediaId, normalized);
-    }
+  if (normalized.type === "show" && normalized.seasons && !hasTvdbSeasons) {
+    await upsertSeasons(db, mediaId, normalized);
   }
 
   // Upsert translations
@@ -702,13 +729,92 @@ export async function persistExtras(
   });
 }
 
+// ─── TMDB still image enrichment ────────────────────────────────────────────
+
+/**
+ * Build a flat map of absoluteNumber → TMDB episode stillPath.
+ * TMDB seasons are iterated in order (excluding specials/S0), and each
+ * episode gets a running absolute index starting at 1.
+ */
+export function buildTmdbStillMap(
+  tmdbSeasons: NormalizedSeason[],
+): Map<number, string> {
+  const map = new Map<number, string>();
+  let absCounter = 0;
+  for (const s of tmdbSeasons
+    .filter((s) => s.number > 0)
+    .sort((a, b) => a.number - b.number)) {
+    for (const ep of (s.episodes ?? []).sort((a, b) => a.number - b.number)) {
+      absCounter++;
+      if (ep.stillPath) map.set(absCounter, ep.stillPath);
+    }
+  }
+  return map;
+}
+
+/**
+ * Overlay TMDB still images onto TVDB episodes by matching absoluteNumber.
+ * Only updates stillPath — titles and descriptions stay from TVDB.
+ * Batches updates in chunks to avoid N+1 queries on large shows.
+ */
+export async function overlayTmdbStills(
+  db: Database,
+  mediaId: string,
+  tmdbStillMap: Map<number, string>,
+): Promise<void> {
+  if (tmdbStillMap.size === 0) return;
+
+  const seasons = await db.query.season.findMany({
+    where: eq(season.mediaId, mediaId),
+    with: {
+      episodes: {
+        columns: { id: true, absoluteNumber: true, stillPath: true },
+      },
+    },
+  });
+
+  // Collect all updates needed
+  const updates: Array<{ id: string; stillPath: string }> = [];
+  for (const s of seasons) {
+    for (const ep of s.episodes) {
+      if (ep.absoluteNumber == null) continue;
+      const tmdbStill = tmdbStillMap.get(ep.absoluteNumber);
+      if (tmdbStill && tmdbStill !== ep.stillPath) {
+        updates.push({ id: ep.id, stillPath: tmdbStill });
+      }
+    }
+  }
+
+  if (updates.length === 0) return;
+
+  // Batch update using CASE expression (one query per chunk instead of N queries)
+  for (let i = 0; i < updates.length; i += 500) {
+    const chunk = updates.slice(i, i + 500);
+    const ids = chunk.map((u) => u.id);
+    const caseExpr = sql.join(
+      chunk.map((u) => sql`WHEN ${episode.id} = ${u.id} THEN ${u.stillPath}`),
+      sql` `,
+    );
+    await db
+      .update(episode)
+      .set({ stillPath: sql`CASE ${caseExpr} ELSE ${episode.stillPath} END` })
+      .where(inArray(episode.id, ids));
+  }
+}
+
 // ─── applyTvdbSeasons ───────────────────────────────────────────────────────
 
 /**
  * Apply TVDB season/episode structure to a media item.
- * Saves existing translations, deletes seasons (cascade), persists new TVDB
- * seasons, and restores translations by matching season/episode numbers.
- * Extracted from reconcile-show-structure.ts lines 65-263.
+ *
+ * Strategy: detach → save translations → delete → insert → re-attach → restore.
+ *
+ * Tables with episodeId/seasonId FK (onDelete: cascade) are detached BEFORE
+ * the season delete so rows survive. After new seasons are inserted, FKs are
+ * re-attached using absoluteNumber (preferred) or seasonNumber+episodeNumber.
+ *
+ * Translations (episode_translation, season_translation) don't have a nullable
+ * FK — they're saved in memory and re-inserted after the rebuild.
  */
 export async function applyTvdbSeasons(
   db: Database,
@@ -716,7 +822,7 @@ export async function applyTvdbSeasons(
   tvdbSeasons: NormalizedSeason[],
   normalized: NormalizedMedia,
 ): Promise<void> {
-  // Save existing episode translations before deleting seasons (cascade deletes them)
+  // ── 1. Snapshot existing structure ──
   const existingSeasons = await db.query.season.findMany({
     where: eq(season.mediaId, mediaId),
     with: {
@@ -726,10 +832,21 @@ export async function applyTvdbSeasons(
     },
   });
 
-  const existingEpIds = existingSeasons.flatMap((s) =>
-    s.episodes.map((e) => e.id),
-  );
+  // Build mapping: old episodeId → identity info for re-attachment
+  const epIdentity = new Map<string, { absoluteNumber: number | null; seasonNumber: number; episodeNumber: number }>();
+  for (const s of existingSeasons) {
+    for (const e of s.episodes) {
+      epIdentity.set(e.id, {
+        absoluteNumber: e.absoluteNumber,
+        seasonNumber: s.number,
+        episodeNumber: e.number,
+      });
+    }
+  }
+  const existingEpIds = [...epIdentity.keys()];
+  const existingSeasonIds = existingSeasons.map((s) => s.id);
 
+  // ── 2. Save translations (cascade-deleted, must be saved in memory) ──
   interface SavedEpTranslation {
     absoluteNumber: number | null;
     seasonNumber: number;
@@ -747,27 +864,12 @@ export async function applyTvdbSeasons(
         sql`, `,
       )})`,
     });
-
-    const epInfoById = new Map<
-      string,
-      { absoluteNumber: number | null; seasonNumber: number; number: number }
-    >();
-    for (const s of existingSeasons) {
-      for (const e of s.episodes) {
-        epInfoById.set(e.id, {
-          absoluteNumber: e.absoluteNumber,
-          seasonNumber: s.number,
-          number: e.number,
-        });
-      }
-    }
-
     savedEpTranslations = epTrans.map((t) => {
-      const info = epInfoById.get(t.episodeId);
+      const info = epIdentity.get(t.episodeId);
       return {
         absoluteNumber: info?.absoluteNumber ?? null,
         seasonNumber: info?.seasonNumber ?? 0,
-        episodeNumber: info?.number ?? 0,
+        episodeNumber: info?.episodeNumber ?? 0,
         language: t.language,
         title: t.title,
         overview: t.overview,
@@ -775,8 +877,6 @@ export async function applyTvdbSeasons(
     });
   }
 
-  // Save season translations
-  const existingSeasonIds = existingSeasons.map((s) => s.id);
   interface SavedSeasonTranslation {
     seasonNumber: number;
     language: string;
@@ -792,11 +892,7 @@ export async function applyTvdbSeasons(
         sql`, `,
       )})`,
     });
-
-    const seasonNumberById = new Map(
-      existingSeasons.map((s) => [s.id, s.number]),
-    );
-
+    const seasonNumberById = new Map(existingSeasons.map((s) => [s.id, s.number]));
     savedSeasonTranslations = sTrans.map((t) => ({
       seasonNumber: seasonNumberById.get(t.seasonId) ?? 0,
       language: t.language,
@@ -805,17 +901,64 @@ export async function applyTvdbSeasons(
     }));
   }
 
-  // Delete seasons (cascade deletes episodes + translations)
-  await db.delete(season).where(eq(season.mediaId, mediaId));
+  // ── 3. Detach nullable FKs + save {rowId, oldEpisodeId} for re-attachment ──
+  interface DetachedRow { rowId: string; oldEpisodeId: string }
+  const detachedFiles: DetachedRow[] = [];
+  const detachedPlayback: DetachedRow[] = [];
+  const detachedHistory: DetachedRow[] = [];
+  const detachedRatings: Array<DetachedRow & { oldSeasonId: string | null }> = [];
 
-  // Persist new TVDB seasons — create a synthetic NormalizedMedia for persistSeasons
-  await persistSeasons(db, mediaId, {
-    ...normalized,
-    type: "show",
-    seasons: tvdbSeasons,
+  if (existingEpIds.length > 0) {
+    const epIdIn = sql`IN (${sql.join(existingEpIds.map((id) => sql`${id}`), sql`, `)})`;
+
+    // Save row→episode mapping THEN null out episodeId
+    const fileRows = await db.query.mediaFile.findMany({
+      where: sql`${mediaFile.episodeId} ${epIdIn}`, columns: { id: true, episodeId: true },
+    });
+    for (const r of fileRows) if (r.episodeId) detachedFiles.push({ rowId: r.id, oldEpisodeId: r.episodeId });
+    if (detachedFiles.length > 0) await db.update(mediaFile).set({ episodeId: null }).where(sql`${mediaFile.episodeId} ${epIdIn}`);
+
+    const playbackRows = await db.query.userPlaybackProgress.findMany({
+      where: sql`${userPlaybackProgress.episodeId} ${epIdIn}`, columns: { id: true, episodeId: true },
+    });
+    for (const r of playbackRows) if (r.episodeId) detachedPlayback.push({ rowId: r.id, oldEpisodeId: r.episodeId });
+    if (detachedPlayback.length > 0) await db.update(userPlaybackProgress).set({ episodeId: null }).where(sql`${userPlaybackProgress.episodeId} ${epIdIn}`);
+
+    const historyRows = await db.query.userWatchHistory.findMany({
+      where: sql`${userWatchHistory.episodeId} ${epIdIn}`, columns: { id: true, episodeId: true },
+    });
+    for (const r of historyRows) if (r.episodeId) detachedHistory.push({ rowId: r.id, oldEpisodeId: r.episodeId });
+    if (detachedHistory.length > 0) await db.update(userWatchHistory).set({ episodeId: null }).where(sql`${userWatchHistory.episodeId} ${epIdIn}`);
+
+    const ratingRows = await db.query.userRating.findMany({
+      where: sql`${userRating.episodeId} ${epIdIn}`, columns: { id: true, episodeId: true, seasonId: true },
+    });
+    for (const r of ratingRows) if (r.episodeId) detachedRatings.push({ rowId: r.id, oldEpisodeId: r.episodeId, oldSeasonId: r.seasonId });
+    if (detachedRatings.length > 0) await db.update(userRating).set({ episodeId: null, seasonId: null }).where(sql`${userRating.episodeId} ${epIdIn}`);
+  }
+
+  // Detach season-level ratings too (seasonId cascades)
+  if (existingSeasonIds.length > 0) {
+    const seasonIdIn = sql`IN (${sql.join(existingSeasonIds.map((id) => sql`${id}`), sql`, `)})`;
+    const seasonRatings = await db.query.userRating.findMany({
+      where: and(sql`${userRating.seasonId} ${seasonIdIn}`, sql`${userRating.episodeId} IS NULL`),
+      columns: { id: true, seasonId: true },
+    });
+    for (const r of seasonRatings) if (r.seasonId) detachedRatings.push({ rowId: r.id, oldEpisodeId: "", oldSeasonId: r.seasonId });
+    if (seasonRatings.length > 0) await db.update(userRating).set({ seasonId: null }).where(sql`${userRating.seasonId} ${seasonIdIn}`);
+  }
+
+  // ── 4. Delete seasons + insert new TVDB structure (transaction) ──
+  await db.transaction(async (tx) => {
+    await tx.delete(season).where(eq(season.mediaId, mediaId));
+    await persistSeasons(tx as unknown as Database, mediaId, {
+      ...normalized,
+      type: "show",
+      seasons: tvdbSeasons,
+    });
   });
 
-  // Update season/episode counts
+  // ── 5. Update season/episode counts ──
   const tvdbSeasonCount = tvdbSeasons.filter((s) => s.number > 0).length;
   const tvdbEpisodeCount = tvdbSeasons.reduce(
     (sum, s) => sum + (s.episodes?.length ?? 0),
@@ -823,105 +966,113 @@ export async function applyTvdbSeasons(
   );
   await db
     .update(media)
-    .set({
-      numberOfSeasons: tvdbSeasonCount,
-      numberOfEpisodes: tvdbEpisodeCount,
-      updatedAt: new Date(),
-    })
+    .set({ numberOfSeasons: tvdbSeasonCount, numberOfEpisodes: tvdbEpisodeCount, updatedAt: new Date() })
     .where(eq(media.id, mediaId));
 
-  // Restore saved translations by matching to new seasons/episodes
-  if (savedEpTranslations.length > 0 || savedSeasonTranslations.length > 0) {
-    const newSeasons = await db.query.season.findMany({
-      where: eq(season.mediaId, mediaId),
-      with: {
-        episodes: {
-          columns: { id: true, number: true, absoluteNumber: true },
-        },
-      },
-    });
+  // ── 6. Build new episode lookup for re-attachment ──
+  const newSeasons = await db.query.season.findMany({
+    where: eq(season.mediaId, mediaId),
+    with: {
+      episodes: { columns: { id: true, number: true, absoluteNumber: true } },
+    },
+  });
 
-    // Restore season translations
-    if (savedSeasonTranslations.length > 0) {
-      const seasonIdByNumber = new Map(
-        newSeasons.map((s) => [s.number, s.id]),
-      );
-      const seasonTransRows = savedSeasonTranslations
-        .filter((t) => seasonIdByNumber.has(t.seasonNumber))
-        .map((t) => ({
-          seasonId: seasonIdByNumber.get(t.seasonNumber)!,
-          language: t.language,
-          name: t.name,
-          overview: t.overview,
-        }));
-
-      for (let i = 0; i < seasonTransRows.length; i += 500) {
-        const chunk = seasonTransRows.slice(i, i + 500);
-        await db
-          .insert(seasonTranslation)
-          .values(chunk)
-          .onConflictDoUpdate({
-            target: [seasonTranslation.seasonId, seasonTranslation.language],
-            set: {
-              name: sql`EXCLUDED.name`,
-              overview: sql`EXCLUDED.overview`,
-            },
-          });
-      }
+  const newEpByAbsolute = new Map<number, string>();
+  const newEpBySeasonEp = new Map<string, string>();
+  const newSeasonIdByNumber = new Map<number, string>();
+  for (const s of newSeasons) {
+    newSeasonIdByNumber.set(s.number, s.id);
+    for (const e of s.episodes) {
+      if (e.absoluteNumber != null) newEpByAbsolute.set(e.absoluteNumber, e.id);
+      newEpBySeasonEp.set(`${s.number}-${e.number}`, e.id);
     }
+  }
 
-    // Restore episode translations
-    if (savedEpTranslations.length > 0) {
-      const newEpByAbsolute = new Map<number, string>();
-      const newEpBySeasonEp = new Map<string, string>();
-      for (const s of newSeasons) {
-        for (const e of s.episodes) {
-          if (e.absoluteNumber != null) {
-            newEpByAbsolute.set(e.absoluteNumber, e.id);
-          }
-          newEpBySeasonEp.set(`${s.number}-${e.number}`, e.id);
-        }
-      }
-
-      const epTransRows: Array<{
-        episodeId: string;
-        language: string;
-        title: string | null;
-        overview: string | null;
-      }> = [];
-
-      for (const t of savedEpTranslations) {
-        let newEpId: string | undefined;
-        if (t.absoluteNumber != null) {
-          newEpId = newEpByAbsolute.get(t.absoluteNumber);
-        }
-        if (!newEpId) {
-          newEpId = newEpBySeasonEp.get(`${t.seasonNumber}-${t.episodeNumber}`);
-        }
-        if (newEpId) {
-          epTransRows.push({
-            episodeId: newEpId,
-            language: t.language,
-            title: t.title,
-            overview: t.overview,
-          });
-        }
-      }
-
-      for (let i = 0; i < epTransRows.length; i += 500) {
-        const chunk = epTransRows.slice(i, i + 500);
-        await db
-          .insert(episodeTranslation)
-          .values(chunk)
-          .onConflictDoUpdate({
-            target: [episodeTranslation.episodeId, episodeTranslation.language],
-            set: {
-              title: sql`EXCLUDED.title`,
-              overview: sql`EXCLUDED.overview`,
-            },
-          });
-      }
+  /** Resolve old episodeId to new episodeId via identity mapping */
+  function resolveNewEpId(oldEpId: string): string | undefined {
+    const info = epIdentity.get(oldEpId);
+    if (!info) return undefined;
+    if (info.absoluteNumber != null) {
+      const id = newEpByAbsolute.get(info.absoluteNumber);
+      if (id) return id;
     }
+    return newEpBySeasonEp.get(`${info.seasonNumber}-${info.episodeNumber}`);
+  }
+
+  /** Resolve old seasonId to new seasonId via season number */
+  function resolveNewSeasonId(oldSeasonId: string): string | undefined {
+    const num = existingSeasons.find((s) => s.id === oldSeasonId)?.number;
+    return num != null ? newSeasonIdByNumber.get(num) : undefined;
+  }
+
+  // ── 7. Re-attach detached FKs by row ID ──
+  for (const r of detachedFiles) {
+    const newEpId = resolveNewEpId(r.oldEpisodeId);
+    if (newEpId) await db.update(mediaFile).set({ episodeId: newEpId }).where(eq(mediaFile.id, r.rowId));
+  }
+  for (const r of detachedPlayback) {
+    const newEpId = resolveNewEpId(r.oldEpisodeId);
+    if (newEpId) await db.update(userPlaybackProgress).set({ episodeId: newEpId }).where(eq(userPlaybackProgress.id, r.rowId));
+  }
+  for (const r of detachedHistory) {
+    const newEpId = resolveNewEpId(r.oldEpisodeId);
+    if (newEpId) await db.update(userWatchHistory).set({ episodeId: newEpId }).where(eq(userWatchHistory.id, r.rowId));
+  }
+  for (const r of detachedRatings) {
+    const newEpId = r.oldEpisodeId ? resolveNewEpId(r.oldEpisodeId) : undefined;
+    const newSeasonId = r.oldSeasonId ? resolveNewSeasonId(r.oldSeasonId) : undefined;
+    if (newEpId || newSeasonId) {
+      await db.update(userRating).set({
+        ...(newEpId ? { episodeId: newEpId } : {}),
+        ...(newSeasonId ? { seasonId: newSeasonId } : {}),
+      }).where(eq(userRating.id, r.rowId));
+    }
+  }
+
+  // ── 8. Restore translations ──
+  if (savedSeasonTranslations.length > 0) {
+    const seasonTransRows = savedSeasonTranslations
+      .filter((t) => newSeasonIdByNumber.has(t.seasonNumber))
+      .map((t) => ({
+        seasonId: newSeasonIdByNumber.get(t.seasonNumber)!,
+        language: t.language,
+        name: t.name,
+        overview: t.overview,
+      }));
+    for (let i = 0; i < seasonTransRows.length; i += 500) {
+      await db
+        .insert(seasonTranslation)
+        .values(seasonTransRows.slice(i, i + 500))
+        .onConflictDoUpdate({
+          target: [seasonTranslation.seasonId, seasonTranslation.language],
+          set: { name: sql`EXCLUDED.name`, overview: sql`EXCLUDED.overview` },
+        });
+    }
+  }
+
+  if (savedEpTranslations.length > 0) {
+    const epTransRows: Array<{ episodeId: string; language: string; title: string | null; overview: string | null }> = [];
+    for (const t of savedEpTranslations) {
+      let newEpId: string | undefined;
+      if (t.absoluteNumber != null) newEpId = newEpByAbsolute.get(t.absoluteNumber);
+      if (!newEpId) newEpId = newEpBySeasonEp.get(`${t.seasonNumber}-${t.episodeNumber}`);
+      if (newEpId) epTransRows.push({ episodeId: newEpId, language: t.language, title: t.title, overview: t.overview });
+    }
+    for (let i = 0; i < epTransRows.length; i += 500) {
+      await db
+        .insert(episodeTranslation)
+        .values(epTransRows.slice(i, i + 500))
+        .onConflictDoUpdate({
+          target: [episodeTranslation.episodeId, episodeTranslation.language],
+          set: { title: sql`EXCLUDED.title`, overview: sql`EXCLUDED.overview` },
+        });
+    }
+  }
+
+  // ── 9. Overlay TMDB still images ──
+  if (normalized.seasons) {
+    const tmdbStillMap = buildTmdbStillMap(normalized.seasons);
+    await overlayTmdbStills(db, mediaId, tmdbStillMap);
   }
 }
 
