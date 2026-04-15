@@ -83,8 +83,11 @@ export async function loadExtrasFromDB(db: Database, mediaId: string, lang: stri
     language: (v as { language?: string }).language ?? null,
   }));
 
-  // Prefer user's language; fallback to en + untagged only if nothing matches
-  const userLangVideos = mappedVideos.filter((v) => v.language === langPrefix);
+  // Prefer user's full locale (e.g., "pt-BR"), then 2-letter prefix ("pt"), then en/untagged
+  const exactLangVideos = mappedVideos.filter((v) => v.language === lang);
+  const userLangVideos = exactLangVideos.length > 0
+    ? exactLangVideos
+    : mappedVideos.filter((v) => v.language === langPrefix);
   const finalVideos = userLangVideos.length > 0
     ? userLangVideos
     : mappedVideos.filter((v) => !v.language || v.language === "en");

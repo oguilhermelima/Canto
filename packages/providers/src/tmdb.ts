@@ -131,12 +131,13 @@ export class TmdbProvider implements MetadataProvider {
     this.language = language;
   }
 
-  /** Build include_image_language param: all supported 2-letter codes + en + null */
+  /** Build include_image_language param: full locales + 2-letter fallbacks + en + null */
   private static buildImageLanguageParam(supportedLangs: string[]): string {
     const codes = new Set<string>(["en", "null"]);
     for (const lang of supportedLangs) {
+      codes.add(lang); // full locale (e.g., "pt-BR")
       const short = lang.split("-")[0];
-      if (short) codes.add(short);
+      if (short) codes.add(short); // 2-letter fallback (e.g., "pt")
     }
     return [...codes].join(",");
   }
@@ -221,6 +222,7 @@ export class TmdbProvider implements MetadataProvider {
     const normalized = this.normalizeMovie(data);
     normalized.translations = this.parseTranslations(data);
     this.enrichTranslationsWithImages(normalized.translations, data);
+    await this.enrichTranslationsWithLocalePoster(normalized.translations, `/movie/${movieId}`, supportedLangs);
     return normalized;
   }
 
@@ -238,6 +240,7 @@ export class TmdbProvider implements MetadataProvider {
     const normalized = this.normalizeShow(data);
     normalized.translations = this.parseTranslations(data);
     this.enrichTranslationsWithImages(normalized.translations, data);
+    await this.enrichTranslationsWithLocalePoster(normalized.translations, `/tv/${showId}`, supportedLangs);
 
     // Fetch full season details (including episodes + translations) for each season
     const rawSeasons = (data.seasons ?? []) as Array<{
@@ -969,14 +972,61 @@ export class TmdbProvider implements MetadataProvider {
       }
     }
 
-    // Match to translations by 2-letter prefix (e.g., "pt-BR" → "pt")
+    // Match to translations: try full locale first (e.g., "pt-BR"), then 2-letter fallback ("pt")
     for (const t of translations) {
       const short = t.language.split("-")[0]!;
-      const poster = bestPoster.get(short);
-      const logo = bestLogo.get(short);
+      const poster = bestPoster.get(t.language) ?? bestPoster.get(short);
+      const logo = bestLogo.get(t.language) ?? bestLogo.get(short);
       if (poster) t.posterPath = poster;
       if (logo) t.logoPath = logo;
     }
+  }
+
+  /**
+   * Fetch locale-specific poster_path for translations that share the same 2-letter prefix.
+   * TMDB images only tag with iso_639_1 (2 letters), so pt-BR and pt-PT get the same poster.
+   * This makes a lightweight call per locale to get the correct region-specific poster.
+   */
+  private async enrichTranslationsWithLocalePoster(
+    translations: import("./types").Translation[],
+    endpoint: string,
+    supportedLangs: string[],
+  ): Promise<void> {
+    // Group supported langs by 2-letter prefix to find ambiguous cases (e.g., pt-BR + pt-PT)
+    const byPrefix = new Map<string, string[]>();
+    for (const lang of supportedLangs) {
+      if (lang.startsWith("en")) continue;
+      const prefix = lang.split("-")[0]!;
+      const list = byPrefix.get(prefix) ?? [];
+      list.push(lang);
+      byPrefix.set(prefix, list);
+    }
+
+    // Only fetch for languages where there are multiple regional variants OR it's the system language
+    const langsToFetch = new Set<string>();
+    for (const [, langs] of byPrefix) {
+      if (langs.length > 1) {
+        for (const l of langs) langsToFetch.add(l);
+      }
+    }
+    // Always fetch for the configured system language
+    if (!this.language.startsWith("en")) langsToFetch.add(this.language);
+
+    if (langsToFetch.size === 0) return;
+
+    await Promise.allSettled(
+      [...langsToFetch].map(async (lang) => {
+        const trans = translations.find((t) => t.language === lang);
+        if (!trans) return;
+        try {
+          const data = await this.fetch<Record<string, unknown>>(endpoint, { language: lang });
+          const poster = data.poster_path as string | null;
+          if (poster) trans.posterPath = poster;
+        } catch {
+          // Skip — keep the generic poster from images response
+        }
+      }),
+    );
   }
 
   private normalizeSearchResult(raw: unknown, type: MediaType): SearchResult {
