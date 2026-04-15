@@ -54,11 +54,18 @@ export async function translateEpisodes(
     }),
   );
 
-  // Batch upsert season translations
+  // Dedup + batch upsert season translations
   if (seasonTransRows.length > 0) {
+    const sSeen = new Set<string>();
+    const dedupedSeasonTrans = seasonTransRows.filter((r) => {
+      const key = `${r.seasonId}-${r.language}`;
+      if (sSeen.has(key)) return false;
+      sSeen.add(key);
+      return true;
+    });
     await db
       .insert(seasonTranslation)
-      .values(seasonTransRows)
+      .values(dedupedSeasonTrans)
       .onConflictDoUpdate({
         target: [seasonTranslation.seasonId, seasonTranslation.language],
         set: { name: sql`EXCLUDED.name`, overview: sql`EXCLUDED.overview` },
@@ -83,10 +90,14 @@ export async function translateEpisodes(
 
   // Map TVDB episodes to translation rows
   const epTransRows: Array<{ episodeId: string; language: string; title: string | null; overview: string | null }> = [];
+  const epSeen = new Set<string>();
   for (const ep of localEpisodes) {
     if (!ep.name && !ep.overview) continue;
     const epId = episodeLookup.get(`${ep.seasonNumber}-${ep.number}`);
     if (!epId) continue;
+    const dedupKey = `${epId}-${language}`;
+    if (epSeen.has(dedupKey)) continue;
+    epSeen.add(dedupKey);
     epTransRows.push({
       episodeId: epId,
       language,

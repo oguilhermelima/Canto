@@ -378,6 +378,7 @@ export async function persistTranslations(
 
   // ── Media translations (batch upsert) ──
   if (normalized.translations && normalized.translations.length > 0) {
+    const mTransSeen = new Set<string>();
     const mediaTransRows = normalized.translations
       .filter((t) => !t.language.startsWith("en-") && supported.has(t.language) && (t.title || t.overview))
       .map((t) => ({
@@ -388,7 +389,13 @@ export async function persistTranslations(
         tagline: t.tagline ?? null,
         posterPath: t.posterPath ?? null,
         logoPath: t.logoPath ?? null,
-      }));
+      }))
+      .filter((r) => {
+        const key = `${r.mediaId}-${r.language}`;
+        if (mTransSeen.has(key)) return false;
+        mTransSeen.add(key);
+        return true;
+      });
 
     for (let i = 0; i < mediaTransRows.length; i += 500) {
       await db
@@ -422,6 +429,7 @@ export async function persistTranslations(
 
   // ── Season translations (batch upsert) ──
   if (normalized.seasonTranslations && normalized.seasonTranslations.length > 0) {
+    const sTransSeen = new Set<string>();
     const seasonTransRows = normalized.seasonTranslations
       .filter((t) => {
         if (t.language.startsWith("en-") || !supported.has(t.language)) return false;
@@ -433,7 +441,13 @@ export async function persistTranslations(
         language: t.language,
         name: t.name ?? null,
         overview: t.overview ?? null,
-      }));
+      }))
+      .filter((r) => {
+        const key = `${r.seasonId}-${r.language}`;
+        if (sTransSeen.has(key)) return false;
+        sTransSeen.add(key);
+        return true;
+      });
 
     for (let i = 0; i < seasonTransRows.length; i += 500) {
       await db
@@ -1103,6 +1117,7 @@ export async function applyTvdbSeasons(
 
   // ── 8. Restore translations ──
   if (savedSeasonTranslations.length > 0) {
+    const seasonTransSeen = new Set<string>();
     const seasonTransRows = savedSeasonTranslations
       .filter((t) => newSeasonIdByNumber.has(t.seasonNumber))
       .map((t) => ({
@@ -1110,7 +1125,13 @@ export async function applyTvdbSeasons(
         language: t.language,
         name: t.name,
         overview: t.overview,
-      }));
+      }))
+      .filter((r) => {
+        const key = `${r.seasonId}-${r.language}`;
+        if (seasonTransSeen.has(key)) return false;
+        seasonTransSeen.add(key);
+        return true;
+      });
     for (let i = 0; i < seasonTransRows.length; i += 500) {
       await db
         .insert(seasonTranslation)
@@ -1124,11 +1145,16 @@ export async function applyTvdbSeasons(
 
   if (savedEpTranslations.length > 0) {
     const epTransRows: Array<{ episodeId: string; language: string; title: string | null; overview: string | null }> = [];
+    const epTransSeen = new Set<string>();
     for (const t of savedEpTranslations) {
       let newEpId: string | undefined;
       if (t.absoluteNumber != null) newEpId = newEpByAbsolute.get(t.absoluteNumber);
       if (!newEpId) newEpId = newEpBySeasonEp.get(`${t.seasonNumber}-${t.episodeNumber}`);
-      if (newEpId) epTransRows.push({ episodeId: newEpId, language: t.language, title: t.title, overview: t.overview });
+      if (!newEpId) continue;
+      const dedupKey = `${newEpId}-${t.language}`;
+      if (epTransSeen.has(dedupKey)) continue;
+      epTransSeen.add(dedupKey);
+      epTransRows.push({ episodeId: newEpId, language: t.language, title: t.title, overview: t.overview });
     }
     for (let i = 0; i < epTransRows.length; i += 500) {
       await db
