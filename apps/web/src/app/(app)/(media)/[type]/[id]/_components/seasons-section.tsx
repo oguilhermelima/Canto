@@ -1,6 +1,8 @@
 "use client";
 
+import { useMemo } from "react";
 import { SeasonTabs } from "~/components/media/season-tabs";
+import { trpc } from "~/lib/trpc/client";
 
 interface SeasonEpisode {
   id: string;
@@ -30,21 +32,38 @@ interface SeasonsSectionProps {
     externalId: number;
     seasons: SeasonItem[];
   };
+  mediaId?: string;
   availability: { data?: { episodes?: Record<string, Array<{ type: string; resolution?: string | null }>> } };
   mediaServers: { data?: { jellyfin?: { url: string }; plex?: { url: string } } };
 }
 
 export function SeasonsSection({
   media,
+  mediaId,
   availability,
   mediaServers,
 }: SeasonsSectionProps): React.JSX.Element | null {
   if (media.type !== "show") return null;
 
+  const { data: userRatings } = trpc.userMedia.getRatings.useQuery(
+    { mediaId: mediaId! },
+    { enabled: !!mediaId },
+  );
+
+  const userRatingMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!userRatings) return map;
+    for (const r of userRatings) {
+      if (r.episodeId) map.set(r.episodeId, r.rating);
+    }
+    return map;
+  }, [userRatings]);
+
   return (
     <div id="seasons-section">
       <SeasonTabs
         showExternalId={String(media.externalId)}
+        userRatings={userRatingMap}
         seasons={media.seasons.map((s) => ({
           id: s.id,
           seasonNumber: s.number,

@@ -15,6 +15,7 @@ import { AdminActions } from "./admin-actions";
 import { RequestSection } from "./request-section";
 import { VideoCarouselSection } from "./video-carousel";
 import { SeasonsSection } from "./seasons-section";
+import { MediaReviewSection } from "./media-review-section";
 import { RemoveDialog } from "./remove-dialog";
 
 interface MediaDetailContentProps {
@@ -154,14 +155,24 @@ export function MediaDetailContent({
             isLoading={detail.extras.isLoading}
           />
 
-          <div className="flex flex-col gap-12 px-4 md:gap-16 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-            {/* Seasons (TV Shows) — browse only */}
-            <SeasonsSection
-              media={media}
-              availability={detail.availability}
-              mediaServers={detail.mediaServers}
+          {/* Reviews */}
+          {detail.mediaId && (
+            <MediaReviewSection
+              mediaId={detail.mediaId}
+              showExternalId={id}
+              mediaType={mediaType}
             />
+          )}
 
+          {/* Seasons (TV Shows) — edge-to-edge scroll like Videos */}
+          <SeasonsSection
+            media={media}
+            mediaId={detail.mediaId}
+            availability={detail.availability}
+            mediaServers={detail.mediaServers}
+          />
+
+          <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
             {/* Cast */}
             <div className="animate-in fade-in-0 duration-500">
               <CastSection

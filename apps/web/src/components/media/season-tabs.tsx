@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useMemo } from "react";
+import Link from "next/link";
 import { cn } from "@canto/ui/cn";
-import { ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clapperboard } from "lucide-react";
+import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
 import { EpisodeCard } from "./episode-card";
 import type { Episode, EpisodeDownloadInfo } from "./episode-card";
 
@@ -19,13 +21,10 @@ interface Season {
 
 interface SeasonTabsProps {
   seasons: Season[];
-  /** External ID of the show (for episode links) */
   showExternalId: string;
-  /** Map of episode ID -> download info for showing status indicators */
+  userRatings?: Map<string, number>;
   downloadedEpisodes?: Map<string, EpisodeDownloadInfo>;
-  /** Episode availability from servers: key = "S01E05" -> [{ type, resolution }] */
   episodeAvailability?: Record<string, Array<{ type: string; resolution?: string | null }>>;
-  /** Server links for "Watch on" buttons */
   serverLinks?: { jellyfin?: { url: string }; plex?: { url: string } };
   className?: string;
 }
@@ -33,6 +32,7 @@ interface SeasonTabsProps {
 export function SeasonTabs({
   seasons,
   showExternalId,
+  userRatings,
   downloadedEpisodes,
   episodeAvailability,
   serverLinks,
@@ -43,7 +43,6 @@ export function SeasonTabs({
       [...seasons]
         .filter((s) => (s.episodes?.length ?? 0) > 0)
         .sort((a, b) => {
-          // Specials (season 0) always last
           if (a.seasonNumber === 0 && b.seasonNumber !== 0) return 1;
           if (b.seasonNumber === 0 && a.seasonNumber !== 0) return -1;
           return a.seasonNumber - b.seasonNumber;
@@ -51,39 +50,25 @@ export function SeasonTabs({
     [seasons],
   );
 
-  const [expandedSeasons, setExpandedSeasons] = useState<Set<string>>(
-    new Set(),
-  );
-
-  const toggleExpand = useCallback((seasonId: string) => {
-    setExpandedSeasons((prev) => {
-      const next = new Set(prev);
-      if (next.has(seasonId)) next.delete(seasonId);
-      else next.add(seasonId);
-      return next;
-    });
-  }, []);
-
   if (filteredSeasons.length === 0) return <></>;
 
   return (
     <section className={cn("relative", className)}>
-      {/* Title */}
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-xl font-semibold tracking-tight">Seasons</h2>
-      </div>
+      <h2 className="mb-4 flex items-center gap-2 pl-4 text-base font-semibold text-foreground md:pl-8 md:text-xl lg:pl-12 xl:pl-16 2xl:pl-24">
+        <Clapperboard size={18} className="text-muted-foreground" />
+        Seasons
+      </h2>
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-5">
         {filteredSeasons.map((season) => (
           <SeasonBlock
             key={season.id}
             season={season}
             showExternalId={showExternalId}
-            isExpanded={expandedSeasons.has(season.id)}
+            userRatings={userRatings}
             downloadedEpisodes={downloadedEpisodes}
             episodeAvailability={episodeAvailability}
             serverLinks={serverLinks}
-            onToggleExpand={() => toggleExpand(season.id)}
           />
         ))}
       </div>
@@ -91,24 +76,22 @@ export function SeasonTabs({
   );
 }
 
-/* ─── Season Block ─── */
+/* ─── Season Block (always expanded) ─── */
 
 function SeasonBlock({
   season,
   showExternalId,
-  isExpanded,
+  userRatings,
   downloadedEpisodes,
   episodeAvailability,
   serverLinks,
-  onToggleExpand,
 }: {
   season: Season;
   showExternalId: string;
-  isExpanded: boolean;
+  userRatings?: Map<string, number>;
   downloadedEpisodes?: Map<string, EpisodeDownloadInfo>;
   episodeAvailability?: Record<string, Array<{ type: string; resolution?: string | null }>>;
   serverLinks?: { jellyfin?: { url: string }; plex?: { url: string } };
-  onToggleExpand: () => void;
 }): React.JSX.Element {
   const episodes = useMemo(
     () =>
@@ -118,7 +101,6 @@ function SeasonBlock({
     [season.episodes],
   );
 
-  // Count available episodes per server
   const jellyfinEpCount = episodeAvailability
     ? episodes.filter((ep) => {
         const key = `S${String(season.seasonNumber).padStart(2, "0")}E${String(ep.episodeNumber).padStart(2, "0")}`;
@@ -146,24 +128,13 @@ function SeasonBlock({
         "",
       ) || rawTitle;
 
+  const seasonHref = `/shows/${showExternalId}/season/${season.seasonNumber}`;
+
   return (
-    <div className="rounded-xl bg-card p-1">
+    <div>
       {/* Header */}
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onToggleExpand}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggleExpand(); } }}
-        className="flex cursor-pointer items-center gap-2 px-3 py-3 sm:gap-3 sm:px-4"
-      >
-        <ChevronRight
-          size={20}
-          className={cn(
-            "shrink-0 text-muted-foreground/50 transition-transform duration-200",
-            isExpanded && "rotate-90",
-          )}
-        />
-        <div className="min-w-0 flex-1">
+      <div className="mb-3 flex items-center gap-3 pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+        <Link href={seasonHref} className="min-w-0 flex-1 group">
           <h3 className="truncate text-sm font-bold leading-tight sm:text-base">
             {isSpecials ? (
               <span>{seasonTitle}</span>
@@ -171,11 +142,11 @@ function SeasonBlock({
               <>
                 <span>S{sNum}</span>
                 <span className="mx-1.5 text-muted-foreground sm:mx-2">|</span>
-                <span>{seasonTitle}</span>
+                <span className="group-hover:underline">{seasonTitle}</span>
               </>
             )}
           </h3>
-          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground sm:text-sm">
+          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
             <span>{epCount} episodes</span>
             {year && (
               <>
@@ -184,9 +155,10 @@ function SeasonBlock({
               </>
             )}
           </div>
-        </div>
-        <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-          {/* Server availability badges */}
+        </Link>
+
+        <div className="flex items-center gap-2.5">
+          {/* Server badges */}
           {jellyfinEpCount > 0 && serverLinks?.jellyfin && (() => {
             const fullyAvailable = jellyfinEpCount >= epCount;
             const label = fullyAvailable
@@ -198,7 +170,6 @@ function SeasonBlock({
                 target="_blank"
                 rel="noopener noreferrer"
                 title={label}
-                aria-label={label}
                 className="hidden h-7 w-7 items-center justify-center rounded-lg border border-[#a95ce0]/20 bg-gradient-to-r from-[#a95ce0]/10 to-[#4bb8e8]/10 transition-colors hover:from-[#a95ce0]/20 hover:to-[#4bb8e8]/20 sm:flex"
               >
                 <span
@@ -223,7 +194,6 @@ function SeasonBlock({
                 target="_blank"
                 rel="noopener noreferrer"
                 title={label}
-                aria-label={label}
                 className="hidden h-7 w-7 items-center justify-center rounded-lg border border-[#e5a00d]/20 bg-[#e5a00d]/10 transition-colors hover:bg-[#e5a00d]/20 sm:flex"
               >
                 <span
@@ -236,40 +206,99 @@ function SeasonBlock({
               </a>
             );
           })()}
+
+          {/* See more link */}
+          <Link
+            href={seasonHref}
+            className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <span className="hidden sm:inline">See more</span>
+            <ChevronRight className="h-4 w-4" />
+          </Link>
         </div>
       </div>
 
-      {/* Collapsible episodes */}
-      <div
-        className={cn(
-          "overflow-hidden transition-all duration-300 ease-in-out",
-          isExpanded ? "max-h-[5000px] opacity-100" : "max-h-0 opacity-0",
-        )}
-      >
-        {episodes.length > 0 && (
-          <div className="flex gap-3 overflow-x-auto px-3 pb-3 scrollbar-none sm:gap-4 sm:px-4">
-            {episodes.map((ep) => (
-              <EpisodeCard
-                key={ep.id}
-                episode={ep}
-                seasonNumber={season.seasonNumber}
-                showExternalId={showExternalId}
-                downloadInfo={downloadedEpisodes?.get(ep.id)}
-                serverAvailability={episodeAvailability?.[
-                  `S${String(season.seasonNumber).padStart(2, "0")}E${String(ep.episodeNumber).padStart(2, "0")}`
-                ]}
-              />
-            ))}
+      {/* Episodes — always visible */}
+      {episodes.length > 0 ? (
+        <EpisodeScrollGrid
+          episodes={episodes}
+          seasonNumber={season.seasonNumber}
+          showExternalId={showExternalId}
+          userRatings={userRatings}
+          downloadedEpisodes={downloadedEpisodes}
+          episodeAvailability={episodeAvailability}
+        />
+      ) : (
+        <div className="pl-4 pr-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+          <div className="flex items-center justify-center rounded-xl border border-dashed border-border/30 py-10 text-xs text-muted-foreground/30">
+            No episodes available
           </div>
-        )}
+        </div>
+      )}
+    </div>
+  );
+}
 
-        {episodes.length === 0 && (
-          <div className="px-4 pb-4">
-            <div className="flex items-center justify-center rounded-xl border border-dashed border-border/30 py-10 text-xs text-muted-foreground/30">
-              No episodes available
-            </div>
-          </div>
-        )}
+/* ─── Episode Scroll Grid with Arrows ─── */
+
+function EpisodeScrollGrid({
+  episodes,
+  seasonNumber,
+  showExternalId,
+  userRatings,
+  downloadedEpisodes,
+  episodeAvailability,
+}: {
+  episodes: Episode[];
+  seasonNumber: number;
+  showExternalId: string;
+  userRatings?: Map<string, number>;
+  downloadedEpisodes?: Map<string, EpisodeDownloadInfo>;
+  episodeAvailability?: Record<string, Array<{ type: string; resolution?: string | null }>>;
+}): React.JSX.Element {
+  const { containerRef, canScrollLeft, canScrollRight, scrollLeft, scrollRight, handleScroll } =
+    useScrollCarousel();
+
+  return (
+    <div className="group/episodes relative">
+      {canScrollLeft && (
+        <button
+          aria-label="Scroll left"
+          className="absolute left-0 top-0 z-20 hidden h-full w-14 items-center justify-center bg-gradient-to-r from-background from-30% to-transparent text-foreground opacity-0 transition-opacity group-hover/episodes:opacity-100 md:flex"
+          onClick={scrollLeft}
+        >
+          <ChevronLeft size={22} />
+        </button>
+      )}
+
+      {canScrollRight && (
+        <button
+          aria-label="Scroll right"
+          className="absolute right-0 top-0 z-20 hidden h-full w-14 items-center justify-center bg-gradient-to-l from-background from-30% to-transparent text-foreground opacity-0 transition-opacity group-hover/episodes:opacity-100 md:flex"
+          onClick={scrollRight}
+        >
+          <ChevronRight size={22} />
+        </button>
+      )}
+
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="flex gap-4 overflow-x-auto pb-2 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
+      >
+        {episodes.map((ep) => (
+          <EpisodeCard
+            key={ep.id}
+            episode={ep}
+            seasonNumber={seasonNumber}
+            showExternalId={showExternalId}
+            userRating={userRatings?.get(ep.id)}
+            downloadInfo={downloadedEpisodes?.get(ep.id)}
+            serverAvailability={episodeAvailability?.[
+              `S${String(seasonNumber).padStart(2, "0")}E${String(ep.episodeNumber).padStart(2, "0")}`
+            ]}
+          />
+        ))}
       </div>
     </div>
   );
