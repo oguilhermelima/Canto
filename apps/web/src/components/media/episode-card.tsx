@@ -24,14 +24,18 @@ export function EpisodeCard({
   episode,
   seasonNumber,
   showExternalId,
+  userRating,
   downloadInfo,
   serverAvailability,
+  className,
 }: {
   episode: Episode;
   seasonNumber: number;
   showExternalId: string;
+  userRating?: number;
   downloadInfo?: EpisodeDownloadInfo;
   serverAvailability?: Array<{ type: string; resolution?: string | null }>;
+  className?: string;
 }): React.JSX.Element {
   const num = String(episode.episodeNumber).padStart(2, "0");
   const isFuture =
@@ -49,6 +53,7 @@ export function EpisodeCard({
         "group flex w-[260px] shrink-0 flex-col overflow-hidden rounded-xl bg-background/50 transition-colors sm:w-[280px]",
         isFuture && "pointer-events-none opacity-40",
         !isFuture && "hover:bg-muted/40",
+        className,
       )}
     >
       {/* Thumbnail */}
@@ -71,13 +76,21 @@ export function EpisodeCard({
           </div>
         )}
 
-        {/* Rating badge — top left */}
-        {episode.voteAverage != null && episode.voteAverage > 0 && (
-          <div className="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-xs font-medium text-yellow-500 backdrop-blur-sm">
-            <Star size={10} className="fill-current" />
-            {episode.voteAverage.toFixed(1)}
-          </div>
-        )}
+        {/* Rating badges — top left */}
+        <div className="absolute left-1.5 top-1.5 flex flex-col gap-1">
+          {episode.voteAverage != null && episode.voteAverage > 0 && (
+            <div className="flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-xs font-medium text-yellow-500 backdrop-blur-sm">
+              <Star size={10} className="fill-current" />
+              {episode.voteAverage.toFixed(1)}
+            </div>
+          )}
+          {userRating != null && (
+            <div className="flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-xs font-medium text-blue-400 backdrop-blur-sm">
+              <Star size={10} className="fill-current" />
+              {userRating}
+            </div>
+          )}
+        </div>
 
         {/* Runtime badge — bottom right */}
         {episode.runtime != null && episode.runtime > 0 && (

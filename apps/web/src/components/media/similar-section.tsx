@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@canto/ui/cn";
+import { Sparkles, Shapes } from "lucide-react";
 import { MediaCarousel } from "./media-carousel";
 
 interface MediaItem {
@@ -39,6 +40,7 @@ export function SimilarSection({
       {hasRecommendations && (
         <MediaCarousel
           title="Recommended"
+          icon={Sparkles}
           items={recommendations}
           isLoading={isLoading}
         />
@@ -47,6 +49,7 @@ export function SimilarSection({
       {hasSimilar && (
         <MediaCarousel
           title="Similar"
+          icon={Shapes}
           items={similar}
           isLoading={isLoading}
         />

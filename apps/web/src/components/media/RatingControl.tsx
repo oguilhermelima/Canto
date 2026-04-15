@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Star } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { trpc } from "~/lib/trpc/client";
@@ -16,16 +16,23 @@ export function RatingControl({
 }: RatingControlProps): React.JSX.Element {
   const utils = trpc.useUtils();
   const [hoverRating, setHoverRating] = useState<number | null>(null);
+  const [selectedRating, setSelectedRating] = useState<number>(initialRating ?? 0);
+
+  // Sync when prop changes (e.g. after refetch)
+  useEffect(() => {
+    setSelectedRating(initialRating ?? 0);
+  }, [initialRating]);
+
   const rateMutation = trpc.userMedia.rate.useMutation({
     onSuccess: () => {
       void utils.userMedia.getState.invalidate({ mediaId });
     },
   });
 
-  const rating = initialRating ?? 0;
-  const currentDisplayRating = hoverRating ?? rating;
+  const currentDisplayRating = hoverRating ?? selectedRating;
 
   const handleRate = (value: number) => {
+    setSelectedRating(value);
     rateMutation.mutate({ mediaId, rating: value });
   };
 
@@ -55,9 +62,9 @@ export function RatingControl({
           </button>
         );
       })}
-      {rating > 0 && (
+      {selectedRating > 0 && (
         <span className="ml-2 text-sm font-medium text-foreground/60">
-          {rating}/10
+          {selectedRating}/10
         </span>
       )}
     </div>

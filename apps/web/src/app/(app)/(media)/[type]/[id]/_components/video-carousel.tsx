@@ -2,7 +2,7 @@
 
 import { useRef, useState, useCallback } from "react";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight, CirclePlay, Play } from "lucide-react";
 import { Skeleton } from "@canto/ui/skeleton";
 
 interface Video {
@@ -43,7 +43,8 @@ export function VideoCarousel({
 
   return (
     <section className="relative">
-      <h2 className="mb-4 pl-4 text-base font-semibold text-foreground md:text-xl md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+      <h2 className="mb-4 flex items-center gap-2 pl-4 text-base font-semibold text-foreground md:text-xl md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+        <CirclePlay size={18} className="text-muted-foreground" />
         Videos
       </h2>
       <div className="group/carousel relative">

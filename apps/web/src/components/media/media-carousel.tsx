@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { cn } from "@canto/ui/cn";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { SectionTitle } from "~/components/layout/section-title";
 import { MediaCard, MediaCardSkeleton } from "./media-card";
 import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
@@ -22,6 +23,7 @@ interface MediaItem {
 
 interface MediaCarouselProps {
   title: string;
+  icon?: LucideIcon;
   seeAllHref?: string;
   titleAction?: React.ReactNode;
   items: MediaItem[];
@@ -35,6 +37,7 @@ interface MediaCarouselProps {
 
 export function MediaCarousel({
   title,
+  icon,
   seeAllHref,
   titleAction,
   items,
@@ -72,7 +75,7 @@ export function MediaCarousel({
 
   return (
     <section className={cn("relative", className)}>
-      <SectionTitle title={title} seeMorePath={seeAllHref} action={titleAction} />
+      <SectionTitle title={title} icon={icon} seeMorePath={seeAllHref} action={titleAction} />
 
       {/* Scroll container */}
       <div className="group/carousel relative">

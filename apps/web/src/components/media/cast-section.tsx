@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { FadeImage } from "~/components/ui/fade-image";
 import Link from "next/link";
 import { Skeleton } from "@canto/ui/skeleton";
-import { User, ChevronDown } from "lucide-react";
+import { User, Users, ChevronDown } from "lucide-react";
 
 interface CastMember {
   id: string;
@@ -54,7 +54,10 @@ export function CastSection({
   return (
     <section className={className}>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-base font-semibold text-foreground md:text-xl">Cast</h2>
+        <h2 className="flex items-center gap-2 text-base font-semibold text-foreground md:text-xl">
+          <Users size={18} className="text-muted-foreground" />
+          Cast
+        </h2>
         {hasMore && (
           <button
             type="button"
