@@ -29,6 +29,7 @@ export interface NormalizedSeason {
   posterPath?: string;
   episodeCount?: number;
   seasonType?: string;
+  voteAverage?: number;
   episodes?: NormalizedEpisode[];
 }
 
@@ -41,8 +42,12 @@ export interface NormalizedEpisode {
   runtime?: number;
   stillPath?: string;
   voteAverage?: number;
+  voteCount?: number;
   absoluteNumber?: number;
   finaleType?: string;
+  episodeType?: string;
+  crew?: Array<{ name: string; job: string; department?: string; profilePath?: string }>;
+  guestStars?: Array<{ name: string; character?: string; profilePath?: string }>;
 }
 
 export interface Translation {

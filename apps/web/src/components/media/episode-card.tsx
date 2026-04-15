@@ -12,6 +12,8 @@ export interface Episode {
   airDate?: string | null;
   runtime?: number | null;
   voteAverage?: number | null;
+  finaleType?: string | null;
+  episodeType?: string | null;
 }
 
 export interface EpisodeDownloadInfo {
@@ -91,6 +93,13 @@ export function EpisodeCard({
             </div>
           )}
         </div>
+
+        {/* Finale badge — bottom left */}
+        {(episode.finaleType === "series" || episode.finaleType === "season" || episode.episodeType === "finale") && (
+          <div className="absolute bottom-1.5 left-1.5 rounded-md bg-amber-500/90 px-1.5 py-0.5 text-xs font-bold text-black backdrop-blur-sm">
+            {episode.finaleType === "series" ? "Series Finale" : "Finale"}
+          </div>
+        )}
 
         {/* Runtime badge — bottom right */}
         {episode.runtime != null && episode.runtime > 0 && (

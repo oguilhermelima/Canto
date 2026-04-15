@@ -254,6 +254,7 @@ export async function persistSeasons(
         posterPath: s.posterPath,
         episodeCount: s.episodeCount,
         seasonType: s.seasonType,
+        voteAverage: s.voteAverage,
       })
       .returning();
 
@@ -269,8 +270,12 @@ export async function persistSeasons(
           runtime: ep.runtime,
           stillPath: ep.stillPath,
           voteAverage: ep.voteAverage,
+          voteCount: ep.voteCount,
           absoluteNumber: ep.absoluteNumber,
           finaleType: ep.finaleType,
+          episodeType: ep.episodeType,
+          crew: ep.crew,
+          guestStars: ep.guestStars,
         })),
       );
     }
@@ -303,6 +308,7 @@ async function upsertSeasons(
         posterPath: s.posterPath,
         episodeCount: s.episodeCount,
         seasonType: s.seasonType,
+        voteAverage: s.voteAverage,
       })
       .onConflictDoUpdate({
         target: [season.mediaId, season.number],
@@ -314,6 +320,7 @@ async function upsertSeasons(
           posterPath: sql`COALESCE(EXCLUDED.poster_path, ${season.posterPath})`,
           episodeCount: sql`EXCLUDED.episode_count`,
           seasonType: sql`EXCLUDED.season_type`,
+          voteAverage: sql`COALESCE(EXCLUDED.vote_average, ${season.voteAverage})`,
         },
       })
       .returning();
@@ -332,8 +339,12 @@ async function upsertSeasons(
             runtime: ep.runtime,
             stillPath: ep.stillPath,
             voteAverage: ep.voteAverage,
+            voteCount: ep.voteCount,
             absoluteNumber: ep.absoluteNumber,
             finaleType: ep.finaleType,
+            episodeType: ep.episodeType,
+            crew: ep.crew,
+            guestStars: ep.guestStars,
           })
           .onConflictDoUpdate({
             target: [episode.seasonId, episode.number],
@@ -344,9 +355,13 @@ async function upsertSeasons(
               airDate: sql`EXCLUDED.air_date`,
               runtime: sql`EXCLUDED.runtime`,
               stillPath: sql`COALESCE(EXCLUDED.still_path, ${episode.stillPath})`,
-              voteAverage: sql`EXCLUDED.vote_average`,
+              voteAverage: sql`COALESCE(EXCLUDED.vote_average, ${episode.voteAverage})`,
+              voteCount: sql`COALESCE(EXCLUDED.vote_count, ${episode.voteCount})`,
               absoluteNumber: sql`EXCLUDED.absolute_number`,
               finaleType: sql`EXCLUDED.finale_type`,
+              episodeType: sql`EXCLUDED.episode_type`,
+              crew: sql`COALESCE(EXCLUDED.crew, ${episode.crew})`,
+              guestStars: sql`COALESCE(EXCLUDED.guest_stars, ${episode.guestStars})`,
             },
           });
       }
@@ -729,76 +744,124 @@ export async function persistExtras(
   });
 }
 
-// ─── TMDB still image enrichment ────────────────────────────────────────────
+// ─── TMDB episode/season enrichment ─────────────────────────────────────────
+
+interface TmdbEpisodeData {
+  stillPath?: string;
+  voteAverage?: number;
+  voteCount?: number;
+  episodeType?: string;
+  crew?: Array<{ name: string; job: string; department?: string; profilePath?: string }>;
+  guestStars?: Array<{ name: string; character?: string; profilePath?: string }>;
+}
 
 /**
- * Build a flat map of absoluteNumber → TMDB episode stillPath.
+ * Build a flat map of absoluteNumber → TMDB episode data.
  * TMDB seasons are iterated in order (excluding specials/S0), and each
  * episode gets a running absolute index starting at 1.
  */
-export function buildTmdbStillMap(
+export function buildTmdbEpisodeMap(
   tmdbSeasons: NormalizedSeason[],
-): Map<number, string> {
-  const map = new Map<number, string>();
+): Map<number, TmdbEpisodeData> {
+  const map = new Map<number, TmdbEpisodeData>();
   let absCounter = 0;
   for (const s of tmdbSeasons
     .filter((s) => s.number > 0)
     .sort((a, b) => a.number - b.number)) {
     for (const ep of (s.episodes ?? []).sort((a, b) => a.number - b.number)) {
       absCounter++;
-      if (ep.stillPath) map.set(absCounter, ep.stillPath);
+      map.set(absCounter, {
+        stillPath: ep.stillPath,
+        voteAverage: ep.voteAverage,
+        voteCount: ep.voteCount,
+        episodeType: ep.episodeType,
+        crew: ep.crew,
+        guestStars: ep.guestStars,
+      });
     }
   }
   return map;
 }
 
+
 /**
- * Overlay TMDB still images onto TVDB episodes by matching absoluteNumber.
- * Only updates stillPath — titles and descriptions stay from TVDB.
- * Batches updates in chunks to avoid N+1 queries on large shows.
+ * Overlay TMDB data onto TVDB episodes by matching absoluteNumber.
+ * Updates: stillPath, voteAverage, voteCount, episodeType, crew, guestStars.
+ * Titles and descriptions stay from TVDB.
  */
-export async function overlayTmdbStills(
+export async function overlayTmdbEpisodeData(
   db: Database,
   mediaId: string,
-  tmdbStillMap: Map<number, string>,
+  tmdbEpMap: Map<number, TmdbEpisodeData>,
 ): Promise<void> {
-  if (tmdbStillMap.size === 0) return;
+  if (tmdbEpMap.size === 0) return;
 
   const seasons = await db.query.season.findMany({
     where: eq(season.mediaId, mediaId),
     with: {
       episodes: {
-        columns: { id: true, absoluteNumber: true, stillPath: true },
+        columns: { id: true, absoluteNumber: true },
       },
     },
   });
 
-  // Collect all updates needed
-  const updates: Array<{ id: string; stillPath: string }> = [];
+  // Collect updates per episode
+  const updates: Array<{ id: string; data: TmdbEpisodeData }> = [];
   for (const s of seasons) {
     for (const ep of s.episodes) {
       if (ep.absoluteNumber == null) continue;
-      const tmdbStill = tmdbStillMap.get(ep.absoluteNumber);
-      if (tmdbStill && tmdbStill !== ep.stillPath) {
-        updates.push({ id: ep.id, stillPath: tmdbStill });
-      }
+      const tmdb = tmdbEpMap.get(ep.absoluteNumber);
+      if (tmdb) updates.push({ id: ep.id, data: tmdb });
     }
   }
 
   if (updates.length === 0) return;
 
-  // Batch update using CASE expression (one query per chunk instead of N queries)
-  for (let i = 0; i < updates.length; i += 500) {
-    const chunk = updates.slice(i, i + 500);
-    const ids = chunk.map((u) => u.id);
-    const caseExpr = sql.join(
-      chunk.map((u) => sql`WHEN ${episode.id} = ${u.id} THEN ${u.stillPath}`),
-      sql` `,
-    );
+  // Update per row (crew/guestStars are JSONB, can't use CASE easily)
+  for (const u of updates) {
     await db
       .update(episode)
-      .set({ stillPath: sql`CASE ${caseExpr} ELSE ${episode.stillPath} END` })
-      .where(inArray(episode.id, ids));
+      .set({
+        ...(u.data.stillPath ? { stillPath: u.data.stillPath } : {}),
+        ...(u.data.voteAverage != null ? { voteAverage: u.data.voteAverage } : {}),
+        ...(u.data.voteCount != null ? { voteCount: u.data.voteCount } : {}),
+        ...(u.data.episodeType ? { episodeType: u.data.episodeType } : {}),
+        ...(u.data.crew ? { crew: u.data.crew } : {}),
+        ...(u.data.guestStars ? { guestStars: u.data.guestStars } : {}),
+      })
+      .where(eq(episode.id, u.id));
+  }
+}
+
+/**
+ * Overlay TMDB voteAverage onto TVDB seasons.
+ * Uses season number matching (TMDB S1 voteAverage → TVDB seasons).
+ * For anime with split seasons (TVDB S1-S17 vs TMDB S1-S2), only
+ * TMDB S1 and S2 can match by number. Others keep null.
+ */
+export async function overlayTmdbSeasonData(
+  db: Database,
+  mediaId: string,
+  tmdbSeasons: NormalizedSeason[],
+): Promise<void> {
+  const tmdbSeasonByNumber = new Map(
+    tmdbSeasons.filter((s) => s.number > 0).map((s) => [s.number, s]),
+  );
+  if (tmdbSeasonByNumber.size === 0) return;
+
+  const dbSeasons = await db.query.season.findMany({
+    where: eq(season.mediaId, mediaId),
+    columns: { id: true, number: true },
+  });
+
+  for (const s of dbSeasons) {
+    const tmdb = tmdbSeasonByNumber.get(s.number);
+    if (tmdb?.voteAverage != null) {
+      await db
+        .update(season)
+        .set({ voteAverage: tmdb.voteAverage })
+        .where(eq(season.id, s.id));
+    }
   }
 }
 
@@ -1071,8 +1134,9 @@ export async function applyTvdbSeasons(
 
   // ── 9. Overlay TMDB still images ──
   if (normalized.seasons) {
-    const tmdbStillMap = buildTmdbStillMap(normalized.seasons);
-    await overlayTmdbStills(db, mediaId, tmdbStillMap);
+    const tmdbEpMap = buildTmdbEpisodeMap(normalized.seasons);
+    await overlayTmdbEpisodeData(db, mediaId, tmdbEpMap);
+    await overlayTmdbSeasonData(db, mediaId, normalized.seasons);
   }
 }
 

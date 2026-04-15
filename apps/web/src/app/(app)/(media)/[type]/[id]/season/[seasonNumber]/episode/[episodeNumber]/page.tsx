@@ -191,6 +191,16 @@ export default function EpisodeDetailPage(): React.JSX.Element {
           </p>
         )}
 
+        {/* Guest Stars */}
+        {(episode as any).guestStars?.length > 0 && (
+          <EpisodeCreditsSection title="Guest Stars" people={(episode as any).guestStars} showCharacter />
+        )}
+
+        {/* Crew */}
+        {(episode as any).crew?.length > 0 && (
+          <EpisodeCreditsSection title="Crew" people={(episode as any).crew} />
+        )}
+
         {/* Your Review + Community Reviews */}
         {episode.id && mediaId && season?.id && (
           <EpisodeReviewsSection
@@ -250,7 +260,7 @@ function EpisodeInfo({
   seasonNum,
   variant,
 }: {
-  episode: { title: string | null; airDate?: string | null; runtime?: number | null; voteAverage?: number | null; number: number };
+  episode: { title: string | null; airDate?: string | null; runtime?: number | null; voteAverage?: number | null; number: number; finaleType?: string | null; episodeType?: string | null };
   sNum: string;
   eNum: string;
   seasonNum: number;
@@ -294,6 +304,11 @@ function EpisodeInfo({
             <span>{episode.voteAverage.toFixed(1)}</span>
             <span className={isHero ? "text-white/40" : "text-muted-foreground/50"}>TMDB</span>
           </div>
+        )}
+        {(episode.finaleType === "series" || episode.finaleType === "season" || episode.episodeType === "finale") && (
+          <span className="rounded-md bg-amber-500/90 px-2 py-0.5 text-xs font-bold text-black">
+            {episode.finaleType === "series" ? "Series Finale" : "Finale"}
+          </span>
         )}
       </div>
     </>
@@ -629,6 +644,52 @@ function ReviewCardStyled({
           {comment}
         </p>
       )}
+    </div>
+  );
+}
+
+/* ─── Episode Credits Section (Crew / Guest Stars) ─── */
+
+function EpisodeCreditsSection({
+  title,
+  people,
+  showCharacter,
+}: {
+  title: string;
+  people: Array<{ name: string; job?: string; character?: string; department?: string; profilePath?: string | null }>;
+  showCharacter?: boolean;
+}): React.JSX.Element {
+  return (
+    <div className="mt-8">
+      <h3 className="mb-4 text-lg font-bold">{title}</h3>
+      <div className="flex flex-wrap gap-3">
+        {people.map((person, i) => (
+          <div
+            key={`${person.name}-${i}`}
+            className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2"
+          >
+            {person.profilePath ? (
+              <Image
+                src={`https://image.tmdb.org/t/p/w92${person.profilePath}`}
+                alt={person.name}
+                width={36}
+                height={36}
+                className="h-9 w-9 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                {person.name.charAt(0)}
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="text-sm font-medium leading-tight">{person.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {showCharacter ? person.character : person.job}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

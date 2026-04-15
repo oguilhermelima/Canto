@@ -416,6 +416,7 @@ export const season = pgTable(
     posterPath: varchar("poster_path", { length: 255 }),
     episodeCount: integer("episode_count"),
     seasonType: varchar("season_type", { length: 30 }),
+    voteAverage: real("vote_average"),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -444,8 +445,12 @@ export const episode = pgTable(
     runtime: integer("runtime"),
     stillPath: varchar("still_path", { length: 255 }),
     voteAverage: real("vote_average"),
+    voteCount: integer("vote_count"),
     absoluteNumber: integer("absolute_number"),
     finaleType: varchar("finale_type", { length: 50 }),
+    episodeType: varchar("episode_type", { length: 30 }),
+    crew: jsonb("crew").$type<Array<{ name: string; job: string; department?: string; profilePath?: string }>>(),
+    guestStars: jsonb("guest_stars").$type<Array<{ name: string; character?: string; profilePath?: string }>>(),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

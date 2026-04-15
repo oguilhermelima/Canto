@@ -5,8 +5,9 @@ import {
   getSupportedLanguageCodes,
   persistTranslations,
   applyTvdbSeasons,
-  buildTmdbStillMap,
-  overlayTmdbStills,
+  buildTmdbEpisodeMap,
+  overlayTmdbEpisodeData,
+  overlayTmdbSeasonData,
 } from "@canto/db/persist-media";
 import {
   findMediaById,
@@ -94,8 +95,9 @@ export async function reconcileShowStructure(
 
       // For TVDB-native shows, also overlay stills (TMDB-native already done in applyTvdbSeasons)
       if (isAlreadyTvdb && tmdbMeta.seasons) {
-        const tmdbStillMap = buildTmdbStillMap(tmdbMeta.seasons);
-        await overlayTmdbStills(db, mediaId, tmdbStillMap);
+        const tmdbEpMap = buildTmdbEpisodeMap(tmdbMeta.seasons);
+        await overlayTmdbEpisodeData(db, mediaId, tmdbEpMap);
+        await overlayTmdbSeasonData(db, mediaId, tmdbMeta.seasons);
       }
 
       // Update base images from TMDB
