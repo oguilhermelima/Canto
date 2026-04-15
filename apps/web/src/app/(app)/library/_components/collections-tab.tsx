@@ -108,49 +108,22 @@ export function CollectionsTab({
   const searchQuery = filters.searchQuery.trim().toLowerCase();
   const canReorder = searchQuery.length === 0;
 
-  const watchlist = useMemo(
-    () => lists?.find((list) => list.type === "watchlist") ?? null,
-    [lists],
-  );
-  const serverLibrary = useMemo(
-    () => lists?.find((list) => list.type === "server") ?? null,
-    [lists],
-  );
+  // DB returns lists in position order — use directly.
+  // Only apply client-side sort/filter when search is active.
+  const mergedLists = useMemo(() => {
+    const all = lists ?? [];
+    if (!searchQuery) return all;
 
-  const customLists = useMemo(() => {
-    let result = lists?.filter((list) => list.type === "custom") ?? [];
-
-    if (searchQuery) {
-      result = result.filter((list) =>
-        list.name.toLowerCase().includes(searchQuery),
-      );
-    }
+    const filtered = all.filter((list) =>
+      list.name.toLowerCase().includes(searchQuery),
+    );
 
     const dir = filters.sortOrder === "asc" ? 1 : -1;
-    result = [...result].sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       if (filters.sortBy === "name") return dir * a.name.localeCompare(b.name);
-      return (
-        dir *
-        (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-      );
+      return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     });
-
-    return result;
   }, [lists, filters.sortBy, filters.sortOrder, searchQuery]);
-
-  const systemLists = useMemo(() => {
-    const result = [watchlist, serverLibrary].filter(
-      (value): value is NonNullable<typeof value> => !!value,
-    );
-    if (!searchQuery) return result;
-    return result.filter((list) => list.name.toLowerCase().includes(searchQuery));
-  }, [watchlist, serverLibrary, searchQuery]);
-
-  // DB returns lists in position order — use directly
-  const mergedLists = useMemo(
-    () => [...systemLists, ...customLists],
-    [systemLists, customLists],
-  );
 
   const hiddenIds = layoutQuery.data?.hiddenListIds ?? [];
   const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
