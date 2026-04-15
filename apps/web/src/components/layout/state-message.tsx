@@ -90,6 +90,11 @@ export const SPACE_STATES = {
     title: "No transmissions scored",
     description: "Rate media to build your personal star chart.",
   },
+  emptyReviews: {
+    icon: Radio,
+    title: "No transmissions received",
+    description: "Be the first to broadcast your thoughts on this title.",
+  },
   emptyFavorites: {
     icon: Heart,
     title: "No stars in your constellation",

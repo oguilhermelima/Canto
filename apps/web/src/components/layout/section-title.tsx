@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@canto/ui/cn";
+import type { LucideIcon } from "lucide-react";
 
 interface SectionTitleProps {
   title: string;
+  icon?: LucideIcon;
   seeMorePath?: string;
   action?: React.ReactNode;
   className?: string;
@@ -11,6 +13,7 @@ interface SectionTitleProps {
 
 export function SectionTitle({
   title,
+  icon: Icon,
   seeMorePath,
   action,
   className,
@@ -23,7 +26,8 @@ export function SectionTitle({
       )}
     >
       <div className="flex items-center gap-1">
-        <h2 className="text-base font-semibold text-foreground md:text-xl">
+        <h2 className="flex items-center gap-2 text-base font-semibold text-foreground md:text-xl">
+          {Icon && <Icon size={18} className="text-muted-foreground" />}
           {title}
         </h2>
         {action}
