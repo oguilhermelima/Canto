@@ -19,7 +19,7 @@ export async function findUserLists(db: Database, userId: string) {
       eq(list.type, "server"),
       sql`${list.id} IN (${memberListIds})`,
     ),
-    orderBy: [desc(list.isSystem), list.position],
+    orderBy: [list.position],
   });
 }
 
@@ -38,7 +38,7 @@ export async function findUserListsWithCounts(
       eq(list.type, "server"),
       sql`${list.id} IN (${memberListIds})`,
     ),
-    orderBy: [desc(list.isSystem), list.position],
+    orderBy: [list.position],
   });
 
   if (lists.length === 0) return [];
