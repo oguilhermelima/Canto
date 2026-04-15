@@ -19,6 +19,8 @@ interface Season {
 
 interface SeasonTabsProps {
   seasons: Season[];
+  /** External ID of the show (for episode links) */
+  showExternalId: string;
   /** Map of episode ID -> download info for showing status indicators */
   downloadedEpisodes?: Map<string, EpisodeDownloadInfo>;
   /** Episode availability from servers: key = "S01E05" -> [{ type, resolution }] */
@@ -30,6 +32,7 @@ interface SeasonTabsProps {
 
 export function SeasonTabs({
   seasons,
+  showExternalId,
   downloadedEpisodes,
   episodeAvailability,
   serverLinks,
@@ -39,7 +42,12 @@ export function SeasonTabs({
     () =>
       [...seasons]
         .filter((s) => (s.episodes?.length ?? 0) > 0)
-        .sort((a, b) => a.seasonNumber - b.seasonNumber),
+        .sort((a, b) => {
+          // Specials (season 0) always last
+          if (a.seasonNumber === 0 && b.seasonNumber !== 0) return 1;
+          if (b.seasonNumber === 0 && a.seasonNumber !== 0) return -1;
+          return a.seasonNumber - b.seasonNumber;
+        }),
     [seasons],
   );
 
@@ -70,6 +78,7 @@ export function SeasonTabs({
           <SeasonBlock
             key={season.id}
             season={season}
+            showExternalId={showExternalId}
             isExpanded={expandedSeasons.has(season.id)}
             downloadedEpisodes={downloadedEpisodes}
             episodeAvailability={episodeAvailability}
@@ -86,6 +95,7 @@ export function SeasonTabs({
 
 function SeasonBlock({
   season,
+  showExternalId,
   isExpanded,
   downloadedEpisodes,
   episodeAvailability,
@@ -93,6 +103,7 @@ function SeasonBlock({
   onToggleExpand,
 }: {
   season: Season;
+  showExternalId: string;
   isExpanded: boolean;
   downloadedEpisodes?: Map<string, EpisodeDownloadInfo>;
   episodeAvailability?: Record<string, Array<{ type: string; resolution?: string | null }>>;
@@ -159,7 +170,7 @@ function SeasonBlock({
             ) : (
               <>
                 <span>S{sNum}</span>
-                <span className="mx-1.5 text-muted-foreground/20 sm:mx-2">|</span>
+                <span className="mx-1.5 text-muted-foreground sm:mx-2">|</span>
                 <span>{seasonTitle}</span>
               </>
             )}
@@ -236,12 +247,13 @@ function SeasonBlock({
         )}
       >
         {episodes.length > 0 && (
-          <div className="flex flex-col divide-y divide-border/30 pb-2">
+          <div className="flex gap-3 overflow-x-auto px-3 pb-3 scrollbar-none sm:gap-4 sm:px-4">
             {episodes.map((ep) => (
               <EpisodeCard
                 key={ep.id}
                 episode={ep}
                 seasonNumber={season.seasonNumber}
+                showExternalId={showExternalId}
                 downloadInfo={downloadedEpisodes?.get(ep.id)}
                 serverAvailability={episodeAvailability?.[
                   `S${String(season.seasonNumber).padStart(2, "0")}E${String(ep.episodeNumber).padStart(2, "0")}`

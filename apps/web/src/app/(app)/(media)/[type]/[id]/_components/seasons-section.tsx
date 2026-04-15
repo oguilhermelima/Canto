@@ -27,6 +27,7 @@ interface SeasonItem {
 interface SeasonsSectionProps {
   media: {
     type: string;
+    externalId: number;
     seasons: SeasonItem[];
   };
   availability: { data?: { episodes?: Record<string, Array<{ type: string; resolution?: string | null }>> } };
@@ -43,6 +44,7 @@ export function SeasonsSection({
   return (
     <div id="seasons-section">
       <SeasonTabs
+        showExternalId={String(media.externalId)}
         seasons={media.seasons.map((s) => ({
           id: s.id,
           seasonNumber: s.number,
