@@ -19,6 +19,7 @@ import {
   Loader2,
   ExternalLink,
   ChevronDown,
+  RefreshCw,
 } from "lucide-react";
 import {
   Dialog,
@@ -959,6 +960,37 @@ function TvdbDefaultToggle(): React.JSX.Element {
 /*  MetadataProvidersSection (Services tab)                                    */
 /* -------------------------------------------------------------------------- */
 
+function RefreshMetadataButton(): React.JSX.Element {
+  const refreshLanguage = trpc.settings.refreshLanguage.useMutation({
+    onSuccess: () => toast.success("Metadata refresh started. This runs in the background and may take a few minutes."),
+    onError: () => toast.error("Failed to start metadata refresh."),
+  });
+
+  return (
+    <div className="flex items-center justify-between px-5 py-4">
+      <div className="mr-4 min-w-0">
+        <p className="text-sm font-medium text-foreground">Refresh all metadata</p>
+        <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
+          Re-fetch titles, overviews, posters, logos, and backdrops for all media from providers. Useful after changing language settings or fixing incorrect images.
+        </p>
+      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={refreshLanguage.isPending}
+        onClick={() => refreshLanguage.mutate()}
+      >
+        {refreshLanguage.isPending ? (
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        ) : (
+          <RefreshCw className="mr-2 h-4 w-4" />
+        )}
+        Refresh
+      </Button>
+    </div>
+  );
+}
+
 export function MetadataProvidersSection(): React.JSX.Element {
   return (
     <div>
@@ -973,6 +1005,12 @@ export function MetadataProvidersSection(): React.JSX.Element {
 
       <SettingsSection title="Use TVDB for season/episode structure" description="Validate and fix the season and episode structure using TVDB data.">
         <TvdbDefaultToggle />
+      </SettingsSection>
+
+      <SettingsSection title="Maintenance" description="Tools for managing your metadata library.">
+        <SectionCard title="Maintenance">
+          <RefreshMetadataButton />
+        </SectionCard>
       </SettingsSection>
     </div>
   );
