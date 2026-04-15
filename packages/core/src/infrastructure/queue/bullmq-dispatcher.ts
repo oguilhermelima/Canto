@@ -57,6 +57,7 @@ export async function dispatchReconcileShow(mediaId: string): Promise<void> {
 
 export async function dispatchRefreshAllLanguage(): Promise<void> {
   const q = await getRefreshAllLangQueue();
+  await q.clean(0, 0, "failed").catch(() => {});
   await q.add("refresh-all-language", {}, {
     jobId: "refresh-all-language",
     removeOnComplete: true,
