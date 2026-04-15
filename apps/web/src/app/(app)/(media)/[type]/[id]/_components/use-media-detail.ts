@@ -29,10 +29,35 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
   const media = resolvedData?.media;
   const mediaLoading = resolved.isLoading;
   const mediaId = (resolvedData as { mediaId?: string } | undefined)?.mediaId;
+  const resolvedSource = (resolvedData as { source?: string } | undefined)?.source;
+
+  // If extras came back empty from DB, the backend dispatched a background refresh.
+  // Refetch once after a short delay to pick up populated extras.
+  const extrasData = resolvedData?.extras;
+  const hasExtras =
+    extrasData &&
+    ((extrasData.credits?.cast?.length ?? 0) > 0 ||
+      (extrasData.similar?.length ?? 0) > 0 ||
+      (extrasData.recommendations?.length ?? 0) > 0);
+  const didRefetchExtras = useRef(false);
+  useEffect(() => {
+    if (
+      resolvedData &&
+      resolvedSource === "db" &&
+      !hasExtras &&
+      !didRefetchExtras.current
+    ) {
+      didRefetchExtras.current = true;
+      const timer = setTimeout(() => {
+        void resolved.refetch();
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [resolvedData, resolvedSource, hasExtras, resolved]);
 
   const extras = {
-    data: resolvedData?.extras,
-    isLoading: resolved.isLoading,
+    data: extrasData,
+    isLoading: resolved.isLoading || (resolvedSource === "db" && !hasExtras && !didRefetchExtras.current),
   };
 
   useDocumentTitle(media?.title);
@@ -67,28 +92,6 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
   );
 
   const deleteTorrentMutation = trpc.torrent.delete.useMutation();
-  const persistMedia = trpc.media.persist.useMutation({
-    onSuccess: () => {
-      void utils.media.resolve.invalidate();
-    },
-    onError: (err) => {
-      toast.error(`Failed to save media: ${err.message}`);
-    },
-  });
-
-  // Persist on visit: when resolve returns live data (not from DB), persist it
-  const resolvedSource = (resolvedData as { source?: string } | undefined)?.source;
-  const didPersist = useRef(false);
-  useEffect(() => {
-    if (resolvedData && resolvedSource === "live" && !didPersist.current && !persistMedia.isPending) {
-      didPersist.current = true;
-      persistMedia.mutate({
-        provider: "tmdb",
-        externalId: parseInt(id, 10),
-        type: mediaType,
-      });
-    }
-  }, [resolvedData, resolvedSource, id, mediaType, persistMedia]);
 
   const requestDownload = trpc.request.create.useMutation({
     onSuccess: () => {
@@ -214,7 +217,6 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
 
     // Mutations
     deleteTorrentMutation,
-    persistMedia,
     requestDownload,
     cancelRequest,
     setContinuousDownload,

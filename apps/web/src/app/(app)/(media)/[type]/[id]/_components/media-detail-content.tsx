@@ -163,18 +163,22 @@ export function MediaDetailContent({
             />
 
             {/* Cast */}
-            <CastSection
-              credits={detail.credits}
-              isLoading={detail.extras.isLoading}
-            />
+            <div className="animate-in fade-in-0 duration-500">
+              <CastSection
+                credits={detail.credits}
+                isLoading={detail.extras.isLoading}
+              />
+            </div>
           </div>
 
           {/* Full-width sections -- Recommendations, Similar */}
-          <SimilarSection
-            similar={detail.similar}
-            recommendations={detail.recommendations}
-            isLoading={detail.extras.isLoading}
-          />
+          <div className="animate-in fade-in-0 duration-500">
+            <SimilarSection
+              similar={detail.similar}
+              recommendations={detail.recommendations}
+              isLoading={detail.extras.isLoading}
+            />
+          </div>
         </div>
       </MediaDetailHero>
 
