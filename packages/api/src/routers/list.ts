@@ -1,6 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { user } from "@canto/db/schema";
+import { getUserLanguage } from "@canto/core/domain/services/user-service";
+import { translateMediaItems } from "@canto/core/domain/services/translation-service";
 
 import {
   getByIdInput,
@@ -162,7 +164,7 @@ export const listRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const listRow = await findListBySlug(ctx.db, input.slug, ctx.session.user.id);
       if (!listRow) throw new TRPCError({ code: "NOT_FOUND", message: "List not found" });
-      const { items, total } = await findListItems(ctx.db, listRow.id, {
+      const { items: rawItems, total } = await findListItems(ctx.db, listRow.id, {
         userId: ctx.session.user.id,
         limit: input.limit,
         offset: input.cursor ?? input.offset,
@@ -181,6 +183,9 @@ export const listRouter = createTRPCRouter({
         watchProviders: input.watchProviders,
         watchRegion: input.watchRegion,
       });
+      const userLang = await getUserLanguage(ctx.db, ctx.session.user.id);
+      const translatedMedia = await translateMediaItems(ctx.db, rawItems.map((i) => i.media), userLang);
+      const items = rawItems.map((item, idx) => ({ ...item, media: translatedMedia[idx]! }));
       return { list: listRow, items, total };
     }),
 

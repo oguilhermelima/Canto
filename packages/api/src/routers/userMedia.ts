@@ -40,6 +40,8 @@ import { rateInput, removeRatingInput } from "@canto/validators";
 import type { LibraryFeedFilterOptions } from "@canto/core/infrastructure/repositories";
 import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/use-cases/promote-user-media-state-from-playback";
 import { pushWatchStateToServers } from "@canto/core/domain/use-cases/push-watch-state";
+import { getUserLanguage } from "@canto/core/domain/services/user-service";
+import { translateMediaItems } from "@canto/core/domain/services/translation-service";
 
 type TrackingStatus = "none" | "planned" | "watching" | "completed" | "dropped";
 type WatchedAtMode = "just_now" | "release_date" | "other_date" | "unknown_date";
@@ -668,8 +670,11 @@ export const userMediaRouter = createTRPCRouter({
         });
       }
 
-      const items = filtered.slice(cursor, cursor + limit);
+      const sliced = filtered.slice(cursor, cursor + limit);
       const nextCursor = cursor + limit < filtered.length ? cursor + limit : undefined;
+
+      const userLang = await getUserLanguage(ctx.db, userId);
+      const items = await translateMediaItems(ctx.db, sliced, userLang);
 
       return {
         items,
@@ -895,8 +900,11 @@ export const userMediaRouter = createTRPCRouter({
       const sorted = scheduleItems.sort(
         (a, b) => a.releaseAt.getTime() - b.releaseAt.getTime(),
       );
-      const items = sorted.slice(cursor, cursor + limit);
+      const sliced = sorted.slice(cursor, cursor + limit);
       const nextCursor = cursor + limit < sorted.length ? cursor + limit : undefined;
+
+      const userLang = await getUserLanguage(ctx.db, userId);
+      const items = await translateMediaItems(ctx.db, sliced, userLang);
 
       return {
         items,
