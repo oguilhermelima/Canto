@@ -15,6 +15,7 @@ import {
   episodeTranslation,
   media,
   mediaCredit,
+  mediaRecommendation,
   mediaTranslation,
   mediaVideo,
   mediaWatchProvider,
@@ -460,8 +461,8 @@ export async function persistTranslations(
 
 /**
  * Takes a complete MediaMetadata result and persists everything to DB.
- * Replaces the scattered persistence across enrich-media, refresh-extras,
- * and reconcile-show-structure.
+ * Single entry point for all media persistence — metadata, seasons,
+ * extras, and recommendation stubs.
  */
 export async function persistFullMedia(
   db: Database,
@@ -520,6 +521,80 @@ export async function persistExtras(
   mediaId: string,
   extras: MediaExtras,
 ): Promise<void> {
+  // ── Similar/Recommendations: upsert media rows BEFORE the transaction ──
+  // Each similar/recommendation needs a media row to link to via the junction table.
+  // We create stub rows (no metadataUpdatedAt) so resolve fetches full data on visit.
+
+  const allRecItems = [
+    ...extras.similar.map((r) => ({ result: r, sourceType: "similar" as const })),
+    ...extras.recommendations.map((r) => ({ result: r, sourceType: "recommendation" as const })),
+  ];
+
+  // Dedup by externalId
+  const uniqueItems = new Map<string, (typeof allRecItems)[number]>();
+  for (const item of allRecItems) {
+    const key = `${item.result.provider ?? "tmdb"}-${item.result.externalId}`;
+    if (!uniqueItems.has(key)) uniqueItems.set(key, item);
+  }
+
+  const recMediaIdByKey = new Map<string, string>();
+
+  if (uniqueItems.size > 0) {
+    // Look up existing media rows for these external IDs
+    const extIds = [...uniqueItems.values()].map((i) => i.result.externalId);
+    const existingRows = await db.query.media.findMany({
+      where: and(
+        inArray(media.externalId, extIds),
+        eq(media.provider, "tmdb"),
+      ),
+      columns: { id: true, externalId: true },
+    });
+    const existingByExtId = new Map(existingRows.map((r) => [r.externalId, r.id]));
+
+    for (const item of uniqueItems.values()) {
+      const key = `${item.result.provider ?? "tmdb"}-${item.result.externalId}`;
+      const existingId = existingByExtId.get(item.result.externalId);
+      if (existingId) {
+        recMediaIdByKey.set(key, existingId);
+      } else {
+        // Create stub row — no metadataUpdatedAt so resolve fetches full data on visit
+        const [inserted] = await db
+          .insert(media)
+          .values({
+            type: item.result.type,
+            externalId: item.result.externalId,
+            provider: item.result.provider ?? "tmdb",
+            title: item.result.title,
+            overview: item.result.overview ?? null,
+            posterPath: item.result.posterPath ?? null,
+            backdropPath: item.result.backdropPath ?? null,
+            logoPath: item.result.logoPath ?? null,
+            releaseDate: item.result.releaseDate || null,
+            year: item.result.year ?? null,
+            voteAverage: item.result.voteAverage ?? null,
+            genreIds: item.result.genreIds ?? [],
+            downloaded: false,
+          })
+          .onConflictDoNothing()
+          .returning();
+        if (inserted) {
+          recMediaIdByKey.set(key, inserted.id);
+        } else {
+          // Conflict = row already exists, re-fetch it
+          const existing = await db.query.media.findFirst({
+            where: and(
+              eq(media.externalId, item.result.externalId),
+              eq(media.provider, item.result.provider ?? "tmdb"),
+              eq(media.type, item.result.type),
+            ),
+            columns: { id: true },
+          });
+          if (existing) recMediaIdByKey.set(key, existing.id);
+        }
+      }
+    }
+  }
+
   // ── Transaction: only DB writes, no network I/O ──
 
   await db.transaction(async (tx) => {
@@ -527,6 +602,7 @@ export async function persistExtras(
     await tx.delete(mediaCredit).where(eq(mediaCredit.mediaId, mediaId));
     await tx.delete(mediaVideo).where(eq(mediaVideo.mediaId, mediaId));
     await tx.delete(mediaWatchProvider).where(eq(mediaWatchProvider.mediaId, mediaId));
+    await tx.delete(mediaRecommendation).where(eq(mediaRecommendation.sourceMediaId, mediaId));
 
     // Insert credits (cast)
     if (extras.credits.cast.length > 0) {
@@ -600,6 +676,22 @@ export async function persistExtras(
       if (wpRows.length > 0) {
         await tx.insert(mediaWatchProvider).values(wpRows);
       }
+    }
+
+    // Insert recommendation junction entries
+    for (const item of uniqueItems.values()) {
+      const key = `${item.result.provider ?? "tmdb"}-${item.result.externalId}`;
+      const recMediaId = recMediaIdByKey.get(key);
+      if (!recMediaId) continue;
+
+      await tx
+        .insert(mediaRecommendation)
+        .values({
+          mediaId: recMediaId,
+          sourceMediaId: mediaId,
+          sourceType: item.sourceType,
+        })
+        .onConflictDoNothing();
     }
 
     // Update extrasUpdatedAt

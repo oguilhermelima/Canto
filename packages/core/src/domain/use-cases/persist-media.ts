@@ -34,7 +34,7 @@ export async function persistMediaUseCase(
     ? await findMediaByAnyReference(db, input.externalId, input.provider, undefined, undefined, input.type)
     : await findMediaByExternalId(db, input.externalId, input.provider, input.type);
 
-  if (existing?.processingStatus === "ready") return existing;
+  if (existing?.metadataUpdatedAt) return existing;
 
   const useTVDBSeasons = existing
     ? getEffectiveProviderSync(existing, globalTvdbEnabled) === "tvdb"

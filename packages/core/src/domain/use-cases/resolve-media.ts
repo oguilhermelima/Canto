@@ -2,15 +2,15 @@ import type { Database } from "@canto/db/client";
 import type { MediaProviderPort } from "../ports/media-provider.port";
 import type { MediaType, NormalizedMedia, NormalizedSeason, ProviderName } from "@canto/providers";
 import { getSetting } from "@canto/db/settings";
-import { getSupportedLanguageCodes } from "@canto/db/persist-media";
-import { findMediaByExternalId } from "../../infrastructure/repositories/media-repository";
+import { getSupportedLanguageCodes, persistFullMedia } from "@canto/db/persist-media";
+import { findMediaByExternalId, findMediaByIdWithSeasons } from "../../infrastructure/repositories/media-repository";
 import { getEffectiveProviderSync } from "../rules/effective-provider";
 import { fetchMediaMetadata } from "./fetch-media-metadata";
 import { loadExtrasFromDB } from "../services/extras-service";
 import { applyMediaTranslation, applySeasonsTranslation } from "../services/translation-service";
 import { getUserLanguage } from "../services/user-service";
 import { normalizedMediaToResponse } from "../mappers/media-mapper";
-import { dispatchRefreshExtras } from "../../infrastructure/queue/bullmq-dispatcher";
+import { dispatchTranslateEpisodes } from "../../infrastructure/queue/bullmq-dispatcher";
 import { logAndSwallow } from "../../lib/log-error";
 
 interface ResolveMediaInput {
@@ -34,19 +34,14 @@ export async function resolveMedia(
 
   const existing = await findMediaByExternalId(db, input.externalId, input.provider, input.type);
 
-  // Return from DB when metadata is complete — translations will be applied
-  if (existing?.metadataUpdatedAt) {
+  // Return from DB only when FULLY persisted (metadata + extras both present)
+  if (existing?.metadataUpdatedAt && existing.extrasUpdatedAt) {
     const lang = await getUserLanguage(db, userId);
     const translated = await applyMediaTranslation(db, existing, lang);
     if (translated.seasons) {
       await applySeasonsTranslation(db, translated.seasons as any, lang);
     }
     const extras = await loadExtrasFromDB(db, existing.id, lang);
-
-    // Dispatch extras refresh in background if missing or stale
-    if (!existing.extrasUpdatedAt) {
-      void dispatchRefreshExtras(existing.id).catch(logAndSwallow("resolveMedia dispatchRefreshExtras"));
-    }
 
     return {
       source: "db" as const,
@@ -71,7 +66,39 @@ export async function resolveMedia(
     { useTVDBSeasons, supportedLanguages: supportedLangs },
   );
 
-  // Apply user's language translation from the live TMDB response
+  // Persist on resolve: save to DB so future visits hit the fast DB path
+  const mediaId = await persistFullMedia(db, result, existing?.id);
+
+  // Dispatch TVDB episode translations for non-English languages
+  if (result.tvdbId && result.tvdbSeasons?.length) {
+    const nonEnLangs = supportedLangs.filter((l) => !l.startsWith("en"));
+    for (const lang of nonEnLangs) {
+      void dispatchTranslateEpisodes(mediaId, result.tvdbId, lang).catch(logAndSwallow("resolveMedia dispatchTranslateEpisodes"));
+    }
+  }
+
+  // Re-read from DB to get the fully persisted + normalized row
+  const persisted = await findMediaByIdWithSeasons(db, mediaId);
+  if (persisted) {
+    const lang = await getUserLanguage(db, userId);
+    const translated = await applyMediaTranslation(db, persisted, lang);
+    if (translated.seasons) {
+      await applySeasonsTranslation(db, translated.seasons as any, lang);
+    }
+    const extras = await loadExtrasFromDB(db, persisted.id, lang);
+
+    return {
+      source: "db" as const,
+      media: translated,
+      extras,
+      persisted: true,
+      mediaId,
+      inLibrary: persisted.inLibrary,
+      downloaded: persisted.downloaded,
+    };
+  }
+
+  // Fallback: return live data if re-read somehow fails
   const lang = await getUserLanguage(db, userId);
   const response = normalizedMediaToResponse(result.media, result.tvdbSeasons);
   if (lang && !lang.startsWith("en") && result.media.translations) {
@@ -89,9 +116,9 @@ export async function resolveMedia(
     source: "live" as const,
     media: response,
     extras: result.extras,
-    persisted: !!existing,
-    mediaId: existing?.id,
-    inLibrary: existing?.inLibrary ?? false,
-    downloaded: existing?.downloaded ?? false,
+    persisted: true,
+    mediaId,
+    inLibrary: false,
+    downloaded: false,
   };
 }

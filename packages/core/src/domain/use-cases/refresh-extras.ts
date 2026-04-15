@@ -9,7 +9,6 @@ import {
   mediaWatchProvider,
 } from "@canto/db/schema";
 import { getSupportedLanguageCodes } from "@canto/db/persist-media";
-import { dispatchEnrichMedia } from "../../infrastructure/queue/bullmq-dispatcher";
 import type { MediaType } from "@canto/providers";
 import { findMediaById } from "../../infrastructure/repositories";
 import type { MediaProviderPort } from "../ports/media-provider.port";
@@ -154,7 +153,7 @@ export async function refreshExtras(
     newRecFields.map((r) => `${r.provider}-${r.externalId}`),
   );
 
-  // ── Persist light media rows outside transaction (may already exist) ──
+  // ── Upsert media rows for recommendations (may already exist) ──
   const mediaIdByExtKey = new Map<string, string>();
   for (const fields of newRecFields) {
     const key = `${fields.provider}-${fields.externalId}`;
@@ -162,7 +161,6 @@ export async function refreshExtras(
       ?? existingMediaByTitle.get(fields.title);
     if (existing) {
       mediaIdByExtKey.set(key, existing.id);
-      // Update logoPath if we fetched a new one and existing doesn't have one
       if (!existing.logoPath && fields.logoPath) {
         await db.update(media).set({ logoPath: fields.logoPath }).where(eq(media.id, existing.id));
       }
@@ -179,11 +177,16 @@ export async function refreshExtras(
         releaseDate: fields.releaseDate || null,
         voteAverage: fields.voteAverage ?? null,
         downloaded: false,
-        processingStatus: "pending",
-      }).returning();
-      mediaIdByExtKey.set(key, inserted!.id);
-      // Dispatch metadata enrichment in background
-      void dispatchEnrichMedia(inserted!.id, false).catch(() => {});
+      }).onConflictDoNothing().returning();
+      if (inserted) {
+        mediaIdByExtKey.set(key, inserted.id);
+      } else {
+        const conflict = await db.query.media.findFirst({
+          where: and(eq(media.externalId, fields.externalId), eq(media.provider, fields.provider), eq(media.type, fields.type)),
+          columns: { id: true },
+        });
+        if (conflict) mediaIdByExtKey.set(key, conflict.id);
+      }
     }
   }
 
