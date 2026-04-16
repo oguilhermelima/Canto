@@ -10,6 +10,13 @@ import {
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { createPlexPin, checkPlexPin, authenticatePlex } from "@canto/core/domain/use-cases/authenticate-plex";
 import { authenticateJellyfin } from "@canto/core/domain/use-cases/authenticate-jellyfin";
+import {
+  createTraktDeviceCode,
+  exchangeTraktDeviceCode,
+  getTraktUserSettings,
+  TraktConfigurationError,
+  TraktHttpError,
+} from "@canto/core/infrastructure/adapters/trakt";
 import { getSetting } from "@canto/db/settings";
 
 /* -------------------------------------------------------------------------- */
@@ -142,7 +149,14 @@ export const userConnectionRouter = createTRPCRouter({
       if (existing) {
         await ctx.db
           .update(userConnection)
-          .set({ token, externalUserId, updatedAt: new Date() })
+          .set({
+            token,
+            refreshToken: null,
+            tokenExpiresAt: null,
+            externalUserId,
+            staleReason: null,
+            updatedAt: new Date(),
+          })
           .where(eq(userConnection.id, existing.id));
         connectionId = existing.id;
       } else {
@@ -152,6 +166,8 @@ export const userConnectionRouter = createTRPCRouter({
             userId: ctx.session.user.id,
             provider: input.provider,
             token,
+            refreshToken: null,
+            tokenExpiresAt: null,
             externalUserId,
           })
           .returning({ id: userConnection.id });
@@ -184,11 +200,14 @@ export const userConnectionRouter = createTRPCRouter({
    * the 5-min scheduled sweep. Dedupes in the dispatcher via jobId.
    */
   syncNow: protectedProcedure.mutation(async ({ ctx }) => {
-    const { dispatchUserReverseSync } = await import(
+    const { dispatchUserReverseSync, dispatchUserTraktSync } = await import(
       "@canto/core/infrastructure/queue/bullmq-dispatcher"
     );
-    const dispatched = await dispatchUserReverseSync(ctx.session.user.id);
-    return { dispatched };
+    const [reverseDispatched, traktDispatched] = await Promise.all([
+      dispatchUserReverseSync(ctx.session.user.id),
+      dispatchUserTraktSync(ctx.session.user.id),
+    ]);
+    return { dispatched: reverseDispatched || traktDispatched };
   }),
 
   // Plex PIN OAuth flow
@@ -241,5 +260,114 @@ export const userConnectionRouter = createTRPCRouter({
       }
 
       return result;
+    }),
+
+  traktDeviceCreate: protectedProcedure.mutation(async () => {
+    try {
+      return await createTraktDeviceCode();
+    } catch (err) {
+      if (err instanceof TraktConfigurationError) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: err.message,
+        });
+      }
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: err instanceof Error ? err.message : "Trakt authorization could not be started",
+      });
+    }
+  }),
+
+  traktDeviceCheck: protectedProcedure
+    .input(z.object({ deviceCode: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      try {
+        const tokenData = await exchangeTraktDeviceCode(input.deviceCode);
+        const userSettings = await getTraktUserSettings(tokenData.access_token);
+        const externalUserId = userSettings.user.ids.slug || userSettings.user.username;
+        const expiresAt = new Date(
+          (tokenData.created_at + tokenData.expires_in) * 1000,
+        );
+
+        const [existing] = await ctx.db
+          .select()
+          .from(userConnection)
+          .where(
+            and(
+              eq(userConnection.userId, ctx.session.user.id),
+              eq(userConnection.provider, "trakt"),
+            ),
+          );
+
+        if (existing) {
+          await ctx.db
+            .update(userConnection)
+            .set({
+              token: tokenData.access_token,
+              refreshToken: tokenData.refresh_token,
+              tokenExpiresAt: expiresAt,
+              externalUserId,
+              staleReason: null,
+              updatedAt: new Date(),
+            })
+            .where(eq(userConnection.id, existing.id));
+        } else {
+          await ctx.db
+            .insert(userConnection)
+            .values({
+              userId: ctx.session.user.id,
+              provider: "trakt",
+              token: tokenData.access_token,
+              refreshToken: tokenData.refresh_token,
+              tokenExpiresAt: expiresAt,
+              externalUserId,
+            });
+        }
+
+        const { dispatchUserTraktSync } = await import(
+          "@canto/core/infrastructure/queue/bullmq-dispatcher"
+        );
+        void dispatchUserTraktSync(ctx.session.user.id);
+
+        return { authenticated: true, pending: false, expired: false };
+      } catch (err) {
+        if (err instanceof TraktConfigurationError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: err.message,
+          });
+        }
+        if (err instanceof TraktHttpError && err.status === 400) {
+          const message = err.message.toLowerCase();
+          if (
+            message.includes("expired_token")
+            || message.includes("access_denied")
+            || message.includes("invalid_grant")
+          ) {
+            return { authenticated: false, pending: false, expired: true };
+          }
+
+          // Trakt's device token endpoint can return bare 400 responses during
+          // polling without a stable error body. Treat unknown 400 as pending
+          // so the UI keeps polling instead of showing a hard failure.
+          if (
+            message.includes("invalid_client")
+            || message.includes("invalid_request")
+            || message.includes("unauthorized_client")
+          ) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: err.message,
+            });
+          }
+
+          return { authenticated: false, pending: true, expired: false };
+        }
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: err instanceof Error ? err.message : "Trakt authentication failed",
+        });
+      }
     }),
 });
