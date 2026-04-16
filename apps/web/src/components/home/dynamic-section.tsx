@@ -113,8 +113,14 @@ export function DynamicSection({
   const dedup = useDedup();
 
   // Filter out items that have already been rendered in other sections
-  // and mark remaining items as rendered
+  // EXCEPT for recommendations, which is a personalized "for you" section
+  const isRecommendationsSection = sectionId?.includes("recommendations");
   const filteredItems = useMemo(() => {
+    // Never filter recommendations - it's a personalized section
+    if (isRecommendationsSection) {
+      return items;
+    }
+
     const unique = items.filter((item) => {
       const alreadyRendered = dedup.isItemRendered(item.provider, item.externalId);
       return !alreadyRendered;
@@ -126,7 +132,7 @@ export function DynamicSection({
     });
 
     return unique;
-  }, [items, dedup]);
+  }, [items, dedup, isRecommendationsSection]);
 
   if (isError) {
     return (

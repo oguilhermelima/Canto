@@ -6,7 +6,7 @@ import type { HomeSectionConfig } from "@canto/db/schema";
 import type { SectionItem } from "../section-item";
 import { DynamicSection } from "../dynamic-section";
 
-const MAX_CAROUSEL_PAGES = 3;
+const MAX_CAROUSEL_PAGES = 9;
 
 function buildSearchHref(config: Record<string, unknown>): string {
   const params = new URLSearchParams();

@@ -17,7 +17,7 @@ export function WatchNextSource({ sectionId, title, style }: WatchNextSourceProp
 
 function WatchNextDynamic({ sectionId, title, style }: WatchNextSourceProps): React.JSX.Element | null {
   const query = trpc.userMedia.getLibraryWatchNext.useInfiniteQuery(
-    { limit: 24, view: "watch_next" as const },
+    { limit: 72, view: "watch_next" as const },
     { getNextPageParam: (lp) => lp.nextCursor, initialCursor: 0 },
   );
 

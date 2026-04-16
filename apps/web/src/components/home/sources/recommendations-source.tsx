@@ -16,7 +16,7 @@ export function RecommendationsSource({ sectionId, title, style }: Recommendatio
   const recsVersionRef = useRef<number | null>(null);
 
   const query = trpc.media.recommendations.useInfiniteQuery(
-    { pageSize: 10 },
+    { pageSize: 30 },
     {
       staleTime: 5 * 60 * 1000,
       refetchInterval: 30 * 1000,

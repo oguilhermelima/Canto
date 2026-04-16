@@ -15,7 +15,7 @@ interface UserMediaSourceProps {
 export function UserMediaSource({ sectionId, title, style, filter }: UserMediaSourceProps): React.JSX.Element | null {
   const query = trpc.userMedia.getUserMedia.useInfiniteQuery(
     {
-      limit: 20,
+      limit: 60,
       status: filter.status as "planned" | "watching" | "completed" | "dropped" | undefined,
       isFavorite: filter.isFavorite,
       sortBy: "updatedAt",

@@ -120,37 +120,45 @@ export function FeaturedCarousel({
           className="flex gap-6 overflow-x-auto overflow-y-visible py-2 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
           onMouseLeave={handleMouseLeave}
         >
-          {isLoading
-            ? Array.from({ length: 12 }).map((_, i) => (
+          {isLoading && visibleItems.length === 0
+            ? // Only show skeletons during initial load when we have no data
+              Array.from({ length: 12 }).map((_, i) => (
                 <Skeleton
                   key={i}
-                  className="shrink-0 rounded-xl h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px] w-[230px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]"
+                  className="shrink-0 rounded-xl animate-pulse h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px] w-[230px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]"
                 />
               ))
-            : visibleItems.map((item, i) => (
-                <FeaturedCard
+            : // Show actual items when we have data
+              visibleItems.map((item, i) => (
+                <div
                   key={`${item.provider}-${item.externalId}-${i}`}
-                  item={item}
-                  index={i}
-                  isOpen={hoveredIndex === i}
-                  onHover={() => handleCardHover(i)}
-                  onHide={() =>
-                    hide({
-                      externalId: item.externalId,
-                      provider: item.provider,
-                      type: item.type,
-                      title: item.title,
-                      posterPath: item.posterPath,
-                    })
-                  }
-                />
+                  className="animate-in fade-in duration-300"
+                >
+                  <FeaturedCard
+                    item={item}
+                    index={i}
+                    isOpen={hoveredIndex === i}
+                    onHover={() => handleCardHover(i)}
+                    onHide={() =>
+                      hide({
+                        externalId: item.externalId,
+                        provider: item.provider,
+                        type: item.type,
+                        title: item.title,
+                        posterPath: item.posterPath,
+                      })
+                    }
+                  />
+                </div>
               ))}
           {isFetchingMore &&
             Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton
+              <div
                 key={`loading-${i}`}
-                className="shrink-0 rounded-xl h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px] w-[230px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]"
-              />
+                className="animate-in fade-in duration-300"
+              >
+                <Skeleton className="shrink-0 rounded-xl animate-pulse h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px] w-[230px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]" />
+              </div>
             ))}
           <div className="w-4 shrink-0 md:w-8 lg:w-12 xl:w-16 2xl:w-24" />
         </div>
