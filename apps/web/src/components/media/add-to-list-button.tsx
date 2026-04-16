@@ -1,25 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@canto/ui/popover";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@canto/ui/sheet";
 import { Bookmark, Check, Eye, Loader2, Plus, X } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { trpc } from "~/lib/trpc/client";
 import { toast } from "sonner";
+import { ResponsiveMenu } from "~/components/layout/responsive-menu";
 
 // ── Keyframes injected once ──
 let listAnimStylesInjected = false;
@@ -74,8 +63,7 @@ export function AddToListButton({
   includeWatchlistInMenu = false,
   onOpenChange,
 }: AddToListButtonProps): React.JSX.Element {
-  const [popoverOpen, setPopoverOpen] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [newListName, setNewListName] = useState("");
   const [creatingNew, setCreatingNew] = useState(false);
   const storageKey = provider && externalId ? `canto:inlist:${provider}-${externalId}` : null;
@@ -94,7 +82,6 @@ export function AddToListButton({
   const [resolving, setResolving] = useState(false);
   const [watchlistAnim, setWatchlistAnim] = useState<"add" | "remove" | null>(null);
   const [bookmarkAnim, setBookmarkAnim] = useState(false);
-  const bookmarkRef = useRef<HTMLButtonElement>(null);
   const utils = trpc.useUtils();
 
   const mediaId = resolvedMediaId ?? initialMediaId;
@@ -442,71 +429,41 @@ export function AddToListButton({
       )}
 
       {/* Save to list — Popover on desktop, Sheet on mobile */}
-      {/* Desktop */}
-      <div className="hidden md:block">
-        <Popover open={popoverOpen} onOpenChange={(open) => { setPopoverOpen(open); onOpenChange?.(open); }}>
-          <PopoverTrigger asChild>
-            <button
-              ref={bookmarkRef}
+      <ResponsiveMenu
+        desktopVariant="popover"
+        align="start"
+        open={menuOpen}
+        onOpenChange={(open) => {
+          setMenuOpen(open);
+          onOpenChange?.(open);
+        }}
+        desktopContentClassName="w-72 p-3"
+        sheetTitle="Save to list"
+        trigger={(
+          <button
+            className={cn(
+              "inline-flex items-center justify-center rounded-xl border backdrop-blur-md transition-all",
+              hasSavedToAnyList
+                ? "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/15"
+                : "border-foreground/10 bg-foreground/15 hover:bg-foreground/25",
+              btnHeight,
+              isSmall ? "w-8" : "w-11",
+            )}
+            aria-label="Save to list"
+            aria-pressed={hasSavedToAnyList}
+          >
+            <Bookmark
               className={cn(
-                "inline-flex items-center justify-center rounded-xl border backdrop-blur-md transition-all",
-                hasSavedToAnyList
-                  ? "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/15"
-                  : "border-foreground/10 bg-foreground/15 hover:bg-foreground/25",
-                btnHeight,
-                isSmall ? "w-8" : "w-11",
+                "h-5 w-5 transition-all",
+                hasSavedToAnyList ? "fill-amber-500 text-amber-500" : "text-foreground/70",
               )}
-              aria-label="Save to list"
-              aria-pressed={hasSavedToAnyList}
-            >
-              <Bookmark
-                className={cn(
-                  "h-5 w-5 transition-all",
-                  hasSavedToAnyList ? "fill-amber-500 text-amber-500" : "text-foreground/70",
-                )}
-                style={bookmarkAnim ? { animation: "list-pop 400ms ease-out" } : undefined}
-              />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="start" sideOffset={8} className="w-72 p-3">
-            {listContent}
-          </PopoverContent>
-        </Popover>
-      </div>
-
-      {/* Mobile */}
-      <div className="md:hidden">
-        <Sheet open={sheetOpen} onOpenChange={(open) => { setSheetOpen(open); onOpenChange?.(open); }}>
-          <SheetTrigger asChild>
-            <button
-              className={cn(
-                "inline-flex items-center justify-center rounded-xl border backdrop-blur-md transition-all",
-                hasSavedToAnyList
-                  ? "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/15"
-                  : "border-foreground/10 bg-foreground/15 hover:bg-foreground/25",
-                btnHeight,
-                isSmall ? "w-8" : "w-11",
-              )}
-              aria-label="Save to list"
-              aria-pressed={hasSavedToAnyList}
-            >
-              <Bookmark
-                className={cn(
-                  "h-5 w-5 transition-all",
-                  hasSavedToAnyList ? "fill-amber-500 text-amber-500" : "text-foreground/70",
-                )}
-                style={bookmarkAnim ? { animation: "list-pop 400ms ease-out" } : undefined}
-              />
-            </button>
-          </SheetTrigger>
-          <SheetContent side="bottom">
-            <SheetHeader className="sr-only">
-              <SheetTitle>Save to list</SheetTitle>
-            </SheetHeader>
-            <div className="pt-2">{listContent}</div>
-          </SheetContent>
-        </Sheet>
-      </div>
+              style={bookmarkAnim ? { animation: "list-pop 400ms ease-out" } : undefined}
+            />
+          </button>
+        )}
+        desktopContent={listContent}
+        mobileContent={listContent}
+      />
     </div>
   );
 }
