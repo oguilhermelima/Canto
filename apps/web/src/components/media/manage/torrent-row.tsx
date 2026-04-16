@@ -4,10 +4,7 @@ import { cn } from "@canto/ui/cn";
 import { Badge } from "@canto/ui/badge";
 import { Button } from "@canto/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
 } from "@canto/ui/dropdown-menu";
 import {
   Download,
@@ -20,6 +17,10 @@ import {
   Trash2,
 } from "lucide-react";
 import { resolveState, formatBytes } from "~/lib/torrent-utils";
+import { ResponsiveMenu } from "~/components/layout/responsive-menu";
+
+const mobileActionButtonCn =
+  "w-full rounded-xl border border-border/60 bg-accent px-3 py-2 text-left text-sm transition-colors hover:bg-accent/80";
 
 export interface TorrentItem {
   id: string;
@@ -51,27 +52,65 @@ function ItemActions({
   onMove: () => void;
 }): React.JSX.Element {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+    <ResponsiveMenu
+      trigger={(
         <button className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
           <MoreHorizontal className="h-3.5 w-3.5" />
         </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-36">
-        <DropdownMenuItem onClick={onRename} className="gap-2 text-xs">
-          <Pencil className="h-3.5 w-3.5" /> Rename
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onMove} className="gap-2 text-xs">
-          <FolderInput className="h-3.5 w-3.5" /> Move
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={onDelete}
-          className="gap-2 text-xs text-red-400 focus:text-red-400"
-        >
-          <Trash2 className="h-3.5 w-3.5" /> Delete
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      )}
+      desktopContentClassName="w-36"
+      sheetTitle="Torrent actions"
+      desktopContent={(
+        <>
+          <DropdownMenuItem onClick={onRename} className="gap-2 text-xs">
+            <Pencil className="h-3.5 w-3.5" /> Rename
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onMove} className="gap-2 text-xs">
+            <FolderInput className="h-3.5 w-3.5" /> Move
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={onDelete}
+            className="gap-2 text-xs text-red-400 focus:text-red-400"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Delete
+          </DropdownMenuItem>
+        </>
+      )}
+      mobileContent={({ close }) => (
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => {
+              onRename();
+              close();
+            }}
+            className={mobileActionButtonCn}
+          >
+            Rename
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onMove();
+              close();
+            }}
+            className={mobileActionButtonCn}
+          >
+            Move
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onDelete();
+              close();
+            }}
+            className={cn(mobileActionButtonCn, "text-red-400")}
+          >
+            Delete
+          </button>
+        </div>
+      )}
+    />
   );
 }
 
@@ -163,8 +202,8 @@ export function SeasonActions({
 }): React.JSX.Element | null {
   if (!hasContent) return null;
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+    <ResponsiveMenu
+      trigger={(
         <Button
           variant="ghost"
           size="sm"
@@ -173,21 +212,59 @@ export function SeasonActions({
         >
           <MoreHorizontal className="h-3.5 w-3.5" />
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
-        <DropdownMenuItem onClick={onRename} className="gap-2 text-xs">
-          <Pencil className="h-3.5 w-3.5" /> Rename Season
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onMove} className="gap-2 text-xs">
-          <FolderInput className="h-3.5 w-3.5" /> Move Season
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={onDelete}
-          className="gap-2 text-xs text-red-400 focus:text-red-400"
-        >
-          <Trash2 className="h-3.5 w-3.5" /> Delete Season
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      )}
+      desktopContentClassName="w-40"
+      sheetTitle="Season actions"
+      desktopContent={(
+        <>
+          <DropdownMenuItem onClick={onRename} className="gap-2 text-xs">
+            <Pencil className="h-3.5 w-3.5" /> Rename Season
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onMove} className="gap-2 text-xs">
+            <FolderInput className="h-3.5 w-3.5" /> Move Season
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={onDelete}
+            className="gap-2 text-xs text-red-400 focus:text-red-400"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Delete Season
+          </DropdownMenuItem>
+        </>
+      )}
+      mobileContent={({ close }) => (
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => {
+              onRename();
+              close();
+            }}
+            className={mobileActionButtonCn}
+          >
+            Rename Season
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onMove();
+              close();
+            }}
+            className={mobileActionButtonCn}
+          >
+            Move Season
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onDelete();
+              close();
+            }}
+            className={cn(mobileActionButtonCn, "text-red-400")}
+          >
+            Delete Season
+          </button>
+        </div>
+      )}
+    />
   );
 }

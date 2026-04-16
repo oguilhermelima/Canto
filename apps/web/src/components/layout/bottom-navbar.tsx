@@ -146,7 +146,7 @@ export function BottomNavbar(): React.JSX.Element {
               { label: "Notifications", icon: Bell, onClick: () => router.push("/notifications") },
               { label: "Requests", icon: Send, onClick: () => router.push("/requests") },
               ...(isAdmin
-                ? [{ label: "Downloads", icon: Download, onClick: () => router.push("/torrents") }]
+                ? [{ label: "Downloads", icon: Download, onClick: () => router.push("/download") }]
                 : []),
             ],
             // System

@@ -164,7 +164,7 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
       { href: "/notifications", label: "Notifications", icon: Bell },
       { href: "/requests", label: "Requests", icon: Send },
       ...(isAdmin
-        ? [{ href: "/torrents", label: "Downloads", icon: Download } as MenuAction]
+        ? [{ href: "/download", label: "Downloads", icon: Download } as MenuAction]
         : []),
     ],
     // System

@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 const publicPaths = ["/login", "/register", "/api/auth", "/api/trpc", "/api/avatar", "/icon"];
 
 /** Routes that require the admin role — non-admins see a 404. */
-const ADMIN_ROUTES = ["/manage", "/torrents"];
+const ADMIN_ROUTES = ["/manage", "/download", "/torrents"];
 const ADMIN_ROUTE_PATTERNS: RegExp[] = [];
 
 function isAdminRoute(pathname: string): boolean {
@@ -18,6 +18,14 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   // Allow public paths
   if (publicPaths.some((path) => pathname.startsWith(path))) {
     return NextResponse.next();
+  }
+
+  // Legacy route redirect
+  if (pathname === "/torrents" || pathname.startsWith("/torrents/")) {
+    const redirectedPath = pathname.replace(/^\/torrents/, "/download");
+    const redirectUrl = new URL(redirectedPath, request.url);
+    redirectUrl.search = request.nextUrl.search;
+    return NextResponse.redirect(redirectUrl);
   }
 
   // Check for session cookie

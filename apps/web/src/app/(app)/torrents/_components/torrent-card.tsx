@@ -3,23 +3,25 @@
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
+import { DropdownMenuItem } from "@canto/ui/dropdown-menu";
 import {
   Pause,
   Play,
   Trash2,
-  ArrowDown,
-  ArrowUp,
-  Clock,
   HardDrive,
   RotateCcw,
   Film,
   Tv,
+  MoreHorizontal,
+  RefreshCw,
+  Radio,
+  Copy,
+  Rocket,
 } from "lucide-react";
 import { mediaDetailHref } from "~/lib/media-href";
+import { ResponsiveMenu } from "~/components/layout/responsive-menu";
 import {
   formatBytes,
-  formatSpeed,
-  formatEta,
   formatDownloadLabel,
   formatQualityLabel,
   resolveState,
@@ -28,11 +30,13 @@ import {
 interface TorrentCardProps {
   torrent: {
     id: string;
+    hash: string | null;
     title: string;
     status: string;
     quality: string | null;
     progress: number | null;
     fileSize: number | null;
+    magnetUrl: string | null;
     downloadType: string | null;
     seasonNumber: number | null;
     episodeNumbers: number[] | null;
@@ -57,10 +61,15 @@ interface TorrentCardProps {
   onPause: (id: string) => void;
   onResume: (id: string) => void;
   onRetry: (id: string) => void;
+  onForceResume: (id: string) => void;
+  onForceRecheck: (id: string) => void;
+  onForceReannounce: (id: string) => void;
+  onCopyMagnet: (id: string) => void;
   onDelete: (id: string, title: string) => void;
   pausePending: boolean;
   resumePending: boolean;
   retryPending: boolean;
+  advancedPending: boolean;
 }
 
 export function TorrentCard({
@@ -68,10 +77,15 @@ export function TorrentCard({
   onPause,
   onResume,
   onRetry,
+  onForceResume,
+  onForceRecheck,
+  onForceReannounce,
+  onCopyMagnet,
   onDelete,
   pausePending,
   resumePending,
   retryPending,
+  advancedPending,
 }: TorrentCardProps): React.JSX.Element {
   const resolved = resolveState(t.status, t.live?.state, t.live?.progress);
   const progress = t.live?.progress ?? t.progress ?? (resolved.isDownloaded ? 1 : 0);
@@ -90,24 +104,23 @@ export function TorrentCard({
       : "bg-blue-500";
 
   return (
-    <div className="overflow-hidden rounded-2xl bg-muted/40">
-      <div className="flex items-center gap-5 p-5 sm:p-6">
-        {/* Poster */}
+    <div className="rounded-2xl bg-muted/40 p-4 sm:p-5">
+      <div className="flex items-start gap-4 sm:gap-5">
         <Link
           href={t.media ? mediaDetailHref(t.media) : "#"}
-          className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-muted sm:h-24 sm:w-24"
+          className="relative h-24 w-16 shrink-0 overflow-hidden rounded-xl bg-muted/70 sm:h-28 sm:w-20"
         >
           {t.media?.posterPath ? (
             <Image
               src={`https://image.tmdb.org/t/p/w342${t.media.posterPath}`}
               alt=""
               fill
-              className="object-cover"
-              sizes="96px"
+              className="object-contain"
+              sizes="80px"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
-              {t.media?.type === "show" ? <Tv size={26} className="text-muted-foreground" /> : <Film size={26} className="text-muted-foreground" />}
+              {t.media?.type === "show" ? <Tv size={24} className="text-muted-foreground" /> : <Film size={24} className="text-muted-foreground" />}
             </div>
           )}
           {qualityLabel && (
@@ -117,7 +130,6 @@ export function TorrentCard({
           )}
         </Link>
 
-        {/* Info + progress */}
         <div className="min-w-0 flex-1 space-y-2.5">
           <div>
             <p className="truncate text-base font-semibold text-foreground sm:text-lg">
@@ -129,50 +141,27 @@ export function TorrentCard({
             </p>
           </div>
 
-          {/* Stats row */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            {t.live && !resolved.isDownloaded ? (
-              <>
-                <span className="flex items-center gap-1.5">
-                  <ArrowDown size={14} className="text-blue-400" />
-                  {formatSpeed(t.live.dlspeed)}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <ArrowUp size={14} className="text-green-400" />
-                  {formatSpeed(t.live.upspeed)}
-                </span>
-                {t.live.eta > 0 && t.live.eta < 8640000 && (
-                  <span className="flex items-center gap-1.5">
-                    <Clock size={14} />
-                    {formatEta(t.live.eta)}
-                  </span>
-                )}
-                <span className="text-muted-foreground">
-                  {t.live.seeds} seeds · {t.live.peers} peers
-                </span>
-              </>
-            ) : resolved.isDownloaded && resolved.seedingLabel ? (
-              <>
-                <span className={cn("rounded-lg px-2.5 py-1 text-xs font-semibold", resolved.seedingColor)}>
-                  {resolved.seedingLabel}
-                </span>
-                {t.live && (
-                  <span className="text-muted-foreground">
-                    {t.live.seeds} seeds · {t.live.peers} peers
-                    {t.live.ratio > 0 && ` · Ratio ${t.live.ratio.toFixed(2)}`}
-                  </span>
-                )}
-              </>
-            ) : null}
-            {size > 0 && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted-foreground">
+            {resolved.seedingLabel ? (
+              <span className={cn("rounded-lg px-2.5 py-1 text-xs font-semibold", resolved.seedingColor)}>
+                {resolved.seedingLabel}
+              </span>
+            ) : (
+              <span className={cn("rounded-lg px-2.5 py-1 text-xs font-semibold", resolved.color)}>
+                {resolved.label}
+              </span>
+            )}
+            {t.live ? <span>{t.live.seeds} seeds</span> : null}
+            {t.live ? <span>{t.live.peers} peers</span> : null}
+            {t.live && t.live.ratio > 0 ? <span>Ratio {t.live.ratio.toFixed(2)}</span> : null}
+            {size > 0 ? (
               <span className="flex items-center gap-1.5">
                 <HardDrive size={14} className="text-muted-foreground" />
                 {formatBytes(size)}
               </span>
-            )}
+            ) : null}
           </div>
 
-          {/* Progress bar */}
           <div className="flex items-center gap-3">
             <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
               <div
@@ -185,56 +174,152 @@ export function TorrentCard({
             </span>
           </div>
         </div>
-
-        {/* Desktop actions */}
-        <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
-          {t.media && (
-            <Link
-              href={mediaDetailHref(t.media)}
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
-              title="Info"
-            >
-              <Tv size={18} />
-            </Link>
-          )}
-          {resolved.canRetry && (
-            <button onClick={() => onRetry(t.id)} disabled={retryPending} className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-blue-500 disabled:opacity-40" title="Retry">
-              <RotateCcw size={18} />
-            </button>
-          )}
-          {resolved.canResume && (
-            <button onClick={() => onResume(t.id)} disabled={resumePending} className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-green-500 disabled:opacity-40" title="Resume">
-              <Play size={18} />
-            </button>
-          )}
-          {resolved.canPause && (
-            <button onClick={() => onPause(t.id)} disabled={pausePending} className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-yellow-500 disabled:opacity-40" title="Pause">
-              <Pause size={18} />
-            </button>
-          )}
-          <button onClick={() => onDelete(t.id, t.media?.title ?? t.title)} className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-red-500" title="Delete">
-            <Trash2 size={18} />
-          </button>
-        </div>
       </div>
 
-      {/* Mobile actions */}
-      <div className="flex items-center justify-end gap-1.5 px-4 pb-4 sm:hidden">
-        {t.media && (
-          <Link href={mediaDetailHref(t.media)} className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground" title="Info">
-            <Tv size={16} />
-          </Link>
-        )}
-        {resolved.canRetry && (
-          <button onClick={() => onRetry(t.id)} disabled={retryPending} className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-blue-500 disabled:opacity-40" title="Retry"><RotateCcw size={16} /></button>
-        )}
-        {resolved.canResume && (
-          <button onClick={() => onResume(t.id)} disabled={resumePending} className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-green-500 disabled:opacity-40" title="Resume"><Play size={16} /></button>
-        )}
-        {resolved.canPause && (
-          <button onClick={() => onPause(t.id)} disabled={pausePending} className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-yellow-500 disabled:opacity-40" title="Pause"><Pause size={16} /></button>
-        )}
-        <button onClick={() => onDelete(t.id, t.media?.title ?? t.title)} className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-red-500" title="Delete"><Trash2 size={16} /></button>
+      <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3">
+        <div className="flex items-center gap-2">
+          {resolved.canPause ? (
+            <button
+              onClick={() => onPause(t.id)}
+              disabled={pausePending}
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-border/60 bg-accent px-3 text-sm font-medium transition-colors hover:bg-accent/80 disabled:opacity-40"
+              title="Pause"
+            >
+              <Pause size={15} />
+              Pause
+            </button>
+          ) : resolved.canResume ? (
+            <button
+              onClick={() => onResume(t.id)}
+              disabled={resumePending}
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-border/60 bg-accent px-3 text-sm font-medium transition-colors hover:bg-accent/80 disabled:opacity-40"
+              title="Resume"
+            >
+              <Play size={15} />
+              Resume
+            </button>
+          ) : resolved.canRetry ? (
+            <button
+              onClick={() => onRetry(t.id)}
+              disabled={retryPending}
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-border/60 bg-accent px-3 text-sm font-medium transition-colors hover:bg-accent/80 disabled:opacity-40"
+              title="Retry"
+            >
+              <RotateCcw size={15} />
+              Retry
+            </button>
+          ) : null}
+
+          <button
+            onClick={() => onDelete(t.id, t.media?.title ?? t.title)}
+            className="inline-flex h-9 items-center gap-2 rounded-xl border border-border/60 bg-accent px-3 text-sm font-medium text-red-400 transition-colors hover:bg-accent/80"
+            title="Delete"
+          >
+            <Trash2 size={15} />
+            Remove
+          </button>
+        </div>
+
+        <ResponsiveMenu
+          trigger={(
+            <button
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-border/60 bg-accent text-muted-foreground transition-colors hover:bg-accent/80 hover:text-foreground"
+              title="Torrent actions"
+            >
+              <MoreHorizontal size={16} />
+            </button>
+          )}
+          desktopContentClassName="w-56"
+          sheetTitle="Torrent actions"
+          desktopContent={(
+            <>
+              <DropdownMenuItem
+                onClick={() => onForceResume(t.id)}
+                disabled={!t.hash || advancedPending}
+                className="gap-3 px-3 py-2.5 text-sm font-medium"
+              >
+                <Rocket className="h-4 w-4" />
+                Force Resume
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onForceRecheck(t.id)}
+                disabled={!t.hash || advancedPending}
+                className="gap-3 px-3 py-2.5 text-sm font-medium"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Force Recheck
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onForceReannounce(t.id)}
+                disabled={!t.hash || advancedPending}
+                className="gap-3 px-3 py-2.5 text-sm font-medium"
+              >
+                <Radio className="h-4 w-4" />
+                Force Reannounce
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onCopyMagnet(t.id)}
+                disabled={!t.magnetUrl && !t.hash}
+                className="gap-3 px-3 py-2.5 text-sm font-medium"
+              >
+                <Copy className="h-4 w-4" />
+                Copy magnetic link
+              </DropdownMenuItem>
+            </>
+          )}
+          mobileContent={({ close }) => (
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => {
+                  onForceResume(t.id);
+                  close();
+                }}
+                disabled={!t.hash || advancedPending}
+                className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80 disabled:opacity-50"
+              >
+                <Rocket className="h-4 w-4 shrink-0" />
+                Force Resume
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onForceRecheck(t.id);
+                  close();
+                }}
+                disabled={!t.hash || advancedPending}
+                className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80 disabled:opacity-50"
+              >
+                <RefreshCw className="h-4 w-4 shrink-0" />
+                Force Recheck
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onForceReannounce(t.id);
+                  close();
+                }}
+                disabled={!t.hash || advancedPending}
+                className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80 disabled:opacity-50"
+              >
+                <Radio className="h-4 w-4 shrink-0" />
+                Force Reannounce
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onCopyMagnet(t.id);
+                  close();
+                }}
+                disabled={!t.magnetUrl && !t.hash}
+                className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80 disabled:opacity-50"
+              >
+                <Copy className="h-4 w-4 shrink-0" />
+                Copy magnetic link
+              </button>
+            </div>
+          )}
+        />
       </div>
     </div>
   );

@@ -156,7 +156,7 @@ export function StatusTab(): React.JSX.Element {
           <StatCard icon={Film} label="Movies" value={stats?.movies ?? 0} loading={statsLoading} href="/collection/server-library?type=movie" color="text-blue-400" bgColor="bg-blue-500/10" />
           <StatCard icon={Tv} label="Shows" value={stats?.shows ?? 0} loading={statsLoading} href="/collection/server-library?type=show" color="text-violet-400" bgColor="bg-violet-500/10" />
           <StatCard icon={Database} label="Total Media" value={stats?.total ?? 0} loading={statsLoading} color="text-emerald-400" bgColor="bg-emerald-500/10" />
-          <StatCard icon={HardDrive} label="Torrents" value={torrents?.length ?? 0} loading={torrentsLoading} href="/torrents" color="text-amber-400" bgColor="bg-amber-500/10" />
+          <StatCard icon={HardDrive} label="Torrents" value={torrents?.length ?? 0} loading={torrentsLoading} href="/download" color="text-amber-400" bgColor="bg-amber-500/10" />
         </div>
       </SettingsSection>
 
