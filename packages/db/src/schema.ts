@@ -1005,8 +1005,10 @@ export const userConnection = pgTable("user_connection", {
   userId: varchar("user_id", { length: 36 })
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  provider: varchar("provider", { length: 20 }).notNull(), // 'plex', 'jellyfin'
+  provider: varchar("provider", { length: 20 }).notNull(), // 'plex', 'jellyfin', 'trakt'
   token: text("token"),
+  refreshToken: text("refresh_token"),
+  tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
   externalUserId: varchar("external_user_id", { length: 255 }),
   accessibleLibraries: jsonb("accessible_libraries").$type<string[]>(),
   enabled: boolean("enabled").notNull().default(true),
@@ -1018,6 +1020,90 @@ export const userConnection = pgTable("user_connection", {
     .notNull()
     .defaultNow(),
 });
+
+export const traktListLink = pgTable(
+  "trakt_list_link",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userConnectionId: uuid("user_connection_id")
+      .notNull()
+      .references(() => userConnection.id, { onDelete: "cascade" }),
+    traktListId: integer("trakt_list_id").notNull(),
+    traktListSlug: varchar("trakt_list_slug", { length: 255 }).notNull(),
+    localListId: uuid("local_list_id")
+      .notNull()
+      .references(() => list.id, { onDelete: "cascade" }),
+    remoteUpdatedAt: timestamp("remote_updated_at", { withTimezone: true }),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("idx_trakt_list_link_connection_remote").on(
+      table.userConnectionId,
+      table.traktListId,
+    ),
+    uniqueIndex("idx_trakt_list_link_local").on(table.localListId),
+    index("idx_trakt_list_link_connection").on(table.userConnectionId),
+  ],
+);
+
+export const traktSyncState = pgTable(
+  "trakt_sync_state",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userConnectionId: uuid("user_connection_id")
+      .notNull()
+      .references(() => userConnection.id, { onDelete: "cascade" }),
+    lastPulledAt: timestamp("last_pulled_at", { withTimezone: true }),
+    lastPushedAt: timestamp("last_pushed_at", { withTimezone: true }),
+    lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("idx_trakt_sync_state_connection").on(table.userConnectionId),
+  ],
+);
+
+export const traktHistorySync = pgTable(
+  "trakt_history_sync",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userConnectionId: uuid("user_connection_id")
+      .notNull()
+      .references(() => userConnection.id, { onDelete: "cascade" }),
+    localHistoryId: uuid("local_history_id").references(() => userWatchHistory.id, {
+      onDelete: "cascade",
+    }),
+    remoteHistoryId: bigint("remote_history_id", { mode: "number" }),
+    syncedDirection: varchar("synced_direction", { length: 10 }).notNull(), // 'pull' | 'push'
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("idx_trakt_history_sync_local").on(
+      table.userConnectionId,
+      table.localHistoryId,
+    ),
+    uniqueIndex("idx_trakt_history_sync_remote").on(
+      table.userConnectionId,
+      table.remoteHistoryId,
+    ),
+    index("idx_trakt_history_sync_connection").on(table.userConnectionId),
+  ],
+);
 
 // ─── User Media States (Watching, Completed, Rating) ───
 
@@ -1434,6 +1520,7 @@ export const listRelations = relations(list, ({ one, many }) => ({
   items: many(listItem),
   members: many(listMember),
   invitations: many(listInvitation),
+  traktLinks: many(traktListLink),
 }));
 
 export const listItemRelations = relations(listItem, ({ one }) => ({
@@ -1483,12 +1570,47 @@ export const downloadRequestRelations = relations(
   }),
 );
 
-export const userConnectionRelations = relations(userConnection, ({ one }) => ({
+export const userConnectionRelations = relations(userConnection, ({ one, many }) => ({
   user: one(user, {
     fields: [userConnection.userId],
     references: [user.id],
   }),
+  traktListLinks: many(traktListLink),
+  traktSyncStates: many(traktSyncState),
+  traktHistorySync: many(traktHistorySync),
 }));
+
+export const traktListLinkRelations = relations(traktListLink, ({ one }) => ({
+  userConnection: one(userConnection, {
+    fields: [traktListLink.userConnectionId],
+    references: [userConnection.id],
+  }),
+  localList: one(list, {
+    fields: [traktListLink.localListId],
+    references: [list.id],
+  }),
+}));
+
+export const traktSyncStateRelations = relations(traktSyncState, ({ one }) => ({
+  userConnection: one(userConnection, {
+    fields: [traktSyncState.userConnectionId],
+    references: [userConnection.id],
+  }),
+}));
+
+export const traktHistorySyncRelations = relations(
+  traktHistorySync,
+  ({ one }) => ({
+    userConnection: one(userConnection, {
+      fields: [traktHistorySync.userConnectionId],
+      references: [userConnection.id],
+    }),
+    localHistory: one(userWatchHistory, {
+      fields: [traktHistorySync.localHistoryId],
+      references: [userWatchHistory.id],
+    }),
+  }),
+);
 
 export const userMediaLibraryRelations = relations(userMediaLibrary, ({ one }) => ({
   user: one(user, {

@@ -148,6 +148,26 @@ export const SETTINGS_REGISTRY = {
     hidden: true,
   }),
 
+  // ── Services: Trakt ───────────────────────────────────────────────────────
+  "trakt.clientId": def({
+    group: "services.trakt",
+    label: "Trakt Client ID",
+    help: "OAuth application client id from trakt.tv/oauth/applications",
+    schema: z.string().min(1),
+    secret: false,
+    inputType: "text",
+    envVar: "TRAKT_CLIENT_ID",
+  }),
+  "trakt.clientSecret": def({
+    group: "services.trakt",
+    label: "Trakt Client Secret",
+    help: "OAuth application client secret used for device token exchange",
+    schema: z.string().min(1),
+    secret: true,
+    inputType: "password",
+    envVar: "TRAKT_CLIENT_SECRET",
+  }),
+
   // ── Downloads: qBittorrent ───────────────────────────────────────────────
   "qbittorrent.enabled": def({
     group: "downloads.qbittorrent",
