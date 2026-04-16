@@ -86,11 +86,11 @@ export function MediaReviewSection({
             <button
               type="button"
               onClick={() => setShowForm(true)}
-              className="flex h-8 items-center gap-1.5 rounded-full bg-foreground px-3 text-xs font-medium text-background transition-opacity hover:opacity-80"
+              className="flex h-8 w-8 items-center justify-center rounded-xl bg-foreground text-background transition-opacity hover:opacity-80"
               title="Write a review"
+              aria-label="Write a review"
             >
               <SquarePen size={14} />
-              <span className="hidden sm:inline">Review</span>
             </button>
           )}
         </div>
