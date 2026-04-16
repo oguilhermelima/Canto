@@ -13,6 +13,7 @@ import { handleBackfillExtras } from "./jobs/backfill-extras";
 import { handleSeedManagement } from "./jobs/seed-management";
 import { handleFolderScan } from "./jobs/folder-scan";
 import { handleValidateDownloads } from "./jobs/validate-downloads";
+import { handleTraktSync, handleTraktSyncUser } from "./jobs/trakt-sync";
 import { refreshExtras } from "@canto/core/domain/use-cases/refresh-extras";
 import { replaceShowWithTvdb } from "@canto/core/domain/use-cases/replace-show-with-tvdb";
 import { rebuildUserRecs } from "@canto/core/domain/use-cases/rebuild-user-recs";
@@ -52,6 +53,8 @@ const queues = {
   plexSync: new Queue("plex-sync", { connection: redisConnection }),
   reverseSyncFull: new Queue("reverse-sync-full", { connection: redisConnection }),
   reverseSyncUser: new Queue("reverse-sync-user", { connection: redisConnection }),
+  traktSync: new Queue("trakt-sync", { connection: redisConnection }),
+  traktSyncUser: new Queue("trakt-sync-user", { connection: redisConnection }),
   stallDetection: new Queue("stall-detection", { connection: redisConnection }),
   rssSync: new Queue("rss-sync", { connection: redisConnection }),
   dailyRecsCheck: new Queue("daily-recs-check", { connection: redisConnection }),
@@ -98,6 +101,12 @@ async function setupSchedules(): Promise<void> {
     "reverse-sync-full-scheduler",
     { every: 24 * 60 * 60 * 1000, startDate: jitterStart(10 * 60 * 1000) },
     { name: "reverse-sync-full" },
+  );
+
+  await queues.traktSync.upsertJobScheduler(
+    "trakt-sync-scheduler",
+    { every: 10 * 60 * 1000, startDate: jitterStart(2 * 60 * 1000) },
+    { name: "trakt-sync" },
   );
 
   await queues.stallDetection.upsertJobScheduler(
@@ -178,6 +187,21 @@ const workers = [
     }
     console.log(`[reverse-sync-user] Running job ${job.id} for user ${userId}`);
     await handleReverseSyncUser(userId);
+  }, { connection: redisConnection, concurrency: 2 }),
+
+  new Worker("trakt-sync", async (job) => {
+    console.log(`[trakt-sync] Running job ${job.id}`);
+    await handleTraktSync();
+  }, { connection: redisConnection, concurrency: 1 }),
+
+  new Worker("trakt-sync-user", async (job) => {
+    const { userId } = job.data as { userId: string };
+    if (!userId) {
+      console.warn(`[trakt-sync-user] Job ${job.id} missing userId, skipping`);
+      return;
+    }
+    console.log(`[trakt-sync-user] Running job ${job.id} for user ${userId}`);
+    await handleTraktSyncUser(userId);
   }, { connection: redisConnection, concurrency: 2 }),
 
   new Worker("stall-detection", async (job) => {
