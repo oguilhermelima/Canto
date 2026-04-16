@@ -8,6 +8,7 @@ import { MediaServersSection } from "./media-servers-section";
 import { DownloadsSection } from "./downloads-section";
 import { SearchTabSection } from "./search-tab-section";
 import { ManualScanSection } from "./manual-scan-section";
+import { TraktSection } from "./trakt-section";
 
 const SECTION_COMPONENTS: Record<string, React.ComponentType> = {
   status: StatusTab,
@@ -15,6 +16,7 @@ const SECTION_COMPONENTS: Record<string, React.ComponentType> = {
   metadata: MetadataProvidersSection,
   search: SearchTabSection,
   "media-servers": MediaServersSection,
+  trakt: TraktSection,
   downloads: DownloadsSection,
   "manual-scan": ManualScanSection,
   about: AboutSection,

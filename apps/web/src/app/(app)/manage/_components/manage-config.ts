@@ -5,6 +5,7 @@ import {
   Search,
   HardDrive,
   MonitorPlay,
+  Link2,
   FolderSearch,
   Info,
 } from "lucide-react";
@@ -36,6 +37,7 @@ export const MANAGE_SECTIONS: ManageSectionGroup[] = [
       { key: "metadata", label: "Metadata", icon: Database, description: "TMDB & TVDB provider configuration" },
       { key: "search", label: "Indexers", icon: Search, description: "Torrent search aggregators" },
       { key: "media-servers", label: "Media Servers", icon: MonitorPlay, description: "Plex & Jellyfin connections" },
+      { key: "trakt", label: "Trakt", icon: Link2, description: "OAuth app credentials for Trakt integration" },
     ],
   },
   {
