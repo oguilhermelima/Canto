@@ -9,13 +9,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@canto/ui/popover";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Settings2 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { AddToListButton } from "~/components/media/add-to-list-button";
 import { MediaLogo } from "~/components/media/media-logo";
 import { RatingControl } from "~/components/media/RatingControl";
-import { PlaybackProgressInfo } from "~/components/media/PlaybackProgressInfo";
 import { WatchTrackingButton } from "~/components/media/watched-toggle-button";
 import { FavoriteButton } from "~/components/media/favorite-button";
 
@@ -75,6 +74,8 @@ interface MediaDetailHeroProps {
     resolution?: string | null;
   }>;
   isAdmin?: boolean;
+  showManageAction?: boolean;
+  onOpenManage?: () => void;
   /** Content rendered at the bottom of the hero, still over the backdrop */
   children?: React.ReactNode;
   // Where to watch
@@ -92,12 +93,6 @@ interface MediaDetailHeroProps {
   trackingStatus?: "none" | "planned" | "watching" | "completed" | "dropped";
   rating?: number | null;
   isFavorite?: boolean;
-  playbackProgress?: {
-    progressSeconds: number;
-    lastWatchedAt: Date | null;
-    source: string | null;
-    isCompleted: boolean;
-  } | null;
   watchTrackingSeasons?: WatchSeason[];
 }
 
@@ -116,7 +111,9 @@ export function MediaDetailHero({
   logoPath,
   externalId,
   provider,
-  isAdmin: _isAdmin,
+  isAdmin,
+  showManageAction,
+  onOpenManage,
   children,
   servers,
   flatrateProviders,
@@ -129,7 +126,6 @@ export function MediaDetailHero({
   trackingStatus,
   rating,
   isFavorite,
-  playbackProgress,
   posterPath,
   watchTrackingSeasons,
 }: MediaDetailHeroProps): React.JSX.Element {
@@ -283,7 +279,7 @@ export function MediaDetailHero({
           )}
 
           {/* Where to Watch row — edge-to-edge scroll on mobile */}
-          {(hasServers || hasProviders || playbackProgress) && (
+          {(hasServers || hasProviders) && (
             <div className="-mx-4 md:mx-0">
               <div className="flex items-center gap-2.5 overflow-x-auto px-4 pb-1 scrollbar-none md:px-0">
                 {(hasServers || hasProviders) && (
@@ -370,17 +366,6 @@ export function MediaDetailHero({
                   />
                 )}
 
-                {playbackProgress && (
-                  <div className="ml-auto shrink-0 border-l border-foreground/10 pl-4">
-                    <PlaybackProgressInfo
-                      progressSeconds={playbackProgress.progressSeconds}
-                      lastWatchedAt={playbackProgress.lastWatchedAt}
-                      source={playbackProgress.source}
-                      isCompleted={playbackProgress.isCompleted}
-                    />
-                  </div>
-                )}
-
                 {/* Right spacer for mobile scroll */}
                 <div className="w-4 shrink-0 md:hidden" />
               </div>
@@ -417,6 +402,17 @@ export function MediaDetailHero({
                 showWatchlistToggle={false}
                 includeWatchlistInMenu
               />
+              {isAdmin && showManageAction && onOpenManage && (
+                <button
+                  type="button"
+                  onClick={onOpenManage}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-foreground/10 bg-foreground/15 text-foreground/70 backdrop-blur-md transition-all hover:bg-foreground/25 hover:text-foreground"
+                  aria-label="Manage library"
+                  title="Manage"
+                >
+                  <Settings2 className="h-5 w-5" />
+                </button>
+              )}
             </div>
             {persistedId && isWatched && (
               <div className="inline-flex items-center gap-3 rounded-2xl border border-foreground/10 bg-black/30 px-3 py-2 backdrop-blur-md">
@@ -458,7 +454,7 @@ function MoreProvidersPopover({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button className="flex h-9 items-center gap-1.5 rounded-xl bg-white/10 px-3 text-sm text-foreground/70 backdrop-blur-sm transition-colors hover:bg-white/15 hover:text-foreground">
+        <button className="flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-white/10 px-3 text-sm text-foreground/70 backdrop-blur-sm transition-colors hover:bg-white/15 hover:text-foreground">
           Rent / Buy
           <ChevronRight className="h-3.5 w-3.5" />
         </button>

@@ -7,6 +7,7 @@ import { useIsAdmin } from "~/hooks/use-is-admin";
 import { useWatchRegion } from "~/hooks/use-watch-region";
 import { useDocumentTitle } from "~/hooks/use-document-title";
 import { useDirectSearch } from "~/hooks/use-direct-search";
+import { resolveState } from "~/lib/torrent-utils";
 
 export function useMediaDetail(id: string, mediaType: "movie" | "show") {
   const isAdmin = useIsAdmin();
@@ -83,6 +84,26 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
     { enabled: !!mediaId && isMovieInLibrary },
   );
   const mediaTorrents = mediaTorrentsQuery.data;
+  const liveTorrents = trpc.torrent.listLiveByMedia.useQuery(
+    { mediaId: mediaId ?? "" },
+    {
+      enabled: !!mediaId && isAdmin,
+      refetchInterval: (query) => {
+        const items = query.state.data;
+        if (!items || items.length === 0) return 15_000;
+        return items.some(
+          (t) =>
+            !resolveState(
+              t.status,
+              t.live?.state,
+              t.live?.progress ?? t.progress,
+            ).isDownloaded,
+        )
+          ? 3_000
+          : 15_000;
+      },
+    },
+  );
 
   const utils = trpc.useUtils();
 
@@ -211,6 +232,7 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
     mediaServers,
     watchProviderLinks,
     mediaTorrents,
+    liveTorrents,
     existingRequest,
     allLibraries,
     userMediaState,

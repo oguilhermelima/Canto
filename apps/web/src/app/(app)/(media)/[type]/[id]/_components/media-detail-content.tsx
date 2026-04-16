@@ -105,6 +105,8 @@ export function MediaDetailContent({
         trackingStatus={detail.userMediaState.data?.trackingStatus as "none" | "planned" | "watching" | "completed" | "dropped" | undefined}
         rating={detail.userMediaState.data?.rating}
         isFavorite={detail.userMediaState.data?.isFavorite}
+        showManageAction={detail.isAdmin && media.inLibrary}
+        onOpenManage={() => detail.setPreferencesOpen(true)}
         watchTrackingSeasons={
           media.seasons.map((season) => ({
             number: season.number,
@@ -118,25 +120,15 @@ export function MediaDetailContent({
                   })),
               }))
         }
-        playbackProgress={
-          detail.userMediaState.data
-            ? {
-                progressSeconds: detail.userMediaState.data.progress,
-                lastWatchedAt: detail.userMediaState.data.lastWatchedAt,
-                source: detail.userMediaState.data.source,
-                isCompleted: detail.userMediaState.data.isCompleted,
-              }
-            : null
-        }
       >
         <div className="flex flex-col gap-12 pb-16 md:gap-16">
-          {/* Admin: Download & Manage */}
+          {/* Admin: Download */}
           <AdminActions
             media={media}
             isAdmin={detail.isAdmin}
             mediaType={mediaType}
+            liveTorrents={detail.liveTorrents.data ?? []}
             onOpenDownload={() => detail.setDownloadModalOpen(true)}
-            onOpenManage={() => detail.setPreferencesOpen(true)}
           />
 
           {/* Request Download — non-admin users */}
