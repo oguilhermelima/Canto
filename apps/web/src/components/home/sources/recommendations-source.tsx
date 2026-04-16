@@ -76,6 +76,7 @@ export function RecommendationsSource({ sectionId, title, style }: Recommendatio
       onLoadMore={query.hasNextPage ? handleLoadMore : undefined}
       onRetry={() => query.refetch()}
       emptyPreset="emptyWatchlist"
+      excludeFromDedup={true}
     />
   );
 }

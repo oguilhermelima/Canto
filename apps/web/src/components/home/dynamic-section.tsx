@@ -24,6 +24,7 @@ interface DynamicSectionProps {
   onLoadMore?: () => void;
   onRetry?: () => void;
   emptyPreset?: string;
+  excludeFromDedup?: boolean;
 }
 
 /* ── Mappers: SectionItem[] → component-specific shapes ── */
@@ -109,19 +110,17 @@ export function DynamicSection({
   onLoadMore,
   onRetry,
   emptyPreset,
+  excludeFromDedup = false,
 }: DynamicSectionProps): React.JSX.Element | null {
   const dedup = useDedup();
 
   // Filter out items that have already been rendered in other sections
-  // EXCEPT for personalized sections that should always show their full content
-  const isPersonalizedSection =
-    sectionId?.includes("recommendations") ||
-    sectionId?.includes("spotlight") ||
-    sectionId?.includes("continue_watching");
+  // EXCEPT for sections that should always show their full content
+  const shouldExcludeFromDedup = excludeFromDedup;
 
   const filteredItems = useMemo(() => {
-    // Never filter personalized sections - they should always show their content
-    if (isPersonalizedSection) {
+    // Never filter excluded sections - they should always show their content
+    if (shouldExcludeFromDedup) {
       return items;
     }
 
@@ -136,7 +135,7 @@ export function DynamicSection({
     });
 
     return unique;
-  }, [items, dedup, isPersonalizedSection]);
+  }, [items, dedup, shouldExcludeFromDedup]);
 
   if (isError) {
     return (

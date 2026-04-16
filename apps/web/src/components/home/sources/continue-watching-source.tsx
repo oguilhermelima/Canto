@@ -69,6 +69,7 @@ function ContinueWatchingDynamic({ sectionId, title, style }: ContinueWatchingSo
       isFetchingMore={query.isFetchingNextPage}
       onLoadMore={query.hasNextPage ? handleLoadMore : undefined}
       onRetry={() => query.refetch()}
+      excludeFromDedup={true}
     />
   );
 }

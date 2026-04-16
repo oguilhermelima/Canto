@@ -47,6 +47,7 @@ export function SpotlightSource({ sectionId, style, title }: SpotlightSourceProp
       isLoading={query.isLoading}
       isError={query.isError}
       onRetry={() => query.refetch()}
+      excludeFromDedup={true}
     />
   );
 }
