@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback, useEffect } from "react";
+import { useMemo, useCallback } from "react";
 import { trpc } from "~/lib/trpc/client";
 import type { SectionItem } from "../section-item";
 import { DynamicSection } from "../dynamic-section";
@@ -20,11 +20,6 @@ function ContinueWatchingDynamic({ sectionId, title, style }: ContinueWatchingSo
     { limit: 48, view: "continue" as const },
     { getNextPageParam: (lp) => lp.nextCursor, initialCursor: 0 },
   );
-
-  // Ensure fresh data on mount
-  useEffect(() => {
-    void query.refetch();
-  }, [query]);
 
   const items = useMemo<SectionItem[]>(
     () =>

@@ -113,12 +113,11 @@ export function DynamicSection({
   const dedup = useDedup();
 
   // Filter out items that have already been rendered in other sections
-  // EXCEPT for personalized sections (recommendations, spotlight, continue watching)
-  // which should always show their full content
+  // EXCEPT for personalized sections that should always show their full content
   const isPersonalizedSection =
     sectionId?.includes("recommendations") ||
     sectionId?.includes("spotlight") ||
-    sectionId?.includes("continue");
+    sectionId?.includes("continue_watching");
 
   const filteredItems = useMemo(() => {
     // Never filter personalized sections - they should always show their content
