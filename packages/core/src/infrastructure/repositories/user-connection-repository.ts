@@ -23,12 +23,22 @@ export async function findUserConnectionsByUserId(db: Database, userId: string) 
 export async function findUserConnectionByProvider(
   db: Database,
   userId: string,
-  provider: "plex" | "jellyfin",
+  provider: "plex" | "jellyfin" | "trakt",
 ) {
   return db.query.userConnection.findFirst({
     where: and(
       eq(userConnection.userId, userId),
       eq(userConnection.provider, provider),
+    ),
+  });
+}
+
+export async function findEnabledTraktConnections(db: Database) {
+  return db.query.userConnection.findMany({
+    where: and(
+      eq(userConnection.enabled, true),
+      eq(userConnection.provider, "trakt"),
+      isNotNull(userConnection.token),
     ),
   });
 }

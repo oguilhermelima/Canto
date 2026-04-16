@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const userConnectionProvider = z.enum(["plex", "jellyfin"]);
+export const userConnectionProvider = z.enum(["plex", "jellyfin", "trakt"]);
 export type UserConnectionProvider = z.infer<typeof userConnectionProvider>;
 
 export const addUserConnectionInput = z.discriminatedUnion("provider", [

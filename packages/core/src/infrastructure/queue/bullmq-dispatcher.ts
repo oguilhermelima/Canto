@@ -25,6 +25,7 @@ const getTranslateEpisodesQueue = createQueueGetter("translate-episodes");
 const getJellyfinSyncQueue = createQueueGetter("jellyfin-sync");
 const getPlexSyncQueue = createQueueGetter("plex-sync");
 const getReverseSyncUserQueue = createQueueGetter("reverse-sync-user");
+const getTraktSyncUserQueue = createQueueGetter("trakt-sync-user");
 const getFolderScanQueue = createQueueGetter("folder-scan");
 
 export async function dispatchRefreshExtras(mediaId: string): Promise<void> {
@@ -92,6 +93,23 @@ export async function dispatchPlexSync(): Promise<boolean> {
 export async function dispatchUserReverseSync(userId: string): Promise<boolean> {
   const q = await getReverseSyncUserQueue();
   const jobId = `reverse-sync-user-${userId}`;
+  const existing = await q.getJob(jobId);
+  if (existing) {
+    const state = await existing.getState();
+    if (state === "active" || state === "waiting") return false;
+    await existing.remove();
+  }
+  await q.add(q.name, { userId }, { jobId, removeOnComplete: true, removeOnFail: 50 });
+  return true;
+}
+
+/**
+ * Dispatch an on-demand Trakt sync for a single user.
+ * Dedupes via jobId so frequent triggers collapse into one run.
+ */
+export async function dispatchUserTraktSync(userId: string): Promise<boolean> {
+  const q = await getTraktSyncUserQueue();
+  const jobId = `trakt-sync-user-${userId}`;
   const existing = await q.getJob(jobId);
   if (existing) {
     const state = await existing.getState();

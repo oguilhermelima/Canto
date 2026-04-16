@@ -140,7 +140,11 @@ export class UserConnectionService {
     return findUserConnectionsByUserId(this.db, userId);
   }
 
-  async addOrUpdateConnection(userId: string, authResult: UserConnectionAuthResult, provider: "plex" | "jellyfin") {
+  async addOrUpdateConnection(
+    userId: string,
+    authResult: UserConnectionAuthResult,
+    provider: "plex" | "jellyfin" | "trakt",
+  ) {
     if (!authResult.success || !authResult.token || !authResult.externalUserId) {
       throw new Error("Cannot add connection without successful authentication");
     }
