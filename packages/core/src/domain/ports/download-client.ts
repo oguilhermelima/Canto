@@ -1,9 +1,13 @@
 export interface DownloadClientPort {
   addTorrent(url: string, category?: string, savePath?: string): Promise<void>;
+  addTorrentFile(fileName: string, fileData: Uint8Array, category?: string, savePath?: string): Promise<void>;
   listTorrents(filter?: { hashes?: string[] }): Promise<TorrentInfo[]>;
   getTorrentFiles(hash: string): Promise<TorrentFileInfo[]>;
   pauseTorrent(hash: string): Promise<void>;
   resumeTorrent(hash: string): Promise<void>;
+  forceResumeTorrent(hash: string): Promise<void>;
+  recheckTorrent(hash: string): Promise<void>;
+  reannounceTorrent(hash: string): Promise<void>;
   deleteTorrent(hash: string, deleteFiles: boolean): Promise<void>;
   ensureCategory(category: string, savePath?: string): Promise<void>;
   createCategory(category: string, savePath?: string): Promise<void>;

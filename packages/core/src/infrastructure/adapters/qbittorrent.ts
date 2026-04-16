@@ -92,6 +92,29 @@ export class QBittorrentClient implements DownloadClientPort {
     }
   }
 
+  async addTorrentFile(
+    fileName: string,
+    fileData: Uint8Array,
+    category?: string,
+    savePath?: string,
+  ): Promise<void> {
+    const body = new FormData();
+    const normalized = new Uint8Array(fileData);
+    body.set("torrents", new Blob([normalized.buffer]), fileName);
+    if (category) body.set("category", category);
+    if (savePath) body.set("savepath", savePath);
+
+    const response = await this.request("/api/v2/torrents/add", {
+      method: "POST",
+      body,
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(`qBittorrent add torrent file failed: ${response.status} ${text}`);
+    }
+  }
+
   async listTorrents(filter?: { hashes?: string[] }): Promise<TorrentInfo[]> {
     const params = new URLSearchParams();
     if (filter?.hashes?.length) {
@@ -127,6 +150,43 @@ export class QBittorrentClient implements DownloadClientPort {
     });
     if (!response.ok) {
       throw new Error(`qBittorrent resume failed: ${response.status}`);
+    }
+  }
+
+  async forceResumeTorrent(hash: string): Promise<void> {
+    const forceStartBody = new URLSearchParams({ hashes: hash, value: "true" });
+    const forceStartResponse = await this.request("/api/v2/torrents/setForceStart", {
+      method: "POST",
+      body: forceStartBody,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    if (!forceStartResponse.ok) {
+      throw new Error(`qBittorrent force start failed: ${forceStartResponse.status}`);
+    }
+    await this.resumeTorrent(hash);
+  }
+
+  async recheckTorrent(hash: string): Promise<void> {
+    const body = new URLSearchParams({ hashes: hash });
+    const response = await this.request("/api/v2/torrents/recheck", {
+      method: "POST",
+      body,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    if (!response.ok) {
+      throw new Error(`qBittorrent recheck failed: ${response.status}`);
+    }
+  }
+
+  async reannounceTorrent(hash: string): Promise<void> {
+    const body = new URLSearchParams({ hashes: hash });
+    const response = await this.request("/api/v2/torrents/reannounce", {
+      method: "POST",
+      body,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    if (!response.ok) {
+      throw new Error(`qBittorrent reannounce failed: ${response.status}`);
     }
   }
 

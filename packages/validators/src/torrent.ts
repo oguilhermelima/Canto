@@ -60,3 +60,42 @@ export const moveTorrentInput = z.object({
   newPath: z.string().min(1),
 });
 export type MoveTorrentInput = z.infer<typeof moveTorrentInput>;
+
+export const addMagnetInput = z.object({
+  magnetUrl: z.string().trim().startsWith("magnet:"),
+});
+export type AddMagnetInput = z.infer<typeof addMagnetInput>;
+
+export const addTorrentFileInput = z.object({
+  fileName: z.string().trim().min(1).max(255),
+  fileBase64: z.string().min(1),
+});
+export type AddTorrentFileInput = z.infer<typeof addTorrentFileInput>;
+
+export const importFromClientInput = z.object({
+  hash: z.string().trim().min(1),
+  mediaExternalId: z.number().int().positive(),
+  mediaProvider: z.enum(["tmdb", "tvdb"]),
+  mediaType: z.enum(["movie", "show"]),
+  downloadType: z.enum(["movie", "season", "episode"]),
+  seasonNumber: z.number().int().positive().optional(),
+  episodeNumbers: z.array(z.number().int().positive()).optional(),
+}).superRefine((data, ctx) => {
+  if (data.downloadType === "episode") {
+    if (!data.seasonNumber) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["seasonNumber"],
+        message: "seasonNumber is required when downloadType is episode",
+      });
+    }
+    if (!data.episodeNumbers || data.episodeNumbers.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["episodeNumbers"],
+        message: "episodeNumbers is required when downloadType is episode",
+      });
+    }
+  }
+});
+export type ImportFromClientInput = z.infer<typeof importFromClientInput>;
