@@ -39,6 +39,14 @@ const BRAND = {
     label: "Jellyfin",
     logo: "/jellyfin-logo.svg",
   },
+  trakt: {
+    color: "#ed1c24",
+    bg: "bg-[#ed1c24]/10",
+    border: "border-[#ed1c24]/20",
+    ring: "ring-[#ed1c24]/30",
+    label: "Trakt",
+    logo: "/trakt-logo.png",
+  },
 } as const;
 
 type Provider = keyof typeof BRAND;
@@ -55,6 +63,21 @@ function formatRelative(date: Date | string): string {
   return `${days}d ago`;
 }
 
+function openOAuthPopup(
+  url: string,
+  name: string,
+  width = 700,
+  height = 700,
+): void {
+  const left = window.screenX + (window.outerWidth - width) / 2;
+  const top = window.screenY + (window.outerHeight - height) / 2;
+  window.open(
+    url,
+    name,
+    `width=${width},height=${height},left=${left},top=${top}`,
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Provider logo                                                              */
 /* -------------------------------------------------------------------------- */
@@ -67,6 +90,18 @@ function ProviderIcon({
   size?: number;
 }): React.JSX.Element {
   const brand = BRAND[provider];
+  if (provider === "trakt") {
+    return (
+      <img
+        src={brand.logo}
+        alt=""
+        width={size}
+        height={size}
+        className="block rounded-[6px]"
+      />
+    );
+  }
+
   return (
     <span
       style={{
@@ -210,6 +245,7 @@ function ConnectionCard({
 const SLOT_HOVER: Record<Provider, string> = {
   plex: "hover:border-[#e5a00d]/30",
   jellyfin: "hover:border-[#a95ce0]/30",
+  trakt: "hover:border-[#ed1c24]/30",
 };
 
 function ProviderSlot({
@@ -225,16 +261,16 @@ function ProviderSlot({
       type="button"
       onClick={onConnect}
       className={cn(
-        "group flex w-full items-center gap-5 rounded-2xl border border-dashed px-5 py-4 transition-all hover:border-solid hover:bg-muted/20",
-        "border-border/40",
+        "group flex w-full items-center gap-5 rounded-2xl border bg-muted/20 px-5 py-4 transition-colors",
+        brand.border,
         SLOT_HOVER[provider],
       )}
     >
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border/30 bg-muted/30 transition-colors group-hover:bg-muted/60">
+      <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border", brand.bg, brand.border)}>
         <ProviderIcon provider={provider} size={20} />
       </div>
       <div className="min-w-0 flex-1 text-left">
-        <p className="text-sm font-medium text-muted-foreground group-hover:text-foreground">
+        <p className="text-sm font-medium text-foreground">
           {brand.label}
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground">Not connected</p>
@@ -273,18 +309,18 @@ export function ConnectionsSection(): React.JSX.Element {
 
   return (
     <SettingsSection
-      title="Media Server Connections"
-      description="Link your personal accounts to sync watch progress and ratings."
+      title="Connections"
+      description="Link media servers and Trakt to sync watch progress, lists, and ratings."
     >
       {isLoading ? (
         <div className="space-y-3">
-          {[0, 1].map((i) => (
+          {[0, 1, 2].map((i) => (
             <div key={i} className="h-20 animate-pulse rounded-2xl bg-muted/30" />
           ))}
         </div>
       ) : (
         <div className="space-y-3">
-          {(["plex", "jellyfin"] as Provider[]).map((provider) => {
+          {(["plex", "jellyfin", "trakt"] as Provider[]).map((provider) => {
             const conn = connections?.find((c) => c.provider === provider);
             if (conn) {
               return (
@@ -330,8 +366,8 @@ function AddConnectionForm({
   onSuccess: () => void;
 }): React.JSX.Element {
   const brand = BRAND[provider];
-  const [authMode, setAuthMode] = useState<"oauth" | "token" | "credentials">(
-    provider === "plex" ? "oauth" : "credentials",
+  const [authMode, setAuthMode] = useState<"oauth" | "token" | "credentials" | "device">(
+    provider === "plex" ? "oauth" : provider === "trakt" ? "device" : "credentials",
   );
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -352,10 +388,34 @@ function AddConnectionForm({
   const createPlexPin = trpc.userConnection.plexPinCreate.useMutation();
   const [pinData, setPinData] = useState<{ pinId: number; clientId: string } | null>(null);
   const [polling, setPolling] = useState(false);
+  const createTraktDevice = trpc.userConnection.traktDeviceCreate.useMutation();
+  const [traktDeviceCode, setTraktDeviceCode] = useState<string | null>(null);
+  const [traktUserCode, setTraktUserCode] = useState<string | null>(null);
+  const [traktVerificationUrl, setTraktVerificationUrl] = useState<string | null>(null);
+  const [traktPolling, setTraktPolling] = useState(false);
+  const [traktPollInterval, setTraktPollInterval] = useState(3_000);
+  const [traktAuthError, setTraktAuthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAuthMode(provider === "plex" ? "oauth" : provider === "trakt" ? "device" : "credentials");
+    setLoading(false);
+    setPolling(false);
+    setTraktPolling(false);
+    setPinData(null);
+    setTraktDeviceCode(null);
+    setTraktUserCode(null);
+    setTraktVerificationUrl(null);
+    setTraktAuthError(null);
+  }, [provider]);
 
   const plexPinCheck = trpc.userConnection.plexPinCheck.useQuery(
     { pinId: pinData?.pinId ?? 0, clientId: pinData?.clientId ?? "" },
     { enabled: polling && !!pinData, refetchInterval: 2000 },
+  );
+
+  const traktDeviceCheck = trpc.userConnection.traktDeviceCheck.useQuery(
+    { deviceCode: traktDeviceCode ?? "" },
+    { enabled: traktPolling && !!traktDeviceCode, refetchInterval: traktPollInterval },
   );
 
   useEffect(() => {
@@ -372,19 +432,48 @@ function AddConnectionForm({
     }
   }, [plexPinCheck.data, onSuccess]);
 
+  useEffect(() => {
+    if (traktDeviceCheck.data?.authenticated) {
+      setTraktPolling(false);
+      setTraktDeviceCode(null);
+      setTraktUserCode(null);
+      setTraktVerificationUrl(null);
+      setTraktAuthError(null);
+      toast.success("Trakt connected — sync has started");
+      onSuccess();
+      return;
+    }
+
+    if (traktDeviceCheck.data?.expired) {
+      setTraktPolling(false);
+      setTraktDeviceCode(null);
+      setTraktUserCode(null);
+      setTraktVerificationUrl(null);
+      setLoading(false);
+      setTraktAuthError(null);
+      toast.error("Trakt authorization expired");
+    }
+  }, [traktDeviceCheck.data, onSuccess]);
+
+  useEffect(() => {
+    if (!traktDeviceCheck.error) return;
+    setTraktPolling(false);
+    setLoading(false);
+    setTraktAuthError(traktDeviceCheck.error.message);
+    toast.error(traktDeviceCheck.error.message);
+  }, [traktDeviceCheck.error]);
+
   const handlePlexOAuth = () => {
     setLoading(true);
     createPlexPin.mutate(undefined, {
       onSuccess: (data) => {
         setPinData({ pinId: data.pinId, clientId: data.clientId });
         setPolling(true);
-        const w = 600, h = 700;
-        const left = window.screenX + (window.outerWidth - w) / 2;
-        const top = window.screenY + (window.outerHeight - h) / 2;
-        window.open(
+        openOAuthPopup(
           `https://app.plex.tv/auth#?clientID=${data.clientId}&code=${data.pinCode}&context%5Bdevice%5D%5Bproduct%5D=Canto`,
           "plex-auth",
-          `width=${w},height=${h},left=${left},top=${top}`,
+          600,
+          700,
         );
       },
       onError: (err) => {
@@ -399,9 +488,46 @@ function AddConnectionForm({
     setLoading(true);
     if (provider === "plex") {
       addConnection.mutate({ provider: "plex", token });
+    } else if (provider === "trakt") {
+      setLoading(false);
     } else {
       addConnection.mutate({ provider: "jellyfin", username, password });
     }
+  };
+
+  const handleTraktDeviceAuth = () => {
+    setLoading(true);
+    createTraktDevice.mutate(undefined, {
+      onSuccess: (data) => {
+        setTraktDeviceCode(data.device_code);
+        setTraktUserCode(data.user_code);
+        setTraktVerificationUrl(data.verification_url);
+        setTraktPollInterval(Math.max(2_000, data.interval * 1_000));
+        setTraktPolling(true);
+        setTraktAuthError(null);
+        setLoading(false);
+        const directAuthorizationUrl = `${data.verification_url.replace(/\/$/, "")}/${encodeURIComponent(data.user_code)}`;
+        openOAuthPopup(directAuthorizationUrl, "trakt-auth", 700, 700);
+        toast.info("Authorize on Trakt and this connection will complete automatically.");
+      },
+      onError: (err) => {
+        setLoading(false);
+        setTraktAuthError(err.message);
+        toast.error(err.message);
+      },
+    });
+  };
+
+  const handleOpenTraktAuthPage = () => {
+    if (!traktVerificationUrl || !traktUserCode) return;
+    const directAuthorizationUrl = `${traktVerificationUrl.replace(/\/$/, "")}/${encodeURIComponent(traktUserCode)}`;
+    openOAuthPopup(directAuthorizationUrl, "trakt-auth", 700, 700);
+  };
+
+  const handleRetryTraktCheck = () => {
+    if (!traktDeviceCode) return;
+    setTraktAuthError(null);
+    setTraktPolling(true);
   };
 
   return (
@@ -416,7 +542,9 @@ function AddConnectionForm({
         <DialogDescription>
           {provider === "plex"
             ? "Sign in with your Plex account to start syncing your watch progress."
-            : "Enter your Jellyfin credentials to start syncing your watch progress."}
+            : provider === "jellyfin"
+              ? "Enter your Jellyfin credentials to start syncing your watch progress."
+              : "Authorize Canto in Trakt to sync watchlist, lists, ratings, favorites, and history."}
         </DialogDescription>
       </DialogHeader>
 
@@ -490,6 +618,84 @@ function AddConnectionForm({
               variant="ghost"
               className="rounded-xl"
             />
+          </div>
+        )}
+
+        {provider === "trakt" && (
+          <div className="space-y-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full rounded-xl gap-2 border-[#ed1c24]/20 hover:bg-[#ed1c24]/10"
+              onClick={handleTraktDeviceAuth}
+              disabled={loading || traktPolling}
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ProviderIcon provider="trakt" size={16} />
+              )}
+              {loading
+                ? "Preparing Trakt authorization…"
+                : traktPolling
+                  ? "Waiting for Trakt approval…"
+                  : traktUserCode
+                    ? "Generate a new Trakt code"
+                    : "Start Trakt OAuth"}
+            </Button>
+
+            {traktUserCode && traktVerificationUrl && (
+              <div className="rounded-xl border border-border/40 bg-muted/20 p-3">
+                <p className="text-xs text-muted-foreground">1) A Trakt popup was opened. If blocked, open it manually.</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="rounded-lg"
+                    onClick={handleOpenTraktAuthPage}
+                  >
+                    Open Trakt auth page
+                  </Button>
+                  <a
+                    href={traktVerificationUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-muted-foreground underline-offset-2 hover:underline break-all"
+                  >
+                    {traktVerificationUrl}
+                  </a>
+                </div>
+
+                <p className="mt-3 text-xs text-muted-foreground">2) Enter this device code on Trakt.</p>
+                <p className="mt-1 text-sm font-semibold tracking-wide">{traktUserCode}</p>
+
+                {traktAuthError ? (
+                  <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2">
+                    <p className="text-xs text-destructive">{traktAuthError}</p>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="mt-2 rounded-lg"
+                      onClick={handleRetryTraktCheck}
+                      disabled={!traktDeviceCode || traktPolling}
+                    >
+                      Retry finishing connection
+                    </Button>
+                  </div>
+                ) : null}
+
+                <p className="mt-3 flex items-center gap-1 text-xs text-muted-foreground">
+                  {traktPolling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  {traktPolling
+                    ? "3) Waiting for Trakt approval… this will finish automatically."
+                    : traktAuthError
+                      ? "3) Approval succeeded, but Canto could not finish token exchange automatically."
+                      : "3) After approval, this connection will complete automatically."}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
