@@ -10,14 +10,14 @@ export function SettingsRow({
   children?: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="flex items-center justify-between gap-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <p className="text-sm font-medium text-foreground">{label}</p>
         {description && (
           <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
         )}
       </div>
-      {children && <div className="shrink-0">{children}</div>}
+      {children && <div className="w-full sm:w-auto sm:shrink-0">{children}</div>}
     </div>
   );
 }

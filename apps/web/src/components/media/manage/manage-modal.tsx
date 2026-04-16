@@ -12,7 +12,6 @@ import {
 import {
   Settings2,
   Download,
-  Server,
   AlertTriangle,
   X,
   Loader2,
@@ -20,7 +19,6 @@ import {
 import { useManageModal } from "./use-manage-modal";
 import { PreferencesTab } from "./preferences-tab";
 import { DownloadsTab } from "./downloads-tab";
-import { ServersTab } from "./servers-tab";
 import { DangerZoneTab } from "./danger-zone-tab";
 
 /* ─── Types ─── */
@@ -36,7 +34,6 @@ interface ManageModalProps {
 const TABS = [
   { value: "preferences", label: "Preferences", icon: Settings2 },
   { value: "downloads", label: "Downloads", icon: Download },
-  { value: "servers", label: "Servers", icon: Server },
   { value: "danger", label: "Danger Zone", icon: AlertTriangle },
 ] as const;
 
@@ -56,6 +53,7 @@ export function ManageModal({
   const manage = useManageModal(mediaId, mediaType, open, () =>
     onOpenChange(false),
   );
+  const activeTabMeta = TABS.find((tab) => tab.value === activeTab) ?? TABS[0];
 
   // Reset tab when modal closes
   useEffect(() => {
@@ -64,33 +62,37 @@ export function ManageModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-border bg-background p-0 md:h-[85vh] md:max-h-[85vh] md:max-w-5xl md:rounded-[2rem] [&>button:last-child]:hidden">
-        <DialogHeader bar className="flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <DialogTitle className="truncate">{mediaTitle}</DialogTitle>
-            <DialogDescription className="mt-0.5 text-sm text-muted-foreground">
-              Manage settings
-            </DialogDescription>
+      <DialogContent className="flex h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-border bg-background p-0 md:h-[76vh] md:max-h-[76vh] md:max-w-4xl md:rounded-[2rem] [&>button:last-child]:hidden">
+        <DialogHeader bar className="border-b border-border/40 px-5 py-4 md:px-7 md:py-5">
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="truncate text-xl font-bold tracking-tight md:text-2xl">
+                {mediaTitle}
+              </DialogTitle>
+              <DialogDescription className="mt-1 text-sm text-muted-foreground">
+                Manage this title
+              </DialogDescription>
+            </div>
+            <button
+              onClick={() => onOpenChange(false)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-muted/30 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+            >
+              <X size={16} />
+            </button>
           </div>
-          <button
-            onClick={() => onOpenChange(false)}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
-          >
-            <X size={16} />
-          </button>
         </DialogHeader>
 
         {/* Mobile tab pills */}
-        <div className="flex shrink-0 gap-1.5 overflow-x-auto border-b border-border/40 px-5 py-3 md:hidden">
+        <div className="flex shrink-0 gap-1.5 overflow-x-auto border-b border-border/40 px-4 py-3 md:hidden">
           {TABS.map((tab) => (
             <button
               key={tab.value}
               onClick={() => setActiveTab(tab.value)}
               className={cn(
-                "flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-colors",
+                "flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition-colors",
                 activeTab === tab.value
-                  ? "bg-foreground text-background"
-                  : "bg-muted/40 text-muted-foreground",
+                  ? "border-border bg-muted text-foreground"
+                  : "border-border/60 bg-background text-muted-foreground",
                 tab.value === "danger" &&
                   activeTab !== "danger" &&
                   "text-red-400",
@@ -102,91 +104,129 @@ export function ManageModal({
           ))}
         </div>
 
-        {/* Two-column layout */}
         <div className="flex min-h-0 flex-1">
           {/* Desktop sidebar */}
-          <div className="hidden w-48 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-border/40 bg-muted/20 p-2 md:flex">
-            {TABS.map((tab) => (
-              <button
-                key={tab.value}
-                onClick={() => setActiveTab(tab.value)}
-                className={cn(
-                  "flex items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition-colors",
-                  activeTab === tab.value
-                    ? "bg-foreground font-medium text-background"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  tab.value === "danger" &&
-                    activeTab !== "danger" &&
-                    "text-red-400 hover:text-red-400",
-                )}
-              >
-                <tab.icon className="h-4 w-4 shrink-0" />
-                {tab.label}
-              </button>
-            ))}
+          <div className="hidden w-[210px] shrink-0 flex-col border-r border-border/40 bg-muted/[0.08] px-3 py-4 md:flex">
+            <div className="space-y-5">
+              <div>
+                <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Configuration
+                </p>
+                <div className="space-y-0.5">
+                  {TABS.filter((tab) => tab.value !== "danger").map((tab) => (
+                    <button
+                      key={tab.value}
+                      onClick={() => setActiveTab(tab.value)}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors",
+                        activeTab === tab.value
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                      )}
+                    >
+                      <tab.icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{tab.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Safety
+                </p>
+                {TABS.filter((tab) => tab.value === "danger").map((tab) => (
+                  <button
+                    key={tab.value}
+                    onClick={() => setActiveTab(tab.value)}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors",
+                      activeTab === tab.value
+                        ? "bg-red-500/10 text-red-400"
+                        : "text-red-400 hover:bg-red-500/10",
+                    )}
+                  >
+                    <tab.icon className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-5 md:p-6">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
             {manage.isLoading || !manage.media ? (
               <div className="flex min-h-[200px] items-center justify-center">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : (
-              <>
-                {activeTab === "preferences" && (
-                  <PreferencesTab
-                    media={manage.media}
-                    mediaId={mediaId}
-                    mediaType={mediaType}
-                    libraries={manage.libraries}
-                    setMediaLibrary={manage.setMediaLibrary}
-                    setContinuousDownload={manage.setContinuousDownload}
-                    refreshMeta={manage.refreshMeta}
-                    invalidateMedia={manage.invalidateMedia}
-                  />
-                )}
+              <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+                <div className="rounded-2xl border border-border/40 bg-muted/[0.05] px-4 py-3.5 md:px-5">
+                  <p
+                    className={cn(
+                      "text-base font-semibold tracking-tight text-foreground",
+                      activeTab === "danger" && "text-red-400",
+                    )}
+                  >
+                    {activeTabMeta.label}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {activeTab === "preferences" &&
+                      "Library, metadata refresh and provider preferences for this title."}
+                    {activeTab === "downloads" &&
+                      "Inspect torrent files, monitor progress and handle release operations."}
+                    {activeTab === "danger" &&
+                      "High-impact actions for this title. Proceed carefully."}
+                  </p>
+                </div>
 
-                {activeTab === "downloads" && (
-                  <DownloadsTab
-                    mediaType={mediaType}
-                    seasons={manage.seasons}
-                    torrentsLoading={manage.torrentsLoading}
-                    filesByEpKey={manage.filesByEpKey}
-                    movieFiles={manage.movieFiles}
-                    liveTorrents={manage.liveTorrents}
-                    torrentsBySeason={manage.torrentsBySeason}
-                    torrentPause={manage.torrentPause}
-                    torrentResume={manage.torrentResume}
-                    torrentDelete={manage.torrentDelete}
-                    torrentRetry={manage.torrentRetry}
-                    torrentRename={manage.torrentRename}
-                    torrentMove={manage.torrentMove}
-                  />
-                )}
+                <div className="rounded-2xl border border-border/40 bg-background/80 p-4 md:p-5">
+                  {activeTab === "preferences" && (
+                    <PreferencesTab
+                      media={manage.media}
+                      mediaId={mediaId}
+                      mediaType={mediaType}
+                      libraries={manage.libraries}
+                      setMediaLibrary={manage.setMediaLibrary}
+                      setContinuousDownload={manage.setContinuousDownload}
+                      refreshMeta={manage.refreshMeta}
+                      invalidateMedia={manage.invalidateMedia}
+                    />
+                  )}
 
-                {activeTab === "servers" && (
-                  <ServersTab
-                    mediaType={mediaType}
-                    seasons={manage.seasons}
-                    availability={manage.availability}
-                    mediaServers={manage.mediaServers}
-                  />
-                )}
+                  {activeTab === "downloads" && (
+                    <DownloadsTab
+                      mediaType={mediaType}
+                      seasons={manage.seasons}
+                      torrentsLoading={manage.torrentsLoading}
+                      filesByEpKey={manage.filesByEpKey}
+                      movieFiles={manage.movieFiles}
+                      liveTorrents={manage.liveTorrents}
+                      torrentsBySeason={manage.torrentsBySeason}
+                      torrentPause={manage.torrentPause}
+                      torrentResume={manage.torrentResume}
+                      torrentDelete={manage.torrentDelete}
+                      torrentRetry={manage.torrentRetry}
+                      torrentRename={manage.torrentRename}
+                      torrentMove={manage.torrentMove}
+                    />
+                  )}
 
-                {activeTab === "danger" && (
-                  <DangerZoneTab
-                    media={manage.media}
-                    mediaId={mediaId}
-                    mediaTorrents={manage.mediaTorrents}
-                    removeFromServer={manage.removeFromServer}
-                    addToLibrary={manage.addToLibrary}
-                    markDownloaded={manage.markDownloaded}
-                    deleteMutation={manage.deleteMutation}
-                    torrentDelete={manage.torrentDelete}
-                  />
-                )}
-              </>
+                  {activeTab === "danger" && (
+                    <DangerZoneTab
+                      media={manage.media}
+                      mediaId={mediaId}
+                      mediaTorrents={manage.mediaTorrents}
+                      removeFromServer={manage.removeFromServer}
+                      addToLibrary={manage.addToLibrary}
+                      markDownloaded={manage.markDownloaded}
+                      deleteMutation={manage.deleteMutation}
+                      torrentDelete={manage.torrentDelete}
+                    />
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </div>
