@@ -5,6 +5,7 @@ import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
 import { HomeSectionRenderer } from "./home-section-renderer";
+import { DedupProvider } from "./dedup-context";
 import type { HomeSectionConfig } from "@canto/db/schema";
 
 interface Section {
@@ -30,54 +31,56 @@ export function HomeSectionList({ sections, isLoading = false }: HomeSectionList
     : true; // assume spotlight while loading
 
   return (
-    <div className="min-h-screen">
-      {/* Mobile logo — only when first section is spotlight (it overlaps) */}
-      {firstIsSpotlight && (
-        <div className="relative z-10 flex h-16 items-center px-4 md:hidden">
+    <DedupProvider>
+      <div className="min-h-screen">
+        {/* Mobile logo — only when first section is spotlight (it overlaps) */}
+        {firstIsSpotlight && (
+          <div className="relative z-10 flex h-16 items-center px-4 md:hidden">
+            {isLoading ? (
+              <div className="flex items-center gap-2.5">
+                <Skeleton className="h-9 w-9 rounded-lg" />
+                <Skeleton className="h-5 w-16" />
+              </div>
+            ) : (
+              <Link href="/" className="flex items-center gap-2.5">
+                <Image src="/canto.svg" alt="Canto" width={36} height={36} className="h-9 w-9 dark:invert" />
+                <span className="text-lg font-bold tracking-tight text-foreground">Canto</span>
+              </Link>
+            )}
+          </div>
+        )}
+
+        <div className={cn("pb-8 md:pb-12", firstIsSpotlight && "-mt-16")}>
           {isLoading ? (
-            <div className="flex items-center gap-2.5">
-              <Skeleton className="h-9 w-9 rounded-lg" />
-              <Skeleton className="h-5 w-16" />
-            </div>
+            <>
+              <SpotlightSkeleton />
+              <div className="mt-4 flex flex-col gap-10 md:mt-12 md:gap-14">
+                <FeaturedCarouselSkeleton />
+                <BackdropCarouselSkeleton />
+                <PosterCarouselSkeleton />
+              </div>
+            </>
           ) : (
-            <Link href="/" className="flex items-center gap-2.5">
-              <Image src="/canto.svg" alt="Canto" width={36} height={36} className="h-9 w-9 dark:invert" />
-              <span className="text-lg font-bold tracking-tight text-foreground">Canto</span>
-            </Link>
+            <>
+              {/* Spotlight (index 0) renders standalone */}
+              {firstIsSpotlight && enabled[0] && (
+                <HomeSectionRenderer section={enabled[0]} />
+              )}
+
+              {/* All other sections in a uniform-gap container */}
+              <div className={cn(
+                "flex flex-col gap-10 md:gap-14",
+                firstIsSpotlight ? "mt-4 md:mt-12" : "",
+              )}>
+                {enabled.slice(firstIsSpotlight ? 1 : 0).map((section) => (
+                  <HomeSectionRenderer key={section.id} section={section} />
+                ))}
+              </div>
+            </>
           )}
         </div>
-      )}
-
-      <div className={cn("pb-8 md:pb-12", firstIsSpotlight && "-mt-16")}>
-        {isLoading ? (
-          <>
-            <SpotlightSkeleton />
-            <div className="mt-4 flex flex-col gap-10 md:mt-12 md:gap-14">
-              <FeaturedCarouselSkeleton />
-              <BackdropCarouselSkeleton />
-              <PosterCarouselSkeleton />
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Spotlight (index 0) renders standalone */}
-            {firstIsSpotlight && enabled[0] && (
-              <HomeSectionRenderer section={enabled[0]} />
-            )}
-
-            {/* All other sections in a uniform-gap container */}
-            <div className={cn(
-              "flex flex-col gap-10 md:gap-14",
-              firstIsSpotlight ? "mt-4 md:mt-12" : "",
-            )}>
-              {enabled.slice(firstIsSpotlight ? 1 : 0).map((section) => (
-                <HomeSectionRenderer key={section.id} section={section} />
-              ))}
-            </div>
-          </>
-        )}
       </div>
-    </div>
+    </DedupProvider>
   );
 }
 

@@ -394,12 +394,15 @@ export const userMediaRouter = createTRPCRouter({
           provider: string;
           addedAt: Date;
           listNames: Set<string>;
+          listTypes: Set<string>;
+          isFromWatchlist: boolean;
         }
       >();
 
       for (const row of listMediaRows) {
         const existing = listMediaMap.get(row.mediaId);
         if (!existing) {
+          const isWatchlist = row.listType === "watchlist";
           listMediaMap.set(row.mediaId, {
             mediaId: row.mediaId,
             mediaType: row.mediaType,
@@ -411,10 +414,14 @@ export const userMediaRouter = createTRPCRouter({
             provider: row.provider,
             addedAt: row.addedAt,
             listNames: new Set([row.listName]),
+            listTypes: new Set([row.listType]),
+            isFromWatchlist: isWatchlist,
           });
           continue;
         }
         existing.listNames.add(row.listName);
+        existing.listTypes.add(row.listType);
+        if (row.listType === "watchlist") existing.isFromWatchlist = true;
         if (row.addedAt > existing.addedAt) existing.addedAt = row.addedAt;
       }
 
@@ -434,6 +441,8 @@ export const userMediaRouter = createTRPCRouter({
           provider: row.provider,
           addedAt: row.lastActivityAt ?? new Date(),
           listNames: new Set(),
+          listTypes: new Set(),
+          isFromWatchlist: false,
         });
       }
 
@@ -616,11 +625,31 @@ export const userMediaRouter = createTRPCRouter({
         });
       }
 
+      // Enhanced sorting for watch_next:
+      // 1. Continue items sorted by most recently watched
+      // 2. List items sorted by: watchlist priority > recency > collection items
+      const sortListItems = (items: typeof listItems) => {
+        return items.sort((a, b) => {
+          const aIsWatchlist = listMediaMap.get(a.mediaId)?.isFromWatchlist ?? false;
+          const bIsWatchlist = listMediaMap.get(b.mediaId)?.isFromWatchlist ?? false;
+          
+          if (aIsWatchlist && bIsWatchlist) {
+            return b.sortDate.getTime() - a.sortDate.getTime();
+          }
+          
+          if (aIsWatchlist !== bIsWatchlist) {
+            return aIsWatchlist ? -1 : 1;
+          }
+          
+          return b.sortDate.getTime() - a.sortDate.getTime();
+        });
+      };
+
       const merged = [
         ...continueItems.sort(
           (a, b) => b.sortDate.getTime() - a.sortDate.getTime(),
         ),
-        ...listItems.sort((a, b) => b.sortDate.getTime() - a.sortDate.getTime()),
+        ...sortListItems(listItems),
       ]
         .map((item) => ({
           id: item.id,

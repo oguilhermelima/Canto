@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import type { SectionItem } from "./section-item";
 import { SpotlightHero } from "./spotlight-hero";
 import type { SpotlightItem } from "./spotlight-hero";
@@ -9,8 +10,10 @@ import { MediaCarousel } from "~/components/media/media-carousel";
 import { SectionTitle } from "~/components/layout/section-title";
 import { StateMessage } from "~/components/layout/state-message";
 import { mediaHref } from "~/lib/media-href";
+import { useDedup } from "./dedup-context";
 
 interface DynamicSectionProps {
+  sectionId: string;
   style: string;
   title: string;
   seeAllHref?: string;
@@ -95,6 +98,7 @@ function toPosterItems(items: SectionItem[]) {
 /* ── Component ── */
 
 export function DynamicSection({
+  sectionId,
   style,
   title,
   seeAllHref,
@@ -106,6 +110,24 @@ export function DynamicSection({
   onRetry,
   emptyPreset,
 }: DynamicSectionProps): React.JSX.Element | null {
+  const dedup = useDedup();
+
+  // Filter out items that have already been rendered in other sections
+  // and mark remaining items as rendered
+  const filteredItems = useMemo(() => {
+    const unique = items.filter((item) => {
+      const alreadyRendered = dedup.isItemRendered(item.provider, item.externalId);
+      return !alreadyRendered;
+    });
+
+    // Mark these items as rendered for subsequent sections
+    unique.forEach((item) => {
+      dedup.markItemRendered(item.provider, item.externalId);
+    });
+
+    return unique;
+  }, [items, dedup]);
+
   if (isError) {
     return (
       <section>
@@ -117,7 +139,7 @@ export function DynamicSection({
     );
   }
 
-  if (!isLoading && items.length === 0) {
+  if (!isLoading && filteredItems.length === 0) {
     if (emptyPreset) {
       return (
         <section>
@@ -135,7 +157,7 @@ export function DynamicSection({
     case "spotlight":
       return (
         <SpotlightHero
-          items={toSpotlightItems(items)}
+          items={toSpotlightItems(filteredItems)}
           isLoading={isLoading}
           isError={isError}
           onRetry={onRetry}
@@ -147,7 +169,7 @@ export function DynamicSection({
         <FeaturedCarousel
           title={title}
           seeAllHref={seeAllHref}
-          items={toFeaturedItems(items)}
+          items={toFeaturedItems(filteredItems)}
           isLoading={isLoading}
           isFetchingMore={isFetchingMore}
           onLoadMore={onLoadMore}
@@ -159,7 +181,7 @@ export function DynamicSection({
         <BackdropCarousel
           title={title}
           seeAllHref={seeAllHref}
-          items={toBackdropItems(items)}
+          items={toBackdropItems(filteredItems)}
           isLoading={isLoading}
           isFetchingMore={isFetchingMore}
           onLoadMore={onLoadMore}
@@ -172,7 +194,7 @@ export function DynamicSection({
         <MediaCarousel
           title={title}
           seeAllHref={seeAllHref}
-          items={toPosterItems(items)}
+          items={toPosterItems(filteredItems)}
           isLoading={isLoading}
         />
       );

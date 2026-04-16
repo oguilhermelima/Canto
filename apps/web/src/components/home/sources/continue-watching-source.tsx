@@ -6,15 +6,16 @@ import type { SectionItem } from "../section-item";
 import { DynamicSection } from "../dynamic-section";
 
 interface ContinueWatchingSourceProps {
+  sectionId: string;
   title: string;
   style: string;
 }
 
-export function ContinueWatchingSource({ title, style }: ContinueWatchingSourceProps): React.JSX.Element {
-  return <ContinueWatchingDynamic title={title} style={style} />;
+export function ContinueWatchingSource({ sectionId, title, style }: ContinueWatchingSourceProps): React.JSX.Element {
+  return <ContinueWatchingDynamic sectionId={sectionId} title={title} style={style} />;
 }
 
-function ContinueWatchingDynamic({ title, style }: ContinueWatchingSourceProps): React.JSX.Element | null {
+function ContinueWatchingDynamic({ sectionId, title, style }: ContinueWatchingSourceProps): React.JSX.Element | null {
   const query = trpc.userMedia.getLibraryWatchNext.useInfiniteQuery(
     { limit: 24, view: "continue" as const },
     { getNextPageParam: (lp) => lp.nextCursor, initialCursor: 0 },
@@ -58,6 +59,7 @@ function ContinueWatchingDynamic({ title, style }: ContinueWatchingSourceProps):
 
   return (
     <DynamicSection
+      sectionId={sectionId}
       style={style}
       title={title}
       seeAllHref="/library/continue-watching"

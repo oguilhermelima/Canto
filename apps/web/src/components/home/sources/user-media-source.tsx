@@ -6,12 +6,13 @@ import type { SectionItem } from "../section-item";
 import { DynamicSection } from "../dynamic-section";
 
 interface UserMediaSourceProps {
+  sectionId: string;
   title: string;
   style: string;
   filter: { status?: string; isFavorite?: boolean };
 }
 
-export function UserMediaSource({ title, style, filter }: UserMediaSourceProps): React.JSX.Element | null {
+export function UserMediaSource({ sectionId, title, style, filter }: UserMediaSourceProps): React.JSX.Element | null {
   const query = trpc.userMedia.getUserMedia.useInfiniteQuery(
     {
       limit: 20,
@@ -52,6 +53,7 @@ export function UserMediaSource({ title, style, filter }: UserMediaSourceProps):
 
   return (
     <DynamicSection
+      sectionId={sectionId}
       style={style}
       title={title}
       items={items}

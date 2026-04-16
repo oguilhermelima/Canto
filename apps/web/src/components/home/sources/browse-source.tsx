@@ -29,12 +29,13 @@ function buildSearchHref(config: Record<string, unknown>): string {
 }
 
 interface BrowseSourceProps {
+  sectionId: string;
   title: string;
   style: string;
   config: HomeSectionConfig;
 }
 
-export function BrowseSource({ title, style, config }: BrowseSourceProps): React.JSX.Element | null {
+export function BrowseSource({ sectionId, title, style, config }: BrowseSourceProps): React.JSX.Element | null {
   const c = config as Record<string, unknown>;
 
   const query = trpc.media.browse.useInfiniteQuery(
@@ -90,6 +91,7 @@ export function BrowseSource({ title, style, config }: BrowseSourceProps): React
 
   return (
     <DynamicSection
+      sectionId={sectionId}
       style={style}
       title={title}
       seeAllHref={buildSearchHref(c)}

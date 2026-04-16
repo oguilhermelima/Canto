@@ -6,11 +6,12 @@ import type { SectionItem } from "../section-item";
 import { DynamicSection } from "../dynamic-section";
 
 interface SpotlightSourceProps {
+  sectionId: string;
   style: string;
   title: string;
 }
 
-export function SpotlightSource({ style, title }: SpotlightSourceProps): React.JSX.Element {
+export function SpotlightSource({ sectionId, style, title }: SpotlightSourceProps): React.JSX.Element {
   const query = trpc.provider.spotlight.useQuery(undefined, {
     staleTime: 30 * 60 * 1000,
   });
@@ -39,6 +40,7 @@ export function SpotlightSource({ style, title }: SpotlightSourceProps): React.J
 
   return (
     <DynamicSection
+      sectionId={sectionId}
       style={style}
       title={title}
       items={items}

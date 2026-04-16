@@ -21,24 +21,24 @@ interface HomeSectionRendererProps {
 }
 
 export function HomeSectionRenderer({ section }: HomeSectionRendererProps): React.JSX.Element | null {
-  const { title, style, sourceType, sourceKey, config } = section;
+  const { id, title, style, sourceType, sourceKey, config } = section;
 
   if (sourceType === "db") {
     switch (sourceKey) {
       case "spotlight":
-        return <SpotlightSource title={title} style={style} />;
+        return <SpotlightSource sectionId={id} title={title} style={style} />;
       case "recommendations":
-        return <RecommendationsSource title={title} style={style} />;
+        return <RecommendationsSource sectionId={id} title={title} style={style} />;
       case "continue_watching":
-        return <ContinueWatchingSource title={title} style={style} />;
+        return <ContinueWatchingSource sectionId={id} title={title} style={style} />;
       case "watch_next":
-        return <WatchNextSource title={title} style={style} />;
+        return <WatchNextSource sectionId={id} title={title} style={style} />;
       case "recently_added":
-        return <RecentlyAddedSource title={title} style={style} />;
+        return <RecentlyAddedSource sectionId={id} title={title} style={style} />;
       case "collection": {
         const cfg = config as Record<string, unknown>;
         const listId = String(cfg?.listId || "");
-        return listId ? <CollectionSource title={title} style={style} listId={listId} /> : null;
+        return listId ? <CollectionSource sectionId={id} title={title} style={style} listId={listId} /> : null;
       }
       default:
         return null;
@@ -46,7 +46,7 @@ export function HomeSectionRenderer({ section }: HomeSectionRendererProps): Reac
   }
 
   if (sourceType === "tmdb") {
-    return <BrowseSource title={title} style={style} config={config} />;
+    return <BrowseSource sectionId={id} title={title} style={style} config={config} />;
   }
 
   return null;

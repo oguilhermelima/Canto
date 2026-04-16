@@ -34,7 +34,7 @@ import type { ServiceEnum } from "@canto/validators";
 import { and, eq } from "drizzle-orm";
 import { media, user, supportedLanguage } from "@canto/db/schema";
 import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure, t } from "../trpc";
-import { dispatchRefreshAllLanguage, dispatchMediaPipeline } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
+import { dispatchRefreshAllLanguage, dispatchMediaPipeline, dispatchRebuildUserRecs } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
 
 // ── Extracted use-cases & services ──
 import { testService } from "@canto/core/infrastructure/adapters/service-tester";
@@ -152,6 +152,11 @@ export const settingsRouter = createTRPCRouter({
 
   refreshLanguage: adminProcedure.mutation(async () => {
     await dispatchRefreshAllLanguage();
+    return { success: true };
+  }),
+
+  rebuildUserRecommendations: adminProcedure.mutation(async ({ ctx }) => {
+    await dispatchRebuildUserRecs(ctx.session.user.id);
     return { success: true };
   }),
 

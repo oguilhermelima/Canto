@@ -6,11 +6,12 @@ import type { SectionItem } from "../section-item";
 import { DynamicSection } from "../dynamic-section";
 
 interface RecommendationsSourceProps {
+  sectionId: string;
   title: string;
   style: string;
 }
 
-export function RecommendationsSource({ title, style }: RecommendationsSourceProps): React.JSX.Element | null {
+export function RecommendationsSource({ sectionId, title, style }: RecommendationsSourceProps): React.JSX.Element | null {
   const utils = trpc.useUtils();
   const recsVersionRef = useRef<number | null>(null);
 
@@ -64,6 +65,7 @@ export function RecommendationsSource({ title, style }: RecommendationsSourcePro
 
   return (
     <DynamicSection
+      sectionId={sectionId}
       style={style}
       title={title}
       seeAllHref="/library/recommendations"

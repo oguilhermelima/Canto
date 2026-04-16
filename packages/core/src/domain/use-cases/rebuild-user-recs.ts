@@ -14,18 +14,22 @@ import {
 } from "../../infrastructure/repositories/user-recommendation-repository";
 
 const MAX_SEEDS = 10;
+const MAX_SEEDS_FROM_COLLECTIONS = 5;
 const MAX_SERVER_SOURCES = 10;
-const MAX_POOL_RANK = 15;
-const SERVER_BASE_WEIGHT = 0.3;
+const MAX_POOL_RANK = 20;
+const SERVER_BASE_WEIGHT = 0.4;
+const COLLECTION_BASE_WEIGHT = 0.6;
 
 /**
  * Weight multiplier based on rank within a source's recommendation items.
- * Top picks get full weight, deeper recommendations get much less.
+ * Favors diversity by giving good weight to mid-rank items (3-12).
+ * Rank 1-3: 1.0 (top picks), Rank 4-12: 0.7 (good diversity), Rank 13-20: 0.35 (deeper)
  */
 function rankMultiplier(rank: number): number {
-  if (rank <= 5) return 1.0;
-  if (rank <= 15) return 0.3;
-  return 0.1;
+  if (rank <= 3) return 1.0;
+  if (rank <= 12) return 0.7;
+  if (rank <= 20) return 0.35;
+  return 0.15;
 }
 
 /**
@@ -81,7 +85,11 @@ function selectSeeds(
 /**
  * Rebuild per-user recommendations with granular weights.
  *
- * Seeds are selected via genre round-robin (max 10) to ensure diversity.
+ * Sources (in priority order):
+ * 1. User's watchlist items (primary) via genre round-robin (max 10 seeds)
+ * 2. User's collection items (secondary) for additional diversity (max 5 seeds)
+ * 3. Server library items (if user has few personal items)
+ *
  * Weight = sourceWeight(seedPosition) × rankMultiplier(recRank)
  */
 export async function rebuildUserRecs(
@@ -93,6 +101,7 @@ export async function rebuildUserRecs(
     .select({
       mediaId: listItem.mediaId,
       genres: media.genres,
+      listType: list.type,
     })
     .from(listItem)
     .innerJoin(list, eq(listItem.listId, list.id))
@@ -105,12 +114,20 @@ export async function rebuildUserRecs(
     )
     .orderBy(desc(listItem.addedAt));
 
-  // 2. Select diverse seeds via genre round-robin
-  const seedMediaIds = selectSeeds(allUserItems, MAX_SEEDS);
+  // Separate watchlist from collections
+  const watchlistItems = allUserItems.filter((i) => i.listType === "watchlist");
+  const collectionItems = allUserItems.filter((i) => i.listType !== "watchlist");
+
+  // 2. Select diverse seeds: watchlist primary, collections secondary
+  const seedMediaIds = selectSeeds(watchlistItems, MAX_SEEDS);
+  const collectionSeedMediaIds = selectSeeds(
+    collectionItems,
+    Math.min(MAX_SEEDS_FROM_COLLECTIONS, MAX_SEEDS - seedMediaIds.length),
+  );
 
   const rows: Array<{ mediaId: string; weight: number }> = [];
 
-  // 3. For each seed, get recommended media IDs ranked by vote_average and assign weighted recs
+  // 3. Process watchlist seeds (primary source)
   for (let pos = 0; pos < seedMediaIds.length; pos++) {
     const sw = sourceWeight(pos);
     const recItems = await db
@@ -132,9 +149,32 @@ export async function rebuildUserRecs(
     }
   }
 
-  // 4. Server library: only if user has fewer than MAX_SEEDS personal items
+  // 4. Process collection seeds (secondary source, lower base weight)
+  for (let pos = 0; pos < collectionSeedMediaIds.length; pos++) {
+    const sw = COLLECTION_BASE_WEIGHT * (1.0 - (pos / MAX_SEEDS_FROM_COLLECTIONS) * 0.4);
+    const recItems = await db
+      .select({ mediaId: mediaRecommendation.mediaId })
+      .from(mediaRecommendation)
+      .innerJoin(media, eq(media.id, mediaRecommendation.mediaId))
+      .where(and(
+        eq(mediaRecommendation.sourceMediaId, collectionSeedMediaIds[pos]!),
+        ...getQualityFilters(),
+      ))
+      .orderBy(getWeightedScoreOrder())
+      .limit(MAX_POOL_RANK);
+
+    for (let rank = 0; rank < recItems.length; rank++) {
+      rows.push({
+        mediaId: recItems[rank]!.mediaId,
+        weight: sw * rankMultiplier(rank + 1),
+      });
+    }
+  }
+
+  // 5. Server library: include if user has few items
   let serverSourceCount = 0;
-  if (seedMediaIds.length < MAX_SEEDS) {
+  const totalOwnSeeds = seedMediaIds.length + collectionSeedMediaIds.length;
+  if (totalOwnSeeds < MAX_SEEDS) {
     const serverSources = await db
       .selectDistinct({ sourceMediaId: mediaRecommendation.sourceMediaId })
       .from(mediaRecommendation)
@@ -154,7 +194,7 @@ export async function rebuildUserRecs(
           ...getQualityFilters(),
         ))
         .orderBy(getWeightedScoreOrder())
-        .limit(5);
+        .limit(8);
 
       for (let rank = 0; rank < recItems.length; rank++) {
         rows.push({
@@ -165,15 +205,15 @@ export async function rebuildUserRecs(
     }
   }
 
-  // 5. Rebuild with granular weights (dedup keeps highest weight per mediaId)
+  // 6. Rebuild with granular weights (dedup keeps highest weight per mediaId)
   await rebuildUserRecommendations(db, userId, rows);
 
   const genreBreakdown = seedMediaIds.length > 0
-    ? ` (seeds from ${new Set(allUserItems.filter((i) => seedMediaIds.includes(i.mediaId)).map((i) => i.genres?.[0] ?? "Other")).size} genres)`
+    ? ` (seeds from ${new Set(watchlistItems.filter((i) => seedMediaIds.includes(i.mediaId)).map((i) => i.genres?.[0] ?? "Other")).size} genres)`
     : "";
 
   console.log(
-    `[rebuild-user-recs] User ${userId}: ${seedMediaIds.length} seeds${genreBreakdown}, ${rows.length} weighted recs, ${serverSourceCount} server sources`,
+    `[rebuild-user-recs] User ${userId}: ${seedMediaIds.length} watchlist + ${collectionSeedMediaIds.length} collection seeds${genreBreakdown}, ${rows.length} weighted recs, ${serverSourceCount} server sources`,
   );
 }
 

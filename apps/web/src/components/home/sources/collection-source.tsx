@@ -6,12 +6,13 @@ import type { SectionItem } from "../section-item";
 import { DynamicSection } from "../dynamic-section";
 
 interface CollectionSourceProps {
+  sectionId: string;
   title: string;
   style: string;
   listId: string;
 }
 
-export function CollectionSource({ title, style, listId }: CollectionSourceProps): React.JSX.Element | null {
+export function CollectionSource({ sectionId, title, style, listId }: CollectionSourceProps): React.JSX.Element | null {
   const { data: lists } = trpc.list.getAll.useQuery(undefined, {
     staleTime: 5 * 60 * 1000,
   });
@@ -43,6 +44,7 @@ export function CollectionSource({ title, style, listId }: CollectionSourceProps
 
   return (
     <DynamicSection
+      sectionId={sectionId}
       style={style}
       title={title}
       seeAllHref={list ? `/collection/${list.slug}` : undefined}

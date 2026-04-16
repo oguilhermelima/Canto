@@ -6,15 +6,16 @@ import type { SectionItem } from "../section-item";
 import { DynamicSection } from "../dynamic-section";
 
 interface WatchNextSourceProps {
+  sectionId: string;
   title: string;
   style: string;
 }
 
-export function WatchNextSource({ title, style }: WatchNextSourceProps): React.JSX.Element {
-  return <WatchNextDynamic title={title} style={style} />;
+export function WatchNextSource({ sectionId, title, style }: WatchNextSourceProps): React.JSX.Element {
+  return <WatchNextDynamic sectionId={sectionId} title={title} style={style} />;
 }
 
-function WatchNextDynamic({ title, style }: WatchNextSourceProps): React.JSX.Element | null {
+function WatchNextDynamic({ sectionId, title, style }: WatchNextSourceProps): React.JSX.Element | null {
   const query = trpc.userMedia.getLibraryWatchNext.useInfiniteQuery(
     { limit: 24, view: "watch_next" as const },
     { getNextPageParam: (lp) => lp.nextCursor, initialCursor: 0 },
@@ -58,6 +59,7 @@ function WatchNextDynamic({ title, style }: WatchNextSourceProps): React.JSX.Ele
 
   return (
     <DynamicSection
+      sectionId={sectionId}
       style={style}
       title={title}
       seeAllHref="/library/watch-next"

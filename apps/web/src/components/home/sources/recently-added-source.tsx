@@ -6,11 +6,12 @@ import type { SectionItem } from "../section-item";
 import { DynamicSection } from "../dynamic-section";
 
 interface RecentlyAddedSourceProps {
+  sectionId: string;
   title: string;
   style: string;
 }
 
-export function RecentlyAddedSource({ title, style }: RecentlyAddedSourceProps): React.JSX.Element | null {
+export function RecentlyAddedSource({ sectionId, title, style }: RecentlyAddedSourceProps): React.JSX.Element | null {
   const query = trpc.library.list.useQuery({
     page: 1,
     pageSize: 20,
@@ -36,6 +37,7 @@ export function RecentlyAddedSource({ title, style }: RecentlyAddedSourceProps):
 
   return (
     <DynamicSection
+      sectionId={sectionId}
       style={style}
       title={title}
       seeAllHref="/collection/server-library"
