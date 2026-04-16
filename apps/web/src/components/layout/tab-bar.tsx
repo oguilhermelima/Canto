@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback, useLayoutEffect } from "react";
 import { cn } from "@canto/ui/cn";
 import { Settings2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -33,14 +33,20 @@ export function TabBar({ tabs, value, onChange, leading, trailing, onFilter, fil
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const [indicator, setIndicator] = useState({ left: 0, width: 0 });
   const [ready, setReady] = useState(false);
+  const tabsSignature = tabs.map((tab) => `${tab.value}:${tab.count ?? 0}`).join("|");
 
   const updateIndicator = useCallback(() => {
     const el = tabRefs.current.get(value);
     if (!el) return;
 
     // offsetLeft is relative to the inner wrapper (positioned parent)
-    setIndicator({ left: el.offsetLeft, width: el.offsetWidth });
-    setReady(true);
+    setIndicator((prev) => {
+      if (prev.left === el.offsetLeft && prev.width === el.offsetWidth) {
+        return prev;
+      }
+      return { left: el.offsetLeft, width: el.offsetWidth };
+    });
+    setReady((prev) => prev || true);
   }, [value]);
 
   const scrollActiveIntoView = useCallback(() => {
@@ -55,10 +61,15 @@ export function TabBar({ tabs, value, onChange, leading, trailing, onFilter, fil
     scroll.scrollTo({ left: scrollLeft, behavior: "smooth" });
   }, [value]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     updateIndicator();
     scrollActiveIntoView();
   }, [updateIndicator, scrollActiveIntoView]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(updateIndicator);
+    return () => window.cancelAnimationFrame(frame);
+  }, [tabsSignature, updateIndicator]);
 
   useEffect(() => {
     window.addEventListener("resize", updateIndicator);
