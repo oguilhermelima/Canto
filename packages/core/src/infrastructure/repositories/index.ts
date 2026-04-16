@@ -15,3 +15,4 @@ export * from "./user-rating-repository";
 export * from "./user-media-library-repository";
 export * from "./home-section-repository";
 export * from "./profile-section-repository";
+export * from "./trakt-sync-repository";
