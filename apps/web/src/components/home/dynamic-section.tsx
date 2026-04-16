@@ -113,11 +113,16 @@ export function DynamicSection({
   const dedup = useDedup();
 
   // Filter out items that have already been rendered in other sections
-  // EXCEPT for recommendations, which is a personalized "for you" section
-  const isRecommendationsSection = sectionId?.includes("recommendations");
+  // EXCEPT for personalized sections (recommendations, spotlight, continue watching)
+  // which should always show their full content
+  const isPersonalizedSection =
+    sectionId?.includes("recommendations") ||
+    sectionId?.includes("spotlight") ||
+    sectionId?.includes("continue");
+
   const filteredItems = useMemo(() => {
-    // Never filter recommendations - it's a personalized section
-    if (isRecommendationsSection) {
+    // Never filter personalized sections - they should always show their content
+    if (isPersonalizedSection) {
       return items;
     }
 
@@ -132,7 +137,7 @@ export function DynamicSection({
     });
 
     return unique;
-  }, [items, dedup, isRecommendationsSection]);
+  }, [items, dedup, isPersonalizedSection]);
 
   if (isError) {
     return (
