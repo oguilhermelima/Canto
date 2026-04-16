@@ -17,7 +17,7 @@ export function ContinueWatchingSource({ sectionId, title, style }: ContinueWatc
 
 function ContinueWatchingDynamic({ sectionId, title, style }: ContinueWatchingSourceProps): React.JSX.Element | null {
   const query = trpc.userMedia.getLibraryWatchNext.useInfiniteQuery(
-    { limit: 72, view: "continue" as const },
+    { limit: 48, view: "continue" as const },
     { getNextPageParam: (lp) => lp.nextCursor, initialCursor: 0 },
   );
 

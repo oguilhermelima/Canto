@@ -96,7 +96,7 @@ export type ApplyProviderOverrideInput = z.infer<typeof applyProviderOverrideInp
 
 export const recommendationsInput = z.object({
   cursor: z.number().int().min(0).default(0),
-  pageSize: z.number().int().min(1).max(20).default(10),
+  pageSize: z.number().int().min(1).max(50).default(10),
   genreIds: z.array(z.number()).optional(),
   genreMode: z.enum(["and", "or"]).default("or").optional(),
   language: z.string().optional(),
