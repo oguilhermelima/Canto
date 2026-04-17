@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
+import { useRef } from "react";
 import { trpc } from "~/lib/trpc/client";
+import { useResponsivePageSize } from "~/hooks/use-responsive-page-size";
 import type { SectionItem } from "../section-item";
 import { DynamicSection } from "../dynamic-section";
+import { useSectionInfiniteQuery } from "./use-section-query";
 
 interface UserMediaSourceProps {
   sectionId: string;
@@ -13,9 +15,13 @@ interface UserMediaSourceProps {
 }
 
 export function UserMediaSource({ sectionId, title, style, filter }: UserMediaSourceProps): React.JSX.Element | null {
+  const current = useResponsivePageSize({ mobile: 10, tablet: 16, desktop: 24 });
+  const lockedRef = useRef(current);
+  const limit = lockedRef.current;
+
   const query = trpc.userMedia.getUserMedia.useInfiniteQuery(
     {
-      limit: 60,
+      limit,
       status: filter.status as "planned" | "watching" | "completed" | "dropped" | undefined,
       isFavorite: filter.isFavorite,
       sortBy: "updatedAt",
@@ -27,41 +33,32 @@ export function UserMediaSource({ sectionId, title, style, filter }: UserMediaSo
     },
   );
 
-  const items = useMemo<SectionItem[]>(
-    () =>
-      (query.data?.pages.flatMap((p) => p.items) ?? []).map((item) => ({
-        externalId: item.externalId,
-        provider: item.provider,
-        type: item.mediaType as "movie" | "show",
-        title: item.title,
-        posterPath: item.posterPath,
-        backdropPath: item.backdropPath,
-        logoPath: item.logoPath,
-        trailerKey: item.trailerKey,
-        overview: item.overview,
-        voteAverage: item.voteAverage,
-        genres: (item.genres as string[] | null) ?? undefined,
-        genreIds: (item.genreIds as number[] | null) ?? undefined,
-        year: item.year,
-      })),
-    [query.data],
+  const result = useSectionInfiniteQuery(
+    query,
+    (page) => page.items,
+    (item): SectionItem => ({
+      externalId: item.externalId,
+      provider: item.provider,
+      type: item.mediaType as "movie" | "show",
+      title: item.title,
+      posterPath: item.posterPath,
+      backdropPath: item.backdropPath,
+      logoPath: item.logoPath,
+      trailerKey: item.trailerKey,
+      overview: item.overview,
+      voteAverage: item.voteAverage,
+      genres: (item.genres as string[] | null) ?? undefined,
+      genreIds: (item.genreIds as number[] | null) ?? undefined,
+      year: item.year,
+    }),
   );
-
-  const handleLoadMore = useCallback(() => {
-    if (query.hasNextPage) void query.fetchNextPage();
-  }, [query]);
 
   return (
     <DynamicSection
+      {...result}
       sectionId={sectionId}
       style={style}
       title={title}
-      items={items}
-      isLoading={query.isLoading}
-      isError={query.isError}
-      isFetchingMore={query.isFetchingNextPage}
-      onLoadMore={query.hasNextPage ? handleLoadMore : undefined}
-      onRetry={() => query.refetch()}
     />
   );
 }

@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
+import { useRef } from "react";
 import { trpc } from "~/lib/trpc/client";
+import { useResponsivePageSize } from "~/hooks/use-responsive-page-size";
 import type { SectionItem } from "../section-item";
 import { DynamicSection } from "../dynamic-section";
+import { useSectionInfiniteQuery } from "./use-section-query";
 
 interface WatchNextSourceProps {
   sectionId: string;
@@ -11,64 +13,55 @@ interface WatchNextSourceProps {
   style: string;
 }
 
-export function WatchNextSource({ sectionId, title, style }: WatchNextSourceProps): React.JSX.Element {
-  return <WatchNextDynamic sectionId={sectionId} title={title} style={style} />;
-}
+export function WatchNextSource({ sectionId, title, style }: WatchNextSourceProps): React.JSX.Element | null {
+  const current = useResponsivePageSize({ mobile: 10, tablet: 16, desktop: 24 });
+  const lockedRef = useRef(current);
+  const limit = lockedRef.current;
 
-function WatchNextDynamic({ sectionId, title, style }: WatchNextSourceProps): React.JSX.Element | null {
   const query = trpc.userMedia.getLibraryWatchNext.useInfiniteQuery(
-    { limit: 72, view: "watch_next" as const },
+    { limit, view: "watch_next" as const },
     { getNextPageParam: (lp) => lp.nextCursor, initialCursor: 0 },
   );
 
-  const items = useMemo<SectionItem[]>(
-    () =>
-      (query.data?.pages.flatMap((p) => p.items) ?? []).map((item) => ({
-        externalId: item.externalId,
-        provider: item.provider,
-        type: item.mediaType as "movie" | "show",
-        title: item.title,
-        posterPath: item.posterPath,
-        backdropPath: item.backdropPath,
-        logoPath: item.logoPath,
-        trailerKey: item.trailerKey,
-        overview: item.overview,
-        voteAverage: item.voteAverage,
-        genres: (item.genres as string[] | null) ?? undefined,
-        genreIds: (item.genreIds as number[] | null) ?? undefined,
-        year: item.year,
-        progress:
-          item.progressPercent != null &&
-          item.progressValue != null &&
-          item.progressTotal != null &&
-          item.progressUnit != null
-            ? {
-                percent: item.progressPercent,
-                value: item.progressValue,
-                total: item.progressTotal,
-                unit: item.progressUnit,
-              }
-            : null,
-      })),
-    [query.data],
+  const result = useSectionInfiniteQuery(
+    query,
+    (page) => page.items,
+    (item): SectionItem => ({
+      externalId: item.externalId,
+      provider: item.provider,
+      type: item.mediaType as "movie" | "show",
+      title: item.title,
+      posterPath: item.posterPath,
+      backdropPath: item.backdropPath,
+      logoPath: item.logoPath,
+      trailerKey: item.trailerKey,
+      overview: item.overview,
+      voteAverage: item.voteAverage,
+      genres: (item.genres as string[] | null) ?? undefined,
+      genreIds: (item.genreIds as number[] | null) ?? undefined,
+      year: item.year,
+      progress:
+        item.progressPercent != null &&
+        item.progressValue != null &&
+        item.progressTotal != null &&
+        item.progressUnit != null
+          ? {
+              percent: item.progressPercent,
+              value: item.progressValue,
+              total: item.progressTotal,
+              unit: item.progressUnit,
+            }
+          : null,
+    }),
   );
-
-  const handleLoadMore = useCallback(() => {
-    if (query.hasNextPage) void query.fetchNextPage();
-  }, [query]);
 
   return (
     <DynamicSection
+      {...result}
       sectionId={sectionId}
       style={style}
       title={title}
       seeAllHref="/library/watch-next"
-      items={items}
-      isLoading={query.isLoading}
-      isError={query.isError}
-      isFetchingMore={query.isFetchingNextPage}
-      onLoadMore={query.hasNextPage ? handleLoadMore : undefined}
-      onRetry={() => query.refetch()}
     />
   );
 }

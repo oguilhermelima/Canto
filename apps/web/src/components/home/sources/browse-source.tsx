@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
 import { trpc } from "~/lib/trpc/client";
 import type { HomeSectionConfig } from "@canto/db/schema";
 import type { SectionItem } from "../section-item";
 import { DynamicSection } from "../dynamic-section";
+import { useSectionInfiniteQuery } from "./use-section-query";
 
 const MAX_CAROUSEL_PAGES = 9;
 
@@ -67,40 +67,31 @@ export function BrowseSource({ sectionId, title, style, config }: BrowseSourcePr
     },
   );
 
-  const items = useMemo<SectionItem[]>(
-    () =>
-      (query.data?.pages.flatMap((p) => p.results) ?? []).map((r) => ({
-        externalId: r.externalId,
-        provider: r.provider,
-        type: r.type as "movie" | "show",
-        title: r.title,
-        posterPath: r.posterPath ?? null,
-        backdropPath: r.backdropPath ?? null,
-        logoPath: r.logoPath,
-        year: r.year,
-        voteAverage: r.voteAverage,
-        popularity: r.popularity,
-        releaseDate: r.releaseDate,
-      })),
-    [query.data],
+  const result = useSectionInfiniteQuery(
+    query,
+    (page) => page.results,
+    (r): SectionItem => ({
+      externalId: r.externalId,
+      provider: r.provider,
+      type: r.type as "movie" | "show",
+      title: r.title,
+      posterPath: r.posterPath ?? null,
+      backdropPath: r.backdropPath ?? null,
+      logoPath: r.logoPath,
+      year: r.year,
+      voteAverage: r.voteAverage,
+      popularity: r.popularity,
+      releaseDate: r.releaseDate,
+    }),
   );
-
-  const handleLoadMore = useCallback(() => {
-    if (query.hasNextPage) void query.fetchNextPage();
-  }, [query]);
 
   return (
     <DynamicSection
+      {...result}
       sectionId={sectionId}
       style={style}
       title={title}
       seeAllHref={buildSearchHref(c)}
-      items={items}
-      isLoading={query.isLoading}
-      isError={query.isError}
-      isFetchingMore={query.isFetchingNextPage}
-      onLoadMore={query.hasNextPage ? handleLoadMore : undefined}
-      onRetry={() => query.refetch()}
     />
   );
 }

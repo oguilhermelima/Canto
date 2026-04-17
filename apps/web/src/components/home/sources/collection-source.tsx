@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useRef } from "react";
 import { trpc } from "~/lib/trpc/client";
+import { useResponsivePageSize } from "~/hooks/use-responsive-page-size";
 import type { SectionItem } from "../section-item";
 import { DynamicSection } from "../dynamic-section";
+import { useSectionQuery } from "./use-section-query";
 
 interface CollectionSourceProps {
   sectionId: string;
@@ -13,6 +15,10 @@ interface CollectionSourceProps {
 }
 
 export function CollectionSource({ sectionId, title, style, listId }: CollectionSourceProps): React.JSX.Element | null {
+  const current = useResponsivePageSize({ mobile: 10, tablet: 16, desktop: 20 });
+  const lockedRef = useRef(current);
+  const limit = lockedRef.current;
+
   const { data: lists } = trpc.list.getAll.useQuery(undefined, {
     staleTime: 5 * 60 * 1000,
   });
@@ -20,38 +26,36 @@ export function CollectionSource({ sectionId, title, style, listId }: Collection
   const list = lists?.find((l) => l.id === listId);
 
   const query = trpc.list.getBySlug.useQuery(
-    { slug: list?.slug ?? "", limit: 20 },
+    { slug: list?.slug ?? "", limit },
     { enabled: !!list?.slug },
   );
 
-  const items = useMemo<SectionItem[]>(
-    () =>
-      (query.data?.items ?? []).map((item) => ({
-        externalId: String(item.media.externalId),
-        provider: item.media.provider,
-        type: item.media.type as "movie" | "show",
-        title: item.media.title,
-        posterPath: item.media.posterPath ?? null,
-        backdropPath: item.media.backdropPath ?? null,
-        logoPath: item.media.logoPath ?? null,
-        year: item.media.year ?? undefined,
-        voteAverage: item.media.voteAverage ?? undefined,
-      })),
-    [query.data],
+  const result = useSectionQuery(
+    query,
+    (data) => data.items,
+    (item): SectionItem => ({
+      externalId: String(item.media.externalId),
+      provider: item.media.provider,
+      type: item.media.type as "movie" | "show",
+      title: item.media.title,
+      posterPath: item.media.posterPath ?? null,
+      backdropPath: item.media.backdropPath ?? null,
+      logoPath: item.media.logoPath ?? null,
+      year: item.media.year ?? undefined,
+      voteAverage: item.media.voteAverage ?? undefined,
+    }),
   );
 
   if (!listId) return null;
 
   return (
     <DynamicSection
+      {...result}
       sectionId={sectionId}
       style={style}
       title={title}
       seeAllHref={list ? `/collection/${list.slug}` : undefined}
-      items={items}
-      isLoading={query.isLoading || !list}
-      isError={query.isError}
-      onRetry={() => query.refetch()}
+      isLoading={result.isLoading || !list}
     />
   );
 }

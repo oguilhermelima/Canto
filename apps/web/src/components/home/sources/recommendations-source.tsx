@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useCallback, useRef, useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { trpc } from "~/lib/trpc/client";
+import { useResponsivePageSize } from "~/hooks/use-responsive-page-size";
 import type { SectionItem } from "../section-item";
 import { DynamicSection } from "../dynamic-section";
+import { useSectionInfiniteQuery } from "./use-section-query";
 
 interface RecommendationsSourceProps {
   sectionId: string;
@@ -15,8 +17,12 @@ export function RecommendationsSource({ sectionId, title, style }: Recommendatio
   const utils = trpc.useUtils();
   const recsVersionRef = useRef<number | null>(null);
 
+  const current = useResponsivePageSize({ mobile: 10, tablet: 20, desktop: 30 });
+  const lockedRef = useRef(current);
+  const pageSize = lockedRef.current;
+
   const query = trpc.media.recommendations.useInfiniteQuery(
-    { pageSize: 30 },
+    { pageSize },
     {
       staleTime: 5 * 60 * 1000,
       refetchInterval: 30 * 1000,
@@ -34,47 +40,32 @@ export function RecommendationsSource({ sectionId, title, style }: Recommendatio
     recsVersionRef.current = currentVersion;
   }, [currentVersion, utils.media.recommendations]);
 
-  const items = useMemo<SectionItem[]>(() => {
-    const seen = new Set<string>();
-    return (query.data?.pages ?? [])
-      .flatMap((p) => p.items)
-      .filter((r) => {
-        const key = `${r.provider}-${r.externalId}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .map((r) => ({
-        externalId: r.externalId,
-        provider: r.provider,
-        type: r.type as "movie" | "show",
-        title: r.title,
-        posterPath: r.posterPath ?? null,
-        backdropPath: r.backdropPath ?? null,
-        logoPath: r.logoPath,
-        trailerKey: r.trailerKey,
-        year: r.year,
-        voteAverage: r.voteAverage,
-        overview: r.overview,
-      }));
-  }, [query.data]);
-
-  const handleLoadMore = useCallback(() => {
-    if (query.hasNextPage) void query.fetchNextPage();
-  }, [query]);
+  const result = useSectionInfiniteQuery(
+    query,
+    (page) => page.items,
+    (r): SectionItem => ({
+      externalId: r.externalId,
+      provider: r.provider,
+      type: r.type as "movie" | "show",
+      title: r.title,
+      posterPath: r.posterPath ?? null,
+      backdropPath: r.backdropPath ?? null,
+      logoPath: r.logoPath,
+      trailerKey: r.trailerKey,
+      year: r.year,
+      voteAverage: r.voteAverage,
+      overview: r.overview,
+    }),
+    true,
+  );
 
   return (
     <DynamicSection
+      {...result}
       sectionId={sectionId}
       style={style}
       title={title}
       seeAllHref="/library/recommendations"
-      items={items}
-      isLoading={query.isLoading}
-      isError={query.isError}
-      isFetchingMore={query.isFetchingNextPage}
-      onLoadMore={query.hasNextPage ? handleLoadMore : undefined}
-      onRetry={() => query.refetch()}
       emptyPreset="emptyWatchlist"
       excludeFromDedup={true}
     />
