@@ -1,7 +1,6 @@
-import { sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { media, mediaVideo, userRecommendation } from "@canto/db/schema";
 import { dispatchRefreshExtras } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
+import { findMediaNeedingExtrasBackfill } from "@canto/core/infrastructure/repositories";
 
 const STALE_DAYS = 7;
 
@@ -16,19 +15,7 @@ const STALE_DAYS = 7;
  * which handles concurrency (2) and deduplication via jobId.
  */
 export async function handleBackfillExtras(db: Database): Promise<void> {
-  const rows = await db
-    .selectDistinctOn([media.id], { id: media.id, title: media.title })
-    .from(userRecommendation)
-    .innerJoin(media, sql`${media.id} = ${userRecommendation.mediaId}`)
-    .where(
-      sql`${userRecommendation.active} = true
-        AND (${media.extrasUpdatedAt} IS NULL OR ${media.extrasUpdatedAt} < now() - interval '1 day' * ${STALE_DAYS})
-        AND (
-          ${media.logoPath} IS NULL
-          OR NOT EXISTS (SELECT 1 FROM ${mediaVideo} WHERE ${mediaVideo.mediaId} = ${media.id})
-        )`,
-    );
-
+  const rows = await findMediaNeedingExtrasBackfill(db, { staleDays: STALE_DAYS });
   if (rows.length === 0) return;
 
   console.log(`[backfill-extras] Dispatching ${rows.length} media for refresh`);

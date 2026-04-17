@@ -1,4 +1,4 @@
-import { Queue, Worker } from "bullmq";
+import { Queue } from "bullmq";
 
 import { handleImportTorrents } from "./jobs/import-torrents";
 import {
@@ -19,49 +19,40 @@ import { replaceShowWithTvdb } from "@canto/core/domain/use-cases/replace-show-w
 import { rebuildUserRecs } from "@canto/core/domain/use-cases/rebuild-user-recs";
 import { refreshAllLanguage } from "@canto/core/domain/use-cases/refresh-all-language";
 import { translateEpisodes } from "@canto/core/domain/use-cases/translate-episodes";
-import { fetchMediaMetadata } from "@canto/core/domain/use-cases/fetch-media-metadata";
-import type { ProviderName, MediaType } from "@canto/providers";
-import { findUsersForDailyRecsCheck } from "@canto/core/infrastructure/repositories/user-recommendation-repository";
-import { findMediaById } from "@canto/core/infrastructure/repositories";
-import { dispatchRebuildUserRecs, dispatchTranslateEpisodes } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
+import { runMediaPipeline } from "@canto/core/domain/use-cases/run-media-pipeline";
+import { enqueueDailyRecsRebuild } from "@canto/core/domain/use-cases/enqueue-daily-recs-rebuild";
 import type { MediaPipelineJob } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
+import { QUEUES } from "@canto/core/infrastructure/queue/queue-names";
+import { getRedisConnection } from "@canto/core/infrastructure/queue/redis-config";
 import { jobDispatcher } from "@canto/core/infrastructure/adapters/job-dispatcher.adapter";
 import { db } from "@canto/db/client";
 import { seedLanguages } from "@canto/db";
-import { getSetting } from "@canto/db/settings";
-import { getSupportedLanguageCodes, persistFullMedia } from "@canto/db/persist-media";
 import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
 import { getTvdbProvider } from "@canto/core/lib/tvdb-client";
 
-/* -------------------------------------------------------------------------- */
-/*  Redis                                                                     */
-/* -------------------------------------------------------------------------- */
-
-const redisConnection = {
-  host: process.env.REDIS_HOST ?? "localhost",
-  port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
-  password: process.env.REDIS_PASSWORD ?? undefined,
-};
+import { DEFAULT_JOB_OPTS, makeWorker } from "./lib/worker-factory";
 
 /* -------------------------------------------------------------------------- */
 /*  Queues                                                                    */
 /* -------------------------------------------------------------------------- */
 
+const redisConnection = getRedisConnection();
+
 const queues = {
-  importTorrents: new Queue("import-torrents", { connection: redisConnection }),
-  jellyfinSync: new Queue("jellyfin-sync", { connection: redisConnection }),
-  plexSync: new Queue("plex-sync", { connection: redisConnection }),
-  reverseSyncFull: new Queue("reverse-sync-full", { connection: redisConnection }),
-  reverseSyncUser: new Queue("reverse-sync-user", { connection: redisConnection }),
-  traktSync: new Queue("trakt-sync", { connection: redisConnection }),
-  traktSyncUser: new Queue("trakt-sync-user", { connection: redisConnection }),
-  stallDetection: new Queue("stall-detection", { connection: redisConnection }),
-  rssSync: new Queue("rss-sync", { connection: redisConnection }),
-  dailyRecsCheck: new Queue("daily-recs-check", { connection: redisConnection }),
-  backfillExtras: new Queue("backfill-extras", { connection: redisConnection }),
-  seedManagement: new Queue("seed-management", { connection: redisConnection }),
-  folderScan: new Queue("folder-scan", { connection: redisConnection }),
-  validateDownloads: new Queue("validate-downloads", { connection: redisConnection }),
+  importTorrents: new Queue(QUEUES.importTorrents, { connection: redisConnection }),
+  jellyfinSync: new Queue(QUEUES.jellyfinSync, { connection: redisConnection }),
+  plexSync: new Queue(QUEUES.plexSync, { connection: redisConnection }),
+  reverseSyncFull: new Queue(QUEUES.reverseSyncFull, { connection: redisConnection }),
+  reverseSyncUser: new Queue(QUEUES.reverseSyncUser, { connection: redisConnection }),
+  traktSync: new Queue(QUEUES.traktSync, { connection: redisConnection }),
+  traktSyncUser: new Queue(QUEUES.traktSyncUser, { connection: redisConnection }),
+  stallDetection: new Queue(QUEUES.stallDetection, { connection: redisConnection }),
+  rssSync: new Queue(QUEUES.rssSync, { connection: redisConnection }),
+  dailyRecsCheck: new Queue(QUEUES.dailyRecsCheck, { connection: redisConnection }),
+  backfillExtras: new Queue(QUEUES.backfillExtras, { connection: redisConnection }),
+  seedManagement: new Queue(QUEUES.seedManagement, { connection: redisConnection }),
+  folderScan: new Queue(QUEUES.folderScan, { connection: redisConnection }),
+  validateDownloads: new Queue(QUEUES.validateDownloads, { connection: redisConnection }),
 };
 
 /* -------------------------------------------------------------------------- */
@@ -77,20 +68,20 @@ function jitterStart(maxMs: number): Date {
 async function setupSchedules(): Promise<void> {
   await queues.importTorrents.upsertJobScheduler(
     "import-torrents-scheduler",
-    { every: 2 * 60 * 1000 },          // 2 min
-    { name: "import-torrents" },
+    { every: 2 * 60 * 1000 },
+    { name: QUEUES.importTorrents, opts: DEFAULT_JOB_OPTS },
   );
 
   await queues.jellyfinSync.upsertJobScheduler(
     "jellyfin-sync-scheduler",
     { every: 5 * 60 * 1000, startDate: jitterStart(60 * 1000) },
-    { name: "jellyfin-sync" },
+    { name: QUEUES.jellyfinSync, opts: DEFAULT_JOB_OPTS },
   );
 
   await queues.plexSync.upsertJobScheduler(
     "plex-sync-scheduler",
     { every: 5 * 60 * 1000, startDate: jitterStart(60 * 1000) },
-    { name: "plex-sync" },
+    { name: QUEUES.plexSync, opts: DEFAULT_JOB_OPTS },
   );
 
   // Daily full scan — ignores per-link delta checkpoints so deletion
@@ -100,55 +91,55 @@ async function setupSchedules(): Promise<void> {
   await queues.reverseSyncFull.upsertJobScheduler(
     "reverse-sync-full-scheduler",
     { every: 24 * 60 * 60 * 1000, startDate: jitterStart(10 * 60 * 1000) },
-    { name: "reverse-sync-full" },
+    { name: QUEUES.reverseSyncFull, opts: DEFAULT_JOB_OPTS },
   );
 
   await queues.traktSync.upsertJobScheduler(
     "trakt-sync-scheduler",
     { every: 10 * 60 * 1000, startDate: jitterStart(2 * 60 * 1000) },
-    { name: "trakt-sync" },
+    { name: QUEUES.traktSync, opts: DEFAULT_JOB_OPTS },
   );
 
   await queues.stallDetection.upsertJobScheduler(
     "stall-detection-scheduler",
-    { every: 30 * 60 * 1000 },         // 30 min
-    { name: "stall-detection" },
+    { every: 30 * 60 * 1000 },
+    { name: QUEUES.stallDetection, opts: DEFAULT_JOB_OPTS },
   );
 
   await queues.rssSync.upsertJobScheduler(
     "rss-sync-scheduler",
-    { every: 15 * 60 * 1000 },         // 15 min
-    { name: "rss-sync" },
+    { every: 15 * 60 * 1000 },
+    { name: QUEUES.rssSync, opts: DEFAULT_JOB_OPTS },
   );
 
   await queues.dailyRecsCheck.upsertJobScheduler(
     "daily-recs-check-scheduler",
-    { every: 60 * 60 * 1000 },         // 1 hour
-    { name: "daily-recs-check" },
+    { every: 60 * 60 * 1000 },
+    { name: QUEUES.dailyRecsCheck, opts: DEFAULT_JOB_OPTS },
   );
 
   await queues.backfillExtras.upsertJobScheduler(
     "backfill-extras-scheduler",
-    { every: 60 * 60 * 1000 },         // 1 hour
-    { name: "backfill-extras" },
+    { every: 60 * 60 * 1000 },
+    { name: QUEUES.backfillExtras, opts: DEFAULT_JOB_OPTS },
   );
 
   await queues.seedManagement.upsertJobScheduler(
     "seed-management-scheduler",
-    { every: 15 * 60 * 1000 },         // 15 min
-    { name: "seed-management" },
+    { every: 15 * 60 * 1000 },
+    { name: QUEUES.seedManagement, opts: DEFAULT_JOB_OPTS },
   );
 
   await queues.folderScan.upsertJobScheduler(
     "folder-scan-scheduler",
-    { every: 30 * 60 * 1000 },         // 30 min
-    { name: "folder-scan" },
+    { every: 30 * 60 * 1000 },
+    { name: QUEUES.folderScan, opts: DEFAULT_JOB_OPTS },
   );
 
   await queues.validateDownloads.upsertJobScheduler(
     "validate-downloads-scheduler",
-    { every: 6 * 60 * 60 * 1000 },    // 6 hours
-    { name: "validate-downloads" },
+    { every: 6 * 60 * 60 * 1000 },
+    { name: QUEUES.validateDownloads, opts: DEFAULT_JOB_OPTS },
   );
 }
 
@@ -159,186 +150,107 @@ async function setupSchedules(): Promise<void> {
 const workers = [
   // ── Scheduled (cron) ──
 
-  new Worker("import-torrents", async (job) => {
-    console.log(`[import-torrents] Running job ${job.id}`);
-    await handleImportTorrents();
-  }, { connection: redisConnection, concurrency: 1 }),
+  makeWorker(QUEUES.importTorrents, () => handleImportTorrents()),
 
-  new Worker("jellyfin-sync", async (job) => {
-    console.log(`[jellyfin-sync] Running job ${job.id}`);
-    await handleJellyfinSync();
-  }, { connection: redisConnection, concurrency: 1 }),
+  makeWorker(QUEUES.jellyfinSync, () => handleJellyfinSync()),
 
-  new Worker("plex-sync", async (job) => {
-    console.log(`[plex-sync] Running job ${job.id}`);
-    await handlePlexSync();
-  }, { connection: redisConnection, concurrency: 1 }),
+  makeWorker(QUEUES.plexSync, () => handlePlexSync()),
 
-  new Worker("reverse-sync-full", async (job) => {
-    console.log(`[reverse-sync-full] Running job ${job.id}`);
-    await handleReverseSyncFull();
-  }, { connection: redisConnection, concurrency: 1 }),
+  makeWorker(QUEUES.reverseSyncFull, () => handleReverseSyncFull()),
 
-  new Worker("reverse-sync-user", async (job) => {
-    const { userId } = job.data as { userId: string };
-    if (!userId) {
-      console.warn(`[reverse-sync-user] Job ${job.id} missing userId, skipping`);
-      return;
-    }
-    console.log(`[reverse-sync-user] Running job ${job.id} for user ${userId}`);
-    await handleReverseSyncUser(userId);
-  }, { connection: redisConnection, concurrency: 2 }),
+  makeWorker<{ userId: string }>(
+    QUEUES.reverseSyncUser,
+    async ({ userId }, log) => {
+      if (!userId) {
+        log.warn("missing userId, skipping");
+        return;
+      }
+      await handleReverseSyncUser(userId);
+    },
+    { concurrency: 2 },
+  ),
 
-  new Worker("trakt-sync", async (job) => {
-    console.log(`[trakt-sync] Running job ${job.id}`);
-    await handleTraktSync();
-  }, { connection: redisConnection, concurrency: 1 }),
+  makeWorker(QUEUES.traktSync, () => handleTraktSync()),
 
-  new Worker("trakt-sync-user", async (job) => {
-    const { userId } = job.data as { userId: string };
-    if (!userId) {
-      console.warn(`[trakt-sync-user] Job ${job.id} missing userId, skipping`);
-      return;
-    }
-    console.log(`[trakt-sync-user] Running job ${job.id} for user ${userId}`);
-    await handleTraktSyncUser(userId);
-  }, { connection: redisConnection, concurrency: 2 }),
+  makeWorker<{ userId: string }>(
+    QUEUES.traktSyncUser,
+    async ({ userId }, log) => {
+      if (!userId) {
+        log.warn("missing userId, skipping");
+        return;
+      }
+      await handleTraktSyncUser(userId);
+    },
+    { concurrency: 2 },
+  ),
 
-  new Worker("stall-detection", async (job) => {
-    console.log(`[stall-detection] Running job ${job.id}`);
-    await handleStallDetection();
-  }, { connection: redisConnection, concurrency: 1 }),
+  makeWorker(QUEUES.stallDetection, () => handleStallDetection()),
 
-  new Worker("rss-sync", async (job) => {
-    console.log(`[rss-sync] Running job ${job.id}`);
-    await handleRssSync();
-  }, { connection: redisConnection, concurrency: 1 }),
+  makeWorker(QUEUES.rssSync, () => handleRssSync()),
 
-  new Worker("daily-recs-check", async () => {
-    const users = await findUsersForDailyRecsCheck(db);
-    if (users.length > 0) {
-      console.log(`[daily-recs-check] ${users.length} user(s) need recs refresh`);
-      for (const u of users) await dispatchRebuildUserRecs(u.id);
-    }
-  }, { connection: redisConnection, concurrency: 1 }),
+  makeWorker(QUEUES.dailyRecsCheck, async (_data, log) => {
+    const dispatched = await enqueueDailyRecsRebuild(db);
+    if (dispatched > 0) log.info({ users: dispatched }, "recs refresh dispatched");
+  }),
 
-  // Backfill: queries IDs with missing extras → dispatches to refresh-extras queue
-  new Worker("backfill-extras", async () => {
-    await handleBackfillExtras(db);
-  }, { connection: redisConnection, concurrency: 1 }),
+  makeWorker(QUEUES.backfillExtras, () => handleBackfillExtras(db)),
 
-  new Worker("seed-management", async (job) => {
-    console.log(`[seed-management] Running job ${job.id}`);
-    await handleSeedManagement();
-  }, { connection: redisConnection, concurrency: 1 }),
+  makeWorker(QUEUES.seedManagement, () => handleSeedManagement()),
 
-  new Worker("folder-scan", async (job) => {
-    console.log(`[folder-scan] Running job ${job.id}`);
-    await handleFolderScan();
-  }, { connection: redisConnection, concurrency: 1 }),
+  makeWorker(QUEUES.folderScan, () => handleFolderScan()),
 
-  new Worker("validate-downloads", async (job) => {
-    console.log(`[validate-downloads] Running job ${job.id}`);
-    await handleValidateDownloads();
-  }, { connection: redisConnection, concurrency: 1 }),
+  makeWorker(QUEUES.validateDownloads, () => handleValidateDownloads()),
 
   // ── On-demand (dispatched by other code) ──
 
-  new Worker("refresh-extras", async (job) => {
-    const { mediaId } = job.data as { mediaId: string };
-    console.log(`[refresh-extras] ${mediaId}`);
-    const tmdb = await getTmdbProvider();
-    await refreshExtras(db, mediaId, { tmdb });
-  }, { connection: redisConnection, concurrency: 2 }),
+  makeWorker<{ mediaId: string }>(
+    QUEUES.refreshExtras,
+    async ({ mediaId }) => {
+      const tmdb = await getTmdbProvider();
+      await refreshExtras(db, mediaId, { tmdb });
+    },
+    { concurrency: 2 },
+  ),
 
-  new Worker("replace-tvdb", async (job) => {
-    const { mediaId } = job.data as { mediaId: string };
-    console.log(`[replace-tvdb] ${mediaId}`);
-    const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
-    await replaceShowWithTvdb(db, mediaId, { tmdb, tvdb, dispatcher: jobDispatcher });
-  }, { connection: redisConnection, concurrency: 1 }),
+  makeWorker<{ mediaId: string }>(
+    QUEUES.reconcileShow,
+    async ({ mediaId }) => {
+      const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
+      await replaceShowWithTvdb(db, mediaId, { tmdb, tvdb, dispatcher: jobDispatcher });
+    },
+  ),
 
-  new Worker("rebuild-user-recs", async (job) => {
-    const { userId } = job.data as { userId: string };
-    console.log(`[rebuild-user-recs] ${userId}`);
-    await rebuildUserRecs(db, userId);
-  }, { connection: redisConnection, concurrency: 2 }),
+  makeWorker<{ userId: string }>(
+    QUEUES.rebuildUserRecs,
+    ({ userId }) => rebuildUserRecs(db, userId),
+    { concurrency: 2 },
+  ),
 
-  new Worker("refresh-all-language", async () => {
-    console.log("[refresh-all-language] Starting...");
+  makeWorker(QUEUES.refreshAllLanguage, async () => {
     const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
     await refreshAllLanguage(db, { tmdb, tvdb });
-  }, { connection: redisConnection, concurrency: 1 }),
+  }),
 
-  new Worker("translate-episodes", async (job) => {
-    const { mediaId, tvdbId, language } = job.data as { mediaId: string; tvdbId: number; language: string };
-    const tvdb = await getTvdbProvider();
-    await translateEpisodes(db, mediaId, tvdbId, language, tvdb);
-  }, { connection: redisConnection, concurrency: 3 }),
+  makeWorker<{ mediaId: string; tvdbId: number; language: string }>(
+    QUEUES.translateEpisodes,
+    async ({ mediaId, tvdbId, language }) => {
+      const tvdb = await getTvdbProvider();
+      await translateEpisodes(db, mediaId, tvdbId, language, tvdb);
+    },
+    { concurrency: 3 },
+  ),
 
   // ── Unified media pipeline ──
 
-  new Worker("media-pipeline", async (job) => {
-    const data = job.data as MediaPipelineJob;
-    const { getEffectiveProviderSync } = await import("@canto/core/domain/rules/effective-provider");
-    const globalTvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
-    const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
-    const supportedLangs = [...await getSupportedLanguageCodes(db)];
-
-    let externalId: number;
-    let provider: ProviderName;
-    let type: MediaType;
-    let existingId: string | undefined;
-    let useTVDBSeasons: boolean;
-
-    if (data.mediaId) {
-      const row = await findMediaById(db, data.mediaId);
-      if (!row) return;
-      externalId = row.externalId;
-      provider = row.provider as ProviderName;
-      type = row.type as MediaType;
-      existingId = row.id;
-      useTVDBSeasons = getEffectiveProviderSync(row, globalTvdbEnabled) === "tvdb";
-      console.log(`[media-pipeline] Reprocessing: ${row.title} (${row.id})`);
-    } else {
-      externalId = data.externalId!;
-      provider = data.provider! as ProviderName;
-      type = data.type! as MediaType;
-      useTVDBSeasons = data.useTVDBSeasons ?? globalTvdbEnabled;
-      console.log(`[media-pipeline] Processing: ${provider}/${externalId}`);
-    }
-
-    const result = await fetchMediaMetadata(
-      externalId, provider, type,
-      { tmdb, tvdb },
-      { reprocess: !!existingId, useTVDBSeasons, supportedLanguages: supportedLangs },
-    );
-
-    const mediaId = await persistFullMedia(db, result, existingId);
-
-    if (result.tvdbId && result.tvdbSeasons?.length) {
-      const nonEnLangs = supportedLangs.filter(l => !l.startsWith("en"));
-      for (const lang of nonEnLangs) {
-        void dispatchTranslateEpisodes(mediaId, result.tvdbId, lang).catch(() => {});
-      }
-    }
-
-    console.log(`[media-pipeline] Done: ${result.media.title} → ready`);
-  }, { connection: redisConnection, concurrency: 5 }),
+  makeWorker<MediaPipelineJob>(
+    QUEUES.mediaPipeline,
+    async (data) => {
+      const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
+      await runMediaPipeline(db, data, { tmdb, tvdb });
+    },
+    { concurrency: 5 },
+  ),
 ];
-
-/* -------------------------------------------------------------------------- */
-/*  Error handling                                                            */
-/* -------------------------------------------------------------------------- */
-
-for (const worker of workers) {
-  worker.on("failed", (job, err) => {
-    console.error(`[${worker.name}] Job ${job?.id} failed:`, err);
-  });
-  worker.on("error", (err) => {
-    console.error(`[${worker.name}] Worker error:`, err);
-  });
-}
 
 /* -------------------------------------------------------------------------- */
 /*  Graceful shutdown                                                         */

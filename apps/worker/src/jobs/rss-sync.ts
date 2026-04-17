@@ -1,6 +1,4 @@
 import { db } from "@canto/db/client";
-import { eq, and } from "drizzle-orm";
-import { media } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
 import { downloadTorrent } from "@canto/core/domain/use-cases/download-torrent";
 import { detectQuality } from "@canto/core/domain/rules/quality";
@@ -12,6 +10,8 @@ import { getDownloadClient } from "@canto/core/infrastructure/adapters/download-
 import { getProwlarrClient } from "@canto/core/infrastructure/adapters/prowlarr";
 import {
   findBlocklistByMediaId,
+  findMediaByIdWithSeasons,
+  findMonitoredShowsForRss,
 } from "@canto/core/infrastructure/repositories";
 
 /**
@@ -29,21 +29,7 @@ export async function handleRssSync(): Promise<void> {
   if (!prowlarrEnabled) return;
 
   // 1. Find monitored shows
-  const monitoredShows = await db
-    .select({
-      id: media.id,
-      title: media.title,
-      externalId: media.externalId,
-      provider: media.provider,
-      type: media.type,
-    })
-    .from(media)
-    .where(
-      and(
-        eq(media.type, "show"),
-        eq(media.continuousDownload, true),
-      ),
-    );
+  const monitoredShows = await findMonitoredShowsForRss(db);
 
   if (monitoredShows.length === 0) return;
 
@@ -146,7 +132,6 @@ export async function handleRssSync(): Promise<void> {
 }
 
 async function getAllSeasonEpisodes(seasonNum: number, mediaId: string): Promise<number[]> {
-  const { findMediaByIdWithSeasons } = await import("@canto/core/infrastructure/repositories");
   const mediaRow = await findMediaByIdWithSeasons(db, mediaId);
   if (!mediaRow) return [];
   const seasonRow = mediaRow.seasons?.find((s) => s.number === seasonNum);

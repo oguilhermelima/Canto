@@ -1,11 +1,12 @@
 import { access, constants } from "node:fs/promises";
 
-import { eq, and } from "drizzle-orm";
-
 import { db } from "@canto/db/client";
-import { media, mediaFile } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
-import { updateMedia } from "@canto/core/infrastructure/repositories";
+import {
+  findDownloadedLibraryMedia,
+  findImportedFilesForMedia,
+  updateMedia,
+} from "@canto/core/infrastructure/repositories";
 import { createNotification } from "@canto/core/domain/use-cases/create-notification";
 
 /**
@@ -21,20 +22,13 @@ export async function handleValidateDownloads(): Promise<void> {
   // Only validate local imports — remote imports can't be checked from Canto's filesystem
   if (importMethod === "remote") return;
 
-  const downloadedMedia = await db.query.media.findMany({
-    where: and(eq(media.downloaded, true), eq(media.inLibrary, true)),
-    columns: { id: true, title: true },
-  });
-
+  const downloadedMedia = await findDownloadedLibraryMedia(db);
   if (downloadedMedia.length === 0) return;
 
   let invalidated = 0;
 
   for (const row of downloadedMedia) {
-    const files = await db.query.mediaFile.findMany({
-      where: and(eq(mediaFile.mediaId, row.id), eq(mediaFile.status, "imported")),
-      columns: { id: true, filePath: true },
-    });
+    const files = await findImportedFilesForMedia(db, row.id);
 
     if (files.length === 0) {
       // No imported files in DB — mark as not downloaded

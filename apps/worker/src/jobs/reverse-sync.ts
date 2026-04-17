@@ -9,7 +9,7 @@
 
 import { db } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
-import { TmdbProvider } from "@canto/providers";
+import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
 import {
   findEnabledSyncLinks,
   findAllUserConnections,
@@ -283,9 +283,7 @@ export async function runReverseSync(options: ReverseSyncOptions = {}): Promise<
   const connections = options.userId
     ? allConnections.filter((c) => c.userId === options.userId)
     : allConnections;
-  const tmdbApiKey = await getSetting("tmdb.apiKey");
-  if (!tmdbApiKey) throw new Error("TMDB API key not configured");
-  const tmdb = new TmdbProvider(tmdbApiKey);
+  const tmdb = await getTmdbProvider();
 
   const globallySyncedLibraries = new Set<string>();
 
