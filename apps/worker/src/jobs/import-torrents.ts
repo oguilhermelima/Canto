@@ -6,6 +6,7 @@ import {
   type ImportedMedia,
 } from "@canto/core/domain/use-cases/trigger-media-server-scans";
 import { getDownloadClient } from "@canto/core/infrastructure/adapters/download-client-factory";
+import { createNodeFileSystemAdapter } from "@canto/core/infrastructure/adapters/filesystem";
 import { buildIndexers } from "@canto/core/infrastructure/adapters/indexer-factory";
 import {
   findUnimportedTorrents,
@@ -44,6 +45,7 @@ export async function handleImportTorrents(): Promise<void> {
 
   const importedFolderIds = new Set<string>();
   const importedMediaIds = new Set<string>();
+  const fs = createNodeFileSystemAdapter();
 
   for (const row of toImport) {
     try {
@@ -55,7 +57,7 @@ export async function handleImportTorrents(): Promise<void> {
       }
 
       const qbClient = await getDownloadClient();
-      await autoImportTorrent(db, claimed, qbClient);
+      await autoImportTorrent(db, claimed, qbClient, { fs });
 
       // Re-read row to check if import succeeded
       const updated = await findTorrentById(db, row.id);
