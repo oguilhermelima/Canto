@@ -17,6 +17,7 @@ import {
 
 import { createTRPCRouter, adminProcedure } from "../trpc";
 import { getDownloadClient } from "@canto/core/infrastructure/adapters/download-client-factory";
+import { createNodeFileSystemAdapter } from "@canto/core/infrastructure/adapters/filesystem";
 import { buildIndexers } from "@canto/core/infrastructure/adapters/indexer-factory";
 import { autoImportTorrent } from "@canto/core/domain/use-cases/import-torrent";
 import { mergeLiveData } from "@canto/core/domain/use-cases/merge-live-data";
@@ -469,7 +470,8 @@ export const torrentRouter = createTRPCRouter({
 
       try {
         const qb = await getDownloadClient();
-        await autoImportTorrent(ctx.db, claimed, qb);
+        const fs = createNodeFileSystemAdapter();
+        await autoImportTorrent(ctx.db, claimed, qb, { fs });
         return { success: true };
       } catch (err) {
         await updateTorrent(ctx.db, row.id, { importing: false });
