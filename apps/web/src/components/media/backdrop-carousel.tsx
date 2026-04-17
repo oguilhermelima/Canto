@@ -115,51 +115,43 @@ export function BackdropCarousel({
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="flex gap-4 overflow-x-auto overflow-y-visible pt-2 pb-2 pl-4 scrollbar-none md:pt-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
+          className="flex gap-4 overflow-x-auto overflow-y-visible pt-2 pb-2 pl-4 [contain:paint] scrollbar-none md:pt-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
         >
           {isLoading && visibleItems.length === 0
-            ? // Only show skeletons during initial load when we have no data
-              Array.from({ length: 8 }).map((_, i) => (
+            ? Array.from({ length: 8 }).map((_, i) => (
                 <BackdropCardSkeleton
                   key={i}
                   className="w-[280px] shrink-0 animate-pulse sm:w-[300px] lg:w-[340px] 2xl:w-[380px]"
                 />
               ))
-            : // Show actual items when we have data
-              visibleItems.map((item, i) => (
-                <div
+            : visibleItems.map((item, i) => (
+                <BackdropCard
                   key={`${item.provider}-${item.externalId}-${i}`}
-                  className="animate-in fade-in duration-300"
-                >
-                  <BackdropCard
-                    {...item}
-                    badge={
-                      badgeStrategy === "auto" ? deriveBadge(item) : item.badge
-                    }
-                    onHide={
-                      item.externalId
-                        ? () =>
-                            hide({
-                              externalId: item.externalId!,
-                              provider: item.provider ?? "tmdb",
-                              type: item.type,
-                              title: item.title,
-                              posterPath: null,
-                            })
-                        : undefined
-                    }
-                    className="w-[280px] shrink-0 sm:w-[300px] lg:w-[340px] 2xl:w-[380px]"
-                  />
-                </div>
+                  {...item}
+                  badge={
+                    badgeStrategy === "auto" ? deriveBadge(item) : item.badge
+                  }
+                  onHide={
+                    item.externalId
+                      ? () =>
+                          hide({
+                            externalId: item.externalId!,
+                            provider: item.provider ?? "tmdb",
+                            type: item.type,
+                            title: item.title,
+                            posterPath: null,
+                          })
+                      : undefined
+                  }
+                  className="w-[280px] shrink-0 sm:w-[300px] lg:w-[340px] 2xl:w-[380px]"
+                />
               ))}
           {isFetchingMore &&
             Array.from({ length: 4 }).map((_, i) => (
-              <div
+              <BackdropCardSkeleton
                 key={`loading-${i}`}
-                className="animate-in fade-in duration-300"
-              >
-                <BackdropCardSkeleton className="w-[280px] shrink-0 animate-pulse sm:w-[300px] lg:w-[340px] 2xl:w-[380px]" />
-              </div>
+                className="w-[280px] shrink-0 animate-pulse sm:w-[300px] lg:w-[340px] 2xl:w-[380px]"
+              />
             ))}
           {/* End spacer to match page padding */}
           <div className="w-4 shrink-0 md:w-8 lg:w-12 xl:w-16 2xl:w-24" />

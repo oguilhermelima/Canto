@@ -104,57 +104,46 @@ export function MediaCarousel({
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="flex gap-6 overflow-x-auto overflow-y-visible pt-2 pb-6 pl-4 scrollbar-none md:pt-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
+          className="flex gap-6 overflow-x-auto overflow-y-visible pt-2 pb-6 pl-4 [contain:paint] scrollbar-none md:pt-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
         >
           {isLoading && visibleItems.length === 0
-            ? // Only show skeletons during initial load when we have no data
-              Array.from({ length: 8 }).map((_, i) => (
+            ? Array.from({ length: 8 }).map((_, i) => (
                 <MediaCardSkeleton
                   key={i}
                   showTitle={false}
                   className="w-[180px] shrink-0 animate-pulse sm:w-[200px] lg:w-[220px] 2xl:w-[240px]"
                 />
               ))
-            : // Show actual items when we have data
-              visibleItems.map((item, i) => (
-                <div
+            : visibleItems.map((item, i) => (
+                <MediaCard
                   key={item.id ?? `${item.provider}-${item.externalId}-${i}`}
-                  className="animate-in fade-in duration-300"
-                >
-                  <MediaCard
-                    {...item}
-                    showTypeBadge
-                    showRating={false}
-                    showYear={false}
-                    showTitle={false}
-                    onHide={
-                      hideable && item.externalId
-                        ? () =>
-                            hide({
-                              externalId: item.externalId!,
-                              provider: item.provider ?? "tmdb",
-                              type: item.type,
-                              title: item.title,
-                              posterPath: item.posterPath,
-                            })
-                        : undefined
-                    }
-                    className="w-[180px] shrink-0 sm:w-[200px] lg:w-[220px] 2xl:w-[240px]"
-                  />
-                </div>
+                  {...item}
+                  showTypeBadge
+                  showRating={false}
+                  showYear={false}
+                  showTitle={false}
+                  onHide={
+                    hideable && item.externalId
+                      ? () =>
+                          hide({
+                            externalId: item.externalId!,
+                            provider: item.provider ?? "tmdb",
+                            type: item.type,
+                            title: item.title,
+                            posterPath: item.posterPath,
+                          })
+                      : undefined
+                  }
+                  className="w-[180px] shrink-0 sm:w-[200px] lg:w-[220px] 2xl:w-[240px]"
+                />
               ))}
-          {/* Loading more skeletons */}
           {isFetchingMore &&
             Array.from({ length: 4 }).map((_, i) => (
-              <div
+              <MediaCardSkeleton
                 key={`loading-${i}`}
-                className="animate-in fade-in duration-300"
-              >
-                <MediaCardSkeleton
-                  showTitle={false}
-                  className="w-[180px] shrink-0 animate-pulse sm:w-[200px] lg:w-[220px] 2xl:w-[240px]"
-                />
-              </div>
+                showTitle={false}
+                className="w-[180px] shrink-0 animate-pulse sm:w-[200px] lg:w-[220px] 2xl:w-[240px]"
+              />
             ))}
           {/* End spacer to match page padding */}
           <div className="w-4 shrink-0 md:w-8 lg:w-12 xl:w-16 2xl:w-24" />
