@@ -3,11 +3,14 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@canto/db/client";
 import * as schema from "@canto/db/schema";
 import { count, sql } from "drizzle-orm";
-import { DEFAULT_HOME_SECTIONS } from "@canto/db/home-section-defaults";
-import { DEFAULT_PROFILE_SECTIONS } from "@canto/db/profile-section-defaults";
+import { onboardNewUser } from "@canto/core/domain/use-cases/onboard-new-user";
+
+const trustedOrigins = process.env.AUTH_TRUSTED_ORIGINS
+  ? process.env.AUTH_TRUSTED_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean)
+  : ["http://localhost:3000"];
 
 export const auth = betterAuth({
-  trustedOrigins: ["http://localhost:3000", "http://192.168.0.210:3000"],
+  trustedOrigins,
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: {
@@ -68,24 +71,7 @@ export const auth = betterAuth({
           }
         },
         after: async (user) => {
-          // Auto-create watchlist for every new user
-          await db.insert(schema.list).values({
-            userId: user.id,
-            name: "Watchlist",
-            slug: "watchlist",
-            type: "watchlist",
-            isSystem: true,
-          });
-
-          // Seed default homepage sections
-          await db.insert(schema.homeSection).values(
-            DEFAULT_HOME_SECTIONS.map((s) => ({ ...s, userId: user.id })),
-          );
-
-          // Seed default profile sections
-          await db.insert(schema.profileSection).values(
-            DEFAULT_PROFILE_SECTIONS.map((s) => ({ ...s, userId: user.id })),
-          );
+          await onboardNewUser(db, user.id, user.email);
         },
       },
     },
