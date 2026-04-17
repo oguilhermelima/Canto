@@ -323,6 +323,55 @@ export async function refreshTraktToken(
   });
 }
 
+export interface TraktConnectionCredentials {
+  id: string;
+  token: string | null;
+  refreshToken: string | null;
+  tokenExpiresAt: Date | null;
+}
+
+export interface TraktRefreshPersistPatch {
+  token: string;
+  refreshToken: string;
+  tokenExpiresAt: Date;
+  staleReason: null;
+}
+
+export async function refreshTraktAccessTokenIfNeeded(
+  conn: TraktConnectionCredentials,
+  persistRefresh: (patch: TraktRefreshPersistPatch) => Promise<void>,
+): Promise<{ accessToken: string; tokenResponse?: TraktTokenResponse }> {
+  const accessToken = conn.token;
+  if (!accessToken) {
+    throw new Error(`Trakt connection ${conn.id} has no access token`);
+  }
+
+  const expiresAt = conn.tokenExpiresAt;
+  const shouldRefresh = !!(
+    conn.refreshToken &&
+    expiresAt &&
+    expiresAt.getTime() <= Date.now() + 30_000
+  );
+
+  if (!shouldRefresh) {
+    return { accessToken };
+  }
+
+  const refreshed = await refreshTraktToken(conn.refreshToken!);
+  const nextExpiresAt = new Date(
+    (refreshed.created_at + refreshed.expires_in) * 1000,
+  );
+
+  await persistRefresh({
+    token: refreshed.access_token,
+    refreshToken: refreshed.refresh_token,
+    tokenExpiresAt: nextExpiresAt,
+    staleReason: null,
+  });
+
+  return { accessToken: refreshed.access_token, tokenResponse: refreshed };
+}
+
 export async function getTraktUserSettings(
   accessToken: string,
 ): Promise<TraktUserSettingsResponse> {

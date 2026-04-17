@@ -54,14 +54,13 @@ import {
   listTraktPersonalLists,
   listTraktRatings,
   listTraktWatchlist,
-  refreshTraktToken,
+  refreshTraktAccessTokenIfNeeded,
   removeItemsFromTraktList,
   removeFromTraktWatchlist,
   removeTraktFavorites,
   removeTraktRatings,
   type TraktIds,
   type TraktMediaRef,
-  type TraktTokenResponse,
 } from "../../infrastructure/adapters/trakt";
 import { updateUserConnection } from "../../infrastructure/repositories/user-connection-repository";
 import { slugify } from "../rules/slugify";
@@ -188,41 +187,6 @@ function toTraktRatingsBody(refs: Array<{ type: "movie" | "show"; ids: TraktIds;
     ...(movies.length > 0 ? { movies } : {}),
     ...(shows.length > 0 ? { shows } : {}),
   };
-}
-
-async function refreshTraktAccessTokenIfNeeded(
-  db: Database,
-  conn: typeof userConnection.$inferSelect,
-): Promise<{ accessToken: string; tokenResponse?: TraktTokenResponse }> {
-  const accessToken = conn.token;
-  if (!accessToken) {
-    throw new Error(`Trakt connection ${conn.id} has no access token`);
-  }
-
-  const expiresAt = conn.tokenExpiresAt;
-  const shouldRefresh = !!(
-    conn.refreshToken &&
-    expiresAt &&
-    expiresAt.getTime() <= Date.now() + 30_000
-  );
-
-  if (!shouldRefresh) {
-    return { accessToken };
-  }
-
-  const refreshed = await refreshTraktToken(conn.refreshToken!);
-  const nextExpiresAt = new Date(
-    (refreshed.created_at + refreshed.expires_in) * 1000,
-  );
-
-  await updateUserConnection(db, conn.id, {
-    token: refreshed.access_token,
-    refreshToken: refreshed.refresh_token,
-    tokenExpiresAt: nextExpiresAt,
-    staleReason: null,
-  });
-
-  return { accessToken: refreshed.access_token, tokenResponse: refreshed };
 }
 
 async function resolveMediaFromTraktRef(
@@ -1133,7 +1097,9 @@ export async function syncTraktConnection(
   });
   if (!conn?.token || !conn.userId) return;
 
-  const { accessToken } = await refreshTraktAccessTokenIfNeeded(db, conn);
+  const { accessToken } = await refreshTraktAccessTokenIfNeeded(conn, (patch) =>
+    updateUserConnection(db, conn.id, patch).then(() => undefined),
+  );
   const syncState = await findTraktSyncStateByConnection(db, conn.id);
   const initialSync = !syncState?.lastActivityAt;
   const now = new Date();
