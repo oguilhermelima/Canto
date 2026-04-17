@@ -24,7 +24,7 @@ export function useScrollCarousel(
   const {
     onLoadMore,
     isFetchingMore = false,
-    loadMoreThreshold = 300,
+    loadMoreThreshold = 800,
     scrollFraction = 0.8,
   } = options ?? {};
 
