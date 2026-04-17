@@ -1,7 +1,6 @@
-import { TRPCError } from "@trpc/server";
-
 import type { Database } from "@canto/db/client";
 
+import { IndexerSearchError, MediaNotFoundError } from "../errors";
 import { detectQuality, detectSource } from "../rules/quality";
 import { calculateConfidence } from "../rules/scoring";
 import { detectLanguages, detectReleaseGroup, detectCodec } from "../rules/parsing";
@@ -61,10 +60,7 @@ export async function searchTorrents(
   const row = await findMediaById(db, input.mediaId);
 
   if (!row) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Media not found",
-    });
+    throw new MediaNotFoundError(input.mediaId);
   }
 
   const page = input.page ?? 0;
@@ -134,10 +130,7 @@ export async function searchTorrents(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unknown error";
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: `Indexer search failed: ${message}`,
-    });
+    throw new IndexerSearchError(`Indexer search failed: ${message}`);
   }
 
   // Filter out blocklisted titles

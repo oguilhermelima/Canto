@@ -1,7 +1,14 @@
-import { TRPCError } from "@trpc/server";
-
 import type { Database } from "@canto/db/client";
 import type { TorrentDownloadInput } from "@canto/validators";
+
+import {
+  BlocklistedReleaseError,
+  DownloadClientError,
+  DuplicateDownloadError,
+  InvalidDownloadInputError,
+  MediaNotFoundError,
+  TorrentPersistenceError,
+} from "../errors";
 
 import { logAndSwallow } from "../../lib/log-error";
 import { resolveDownloadUrl } from "../../lib/follow-redirects";
@@ -198,10 +205,9 @@ async function coreDownload(
   const magnetOrUrl = input.magnetUrl ?? input.torrentUrl;
 
   if (!magnetOrUrl) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Either magnetUrl or downloadUrl must be provided",
-    });
+    throw new InvalidDownloadInputError(
+      "Either magnetUrl or downloadUrl must be provided",
+    );
   }
 
   // ── Fetch media with seasons/episodes for association ──
@@ -209,7 +215,7 @@ async function coreDownload(
   const mediaRow = await findMediaByIdWithSeasons(db, input.mediaId);
 
   if (!mediaRow) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
+    throw new MediaNotFoundError(input.mediaId);
   }
 
   // ── Resolve download folder (explicit, assigned, or auto via rules) ──
@@ -221,10 +227,7 @@ async function coreDownload(
   if (!opts.skipDedup) {
     const blocked = await findBlocklistEntry(db, input.mediaId, input.title);
     if (blocked) {
-      throw new TRPCError({
-        code: "CONFLICT",
-        message: `This release is blocklisted: ${blocked.reason}`,
-      });
+      throw new BlocklistedReleaseError(blocked.reason);
     }
   }
 
@@ -313,10 +316,9 @@ async function coreDownload(
     }
 
     if (duplicates.length > 0) {
-      throw new TRPCError({
-        code: "CONFLICT",
-        message: `Already downloaded in ${quality} ${source}: ${duplicates.join(", ")}`,
-      });
+      throw new DuplicateDownloadError(
+        `Already downloaded in ${quality} ${source}: ${duplicates.join(", ")}`,
+      );
     }
   }
 
@@ -357,7 +359,7 @@ async function coreDownload(
   });
 
   if (!torrentRow) {
-    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create torrent" });
+    throw new TorrentPersistenceError();
   }
 
   // ── Create placeholder media_file records ──
@@ -390,10 +392,7 @@ async function coreDownload(
     // Rollback on constraint violation
     await deleteMediaFilesByTorrentId(db, torrentRow.id);
     await deleteTorrent(db, torrentRow.id);
-    throw new TRPCError({
-      code: "CONFLICT",
-      message: "Duplicate file version detected",
-    });
+    throw new DuplicateDownloadError("Duplicate file version detected");
   }
 
   // ── Add to qBittorrent ──
@@ -465,10 +464,9 @@ async function coreDownload(
       mediaId: input.mediaId,
     }).catch(logAndSwallow("download-torrent createNotification"));
 
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: `Failed to add torrent to qBittorrent: ${qbErr instanceof Error ? qbErr.message : "Unknown error"}`,
-    });
+    throw new DownloadClientError(
+      `Failed to add torrent to qBittorrent: ${qbErr instanceof Error ? qbErr.message : "Unknown error"}`,
+    );
   }
 
   return torrentRow;
