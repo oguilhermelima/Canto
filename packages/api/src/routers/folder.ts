@@ -2,7 +2,7 @@ import nodePath from "node:path";
 import { readdir } from "node:fs/promises";
 
 import { TRPCError } from "@trpc/server";
-import { z } from "zod";
+import { eq, and } from "drizzle-orm";
 
 import {
   createFolderInput,
@@ -17,8 +17,10 @@ import {
   listServerLinksInput,
   updateServerLinkInput,
   listMediaPathsInput,
+  createQbitCategoryInput,
 } from "@canto/validators";
 
+import { userConnection } from "@canto/db/schema";
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
 import { getDownloadClient } from "@canto/core/infrastructure/adapters/download-client-factory";
 import { resolveFolder } from "@canto/core/domain/rules/folder-routing";
@@ -37,10 +39,13 @@ import {
   removeServerLink,
   findAllServerLinks,
   findMediaPathsByFolder,
+  findServerLinkById,
   addMediaPath,
   removeMediaPath,
 } from "@canto/core/infrastructure/repositories/folder-repository";
 import { findMediaById } from "@canto/core/infrastructure/repositories/media-repository";
+import { dispatchJellyfinSync, dispatchPlexSync } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
+import { logAndSwallow } from "@canto/core/lib/log-error";
 
 // ── Extracted rules & use-cases ──
 import { validatePath } from "@canto/core/domain/rules/validate-path";
@@ -149,16 +154,7 @@ export const folderRouter = createTRPCRouter({
   }),
 
   createQbitCategory: adminProcedure
-    .input(
-      z.object({
-        name: z
-          .string()
-          .min(1, "Category name is required")
-          .max(100)
-          .regex(/^[^\\/]+$/, "Category name cannot contain / or \\"),
-        savePath: z.string().min(1, "Save path is required").max(500),
-      }),
-    )
+    .input(createQbitCategoryInput)
     .mutation(async ({ input }) => {
       const client = await getDownloadClient();
 
@@ -201,11 +197,8 @@ export const folderRouter = createTRPCRouter({
   listAllServerLinks: protectedProcedure
     .input(listServerLinksInput.optional())
     .query(async ({ ctx, input }) => {
-      // Find the user's connection for this provider
       let userConnId: string | undefined;
       if (input?.serverType) {
-        const { userConnection } = await import("@canto/db/schema");
-        const { eq, and } = await import("drizzle-orm");
         const conn = await ctx.db.query.userConnection.findFirst({
           where: and(
             eq(userConnection.userId, ctx.session.user.id),
@@ -222,10 +215,7 @@ export const folderRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       let userConnId = input.userConnectionId;
 
-      // If no ID provided, find the one for the current user
       if (!userConnId) {
-        const { userConnection } = await import("@canto/db/schema");
-        const { eq, and } = await import("drizzle-orm");
         const conn = await ctx.db.query.userConnection.findFirst({
           where: and(
             eq(userConnection.userId, ctx.session.user.id),
@@ -244,15 +234,11 @@ export const folderRouter = createTRPCRouter({
         userConnectionId: userConnId,
       });
 
-      // Kick off a sync so the user's library data is populated right away
       if (input.syncEnabled) {
-        const { dispatchJellyfinSync, dispatchPlexSync } = await import(
-          "@canto/core/infrastructure/queue/bullmq-dispatcher"
-        );
         if (input.serverType === "jellyfin") {
-          await dispatchJellyfinSync().catch(() => { /* non-critical */ });
+          await dispatchJellyfinSync().catch(logAndSwallow("folder.addServerLink:dispatchJellyfinSync"));
         } else if (input.serverType === "plex") {
-          await dispatchPlexSync().catch(() => { /* non-critical */ });
+          await dispatchPlexSync().catch(logAndSwallow("folder.addServerLink:dispatchPlexSync"));
         }
       }
 
@@ -266,20 +252,13 @@ export const folderRouter = createTRPCRouter({
       if (input.syncEnabled !== undefined) data.syncEnabled = input.syncEnabled;
       const link = await updateServerLink(ctx.db, input.id, data);
 
-      // If sync was just enabled, kick off a sync
       if (input.syncEnabled === true) {
-        const { findServerLinkById } = await import(
-          "@canto/core/infrastructure/repositories/folder-repository"
-        );
         const serverLink = await findServerLinkById(ctx.db, input.id);
         if (serverLink) {
-          const { dispatchJellyfinSync, dispatchPlexSync } = await import(
-            "@canto/core/infrastructure/queue/bullmq-dispatcher"
-          );
           if (serverLink.serverType === "jellyfin") {
-            await dispatchJellyfinSync().catch(() => { /* non-critical */ });
+            await dispatchJellyfinSync().catch(logAndSwallow("folder.updateServerLink:dispatchJellyfinSync"));
           } else if (serverLink.serverType === "plex") {
-            await dispatchPlexSync().catch(() => { /* non-critical */ });
+            await dispatchPlexSync().catch(logAndSwallow("folder.updateServerLink:dispatchPlexSync"));
           }
         }
       }
@@ -291,16 +270,15 @@ export const folderRouter = createTRPCRouter({
     .input(removeServerLinkInput)
     .mutation(async ({ ctx, input }) => {
       if (ctx.session.user.role !== "admin") {
-        const { findServerLinkById } = await import(
-          "@canto/core/infrastructure/repositories/folder-repository"
-        );
         const link = await findServerLinkById(ctx.db, input.id);
         if (!link) throw new TRPCError({ code: "NOT_FOUND" });
         // Non-admins can only delete links owned by their own connections
         const conn = link.userConnectionId
           ? await ctx.db.query.userConnection.findFirst({
-              where: (uc, { eq, and: a }) =>
-                a(eq(uc.id, link.userConnectionId!), eq(uc.userId, ctx.session.user.id)),
+              where: and(
+                eq(userConnection.id, link.userConnectionId),
+                eq(userConnection.userId, ctx.session.user.id),
+              ),
             })
           : null;
         if (!conn) {

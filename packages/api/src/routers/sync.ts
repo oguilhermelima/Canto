@@ -23,8 +23,10 @@ import {
   resolveMediaVersionPreview,
 } from "@canto/core/domain/use-cases/resolve-media-version";
 import { discoverServerLibraries } from "@canto/core/domain/use-cases/discover-server-libraries";
+import { updateMediaServerMetadata } from "@canto/core/domain/use-cases/update-media-server-metadata";
 import { getMediaAvailability } from "@canto/core/domain/services/media-availability-service";
 import { listMediaVersionGroups } from "@canto/core/domain/services/media-version-groups-service";
+import { logAndSwallow } from "@canto/core/lib/log-error";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                     */
@@ -136,14 +138,8 @@ export const syncRouter = createTRPCRouter({
 
       const mutated = result as { mediaId: string; suggestedName: string };
       if (input.updateMediaServer && mutated.mediaId) {
-        const { updateMediaServerMetadata } = await import(
-          "@canto/core/domain/use-cases/update-media-server-metadata"
-        );
-        await updateMediaServerMetadata(ctx.db, mutated.mediaId).catch((err) =>
-          console.warn(
-            "[resolveMediaVersion] Server update failed:",
-            err instanceof Error ? err.message : err,
-          ),
+        await updateMediaServerMetadata(ctx.db, mutated.mediaId).catch(
+          logAndSwallow("sync.resolveMediaVersion:updateMediaServerMetadata"),
         );
       }
 

@@ -1,10 +1,10 @@
-import { z } from "zod";
 import {
   listInput,
   setMediaLibraryInput,
   setContinuousDownloadInput,
   setPreferenceInput,
   setDownloadSettingsInput,
+  setAutoMergeVersionsInput,
 } from "@canto/validators";
 import { deleteSetting, getSetting, getSettings, setSetting } from "@canto/db/settings";
 
@@ -135,7 +135,7 @@ export const libraryRouter = createTRPCRouter({
   }),
 
   setAutoMergeVersions: adminProcedure
-    .input(z.boolean())
+    .input(setAutoMergeVersionsInput)
     .mutation(async ({ input }) => {
       await setSetting("autoMergeVersions", input);
       return { success: true };

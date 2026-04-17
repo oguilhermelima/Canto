@@ -38,8 +38,13 @@ import { dispatchRefreshAllLanguage, dispatchMediaPipeline, dispatchRebuildUserR
 
 // ── Extracted use-cases & services ──
 import { testService } from "@canto/core/infrastructure/adapters/service-tester";
-import { authenticateJellyfin } from "@canto/core/domain/use-cases/authenticate-jellyfin";
-import { authenticatePlex, loginPlex, createPlexPin, checkPlexPin } from "@canto/core/domain/use-cases/authenticate-plex";
+import {
+  authenticateJellyfin,
+  authenticatePlex,
+  loginPlex,
+  createPlexPin,
+  checkPlexPin,
+} from "@canto/core/domain/use-cases/authenticate-media-server";
 import { validateServiceUrl } from "@canto/core/domain/rules/validate-service-url";
 
 const setupOrAdminProcedure = t.procedure.use(async ({ ctx, next }) => {

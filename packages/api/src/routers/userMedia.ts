@@ -1,6 +1,3 @@
-import { z } from "zod";
-import { and, count, desc, eq } from "drizzle-orm";
-import { userHiddenMedia } from "@canto/db/schema";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
@@ -39,12 +36,38 @@ import {
   computeAndSyncSeasonRating,
   computeAndSyncMediaRating,
 } from "@canto/core/infrastructure/repositories";
-import { rateInput, removeRatingInput } from "@canto/validators";
+import {
+  hideMedia,
+  unhideMedia,
+  findHiddenMediaPaginated,
+  findHiddenIds,
+} from "@canto/core/infrastructure/repositories/user-hidden-media-repository";
+import {
+  rateInput,
+  removeRatingInput,
+  updateMediaStatusInput,
+  mediaIdInput,
+  getUserMediaInput,
+  getLibraryWatchNextInput,
+  getUpcomingScheduleInput,
+  getLibraryHistoryInput,
+  getMediaReviewsInput,
+  getReviewByIdInput,
+  getEpisodeReviewsInput,
+  toggleFavoriteInput,
+  hideMediaInput,
+  unhideMediaInput,
+  getHiddenMediaInput,
+  trackInput,
+  logWatchedInput,
+  removeHistoryEntriesInput,
+} from "@canto/validators";
 import type { LibraryFeedFilterOptions } from "@canto/core/infrastructure/repositories";
 import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/use-cases/promote-user-media-state-from-playback";
 import { pushWatchStateToServers } from "@canto/core/domain/use-cases/push-watch-state";
 import { getUserLanguage } from "@canto/core/domain/services/user-service";
 import { translateMediaItems } from "@canto/core/domain/services/translation-service";
+import { logAndSwallow } from "@canto/core/lib/log-error";
 
 type TrackingStatus = "none" | "planned" | "watching" | "completed" | "dropped";
 type WatchedAtMode = "just_now" | "release_date" | "other_date" | "unknown_date";
@@ -118,22 +141,6 @@ function toProgressPercent(current: number, total: number): number | null {
   return Math.max(0, Math.min(100, percentage));
 }
 
-const libraryFilterSchema = z.object({
-  source: z.enum(["jellyfin", "plex", "manual"]).optional(),
-  sortBy: z.enum(["recently_watched", "name_asc", "name_desc", "year_desc", "year_asc"]).optional(),
-  yearMin: z.number().optional(),
-  yearMax: z.number().optional(),
-  watchStatus: z.enum(["in_progress", "completed", "not_started"]).optional(),
-  genreIds: z.array(z.number()).optional(),
-  scoreMin: z.number().optional(),
-  scoreMax: z.number().optional(),
-  runtimeMin: z.number().optional(),
-  runtimeMax: z.number().optional(),
-  language: z.string().optional(),
-  certification: z.string().optional(),
-  tvStatus: z.string().optional(),
-});
-
 function computeTrackingStatus(params: {
   mediaType: MediaType;
   history: Array<{ episodeId: string | null }>;
@@ -168,9 +175,7 @@ function computeTrackingStatus(params: {
 
 export const userMediaRouter = createTRPCRouter({
   getState: protectedProcedure
-    .input(z.object({
-      mediaId: z.string(),
-    }))
+    .input(mediaIdInput)
     .query(async ({ ctx, input }) => {
       const [state, progress] = await Promise.all([
         findUserMediaState(ctx.db, ctx.session.user.id, input.mediaId),
@@ -191,9 +196,7 @@ export const userMediaRouter = createTRPCRouter({
     }),
 
   getHistory: protectedProcedure
-    .input(z.object({
-      mediaId: z.string(),
-    }))
+    .input(mediaIdInput)
     .query(async ({ ctx, input }) => {
       const history = await findUserWatchHistoryByMedia(
         ctx.db,
@@ -214,19 +217,7 @@ export const userMediaRouter = createTRPCRouter({
   ),
 
   getUserMedia: protectedProcedure
-    .input(
-      z.object({
-        status: z.enum(["planned", "watching", "completed", "dropped"]).optional(),
-        hasRating: z.boolean().optional(),
-        isFavorite: z.boolean().optional(),
-        isHidden: z.boolean().optional(),
-        mediaType: z.enum(["movie", "show"]).optional(),
-        sortBy: z.enum(["updatedAt", "rating", "title", "year"]).default("updatedAt"),
-        sortOrder: z.enum(["asc", "desc"]).default("desc"),
-        limit: z.number().int().min(1).max(100).default(24),
-        cursor: z.number().int().min(0).nullish(),
-      }),
-    )
+    .input(getUserMediaInput)
     .query(async ({ ctx, input }) => {
       const offset = input.cursor ?? 0;
       const result = await findUserMediaPaginated(ctx.db, ctx.session.user.id, {
@@ -254,14 +245,7 @@ export const userMediaRouter = createTRPCRouter({
   }),
 
   getLibraryWatchNext: protectedProcedure
-    .input(
-      z.object({
-        limit: z.number().int().min(1).max(100).default(24),
-        cursor: z.number().int().min(0).nullish(),
-        view: z.enum(["all", "continue", "watch_next"]).default("all"),
-        mediaType: z.enum(["movie", "show"]).optional(),
-      }).merge(libraryFilterSchema),
-    )
+    .input(getLibraryWatchNextInput)
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
       const limit = input.limit;
@@ -716,12 +700,7 @@ export const userMediaRouter = createTRPCRouter({
     }),
 
   getUpcomingSchedule: protectedProcedure
-    .input(
-      z.object({
-        limit: z.number().int().min(1).max(100).default(24),
-        cursor: z.number().int().min(0).nullish(),
-      }),
-    )
+    .input(getUpcomingScheduleInput)
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
       const limit = input.limit;
@@ -946,14 +925,7 @@ export const userMediaRouter = createTRPCRouter({
     }),
 
   getLibraryHistory: protectedProcedure
-    .input(
-      z.object({
-        limit: z.number().int().min(1).max(200).default(40),
-        cursor: z.number().int().min(0).nullish(),
-        mediaType: z.enum(["movie", "show"]).optional(),
-        completedOnly: z.boolean().optional(),
-      }).merge(libraryFilterSchema),
-    )
+    .input(getLibraryHistoryInput)
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
       const limit = input.limit;
@@ -1240,17 +1212,12 @@ export const userMediaRouter = createTRPCRouter({
     }),
 
   updateState: protectedProcedure
-    .input(z.object({
-      mediaId: z.string(),
-      trackingStatus: z.enum(["none", "planned", "watching", "completed", "dropped"]).optional(),
-      rating: z.number().min(0).max(10).optional(),
-      progress: z.number().min(0).optional(),
-    }))
+    .input(updateMediaStatusInput)
     .mutation(async ({ ctx, input }) => {
       await upsertUserMediaState(ctx.db, {
         userId: ctx.session.user.id,
         mediaId: input.mediaId,
-        ...(input.trackingStatus !== undefined && { status: input.trackingStatus }),
+        ...(input.status !== undefined && { status: input.status }),
         ...(input.rating !== undefined && { rating: input.rating }),
       });
       return { success: true };
@@ -1284,29 +1251,23 @@ export const userMediaRouter = createTRPCRouter({
     }),
 
   getRatings: protectedProcedure
-    .input(z.object({ mediaId: z.string() }))
+    .input(mediaIdInput)
     .query(({ ctx, input }) =>
       findUserRatingsByMedia(ctx.db, ctx.session.user.id, input.mediaId),
     ),
 
   getMediaReviews: protectedProcedure
-    .input(z.object({
-      mediaId: z.string().uuid(),
-      limit: z.number().int().min(1).max(100).default(50),
-      offset: z.number().int().min(0).default(0),
-      episodeId: z.string().uuid().optional(),
-      sortBy: z.enum(["date", "rating"]).default("date"),
-    }))
+    .input(getMediaReviewsInput)
     .query(({ ctx, input }) =>
       findMediaReviews(ctx.db, input.mediaId, input),
     ),
 
   getReviewById: protectedProcedure
-    .input(z.object({ reviewId: z.string().uuid() }))
+    .input(getReviewByIdInput)
     .query(({ ctx, input }) => findReviewById(ctx.db, input.reviewId)),
 
   getEpisodeReviews: protectedProcedure
-    .input(z.object({ episodeId: z.string().uuid() }))
+    .input(getEpisodeReviewsInput)
     .query(({ ctx, input }) =>
       findEpisodeRatingsFromAllUsers(ctx.db, input.episodeId),
     ),
@@ -1343,10 +1304,7 @@ export const userMediaRouter = createTRPCRouter({
     }),
 
   toggleFavorite: protectedProcedure
-    .input(z.object({
-      mediaId: z.string(),
-      isFavorite: z.boolean(),
-    }))
+    .input(toggleFavoriteInput)
     .mutation(async ({ ctx, input }) => {
       await upsertUserMediaState(ctx.db, {
         userId: ctx.session.user.id,
@@ -1357,90 +1315,38 @@ export const userMediaRouter = createTRPCRouter({
     }),
 
   hideMedia: protectedProcedure
-    .input(z.object({
-      externalId: z.number(),
-      provider: z.string().default("tmdb"),
-      type: z.enum(["movie", "show"]),
-      title: z.string(),
-      posterPath: z.string().nullable().optional(),
-    }))
+    .input(hideMediaInput)
     .mutation(async ({ ctx, input }) => {
-      await ctx.db
-        .insert(userHiddenMedia)
-        .values({
-          userId: ctx.session.user.id,
-          externalId: input.externalId,
-          provider: input.provider,
-          type: input.type,
-          title: input.title,
-          posterPath: input.posterPath,
-        })
-        .onConflictDoNothing();
+      await hideMedia(ctx.db, { ...input, userId: ctx.session.user.id });
       return { success: true };
     }),
 
   unhideMedia: protectedProcedure
-    .input(z.object({
-      externalId: z.number(),
-      provider: z.string().default("tmdb"),
-    }))
+    .input(unhideMediaInput)
     .mutation(async ({ ctx, input }) => {
-      await ctx.db
-        .delete(userHiddenMedia)
-        .where(
-          and(
-            eq(userHiddenMedia.userId, ctx.session.user.id),
-            eq(userHiddenMedia.externalId, input.externalId),
-            eq(userHiddenMedia.provider, input.provider),
-          ),
-        );
+      await unhideMedia(ctx.db, { ...input, userId: ctx.session.user.id });
       return { success: true };
     }),
 
   getHiddenMedia: protectedProcedure
-    .input(z.object({
-      limit: z.number().int().min(1).max(100).default(24),
-      cursor: z.number().int().min(0).nullish(),
-    }))
+    .input(getHiddenMediaInput)
     .query(async ({ ctx, input }) => {
-      const userId = ctx.session.user.id;
       const offset = input.cursor ?? 0;
-
-      const [items, [countRow]] = await Promise.all([
-        ctx.db
-          .select()
-          .from(userHiddenMedia)
-          .where(eq(userHiddenMedia.userId, userId))
-          .orderBy(desc(userHiddenMedia.createdAt))
-          .limit(input.limit)
-          .offset(offset),
-        ctx.db
-          .select({ total: count() })
-          .from(userHiddenMedia)
-          .where(eq(userHiddenMedia.userId, userId)),
-      ]);
-
-      const total = countRow?.total ?? 0;
+      const { items, total } = await findHiddenMediaPaginated(
+        ctx.db,
+        ctx.session.user.id,
+        { limit: input.limit, offset },
+      );
       const nextCursor = offset + input.limit < total ? offset + input.limit : undefined;
       return { items, total, nextCursor };
     }),
 
-  getHiddenIds: protectedProcedure.query(async ({ ctx }) => {
-    const rows = await ctx.db
-      .select({
-        externalId: userHiddenMedia.externalId,
-        provider: userHiddenMedia.provider,
-      })
-      .from(userHiddenMedia)
-      .where(eq(userHiddenMedia.userId, ctx.session.user.id));
-    return rows;
-  }),
+  getHiddenIds: protectedProcedure.query(({ ctx }) =>
+    findHiddenIds(ctx.db, ctx.session.user.id),
+  ),
 
   track: protectedProcedure
-    .input(z.object({
-      mediaId: z.string(),
-      status: z.enum(["none", "planned", "watching", "completed", "dropped"]),
-    }))
+    .input(trackInput)
     .mutation(async ({ ctx, input }) => {
       await upsertUserMediaState(ctx.db, {
         userId: ctx.session.user.id,
@@ -1451,18 +1357,7 @@ export const userMediaRouter = createTRPCRouter({
     }),
 
   logWatched: protectedProcedure
-    .input(z.object({
-      mediaId: z.string(),
-      scope: z.enum(["movie", "show", "season", "episode"]).optional(),
-      seasonNumber: z.number().int().min(0).optional(),
-      episodeNumber: z.number().int().min(1).optional(),
-      selectedEpisodeIds: z.array(z.string()).min(1).optional(),
-      watchedAtMode: z.enum(["just_now", "release_date", "other_date", "unknown_date"]).default("just_now"),
-      watchedAt: z.string().datetime().optional(),
-      markDropped: z.boolean().default(false),
-      rating: z.number().int().min(1).max(10).optional(),
-      comment: z.string().max(5000).optional(),
-    }))
+    .input(logWatchedInput)
     .mutation(async ({ ctx, input }) => {
       if (input.markDropped && (input.scope || input.selectedEpisodeIds)) {
         throw new TRPCError({
@@ -1697,12 +1592,7 @@ export const userMediaRouter = createTRPCRouter({
           ctx.session.user.id,
           input.mediaId,
           true,
-        ).catch((err) => {
-          console.error(
-            "[userMedia.logWatched] pushWatchStateToServers failed:",
-            err instanceof Error ? err.message : err,
-          );
-        });
+        ).catch(logAndSwallow("userMedia.logWatched:pushWatchStateToServers"));
       }
 
       const latestHistoryDate = history[0]?.watchedAt ?? null;
@@ -1786,10 +1676,7 @@ export const userMediaRouter = createTRPCRouter({
     }),
 
   removeHistoryEntries: protectedProcedure
-    .input(z.object({
-      mediaId: z.string(),
-      entryIds: z.array(z.string()).min(1),
-    }))
+    .input(removeHistoryEntriesInput)
     .mutation(async ({ ctx, input }) => {
       const mediaWithSeasons = await findMediaByIdWithSeasons(ctx.db, input.mediaId);
       if (!mediaWithSeasons) {
@@ -1848,12 +1735,7 @@ export const userMediaRouter = createTRPCRouter({
           ctx.session.user.id,
           input.mediaId,
           false,
-        ).catch((err) => {
-          console.error(
-            "[userMedia.removeHistoryEntries] pushWatchStateToServers failed:",
-            err instanceof Error ? err.message : err,
-          );
-        });
+        ).catch(logAndSwallow("userMedia.removeHistoryEntries:pushWatchStateToServers"));
       }
 
       const [state, progress] = await Promise.all([
@@ -1877,9 +1759,7 @@ export const userMediaRouter = createTRPCRouter({
     }),
 
   markDropped: protectedProcedure
-    .input(z.object({
-      mediaId: z.string(),
-    }))
+    .input(mediaIdInput)
     .mutation(async ({ ctx, input }) => {
       await upsertUserMediaState(ctx.db, {
         userId: ctx.session.user.id,
@@ -1892,12 +1772,7 @@ export const userMediaRouter = createTRPCRouter({
         ctx.session.user.id,
         input.mediaId,
         false,
-      ).catch((err) => {
-        console.error(
-          "[userMedia.markDropped] pushWatchStateToServers failed:",
-          err instanceof Error ? err.message : err,
-        );
-      });
+      ).catch(logAndSwallow("userMedia.markDropped:pushWatchStateToServers"));
 
       const [state, progress] = await Promise.all([
         findUserMediaState(ctx.db, ctx.session.user.id, input.mediaId),
@@ -1919,9 +1794,7 @@ export const userMediaRouter = createTRPCRouter({
     }),
 
   clearTracking: protectedProcedure
-    .input(z.object({
-      mediaId: z.string(),
-    }))
+    .input(mediaIdInput)
     .mutation(async ({ ctx, input }) => {
       await upsertUserMediaState(ctx.db, {
         userId: ctx.session.user.id,
@@ -1934,12 +1807,7 @@ export const userMediaRouter = createTRPCRouter({
         ctx.session.user.id,
         input.mediaId,
         false,
-      ).catch((err) => {
-        console.error(
-          "[userMedia.clearTracking] pushWatchStateToServers failed:",
-          err instanceof Error ? err.message : err,
-        );
-      });
+      ).catch(logAndSwallow("userMedia.clearTracking:pushWatchStateToServers"));
 
       const [state, progress] = await Promise.all([
         findUserMediaState(ctx.db, ctx.session.user.id, input.mediaId),

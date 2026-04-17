@@ -37,15 +37,26 @@ import { findMediaFilesByMediaId } from "@canto/core/infrastructure/repositories
 // ── Extracted use-cases & services ──
 import { loadExtrasFromDB } from "@canto/core/domain/services/extras-service";
 import { getByExternal } from "@canto/core/domain/use-cases/get-by-external";
-import { resolveMedia } from "@canto/core/domain/use-cases/resolve-media";
-import { persistMediaUseCase } from "@canto/core/domain/use-cases/persist-media";
+import {
+  resolveMedia,
+  persistMediaUseCase,
+  persistFullMedia,
+  getSupportedLanguageCodes,
+} from "@canto/core/domain/use-cases/persist-media";
 import { getRecommendations } from "@canto/core/domain/use-cases/get-recommendations";
 import { fetchLogos, enrichBrowseWithLogos } from "@canto/core/domain/use-cases/fetch-logos";
 import { db as appDb } from "@canto/db/client";
 import { setLibraryStatus } from "@canto/core/domain/use-cases/manage-library-status";
-import { mapPoolItem } from "@canto/core/domain/mappers/media-mapper";
 import type { RecsFilters } from "@canto/core/infrastructure/repositories/user-recommendation-repository";
-import { getSupportedLanguageCodes } from "@canto/db/persist-media";
+import { fetchMediaMetadata } from "@canto/core/domain/use-cases/fetch-media-metadata";
+import { getEffectiveProvider } from "@canto/core/domain/rules/effective-provider";
+import { reconcileShowStructure } from "@canto/core/domain/use-cases/reconcile-show-structure";
+import { jobDispatcher } from "@canto/core/infrastructure/adapters/job-dispatcher.adapter";
+import { findServerLibrary, removeListItem } from "@canto/core/infrastructure/repositories/list-repository";
+import { revertRequestStatus } from "@canto/core/infrastructure/repositories/request-repository";
+import { findMediaVersionsByMediaId } from "@canto/core/infrastructure/repositories/media-version-repository";
+import { executeReorganizeMediaFiles } from "@canto/core/domain/use-cases/reorganize-media-files";
+import { updateMediaServerMetadata } from "@canto/core/domain/use-cases/update-media-server-metadata";
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                   */
@@ -130,24 +141,24 @@ export const mediaRouter = createTRPCRouter({
 
         const discoverOpts = {
           page,
-          with_text_query: input.query,
-          with_genres: input.genres,
-          with_original_language: input.language,
-          with_keywords: input.keywords,
-          vote_average_gte: input.scoreMin,
-          vote_average_lte: input.scoreMax,
-          with_runtime_gte: input.runtimeMin,
-          with_runtime_lte: input.runtimeMax,
+          query: input.query,
+          genreIds: input.genres,
+          originalLanguage: input.language,
+          keywordIds: input.keywords,
+          minScore: input.scoreMin,
+          maxScore: input.scoreMax,
+          minRuntime: input.runtimeMin,
+          maxRuntime: input.runtimeMax,
           sort_by: input.sortBy ?? "popularity.desc",
-          first_air_date_gte: input.type === "show" ? input.dateFrom : undefined,
-          release_date_gte: input.type === "movie" ? input.dateFrom : undefined,
-          first_air_date_lte: input.type === "show" ? (input.dateTo ?? today) : undefined,
-          release_date_lte: input.type === "movie" ? (input.dateTo ?? today) : undefined,
+          firstAirDateFrom: input.type === "show" ? input.dateFrom : undefined,
+          releaseDateFrom: input.type === "movie" ? input.dateFrom : undefined,
+          firstAirDateTo: input.type === "show" ? (input.dateTo ?? today) : undefined,
+          releaseDateTo: input.type === "movie" ? (input.dateTo ?? today) : undefined,
           certification: input.certification,
           certification_country: input.certification ? "US" : undefined,
           with_status: input.status,
-          with_watch_providers: input.watchProviders,
-          watch_region: input.watchRegion,
+          watchProviderIds: input.watchProviders,
+          watchRegion: input.watchRegion,
         };
 
         if (input.mode === "trending") {
@@ -170,7 +181,7 @@ export const mediaRouter = createTRPCRouter({
     const userLang = await getUserLanguage(ctx.db, ctx.session.user.id);
     const translated = await applyMediaTranslation(ctx.db, row, userLang);
     if (translated.seasons) {
-      await applySeasonsTranslation(ctx.db, translated.seasons as any, userLang);
+      await applySeasonsTranslation(ctx.db, translated.seasons, userLang);
     }
     return translated;
   }),
@@ -234,10 +245,7 @@ export const mediaRouter = createTRPCRouter({
       const row = await findMediaById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
 
-      const { fetchMediaMetadata } = await import("@canto/core/domain/use-cases/fetch-media-metadata");
-      const { persistFullMedia } = await import("@canto/db/persist-media");
       const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
-      const { getEffectiveProvider } = await import("@canto/core/domain/rules/effective-provider");
       const effectiveProvider = await getEffectiveProvider(row);
       const supportedLangs = [...await getSupportedLanguageCodes(ctx.db)];
 
@@ -258,8 +266,6 @@ export const mediaRouter = createTRPCRouter({
           columns: { id: true },
         });
         if (!hasTvdbSeasons) {
-          const { reconcileShowStructure } = await import("@canto/core/domain/use-cases/reconcile-show-structure");
-          const { jobDispatcher } = await import("@canto/core/infrastructure/adapters/job-dispatcher.adapter");
           await reconcileShowStructure(ctx.db, row.id, { tmdb, tvdb, dispatcher: jobDispatcher }, { force: true });
         }
       }
@@ -288,14 +294,8 @@ export const mediaRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const updated = await updateMedia(ctx.db, input.id, { inLibrary: false, downloaded: false });
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
-      const { findServerLibrary, removeListItem } = await import(
-        "@canto/core/infrastructure/repositories/list-repository"
-      );
       const serverLib = await findServerLibrary(ctx.db);
       if (serverLib) await removeListItem(ctx.db, serverLib.id, input.id);
-      const { revertRequestStatus } = await import(
-        "@canto/core/infrastructure/repositories/request-repository"
-      );
       await revertRequestStatus(ctx.db, input.id, "downloaded", "approved");
       return updated;
     }),
@@ -317,9 +317,6 @@ export const mediaRouter = createTRPCRouter({
 
       const currentSeasons = (row.seasons ?? []).filter((s: { number: number }) => s.number > 0);
       const mediaFiles = await findMediaFilesByMediaId(ctx.db, input.id);
-      const { findMediaVersionsByMediaId } = await import(
-        "@canto/core/infrastructure/repositories/media-version-repository"
-      );
       const versions = await findMediaVersionsByMediaId(ctx.db, input.id);
 
       return {
@@ -338,20 +335,12 @@ export const mediaRouter = createTRPCRouter({
 
       await updateMedia(ctx.db, input.id, { overrideProviderFor: input.overrideProviderFor });
 
-      const { getEffectiveProvider } = await import("@canto/core/domain/rules/effective-provider");
       const effectiveProvider = await getEffectiveProvider({ ...row, overrideProviderFor: input.overrideProviderFor });
 
       if (effectiveProvider === "tvdb") {
-        const [{ reconcileShowStructure }, tmdb, tvdb, { jobDispatcher }] = await Promise.all([
-          import("@canto/core/domain/use-cases/reconcile-show-structure"),
-          getTmdbProvider(),
-          getTvdbProvider(),
-          import("@canto/core/infrastructure/adapters/job-dispatcher.adapter"),
-        ]);
+        const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
         await reconcileShowStructure(ctx.db, input.id, { tmdb, tvdb, dispatcher: jobDispatcher }, { force: true });
       } else {
-        const { fetchMediaMetadata } = await import("@canto/core/domain/use-cases/fetch-media-metadata");
-        const { persistFullMedia } = await import("@canto/db/persist-media");
         const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
         const supportedLangs = [...await getSupportedLanguageCodes(ctx.db)];
 
@@ -364,12 +353,10 @@ export const mediaRouter = createTRPCRouter({
       }
 
       if (input.renameFiles) {
-        const { executeReorganizeMediaFiles } = await import("@canto/core/domain/use-cases/reorganize-media-files");
         await executeReorganizeMediaFiles(ctx.db, input.id);
       }
 
       if (input.updateMediaServer) {
-        const { updateMediaServerMetadata } = await import("@canto/core/domain/use-cases/update-media-server-metadata");
         await updateMediaServerMetadata(ctx.db, input.id);
       }
 

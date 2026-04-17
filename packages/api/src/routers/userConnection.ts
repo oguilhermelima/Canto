@@ -1,15 +1,20 @@
 import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { userConnection } from "@canto/db/schema";
 import {
   addUserConnectionInput,
   deleteUserConnectionInput,
+  traktDeviceCheckInput,
+  checkPlexPinInput,
 } from "@canto/validators";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { createPlexPin, checkPlexPin, authenticatePlex } from "@canto/core/domain/use-cases/authenticate-plex";
-import { authenticateJellyfin } from "@canto/core/domain/use-cases/authenticate-jellyfin";
+import {
+  createPlexPin,
+  checkPlexPin,
+  authenticatePlex,
+  authenticateJellyfin,
+} from "@canto/core/domain/use-cases/authenticate-media-server";
 import {
   createTraktDeviceCode,
   exchangeTraktDeviceCode,
@@ -18,10 +23,15 @@ import {
   TraktHttpError,
 } from "@canto/core/infrastructure/adapters/trakt";
 import { getSetting } from "@canto/db/settings";
-
-/* -------------------------------------------------------------------------- */
-/*  Helpers                                                                    */
-/* -------------------------------------------------------------------------- */
+import { discoverServerLibraries } from "@canto/core/domain/use-cases/discover-server-libraries";
+import { upsertServerLink } from "@canto/core/infrastructure/repositories/folder-repository";
+import {
+  dispatchJellyfinSync,
+  dispatchPlexSync,
+  dispatchUserReverseSync,
+  dispatchUserTraktSync,
+} from "@canto/core/infrastructure/queue/bullmq-dispatcher";
+import { logAndSwallow } from "@canto/core/lib/log-error";
 
 /**
  * After a userConnection is created/updated, auto-discover all accessible libraries
@@ -35,16 +45,6 @@ async function setupLibrariesForConnection(
   connectionId: string,
 ): Promise<void> {
   try {
-    const { discoverServerLibraries } = await import(
-      "@canto/core/domain/use-cases/discover-server-libraries"
-    );
-    const { upsertServerLink } = await import(
-      "@canto/core/infrastructure/repositories/folder-repository"
-    );
-    const { dispatchJellyfinSync, dispatchPlexSync } = await import(
-      "@canto/core/infrastructure/queue/bullmq-dispatcher"
-    );
-
     const libraries = await discoverServerLibraries(db, provider, userId);
 
     for (const lib of libraries) {
@@ -66,13 +66,9 @@ async function setupLibrariesForConnection(
       await dispatchPlexSync();
     }
   } catch (err) {
-    console.warn("[userConnection] Failed to auto-setup libraries:", err instanceof Error ? err.message : err);
+    logAndSwallow("userConnection:setupLibrariesForConnection")(err);
   }
 }
-
-/* -------------------------------------------------------------------------- */
-/*  Router                                                                     */
-/* -------------------------------------------------------------------------- */
 
 export const userConnectionRouter = createTRPCRouter({
   list: protectedProcedure.query(async ({ ctx }) => {
@@ -174,7 +170,6 @@ export const userConnectionRouter = createTRPCRouter({
         connectionId = inserted!.id;
       }
 
-      // Fire-and-forget: auto-discover all libraries and dispatch sync
       void setupLibrariesForConnection(ctx.db, ctx.session.user.id, input.provider, connectionId);
 
       return { success: true, id: connectionId };
@@ -200,9 +195,6 @@ export const userConnectionRouter = createTRPCRouter({
    * the 5-min scheduled sweep. Dedupes in the dispatcher via jobId.
    */
   syncNow: protectedProcedure.mutation(async ({ ctx }) => {
-    const { dispatchUserReverseSync, dispatchUserTraktSync } = await import(
-      "@canto/core/infrastructure/queue/bullmq-dispatcher"
-    );
     const [reverseDispatched, traktDispatched] = await Promise.all([
       dispatchUserReverseSync(ctx.session.user.id),
       dispatchUserTraktSync(ctx.session.user.id),
@@ -210,14 +202,17 @@ export const userConnectionRouter = createTRPCRouter({
     return { dispatched: reverseDispatched || traktDispatched };
   }),
 
-  // Plex PIN OAuth flow
   plexPinCreate: protectedProcedure.mutation(() => createPlexPin()),
 
   plexPinCheck: protectedProcedure
-    .input(z.object({ pinId: z.number(), clientId: z.string() }))
+    .input(checkPlexPinInput)
     .query(async ({ ctx, input }) => {
-      const serverUrl = (await getSetting("plex.url")) ?? undefined;
-      const result = await checkPlexPin({ ...input, serverUrl });
+      const serverUrl = input.serverUrl ?? (await getSetting("plex.url")) ?? undefined;
+      const result = await checkPlexPin({
+        pinId: input.pinId,
+        clientId: input.clientId,
+        serverUrl,
+      });
 
       if (result.authenticated && result.token) {
         const [existing] = await ctx.db
@@ -255,7 +250,6 @@ export const userConnectionRouter = createTRPCRouter({
           connectionId = inserted!.id;
         }
 
-        // Auto-discover libraries and dispatch sync
         void setupLibrariesForConnection(ctx.db, ctx.session.user.id, "plex", connectionId);
       }
 
@@ -280,7 +274,7 @@ export const userConnectionRouter = createTRPCRouter({
   }),
 
   traktDeviceCheck: protectedProcedure
-    .input(z.object({ deviceCode: z.string().min(1) }))
+    .input(traktDeviceCheckInput)
     .query(async ({ ctx, input }) => {
       try {
         const tokenData = await exchangeTraktDeviceCode(input.deviceCode);
@@ -325,9 +319,6 @@ export const userConnectionRouter = createTRPCRouter({
             });
         }
 
-        const { dispatchUserTraktSync } = await import(
-          "@canto/core/infrastructure/queue/bullmq-dispatcher"
-        );
         void dispatchUserTraktSync(ctx.session.user.id);
 
         return { authenticated: true, pending: false, expired: false };

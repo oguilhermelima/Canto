@@ -36,6 +36,7 @@ import {
   addListItem,
   reorderListItems,
   findMediaInLists,
+  ensureServerLibrary,
 } from "@canto/core/infrastructure/repositories/list-repository";
 import {
   findUserPreferences,
@@ -282,9 +283,6 @@ export const listRouter = createTRPCRouter({
   addToServerLibrary: adminProcedure
     .input(getByMediaIdInput)
     .mutation(async ({ ctx, input }) => {
-      const { ensureServerLibrary } = await import(
-        "@canto/core/infrastructure/repositories/list-repository"
-      );
       const serverLib = await ensureServerLibrary(ctx.db);
       return addListItem(ctx.db, { listId: serverLib.id, mediaId: input.mediaId });
     }),

@@ -40,7 +40,7 @@ import { renameTorrent } from "@canto/core/domain/use-cases/rename-torrent";
 import { getQBClient } from "@canto/core/infrastructure/adapters/qbittorrent";
 import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
 import { getTvdbProvider } from "@canto/core/lib/tvdb-client";
-import { resolveMedia } from "@canto/core/domain/use-cases/resolve-media";
+import { resolveMedia } from "@canto/core/domain/use-cases/persist-media";
 import { parseEpisodes, parseSeasons } from "@canto/core/domain/rules/parsing";
 import { detectQuality, detectSource } from "@canto/core/domain/rules/quality";
 import { updateMedia } from "@canto/core/infrastructure/repositories/media-repository";
