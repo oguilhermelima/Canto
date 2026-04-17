@@ -309,12 +309,15 @@ export function Topbar(): React.JSX.Element {
   }, [router]);
 
   return (
-    <header className="pointer-events-none fixed top-0 right-0 left-0 z-40 hidden justify-center pt-2 md:flex">
+    <header
+      className="pointer-events-none fixed top-0 right-0 left-0 z-40 hidden justify-center pt-2 md:flex"
+      style={{ transform: "translateZ(0)" }}
+    >
       <nav
         className={cn(
-          "pointer-events-auto flex w-full items-center overflow-visible rounded-2xl border py-2.5 transition-all duration-300 ease-out",
+          "pointer-events-auto flex w-full items-center overflow-visible rounded-2xl border py-2.5 transition-[max-width,background-color,border-color,padding] duration-300 ease-out",
           scrolled
-            ? "max-w-[80%] border-border/50 bg-background/80 px-6 backdrop-blur-xl xl:max-w-[60%]"
+            ? "max-w-[80%] border-border/50 bg-background px-6 xl:max-w-[60%]"
             : "max-w-full border-transparent px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24",
         )}
       >
