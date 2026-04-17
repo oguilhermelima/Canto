@@ -9,7 +9,7 @@
 
 import type { Database } from "@canto/db/client";
 import type { MediaProviderPort } from "../ports/media-provider.port";
-import { persistMedia, getSupportedLanguageCodes } from "@canto/db/persist-media";
+import { persistMedia, getSupportedLanguageCodes } from "./persist-media";
 import {
   findMediaVersionById,
   findMediaVersionsByMediaId,

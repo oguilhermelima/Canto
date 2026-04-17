@@ -2,7 +2,7 @@
 /*  Use-case: Resolve TMDB ID from external IDs (trust-first, no title search) */
 /* -------------------------------------------------------------------------- */
 
-import type { TmdbProvider } from "@canto/providers";
+import type { MediaProviderPort } from "../ports/media-provider.port";
 
 const TMDB_DELAY_MS = 300;
 const TMDB_MAX_RETRIES = 3;
@@ -53,7 +53,7 @@ export interface ResolvedExternalId {
  * the sync item as "unmatched" and surface it for admin action.
  */
 export async function resolveExternalId(
-  tmdb: TmdbProvider,
+  tmdb: MediaProviderPort,
   item: {
     tmdbId?: number;
     imdbId?: string;
@@ -66,8 +66,8 @@ export async function resolveExternalId(
       return { tmdbId: item.tmdbId, resolvedType: item.type };
     }
 
-    if (item.imdbId) {
-      const results = await tmdbCall(() => tmdb.findByImdbId(item.imdbId!));
+    if (item.imdbId && tmdb.findByImdbId) {
+      const results = await tmdbCall(() => tmdb.findByImdbId!(item.imdbId!));
       const match = results.find((r) => r.type === item.type) ?? results[0];
       if (match) {
         return {

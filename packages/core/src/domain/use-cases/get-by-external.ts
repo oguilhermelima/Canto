@@ -1,7 +1,7 @@
 import type { Database } from "@canto/db/client";
 import type { MediaProviderPort } from "../ports/media-provider.port";
 import type { MediaType, ProviderName } from "@canto/providers";
-import { persistMedia } from "@canto/db/persist-media";
+import { persistMedia } from "./persist-media";
 import { getSetting } from "@canto/db/settings";
 import { logAndSwallow } from "../../lib/log-error";
 import {

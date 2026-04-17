@@ -2,7 +2,7 @@ import { eq, and, sql, isNotNull, or } from "drizzle-orm";
 
 import type { Database } from "@canto/db/client";
 import { media, mediaTranslation } from "@canto/db/schema";
-import { getSupportedLanguageCodes } from "@canto/db/persist-media";
+import { getSupportedLanguageCodes } from "./persist-media";
 import type { MediaProviderPort } from "../ports/media-provider.port";
 import type { SearchResult } from "@canto/providers";
 

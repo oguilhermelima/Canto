@@ -8,7 +8,7 @@ import {
   buildTmdbEpisodeMap,
   overlayTmdbEpisodeData,
   overlayTmdbSeasonData,
-} from "@canto/db/persist-media";
+} from "./persist-media";
 import {
   findMediaById,
   updateMedia,

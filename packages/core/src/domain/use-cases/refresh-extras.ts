@@ -8,7 +8,7 @@ import {
   mediaVideo,
   mediaWatchProvider,
 } from "@canto/db/schema";
-import { getSupportedLanguageCodes } from "@canto/db/persist-media";
+import { getSupportedLanguageCodes } from "./persist-media";
 import type { MediaType } from "@canto/providers";
 import { findMediaById } from "../../infrastructure/repositories";
 import type { MediaProviderPort } from "../ports/media-provider.port";

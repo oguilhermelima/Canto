@@ -8,8 +8,8 @@
 /* -------------------------------------------------------------------------- */
 
 import type { Database } from "@canto/db/client";
-import type { TmdbProvider } from "@canto/providers";
-import { persistMedia, getSupportedLanguageCodes } from "@canto/db/persist-media";
+import type { MediaProviderPort } from "../ports/media-provider.port";
+import { persistMedia, getSupportedLanguageCodes } from "../use-cases/persist-media";
 import { getSetting, getSettings, setSettingRaw } from "@canto/db/settings";
 
 import { dispatchMediaPipeline } from "../../infrastructure/queue/bullmq-dispatcher";
@@ -177,7 +177,7 @@ interface ResolvedMediaAnchor {
  */
 async function ensureMediaAnchor(
   db: Database,
-  tmdb: TmdbProvider,
+  tmdb: MediaProviderPort,
   scanned: ScannedMediaItem,
   cache: Map<number, ResolvedMediaAnchor>,
   supportedLangs: readonly string[],
@@ -363,7 +363,7 @@ async function loadServerConfig(): Promise<ServerConfig> {
  */
 export async function runSyncPipeline(
   db: Database,
-  tmdb: TmdbProvider,
+  tmdb: MediaProviderPort,
   scannedItems: ScannedMediaItem[],
   tag: string,
   opts: SyncPipelineOptions = {},
@@ -463,7 +463,7 @@ interface ProcessCtx {
 
 async function processOne(
   db: Database,
-  tmdb: TmdbProvider,
+  tmdb: MediaProviderPort,
   scanned: ScannedMediaItem,
   ctx: ProcessCtx,
 ): Promise<void> {

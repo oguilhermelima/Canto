@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { media, mediaRecommendation, user } from "@canto/db/schema";
-import { updateMediaFromNormalized, getSupportedLanguageCodes } from "@canto/db/persist-media";
+import { updateMediaFromNormalized, getSupportedLanguageCodes } from "./persist-media";
 import type { MediaType } from "@canto/providers";
 import { refreshExtras } from "./refresh-extras";
 import { rebuildUserRecs } from "./rebuild-user-recs";

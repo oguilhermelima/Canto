@@ -2,7 +2,7 @@ import { readdir, stat } from "node:fs/promises";
 import { join, basename, extname } from "node:path";
 
 import type { Database } from "@canto/db/client";
-import { persistMedia, getSupportedLanguageCodes } from "@canto/db/persist-media";
+import { persistMedia, getSupportedLanguageCodes } from "./persist-media";
 
 import { parseFolderMediaInfo } from "../rules/parsing";
 import { VIDEO_EXTENSIONS } from "../rules/naming";
