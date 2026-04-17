@@ -4,6 +4,10 @@ export type {
   TorrentInfo,
   TorrentFileInfo,
 } from "./download-client";
+export type {
+  FileSystemPort,
+  HardlinkOrCopyResult,
+} from "./file-system.port";
 export type { IndexerPort } from "./indexer";
 export type { MediaProviderPort } from "./media-provider.port";
 export type { JobDispatcherPort } from "./job-dispatcher.port";
