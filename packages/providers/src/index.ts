@@ -1,4 +1,4 @@
-import { TmdbProvider } from "./tmdb";
+import { TmdbProvider } from "./tmdb/index";
 import { TvdbProvider } from "./tvdb";
 import type { MetadataProvider, ProviderName } from "./types";
 
@@ -34,5 +34,5 @@ export async function getProvider(
 }
 
 export * from "./types";
-export { TmdbProvider } from "./tmdb";
+export { TmdbProvider } from "./tmdb/index";
 export { TvdbProvider } from "./tvdb";

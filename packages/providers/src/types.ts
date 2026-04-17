@@ -207,24 +207,25 @@ export interface SearchOpts {
 
 export interface DiscoverOpts {
   page?: number;
-  with_text_query?: string;
-  with_genres?: string;
-  with_original_language?: string;
+  query?: string;
+  genreIds?: string;
+  withoutGenreIds?: string;
+  originalLanguage?: string;
   sort_by?: string;
-  first_air_date_gte?: string;
-  release_date_gte?: string;
-  with_keywords?: string;
-  vote_average_gte?: number;
-  vote_average_lte?: number;
-  with_runtime_lte?: number;
-  first_air_date_lte?: string;
-  release_date_lte?: string;
+  firstAirDateFrom?: string;
+  releaseDateFrom?: string;
+  keywordIds?: string;
+  minScore?: number;
+  maxScore?: number;
+  maxRuntime?: number;
+  firstAirDateTo?: string;
+  releaseDateTo?: string;
   certification?: string;
   certification_country?: string;
   with_status?: string;
-  with_watch_providers?: string;
-  watch_region?: string;
-  with_runtime_gte?: number;
+  watchProviderIds?: string;
+  watchRegion?: string;
+  minRuntime?: number;
 }
 
 export interface MetadataOpts {
