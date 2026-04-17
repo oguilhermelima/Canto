@@ -6,7 +6,21 @@ import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
 import { HomeSectionRenderer } from "./home-section-renderer";
 import { DedupProvider } from "./dedup-context";
+import { LazySection } from "./lazy-section";
 import type { HomeSectionConfig } from "@canto/db/schema";
+
+function getMinHeightByStyle(style: string): number {
+  switch (style) {
+    case "large_video":
+      return 520;
+    case "card":
+      return 260;
+    case "cover":
+      return 400;
+    default:
+      return 260;
+  }
+}
 
 interface Section {
   id: string;
@@ -72,8 +86,15 @@ export function HomeSectionList({ sections, isLoading = false }: HomeSectionList
                 "flex flex-col gap-10 md:gap-14",
                 firstIsSpotlight ? "mt-4 md:mt-12" : "",
               )}>
-                {enabled.slice(firstIsSpotlight ? 1 : 0).map((section) => (
-                  <HomeSectionRenderer key={section.id} section={section} />
+                {enabled.slice(firstIsSpotlight ? 1 : 0).map((section, i) => (
+                  <LazySection
+                    key={section.id}
+                    id={section.id}
+                    minHeight={getMinHeightByStyle(section.style)}
+                    eager={i === 0}
+                  >
+                    <HomeSectionRenderer section={section} />
+                  </LazySection>
                 ))}
               </div>
             </>
@@ -114,7 +135,7 @@ function FeaturedCarouselSkeleton(): React.JSX.Element {
       <div className="mb-4 pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
         <Skeleton className="h-7 w-48" />
       </div>
-      <div className="flex gap-6 overflow-hidden pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+      <div className="flex gap-6 overflow-hidden py-2 pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
         {Array.from({ length: 8 }).map((_, i) => (
           <Skeleton
             key={i}
@@ -132,7 +153,7 @@ function BackdropCarouselSkeleton(): React.JSX.Element {
       <div className="mb-4 pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
         <Skeleton className="h-7 w-48" />
       </div>
-      <div className="flex gap-4 overflow-hidden pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+      <div className="flex gap-4 overflow-hidden pt-2 pb-2 pl-4 md:pt-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
         {Array.from({ length: 6 }).map((_, i) => (
           <Skeleton
             key={i}
@@ -150,7 +171,7 @@ function PosterCarouselSkeleton(): React.JSX.Element {
       <div className="mb-4 pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
         <Skeleton className="h-7 w-48" />
       </div>
-      <div className="flex gap-3 overflow-hidden pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+      <div className="flex gap-3 overflow-hidden pt-2 pb-6 pl-4 md:pt-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
         {Array.from({ length: 8 }).map((_, i) => (
           <Skeleton
             key={i}
