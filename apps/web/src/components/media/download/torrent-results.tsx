@@ -119,7 +119,7 @@ export function TorrentResults({
   return (
     <div className="flex h-full flex-col">
       {/* Filter toolbar */}
-      <div className="shrink-0 border-b border-border/40 px-5 py-3">
+      <div className="shrink-0 border-b border-border px-5 py-3">
         {/* Mobile filters */}
         <div className="overflow-hidden rounded-2xl bg-muted/40 md:hidden">
           <div className="flex items-center">
@@ -149,7 +149,7 @@ export function TorrentResults({
             )}
           >
             <div className="overflow-hidden">
-              <div className="space-y-3 border-t border-border/30 px-4 pb-4 pt-3">
+              <div className="space-y-3 border-t border-border px-4 pb-4 pt-3">
                 <div className="relative">
                   <Search
                     size={14}
@@ -376,18 +376,18 @@ export function TorrentResults({
           <div className="flex min-h-[300px] flex-col items-center justify-center gap-6 px-5 py-16">
             <div className="relative flex h-20 w-20 items-center justify-center">
               <div
-                className="absolute h-20 w-20 animate-ping rounded-full border border-primary/20"
+                className="absolute h-20 w-20 animate-ping rounded-full border border-primary"
                 style={{ animationDuration: "2s" }}
               />
               <div
-                className="absolute h-14 w-14 animate-ping rounded-full border border-primary/30"
+                className="absolute h-14 w-14 animate-ping rounded-full border border-primary"
                 style={{
                   animationDuration: "2s",
                   animationDelay: "0.4s",
                 }}
               />
               <div
-                className="absolute h-8 w-8 animate-ping rounded-full border border-primary/40"
+                className="absolute h-8 w-8 animate-ping rounded-full border border-primary"
                 style={{
                   animationDuration: "2s",
                   animationDelay: "0.8s",
@@ -452,7 +452,7 @@ export function TorrentResults({
                   </div>
 
                   {/* Body */}
-                  <div className="flex items-start gap-4 border-t border-border/50 px-5 py-4">
+                  <div className="flex items-start gap-4 border-t border-border px-5 py-4">
                     <div
                       className={cn(
                         "mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold tabular-nums",
@@ -511,7 +511,7 @@ export function TorrentResults({
                   </div>
 
                   {/* Footer */}
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border/50 px-5 py-2.5 text-xs font-medium text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border px-5 py-2.5 text-xs font-medium text-muted-foreground">
                     <span className="flex items-center gap-1.5 text-muted-foreground">
                       <ArrowUp size={12} className="text-muted-foreground" />
                       {t.seeders} seeders
@@ -573,7 +573,7 @@ export function TorrentResults({
 
       {/* Pagination footer */}
       {(torrentPage > 0 || hasMore) && (
-        <div className="flex shrink-0 items-center justify-between border-t border-border/40 px-5 py-3">
+        <div className="flex shrink-0 items-center justify-between border-t border-border px-5 py-3">
           <span className="text-xs text-muted-foreground">
             Page {torrentPage + 1}
             {allFilteredTorrents.length > 0 && (

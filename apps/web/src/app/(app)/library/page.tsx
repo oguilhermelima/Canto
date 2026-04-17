@@ -1,7 +1,7 @@
 "use client";
 
 import { LazySection } from "~/components/home/lazy-section";
-import { PageHeader } from "~/components/layout/page-header";
+import { PageHeader } from "~/components/page-header";
 import { useDocumentTitle } from "~/hooks/use-document-title";
 import { HubWatchNextSection } from "./_components/hub-watch-next-section";
 import { HubUpcomingSection } from "./_components/hub-upcoming-section";

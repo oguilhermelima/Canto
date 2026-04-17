@@ -204,7 +204,7 @@ export function ServersTab({
                       return (
                         <div
                           key={ep.id}
-                          className="flex items-center gap-3 border-b border-border/50 px-4 py-2.5 last:border-b-0"
+                          className="flex items-center gap-3 border-b border-border px-4 py-2.5 last:border-b-0"
                         >
                           <span className="w-10 shrink-0 text-xs font-medium text-muted-foreground">
                             E{String(ep.number).padStart(2, "0")}

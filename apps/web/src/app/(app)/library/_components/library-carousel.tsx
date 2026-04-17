@@ -1,12 +1,11 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@canto/ui/cn";
-import { SectionTitle } from "~/components/layout/section-title";
-import {
-  SPACE_STATES,
-  StateMessage,
-} from "~/components/layout/state-message";
+import { SectionTitle } from "@canto/ui/section-title";
+import { StateMessage } from "@canto/ui/state-message";
+import { SPACE_STATES } from "@canto/ui/presets/space-states";
 import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
 
 type SpaceStateKey = keyof typeof SPACE_STATES;
@@ -73,7 +72,7 @@ export const LibraryCarousel = <T,>({
   if (isLoading) {
     return (
       <section className="relative">
-        <SectionTitle title={title} seeMorePath={seeAllHref} />
+        <SectionTitle title={title} seeMorePath={seeAllHref} linkAs={Link} />
         <div className={cn("mt-2 md:mt-4", SCROLL_CONTAINER_CLASSES)}>
           {Array.from({ length: skeletonCount }).map((_, index) => (
             <div key={index} className={skeletonClasses} />
@@ -87,7 +86,7 @@ export const LibraryCarousel = <T,>({
   if (isError) {
     return (
       <section className="relative">
-        <SectionTitle title={title} seeMorePath={seeAllHref} />
+        <SectionTitle title={title} seeMorePath={seeAllHref} linkAs={Link} />
         <div className="mt-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
           <StateMessage preset="error" onRetry={onRetry} minHeight="200px" />
         </div>
@@ -98,7 +97,7 @@ export const LibraryCarousel = <T,>({
   if (items.length === 0) {
     return (
       <section className="relative">
-        <SectionTitle title={title} seeMorePath={seeAllHref} />
+        <SectionTitle title={title} seeMorePath={seeAllHref} linkAs={Link} />
         <div className="mt-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
           <StateMessage preset={emptyPreset} minHeight="200px" />
         </div>
@@ -108,7 +107,7 @@ export const LibraryCarousel = <T,>({
 
   return (
     <section className="relative">
-      <SectionTitle title={title} seeMorePath={seeAllHref} />
+      <SectionTitle title={title} seeMorePath={seeAllHref} linkAs={Link} />
 
       <div className="group/carousel relative mt-4">
         {canScrollLeft && (

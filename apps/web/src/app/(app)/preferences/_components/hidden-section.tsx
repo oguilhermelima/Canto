@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Eye, Loader2 } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { useHiddenMedia } from "~/hooks/use-hidden-media";
-import { StateMessage } from "~/components/layout/state-message";
+import { StateMessage } from "@canto/ui/state-message";
 import { SettingsSection } from "~/components/settings/shared";
 
 export function HiddenSection(): React.JSX.Element {
@@ -108,7 +108,7 @@ function HiddenMediaCard({
             className="h-full w-full object-cover opacity-50"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted-foreground/20">
+          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
             <span className="text-3xl font-bold">{item.title.charAt(0)}</span>
           </div>
         )}

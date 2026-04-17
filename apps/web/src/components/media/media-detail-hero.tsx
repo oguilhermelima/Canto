@@ -208,11 +208,11 @@ export function MediaDetailHero({
 
           {/* Director/Creator */}
           {director && (
-            <p className="text-xs text-foreground/60 sm:text-sm">
+            <p className="text-xs text-foreground sm:text-sm">
               {director.job === "Director" ? "Directed by" : "Created by"}{" "}
               <Link
                 href={`/person/${director.personId}`}
-                className="font-medium text-foreground/80 transition-colors hover:text-foreground"
+                className="font-medium text-foreground transition-colors hover:text-foreground"
               >
                 {director.name}
               </Link>
@@ -220,42 +220,42 @@ export function MediaDetailHero({
           )}
 
           {/* Meta line */}
-          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-foreground/60 sm:gap-x-3 sm:text-sm">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-foreground sm:gap-x-3 sm:text-sm">
             <span>{type === "movie" ? "Movie" : "TV Show"}</span>
             {voteAverage != null && voteAverage > 0 && (
               <>
-                <span className="text-foreground/20">|</span>
+                <span className="text-foreground">|</span>
                 <span className="text-yellow-500">{voteAverage.toFixed(1)}</span>
               </>
             )}
             {releaseDate && (
               <>
-                <span className="text-foreground/20">|</span>
+                <span className="text-foreground">|</span>
                 <span>{formatDate(releaseDate)}</span>
               </>
             )}
             {contentRating && (
               <>
-                <span className="text-foreground/20">|</span>
-                <span className="rounded border border-foreground/20 px-1.5 py-0.5 text-xs font-medium leading-none">
+                <span className="text-foreground">|</span>
+                <span className="rounded border border-foreground px-1.5 py-0.5 text-xs font-medium leading-none">
                   {contentRating}
                 </span>
               </>
             )}
             {runtime != null && runtime > 0 && (
               <>
-                <span className="text-foreground/20">|</span>
+                <span className="text-foreground">|</span>
                 <span>{formatRuntime(runtime)}</span>
               </>
             )}
             {genres && genres.length > 0 && (
               <>
-                <span className="text-foreground/20">|</span>
+                <span className="text-foreground">|</span>
                 {genres.map((genre, i) => {
                   const gId = genreIds?.[i];
                   return (
                     <span key={genre} className="flex items-center gap-1.5">
-                      {i > 0 && <span className="text-foreground/20">,</span>}
+                      {i > 0 && <span className="text-foreground">,</span>}
                       <Link
                         href={`/search${gId ? `?genre=${gId}` : ""}`}
                         className="transition-colors hover:text-foreground"
@@ -272,7 +272,7 @@ export function MediaDetailHero({
           {/* Overview */}
           {overview && (
             <div className="max-w-2xl">
-              <p className="text-xs leading-relaxed text-foreground/70 sm:text-sm">
+              <p className="text-xs leading-relaxed text-foreground sm:text-sm">
                 {overview}
               </p>
             </div>
@@ -283,7 +283,7 @@ export function MediaDetailHero({
             <div className="-mx-4 md:mx-0">
               <div className="flex items-center gap-2.5 overflow-x-auto px-4 pb-1 scrollbar-none md:px-0">
                 {(hasServers || hasProviders) && (
-                  <span className="shrink-0 text-xs font-medium capitalize text-foreground/40">
+                  <span className="shrink-0 text-xs font-medium capitalize text-foreground">
                     Where to watch
                   </span>
                 )}
@@ -351,7 +351,7 @@ export function MediaDetailHero({
                         />
                       </div>
                     )}
-                    <span className="text-sm text-foreground/80">
+                    <span className="text-sm text-foreground">
                       {p.providerName}
                     </span>
                   </a>
@@ -406,7 +406,7 @@ export function MediaDetailHero({
                 <button
                   type="button"
                   onClick={onOpenManage}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-foreground/10 bg-foreground/15 text-foreground/70 backdrop-blur-md transition-all hover:bg-foreground/25 hover:text-foreground"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-foreground/20 bg-foreground/15 text-foreground backdrop-blur-md transition-all hover:bg-foreground/25 hover:text-foreground"
                   aria-label="Manage library"
                   title="Manage"
                 >
@@ -415,8 +415,8 @@ export function MediaDetailHero({
               )}
             </div>
             {persistedId && isWatched && (
-              <div className="inline-flex items-center gap-3 rounded-2xl border border-foreground/10 bg-black/30 px-3 py-2 backdrop-blur-md">
-                <span className="text-sm font-medium text-foreground/80">
+              <div className="inline-flex items-center gap-3 rounded-2xl border border-foreground/20 bg-black/30 px-3 py-2 backdrop-blur-md">
+                <span className="text-sm font-medium text-foreground">
                   Rate
                 </span>
                 <RatingControl
@@ -454,7 +454,7 @@ function MoreProvidersPopover({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button className="flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-white/10 px-3 text-sm text-foreground/70 backdrop-blur-sm transition-colors hover:bg-white/15 hover:text-foreground">
+        <button className="flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-white/10 px-3 text-sm text-foreground backdrop-blur-sm transition-colors hover:bg-white/15 hover:text-foreground">
           Rent / Buy
           <ChevronRight className="h-3.5 w-3.5" />
         </button>

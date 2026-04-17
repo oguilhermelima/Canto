@@ -95,7 +95,7 @@ const NavLinks = memo(function NavLinks({ scrolled }: { scrolled?: boolean }): R
               "relative z-10 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors duration-200",
               isActive
                 ? "text-background"
-                : "text-foreground/80 hover:text-foreground",
+                : "text-foreground hover:text-foreground",
             )}
           >
             <Icon className="h-3.5 w-3.5" />
@@ -216,7 +216,7 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
       <div
         ref={menuRef}
         className={cn(
-          "absolute right-0 top-full z-50 mt-5 w-80 overflow-hidden rounded-2xl border border-border/50 bg-background p-5 shadow-xl transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]",
+          "absolute right-0 top-full z-50 mt-5 w-80 overflow-hidden rounded-2xl border border-border bg-background p-5 shadow-xl transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]",
           open
             ? "pointer-events-auto translate-y-0 scale-100 opacity-100"
             : "pointer-events-none -translate-y-3 scale-95 opacity-0",
@@ -250,7 +250,7 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
             key={gi}
             className={cn(
               "grid grid-cols-3",
-              gi === 0 ? "border-t border-border/50 pt-5" : "mt-5 border-t border-border/50 pt-5",
+              gi === 0 ? "border-t border-border pt-5" : "mt-5 border-t border-border pt-5",
             )}
           >
             {group.map((action) => {
@@ -258,9 +258,9 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
               const item = (
                 <div className="flex flex-col items-center gap-2.5">
                   <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/60 transition-colors hover:bg-muted">
-                    <Icon className="h-[22px] w-[22px] text-foreground/80" />
+                    <Icon className="h-[22px] w-[22px] text-foreground" />
                   </div>
-                  <span className="text-center text-xs leading-tight text-foreground/80">
+                  <span className="text-center text-xs leading-tight text-foreground">
                     {action.label}
                   </span>
                 </div>
@@ -317,7 +317,7 @@ export function Topbar(): React.JSX.Element {
         className={cn(
           "pointer-events-auto flex w-full items-center overflow-visible rounded-2xl border py-2.5 transition-[max-width,background-color,border-color,padding] duration-300 ease-out",
           scrolled
-            ? "max-w-[80%] border-border/50 bg-background px-6 xl:max-w-[60%]"
+            ? "max-w-[80%] border-border bg-background px-6 xl:max-w-[60%]"
             : "max-w-full border-transparent px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24",
         )}
       >

@@ -37,11 +37,11 @@ export default function ManageLoading(): React.JSX.Element {
         {Array.from({ length: 3 }).map((_, g) => (
           <div key={g}>
             <Skeleton className="mb-2 h-3 w-20" />
-            <div className="overflow-hidden rounded-2xl border border-border/40">
+            <div className="overflow-hidden rounded-2xl border border-border">
               {Array.from({ length: g === 1 ? 3 : 2 }).map((_, i) => (
                 <div
                   key={i}
-                  className={`flex items-center gap-3.5 px-4 py-3.5${i > 0 ? " border-t border-border/40" : ""}`}
+                  className={`flex items-center gap-3.5 px-4 py-3.5${i > 0 ? " border-t border-border" : ""}`}
                 >
                   <Skeleton className="h-9 w-9 shrink-0 rounded-xl" />
                   <div className="flex-1 space-y-1">

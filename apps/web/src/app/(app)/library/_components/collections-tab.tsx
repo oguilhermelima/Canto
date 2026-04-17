@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
-import { StateMessage } from "~/components/layout/state-message";
+import { StateMessage } from "@canto/ui/state-message";
 import { CollectionEditPopover } from "./collection-edit-popover";
 import { CollectionMembersDialog } from "./collection-members-dialog";
 import type { CollectionFilterState } from "./collection-filter-sidebar";
@@ -281,7 +281,7 @@ export function CollectionsTab({
           </div>
 
           {visibleLists.length === 0 ? (
-            <div className="rounded-2xl border border-border/50 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
+            <div className="rounded-2xl border border-border bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
               No lists match your search.
             </div>
           ) : (
@@ -293,9 +293,9 @@ export function CollectionsTab({
                   <div
                     key={list.id}
                     className={cn(
-                      "group flex min-h-[108px] items-center gap-4 rounded-2xl border border-border/50 bg-muted/20 px-4 py-3 transition-colors hover:bg-accent/50",
+                      "group flex min-h-[108px] items-center gap-4 rounded-2xl border border-border bg-muted/20 px-4 py-3 transition-colors hover:bg-accent/50",
                       isHidden && showHidden && "opacity-60",
-                      isDropTarget && "border-dashed border-primary/60 bg-primary/5",
+                      isDropTarget && "border-dashed border-primary bg-primary/5",
                     )}
                     onDragOver={(event) => {
                       if (!canReorder || !draggedId) return;
@@ -426,13 +426,13 @@ export function CollectionsTab({
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
-            className="group flex min-h-[108px] w-full items-center gap-4 rounded-2xl border border-dashed border-border/50 bg-muted/20 px-4 py-3 transition-colors hover:border-foreground/20 hover:bg-muted/40"
+            className="group flex min-h-[108px] w-full items-center gap-4 rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-3 transition-colors hover:border-foreground hover:bg-muted/40"
           >
             <div className="relative h-[90px] w-[110px] shrink-0">
               {Array.from({ length: 3 }).map((_, index) => (
                 <div
                   key={index}
-                  className="absolute top-0 h-[90px] w-[58px] rounded-lg border border-border/40 bg-background/70"
+                  className="absolute top-0 h-[90px] w-[58px] rounded-lg border border-border bg-background/70"
                   style={{ left: `${index * 20}px`, zIndex: index + 1 }}
                 />
               ))}

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { MediaGrid } from "~/components/media/media-grid";
-import { StateMessage } from "~/components/layout/state-message";
+import { StateMessage } from "@canto/ui/state-message";
 
 export function FavoritesTab(): React.JSX.Element {
   const sentinelRef = useRef<HTMLDivElement>(null);

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { StateMessage } from "~/components/layout/state-message";
+import { StateMessage } from "@canto/ui/state-message";
 
 export default function LibraryError({
   error,

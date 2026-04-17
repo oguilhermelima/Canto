@@ -20,7 +20,7 @@ import { resolveState, formatBytes } from "~/lib/torrent-utils";
 import { ResponsiveMenu } from "~/components/layout/responsive-menu";
 
 const mobileActionButtonCn =
-  "w-full rounded-xl border border-border/60 bg-accent px-3 py-2 text-left text-sm transition-colors hover:bg-accent/80";
+  "w-full rounded-xl border border-border bg-accent px-3 py-2 text-left text-sm transition-colors hover:bg-accent/80";
 
 export interface TorrentItem {
   id: string;

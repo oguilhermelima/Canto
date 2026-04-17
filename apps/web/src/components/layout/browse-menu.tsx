@@ -78,7 +78,7 @@ export function BrowseMenu({
           {groups?.map((group, gi) => (
             <div
               key={group.label}
-              className={gi > 0 ? "mt-5 border-t border-border/50 pt-5" : ""}
+              className={gi > 0 ? "mt-5 border-t border-border pt-5" : ""}
             >
               <p className="mb-3 text-xs font-medium text-muted-foreground">
                 {group.label}
@@ -106,7 +106,7 @@ export function BrowseMenu({
                             "h-[22px] w-[22px]",
                             item.className?.includes("text-red")
                               ? "text-red-400"
-                              : "text-foreground/80",
+                              : "text-foreground",
                           )}
                         />
                       )}
@@ -116,7 +116,7 @@ export function BrowseMenu({
                         "text-center text-xs leading-tight",
                         item.className?.includes("text-red")
                           ? "text-red-400"
-                          : "text-foreground/80",
+                          : "text-foreground",
                       )}
                     >
                       {item.label}
@@ -129,7 +129,7 @@ export function BrowseMenu({
 
           <div
             className={cn(
-              groups && groups.length > 0 ? "mt-5 border-t border-border/50 pt-5" : "",
+              groups && groups.length > 0 ? "mt-5 border-t border-border pt-5" : "",
             )}
           >
             <p className="mb-3 text-xs font-medium text-muted-foreground">View</p>
@@ -155,11 +155,11 @@ export function BrowseMenu({
                       <item.icon
                         className={cn(
                           "h-[22px] w-[22px]",
-                          active ? "text-background" : "text-foreground/80",
+                          active ? "text-background" : "text-foreground",
                         )}
                       />
                     </div>
-                    <span className="text-center text-xs leading-tight text-foreground/80">
+                    <span className="text-center text-xs leading-tight text-foreground">
                       {item.label}
                     </span>
                   </button>

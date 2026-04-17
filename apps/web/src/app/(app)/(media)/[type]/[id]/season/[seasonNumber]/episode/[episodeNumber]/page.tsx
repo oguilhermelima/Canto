@@ -43,7 +43,7 @@ export default function EpisodeDetailPage(): React.JSX.Element {
   });
 
   const media = resolvedData?.media;
-  const mediaId = (resolvedData as { mediaId?: string } | undefined)?.mediaId;
+  const mediaId = resolvedData?.mediaId;
 
   const season = useMemo(
     () => media?.seasons?.find((s: { number: number }) => s.number === seasonNum),
@@ -192,13 +192,13 @@ export default function EpisodeDetailPage(): React.JSX.Element {
         )}
 
         {/* Guest Stars */}
-        {(episode as any).guestStars?.length > 0 && (
-          <EpisodeCreditsSection title="Guest Stars" people={(episode as any).guestStars} showCharacter />
+        {episode.guestStars && episode.guestStars.length > 0 && (
+          <EpisodeCreditsSection title="Guest Stars" people={episode.guestStars} showCharacter />
         )}
 
         {/* Crew */}
-        {(episode as any).crew?.length > 0 && (
-          <EpisodeCreditsSection title="Crew" people={(episode as any).crew} />
+        {episode.crew && episode.crew.length > 0 && (
+          <EpisodeCreditsSection title="Crew" people={episode.crew} />
         )}
 
         {/* Your Review + Community Reviews */}
@@ -212,15 +212,15 @@ export default function EpisodeDetailPage(): React.JSX.Element {
         )}
 
         {/* Prev / Next navigation */}
-        <div className="mt-10 flex items-center justify-between border-t border-border/30 pt-6">
+        <div className="mt-10 flex items-center justify-between border-t border-border pt-6">
           {prevEpisode ? (
             <Link
               href={`/shows/${params.id}/season/${seasonNum}/episode/${prevEpisode.number}`}
               className="group flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
-              <ChevronLeft size={16} className="text-muted-foreground/50 transition-colors group-hover:text-foreground" />
+              <ChevronLeft size={16} className="text-muted-foreground transition-colors group-hover:text-foreground" />
               <div>
-                <span className="text-xs text-muted-foreground/50">Previous</span>
+                <span className="text-xs text-muted-foreground">Previous</span>
                 <p className="mt-0.5 font-medium text-foreground">
                   E{String(prevEpisode.number).padStart(2, "0")} — {prevEpisode.title || `Episode ${prevEpisode.number}`}
                 </p>
@@ -235,12 +235,12 @@ export default function EpisodeDetailPage(): React.JSX.Element {
               className="group flex items-center gap-2 text-right text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
               <div>
-                <span className="text-xs text-muted-foreground/50">Next</span>
+                <span className="text-xs text-muted-foreground">Next</span>
                 <p className="mt-0.5 font-medium text-foreground">
                   E{String(nextEpisode.number).padStart(2, "0")} — {nextEpisode.title || `Episode ${nextEpisode.number}`}
                 </p>
               </div>
-              <ChevronRight size={16} className="text-muted-foreground/50 transition-colors group-hover:text-foreground" />
+              <ChevronRight size={16} className="text-muted-foreground transition-colors group-hover:text-foreground" />
             </Link>
           ) : (
             <div />
@@ -302,7 +302,7 @@ function EpisodeInfo({
           <div className="flex items-center gap-1.5" title="TMDB rating">
             <Star size={14} className="fill-yellow-500 text-yellow-500" />
             <span>{episode.voteAverage.toFixed(1)}</span>
-            <span className={isHero ? "text-white/40" : "text-muted-foreground/50"}>TMDB</span>
+            <span className={isHero ? "text-white/40" : "text-muted-foreground"}>TMDB</span>
           </div>
         )}
         {(episode.finaleType === "series" || episode.finaleType === "season" || episode.episodeType === "finale") && (
@@ -403,7 +403,7 @@ function EpisodeReviewsSection({
           }
         />
       ) : (
-        <div className="rounded-2xl border border-border/30 bg-card/50 p-4">
+        <div className="rounded-2xl border border-border bg-card/50 p-4">
           <EpisodeRatingForm
             mediaId={mediaId}
             seasonId={seasonId}
@@ -422,14 +422,14 @@ function EpisodeReviewsSection({
           <h3 className="mb-4 text-sm font-semibold text-muted-foreground">
             Community
             {otherReviews.length > 0 && (
-              <span className="ml-1.5 text-muted-foreground/50">{otherReviews.length}</span>
+              <span className="ml-1.5 text-muted-foreground">{otherReviews.length}</span>
             )}
           </h3>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {isLoading
               ? Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="rounded-2xl border border-border/30 bg-card/50 p-4">
+                  <div key={i} className="rounded-2xl border border-border bg-card/50 p-4">
                     <div className="flex items-start gap-3">
                       <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
                       <div className="flex-1 space-y-2">
@@ -548,7 +548,7 @@ function EpisodeRatingForm({
                   "h-5 w-5 transition-colors",
                   isActive
                     ? "fill-yellow-500 text-yellow-500"
-                    : "text-foreground/15 group-hover:text-foreground/30",
+                    : "text-foreground group-hover:text-foreground",
                 )}
               />
             </button>
@@ -567,7 +567,7 @@ function EpisodeRatingForm({
         onChange={(e) => setComment(e.target.value)}
         placeholder="Share your thoughts on this episode..."
         rows={3}
-        className="mt-3 w-full resize-none rounded-xl border-0 bg-background/80 px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-foreground/20"
+        className="mt-3 w-full resize-none rounded-xl border-0 bg-background/80 px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
       />
 
       {/* Actions */}
@@ -608,7 +608,7 @@ function ReviewCardStyled({
   menu?: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="rounded-2xl border border-border/30 bg-card/50 p-4">
+    <div className="rounded-2xl border border-border bg-card/50 p-4">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted">

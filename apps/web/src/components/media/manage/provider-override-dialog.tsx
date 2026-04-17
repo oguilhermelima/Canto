@@ -83,7 +83,7 @@ export function ProviderOverrideDialog({
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-xl border border-border/40 px-4 py-3">
+              <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
                 <div>
                   <p className="text-sm font-medium">Rename files on disk</p>
                   <p className="text-xs text-muted-foreground">
@@ -97,7 +97,7 @@ export function ProviderOverrideDialog({
                 />
               </div>
 
-              <div className="flex items-center justify-between rounded-xl border border-border/40 px-4 py-3">
+              <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
                 <div>
                   <p className="text-sm font-medium">Update on Jellyfin/Plex</p>
                   <p className="text-xs text-muted-foreground">

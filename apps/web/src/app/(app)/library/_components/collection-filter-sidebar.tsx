@@ -60,7 +60,7 @@ export function CollectionFilterSidebar({
 
       <div className="flex flex-col">
         {/* Search */}
-        <div className="border-b border-border/40 py-4">
+        <div className="border-b border-border py-4">
           <button
             type="button"
             className="mb-4 flex w-full items-center justify-between"
@@ -80,7 +80,7 @@ export function CollectionFilterSidebar({
         </div>
 
         {/* Sort */}
-        <div className="border-b border-border/40 py-4 last:border-b-0">
+        <div className="border-b border-border py-4 last:border-b-0">
           <button
             type="button"
             className="mb-4 flex w-full items-center justify-between"

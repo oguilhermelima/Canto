@@ -62,7 +62,7 @@ export function PersonHero({ person }: PersonHeroProps): React.JSX.Element {
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center">
-                <User className="h-20 w-20 text-muted-foreground/20" />
+                <User className="h-20 w-20 text-muted-foreground" />
               </div>
             )}
           </div>
@@ -70,7 +70,7 @@ export function PersonHero({ person }: PersonHeroProps): React.JSX.Element {
           {/* Info */}
           <div className="flex flex-col items-center pb-4 text-center md:items-start md:text-left">
             {person.knownForDepartment && (
-              <p className="mb-1 text-sm font-medium uppercase tracking-wider text-muted-foreground/60">
+              <p className="mb-1 text-sm font-medium uppercase tracking-wider text-muted-foreground">
                 {person.knownForDepartment}
               </p>
             )}
@@ -82,10 +82,10 @@ export function PersonHero({ person }: PersonHeroProps): React.JSX.Element {
             <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground md:justify-start">
               {person.birthday && (
                 <span className="flex items-center gap-1.5">
-                  <Cake size={15} className="text-muted-foreground/50" />
+                  <Cake size={15} className="text-muted-foreground" />
                   {formatDate(person.birthday)}
                   {age !== null && !person.deathday && (
-                    <span className="text-muted-foreground/50">
+                    <span className="text-muted-foreground">
                       ({age} years old)
                     </span>
                   )}
@@ -93,7 +93,7 @@ export function PersonHero({ person }: PersonHeroProps): React.JSX.Element {
               )}
 
               {person.deathday && (
-                <span className="flex items-center gap-1.5 text-muted-foreground/50">
+                <span className="flex items-center gap-1.5 text-muted-foreground">
                   &ndash; {formatDate(person.deathday)}
                   {age !== null && <span>({age})</span>}
                 </span>
@@ -101,7 +101,7 @@ export function PersonHero({ person }: PersonHeroProps): React.JSX.Element {
 
               {person.placeOfBirth && (
                 <span className="flex items-center gap-1.5">
-                  <MapPin size={15} className="text-muted-foreground/50" />
+                  <MapPin size={15} className="text-muted-foreground" />
                   {person.placeOfBirth}
                 </span>
               )}

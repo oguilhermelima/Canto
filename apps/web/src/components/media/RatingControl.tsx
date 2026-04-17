@@ -56,14 +56,14 @@ export function RatingControl({
                 "h-5 w-5 transition-colors",
                 isActive
                   ? "fill-yellow-500 text-yellow-500"
-                  : "text-foreground/20 group-hover:text-foreground/40"
+                  : "text-foreground group-hover:text-foreground"
               )}
             />
           </button>
         );
       })}
       {selectedRating > 0 && (
-        <span className="ml-2 text-sm font-medium text-foreground/60">
+        <span className="ml-2 text-sm font-medium text-foreground">
           {selectedRating}/10
         </span>
       )}

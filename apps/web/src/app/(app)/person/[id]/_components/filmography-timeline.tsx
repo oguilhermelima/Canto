@@ -44,9 +44,9 @@ function TimelineCard({
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             {credit.mediaType === "movie" ? (
-              <Film className="h-5 w-5 text-muted-foreground/15" />
+              <Film className="h-5 w-5 text-muted-foreground" />
             ) : (
-              <Tv className="h-5 w-5 text-muted-foreground/15" />
+              <Tv className="h-5 w-5 text-muted-foreground" />
             )}
           </div>
         )}
@@ -66,7 +66,7 @@ function TimelineCard({
         {credit.character && (
           <p className="mt-1 text-sm text-muted-foreground">
             as{" "}
-            <span className="font-medium text-foreground/70">
+            <span className="font-medium text-foreground">
               {credit.character}
             </span>
           </p>
@@ -134,7 +134,7 @@ export function FilmographyTimeline({
         Filmography
       </h2>
 
-      <div className="relative ml-4 border-l-2 border-border/40 md:ml-8">
+      <div className="relative ml-4 border-l-2 border-border md:ml-8">
         {grouped.map(([year, credits], groupIdx) => (
           <div
             key={year}

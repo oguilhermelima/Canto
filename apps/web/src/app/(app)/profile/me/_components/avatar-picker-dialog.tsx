@@ -120,10 +120,10 @@ export function AvatarPickerDialog({
               disabled={isProcessing}
               onClick={() => void selectDefaultAvatar(avatar.src)}
               className={cn(
-                "group relative flex items-center justify-center overflow-hidden rounded-xl border-2 p-2 transition-all hover:border-foreground/40 hover:bg-muted/40",
+                "group relative flex items-center justify-center overflow-hidden rounded-xl border-2 p-2 transition-all hover:border-foreground hover:bg-muted/40",
                 currentImage === avatar.src
                   ? "border-primary bg-primary/10"
-                  : "border-border/50",
+                  : "border-border",
                 isProcessing && "opacity-50",
               )}
             >
@@ -138,7 +138,7 @@ export function AvatarPickerDialog({
           ))}
         </div>
 
-        <div className="border-t border-border/50 pt-4">
+        <div className="border-t border-border pt-4">
           <input
             ref={fileInputRef}
             type="file"

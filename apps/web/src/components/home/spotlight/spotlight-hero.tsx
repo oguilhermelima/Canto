@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
-import { StateMessage } from "~/components/layout/state-message";
+import { StateMessage } from "@canto/ui/state-message";
 import { useHiddenMedia } from "~/hooks/use-hidden-media";
 import { trpc } from "~/lib/trpc/client";
 import { SpotlightBackdrop } from "./spotlight-backdrop";

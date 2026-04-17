@@ -88,7 +88,7 @@ export function IndexerStep({
           onClick={() => { setChoice(choice === "prowlarr" ? null : "prowlarr"); setUrl(""); setApiKey(""); }}
           className={cn(
             "flex flex-1 flex-col items-center gap-3 rounded-xl border p-4 transition-all",
-            choice === "prowlarr" ? "border-primary/50 bg-primary/5" : "border-border hover:bg-accent/50",
+            choice === "prowlarr" ? "border-primary bg-primary/5" : "border-border hover:bg-accent/50",
           )}
         >
           <ServiceLogo src="/prowlarr.svg" alt="" size={32} />
@@ -99,7 +99,7 @@ export function IndexerStep({
           onClick={() => { setChoice(choice === "jackett" ? null : "jackett"); setUrl(""); setApiKey(""); }}
           className={cn(
             "flex flex-1 flex-col items-center gap-3 rounded-xl border p-4 transition-all",
-            choice === "jackett" ? "border-primary/50 bg-primary/5" : "border-border hover:bg-accent/50",
+            choice === "jackett" ? "border-primary bg-primary/5" : "border-border hover:bg-accent/50",
           )}
         >
           <ServiceLogo brand="jackett" alt="" size={32} />

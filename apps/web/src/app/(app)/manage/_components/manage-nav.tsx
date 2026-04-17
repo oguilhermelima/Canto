@@ -62,7 +62,7 @@ export function ManageMobileList(): React.JSX.Element {
           <p className="mb-2 px-1 text-xs font-semibold text-muted-foreground">
             {group.groupLabel}
           </p>
-          <div className="overflow-hidden rounded-2xl border border-border/40">
+          <div className="overflow-hidden rounded-2xl border border-border">
             {group.items.map((item, i) => {
               const Icon = item.icon;
               return (
@@ -71,7 +71,7 @@ export function ManageMobileList(): React.JSX.Element {
                   href={`/manage?section=${item.key}`}
                   className={cn(
                     "flex items-center gap-3.5 px-4 py-3.5 transition-colors active:bg-muted/50",
-                    i > 0 && "border-t border-border/40",
+                    i > 0 && "border-t border-border",
                   )}
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted/60">

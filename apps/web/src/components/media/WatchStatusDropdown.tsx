@@ -40,13 +40,13 @@ export function WatchStatusDropdown({
   const handleStatusChange = (value: string) => {
     updateMutation.mutate({
       mediaId,
-      trackingStatus: value as TrackingStatus,
+      status: value as TrackingStatus,
     });
   };
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-medium text-muted-foreground/60 uppercase tracking-wider ml-1">
+      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider ml-1">
         Watch Status
       </label>
       <Select value={status} onValueChange={handleStatusChange}>

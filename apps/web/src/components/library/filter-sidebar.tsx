@@ -220,7 +220,7 @@ export function FilterSidebar({
                       "rounded-xl px-2.5 py-1 text-xs font-medium transition-colors",
                       isActive
                         ? "bg-primary text-primary-foreground"
-                        : "border border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+                        : "border border-border text-muted-foreground hover:border-foreground hover:text-foreground",
                     )}
                     onClick={() =>
                       onFiltersChange({
@@ -312,7 +312,7 @@ export function FilterSidebar({
                       "rounded-xl px-2.5 py-1 text-xs font-medium transition-colors",
                       isActive
                         ? "bg-primary text-primary-foreground"
-                        : "border border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+                        : "border border-border text-muted-foreground hover:border-foreground hover:text-foreground",
                     )}
                     onClick={() =>
                       onFiltersChange({

@@ -2,7 +2,7 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useDocumentTitle } from "~/hooks/use-document-title";
-import { PageHeader } from "~/components/layout/page-header";
+import { PageHeader } from "~/components/page-header";
 import { ManageSidebar, ManageMobileList } from "./_components/manage-nav";
 import { ManageContent } from "./_components/manage-content";
 import { ALL_MANAGE_KEYS, DEFAULT_MANAGE_SECTION, MANAGE_SECTIONS } from "./_components/manage-config";

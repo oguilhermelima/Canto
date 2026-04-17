@@ -246,7 +246,7 @@ export function ProfileSection(): React.JSX.Element {
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading}
-                className="flex aspect-[3/1] w-full items-center justify-center rounded-xl border border-dashed border-border bg-muted/30 text-muted-foreground transition-colors hover:border-foreground/20 hover:bg-muted/50"
+                className="flex aspect-[3/1] w-full items-center justify-center rounded-xl border border-dashed border-border bg-muted/30 text-muted-foreground transition-colors hover:border-foreground hover:bg-muted/50"
               >
                 {uploading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />

@@ -87,7 +87,7 @@ export function AdvancedFilter({
           </div>
 
           {/* Footer */}
-          <div className="shrink-0 border-t border-border/40 px-6 py-4">
+          <div className="shrink-0 border-t border-border px-6 py-4">
             <div className="flex items-center gap-3">
               <Button
                 variant="outline"

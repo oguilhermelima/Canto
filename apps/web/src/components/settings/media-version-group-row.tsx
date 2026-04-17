@@ -137,7 +137,7 @@ export function MediaVersionGroupRow({
                 </span>
               )}
               {group.media.externalId && (
-                <span className="shrink-0 font-mono text-xs text-muted-foreground/70">
+                <span className="shrink-0 font-mono text-xs text-muted-foreground">
                   #{group.media.externalId}
                 </span>
               )}
@@ -152,8 +152,8 @@ export function MediaVersionGroupRow({
                 <StatusIcon size={12} />
                 {statusMeta.label}
               </span>
-              <span className="flex items-center gap-1.5 font-medium text-foreground/70">
-                <Layers size={12} className="text-muted-foreground/50" />
+              <span className="flex items-center gap-1.5 font-medium text-foreground">
+                <Layers size={12} className="text-muted-foreground" />
                 {versionCount === 1 ? "1 version" : `${versionCount} versions`}
               </span>
             </div>
@@ -171,7 +171,7 @@ export function MediaVersionGroupRow({
       </div>
 
       {expanded && (
-        <div className="space-y-2 border-t border-border/50 px-5 py-4">
+        <div className="space-y-2 border-t border-border px-5 py-4">
           {group.versions.map((version) => (
             <MediaVersionRow
               key={version.id}

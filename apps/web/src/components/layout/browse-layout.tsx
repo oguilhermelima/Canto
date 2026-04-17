@@ -3,9 +3,9 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { cn } from "@canto/ui/cn";
 import { Film, Loader2, Tv } from "lucide-react";
-import { PageHeader } from "~/components/layout/page-header";
-import { TabBar } from "~/components/layout/tab-bar";
-import { StateMessage } from "~/components/layout/state-message";
+import { PageHeader } from "~/components/page-header";
+import { TabBar } from "@canto/ui/tab-bar";
+import { StateMessage } from "@canto/ui/state-message";
 import { BrowseMenu } from "~/components/layout/browse-menu";
 import { AdvancedFilter } from "~/components/layout/advanced-filter";
 import { useIsMobile } from "~/hooks/use-is-mobile";

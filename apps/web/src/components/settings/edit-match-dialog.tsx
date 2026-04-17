@@ -224,7 +224,7 @@ export function EditMatchDialog({
               </div>
 
               {searchResults.data && searchResults.data.results.length > 0 && (
-                <div className="max-h-60 overflow-y-auto rounded-xl border border-border/40">
+                <div className="max-h-60 overflow-y-auto rounded-xl border border-border">
                   {searchResults.data.results.slice(0, 10).map((result) => {
                     const isSelected =
                       selectedMatch?.tmdbId === result.externalId;
@@ -274,7 +274,7 @@ export function EditMatchDialog({
                 </div>
               )}
 
-              <div className="space-y-3 rounded-xl border border-border/40 px-4 py-3">
+              <div className="space-y-3 rounded-xl border border-border px-4 py-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-start gap-3">
                     <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />

@@ -66,7 +66,7 @@ export function DownloadModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={`flex h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-border bg-background p-0 md:max-w-3xl md:rounded-[2rem] [&>button:last-child]:hidden ${showingResults ? "md:h-[65vh] md:max-h-[65vh]" : mediaType === "show" ? "md:h-auto md:min-h-[50vh] md:max-h-[65vh]" : "md:h-auto md:max-h-[65vh]"}`}>
         {/* Header — fixed two-row height on both screens */}
-        <div className="shrink-0 border-b border-border/40 px-5 py-4">
+        <div className="shrink-0 border-b border-border px-5 py-4">
           <div className="flex items-start gap-3">
             {showingResults && (
               <button

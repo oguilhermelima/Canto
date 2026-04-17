@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { MediaCard, MediaCardSkeleton } from "~/components/media/media-card";
-import { StateMessage } from "~/components/layout/state-message";
+import { StateMessage } from "@canto/ui/state-message";
 
 const GRID_CLASSES =
   "grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-6";

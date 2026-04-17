@@ -7,7 +7,7 @@ import Image from "next/image";
 import { Star } from "lucide-react";
 import { Button } from "@canto/ui/button";
 import { Skeleton } from "@canto/ui/skeleton";
-import { PageHeader } from "~/components/layout/page-header";
+import { PageHeader } from "~/components/page-header";
 import { trpc } from "~/lib/trpc/client";
 import { useDocumentTitle } from "~/hooks/use-document-title";
 
@@ -118,11 +118,11 @@ export default function ReviewDetailPage(): React.JSX.Element {
 
         {/* Comment — full, no clamp */}
         {review.comment ? (
-          <p className="mt-5 max-w-4xl whitespace-pre-wrap text-sm leading-relaxed text-foreground/80">
+          <p className="mt-5 max-w-4xl whitespace-pre-wrap text-sm leading-relaxed text-foreground">
             {review.comment}
           </p>
         ) : (
-          <p className="mt-5 text-sm text-muted-foreground/50">
+          <p className="mt-5 text-sm text-muted-foreground">
             No written review.
           </p>
         )}

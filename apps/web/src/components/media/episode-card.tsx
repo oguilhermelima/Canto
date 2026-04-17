@@ -72,7 +72,7 @@ export function EpisodeCard({
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-muted to-muted/50">
-            <span className="text-xl font-black text-muted-foreground/10">
+            <span className="text-xl font-black text-muted-foreground">
               E{num}
             </span>
           </div>
@@ -152,7 +152,7 @@ export function EpisodeCard({
           <span className="font-medium">E{num}</span>
           {episode.airDate && (
             <>
-              <span className="text-muted-foreground/30">·</span>
+              <span className="text-muted-foreground">·</span>
               <span>
                 {new Date(episode.airDate).toLocaleDateString("en-US", {
                   month: "short",

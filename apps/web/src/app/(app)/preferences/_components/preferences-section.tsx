@@ -182,7 +182,7 @@ export function PreferencesSection(): React.JSX.Element {
                       title={p.providerName}
                       width={44}
                       height={44}
-                      className="h-11 w-11 rounded-xl border border-border/60 object-cover"
+                      className="h-11 w-11 rounded-xl border border-border object-cover"
                     />
                   ))}
                 </div>

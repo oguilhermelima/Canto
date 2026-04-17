@@ -91,19 +91,19 @@ export function DownloadsTab({
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-border/60 bg-muted/[0.08] p-3">
+        <div className="rounded-xl border border-border bg-muted/[0.08] p-3">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Torrents
           </p>
           <p className="mt-1 text-xl font-semibold">{allTorrents.length}</p>
         </div>
-        <div className="rounded-xl border border-border/60 bg-muted/[0.08] p-3">
+        <div className="rounded-xl border border-border bg-muted/[0.08] p-3">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Active
           </p>
           <p className="mt-1 text-xl font-semibold">{activeTorrents}</p>
         </div>
-        <div className="rounded-xl border border-border/60 bg-muted/[0.08] p-3">
+        <div className="rounded-xl border border-border bg-muted/[0.08] p-3">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Downloaded Files
           </p>
@@ -111,8 +111,8 @@ export function DownloadsTab({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-border/60 bg-background/70">
-        <div className="flex items-center gap-2 border-b border-border/50 px-4 py-3">
+      <div className="overflow-hidden rounded-2xl border border-border bg-background/70">
+        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
           <Download className="h-4 w-4 text-muted-foreground" />
           <p className="text-sm font-semibold text-foreground">Torrents</p>
           <span className="ml-auto text-xs text-muted-foreground">
@@ -150,8 +150,8 @@ export function DownloadsTab({
         )}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-border/60 bg-background/70">
-        <div className="flex items-center gap-2 border-b border-border/50 px-4 py-3">
+      <div className="overflow-hidden rounded-2xl border border-border bg-background/70">
+        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
           <HardDrive className="h-4 w-4 text-muted-foreground" />
           <p className="text-sm font-semibold text-foreground">Files by content</p>
         </div>

@@ -24,7 +24,7 @@ import { Eye, EyeOff, Globe, Loader2, Lock, Pencil, Trash2, Users } from "lucide
 import { BrowseLayout } from "~/components/layout/browse-layout";
 import type { FilterOutput, BrowseItem, BrowseMenuGroup } from "~/components/layout/browse-layout";
 import { collectionStrategy } from "~/components/layout/card-strategies";
-import { StateMessage } from "~/components/layout/state-message";
+import { StateMessage } from "@canto/ui/state-message";
 import { trpc } from "~/lib/trpc/client";
 import { useDocumentTitle } from "~/hooks/use-document-title";
 import { useViewMode } from "~/hooks/use-view-mode";

@@ -41,7 +41,7 @@ export function TitleBar({
     <div
       className={cn(
         "sticky top-0 z-40 w-full bg-background transition-transform duration-300 md:hidden",
-        border && "border-b border-border/60",
+        border && "border-b border-border",
         className,
       )}
     >

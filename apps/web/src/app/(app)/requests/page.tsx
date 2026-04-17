@@ -1,18 +1,18 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { cn } from "@canto/ui/cn";
 import { Input } from "@canto/ui/input";
 import { Skeleton } from "@canto/ui/skeleton";
 import { Search, ArrowUpDown, Loader2 } from "lucide-react";
-import { PageHeader } from "~/components/layout/page-header";
-import { StateMessage } from "~/components/layout/state-message";
-import { TabBar } from "~/components/layout/tab-bar";
+import { PageHeader } from "~/components/page-header";
+import { StateMessage } from "@canto/ui/state-message";
+import { TabBar } from "@canto/ui/tab-bar";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { useIsAdmin } from "~/hooks/use-is-admin";
 import { useDocumentTitle } from "~/hooks/use-document-title";
+import { useInfiniteScroll } from "~/hooks/use-infinite-scroll";
 import { mediaDetailHref } from "~/lib/media-href";
 import { STATUS_TABS, TYPE_TABS } from "./_components/constants";
 import { RequestCard } from "./_components/request-card";
@@ -32,7 +32,6 @@ export default function RequestsPage(): React.JSX.Element {
   useDocumentTitle("Requests");
 
   const PAGE_SIZE = 20;
-  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const utils = trpc.useUtils();
   const {
@@ -60,20 +59,11 @@ export default function RequestsPage(): React.JSX.Element {
     [data],
   );
 
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting && hasNextPage && !isFetchingNextPage) {
-          void fetchNextPage();
-        }
-      },
-      { rootMargin: "200px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  const sentinelRef = useInfiniteScroll({
+    hasNextPage: hasNextPage ?? false,
+    isFetchingNextPage,
+    onFetchNextPage: () => void fetchNextPage(),
+  });
 
   const cancelMutation = trpc.request.cancel.useMutation({
     onSuccess: () => {
@@ -165,22 +155,12 @@ export default function RequestsPage(): React.JSX.Element {
             />
           </div>
 
-          <div className="flex items-center gap-1">
-            {TYPE_TABS.map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => setTypeFilter(value)}
-                className={cn(
-                  "h-10 rounded-xl px-4 text-sm font-medium transition-colors",
-                  typeFilter === value
-                    ? "bg-foreground/10 text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <TabBar
+            tabs={TYPE_TABS.map(({ value, label }) => ({ value, label }))}
+            value={typeFilter}
+            onChange={setTypeFilter}
+            className="mb-0 py-0"
+          />
 
           <button
             onClick={() => setSortBy((s) => s === "date" ? "title" : "date")}

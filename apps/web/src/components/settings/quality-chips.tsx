@@ -32,14 +32,14 @@ export function QualityChips({ meta }: { meta: QualityMeta }): React.JSX.Element
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
       {resolution && (
-        <span className="flex items-center gap-1.5 font-medium text-foreground/80">
-          <Monitor size={12} className="text-muted-foreground/50" />
+        <span className="flex items-center gap-1.5 font-medium text-foreground">
+          <Monitor size={12} className="text-muted-foreground" />
           {resolution}
         </span>
       )}
       {meta.videoCodec && (
-        <span className="flex items-center gap-1.5 font-mono font-medium text-foreground/70">
-          <Film size={12} className="text-muted-foreground/50" />
+        <span className="flex items-center gap-1.5 font-mono font-medium text-foreground">
+          <Film size={12} className="text-muted-foreground" />
           {meta.videoCodec.toLowerCase()}
         </span>
       )}
@@ -50,14 +50,14 @@ export function QualityChips({ meta }: { meta: QualityMeta }): React.JSX.Element
         </span>
       )}
       {meta.primaryAudioLang && (
-        <span className="flex items-center gap-1.5 font-medium text-foreground/70">
-          <Languages size={12} className="text-muted-foreground/50" />
+        <span className="flex items-center gap-1.5 font-medium text-foreground">
+          <Languages size={12} className="text-muted-foreground" />
           {meta.primaryAudioLang}
         </span>
       )}
       {meta.fileSize != null && meta.fileSize > 0 && (
-        <span className="flex items-center gap-1.5 font-medium text-foreground/70">
-          <HardDrive size={12} className="text-muted-foreground/50" />
+        <span className="flex items-center gap-1.5 font-medium text-foreground">
+          <HardDrive size={12} className="text-muted-foreground" />
           {formatBytes(meta.fileSize)}
         </span>
       )}

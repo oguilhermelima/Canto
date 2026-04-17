@@ -146,8 +146,8 @@ export function SeasonSelect({
                 allSeasonsSelected
                   ? "border-primary bg-primary text-primary-foreground"
                   : hasSelection
-                    ? "border-primary/50 bg-primary/20"
-                    : "border-muted-foreground/30 hover:border-muted-foreground/50",
+                    ? "border-primary bg-primary/20"
+                    : "border-muted-foreground hover:border-muted-foreground",
               )}
               title="Select all"
             >
@@ -242,7 +242,7 @@ function SeasonBlock({
         <ChevronRight
           size={20}
           className={cn(
-            "shrink-0 text-muted-foreground/50 transition-transform duration-200",
+            "shrink-0 text-muted-foreground transition-transform duration-200",
             isExpanded && "rotate-90",
           )}
         />
@@ -253,7 +253,7 @@ function SeasonBlock({
             ) : (
               <>
                 <span>S{sNum}</span>
-                <span className="mx-1.5 text-foreground/20 sm:mx-2">
+                <span className="mx-1.5 text-foreground sm:mx-2">
                   |
                 </span>
                 <span>{seasonTitle}</span>
@@ -264,7 +264,7 @@ function SeasonBlock({
             <span>{epCount} episodes</span>
             {year && (
               <>
-                <span className="text-muted-foreground/30">·</span>
+                <span className="text-muted-foreground">·</span>
                 <span>{year}</span>
               </>
             )}
@@ -287,8 +287,8 @@ function SeasonBlock({
                 : allEpsSelected
                   ? "border-primary bg-primary/80 text-primary-foreground"
                   : selectedCount > 0
-                    ? "border-primary/50 bg-primary/20"
-                    : "border-muted-foreground/30 hover:border-muted-foreground/50",
+                    ? "border-primary bg-primary/20"
+                    : "border-muted-foreground hover:border-muted-foreground",
             )}
           >
             {isSeasonSelected || allEpsSelected ? (
@@ -355,7 +355,7 @@ function SeasonBlock({
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-muted to-muted/50">
-                        <span className="text-sm font-black text-muted-foreground/10">
+                        <span className="text-sm font-black text-muted-foreground">
                           E{num}
                         </span>
                       </div>
@@ -368,7 +368,7 @@ function SeasonBlock({
                       <span className="font-medium">E{num}</span>
                       {ep.airDate && (
                         <>
-                          <span className="text-muted-foreground/30">
+                          <span className="text-muted-foreground">
                             ·
                           </span>
                           <span>
@@ -396,8 +396,8 @@ function SeasonBlock({
                       isSelected && !isMuted
                         ? "border-primary bg-primary text-primary-foreground"
                         : isMuted
-                          ? "border-muted-foreground/20"
-                          : "border-muted-foreground/30 group-hover:border-muted-foreground/50",
+                          ? "border-muted-foreground"
+                          : "border-muted-foreground group-hover:border-muted-foreground",
                     )}
                   >
                     {isSelected && !isMuted && (
@@ -412,7 +412,7 @@ function SeasonBlock({
 
         {episodes.length === 0 && (
           <div className="px-4 pb-4">
-            <div className="flex items-center justify-center rounded-xl border border-dashed border-border/30 py-10 text-xs text-muted-foreground/30">
+            <div className="flex items-center justify-center rounded-xl border border-dashed border-border py-10 text-xs text-muted-foreground">
               No episodes available
             </div>
           </div>

@@ -122,7 +122,7 @@ export function UpcomingScheduleCard({
             sizes="(max-width: 640px) 80vw, (max-width: 1024px) 40vw, 25vw"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted-foreground/30">
+          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
             {item.mediaType === "show" ? (
               <Tv className="h-10 w-10" />
             ) : (

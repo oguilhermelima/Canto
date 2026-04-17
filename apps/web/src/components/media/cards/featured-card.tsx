@@ -67,7 +67,7 @@ export function FeaturedCard({
         "group relative shrink-0 overflow-hidden rounded-xl transition-[width] duration-200 ease-out",
         "h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px]",
         isOpen
-          ? "border border-border/40 w-[calc(360px*16/9)] sm:w-[calc(400px*16/9)] lg:w-[calc(440px*16/9)] 2xl:w-[calc(500px*16/9)]"
+          ? "border border-border w-[calc(360px*16/9)] sm:w-[calc(400px*16/9)] lg:w-[calc(440px*16/9)] 2xl:w-[calc(500px*16/9)]"
           : "w-[230px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]",
       )}
       onMouseEnter={handleMouseEnter}
@@ -95,9 +95,9 @@ export function FeaturedCard({
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-muted">
             {item.type === "movie" ? (
-              <Film className="h-10 w-10 text-muted-foreground/20" />
+              <Film className="h-10 w-10 text-muted-foreground" />
             ) : (
-              <Tv className="h-10 w-10 text-muted-foreground/20" />
+              <Tv className="h-10 w-10 text-muted-foreground" />
             )}
           </div>
         )}

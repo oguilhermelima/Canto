@@ -125,7 +125,7 @@ function CastCard({
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
-            <User className="h-8 w-8 text-muted-foreground/15" />
+            <User className="h-8 w-8 text-muted-foreground" />
           </div>
         )}
       </div>
@@ -133,7 +133,7 @@ function CastCard({
         {name}
       </p>
       {character && (
-        <p className="text-center text-sm text-muted-foreground/60">
+        <p className="text-center text-sm text-muted-foreground">
           {character}
         </p>
       )}

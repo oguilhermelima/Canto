@@ -123,7 +123,7 @@ export function FavoriteButton({ mediaId, isFavorite: initialFavorite }: Favorit
           ? isHovered
             ? "border-red-500/30 bg-red-500/10 text-red-400"
             : "border-red-500/40 bg-red-500/15 text-red-500"
-          : "border-foreground/10 bg-foreground/15 text-foreground/70 hover:bg-foreground/25 hover:text-foreground",
+          : "border-foreground/20 bg-foreground/15 text-foreground hover:bg-foreground/25 hover:text-foreground",
       )}
       aria-label={optimistic ? "Remove from favorites" : "Add to favorites"}
     >

@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
-import { StateMessage } from "~/components/layout/state-message";
+import { StateMessage } from "@canto/ui/state-message";
 import { SettingField } from "~/components/settings/_primitives";
 import { SettingsSection } from "~/components/settings/shared";
 import { SyncItemsDialog } from "~/components/settings/sync-items-dialog";
@@ -62,7 +62,7 @@ function SyncStatusSection(): React.JSX.Element {
     >
       <div className="space-y-3">
         {/* Trigger sync card */}
-        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card px-4 py-3">
+        <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
           <div>
             <p className="text-sm font-medium text-foreground">Trigger sync</p>
             <p className="text-xs text-muted-foreground">
@@ -86,7 +86,7 @@ function SyncStatusSection(): React.JSX.Element {
         </div>
 
         {/* Library items viewer */}
-        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card px-4 py-3">
+        <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
           <div>
             <p className="text-sm font-medium text-foreground">Library items</p>
             <p className="text-xs text-muted-foreground">
@@ -168,7 +168,7 @@ function LibraryLinkingSection({ source }: { source: "jellyfin" | "plex" }): Rea
   }
 
   return (
-    <div className="divide-y divide-border/30 rounded-xl border border-border/40 overflow-hidden">
+    <div className="divide-y divide-border/30 rounded-xl border border-border overflow-hidden">
       {items.map((lib) => {
         const hasLink = !!lib.linkId;
 
@@ -195,9 +195,9 @@ function LibraryLinkingSection({ source }: { source: "jellyfin" | "plex" }): Rea
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     {lib.serverPath && (
-                      <p className="text-xs text-muted-foreground/50 truncate">{lib.serverPath}</p>
+                      <p className="text-xs text-muted-foreground truncate">{lib.serverPath}</p>
                     )}
-                    <span className="text-xs text-muted-foreground/40">
+                    <span className="text-xs text-muted-foreground">
                       {hasLink ? `Last sync: ${timeAgo(lib.lastSyncedAt)}` : "Not synced"}
                     </span>
                   </div>
@@ -256,7 +256,7 @@ function _ServerLibraryGroup({
     >
       <div className="space-y-4">
         {/* Rescan server card */}
-        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card px-4 py-3">
+        <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
           <div>
             <p className="text-sm font-medium text-foreground">Scan server libraries</p>
             <p className="text-xs text-muted-foreground">Discover available libraries on the server to enable syncing</p>
@@ -301,7 +301,7 @@ export function FolderScanSection(): React.JSX.Element {
       description="Detect existing media files in your library paths and match them to TMDB."
     >
       <div className="space-y-4">
-        <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
           <div className="flex items-center justify-between px-5 py-4">
             <div className="flex min-w-0 items-center gap-3">
               <FolderSearch className="h-5 w-5 shrink-0 text-primary" />
@@ -316,7 +316,7 @@ export function FolderScanSection(): React.JSX.Element {
             <SettingField settingKey="sync.folderScan.enabled" hideLabel hideHelp />
           </div>
 
-          <div className="flex items-center justify-between border-t border-border/40 px-5 py-3.5">
+          <div className="flex items-center justify-between border-t border-border px-5 py-3.5">
             <p className="text-xs text-muted-foreground">
               {folderScanEnabled ? "Runs periodically in the background" : "Enable the toggle above for automatic scans"}
             </p>

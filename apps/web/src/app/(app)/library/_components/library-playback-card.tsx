@@ -169,7 +169,7 @@ export function LibraryPlaybackCard({
   return (
     <Link
       href={mediaHref(entry.provider, entry.externalId, entry.mediaType)}
-      className="group block overflow-hidden rounded-2xl border border-border/40 bg-muted/35 transition-colors hover:bg-muted/50"
+      className="group block overflow-hidden rounded-2xl border border-border bg-muted/35 transition-colors hover:bg-muted/50"
     >
       <div className="flex items-center gap-4 p-4 sm:gap-5 sm:p-5">
         <div className="relative h-20 w-14 shrink-0 overflow-hidden rounded-xl bg-background/70 sm:h-24 sm:w-16">
@@ -230,7 +230,7 @@ export function LibraryPlaybackCard({
           )}
         </div>
 
-        <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/40 bg-background/70 text-muted-foreground transition-colors group-hover:text-foreground sm:flex">
+        <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background/70 text-muted-foreground transition-colors group-hover:text-foreground sm:flex">
           {mode === "watched" ? (
             <CheckCircle2 className="h-4 w-4" />
           ) : (

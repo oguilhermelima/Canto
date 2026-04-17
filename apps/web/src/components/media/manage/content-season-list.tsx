@@ -155,7 +155,7 @@ export function ContentSeasonList({
                   return (
                     <div
                       key={ep.id}
-                      className="border-b border-border/50 px-4 py-2.5 last:border-b-0"
+                      className="border-b border-border px-4 py-2.5 last:border-b-0"
                     >
                       <div className="flex items-start gap-3">
                         <span className="mt-0.5 w-10 shrink-0 text-xs font-medium text-muted-foreground">

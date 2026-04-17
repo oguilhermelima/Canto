@@ -162,7 +162,7 @@ export function TasteNarrative({ genres, insights }: ProfileStoryData): React.JS
       <div className="mt-3 flex flex-wrap gap-1.5">
         {genres.slice(0, 8).map((g, i) => (
           <span key={g.genre} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs ${i === 0 ? "bg-primary/15 font-medium text-primary" : "bg-white/[0.06] text-muted-foreground"}`}>
-            {g.genre} <span className={i === 0 ? "text-primary/70" : "text-foreground"}>{g.count}</span>
+            {g.genre} <span className={i === 0 ? "text-primary" : "text-foreground"}>{g.count}</span>
           </span>
         ))}
       </div>

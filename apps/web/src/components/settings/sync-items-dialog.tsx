@@ -23,8 +23,8 @@ import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 import { trpc } from "~/lib/trpc/client";
-import { TabBar } from "~/components/layout/tab-bar";
-import { StateMessage } from "~/components/layout/state-message";
+import { TabBar } from "@canto/ui/tab-bar";
+import { StateMessage } from "@canto/ui/state-message";
 
 import {
   MediaVersionGroupRow
@@ -432,7 +432,7 @@ export function SyncItemsDialog({
           </div>
 
           {totalPages > 1 && data && (
-            <div className="flex shrink-0 items-center justify-center gap-3 border-t border-border/40 px-6 py-3">
+            <div className="flex shrink-0 items-center justify-center gap-3 border-t border-border px-6 py-3">
               <Button
                 size="sm"
                 variant="ghost"

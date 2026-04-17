@@ -150,7 +150,7 @@ function SeasonBlock({
             <span>{epCount} episodes</span>
             {year && (
               <>
-                <span className="text-muted-foreground/30">·</span>
+                <span className="text-muted-foreground">·</span>
                 <span>{year}</span>
               </>
             )}
@@ -230,7 +230,7 @@ function SeasonBlock({
         />
       ) : (
         <div className="pl-4 pr-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
-          <div className="flex items-center justify-center rounded-xl border border-dashed border-border/30 py-10 text-xs text-muted-foreground/30">
+          <div className="flex items-center justify-center rounded-xl border border-dashed border-border py-10 text-xs text-muted-foreground">
             No episodes available
           </div>
         </div>

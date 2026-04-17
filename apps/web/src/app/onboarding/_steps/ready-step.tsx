@@ -35,21 +35,21 @@ export function ReadyStep({
       </div>
 
       <div className="mx-auto grid w-full max-w-2xl grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border/40 p-6">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border p-6">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
             <Search className="h-6 w-6 text-primary" />
           </div>
           <p className="text-sm font-semibold text-foreground">Discover</p>
           <p className="text-sm text-muted-foreground leading-relaxed">Browse trending movies, shows, and anime across all your sources.</p>
         </div>
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border/40 p-6">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border p-6">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
             <Download className="h-6 w-6 text-primary" />
           </div>
           <p className="text-sm font-semibold text-foreground">Download</p>
           <p className="text-sm text-muted-foreground leading-relaxed">Search across your indexers and send torrents to qBittorrent with one click.</p>
         </div>
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border/40 p-6">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border p-6">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
             <FolderSync className="h-6 w-6 text-primary" />
           </div>

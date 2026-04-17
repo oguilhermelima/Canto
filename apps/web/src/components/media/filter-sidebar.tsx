@@ -127,7 +127,7 @@ function Section({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="border-b border-border/40 py-4 last:border-b-0">
+    <div className="border-b border-border py-4 last:border-b-0">
       <div
         role="button"
         tabIndex={0}
@@ -410,7 +410,7 @@ export function FilterSidebar({
           <h2 className="text-xl font-bold tracking-tight text-foreground">Filter</h2>
           <button
             type="button"
-            className="flex items-center gap-1.5 text-[13px] text-foreground/70 transition-colors hover:text-foreground"
+            className="flex items-center gap-1.5 text-[13px] text-foreground transition-colors hover:text-foreground"
             onClick={handleReset}
           >
             <RotateCcw size={13} />
@@ -427,7 +427,7 @@ export function FilterSidebar({
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="h-9 flex-1 appearance-none rounded-xl border-0 bg-accent px-3 text-[13px] text-foreground/70 outline-none"
+                className="h-9 flex-1 appearance-none rounded-xl border-0 bg-accent px-3 text-[13px] text-foreground outline-none"
               >
                 {(isLibrary ? LIBRARY_SORT_OPTIONS : SORT_OPTIONS).map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -508,7 +508,7 @@ export function FilterSidebar({
                 max={2030}
                 value={yearMin}
                 onChange={(e) => setYearMin(e.target.value)}
-                className="!h-9 !rounded-xl !border-0 !bg-accent !text-[13px] !font-medium !text-foreground/70 !placeholder:text-foreground/30"
+                className="!h-9 !rounded-xl !border-0 !bg-accent !text-[13px] !font-medium !text-foreground !placeholder:text-foreground"
               />
               <span className="text-xs text-muted-foreground">–</span>
               <Input
@@ -518,7 +518,7 @@ export function FilterSidebar({
                 max={2030}
                 value={yearMax}
                 onChange={(e) => setYearMax(e.target.value)}
-                className="!h-9 !rounded-xl !border-0 !bg-accent !text-[13px] !font-medium !text-foreground/70 !placeholder:text-foreground/30"
+                className="!h-9 !rounded-xl !border-0 !bg-accent !text-[13px] !font-medium !text-foreground !placeholder:text-foreground"
               />
             </div>
           </Section>
@@ -620,7 +620,7 @@ export function FilterSidebar({
                 placeholder="Min"
                 value={runtimeMin}
                 onChange={(e) => setRuntimeMin(e.target.value.replace(/\D/g, ""))}
-                className="!h-9 !rounded-xl !border-0 !bg-accent !text-[13px] !font-medium !text-foreground/70 !placeholder:text-foreground/30"
+                className="!h-9 !rounded-xl !border-0 !bg-accent !text-[13px] !font-medium !text-foreground !placeholder:text-foreground"
               />
               <span className="text-xs text-muted-foreground">–</span>
               <Input
@@ -628,7 +628,7 @@ export function FilterSidebar({
                 placeholder="Max"
                 value={runtimeMax}
                 onChange={(e) => setRuntimeMax(e.target.value.replace(/\D/g, ""))}
-                className="!h-9 !rounded-xl !border-0 !bg-accent !text-[13px] !font-medium !text-foreground/70 !placeholder:text-foreground/30"
+                className="!h-9 !rounded-xl !border-0 !bg-accent !text-[13px] !font-medium !text-foreground !placeholder:text-foreground"
               />
               <span className="text-[10px] text-muted-foreground">min</span>
             </div>
@@ -641,7 +641,7 @@ export function FilterSidebar({
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="h-9 w-full appearance-none rounded-xl border-0 bg-accent px-3 text-[13px] text-foreground/70 outline-none"
+              className="h-9 w-full appearance-none rounded-xl border-0 bg-accent px-3 text-[13px] text-foreground outline-none"
             >
               {LANGUAGES.map((l) => (
                 <option key={l.value} value={l.value}>{l.label}</option>

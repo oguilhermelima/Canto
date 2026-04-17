@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { BrowseLayout } from "~/components/layout/browse-layout";
 import type { FilterOutput, BrowseItem } from "~/components/layout/browse-layout";
 import { browseStrategy } from "~/components/layout/card-strategies";
-import { StateMessage } from "~/components/layout/state-message";
+import { StateMessage } from "@canto/ui/state-message";
 import { useDocumentTitle } from "~/hooks/use-document-title";
 import { useViewMode } from "~/hooks/use-view-mode";
 import { trpc } from "~/lib/trpc/client";

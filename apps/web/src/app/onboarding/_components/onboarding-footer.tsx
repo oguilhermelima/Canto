@@ -53,7 +53,7 @@ export function OnboardingFooter({
   } = config;
 
   return (
-    <div className="mt-10 fixed inset-x-0 bottom-0 z-50 border-t border-border/20 bg-background md:static md:z-auto md:border-0 md:bg-transparent">
+    <div className="mt-10 fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background md:static md:z-auto md:border-0 md:bg-transparent">
       <div className="mx-auto w-full max-w-2xl space-y-3 px-4 py-4">
         {/* Actions */}
         {onPrimary && (

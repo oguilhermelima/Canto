@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 import { Star } from "lucide-react";
 import { Button } from "@canto/ui/button";
 import { Skeleton } from "@canto/ui/skeleton";
-import { PageHeader } from "~/components/layout/page-header";
+import { PageHeader } from "~/components/page-header";
 import { EpisodeCard } from "~/components/media/episode-card";
 import { trpc } from "~/lib/trpc/client";
 import { useDocumentTitle } from "~/hooks/use-document-title";
@@ -30,7 +30,7 @@ export default function SeasonDetailPage(): React.JSX.Element {
   });
 
   const media = resolvedData?.media;
-  const mediaId = (resolvedData as { mediaId?: string } | undefined)?.mediaId;
+  const mediaId = resolvedData?.mediaId;
 
   const season = useMemo(
     () => media?.seasons?.find((s: { number: number }) => s.number === seasonNum),
@@ -126,7 +126,7 @@ export default function SeasonDetailPage(): React.JSX.Element {
             <span>{episodes.length} episodes</span>
             {year && (
               <>
-                <span className="text-muted-foreground/30">·</span>
+                <span className="text-muted-foreground">·</span>
                 <span>{year}</span>
               </>
             )}

@@ -12,7 +12,7 @@ export function AboutSection(): React.JSX.Element {
   return (
     <div>
       <SettingsSection title="About" description="Instance information and resources.">
-        <div className="rounded-2xl border border-border/60 bg-card p-5">
+        <div className="rounded-2xl border border-border bg-card p-5">
           <div className="flex items-center gap-4">
             <Image src="/canto.svg" alt="Canto" width={48} height={48} className="h-12 w-12 dark:invert" />
             <div>
@@ -23,7 +23,7 @@ export function AboutSection(): React.JSX.Element {
           </div>
         </div>
 
-        <div className="mt-4 divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/60 bg-card">
+        <div className="mt-4 divide-y divide-border/60 overflow-hidden rounded-2xl border border-border bg-card">
           {LINKS.map((link) => (
             <a
               key={link.name}
@@ -36,7 +36,7 @@ export function AboutSection(): React.JSX.Element {
                 <p className="text-sm font-medium text-foreground">{link.name}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">{link.desc}</p>
               </div>
-              <ExternalLink className="h-4 w-4 text-muted-foreground/50" />
+              <ExternalLink className="h-4 w-4 text-muted-foreground" />
             </a>
           ))}
         </div>

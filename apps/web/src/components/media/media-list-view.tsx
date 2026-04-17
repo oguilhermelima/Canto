@@ -57,9 +57,9 @@ export function MediaListItem({ item }: { item: MediaItem }): React.JSX.Element 
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             {item.type === "movie" ? (
-              <Film className="h-5 w-5 text-muted-foreground/30" />
+              <Film className="h-5 w-5 text-muted-foreground" />
             ) : (
-              <Tv className="h-5 w-5 text-muted-foreground/30" />
+              <Tv className="h-5 w-5 text-muted-foreground" />
             )}
           </div>
         )}

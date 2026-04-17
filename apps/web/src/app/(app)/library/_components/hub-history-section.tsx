@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Bookmark, Clock3, Tv } from "lucide-react";
-import { SectionTitle } from "~/components/layout/section-title";
+import { SectionTitle } from "@canto/ui/section-title";
 import { cn } from "@canto/ui/cn";
 import { trpc } from "~/lib/trpc/client";
 import { mediaHref } from "~/lib/media-href";
@@ -159,7 +159,7 @@ export function HubHistorySection(): React.JSX.Element {
   if (isLoading) {
     return (
       <section>
-        <SectionTitle title="Recent Activity" seeMorePath="/library/history" />
+        <SectionTitle title="Recent Activity" seeMorePath="/library/history" linkAs={Link} />
         <div className="mt-2 space-y-2 px-4 md:mt-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
           {Array.from({ length: 4 }).map((_, index) => (
             <div
@@ -175,7 +175,7 @@ export function HubHistorySection(): React.JSX.Element {
   if (isError) {
     return (
       <section className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        <div className="rounded-2xl border border-border/50 bg-muted/20 px-4 py-6">
+        <div className="rounded-2xl border border-border bg-muted/20 px-4 py-6">
           <p className="text-sm text-muted-foreground">
             Failed to load recent activity.
           </p>
@@ -195,7 +195,7 @@ export function HubHistorySection(): React.JSX.Element {
     return (
       <section>
         <SectionTitle title="Recent Activity" />
-        <div className="mt-2 rounded-2xl px-4 md:mt-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24 border border-border/50 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
+        <div className="mt-2 rounded-2xl px-4 md:mt-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24 border border-border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
           No activity in the log yet. Your journey through the stars begins with
           the first play.
         </div>
@@ -205,7 +205,7 @@ export function HubHistorySection(): React.JSX.Element {
 
   return (
     <section>
-      <SectionTitle title="Recent Activity" seeMorePath="/library/history" />
+      <SectionTitle title="Recent Activity" seeMorePath="/library/history" linkAs={Link} />
 
       <div className="mt-2 space-y-5 px-4 md:mt-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {groups.map((group) => (
@@ -213,11 +213,11 @@ export function HubHistorySection(): React.JSX.Element {
             <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {group.label}
             </h3>
-            <div className="rounded-xl border border-border/40 bg-muted/20">
+            <div className="rounded-xl border border-border bg-muted/20">
               {group.entries.map((entry, i) => (
                 <div key={entry.id}>
                   {i > 0 && (
-                    <div className="mx-2 border-t border-border/30" />
+                    <div className="mx-2 border-t border-border" />
                   )}
                   <CompactHistoryEntry entry={entry} />
                 </div>

@@ -191,7 +191,7 @@ function RuleBadges({ group }: { group: RuleGroup }): React.JSX.Element {
             {node.label}
           </span>
         ) : (
-          <span key={i} className="text-[11px] font-medium text-muted-foreground/50">
+          <span key={i} className="text-[11px] font-medium text-muted-foreground">
             {node.label}
           </span>
         ),
@@ -450,7 +450,7 @@ function ConditionEditor({
       </div>
 
       {/* Remove */}
-      <button type="button" onClick={onRemove} className="shrink-0 rounded-lg p-2.5 text-muted-foreground/40 hover:text-destructive hover:bg-accent transition-colors mt-0.5">
+      <button type="button" onClick={onRemove} className="shrink-0 rounded-lg p-2.5 text-muted-foreground hover:text-destructive hover:bg-accent transition-colors mt-0.5">
         <X className="h-4 w-4" />
       </button>
     </div>
@@ -499,7 +499,7 @@ function ConnectorLabel({ value }: { value: "AND" | "OR" }): React.JSX.Element {
 function OperatorToggle({ value, onChange }: { value: "AND" | "OR"; onChange: (v: "AND" | "OR") => void }): React.JSX.Element {
   const isAnd = value === "AND";
   return (
-    <div className="inline-flex rounded-xl border border-border/40 overflow-hidden">
+    <div className="inline-flex rounded-xl border border-border overflow-hidden">
       <button
         type="button"
         onClick={() => onChange("AND")}
@@ -549,7 +549,7 @@ function ConditionSet({
 
   return (
     <div className={cn(
-      "rounded-xl border-l-[3px] border border-border/20 p-4 space-y-2",
+      "rounded-xl border-l-[3px] border border-border p-4 space-y-2",
       isAnd ? "border-l-blue-500/30 bg-blue-500/[0.03]" : "border-l-amber-500/30 bg-amber-500/[0.03]",
     )}>
       <div className="flex items-center justify-between">
@@ -557,7 +557,7 @@ function ConditionSet({
           <OperatorToggle value={group.operator} onChange={(op) => onChange({ ...group, operator: op })} />
           <span>of these must match</span>
         </div>
-        <button type="button" onClick={onRemove} className="rounded-lg p-1.5 text-muted-foreground/40 hover:text-destructive hover:bg-accent transition-colors">
+        <button type="button" onClick={onRemove} className="rounded-lg p-1.5 text-muted-foreground hover:text-destructive hover:bg-accent transition-colors">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -567,7 +567,7 @@ function ConditionSet({
           {i < conditions.length - 1 && <ConnectorLabel value={group.operator} />}
         </div>
       ))}
-      <button type="button" onClick={addCondition} className="text-sm text-muted-foreground/60 hover:text-foreground transition-colors">
+      <button type="button" onClick={addCondition} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
         + Add new condition to this set
       </button>
     </div>
@@ -638,7 +638,7 @@ function RulesEditor({
 
       {/* Add actions — always at the bottom */}
       <div className="flex items-center gap-3 pt-1">
-        <button type="button" onClick={addCondition} className="text-sm text-primary hover:text-primary/80 transition-colors font-medium">
+        <button type="button" onClick={addCondition} className="text-sm text-primary hover:text-primary transition-colors font-medium">
           + Add condition
         </button>
         <button type="button" onClick={addSet} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -685,7 +685,7 @@ function RulesEditorDialog({
         <div className="pt-3">
           <RulesEditor rules={draft} onChange={setDraft} />
         </div>
-        <div className="flex items-center justify-between pt-5 border-t border-border/30">
+        <div className="flex items-center justify-between pt-5 border-t border-border">
           <Button variant="ghost" className="text-muted-foreground rounded-xl" onClick={() => { onSave(null); onOpenChange(false); }}>
             Clear rules
           </Button>
@@ -825,12 +825,12 @@ function MediaPathsSection({ folderId, isLocal }: { folderId: string; isLocal: b
         className="flex w-full items-center justify-between py-1 text-left transition-colors"
       >
         <div className="flex items-center gap-2">
-          <p className="text-xs font-medium text-foreground/60">Additional paths</p>
+          <p className="text-xs font-medium text-foreground">Additional paths</p>
           {paths.length > 0 && (
-            <span className="text-xs text-muted-foreground/40">{paths.length}</span>
+            <span className="text-xs text-muted-foreground">{paths.length}</span>
           )}
         </div>
-        <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground/40 transition-transform duration-200", open && "rotate-180")} />
+        <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform duration-200", open && "rotate-180")} />
       </button>
 
       <AnimatedCollapse open={open}>
@@ -847,7 +847,7 @@ function MediaPathsSection({ folderId, isLocal }: { folderId: string; isLocal: b
                 <div key={mp.id} className="flex items-center gap-2 rounded-lg bg-muted/20 px-3 py-2">
                   <p className="text-sm text-foreground truncate flex-1 font-mono">{mp.path}</p>
                   {mp.label && (
-                    <span className="text-xs text-muted-foreground/60 shrink-0">{mp.label}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">{mp.label}</span>
                   )}
                   <Badge
                     variant="secondary"
@@ -862,7 +862,7 @@ function MediaPathsSection({ folderId, isLocal }: { folderId: string; isLocal: b
                     type="button"
                     onClick={() => removePath.mutate({ id: mp.id })}
                     disabled={removePath.isPending}
-                    className="shrink-0 rounded p-1 text-muted-foreground/40 hover:text-destructive transition-colors"
+                    className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive transition-colors"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -870,7 +870,7 @@ function MediaPathsSection({ folderId, isLocal }: { folderId: string; isLocal: b
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground/40 italic py-1">
+            <p className="text-sm text-muted-foreground italic py-1">
               If Jellyfin, Plex, or other servers use a different path for this same content, add it here so Canto can track it.
             </p>
           )}
@@ -930,7 +930,7 @@ function MediaPathsSection({ folderId, isLocal }: { folderId: string; isLocal: b
             <button
               type="button"
               onClick={() => setAdding(true)}
-              className="text-sm text-primary hover:text-primary/80 transition-colors font-medium pt-1"
+              className="text-sm text-primary hover:text-primary transition-colors font-medium pt-1"
             >
               + Add path
             </button>
@@ -1027,7 +1027,7 @@ function QbitPathSelect({
               <div className="flex min-w-0 flex-col">
                 <span className="truncate font-medium">{opt.savePath}</span>
                 {showCategoryHint && opt.category !== "current" && (
-                  <span className="truncate text-xs text-muted-foreground/60">
+                  <span className="truncate text-xs text-muted-foreground">
                     {opt.category}
                   </span>
                 )}
@@ -1112,7 +1112,7 @@ function CreateQbitCategoryDialog({
               placeholder="/data/downloads/movies"
               disabled={createCat.isPending}
             />
-            <p className="text-xs text-muted-foreground/70">
+            <p className="text-xs text-muted-foreground">
               Must be an absolute path writable by the qBittorrent server. The category is validated immediately — invalid paths are rolled back.
             </p>
           </div>
@@ -1203,7 +1203,7 @@ function PathInput({
           </button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-80 p-0">
-          <div className="border-b border-border/40 px-3 py-2.5">
+          <div className="border-b border-border px-3 py-2.5">
             <p className="text-sm font-medium text-foreground truncate">{data?.path ?? browsePath}</p>
           </div>
           <div className="max-h-[240px] overflow-y-auto p-1.5">
@@ -1223,7 +1223,7 @@ function PathInput({
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               </div>
             ) : data?.dirs.length === 0 ? (
-              <p className="py-4 text-center text-sm text-muted-foreground/50">No subfolders</p>
+              <p className="py-4 text-center text-sm text-muted-foreground">No subfolders</p>
             ) : (
               data?.dirs.map((dir) => (
                 <div key={dir.path} className="flex items-center">
@@ -1238,7 +1238,7 @@ function PathInput({
                   <button
                     type="button"
                     onClick={() => setBrowsePath(dir.path)}
-                    className="shrink-0 rounded-lg p-1.5 text-muted-foreground/40 hover:text-foreground hover:bg-accent transition-colors"
+                    className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                     title="Open folder"
                   >
                     <ChevronRight className="h-3.5 w-3.5" />
@@ -1248,7 +1248,7 @@ function PathInput({
             )}
           </div>
           {/* Select current folder */}
-          <div className="border-t border-border/40 p-2">
+          <div className="border-t border-border p-2">
             <Button
               size="sm"
               className="w-full rounded-xl gap-2"
@@ -1343,7 +1343,7 @@ function FolderCard({
     <>
       <div className={cn(
         "rounded-2xl border transition-colors overflow-hidden",
-        needsConfig ? "border-amber-500/30 bg-amber-500/[0.02]" : "border-border/40",
+        needsConfig ? "border-amber-500/30 bg-amber-500/[0.02]" : "border-border",
       )}>
         {/* Header — always visible */}
         <div className="flex w-full items-start gap-3 px-4 sm:px-5 py-4">
@@ -1358,7 +1358,7 @@ function FolderCard({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
-                className="h-auto rounded-none border-0 border-b border-border/40 bg-transparent p-0 pb-1 text-base font-semibold text-foreground shadow-none ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary/60 caret-primary"
+                className="h-auto rounded-none border-0 border-b border-border bg-transparent p-0 pb-1 text-base font-semibold text-foreground shadow-none ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary caret-primary"
               />
             ) : (
               <div className="flex items-center gap-2 flex-wrap min-w-0">
@@ -1373,21 +1373,21 @@ function FolderCard({
             )}
           </button>
           {expanded && (
-            <Pencil className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/40" />
+            <Pencil className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
           )}
           <button type="button" onClick={onToggle} className="mt-0.5 shrink-0">
-            <ChevronDown className={cn("h-4 w-4 text-muted-foreground/50 transition-transform duration-300", expanded && "rotate-180")} />
+            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform duration-300", expanded && "rotate-180")} />
           </button>
         </div>
 
         {/* Expanded editor */}
         <AnimatedCollapse open={expanded}>
-          <div className="border-t border-border/30 px-4 sm:px-5 py-5">
+          <div className="border-t border-border px-4 sm:px-5 py-5">
 
             {/* ── Download ── */}
             <div className="mt-2 flex items-center gap-3">
               <Download className="h-3.5 w-3.5 text-blue-400 shrink-0" />
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Download</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Download</p>
               <div className="h-px flex-1 bg-border/40" />
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -1414,7 +1414,7 @@ function FolderCard({
                     <button
                       type="button"
                       onClick={() => setEditingDlPath(true)}
-                      className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border/40 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                      className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border text-sm text-muted-foreground transition-colors hover:border-primary hover:text-primary"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       Set download path
@@ -1448,7 +1448,7 @@ function FolderCard({
             {/* ── Storage ── */}
             <div className="mt-8 flex items-center gap-3">
               <FolderOpen className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Storage</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Storage</p>
               <div className="h-px flex-1 bg-border/40" />
             </div>
             <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
@@ -1477,7 +1477,7 @@ function FolderCard({
                     <button
                       type="button"
                       onClick={() => setEditingLibPath(true)}
-                      className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border/40 text-sm text-muted-foreground transition-colors hover:border-emerald-400/40 hover:text-emerald-400"
+                      className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border text-sm text-muted-foreground transition-colors hover:border-emerald-400/40 hover:text-emerald-400"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       Set storage path
@@ -1490,7 +1490,7 @@ function FolderCard({
             {/* ── Routing ── */}
             <div className="mt-8 flex items-center gap-3">
               <Wand2 className="h-3.5 w-3.5 text-primary shrink-0" />
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Routing</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Routing</p>
               <div className="h-px flex-1 bg-border/40" />
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -1498,9 +1498,9 @@ function FolderCard({
             </p>
 
             {/* Rules */}
-            <div className="mt-4 rounded-xl border border-border/60 bg-card p-4">
+            <div className="mt-4 rounded-xl border border-border bg-card p-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-foreground/80">Rules</p>
+                <p className="text-sm font-medium text-foreground">Rules</p>
                 <Button size="sm" variant="outline" className="h-8 gap-1.5 rounded-xl text-xs" onClick={() => setRulesOpen(true)}>
                   <Pencil className="h-3.5 w-3.5" />
                   Edit rules
@@ -1520,7 +1520,7 @@ function FolderCard({
             {/* ── Fallback ── */}
             <div className="mt-8 flex items-center gap-3">
               <ShieldCheck className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Fallback</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Fallback</p>
               <div className="h-px flex-1 bg-border/40" />
             </div>
             <div className="mt-3 flex items-center justify-between">
@@ -1535,8 +1535,8 @@ function FolderCard({
             </div>
 
             {/* Actions */}
-            <div className="mt-6 flex items-center justify-between border-t border-border/20 pt-4">
-              <button type="button" onClick={() => deleteFolder.mutate({ id: folder.id })} disabled={deleteFolder.isPending} className="text-sm text-muted-foreground/60 hover:text-destructive transition-colors flex items-center gap-1.5">
+            <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
+              <button type="button" onClick={() => deleteFolder.mutate({ id: folder.id })} disabled={deleteFolder.isPending} className="text-sm text-muted-foreground hover:text-destructive transition-colors flex items-center gap-1.5">
                 <Trash2 className="h-3.5 w-3.5" />
                 Delete library
               </button>
@@ -1608,8 +1608,8 @@ function CustomFolderDialog({
           {root && slug && (
             <div className="rounded-xl bg-muted/30 px-4 py-3 space-y-1">
               <p className="text-xs font-medium text-muted-foreground">Generated paths</p>
-              <p className="text-sm text-foreground/80 font-mono">{root}/downloads/{slug}</p>
-              <p className="text-sm text-foreground/80 font-mono">{root}/media/{slug}</p>
+              <p className="text-sm text-foreground font-mono">{root}/downloads/{slug}</p>
+              <p className="text-sm text-foreground font-mono">{root}/media/{slug}</p>
             </div>
           )}
           <Button
@@ -1702,12 +1702,12 @@ function ScanFoldersDialog({
           <PathInput value={scanPath} onChange={setScanPath} placeholder="/" className="h-10 bg-accent rounded-xl border-none text-sm" />
 
           {/* Folder list with checkboxes */}
-          <div className="rounded-xl border border-border/40 overflow-hidden">
+          <div className="rounded-xl border border-border overflow-hidden">
             {data?.parent && data.parent !== data.path && (
               <button
                 type="button"
                 onClick={() => setScanPath(data.parent)}
-                className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-muted-foreground hover:bg-accent transition-colors border-b border-border/30"
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-muted-foreground hover:bg-accent transition-colors border-b border-border"
               >
                 <CornerLeftUp className="h-4 w-4 shrink-0" />
                 ..
@@ -1719,12 +1719,12 @@ function ScanFoldersDialog({
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 </div>
               ) : data?.dirs.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground/50">No subfolders found</p>
+                <p className="py-6 text-center text-sm text-muted-foreground">No subfolders found</p>
               ) : (
                 data?.dirs.map((dir) => {
                   const isSelected = selected.has(dir.path);
                   return (
-                    <div key={dir.path} className="flex items-center border-b border-border/20 last:border-0">
+                    <div key={dir.path} className="flex items-center border-b border-border last:border-0">
                       <button
                         type="button"
                         onClick={() => toggle(dir.path, dir.name)}
@@ -1735,7 +1735,7 @@ function ScanFoldersDialog({
                       >
                         <div className={cn(
                           "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors",
-                          isSelected ? "border-primary bg-primary text-primary-foreground" : "border-border/60",
+                          isSelected ? "border-primary bg-primary text-primary-foreground" : "border-border",
                         )}>
                           {isSelected && <Check className="h-3 w-3" />}
                         </div>
@@ -1745,7 +1745,7 @@ function ScanFoldersDialog({
                       <button
                         type="button"
                         onClick={() => setScanPath(dir.path)}
-                        className="shrink-0 px-3 py-2.5 text-muted-foreground/40 hover:text-foreground transition-colors"
+                        className="shrink-0 px-3 py-2.5 text-muted-foreground hover:text-foreground transition-colors"
                       >
                         <ChevronRight className="h-3.5 w-3.5" />
                       </button>
@@ -1922,7 +1922,7 @@ export function DownloadFolders({ mode = "settings", importMethod: importMethodP
         {/* Base path — only when not provided externally */}
         {/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- toggle for future use */}
         {showBasePath && (
-          <div className="rounded-2xl border border-border/40 bg-muted/5 p-4 sm:p-5 space-y-3">
+          <div className="rounded-2xl border border-border bg-muted/5 p-4 sm:p-5 space-y-3">
             <div className="flex items-center gap-2">
               <FolderOpen className="h-5 w-5 text-primary" />
               <p className="text-sm font-semibold text-foreground">Base path</p>
@@ -1973,11 +1973,11 @@ export function DownloadFolders({ mode = "settings", importMethod: importMethodP
       {/* Base path + generate — only when not provided externally */}
       {/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- toggle for future use */}
       {showBasePath && (
-        <div className="rounded-2xl border border-border/40 bg-muted/5 p-5 space-y-3">
+        <div className="rounded-2xl border border-border bg-muted/5 p-5 space-y-3">
           <div className="flex items-center gap-2">
             <FolderOpen className="h-5 w-5 text-primary" />
             <p className="text-sm font-semibold text-foreground">Base path</p>
-            <span className="text-sm text-muted-foreground/60">
+            <span className="text-sm text-muted-foreground">
               — generates <code className="text-xs bg-muted/60 px-1.5 py-0.5 rounded-md">/downloads/</code> and <code className="text-xs bg-muted/60 px-1.5 py-0.5 rounded-md">/media/</code> subfolders
             </span>
           </div>

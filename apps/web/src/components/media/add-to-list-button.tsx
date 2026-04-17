@@ -398,7 +398,7 @@ export function AddToListButton({
             btnText,
             isInWatchlist
               ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 hover:border-zinc-500/30 hover:bg-zinc-500/10 hover:text-zinc-400"
-              : "border-foreground/10 bg-foreground/15 text-foreground hover:bg-foreground/25",
+              : "border-foreground/20 bg-foreground/15 text-foreground hover:bg-foreground/25",
           )}
           onClick={() => void toggleWatchlist()}
           disabled={!watchlist || isLoading}
@@ -445,7 +445,7 @@ export function AddToListButton({
               "inline-flex items-center justify-center rounded-xl border backdrop-blur-md transition-all",
               hasSavedToAnyList
                 ? "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/15"
-                : "border-foreground/10 bg-foreground/15 hover:bg-foreground/25",
+                : "border-foreground/20 bg-foreground/15 hover:bg-foreground/25",
               btnHeight,
               isSmall ? "w-8" : "w-11",
             )}
@@ -455,7 +455,7 @@ export function AddToListButton({
             <Bookmark
               className={cn(
                 "h-5 w-5 transition-all",
-                hasSavedToAnyList ? "fill-amber-500 text-amber-500" : "text-foreground/70",
+                hasSavedToAnyList ? "fill-amber-500 text-amber-500" : "text-foreground",
               )}
               style={bookmarkAnim ? { animation: "list-pop 400ms ease-out" } : undefined}
             />

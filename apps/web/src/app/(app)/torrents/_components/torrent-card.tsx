@@ -176,13 +176,13 @@ export function TorrentCard({
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3">
+      <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
         <div className="flex items-center gap-2">
           {resolved.canPause ? (
             <button
               onClick={() => onPause(t.id)}
               disabled={pausePending}
-              className="inline-flex h-9 items-center gap-2 rounded-xl border border-border/60 bg-accent px-3 text-sm font-medium transition-colors hover:bg-accent/80 disabled:opacity-40"
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-accent px-3 text-sm font-medium transition-colors hover:bg-accent/80 disabled:opacity-40"
               title="Pause"
             >
               <Pause size={15} />
@@ -192,7 +192,7 @@ export function TorrentCard({
             <button
               onClick={() => onResume(t.id)}
               disabled={resumePending}
-              className="inline-flex h-9 items-center gap-2 rounded-xl border border-border/60 bg-accent px-3 text-sm font-medium transition-colors hover:bg-accent/80 disabled:opacity-40"
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-accent px-3 text-sm font-medium transition-colors hover:bg-accent/80 disabled:opacity-40"
               title="Resume"
             >
               <Play size={15} />
@@ -202,7 +202,7 @@ export function TorrentCard({
             <button
               onClick={() => onRetry(t.id)}
               disabled={retryPending}
-              className="inline-flex h-9 items-center gap-2 rounded-xl border border-border/60 bg-accent px-3 text-sm font-medium transition-colors hover:bg-accent/80 disabled:opacity-40"
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-accent px-3 text-sm font-medium transition-colors hover:bg-accent/80 disabled:opacity-40"
               title="Retry"
             >
               <RotateCcw size={15} />
@@ -212,7 +212,7 @@ export function TorrentCard({
 
           <button
             onClick={() => onDelete(t.id, t.media?.title ?? t.title)}
-            className="inline-flex h-9 items-center gap-2 rounded-xl border border-border/60 bg-accent px-3 text-sm font-medium text-red-400 transition-colors hover:bg-accent/80"
+            className="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-accent px-3 text-sm font-medium text-red-400 transition-colors hover:bg-accent/80"
             title="Delete"
           >
             <Trash2 size={15} />
@@ -223,7 +223,7 @@ export function TorrentCard({
         <ResponsiveMenu
           trigger={(
             <button
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-border/60 bg-accent text-muted-foreground transition-colors hover:bg-accent/80 hover:text-foreground"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-accent text-muted-foreground transition-colors hover:bg-accent/80 hover:text-foreground"
               title="Torrent actions"
             >
               <MoreHorizontal size={16} />
@@ -276,7 +276,7 @@ export function TorrentCard({
                   close();
                 }}
                 disabled={!t.hash || advancedPending}
-                className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80 disabled:opacity-50"
+                className="flex w-full items-center gap-3 rounded-xl border border-border bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80 disabled:opacity-50"
               >
                 <Rocket className="h-4 w-4 shrink-0" />
                 Force Resume
@@ -288,7 +288,7 @@ export function TorrentCard({
                   close();
                 }}
                 disabled={!t.hash || advancedPending}
-                className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80 disabled:opacity-50"
+                className="flex w-full items-center gap-3 rounded-xl border border-border bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80 disabled:opacity-50"
               >
                 <RefreshCw className="h-4 w-4 shrink-0" />
                 Force Recheck
@@ -300,7 +300,7 @@ export function TorrentCard({
                   close();
                 }}
                 disabled={!t.hash || advancedPending}
-                className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80 disabled:opacity-50"
+                className="flex w-full items-center gap-3 rounded-xl border border-border bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80 disabled:opacity-50"
               >
                 <Radio className="h-4 w-4 shrink-0" />
                 Force Reannounce
@@ -312,7 +312,7 @@ export function TorrentCard({
                   close();
                 }}
                 disabled={!t.magnetUrl && !t.hash}
-                className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80 disabled:opacity-50"
+                className="flex w-full items-center gap-3 rounded-xl border border-border bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80 disabled:opacity-50"
               >
                 <Copy className="h-4 w-4 shrink-0" />
                 Copy magnetic link

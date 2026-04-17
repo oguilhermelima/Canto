@@ -206,7 +206,7 @@ export function HomeSectionsEditor(): React.JSX.Element {
           ))}
         </div>
       ) : sections.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border/40 py-12 text-center">
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-12 text-center">
           <p className="text-sm text-muted-foreground">No sections configured</p>
           <button
             type="button"

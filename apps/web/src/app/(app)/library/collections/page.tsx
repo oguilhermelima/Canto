@@ -15,7 +15,7 @@ import { Input } from "@canto/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@canto/ui/tooltip";
 import { ArrowUpDown, Check, Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { PageHeader } from "~/components/layout/page-header";
+import { PageHeader } from "~/components/page-header";
 import { useDocumentTitle } from "~/hooks/use-document-title";
 import { trpc } from "~/lib/trpc/client";
 import { DEFAULT_COLLECTION_FILTERS } from "../_components/collection-filter-sidebar";

@@ -115,9 +115,9 @@ export function BackdropCard({
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             {type === "movie" ? (
-              <Film className="h-10 w-10 text-muted-foreground/20" />
+              <Film className="h-10 w-10 text-muted-foreground" />
             ) : (
-              <Tv className="h-10 w-10 text-muted-foreground/20" />
+              <Tv className="h-10 w-10 text-muted-foreground" />
             )}
           </div>
         )}

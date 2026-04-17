@@ -50,7 +50,7 @@ export function WhereToWatch({
         {/* Your Library (Jellyfin/Plex) */}
         {hasServers && (
           <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground/60">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Your Library
             </p>
             <div className="-my-2 flex gap-3 overflow-x-auto py-2" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
@@ -98,7 +98,7 @@ export function WhereToWatch({
         {/* Stream */}
         {flatrateProviders.length > 0 && (
           <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground/60">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Stream
             </p>
             <div className="-my-2 flex gap-3 overflow-x-auto py-2" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
@@ -125,7 +125,7 @@ export function WhereToWatch({
         {/* Rent / Buy */}
         {rentBuyProviders.length > 0 && (
           <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground/60">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Rent / Buy
             </p>
             <div className="-my-2 flex gap-3 overflow-x-auto py-2" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>

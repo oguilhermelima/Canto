@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { MediaGrid } from "~/components/media/media-grid";
-import { StateMessage } from "~/components/layout/state-message";
-import type { SPACE_STATES } from "~/components/layout/state-message";
+import { StateMessage } from "@canto/ui/state-message";
+import type { SPACE_STATES } from "@canto/ui/presets/space-states";
 
 const EMPTY_PRESET_MAP: Record<
   "planned" | "completed" | "dropped",

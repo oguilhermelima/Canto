@@ -5,7 +5,7 @@ import { cn } from "@canto/ui/cn";
 import { Plus } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { MediaCarousel } from "~/components/media/media-carousel";
-import { StateMessage } from "~/components/layout/state-message";
+import { StateMessage } from "@canto/ui/state-message";
 
 interface ListInfo {
   id: string;
@@ -134,7 +134,7 @@ export function CollectionsSectionsView({
         <button
           type="button"
           onClick={onCreateCollection}
-          className="group flex h-14 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border/50 transition-colors hover:border-foreground/20 hover:bg-muted/40"
+          className="group flex h-14 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border transition-colors hover:border-foreground hover:bg-muted/40"
         >
           <Plus className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
           <span className="text-sm font-medium text-muted-foreground transition-colors group-hover:text-foreground">

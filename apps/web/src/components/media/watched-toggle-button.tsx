@@ -103,10 +103,10 @@ interface MultiSelectOption {
 }
 
 const controlClassName =
-  "h-10 w-full appearance-none rounded-xl border-0 bg-accent px-3 pr-9 text-sm text-foreground/80 outline-none transition-colors focus-visible:ring-1 focus-visible:ring-primary/30";
+  "h-10 w-full appearance-none rounded-xl border-0 bg-accent px-3 pr-9 text-sm text-foreground outline-none transition-colors focus-visible:ring-1 focus-visible:ring-primary/30";
 
 const smallControlClassName =
-  "h-9 w-full appearance-none rounded-xl border-0 bg-accent px-3 text-sm text-foreground/80 outline-none transition-colors focus-visible:ring-1 focus-visible:ring-primary/30";
+  "h-9 w-full appearance-none rounded-xl border-0 bg-accent px-3 text-sm text-foreground outline-none transition-colors focus-visible:ring-1 focus-visible:ring-primary/30";
 
 const RATING_LABELS: Record<number, { emoji: string; label: string }> = {
   1: { emoji: "😵", label: "Awful" },
@@ -231,7 +231,7 @@ function statusButtonClass(status: TrackingStatus): string {
     case "dropped":
       return "border-zinc-500/30 bg-zinc-500/10 text-zinc-400 hover:bg-zinc-500/20";
     default:
-      return "border-foreground/10 bg-foreground/15 text-foreground hover:bg-foreground/25";
+      return "border-foreground/20 bg-foreground/15 text-foreground hover:bg-foreground/25";
   }
 }
 
@@ -339,7 +339,7 @@ function ChipMultiSelect({
         <button
           type="button"
           className={cn(
-            "flex min-h-[36px] w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-border/50 bg-accent px-3 py-1.5 text-left text-xs transition-colors hover:bg-accent/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/20",
+            "flex min-h-[36px] w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-border bg-accent px-3 py-1.5 text-left text-xs transition-colors hover:bg-accent/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/20",
             value.length === 0 && "text-muted-foreground",
           )}
         >
@@ -384,7 +384,7 @@ function ChipMultiSelect({
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="w-[var(--radix-popover-trigger-width)] min-w-[var(--radix-popover-trigger-width)] rounded-xl border-border/60 bg-background p-1"
+        className="w-[var(--radix-popover-trigger-width)] min-w-[var(--radix-popover-trigger-width)] rounded-xl border-border bg-background p-1"
         onWheel={(event) => event.stopPropagation()}
       >
         <div
@@ -413,7 +413,7 @@ function ChipMultiSelect({
                     "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors",
                     selected
                       ? "border-foreground bg-foreground text-background"
-                      : "border-muted-foreground/50",
+                      : "border-muted-foreground",
                   )}
                 >
                   {selected && <Check className="h-2 w-2" />}
@@ -471,7 +471,7 @@ function DateTimeValuePicker({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex h-10 w-full items-center justify-between rounded-xl bg-accent px-3 text-sm text-foreground/80 transition-colors hover:bg-accent/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30"
+          className="flex h-10 w-full items-center justify-between rounded-xl bg-accent px-3 text-sm text-foreground transition-colors hover:bg-accent/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30"
         >
           <span>{formatLocalDateTime(value)}</span>
           <CalendarRange className="h-4 w-4 text-muted-foreground" />
@@ -479,7 +479,7 @@ function DateTimeValuePicker({
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="w-[340px] rounded-xl border border-border/60 bg-background p-3"
+        className="w-[340px] rounded-xl border border-border bg-background p-3"
       >
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-2">
@@ -1000,7 +1000,7 @@ export function WatchTrackingButton({
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="flex h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-border/50 bg-background p-0 md:h-auto md:max-h-[85vh] md:max-w-lg md:rounded-3xl [&>button:last-child]:hidden">
+        <DialogContent className="flex h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-border bg-background p-0 md:h-auto md:max-h-[85vh] md:max-w-lg md:rounded-3xl [&>button:last-child]:hidden">
           {/* ── Cinematic header with backdrop ── */}
           <div className="relative shrink-0 overflow-hidden">
             {backdropPath && (
@@ -1021,7 +1021,7 @@ export function WatchTrackingButton({
                   <DialogTitle className="text-xl font-bold">
                     {activeTab === "track" ? "I watched..." : "Watch history"}
                   </DialogTitle>
-                  <DialogDescription className="mt-1 truncate text-sm text-foreground/70">
+                  <DialogDescription className="mt-1 truncate text-sm text-foreground">
                     {title}
                   </DialogDescription>
                 </div>
@@ -1076,8 +1076,8 @@ export function WatchTrackingButton({
                               className={cn(
                                 "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition-all duration-200 active:scale-95",
                                 isSelected
-                                  ? "border-foreground/20 bg-foreground/10 text-foreground"
-                                  : "border-border/50 text-muted-foreground hover:border-foreground/15 hover:text-foreground",
+                                  ? "border-foreground bg-foreground/10 text-foreground"
+                                  : "border-border text-muted-foreground hover:border-foreground hover:text-foreground",
                               )}
                             >
                               <Icon className="h-3.5 w-3.5" />
@@ -1162,8 +1162,8 @@ export function WatchTrackingButton({
                             className={cn(
                               "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition-all duration-200 active:scale-95",
                               selected
-                                ? "border-foreground/20 bg-foreground/10 text-foreground"
-                                : "border-border/50 text-muted-foreground hover:border-foreground/15 hover:text-foreground",
+                                ? "border-foreground bg-foreground/10 text-foreground"
+                                : "border-border text-muted-foreground hover:border-foreground hover:text-foreground",
                             )}
                           >
                             <Icon className="h-3.5 w-3.5" />
@@ -1186,7 +1186,7 @@ export function WatchTrackingButton({
                       )}
 
                       {requiresBulkChoice && (
-                        <div className="space-y-3 rounded-2xl border border-border/50 bg-accent p-3.5">
+                        <div className="space-y-3 rounded-2xl border border-border bg-accent p-3.5">
                           <div className="flex items-center justify-between">
                             <p className="text-xs font-semibold text-muted-foreground">
                               Episode selection
@@ -1203,8 +1203,8 @@ export function WatchTrackingButton({
                               className={cn(
                                 "rounded-xl border px-3 py-2 text-sm font-medium transition-all duration-200 active:scale-[0.98]",
                                 bulkMode === "all"
-                                  ? "border-foreground/20 bg-foreground/10 text-foreground"
-                                  : "border-border/50 text-muted-foreground hover:border-foreground/15 hover:text-foreground",
+                                  ? "border-foreground bg-foreground/10 text-foreground"
+                                  : "border-border text-muted-foreground hover:border-foreground hover:text-foreground",
                               )}
                             >
                               Mark all episodes
@@ -1215,8 +1215,8 @@ export function WatchTrackingButton({
                               className={cn(
                                 "rounded-xl border px-3 py-2 text-sm font-medium transition-all duration-200 active:scale-[0.98]",
                                 bulkMode === "select"
-                                  ? "border-foreground/20 bg-foreground/10 text-foreground"
-                                  : "border-border/50 text-muted-foreground hover:border-foreground/15 hover:text-foreground",
+                                  ? "border-foreground bg-foreground/10 text-foreground"
+                                  : "border-border text-muted-foreground hover:border-foreground hover:text-foreground",
                               )}
                             >
                               Select individually
@@ -1262,8 +1262,8 @@ export function WatchTrackingButton({
                                       className={cn(
                                         "flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left transition-all duration-150 active:scale-[0.99]",
                                         selected
-                                          ? "border-foreground/20 bg-foreground/10"
-                                          : "border-border/50 hover:border-foreground/15",
+                                          ? "border-foreground bg-foreground/10"
+                                          : "border-border hover:border-foreground",
                                       )}
                                     >
                                       <span className="truncate pr-2 text-sm">
@@ -1298,7 +1298,7 @@ export function WatchTrackingButton({
                   {normalizedStatus === "watching" && (
                     <button
                       type="button"
-                      className="rounded-full px-3 py-1.5 text-xs font-medium text-foreground/30 transition-colors hover:text-foreground/50 disabled:opacity-50"
+                      className="rounded-full px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:text-foreground disabled:opacity-50"
                       disabled={pending}
                       onClick={() => markDroppedMutation.mutate({ mediaId })}
                     >
@@ -1309,7 +1309,7 @@ export function WatchTrackingButton({
                   {normalizedStatus === "dropped" && (
                     <button
                       type="button"
-                      className="rounded-full px-3 py-1.5 text-xs font-medium text-foreground/30 transition-colors hover:text-foreground/50 disabled:opacity-50"
+                      className="rounded-full px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:text-foreground disabled:opacity-50"
                       disabled={pending}
                       onClick={() => clearTrackingMutation.mutate({ mediaId })}
                     >
@@ -1319,7 +1319,7 @@ export function WatchTrackingButton({
                   <div className="flex-1" />
                   <button
                     type="button"
-                    className="rounded-full px-4 py-2 text-sm font-medium text-foreground/40 transition-colors hover:text-foreground/60 disabled:opacity-50"
+                    className="rounded-full px-4 py-2 text-sm font-medium text-foreground transition-colors hover:text-foreground disabled:opacity-50"
                     onClick={() => setOpen(false)}
                     disabled={pending}
                   >
@@ -1372,7 +1372,7 @@ export function WatchTrackingButton({
                       {historyGroups.map((group) => (
                         <details
                           key={group.key}
-                          className="group overflow-hidden rounded-xl border border-border/50 bg-muted/20"
+                          className="group overflow-hidden rounded-xl border border-border bg-muted/20"
                         >
                           <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5">
                             <span className="text-sm font-medium">{group.title}</span>
@@ -1381,7 +1381,7 @@ export function WatchTrackingButton({
                               <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
                             </div>
                           </summary>
-                          <div className="border-t border-border/40">
+                          <div className="border-t border-border">
                             {group.items.map((item) => {
                               const selected = selectedHistoryEntryIds.includes(
                                 item.entry.id,
@@ -1392,7 +1392,7 @@ export function WatchTrackingButton({
                                   type="button"
                                   onClick={() => toggleHistoryEntry(item.entry.id)}
                                   className={cn(
-                                    "flex w-full items-start gap-3 border-b border-border/30 px-3 py-2.5 text-left transition-colors last:border-0 hover:bg-accent/70",
+                                    "flex w-full items-start gap-3 border-b border-border px-3 py-2.5 text-left transition-colors last:border-0 hover:bg-accent/70",
                                     selected && "bg-primary/10",
                                   )}
                                 >
@@ -1401,7 +1401,7 @@ export function WatchTrackingButton({
                                       "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors",
                                       selected
                                         ? "border-primary bg-primary text-primary-foreground"
-                                        : "border-muted-foreground/60",
+                                        : "border-muted-foreground",
                                     )}
                                   >
                                     {selected && <Check className="h-3 w-3" />}
@@ -1426,7 +1426,7 @@ export function WatchTrackingButton({
                 </div>
               </div>
 
-              <div className="shrink-0 border-t border-border/50 px-5 py-3 md:px-6">
+              <div className="shrink-0 border-t border-border px-5 py-3 md:px-6">
                 <div className="flex items-center justify-end gap-2">
                   <Button
                     variant="ghost"

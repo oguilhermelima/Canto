@@ -19,7 +19,7 @@ export function AutoMergeSection(): React.JSX.Element {
 
   return (
     <SettingsSection title="Post-import" description="Automatic actions after media files are imported.">
-      <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card px-4 py-3">
+      <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
         <div>
           <p className="text-sm font-medium text-foreground">Auto-merge versions</p>
           <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
@@ -75,8 +75,8 @@ export function ImportMethodSection(): React.JSX.Element {
             className={cn(
               "flex flex-col gap-1.5 rounded-xl border p-4 text-left transition-all",
               importMethod === "local"
-                ? "border-primary/50 bg-primary/5"
-                : "border-border/40 bg-muted/20 hover:bg-muted/40",
+                ? "border-primary bg-primary/5"
+                : "border-border bg-muted/20 hover:bg-muted/40",
             )}
           >
             <span className="text-sm font-semibold">Hardlink (local)</span>
@@ -90,8 +90,8 @@ export function ImportMethodSection(): React.JSX.Element {
             className={cn(
               "flex flex-col gap-1.5 rounded-xl border p-4 text-left transition-all",
               importMethod === "remote"
-                ? "border-primary/50 bg-primary/5"
-                : "border-border/40 bg-muted/20 hover:bg-muted/40",
+                ? "border-primary bg-primary/5"
+                : "border-border bg-muted/20 hover:bg-muted/40",
             )}
           >
             <span className="text-sm font-semibold">qBittorrent API (remote)</span>
@@ -158,7 +158,7 @@ export function SeedingSection(): React.JSX.Element {
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground/80">Ratio limit</label>
+            <label className="text-sm font-medium text-foreground">Ratio limit</label>
             <Input
               type="number"
               step="0.1"
@@ -171,7 +171,7 @@ export function SeedingSection(): React.JSX.Element {
             <p className="text-xs text-muted-foreground">Stop seeding after reaching this upload ratio.</p>
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground/80">Time limit (hours)</label>
+            <label className="text-sm font-medium text-foreground">Time limit (hours)</label>
             <Input
               type="number"
               step="1"
@@ -185,7 +185,7 @@ export function SeedingSection(): React.JSX.Element {
           </div>
         </div>
 
-        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card px-4 py-3">
+        <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
           <div>
             <p className="text-sm font-medium text-foreground">Clean up after seeding</p>
             <p className="text-xs text-muted-foreground">

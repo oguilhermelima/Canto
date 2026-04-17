@@ -79,7 +79,7 @@ function _OrDivider(): React.JSX.Element {
   return (
     <div className="flex items-center gap-3 py-1">
       <div className="h-px flex-1 bg-border/40" />
-      <span className="text-xs text-muted-foreground/40">or</span>
+      <span className="text-xs text-muted-foreground">or</span>
       <div className="h-px flex-1 bg-border/40" />
     </div>
   );
@@ -212,7 +212,7 @@ function ServiceRow({
   const info = SERVICE_INFO[serviceKey];
 
   return (
-    <div className={cn(!isLast && "border-b border-border/30")}>
+    <div className={cn(!isLast && "border-b border-border")}>
       {/* Header — click to expand/collapse */}
       <div
         role="button"
@@ -222,7 +222,7 @@ function ServiceRow({
         className={cn("flex w-full items-center justify-between px-5 py-3.5 text-left cursor-pointer bg-gradient-to-r", BRAND_GRADIENT[serviceKey] ?? "")}
       >
         <div className="flex items-center gap-2.5 min-w-0">
-          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform duration-300", expanded && "rotate-180")} />
+          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300", expanded && "rotate-180")} />
           <BrandLogo serviceKey={serviceKey} />
           <p className="text-base font-semibold text-foreground">{title}</p>
           {isEnabled ? (
@@ -392,7 +392,7 @@ function MediaServerRow({
   const info = SERVICE_INFO[serviceKey];
 
   return (
-    <div className={cn(!isLast && "border-b border-border/30")}>
+    <div className={cn(!isLast && "border-b border-border")}>
       <div
         role="button"
         tabIndex={0}
@@ -401,7 +401,7 @@ function MediaServerRow({
         className={cn("flex w-full items-center justify-between px-5 py-3.5 text-left cursor-pointer bg-gradient-to-r", brandGradient)}
       >
         <div className="flex items-center gap-2.5 min-w-0">
-          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform duration-300", expanded && "rotate-180")} />
+          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300", expanded && "rotate-180")} />
           <span className="inline-block h-5 w-5 shrink-0" style={logoStyle} />
           <p className="text-base font-semibold text-foreground">{title}</p>
           {isEnabled ? (
@@ -529,7 +529,7 @@ function PlexOAuthSection({ serverUrl, disabled, onSuccess, isConnected }: { ser
   };
 
   return (
-    <div className={cn("rounded-xl border bg-card p-4 transition-all", disabled ? "border-border/30 opacity-40" : "border-border/60 hover:border-border/80")}>
+    <div className={cn("rounded-xl border bg-card p-4 transition-all", disabled ? "border-border opacity-40" : "border-border hover:border-border")}>
       <p className="mb-2 text-sm font-medium text-foreground">{isConnected ? "Plex account" : "Sign in with Plex"}</p>
       <p className="mb-3 text-sm text-muted-foreground">
         {isConnected
@@ -605,7 +605,7 @@ function TmdbSection(): React.JSX.Element {
         className={cn("flex items-center justify-between px-5 py-3.5 cursor-pointer bg-gradient-to-r", BRAND_GRADIENT.tmdb)}
       >
         <div className="flex items-center gap-2.5 min-w-0">
-          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform duration-300", expanded && "rotate-180")} />
+          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300", expanded && "rotate-180")} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/tmdb.svg" alt="" className="h-5 w-5 shrink-0" />
           <p className="text-base font-semibold text-foreground">TMDB</p>
@@ -727,7 +727,7 @@ function TvdbApiKeySection(): React.JSX.Element {
         className={cn("flex items-center justify-between px-5 py-3.5 cursor-pointer bg-gradient-to-r", BRAND_GRADIENT.tvdb)}
       >
         <div className="flex items-center gap-2.5 min-w-0">
-          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform duration-300", expanded && "rotate-180")} />
+          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300", expanded && "rotate-180")} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/tvdb.svg" alt="" className="h-5 w-5 shrink-0" />
           <p className="text-base font-semibold text-foreground">TVDB</p>
@@ -835,7 +835,7 @@ function WatchRegionSection(): React.JSX.Element {
             ) : watchProviders && watchProviders.length > 0 ? (
               <div className="flex flex-wrap gap-2.5">
                 {watchProviders.slice(0, 30).map((p) => (
-                  <Image key={p.providerId} src={`${TMDB_IMAGE_BASE}/w92${p.logoPath}`} alt={p.providerName} title={p.providerName} width={44} height={44} className="h-11 w-11 rounded-xl border border-border/60 object-cover" />
+                  <Image key={p.providerId} src={`${TMDB_IMAGE_BASE}/w92${p.logoPath}`} alt={p.providerName} title={p.providerName} width={44} height={44} className="h-11 w-11 rounded-xl border border-border object-cover" />
                 ))}
               </div>
             ) : <p className="text-xs text-muted-foreground">No providers found.</p>}
@@ -1192,7 +1192,7 @@ function PlexServerSection(): React.JSX.Element {
         className={cn("flex w-full items-center justify-between px-5 py-3.5 text-left cursor-pointer bg-gradient-to-r", BRAND_GRADIENT.plex)}
       >
         <div className="flex items-center gap-2.5 min-w-0">
-          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform duration-300", expanded && "rotate-180")} />
+          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300", expanded && "rotate-180")} />
           <span className="inline-block h-5 w-5 shrink-0 bg-[#e5a00d]" style={{ mask: "url(/plex-logo.svg) center/contain no-repeat", WebkitMask: "url(/plex-logo.svg) center/contain no-repeat" }} />
           <p className="text-base font-semibold text-foreground">Plex</p>
           {isEnabled ? (
@@ -1387,7 +1387,7 @@ export function MetadataSettingsSection(): React.JSX.Element {
                 </li>
               </ul>
 
-              <p className="text-sm text-muted-foreground/70">
+              <p className="text-sm text-muted-foreground">
                 <strong className="text-muted-foreground">Note:</strong> Not all streaming providers support direct search.
                 Only providers with a known search URL (such as Netflix, Disney+, Amazon Prime, HBO Max, and Crunchyroll)
                 will open a direct search. Other providers will fall back to the TMDB watch page regardless of this setting.

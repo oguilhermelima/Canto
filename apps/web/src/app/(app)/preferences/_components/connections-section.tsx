@@ -645,7 +645,7 @@ function AddConnectionForm({
             </Button>
 
             {traktUserCode && traktVerificationUrl && (
-              <div className="rounded-xl border border-border/40 bg-muted/20 p-3">
+              <div className="rounded-xl border border-border bg-muted/20 p-3">
                 <p className="text-xs text-muted-foreground">1) A Trakt popup was opened. If blocked, open it manually.</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <Button
@@ -671,7 +671,7 @@ function AddConnectionForm({
                 <p className="mt-1 text-sm font-semibold tracking-wide">{traktUserCode}</p>
 
                 {traktAuthError ? (
-                  <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2">
+                  <div className="mt-3 rounded-lg border border-destructive bg-destructive/10 px-3 py-2">
                     <p className="text-xs text-destructive">{traktAuthError}</p>
                     <Button
                       type="button"

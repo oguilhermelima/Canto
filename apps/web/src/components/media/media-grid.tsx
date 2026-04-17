@@ -2,7 +2,7 @@
 
 import { cn } from "@canto/ui/cn";
 import { MediaCard, MediaCardSkeleton } from "./media-card";
-import { StateMessage } from "~/components/layout/state-message";
+import { StateMessage } from "@canto/ui/state-message";
 
 interface MediaItem {
   id?: string;
@@ -67,7 +67,7 @@ export function MediaGrid({
             {item.totalRating != null && item.voteCount != null && item.voteCount > 0 && (
               <div className="absolute left-1.5 top-1.5 z-10 flex items-center gap-1 rounded-lg bg-primary px-2 py-0.5">
                 <span className="text-xs font-bold text-primary-foreground">{item.totalRating}</span>
-                <span className="text-[10px] text-primary-foreground/70">
+                <span className="text-[10px] text-primary-foreground">
                   ({item.voteCount})
                 </span>
               </div>

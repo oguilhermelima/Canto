@@ -21,7 +21,7 @@ import {
 import { Bookmark, Check, ChevronLeft, ChevronRight, Eye, Server, X } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import type { HomeSectionConfig } from "@canto/db/schema";
-import { TabBar } from "~/components/layout/tab-bar";
+import { TabBar } from "@canto/ui/tab-bar";
 import { BackdropCard } from "~/components/media/backdrop-card";
 import { MediaCard } from "~/components/media/media-card";
 
@@ -430,7 +430,7 @@ function TmdbConditionEditor({
         </div>
 
         {/* Remove */}
-        <button type="button" onClick={onRemove} className="mt-0.5 shrink-0 rounded-lg p-2.5 text-muted-foreground/40 transition-colors hover:bg-accent hover:text-destructive">
+        <button type="button" onClick={onRemove} className="mt-0.5 shrink-0 rounded-lg p-2.5 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -513,13 +513,13 @@ function StylePreview({ value }: { value: string }): React.JSX.Element {
         <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-5">
           <img src="/logo-example.webp" alt="Il Sorpasso" className="h-8 w-auto self-start drop-shadow-lg sm:h-10" />
-          <div className="flex flex-wrap items-center gap-x-2 text-xs text-foreground/70">
-            <span>Movie</span><span className="text-foreground/30">|</span>
-            <span className="text-yellow-400">8.0</span><span className="text-foreground/30">|</span>
-            <span>1962</span><span className="text-foreground/30">|</span>
-            <span>Comedy</span><span className="text-foreground/30">·</span><span>Drama</span>
+          <div className="flex flex-wrap items-center gap-x-2 text-xs text-foreground">
+            <span>Movie</span><span className="text-foreground">|</span>
+            <span className="text-yellow-400">8.0</span><span className="text-foreground">|</span>
+            <span>1962</span><span className="text-foreground">|</span>
+            <span>Comedy</span><span className="text-foreground">·</span><span>Drama</span>
           </div>
-          <p className="line-clamp-2 max-w-md text-xs leading-relaxed text-foreground/70">
+          <p className="line-clamp-2 max-w-md text-xs leading-relaxed text-foreground">
             Roberto, a restless Italian playboy, picks up shy law student Bruno for an impromptu road trip through the Italian countryside.
           </p>
           <div className="flex items-center gap-2 pt-1">
@@ -534,7 +534,7 @@ function StylePreview({ value }: { value: string }): React.JSX.Element {
   if (value === "large_video") {
     return (
       <div className="flex w-full justify-center overflow-hidden rounded-xl bg-black py-4">
-        <div className="group/card relative h-72 w-44 shrink-0 overflow-hidden rounded-xl transition-[width] duration-300 ease-in-out hover:w-full hover:border hover:border-border/40">
+        <div className="group/card relative h-72 w-44 shrink-0 overflow-hidden rounded-xl transition-[width] duration-300 ease-in-out hover:w-full hover:border hover:border-border">
           <div className="absolute inset-0 transition-opacity duration-300 group-hover/card:pointer-events-none group-hover/card:opacity-0">
             <img src="/poster-example.webp" alt="" className="h-full w-full object-cover" />
           </div>
@@ -743,8 +743,8 @@ export function SectionEditorDialog({
                         className={cn(
                           "flex w-full flex-col rounded-2xl border px-4 py-3 text-left transition-colors",
                           dbSourceKey === opt.value
-                            ? "border-foreground/20 bg-accent"
-                            : "border-border/50 bg-muted/20 hover:bg-accent/50",
+                            ? "border-foreground bg-accent"
+                            : "border-border bg-muted/20 hover:bg-accent/50",
                         )}
                       >
                         <span className="text-sm font-semibold text-foreground">{opt.label}</span>
@@ -766,7 +766,7 @@ export function SectionEditorDialog({
                     )}
 
                     {!listsLoading && collections.length === 0 && (
-                      <div className="rounded-2xl border border-border/50 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
+                      <div className="rounded-2xl border border-border bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
                         No collections yet
                       </div>
                     )}
@@ -779,8 +779,8 @@ export function SectionEditorDialog({
                         className={cn(
                           "flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-colors",
                           selectedListId === list.id
-                            ? "border-foreground/20 bg-accent"
-                            : "border-border/50 bg-muted/20 hover:bg-accent/50",
+                            ? "border-foreground bg-accent"
+                            : "border-border bg-muted/20 hover:bg-accent/50",
                         )}
                       >
                         <CollectionPreviewStack posters={list.previewPosters} type={list.type} />
@@ -819,7 +819,7 @@ export function SectionEditorDialog({
                       <button
                         type="button"
                         onClick={addCondition}
-                        className="text-sm font-medium text-primary transition-colors hover:text-primary/80"
+                        className="text-sm font-medium text-primary transition-colors hover:text-primary"
                       >
                         + Add condition
                       </button>
@@ -859,7 +859,7 @@ export function SectionEditorDialog({
         </div>
 
         {/* ── Footer ── */}
-        <div className="flex shrink-0 items-center justify-between border-t border-border/40 px-6 py-4">
+        <div className="flex shrink-0 items-center justify-between border-t border-border px-6 py-4">
           <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl">Cancel</Button>
           <div className="flex gap-2">
             {step > 0 && (

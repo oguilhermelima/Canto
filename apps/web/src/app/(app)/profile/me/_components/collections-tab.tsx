@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { trpc } from "~/lib/trpc/client";
 import { MediaCarousel } from "~/components/media/media-carousel";
-import { StateMessage } from "~/components/layout/state-message";
+import { StateMessage } from "@canto/ui/state-message";
 
 function CollectionSection({
   list,

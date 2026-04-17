@@ -4,8 +4,8 @@ import { Film, Tv } from "lucide-react";
 import { BrowseLayout } from "~/components/layout/browse-layout";
 import type { FilterOutput, BrowseItem } from "~/components/layout/browse-layout";
 import { browseStrategy } from "~/components/layout/card-strategies";
-import { TabBar } from "~/components/layout/tab-bar";
-import { StateMessage } from "~/components/layout/state-message";
+import { TabBar } from "@canto/ui/tab-bar";
+import { StateMessage } from "@canto/ui/state-message";
 import { useViewMode } from "~/hooks/use-view-mode";
 
 const TYPE_OPTIONS = [

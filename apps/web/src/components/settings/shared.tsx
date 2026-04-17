@@ -6,7 +6,7 @@ export function SectionCard({
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
       {children}
     </div>
   );
@@ -25,7 +25,7 @@ export function SettingsSection({
 }): React.JSX.Element {
   if (variant === "grid") {
     return (
-      <div className="grid border-t border-border/40 py-4 first:border-t-0 first:pt-0 md:grid-cols-[280px_1fr] md:gap-12 md:py-10">
+      <div className="grid border-t border-border py-4 first:border-t-0 first:pt-0 md:grid-cols-[280px_1fr] md:gap-12 md:py-10">
         <div className="mb-2 shrink-0 md:mb-0">
           <h3 className="text-sm font-semibold text-foreground md:text-base">{title}</h3>
           {description && (
@@ -38,7 +38,7 @@ export function SettingsSection({
   }
 
   return (
-    <div className="group/section border-t border-border/40 py-6 first:border-t-0 first:pt-0">
+    <div className="group/section border-t border-border py-6 first:border-t-0 first:pt-0">
       <div className="mb-4 group-first/section:hidden md:block">
         <h3 className="text-base font-semibold text-foreground">{title}</h3>
         {description && (

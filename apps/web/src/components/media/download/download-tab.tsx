@@ -68,7 +68,7 @@ export function DownloadTab({
   return (
     <div className="flex-1 overflow-y-auto">
       {/* ─── Full Show / Full Movie ─── */}
-      <section className="border-b border-border/40 px-5 py-5">
+      <section className="border-b border-border px-5 py-5">
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
             <h3 className="text-base font-semibold text-foreground">
@@ -92,7 +92,7 @@ export function DownloadTab({
 
       {/* ─── Granular (shows only) ─── */}
       {mediaType === "show" && (
-        <section className="border-b border-border/40 px-5 py-5">
+        <section className="border-b border-border px-5 py-5">
           <SeasonSelect
             seasons={seasons}
             selectedSeasons={selectedSeasons}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
 import { useIsAdmin } from "~/hooks/use-is-admin";
@@ -19,7 +19,6 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
   const { region: watchRegion } = useWatchRegion();
   const { enabled: directSearchEnabled } = useDirectSearch();
 
-  // Always use media.resolve — new routing always provides TMDB external ID + type
   const resolved = trpc.media.resolve.useQuery({
     provider: "tmdb",
     externalId: parseInt(id, 10),
@@ -29,36 +28,12 @@ export function useMediaDetail(id: string, mediaType: "movie" | "show") {
   const resolvedData = resolved.data;
   const media = resolvedData?.media;
   const mediaLoading = resolved.isLoading;
-  const mediaId = (resolvedData as { mediaId?: string } | undefined)?.mediaId;
-  const resolvedSource = (resolvedData as { source?: string } | undefined)?.source;
-
-  // If extras came back empty from DB, the backend dispatched a background refresh.
-  // Refetch once after a short delay to pick up populated extras.
+  const mediaId = resolvedData?.mediaId;
   const extrasData = resolvedData?.extras;
-  const hasExtras =
-    extrasData &&
-    ((extrasData.credits?.cast?.length ?? 0) > 0 ||
-      (extrasData.similar?.length ?? 0) > 0 ||
-      (extrasData.recommendations?.length ?? 0) > 0);
-  const didRefetchExtras = useRef(false);
-  useEffect(() => {
-    if (
-      resolvedData &&
-      resolvedSource === "db" &&
-      !hasExtras &&
-      !didRefetchExtras.current
-    ) {
-      didRefetchExtras.current = true;
-      const timer = setTimeout(() => {
-        void resolved.refetch();
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [resolvedData, resolvedSource, hasExtras, resolved]);
 
   const extras = {
     data: extrasData,
-    isLoading: resolved.isLoading || (resolvedSource === "db" && !hasExtras && !didRefetchExtras.current),
+    isLoading: resolved.isLoading,
   };
 
   useDocumentTitle(media?.title);

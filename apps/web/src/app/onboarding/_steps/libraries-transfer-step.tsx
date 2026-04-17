@@ -55,8 +55,8 @@ export function LibrariesTransferStep({
           className={cn(
             "rounded-2xl border p-6 text-left transition-all",
             importMethod === "local"
-              ? "border-primary/50 bg-primary/5"
-              : "border-border/40 hover:bg-muted/10",
+              ? "border-primary bg-primary/5"
+              : "border-border hover:bg-muted/10",
           )}
         >
           <div className="flex items-start gap-4">
@@ -72,7 +72,7 @@ export function LibrariesTransferStep({
                 Think of it as a shortcut — the same file shows up in both your download and library folders,
                 but only takes up space once on your disk. The safest way to keep your library intact.
               </p>
-              <div className="mt-3 space-y-2.5 border-t border-border/20 pt-3">
+              <div className="mt-3 space-y-2.5 border-t border-border pt-3">
                 <div className="flex items-start gap-2 text-sm">
                   <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
                   <span className="text-foreground"><strong>Library stays intact</strong> — even if you delete the torrent, the file remains in your library</span>
@@ -101,8 +101,8 @@ export function LibrariesTransferStep({
           className={cn(
             "rounded-2xl border p-6 text-left transition-all",
             importMethod === "remote"
-              ? "border-primary/50 bg-primary/5"
-              : "border-border/40 hover:bg-muted/10",
+              ? "border-primary bg-primary/5"
+              : "border-border hover:bg-muted/10",
           )}
         >
           <div className="flex items-start gap-4">
@@ -118,7 +118,7 @@ export function LibrariesTransferStep({
                 Canto sends instructions to qBittorrent over the network to move and rename files for you.
                 Best when qBittorrent runs on a different machine or container than Canto.
               </p>
-              <div className="mt-3 space-y-2.5 border-t border-border/20 pt-3">
+              <div className="mt-3 space-y-2.5 border-t border-border pt-3">
                 <div className="flex items-start gap-2 text-sm">
                   <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
                   <span className="text-foreground"><strong>Works across machines</strong> — no shared filesystem or storage needed</span>

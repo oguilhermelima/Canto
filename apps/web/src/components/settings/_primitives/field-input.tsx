@@ -109,7 +109,7 @@ export function FieldInput({
         >
           <SelectTrigger
             className={cn(
-              "h-10 rounded-xl border-none bg-accent text-sm text-foreground/80 focus:ring-0 focus:ring-offset-0",
+              "h-10 rounded-xl border-none bg-accent text-sm text-foreground focus:ring-0 focus:ring-offset-0",
               className,
             )}
           >

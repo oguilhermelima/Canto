@@ -14,7 +14,7 @@ export function DownloadsSection(): React.JSX.Element {
         title="Libraries"
         description="Each library defines where files are downloaded, where your media is stored, and how new downloads are routed."
       >
-        <div className="mb-4 rounded-xl border border-border/30 bg-muted/5 px-4 py-3">
+        <div className="mb-4 rounded-xl border border-border bg-muted/5 px-4 py-3">
           <p className="text-sm text-muted-foreground">
             Canto renames and organizes files in the storage path so media servers can recognize them:
           </p>

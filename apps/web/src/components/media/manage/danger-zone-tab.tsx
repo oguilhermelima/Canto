@@ -38,7 +38,7 @@ export function DangerZoneTab({
   return (
     <div className="space-y-5">
       {hasRecoveryActions && (
-        <section className="rounded-2xl border border-border/60 bg-muted/[0.05] p-4 md:p-5">
+        <section className="rounded-2xl border border-border bg-muted/[0.05] p-4 md:p-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Recovery actions
           </p>
@@ -105,7 +105,7 @@ export function DangerZoneTab({
         </div>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/60 bg-background/70 p-3">
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-background/70 p-3">
             <input
               type="checkbox"
               checked={removeDeleteFiles}
@@ -121,7 +121,7 @@ export function DangerZoneTab({
               </p>
             </div>
           </label>
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/60 bg-background/70 p-3">
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-background/70 p-3">
             <input
               type="checkbox"
               checked={removeDeleteTorrent}

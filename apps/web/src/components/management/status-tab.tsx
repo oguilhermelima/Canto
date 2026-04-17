@@ -57,7 +57,7 @@ function StatCard({
 }): React.JSX.Element {
   const content = (
     <div className={cn(
-      "rounded-2xl border border-border/60 bg-card p-5 transition-colors",
+      "rounded-2xl border border-border bg-card p-5 transition-colors",
       href && "cursor-pointer hover:bg-muted/10",
     )}>
       <div className="mb-3 flex items-center gap-3">
@@ -93,7 +93,7 @@ function UsageBar({ used, total, label, icon: Icon, color, format = formatBytes 
 }): React.JSX.Element {
   const pct = total > 0 ? Math.round((used / total) * 100) : 0;
   return (
-    <div className="rounded-2xl border border-border/60 bg-card p-5">
+    <div className="rounded-2xl border border-border bg-card p-5">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Icon className="h-4 w-4 text-muted-foreground" />
@@ -123,7 +123,7 @@ function ServiceRow({
   icon: React.ComponentType<{ className?: string }>;
 }): React.JSX.Element {
   return (
-    <div className="flex items-center justify-between border-b border-border/20 py-3 last:border-0">
+    <div className="flex items-center justify-between border-b border-border py-3 last:border-0">
       <div className="flex items-center gap-3">
         <Icon className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-medium text-foreground">{name}</span>
@@ -213,7 +213,7 @@ export function StatusTab(): React.JSX.Element {
                 />
               )}
               {sysInfo?.qbitDisk && (
-                <div className="rounded-2xl border border-border/60 bg-card p-5">
+                <div className="rounded-2xl border border-border bg-card p-5">
                   <div className="mb-3 flex items-center gap-3">
                     <Download className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm font-medium text-foreground">qBittorrent</span>
@@ -221,7 +221,7 @@ export function StatusTab(): React.JSX.Element {
                   <p className="text-2xl font-bold text-foreground">{formatBytes(sysInfo.qbitDisk.free)}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">free space</p>
                   {(sysInfo.qbitDisk.dlSpeed > 0 || sysInfo.qbitDisk.upSpeed > 0) && (
-                    <div className="mt-3 flex items-center gap-4 border-t border-border/20 pt-3">
+                    <div className="mt-3 flex items-center gap-4 border-t border-border pt-3">
                       <span className="flex items-center gap-1 text-xs text-muted-foreground">
                         <ArrowDown className="h-3 w-3 text-blue-400" />
                         {formatSpeed(sysInfo.qbitDisk.dlSpeed)}
@@ -244,7 +244,7 @@ export function StatusTab(): React.JSX.Element {
 
       {/* Services */}
       <SettingsSection title="Services" description="Connection status for configured services.">
-        <div className="rounded-2xl border border-border/60 bg-card px-4">
+        <div className="rounded-2xl border border-border bg-card px-4">
           <ServiceRow name="TMDB" enabled={true} icon={Film} />
           <ServiceRow name="TVDB" enabled={services?.tvdb ?? false} icon={Tv} />
           <ServiceRow name="qBittorrent" enabled={services?.qbittorrent ?? false} icon={Download} />
@@ -257,7 +257,7 @@ export function StatusTab(): React.JSX.Element {
 
       {/* Version */}
       <SettingsSection title="Instance" description="Version and build information.">
-        <div className="rounded-2xl border border-border/60 bg-card p-5">
+        <div className="rounded-2xl border border-border bg-card p-5">
           <div className="flex items-center gap-4">
             <Image src="/canto.svg" alt="Canto" width={40} height={40} className="h-10 w-10 dark:invert" />
             <div>

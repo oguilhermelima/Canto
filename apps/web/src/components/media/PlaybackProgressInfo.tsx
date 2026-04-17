@@ -43,10 +43,10 @@ export function PlaybackProgressInfo({
     <div className="flex items-center gap-2.5 rounded-xl bg-white/5 px-3 py-2 text-xs backdrop-blur-sm">
       <PlayCircle className="h-4 w-4 text-primary" />
       <div className="flex flex-col">
-        <span className="font-medium text-foreground/80">
+        <span className="font-medium text-foreground">
           {isCompleted ? "Finished watching" : `Last watched at ${formatTime(progressSeconds ?? 0)}`}
         </span>
-        <span className="text-[10px] text-muted-foreground/60 uppercase tracking-tight">
+        <span className="text-[10px] text-muted-foreground uppercase tracking-tight">
           {source ? `On ${source} • ` : ""}
           {formatRelativeTime(date)}
         </span>

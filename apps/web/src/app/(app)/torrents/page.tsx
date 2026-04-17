@@ -28,9 +28,9 @@ import {
 import { DropdownMenuItem } from "@canto/ui/dropdown-menu";
 import { Skeleton } from "@canto/ui/skeleton";
 import { toast } from "sonner";
-import { PageHeader } from "~/components/layout/page-header";
-import { TabBar } from "~/components/layout/tab-bar";
-import { StateMessage } from "~/components/layout/state-message";
+import { PageHeader } from "~/components/page-header";
+import { TabBar } from "@canto/ui/tab-bar";
+import { StateMessage } from "@canto/ui/state-message";
 import { ResponsiveMenu } from "~/components/layout/responsive-menu";
 import { trpc } from "~/lib/trpc/client";
 import { useDocumentTitle } from "~/hooks/use-document-title";
@@ -499,7 +499,7 @@ export default function DownloadsPage(): React.JSX.Element {
               handleSelectTorrentFile();
               close();
             }}
-            className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80"
+            className="flex w-full items-center gap-3 rounded-xl border border-border bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80"
           >
             <Upload className="h-4 w-4 shrink-0" />
             Import .torrent
@@ -510,7 +510,7 @@ export default function DownloadsPage(): React.JSX.Element {
               setMagnetDialogOpen(true);
               close();
             }}
-            className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80"
+            className="flex w-full items-center gap-3 rounded-xl border border-border bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80"
           >
             <Link2 className="h-4 w-4 shrink-0" />
             Import magnetic link
@@ -521,7 +521,7 @@ export default function DownloadsPage(): React.JSX.Element {
               setClientImportDialogOpen(true);
               close();
             }}
-            className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80"
+            className="flex w-full items-center gap-3 rounded-xl border border-border bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80"
           >
             <Download className="h-4 w-4 shrink-0" />
             Import from qBittorrent
@@ -701,7 +701,7 @@ export default function DownloadsPage(): React.JSX.Element {
                     ) : (
                       <div className="space-y-2">
                         {filteredClientItems.map((item) => (
-                          <div key={item.hash} className="rounded-xl border border-border/60 p-3">
+                          <div key={item.hash} className="rounded-xl border border-border p-3">
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-semibold text-foreground">
@@ -736,7 +736,7 @@ export default function DownloadsPage(): React.JSX.Element {
                 </>
               ) : (
                 <>
-                  <div className="rounded-xl border border-border/60 bg-accent/40 p-3">
+                  <div className="rounded-xl border border-border bg-accent/40 p-3">
                     <p className="text-xs text-muted-foreground">Selected torrent</p>
                     <p className="truncate text-sm font-semibold text-foreground">
                       {selectedClientTorrent?.name}
@@ -840,7 +840,7 @@ export default function DownloadsPage(): React.JSX.Element {
                               className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors ${
                                 isSelected
                                   ? "border-primary bg-primary/10"
-                                  : "border-border/60 hover:bg-accent/40"
+                                  : "border-border hover:bg-accent/40"
                               }`}
                             >
                               <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
@@ -881,7 +881,7 @@ export default function DownloadsPage(): React.JSX.Element {
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between gap-2 border-t border-border/60 pt-3">
+                  <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
                     <Button
                       type="button"
                       variant="outline"

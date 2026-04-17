@@ -58,8 +58,8 @@ export function SectionRow({
       className={cn(
         "group flex items-center gap-3 rounded-xl border px-3 py-3 transition-all",
         isDragTarget
-          ? "border-dashed border-primary/50 bg-primary/5"
-          : "border-border/40 bg-card hover:border-border",
+          ? "border-dashed border-primary bg-primary/5"
+          : "border-border bg-card hover:border-border",
         !section.enabled && "opacity-50",
       )}
       onDragOver={onDragOver}
@@ -70,7 +70,7 @@ export function SectionRow({
         draggable
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
-        className="cursor-grab touch-none text-muted-foreground/50 transition-colors hover:text-foreground active:cursor-grabbing"
+        className="cursor-grab touch-none text-muted-foreground transition-colors hover:text-foreground active:cursor-grabbing"
       >
         <GripVertical size={18} />
       </button>

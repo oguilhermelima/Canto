@@ -97,7 +97,7 @@ export default function AuthLayout({
   return (
     <div className="flex min-h-screen bg-background">
       {/* Left — decorative panel (desktop only) */}
-      <div className="relative hidden overflow-hidden lg:flex lg:w-[55%] lg:items-center lg:justify-center bg-zinc-950 border-r border-border/30">
+      <div className="relative hidden overflow-hidden lg:flex lg:w-[55%] lg:items-center lg:justify-center bg-zinc-950 border-r border-border">
         {/* Lava blobs */}
         <div className="absolute inset-0">
           <div className="absolute top-1/4 left-1/3 h-80 w-80 rounded-full bg-red-600/30 blur-[100px] animate-[lava-1_12s_ease-in-out_infinite]" />

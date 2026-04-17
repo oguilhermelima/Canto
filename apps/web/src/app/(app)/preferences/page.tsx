@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useDocumentTitle } from "~/hooks/use-document-title";
-import { PageHeader } from "~/components/layout/page-header";
+import { PageHeader } from "~/components/page-header";
 import { authClient } from "~/lib/auth-client";
 import { PreferencesSidebar, PreferencesMobileList } from "./_components/preferences-nav";
 import { PreferencesContent } from "./_components/preferences-content";

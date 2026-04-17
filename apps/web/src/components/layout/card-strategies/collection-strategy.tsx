@@ -9,7 +9,7 @@ function GridCard({ item }: { item: BrowseItem }): React.JSX.Element {
   const badge = item.totalRating != null && item.voteCount != null && item.voteCount > 0 ? (
     <div className="absolute left-1.5 top-1.5 z-10 flex items-center gap-1 rounded-lg bg-primary px-2 py-0.5">
       <span className="text-xs font-bold text-primary-foreground">{item.totalRating}</span>
-      <span className="text-xs text-primary-foreground/70">({item.voteCount})</span>
+      <span className="text-xs text-primary-foreground">({item.voteCount})</span>
     </div>
   ) : undefined;
 

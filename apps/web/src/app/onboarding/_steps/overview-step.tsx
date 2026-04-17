@@ -113,7 +113,7 @@ function PipelineCard({
   bg: string;
 }): React.JSX.Element {
   return (
-    <div className="flex flex-1 flex-col items-center gap-3 rounded-2xl border border-border/30 bg-accent/20 p-5">
+    <div className="flex flex-1 flex-col items-center gap-3 rounded-2xl border border-border bg-accent/20 p-5">
       <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${bg}`}>
         <Icon className={`h-5 w-5 ${accent}`} />
       </div>
@@ -142,7 +142,7 @@ function MobileCard({
   bg: string;
 }): React.JSX.Element {
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-border/30 bg-accent/20 p-4 text-left">
+    <div className="flex items-center gap-4 rounded-2xl border border-border bg-accent/20 p-4 text-left">
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${bg}`}>
         <Icon className={`h-5 w-5 ${accent}`} />
       </div>

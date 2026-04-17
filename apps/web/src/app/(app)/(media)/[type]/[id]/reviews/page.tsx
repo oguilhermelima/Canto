@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback, useRef, useEffect } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { notFound } from "next/navigation";
 import Image from "next/image";
@@ -8,16 +8,17 @@ import Link from "next/link";
 import { ArrowDownUp, ChevronDown, Star } from "lucide-react";
 import { Skeleton } from "@canto/ui/skeleton";
 import { cn } from "@canto/ui/cn";
-import { StateMessage } from "~/components/layout/state-message";
+import { StateMessage } from "@canto/ui/state-message";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@canto/ui/popover";
-import { PageHeader } from "~/components/layout/page-header";
-import { TabBar } from "~/components/layout/tab-bar";
+import { PageHeader } from "~/components/page-header";
+import { TabBar } from "@canto/ui/tab-bar";
 import { trpc } from "~/lib/trpc/client";
 import { useDocumentTitle } from "~/hooks/use-document-title";
+import { useInfiniteScroll } from "~/hooks/use-infinite-scroll";
 
 const PAGE_SIZE = 20;
 
@@ -41,7 +42,6 @@ export default function ReviewsPage(): React.JSX.Element {
   const [scopeFilter, setScopeFilter] = useState("all");
   const [episodeFilter, setEpisodeFilter] = useState<string | undefined>(undefined);
   const [sortBy, setSortBy] = useState<"date" | "rating">("date");
-  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const { data: resolvedData } = trpc.media.resolve.useQuery({
     externalId: parseInt(params.id, 10),
@@ -50,7 +50,7 @@ export default function ReviewsPage(): React.JSX.Element {
   });
 
   const media = resolvedData?.media;
-  const mediaId = (resolvedData as { mediaId?: string } | undefined)?.mediaId;
+  const mediaId = resolvedData?.mediaId;
 
   useDocumentTitle(media?.title ? `Reviews — ${media.title}` : undefined);
 
@@ -105,19 +105,15 @@ export default function ReviewsPage(): React.JSX.Element {
   useEffect(() => { window.scrollTo(0, 0); }, []);
 
   const handleFetchNext = useCallback(() => {
-    if (hasNextPage) setVisibleCount((c) => c + PAGE_SIZE);
-  }, [hasNextPage]);
+    setVisibleCount((c) => c + PAGE_SIZE);
+  }, []);
 
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry?.isIntersecting) handleFetchNext(); },
-      { rootMargin: "300px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [handleFetchNext]);
+  const sentinelRef = useInfiniteScroll({
+    hasNextPage,
+    isFetchingNextPage: false,
+    onFetchNextPage: handleFetchNext,
+    rootMargin: "300px",
+  });
 
   const backHref = `/${params.type}/${params.id}`;
 
@@ -155,7 +151,7 @@ export default function ReviewsPage(): React.JSX.Element {
             <select
               value={episodeFilter ?? ""}
               onChange={(e) => setEpisodeFilter(e.target.value || undefined)}
-              className="max-w-[300px] truncate rounded-xl border border-border/30 bg-card px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
+              className="max-w-[300px] truncate rounded-xl border border-border bg-card px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
             >
               <option value="">All episodes</option>
               {episodes.map((ep) => (
@@ -171,7 +167,7 @@ export default function ReviewsPage(): React.JSX.Element {
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="flex items-center gap-2 rounded-xl border border-border/30 bg-card px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
               >
                 <ArrowDownUp size={14} />
                 {sortBy === "date" ? "Recent" : "Top rated"}
@@ -205,7 +201,7 @@ export default function ReviewsPage(): React.JSX.Element {
         <div className="mt-6 space-y-3">
           {isLoading
             ? Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="rounded-2xl border border-border/50 bg-card p-4">
+                <div key={i} className="rounded-2xl border border-border bg-card p-4">
                   <div className="flex items-start gap-3">
                     <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
                     <div className="flex-1 space-y-2">
@@ -262,7 +258,7 @@ function ExpandableReviewCard({
   return (
     <Link
       href={href}
-      className="block rounded-2xl border border-border/50 bg-card p-4 transition-colors hover:border-border/80"
+      className="block rounded-2xl border border-border bg-card p-4 transition-colors hover:border-border"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-3">
@@ -295,7 +291,7 @@ function ExpandableReviewCard({
       {review.comment && (
         <div className="mt-2.5">
           <p className={cn(
-            "text-sm leading-relaxed text-foreground/70",
+            "text-sm leading-relaxed text-foreground",
             !expanded && "line-clamp-3",
           )}>
             {review.comment}

@@ -38,7 +38,7 @@ export function PersonPageSkeleton(): React.JSX.Element {
 
       <div className="mx-auto mt-16 w-full px-4 md:mt-20 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         <Skeleton className="mb-10 h-7 w-40" />
-        <div className="ml-8 border-l-2 border-border/40">
+        <div className="ml-8 border-l-2 border-border">
           {Array.from({ length: 4 }).map((_, gi) => (
             <div key={gi} className="mb-10">
               <div className="-ml-[13px] mb-4 flex items-center gap-4">

@@ -210,7 +210,7 @@ export function TorrentDialog({
               className={cn(
                 "absolute inset-0 flex items-center border-b transition-all duration-300",
                 advancedSearch
-                  ? "border-foreground/20 opacity-100 delay-150"
+                  ? "border-foreground opacity-100 delay-150"
                   : "pointer-events-none border-transparent opacity-0",
               )}
             >
@@ -376,7 +376,7 @@ export function TorrentDialog({
               )}
             >
               <div className="overflow-hidden">
-                <div className="space-y-3 border-t border-border/30 px-4 pb-4 pt-3">
+                <div className="space-y-3 border-t border-border px-4 pb-4 pt-3">
                   <div className="relative">
                     <Search
                       size={14}
@@ -653,18 +653,18 @@ export function TorrentDialog({
             <div className="flex min-h-[300px] flex-col items-center justify-center gap-6 px-5 py-16">
               <div className="relative flex h-20 w-20 items-center justify-center">
                 <div
-                  className="absolute h-20 w-20 animate-ping rounded-full border border-primary/20"
+                  className="absolute h-20 w-20 animate-ping rounded-full border border-primary"
                   style={{ animationDuration: "2s" }}
                 />
                 <div
-                  className="absolute h-14 w-14 animate-ping rounded-full border border-primary/30"
+                  className="absolute h-14 w-14 animate-ping rounded-full border border-primary"
                   style={{
                     animationDuration: "2s",
                     animationDelay: "0.4s",
                   }}
                 />
                 <div
-                  className="absolute h-8 w-8 animate-ping rounded-full border border-primary/40"
+                  className="absolute h-8 w-8 animate-ping rounded-full border border-primary"
                   style={{
                     animationDuration: "2s",
                     animationDelay: "0.8s",
@@ -730,7 +730,7 @@ export function TorrentDialog({
                     </div>
 
                     {/* Body */}
-                    <div className="flex items-start gap-4 border-t border-border/50 px-5 py-4">
+                    <div className="flex items-start gap-4 border-t border-border px-5 py-4">
                       <div
                         className={cn(
                           "mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold tabular-nums",
@@ -791,7 +791,7 @@ export function TorrentDialog({
                     </div>
 
                     {/* Footer */}
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border/50 px-5 py-2.5 text-xs font-medium text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border px-5 py-2.5 text-xs font-medium text-muted-foreground">
                       <span className="flex items-center gap-1.5 text-muted-foreground">
                         <ArrowUp
                           size={12}

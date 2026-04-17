@@ -100,8 +100,8 @@ export function AppearanceSection(): React.JSX.Element {
               className={cn(
                 "relative flex flex-col gap-3 rounded-2xl border p-3 text-left transition-all",
                 selected
-                  ? "border-foreground/20 bg-accent ring-1 ring-foreground/10"
-                  : "border-border/50 bg-muted/20 hover:bg-accent/50",
+                  ? "border-foreground bg-accent ring-1 ring-foreground/10"
+                  : "border-border bg-muted/20 hover:bg-accent/50",
               )}
             >
               {selected && (

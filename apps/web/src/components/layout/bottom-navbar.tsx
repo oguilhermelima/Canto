@@ -74,7 +74,7 @@ export function BottomNavbar(): React.JSX.Element {
   return (
     <nav
       className={cn(
-        "fixed bottom-0 left-0 right-0 z-40 flex items-center justify-center gap-14 border-t border-border/50 bg-background py-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] transition-transform duration-400 ease-[cubic-bezier(0.25,1,0.5,1)] md:hidden",
+        "fixed bottom-0 left-0 right-0 z-40 flex items-center justify-center gap-14 border-t border-border bg-background py-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] transition-transform duration-400 ease-[cubic-bezier(0.25,1,0.5,1)] md:hidden",
         hidden && "translate-y-full",
       )}
     >
@@ -171,7 +171,7 @@ export function BottomNavbar(): React.JSX.Element {
               key={gi}
               className={cn(
                 "grid grid-cols-3",
-                gi > 0 && "mt-5 border-t border-border/50 pt-5",
+                gi > 0 && "mt-5 border-t border-border pt-5",
               )}
             >
               {group.map((action) => {
@@ -183,9 +183,9 @@ export function BottomNavbar(): React.JSX.Element {
                     className="flex flex-col items-center gap-2.5"
                   >
                     <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/60 transition-colors active:bg-muted">
-                      <Icon className="h-[22px] w-[22px] text-foreground/80" />
+                      <Icon className="h-[22px] w-[22px] text-foreground" />
                     </div>
-                    <span className="text-center text-xs leading-tight text-foreground/80">
+                    <span className="text-center text-xs leading-tight text-foreground">
                       {action.label}
                     </span>
                   </button>

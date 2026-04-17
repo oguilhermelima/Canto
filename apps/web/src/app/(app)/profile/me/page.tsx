@@ -11,7 +11,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useDocumentTitle } from "~/hooks/use-document-title";
-import { TabBar } from "~/components/layout/tab-bar";
+import { TabBar } from "@canto/ui/tab-bar";
 import { authClient } from "~/lib/auth-client";
 import { trpc } from "~/lib/trpc/client";
 import { ProfileHeader } from "./_components/profile-header";

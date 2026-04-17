@@ -141,7 +141,7 @@ export function AdminActions({
         className={cn(
           "relative isolate inline-flex h-11 w-full overflow-hidden rounded-xl border text-left backdrop-blur-md transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 md:w-auto",
           (buttonState === "default" || buttonState === "downloaded") &&
-            "border-foreground/12 bg-foreground/15 text-foreground hover:bg-foreground/25",
+            "border-foreground/20 bg-foreground/15 text-foreground hover:bg-foreground/25",
           buttonState === "downloading" &&
             "border-blue-400/45 bg-blue-500/20 text-blue-100 hover:bg-blue-500/30",
           buttonState === "paused" &&

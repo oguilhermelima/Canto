@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight, MessageSquareText, MoreHorizontal, Pencil, SquarePen, Star, Trash2 } from "lucide-react";
 import { Button } from "@canto/ui/button";
 import { Skeleton } from "@canto/ui/skeleton";
-import { StateMessage } from "~/components/layout/state-message";
+import { StateMessage } from "@canto/ui/state-message";
 import { cn } from "@canto/ui/cn";
 import {
   Popover,
@@ -118,7 +118,7 @@ export function MediaReviewSection({
       {isLoading ? (
         <div className="flex gap-4 overflow-hidden pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="w-[300px] shrink-0 rounded-2xl border border-border/50 bg-card p-4 sm:w-[340px]">
+            <div key={i} className="w-[300px] shrink-0 rounded-2xl border border-border bg-card p-4 sm:w-[340px]">
               <div className="flex items-start gap-3">
                 <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
                 <div className="flex-1 space-y-2">
@@ -258,7 +258,7 @@ function ReviewCard({
   menu?: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="relative w-[300px] shrink-0 rounded-2xl border border-border/50 bg-card p-4 transition-colors hover:border-border/80 sm:w-[340px]">
+    <div className="relative w-[300px] shrink-0 rounded-2xl border border-border bg-card p-4 transition-colors hover:border-border sm:w-[340px]">
       <Link href={href} className="absolute inset-0 z-0 rounded-2xl" />
       <div className="relative z-10 flex items-start justify-between gap-2">
         <div className="flex items-center gap-3">
@@ -294,7 +294,7 @@ function ReviewCard({
         </div>
       )}
       {comment && (
-        <p className="relative z-10 mt-2.5 line-clamp-3 text-sm leading-relaxed text-foreground/70">{comment}</p>
+        <p className="relative z-10 mt-2.5 line-clamp-3 text-sm leading-relaxed text-foreground">{comment}</p>
       )}
     </div>
   );
@@ -354,7 +354,7 @@ function ReviewForm({
   const displayRating = hoverRating ?? selectedRating ?? 0;
 
   return (
-    <div className="rounded-2xl border border-border/50 bg-card p-4">
+    <div className="rounded-2xl border border-border bg-card p-4">
       <div className="flex items-center gap-0.5">
         {Array.from({ length: 10 }).map((_, i) => {
           const value = i + 1;
@@ -367,7 +367,7 @@ function ReviewForm({
               onMouseLeave={() => setHoverRating(null)}
               onClick={() => setSelectedRating(value)}
             >
-              <Star className={cn("h-5 w-5 transition-colors", value <= displayRating ? "fill-yellow-500 text-yellow-500" : "text-foreground/15 group-hover:text-foreground/30")} />
+              <Star className={cn("h-5 w-5 transition-colors", value <= displayRating ? "fill-yellow-500 text-yellow-500" : "text-foreground group-hover:text-foreground")} />
             </button>
           );
         })}
@@ -380,7 +380,7 @@ function ReviewForm({
         onChange={(e) => setComment(e.target.value)}
         placeholder="Share your thoughts..."
         rows={3}
-        className="mt-3 w-full resize-none rounded-xl border-0 bg-background/80 px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-foreground/20"
+        className="mt-3 w-full resize-none rounded-xl border-0 bg-background/80 px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
       />
       <div className="mt-2.5 flex items-center justify-end gap-2">
         <Button size="sm" variant="ghost" className="rounded-xl text-xs" onClick={onCancel}>Cancel</Button>
