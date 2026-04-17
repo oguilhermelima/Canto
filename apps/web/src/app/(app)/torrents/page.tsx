@@ -1,101 +1,50 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Image from "next/image";
-import {
-  Loader2,
-  Download,
-  Upload,
-  Link2,
-  Search,
-  ArrowLeft,
-  Film,
-  Tv,
-  Check,
-} from "lucide-react";
-import { Button } from "@canto/ui/button";
-import { Input } from "@canto/ui/input";
-import { Textarea } from "@canto/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@canto/ui/dialog";
-import { DropdownMenuItem } from "@canto/ui/dropdown-menu";
-import { Skeleton } from "@canto/ui/skeleton";
 import { PageHeader } from "~/components/page-header";
-import { TabBar } from "@canto/ui/tab-bar";
-import { StateMessage } from "@canto/ui/state-message";
-import { ResponsiveMenu } from "~/components/layout/responsive-menu";
 import { trpc } from "~/lib/trpc/client";
 import { useDocumentTitle } from "~/hooks/use-document-title";
 import { useInfiniteScroll } from "~/hooks/use-infinite-scroll";
-import { resolveState, formatBytes, formatEta, formatSpeed } from "~/lib/torrent-utils";
-import { TorrentCard } from "./_components/torrent-card";
 import { DeleteDialog } from "./_components/delete-dialog";
 import type { DeleteTarget } from "./_components/delete-dialog";
+import { ImportFromClientDialog } from "./_components/import-from-client-dialog";
+import { ImportMagnetDialog } from "./_components/import-magnet-dialog";
+import { ImportMenu } from "./_components/import-menu";
+import { TorrentList } from "./_components/torrent-list";
+import { TorrentTabs } from "./_components/torrent-tabs";
 import { useTorrentActions } from "./_hooks/use-torrent-actions";
 import { useTorrentImport } from "./_hooks/use-torrent-import";
+import { filterAndCountTorrents } from "./_lib/filter-torrents";
 
 const PAGE_SIZE = 20;
-
-const STATUS_TABS = [
-  { value: "all", label: "All" },
-  { value: "downloading", label: "Active" },
-  { value: "completed", label: "Completed" },
-  { value: "paused", label: "Paused" },
-] as const;
-
-function getClientStateLabel(state: string, progress: number): string {
-  if (progress >= 1) return "Completed";
-  if (state.includes("paused")) return "Paused";
-  if (state.includes("stalled")) return "Stalled";
-  if (state === "checkingDL" || state === "checkingUP" || state === "checkingResumeData") return "Checking";
-  if (state === "error" || state === "missingFiles") return "Error";
-  return "Downloading";
-}
 
 export default function DownloadsPage(): React.JSX.Element {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
-  const modalInputCn =
-    "h-10 rounded-xl border-none bg-accent text-sm ring-0 focus-visible:ring-1 focus-visible:ring-primary/30";
 
   useDocumentTitle("Downloads");
 
   const utils = trpc.useUtils();
-  const {
-    data,
-    isLoading,
-    isError,
-    hasNextPage,
-    isFetchingNextPage,
-    fetchNextPage,
-  } = trpc.torrent.listLive.useInfiniteQuery(
+  const query = trpc.torrent.listLive.useInfiniteQuery(
     { limit: PAGE_SIZE },
     {
       refetchInterval: 3000,
-      getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const currentOffset = lastPageParam as number;
-        if (currentOffset + lastPage.items.length >= lastPage.total) return undefined;
-        return currentOffset + lastPage.items.length;
-      },
       initialCursor: 0,
+      getNextPageParam: (lastPage, _allPages, lastPageParam) => {
+        const offset = lastPageParam as number;
+        if (offset + lastPage.items.length >= lastPage.total) return undefined;
+        return offset + lastPage.items.length;
+      },
     },
   );
-
   const torrents = useMemo(
-    () => data?.pages.flatMap((p) => p.items) ?? [],
-    [data],
+    () => query.data?.pages.flatMap((p) => p.items) ?? [],
+    [query.data],
   );
-
   const sentinelRef = useInfiniteScroll({
-    hasNextPage: hasNextPage ?? false,
-    isFetchingNextPage,
-    onFetchNextPage: () => void fetchNextPage(),
+    hasNextPage: query.hasNextPage ?? false,
+    isFetchingNextPage: query.isFetchingNextPage,
+    onFetchNextPage: () => void query.fetchNextPage(),
   });
 
   const actions = useTorrentActions({
@@ -104,102 +53,16 @@ export default function DownloadsPage(): React.JSX.Element {
   });
   const imp = useTorrentImport();
 
-  const filtered =
-    statusFilter === "all"
-      ? torrents
-      : torrents.filter((t) => {
-          const r = resolveState(t.status, t.live?.state, t.live?.progress);
-          if (statusFilter === "downloading") return !r.isDownloaded && !r.canResume;
-          if (statusFilter === "completed") return r.isDownloaded;
-          if (statusFilter === "paused") return r.canResume && !r.isDownloaded;
-          return true;
-        });
-
-  const counts = {
-    all: torrents.length,
-    downloading: torrents.filter((t) => {
-      const r = resolveState(t.status, t.live?.state, t.live?.progress);
-      return !r.isDownloaded && !r.canResume;
-    }).length,
-    completed: torrents.filter((t) => resolveState(t.status, t.live?.state, t.live?.progress).isDownloaded).length,
-    paused: torrents.filter((t) => {
-      const r = resolveState(t.status, t.live?.state, t.live?.progress);
-      return r.canResume && !r.isDownloaded;
-    }).length,
-  };
-
-  const filteredClientItems = useMemo(() => {
-    if (!imp.clientSearch.trim()) return imp.clientList;
-    const q = imp.clientSearch.trim().toLowerCase();
-    return imp.clientList.filter((item) => item.name.toLowerCase().includes(q));
-  }, [imp.clientList, imp.clientSearch]);
+  const { filtered, counts } = useMemo(
+    () => filterAndCountTorrents(torrents, statusFilter),
+    [torrents, statusFilter],
+  );
 
   const importMenu = (
-    <ResponsiveMenu
-      trigger={(
-        <Button variant="outline" size="sm" className="gap-2.5 rounded-xl px-4">
-          <Upload className="h-4 w-4" />
-          Import
-        </Button>
-      )}
-      desktopContentClassName="w-64"
-      sheetTitle="Import downloads"
-      desktopContent={(
-        <>
-          <DropdownMenuItem className="gap-3 px-3 py-2.5 text-sm font-medium" onClick={imp.selectTorrentFile}>
-            <Upload className="h-4 w-4" />
-            Import .torrent
-          </DropdownMenuItem>
-          <DropdownMenuItem className="gap-3 px-3 py-2.5 text-sm font-medium" onClick={() => imp.setMagnetDialogOpen(true)}>
-            <Link2 className="h-4 w-4" />
-            Import magnetic link
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="gap-3 px-3 py-2.5 text-sm font-medium"
-            onClick={() => imp.setClientImportDialogOpen(true)}
-          >
-            <Download className="h-4 w-4" />
-            Import from qBittorrent
-          </DropdownMenuItem>
-        </>
-      )}
-      mobileContent={({ close }) => (
-        <div className="space-y-3">
-          <button
-            type="button"
-            onClick={() => {
-              imp.selectTorrentFile();
-              close();
-            }}
-            className="flex w-full items-center gap-3 rounded-xl border border-border bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80"
-          >
-            <Upload className="h-4 w-4 shrink-0" />
-            Import .torrent
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              imp.setMagnetDialogOpen(true);
-              close();
-            }}
-            className="flex w-full items-center gap-3 rounded-xl border border-border bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80"
-          >
-            <Link2 className="h-4 w-4 shrink-0" />
-            Import magnetic link
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              imp.setClientImportDialogOpen(true);
-              close();
-            }}
-            className="flex w-full items-center gap-3 rounded-xl border border-border bg-accent px-4 py-3 text-left text-base font-medium transition-colors hover:bg-accent/80"
-          >
-            <Download className="h-4 w-4 shrink-0" />
-            Import from qBittorrent
-          </button>
-        </div>
-      )}
+    <ImportMenu
+      onSelectTorrent={imp.selectTorrentFile}
+      onMagnet={() => imp.setMagnetDialogOpen(true)}
+      onClient={() => imp.setClientImportDialogOpen(true)}
     />
   );
 
@@ -208,17 +71,10 @@ export default function DownloadsPage(): React.JSX.Element {
       <PageHeader
         title="Downloads"
         subtitle="Monitor and manage your active downloads."
-        children={(
-          <div className="mt-3 flex items-center gap-2 md:hidden">
-            {importMenu}
-          </div>
-        )}
-        action={(
-          <div className="hidden items-center gap-2 md:flex">
-            {importMenu}
-          </div>
-        )}
-      />
+        action={<div className="hidden items-center gap-2 md:flex">{importMenu}</div>}
+      >
+        <div className="mt-3 flex items-center gap-2 md:hidden">{importMenu}</div>
+      </PageHeader>
       <input
         ref={imp.fileInputRef}
         type="file"
@@ -228,67 +84,23 @@ export default function DownloadsPage(): React.JSX.Element {
       />
 
       <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        <TabBar
-          tabs={STATUS_TABS.map(({ value, label }) => ({
-            value,
-            label,
-            count: counts[value as keyof typeof counts],
-          }))}
+        <TorrentTabs
           value={statusFilter}
           onChange={setStatusFilter}
+          counts={counts}
         />
 
-        {isError ? (
-          <StateMessage preset="error" onRetry={() => void utils.torrent.listLive.invalidate()} />
-        ) : isLoading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-5 rounded-2xl bg-muted/40 p-4">
-                <Skeleton className="h-16 w-16 shrink-0 rounded-2xl" />
-                <div className="flex-1 space-y-3">
-                  <Skeleton className="h-4 w-2/3" />
-                  <Skeleton className="h-3 w-1/3" />
-                  <Skeleton className="h-1.5 w-full rounded-full" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <StateMessage preset="emptyTorrents" />
-        ) : (
-          <div className="space-y-3">
-            {filtered.map((t) => (
-              <TorrentCard
-                key={t.id}
-                torrent={t as Parameters<typeof TorrentCard>[0]["torrent"]}
-                onPause={actions.pause}
-                onResume={actions.resume}
-                onRetry={actions.retry}
-                onForceResume={actions.forceResume}
-                onForceRecheck={actions.forceRecheck}
-                onForceReannounce={actions.forceReannounce}
-                onCopyMagnet={actions.copyMagnet}
-                onDelete={(id, title) => setDeleteTarget({ id, title })}
-                pausePending={actions.pausePending}
-                resumePending={actions.resumePending}
-                retryPending={actions.retryPending}
-                advancedPending={actions.advancedPending}
-              />
-            ))}
-
-            <div ref={sentinelRef} className="h-1" />
-
-            {isFetchingNextPage && (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            )}
-
-            {!hasNextPage && !isFetchingNextPage && filtered.length > 0 && (
-              <StateMessage preset="endOfItems" inline />
-            )}
-          </div>
-        )}
+        <TorrentList
+          torrents={filtered as Parameters<typeof TorrentList>[0]["torrents"]}
+          isLoading={query.isLoading}
+          isError={query.isError}
+          onRetry={() => void utils.torrent.listLive.invalidate()}
+          hasNextPage={query.hasNextPage ?? false}
+          isFetchingNextPage={query.isFetchingNextPage}
+          sentinelRef={sentinelRef}
+          actions={actions}
+          onDelete={(id, title) => setDeleteTarget({ id, title })}
+        />
 
         <DeleteDialog
           target={deleteTarget}
@@ -297,283 +109,45 @@ export default function DownloadsPage(): React.JSX.Element {
           isPending={actions.deletePending}
         />
 
-        <Dialog open={imp.magnetDialogOpen} onOpenChange={imp.setMagnetDialogOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader className="text-left">
-              <DialogTitle>Import magnetic link</DialogTitle>
-              <DialogDescription>
-                Paste a magnetic link to add this download to qBittorrent and Canto tracking.
-              </DialogDescription>
-            </DialogHeader>
-            <Textarea
-              value={imp.magnetLink}
-              onChange={(e) => imp.setMagnetLink(e.target.value)}
-              placeholder="magnet:?xt=urn:btih:..."
-              className="min-h-28 rounded-xl border-none bg-accent text-sm ring-0 focus-visible:ring-1 focus-visible:ring-primary/30"
-            />
-            <DialogFooter>
-              <Button
-                variant="outline"
-                className="rounded-xl"
-                onClick={() => imp.setMagnetDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="rounded-xl"
-                onClick={imp.submitMagnet}
-                disabled={imp.magnetPending || !imp.magnetLink.trim()}
-              >
-                {imp.magnetPending ? "Importing..." : "Import"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <ImportMagnetDialog
+          open={imp.magnetDialogOpen}
+          onOpenChange={imp.setMagnetDialogOpen}
+          value={imp.magnetLink}
+          onChange={imp.setMagnetLink}
+          onSubmit={imp.submitMagnet}
+          isPending={imp.magnetPending}
+        />
 
-        <Dialog
+        <ImportFromClientDialog
           open={imp.clientImportDialogOpen}
           onOpenChange={(open) => {
             imp.setClientImportDialogOpen(open);
             if (!open) imp.resetClientImportDialog();
           }}
-        >
-          <DialogContent className="flex h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-border bg-background p-0 md:h-[80vh] md:max-h-[80vh] md:max-w-2xl md:rounded-[2rem]">
-            <DialogHeader className="px-5 pt-6 pb-4 text-left">
-              <DialogTitle>Import from qBittorrent</DialogTitle>
-              <DialogDescription>
-                {imp.importStep === "select-torrent"
-                  ? "Step 1/2 · Select a torrent from qBittorrent."
-                  : "Step 2/2 · Search and select the exact media item."}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex min-h-0 flex-1 flex-col gap-4 px-5 pb-5">
-              {imp.importStep === "select-torrent" ? (
-                <>
-                  <div className="relative">
-                    <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      value={imp.clientSearch}
-                      onChange={(e) => imp.setClientSearch(e.target.value)}
-                      placeholder="Search torrents in qBittorrent..."
-                      className={`${modalInputCn} pl-9`}
-                    />
-                  </div>
-                  <div className="min-h-0 flex-1 overflow-y-auto">
-                    {imp.clientListLoading ? (
-                      <div className="space-y-2">
-                        {Array.from({ length: 6 }).map((_, idx) => (
-                          <Skeleton key={idx} className="h-16 rounded-xl" />
-                        ))}
-                      </div>
-                    ) : filteredClientItems.length === 0 ? (
-                      <StateMessage preset="emptyTorrents" inline />
-                    ) : (
-                      <div className="space-y-2">
-                        {filteredClientItems.map((item) => (
-                          <div key={item.hash} className="rounded-xl border border-border p-3">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold text-foreground">
-                                  {item.name}
-                                </p>
-                                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                                  <span>{getClientStateLabel(item.state, item.progress)}</span>
-                                  <span>{Math.round(item.progress * 100)}%</span>
-                                  {item.size > 0 && <span>{formatBytes(item.size)}</span>}
-                                  {item.dlspeed > 0 && <span>↓ {formatSpeed(item.dlspeed)}</span>}
-                                  {item.upspeed > 0 && <span>↑ {formatSpeed(item.upspeed)}</span>}
-                                  {item.eta > 0 && item.eta < 8640000 && (
-                                    <span>ETA {formatEta(item.eta)}</span>
-                                  )}
-                                </div>
-                              </div>
-                              <Button
-                                size="sm"
-                                className="rounded-xl"
-                                variant={item.tracked && item.trackedMediaId ? "outline" : "default"}
-                                disabled={item.tracked && item.trackedMediaId != null}
-                                onClick={() => imp.goToMediaStep(item)}
-                              >
-                                {item.tracked && item.trackedMediaId ? "Imported" : "Select"}
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="rounded-xl border border-border bg-accent/40 p-3">
-                    <p className="text-xs text-muted-foreground">Selected torrent</p>
-                    <p className="truncate text-sm font-semibold text-foreground">
-                      {imp.selectedClientTorrent?.name}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="rounded-xl"
-                      variant={imp.importMatchMode === "movie" ? "default" : "outline"}
-                      onClick={() => {
-                        imp.setImportMatchMode("movie");
-                        imp.setSelectedMedia(null);
-                      }}
-                    >
-                      Movie
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="rounded-xl"
-                      variant={imp.importMatchMode === "series" ? "default" : "outline"}
-                      onClick={() => {
-                        imp.setImportMatchMode("series");
-                        imp.setSelectedMedia(null);
-                      }}
-                    >
-                      Series
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="rounded-xl"
-                      variant={imp.importMatchMode === "episode" ? "default" : "outline"}
-                      onClick={() => {
-                        imp.setImportMatchMode("episode");
-                        imp.setSelectedMedia(null);
-                      }}
-                    >
-                      Episode
-                    </Button>
-                  </div>
-
-                  <div className="relative">
-                    <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      value={imp.tmdbSearch}
-                      onChange={(e) => imp.setTmdbSearch(e.target.value)}
-                      placeholder="Search on TMDB..."
-                      className={`${modalInputCn} pl-9`}
-                    />
-                  </div>
-
-                  {(imp.importMatchMode === "series" || imp.importMatchMode === "episode") && (
-                    <div className={imp.importMatchMode === "episode" ? "grid grid-cols-2 gap-2" : ""}>
-                      <Input
-                        value={imp.seasonInput}
-                        onChange={(e) => imp.setSeasonInput(e.target.value)}
-                        placeholder={
-                          imp.importMatchMode === "episode"
-                            ? "Season"
-                            : "Season (optional)"
-                        }
-                        className={modalInputCn}
-                      />
-                      {imp.importMatchMode === "episode" && (
-                        <Input
-                          value={imp.episodeInput}
-                          onChange={(e) => imp.setEpisodeInput(e.target.value)}
-                          placeholder="Episode (e.g. 3 or 3,4)"
-                          className={modalInputCn}
-                        />
-                      )}
-                    </div>
-                  )}
-
-                  <div className="min-h-0 flex-1 overflow-y-auto">
-                    {imp.searchLoading ? (
-                      <div className="space-y-2">
-                        {Array.from({ length: 6 }).map((_, idx) => (
-                          <Skeleton key={idx} className="h-16 rounded-xl" />
-                        ))}
-                      </div>
-                    ) : imp.debouncedTmdbSearch.trim().length < 2 ? (
-                      <StateMessage preset="emptySearch" inline />
-                    ) : imp.searchResults.length === 0 ? (
-                      <StateMessage preset="emptySearch" inline />
-                    ) : (
-                      <div className="space-y-2">
-                        {imp.searchResults.map((result) => {
-                          const isSelected =
-                            imp.selectedMedia?.externalId === result.externalId &&
-                            imp.selectedMedia.type === result.type;
-                          return (
-                            <button
-                              key={`${result.provider}-${result.externalId}-${result.type}`}
-                              type="button"
-                              onClick={() => imp.setSelectedMedia(result)}
-                              className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors ${
-                                isSelected
-                                  ? "border-primary bg-primary/10"
-                                  : "border-border hover:bg-accent/40"
-                              }`}
-                            >
-                              <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-md bg-muted">
-                                {result.posterPath ? (
-                                  <Image
-                                    src={`https://image.tmdb.org/t/p/w342${result.posterPath}`}
-                                    alt=""
-                                    fill
-                                    className="object-cover"
-                                    sizes="40px"
-                                  />
-                                ) : (
-                                  <div className="flex h-full w-full items-center justify-center">
-                                    {result.type === "movie" ? (
-                                      <Film className="h-4 w-4 text-muted-foreground" />
-                                    ) : (
-                                      <Tv className="h-4 w-4 text-muted-foreground" />
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold text-foreground">
-                                  {result.title}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {result.type === "movie" ? "Movie" : "Series"}
-                                  {result.year ? ` · ${result.year}` : ""}
-                                </p>
-                              </div>
-                              {isSelected ? (
-                                <Check className="h-4 w-4 text-primary" />
-                              ) : null}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-xl"
-                      onClick={() => imp.setImportStep("select-torrent")}
-                    >
-                      <ArrowLeft className="mr-1 h-4 w-4" />
-                      Back
-                    </Button>
-                    <Button
-                      type="button"
-                      className="rounded-xl"
-                      disabled={imp.clientImportPending || !imp.selectedMedia}
-                      onClick={() => void imp.submitClientImport()}
-                    >
-                      {imp.clientImportPending ? "Importing..." : "Import"}
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
+          importStep={imp.importStep}
+          onImportStepChange={imp.setImportStep}
+          clientSearch={imp.clientSearch}
+          onClientSearchChange={imp.setClientSearch}
+          clientList={imp.clientList}
+          clientListLoading={imp.clientListLoading}
+          onSelectClient={imp.goToMediaStep}
+          selectedClientTorrent={imp.selectedClientTorrent}
+          importMatchMode={imp.importMatchMode}
+          onImportMatchModeChange={imp.setImportMatchMode}
+          tmdbSearch={imp.tmdbSearch}
+          onTmdbSearchChange={imp.setTmdbSearch}
+          debouncedTmdbSearch={imp.debouncedTmdbSearch}
+          searchResults={imp.searchResults}
+          searchLoading={imp.searchLoading}
+          selectedMedia={imp.selectedMedia}
+          onSelectMedia={imp.setSelectedMedia}
+          seasonInput={imp.seasonInput}
+          onSeasonInputChange={imp.setSeasonInput}
+          episodeInput={imp.episodeInput}
+          onEpisodeInputChange={imp.setEpisodeInput}
+          onSubmit={() => void imp.submitClientImport()}
+          isPending={imp.clientImportPending}
+        />
       </div>
     </div>
   );
