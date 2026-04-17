@@ -66,9 +66,7 @@ export function BackdropCard({
   const href = mediaHref(provider ?? "tmdb", externalId ?? "0", type);
   const utils = trpc.useUtils();
 
-  // If browse already provided logoPath, skip the per-card query
   const hasLogoFromProps = logoFromProps !== undefined;
-  // getLogo is protected — unauthenticated users fall back to text title
   const fetchedLogo = useLogo(provider, externalId, type, {
     title,
     posterPath: null,
@@ -78,10 +76,9 @@ export function BackdropCard({
   }, { skip: hasLogoFromProps });
 
   const logoPath = hasLogoFromProps ? logoFromProps : fetchedLogo;
-
-  // undefined = still loading, null = no logo, string = logo path
   const logoResolved = logoPath !== undefined;
   const [imageReady, setImageReady] = useState(!backdropPath);
+  const ready = imageReady && logoResolved;
 
   const handlePrefetch = useCallback(() => {
     if (externalId) {
@@ -93,34 +90,12 @@ export function BackdropCard({
     }
   }, [externalId, provider, type, utils]);
 
-  // Show skeleton until logo and image are both ready
-  if (!logoResolved || !imageReady) {
-    return (
-      <div className={cn("relative shrink-0", className)}>
-        <BackdropCardSkeleton />
-        {/* Render image offscreen to trigger preload */}
-        {backdropPath && !imageReady && (
-          <FadeImage
-            loader={tmdbBackdropLoader}
-            src={backdropPath}
-            alt=""
-            fill
-            className="pointer-events-none !absolute !h-0 !w-0 opacity-0"
-            onLoad={() => setImageReady(true)}
-            loading="lazy"
-            sizes="1px"
-          />
-        )}
-      </div>
-    );
-  }
-
   return (
     <Link
       href={href}
       onMouseEnter={handlePrefetch}
       className={cn(
-        "group relative flex shrink-0 overflow-hidden rounded-xl animate-in fade-in-0 zoom-in-95 duration-500 ease-out fill-mode-both transition-all hover:z-10 hover:scale-[1.03] hover:ring-2 hover:ring-foreground/20",
+        "group relative flex shrink-0 overflow-hidden rounded-xl transition-[box-shadow] duration-200 hover:z-10 hover:ring-2 hover:ring-foreground/20",
         className,
       )}
     >
@@ -131,10 +106,11 @@ export function BackdropCard({
             src={backdropPath}
             alt={title}
             fill
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-            fadeDuration={500}
+            className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            fadeDuration={250}
             loading="lazy"
             sizes="(max-width: 640px) 80vw, (max-width: 1024px) 40vw, 25vw"
+            onLoad={() => setImageReady(true)}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
@@ -146,77 +122,98 @@ export function BackdropCard({
           </div>
         )}
 
-        {/* Hide button */}
-        {onHide && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onHide();
-            }}
-            className="absolute left-2.5 top-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-white/70 opacity-0 backdrop-blur-sm transition-all hover:bg-black/80 hover:text-white group-hover:opacity-100"
-            aria-label={`Hide ${title}`}
-          >
-            <EyeOff className="h-3.5 w-3.5" />
-          </button>
-        )}
-
-        {/* Badge */}
-        {badge && (
-          <div className="absolute right-2.5 top-2.5 z-10">
-            <span
-              className={cn(
-                "rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-md",
-                BADGE_CONFIG[badge].className,
-              )}
-            >
-              {BADGE_CONFIG[badge].label}
-            </span>
-          </div>
-        )}
-
-        {/* Bottom gradient + logo or title */}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pb-3 pt-12">
-          {logoPath ? (
-            <MediaLogo src={`${TMDB_IMAGE_BASE}/w500${logoPath}`} alt={title} size="card" />
-          ) : (
-            <p className="line-clamp-2 text-sm font-semibold leading-tight text-white drop-shadow-lg">
-              {title}
-            </p>
+        {/* Skeleton shimmer on top until image + logo resolved */}
+        <div
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute inset-0 transition-opacity duration-200",
+            ready ? "opacity-0" : "opacity-100",
           )}
-          <div className="mt-2 flex items-center gap-1.5 text-xs text-white">
-            <span>{type === "movie" ? "Movie" : "TV Show"}</span>
-            {voteAverage != null && voteAverage > 0 && (
-              <>
-                <span className="text-white/30">·</span>
-                <span className="text-yellow-400">
-                  {voteAverage.toFixed(1)}
-                </span>
-              </>
+        >
+          <div
+            className={cn(
+              "absolute inset-0 rounded-xl bg-muted",
+              !ready && "animate-pulse",
             )}
-            {year && (
-              <>
-                <span className="text-white/30">·</span>
-                <span>{year}</span>
-              </>
-            )}
-          </div>
-          {progress && (
-            <div className="mt-2 flex items-center gap-2">
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/20">
-                <div
-                  className="h-full rounded-full bg-white"
-                  style={{ width: `${progress.percent}%` }}
-                />
-              </div>
-              <span className="shrink-0 text-xs tabular-nums text-white">
-                {progress.unit === "seconds"
-                  ? `${formatDuration(progress.value)} / ${formatDuration(progress.total)}`
-                  : `${progress.value}/${progress.total}`}
+          />
+        </div>
+
+        {/* Overlays fade in once content ready */}
+        <div
+          className={cn(
+            "absolute inset-0 transition-opacity duration-200",
+            ready ? "opacity-100" : "pointer-events-none opacity-0",
+          )}
+        >
+          {onHide && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onHide();
+              }}
+              className="absolute left-2.5 top-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-white/70 opacity-0 backdrop-blur-sm transition-opacity hover:bg-black/80 hover:text-white group-hover:opacity-100"
+              aria-label={`Hide ${title}`}
+            >
+              <EyeOff className="h-3.5 w-3.5" />
+            </button>
+          )}
+
+          {badge && (
+            <div className="absolute right-2.5 top-2.5 z-10">
+              <span
+                className={cn(
+                  "rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-md",
+                  BADGE_CONFIG[badge].className,
+                )}
+              >
+                {BADGE_CONFIG[badge].label}
               </span>
             </div>
           )}
+
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pb-3 pt-12">
+            {logoPath ? (
+              <MediaLogo src={`${TMDB_IMAGE_BASE}/w500${logoPath}`} alt={title} size="card" />
+            ) : (
+              <p className="line-clamp-2 text-sm font-semibold leading-tight text-white drop-shadow-lg">
+                {title}
+              </p>
+            )}
+            <div className="mt-2 flex items-center gap-1.5 text-xs text-white">
+              <span>{type === "movie" ? "Movie" : "TV Show"}</span>
+              {voteAverage != null && voteAverage > 0 && (
+                <>
+                  <span className="text-white/30">·</span>
+                  <span className="text-yellow-400">
+                    {voteAverage.toFixed(1)}
+                  </span>
+                </>
+              )}
+              {year && (
+                <>
+                  <span className="text-white/30">·</span>
+                  <span>{year}</span>
+                </>
+              )}
+            </div>
+            {progress && (
+              <div className="mt-2 flex items-center gap-2">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/20">
+                  <div
+                    className="h-full rounded-full bg-white"
+                    style={{ width: `${progress.percent}%` }}
+                  />
+                </div>
+                <span className="shrink-0 text-xs tabular-nums text-white">
+                  {progress.unit === "seconds"
+                    ? `${formatDuration(progress.value)} / ${formatDuration(progress.total)}`
+                    : `${progress.value}/${progress.total}`}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </Link>

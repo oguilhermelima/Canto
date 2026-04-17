@@ -65,8 +65,8 @@ export function EpisodeCard({
             src={episode.stillPath.startsWith("http") ? episode.stillPath : `https://image.tmdb.org/t/p/w400${episode.stillPath}`}
             alt={episode.title || `Episode ${episode.episodeNumber}`}
             fill
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
-            fadeDuration={300}
+            className="object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+            fadeDuration={200}
             sizes="280px"
             loading="lazy"
           />
