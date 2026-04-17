@@ -1,16 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
 import type { SectionItem } from "./section-item";
-import { SpotlightHero } from "./spotlight-hero";
-import type { SpotlightItem } from "./spotlight-hero";
+import { SpotlightHero } from "./spotlight/spotlight-hero";
+import type { SpotlightItem } from "./spotlight/spotlight-hero";
 import { FeaturedCarousel } from "~/components/media/featured-carousel";
 import { BackdropCarousel } from "~/components/media/backdrop-carousel";
 import { MediaCarousel } from "~/components/media/media-carousel";
 import { SectionTitle } from "~/components/layout/section-title";
 import { StateMessage } from "~/components/layout/state-message";
 import { mediaHref } from "~/lib/media-href";
-import { useDedup } from "./dedup-context";
+import { useSectionDedup } from "./dedup-context";
 
 interface DynamicSectionProps {
   sectionId: string;
@@ -112,30 +111,9 @@ export function DynamicSection({
   emptyPreset,
   excludeFromDedup = false,
 }: DynamicSectionProps): React.JSX.Element | null {
-  const dedup = useDedup();
-
-  // Filter out items that have already been rendered in other sections
-  // EXCEPT for sections that should always show their full content
-  const shouldExcludeFromDedup = excludeFromDedup;
-
-  const filteredItems = useMemo(() => {
-    // Never filter excluded sections - they should always show their content
-    if (shouldExcludeFromDedup) {
-      return items;
-    }
-
-    const unique = items.filter((item) => {
-      const alreadyRendered = dedup.isItemRendered(item.provider, item.externalId);
-      return !alreadyRendered;
-    });
-
-    // Mark these items as rendered for subsequent sections
-    unique.forEach((item) => {
-      dedup.markItemRendered(item.provider, item.externalId);
-    });
-
-    return unique;
-  }, [items, dedup, shouldExcludeFromDedup]);
+  const filteredItems = useSectionDedup(sectionId, items, {
+    enabled: !excludeFromDedup,
+  });
 
   if (isError) {
     return (
