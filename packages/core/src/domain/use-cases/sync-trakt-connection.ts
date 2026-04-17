@@ -68,7 +68,7 @@ import { slugify } from "../rules/slugify";
 import { persistMediaUseCase } from "./persist-media";
 import { getTmdbProvider } from "../../lib/tmdb-client";
 import { getTvdbProvider } from "../../lib/tvdb-client";
-import { addUserWatchHistory } from "../../infrastructure/repositories/user-media-repository";
+import { addUserWatchHistory } from "../../infrastructure/repositories/user-media";
 
 const CONFLICT_WINDOW_MS = 10 * 60 * 1000;
 

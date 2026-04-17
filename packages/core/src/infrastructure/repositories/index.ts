@@ -10,7 +10,7 @@ export * from "./list-repository";
 export * from "./request-repository";
 export * from "./user-recommendation-repository";
 export * from "./user-connection-repository";
-export * from "./user-media-repository";
+export * from "./user-media";
 export * from "./user-rating-repository";
 export * from "./user-media-library-repository";
 export * from "./home-section-repository";
