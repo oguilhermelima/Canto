@@ -1,182 +1,16 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import Link from "next/link";
-import { SectionTitle } from "~/components/layout/section-title";
-import Image from "next/image";
-import {
-  Bookmark,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  Tv,
-} from "lucide-react";
-import { Skeleton } from "@canto/ui/skeleton";
+import { LibraryCarousel } from "~/app/(app)/library/_components/library-carousel";
+import { useSectionInfiniteQuery } from "~/components/home/sources/use-section-query";
+import { UpcomingScheduleCard } from "~/components/media/cards/upcoming-schedule-card";
+import type { UpcomingScheduleItem } from "~/components/media/cards/upcoming-schedule-card";
 import { trpc } from "~/lib/trpc/client";
-import { mediaHref } from "~/lib/media-href";
-import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
-import { useLogo } from "~/hooks/use-logos";
-import { MediaLogo } from "~/components/media/media-logo";
-import { StateMessage } from "~/components/layout/state-message";
-import { cn } from "@canto/ui/cn";
 
-const PAGE_SIZE = 24;
-const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
+export { UpcomingScheduleCard } from "~/components/media/cards/upcoming-schedule-card";
+export type { UpcomingScheduleItem } from "~/components/media/cards/upcoming-schedule-card";
 
-interface UpcomingScheduleItem {
-  id: string;
-  kind: "upcoming_episode" | "upcoming_movie";
-  mediaId: string;
-  mediaType: "movie" | "show";
-  title: string;
-  posterPath: string | null;
-  backdropPath: string | null;
-  year: number | null;
-  externalId: number;
-  provider: string;
-  fromLists: string[];
-  releaseAt: Date | string;
-  episode:
-    | {
-        id: string;
-        seasonNumber: number;
-        number: number;
-        title: string | null;
-      }
-    | null;
-}
-
-function imageUrl(item: UpcomingScheduleItem): string | null {
-  const path = item.backdropPath ?? item.posterPath;
-  if (!path) return null;
-  if (path.startsWith("http")) return path;
-  return `https://image.tmdb.org/t/p/w780${path}`;
-}
-
-function formatReleaseLabel(value: Date): string {
-  if (Number.isNaN(value.getTime())) return "Soon";
-
-  const now = new Date();
-  const startOfToday = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-  );
-  const startOfRelease = new Date(
-    value.getFullYear(),
-    value.getMonth(),
-    value.getDate(),
-  );
-  const diffDays = Math.round(
-    (startOfRelease.getTime() - startOfToday.getTime()) / 86_400_000,
-  );
-
-  if (diffDays <= 0) return "Today";
-  if (diffDays === 1) return "Tomorrow";
-  return `In ${diffDays} days`;
-}
-
-function UpcomingScheduleCard({
-  item,
-}: {
-  item: UpcomingScheduleItem;
-}): React.JSX.Element {
-  const releaseDate = new Date(item.releaseAt);
-  const releaseLabel = formatReleaseLabel(releaseDate);
-  const episodeLabel = item.episode
-    ? `S${String(item.episode.seasonNumber).padStart(2, "0")}E${String(item.episode.number).padStart(2, "0")}${item.episode.title ? ` · ${item.episode.title}` : ""}`
-    : "Movie release";
-
-  const cardImage = imageUrl(item);
-  const logoPath = useLogo(
-    item.provider,
-    String(item.externalId),
-    item.mediaType,
-    {
-      title: item.title,
-      posterPath: item.posterPath,
-      backdropPath: item.backdropPath,
-      year: item.year,
-    },
-  );
-  const [imageReady, setImageReady] = useState(!cardImage);
-  const logoResolved = logoPath !== undefined;
-
-  if (!logoResolved || !imageReady) {
-    return (
-      <div className="relative w-[280px] shrink-0 sm:w-[300px] lg:w-[340px] 2xl:w-[380px]">
-        <Skeleton className="aspect-video w-full rounded-xl" />
-        {cardImage && !imageReady && (
-          <img
-            src={cardImage}
-            alt=""
-            onLoad={() => setImageReady(true)}
-            className="invisible absolute h-0 w-0"
-          />
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <Link
-      href={mediaHref(item.provider, item.externalId, item.mediaType)}
-      className="group relative flex w-[280px] shrink-0 overflow-hidden rounded-xl animate-in fade-in-0 zoom-in-95 duration-500 ease-out fill-mode-both transition-all hover:z-10 hover:scale-[1.03] hover:ring-2 hover:ring-foreground/20 sm:w-[300px] lg:w-[340px] 2xl:w-[380px]"
-    >
-      <div className="relative aspect-video w-full overflow-hidden bg-muted">
-        {cardImage ? (
-          <Image
-            src={cardImage}
-            alt={item.title}
-            fill
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-            sizes="(max-width: 640px) 80vw, (max-width: 1024px) 40vw, 25vw"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted-foreground/30">
-            {item.mediaType === "show" ? (
-              <Tv className="h-10 w-10" />
-            ) : (
-              <Bookmark className="h-10 w-10" />
-            )}
-          </div>
-        )}
-
-        <div className="absolute right-2.5 top-2.5 rounded-sm bg-sky-500 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-md">
-          {releaseLabel}
-        </div>
-
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/45 to-transparent px-3 pb-3 pt-14">
-          {logoPath ? (
-            <MediaLogo
-              src={`${TMDB_IMAGE_BASE}/w500${logoPath}`}
-              alt={item.title}
-              size="card"
-              className="max-w-[70%]"
-            />
-          ) : (
-            <p className="line-clamp-2 text-sm font-semibold leading-tight text-white">
-              {item.title}
-            </p>
-          )}
-          <p
-            className={cn(
-              "line-clamp-2 text-xs text-white/80",
-              logoPath ? "mt-2" : "mt-1",
-            )}
-          >
-            {episodeLabel}
-          </p>
-          <p className="mt-1 text-[11px] text-white/70">
-            {releaseDate.toLocaleDateString(undefined, {
-              dateStyle: "medium",
-            })}
-          </p>
-        </div>
-      </div>
-    </Link>
-  );
-}
+const PAGE_SIZE = 72;
+const CARD_WIDTH_CLASS = "w-[280px] sm:w-[300px] lg:w-[340px] 2xl:w-[380px]";
 
 export function UpcomingScheduleSection(): React.JSX.Element {
   return (
@@ -194,15 +28,7 @@ export function UpcomingScheduleSectionContent({
   title: string;
   seeAllHref?: string;
 }): React.JSX.Element {
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-    hasNextPage,
-    isFetchingNextPage,
-    fetchNextPage,
-  } = trpc.userMedia.getUpcomingSchedule.useInfiniteQuery(
+  const query = trpc.userMedia.getUpcomingSchedule.useInfiniteQuery(
     { limit: PAGE_SIZE },
     {
       getNextPageParam: (lastPage) => lastPage.nextCursor,
@@ -210,121 +36,29 @@ export function UpcomingScheduleSectionContent({
     },
   );
 
-  const items = useMemo(
-    () =>
-      (data?.pages.flatMap((page) => page.items) ?? []) as UpcomingScheduleItem[],
-    [data],
-  );
-
-  const handleFetchNextPage = useCallback(() => {
-    if (hasNextPage && !isFetchingNextPage) {
-      void fetchNextPage();
-    }
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
-
-  const {
-    containerRef,
-    canScrollLeft,
-    canScrollRight,
-    scrollLeft,
-    scrollRight,
-    handleScroll,
-  } = useScrollCarousel({
-    onLoadMore: handleFetchNextPage,
-    isFetchingMore: isFetchingNextPage,
-    loadMoreThreshold: 260,
-    scrollFraction: 0.8,
-  });
-
-  if (isLoading) {
-    return (
-      <section className="relative">
-        <SectionTitle title={title} seeMorePath={seeAllHref} />
-        <div className="mt-2 flex gap-4 overflow-x-auto md:mt-4 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <div
-              key={index}
-              className="aspect-video w-[280px] shrink-0 animate-pulse rounded-xl bg-muted sm:w-[300px] lg:w-[340px] 2xl:w-[380px]"
-            />
-          ))}
-          <div className="w-4 shrink-0 md:w-8 lg:w-12 xl:w-16 2xl:w-24" />
-        </div>
-      </section>
+  const { items, isLoading, isError, isFetchingMore, onLoadMore, onRetry } =
+    useSectionInfiniteQuery(
+      query,
+      (page) => page.items,
+      (raw): UpcomingScheduleItem => raw as UpcomingScheduleItem,
     );
-  }
-
-  if (isError) {
-    return (
-      <section className="relative">
-        <SectionTitle title={title} seeMorePath={seeAllHref} />
-        <div className="mt-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-          <StateMessage preset="error" onRetry={() => void refetch()} minHeight="200px" />
-        </div>
-      </section>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <section className="relative">
-        <SectionTitle title={title} seeMorePath={seeAllHref} />
-        <div className="mt-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-          <StateMessage preset="emptyUpcoming" minHeight="200px" />
-        </div>
-      </section>
-    );
-  }
 
   return (
-    <section className="relative">
-      <SectionTitle title={title} seeMorePath={seeAllHref} />
-
-      <div className="group/carousel relative mt-4">
-        {canScrollLeft && (
-          <button
-            aria-label="Scroll left"
-            className="absolute left-0 top-0 z-20 hidden h-full w-14 items-center justify-center bg-gradient-to-r from-background/80 to-transparent text-foreground/60 opacity-0 transition-opacity hover:text-foreground group-hover/carousel:opacity-100 md:flex lg:w-20"
-            onClick={scrollLeft}
-          >
-            <ChevronLeft size={24} />
-          </button>
-        )}
-
-        {canScrollRight && (
-          <button
-            aria-label="Scroll right"
-            className="absolute right-0 top-0 z-20 hidden h-full w-14 items-center justify-center bg-gradient-to-l from-background/80 to-transparent text-foreground/60 opacity-0 transition-opacity hover:text-foreground group-hover/carousel:opacity-100 md:flex lg:w-20"
-            onClick={scrollRight}
-          >
-            <ChevronRight size={24} />
-          </button>
-        )}
-
-        <div
-          ref={containerRef}
-          onScroll={handleScroll}
-          className="flex gap-4 overflow-x-auto overflow-y-visible pt-1 pb-2 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
-        >
-          {items.map((item) => (
-            <UpcomingScheduleCard key={item.id} item={item} />
-          ))}
-
-          {isFetchingNextPage &&
-            Array.from({ length: 2 }).map((_, i) => (
-              <div
-                key={`loading-${i}`}
-                className="aspect-video w-[280px] shrink-0 animate-pulse rounded-xl bg-muted sm:w-[300px] lg:w-[340px] 2xl:w-[380px]"
-              />
-            ))}
-          <div className="w-4 shrink-0 md:w-8 lg:w-12 xl:w-16 2xl:w-24" />
-        </div>
-
-        {isFetchingNextPage && (
-          <div className="mt-2 flex items-center justify-center">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
-        )}
-      </div>
-    </section>
+    <LibraryCarousel<UpcomingScheduleItem>
+      title={title}
+      seeAllHref={seeAllHref}
+      items={items}
+      isLoading={isLoading}
+      isError={isError}
+      isFetchingMore={isFetchingMore}
+      onLoadMore={onLoadMore}
+      onRetry={onRetry}
+      emptyPreset="emptyUpcoming"
+      renderCard={(item) => (
+        <UpcomingScheduleCard key={item.id} item={item} />
+      )}
+      cardWidthClass={CARD_WIDTH_CLASS}
+      aspectRatioClass="aspect-video"
+    />
   );
 }
