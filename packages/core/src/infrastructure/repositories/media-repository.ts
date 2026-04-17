@@ -18,9 +18,11 @@ import {
   media,
   mediaFile,
   mediaVersion,
+  mediaVideo,
   season,
   torrent,
   userConnection,
+  userRecommendation,
 } from "@canto/db/schema";
 import type { ListInput } from "@canto/validators";
 
@@ -380,4 +382,71 @@ export async function listLibraryMedia(
   ]);
 
   return { items, total: totalRow?.total ?? 0, page, pageSize };
+}
+
+/**
+ * Shows marked for continuous-download RSS monitoring. Returned shape matches
+ * what the RSS matcher needs (id/title/externalId/provider/type).
+ */
+export async function findMonitoredShowsForRss(db: Database) {
+  return db
+    .select({
+      id: media.id,
+      title: media.title,
+      externalId: media.externalId,
+      provider: media.provider,
+      type: media.type,
+    })
+    .from(media)
+    .where(and(eq(media.type, "show"), eq(media.continuousDownload, true)));
+}
+
+/**
+ * Media currently in the user library that is marked as downloaded — used by
+ * the `validate-downloads` job to check file-system presence.
+ */
+export async function findDownloadedLibraryMedia(
+  db: Database,
+): Promise<Array<{ id: string; title: string }>> {
+  return db.query.media.findMany({
+    where: and(eq(media.downloaded, true), eq(media.inLibrary, true)),
+    columns: { id: true, title: true },
+  });
+}
+
+/**
+ * Imported media_file rows for a given media — `id` and `filePath` only.
+ * Used by the `validate-downloads` job.
+ */
+export async function findImportedFilesForMedia(
+  db: Database,
+  mediaId: string,
+): Promise<Array<{ id: string; filePath: string | null }>> {
+  return db
+    .select({ id: mediaFile.id, filePath: mediaFile.filePath })
+    .from(mediaFile)
+    .where(and(eq(mediaFile.mediaId, mediaId), eq(mediaFile.status, "imported")));
+}
+
+/**
+ * Media present in an active user recommendation that is missing a logo or
+ * video extras and hasn't had extras refreshed in the last `staleDays` days.
+ * Drives the `backfill-extras` scheduled job.
+ */
+export async function findMediaNeedingExtrasBackfill(
+  db: Database,
+  opts: { staleDays: number },
+): Promise<Array<{ id: string; title: string }>> {
+  return db
+    .selectDistinctOn([media.id], { id: media.id, title: media.title })
+    .from(userRecommendation)
+    .innerJoin(media, sql`${media.id} = ${userRecommendation.mediaId}`)
+    .where(
+      sql`${userRecommendation.active} = true
+        AND (${media.extrasUpdatedAt} IS NULL OR ${media.extrasUpdatedAt} < now() - interval '1 day' * ${opts.staleDays})
+        AND (
+          ${media.logoPath} IS NULL
+          OR NOT EXISTS (SELECT 1 FROM ${mediaVideo} WHERE ${mediaVideo.mediaId} = ${media.id})
+        )`,
+    );
 }
