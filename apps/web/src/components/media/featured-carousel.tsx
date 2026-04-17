@@ -1,22 +1,17 @@
 "use client";
 
-import { useRef, useState, useCallback, useMemo } from "react";
-import { FadeImage } from "~/components/ui/fade-image";
-import Link from "next/link";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { cn } from "@canto/ui/cn";
-import { ChevronLeft, ChevronRight, EyeOff, Film, Tv, Volume2, VolumeOff } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { SectionTitle } from "~/components/layout/section-title";
-import { AddToListButton } from "~/components/media/add-to-list-button";
 import { Skeleton } from "@canto/ui/skeleton";
-import { tmdbPosterLoader, tmdbBackdropLoader } from "~/lib/tmdb-image";
-import { MediaLogo } from "~/components/media/media-logo";
-import { mediaHref } from "~/lib/media-href";
 import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
 import { useHiddenMedia } from "~/hooks/use-hidden-media";
+import { FeaturedCard } from "~/components/media/cards/featured-card";
 
-const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
+export { FeaturedCard } from "~/components/media/cards/featured-card";
 
-interface FeaturedItem {
+export interface FeaturedItem {
   id?: string;
   externalId: number | string;
   provider: string;
@@ -40,8 +35,6 @@ interface FeaturedCarouselProps {
   onLoadMore?: () => void;
   className?: string;
 }
-
-const TRAILER_DELAY_MS = 800;
 
 export function FeaturedCarousel({
   title,
@@ -117,261 +110,44 @@ export function FeaturedCarousel({
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="flex gap-6 overflow-x-auto overflow-y-visible py-2 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
+          className="flex gap-6 overflow-x-auto overflow-y-visible py-2 pl-4 [contain:paint] scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
           onMouseLeave={handleMouseLeave}
         >
           {isLoading && visibleItems.length === 0
-            ? // Only show skeletons during initial load when we have no data
-              Array.from({ length: 12 }).map((_, i) => (
+            ? Array.from({ length: 12 }).map((_, i) => (
                 <Skeleton
                   key={i}
                   className="shrink-0 rounded-xl animate-pulse h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px] w-[230px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]"
                 />
               ))
-            : // Show actual items when we have data
-              visibleItems.map((item, i) => (
-                <div
+            : visibleItems.map((item, i) => (
+                <FeaturedCard
                   key={`${item.provider}-${item.externalId}-${i}`}
-                  className="animate-in fade-in duration-300"
-                >
-                  <FeaturedCard
-                    item={item}
-                    index={i}
-                    isOpen={hoveredIndex === i}
-                    onHover={() => handleCardHover(i)}
-                    onHide={() =>
-                      hide({
-                        externalId: item.externalId,
-                        provider: item.provider,
-                        type: item.type,
-                        title: item.title,
-                        posterPath: item.posterPath,
-                      })
-                    }
-                  />
-                </div>
+                  item={item}
+                  index={i}
+                  isOpen={hoveredIndex === i}
+                  onHover={() => handleCardHover(i)}
+                  onHide={() =>
+                    hide({
+                      externalId: item.externalId,
+                      provider: item.provider,
+                      type: item.type,
+                      title: item.title,
+                      posterPath: item.posterPath,
+                    })
+                  }
+                />
               ))}
           {isFetchingMore &&
             Array.from({ length: 4 }).map((_, i) => (
-              <div
+              <Skeleton
                 key={`loading-${i}`}
-                className="animate-in fade-in duration-300"
-              >
-                <Skeleton className="shrink-0 rounded-xl animate-pulse h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px] w-[230px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]" />
-              </div>
+                className="shrink-0 rounded-xl animate-pulse h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px] w-[230px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]"
+              />
             ))}
           <div className="w-4 shrink-0 md:w-8 lg:w-12 xl:w-16 2xl:w-24" />
         </div>
       </div>
     </section>
-  );
-}
-
-function FeaturedCard({
-  item,
-  index,
-  isOpen,
-  onHover,
-  onHide,
-}: {
-  item: FeaturedItem;
-  index: number;
-  isOpen: boolean;
-  onHover: () => void;
-  onHide: () => void;
-}): React.JSX.Element {
-  const [showTrailer, setShowTrailer] = useState(false);
-  const [muted, setMuted] = useState(true);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const trailerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleMouseEnter = useCallback(() => {
-    onHover();
-    if (item.trailerKey) {
-      trailerTimerRef.current = setTimeout(() => setShowTrailer(true), TRAILER_DELAY_MS);
-    }
-  }, [onHover, item.trailerKey]);
-
-  const handleMouseLeave = useCallback(() => {
-    if (trailerTimerRef.current) clearTimeout(trailerTimerRef.current);
-    trailerTimerRef.current = null;
-    setShowTrailer(false);
-    setMuted(true);
-  }, []);
-
-  const toggleMute = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const next = !muted;
-    setMuted(next);
-    iframeRef.current?.contentWindow?.postMessage(
-      JSON.stringify({ event: "command", func: next ? "mute" : "unMute", args: [] }),
-      "*",
-    );
-  }, [muted]);
-
-  const href = mediaHref(item.provider, item.externalId, item.type);
-  const posterSrc = item.posterPath ?? null;
-  const backdropSrc = item.backdropPath ?? null;
-
-  return (
-    <div
-      className={cn(
-        "group relative shrink-0 overflow-hidden rounded-xl transition-[width] duration-300 ease-in-out",
-        "h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px]",
-        isOpen
-          ? "border border-border/40 w-[calc(360px*16/9)] sm:w-[calc(400px*16/9)] lg:w-[calc(440px*16/9)] 2xl:w-[calc(500px*16/9)]"
-          : "w-[230px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]",
-      )}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      {/* Poster — visible when closed */}
-      <Link
-        href={href}
-        className={cn(
-          "absolute inset-0 transition-opacity duration-300",
-          isOpen ? "pointer-events-none opacity-0" : "opacity-100",
-        )}
-      >
-        {posterSrc ? (
-          <FadeImage
-            loader={tmdbPosterLoader}
-            src={posterSrc}
-            alt={item.title}
-            fill
-            className="object-cover"
-            fadeDuration={400}
-            priority={index < 2}
-            sizes="(max-width: 640px) 230px, (max-width: 1024px) 250px, (max-width: 1536px) 280px, 320px"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-muted">
-            {item.type === "movie" ? (
-              <Film className="h-10 w-10 text-muted-foreground/20" />
-            ) : (
-              <Tv className="h-10 w-10 text-muted-foreground/20" />
-            )}
-          </div>
-        )}
-      </Link>
-
-      {/* Backdrop — visible when open */}
-      <Link
-        href={href}
-        className={cn(
-          "absolute inset-0 transition-opacity duration-300",
-          isOpen ? "opacity-100" : "pointer-events-none opacity-0",
-        )}
-      >
-        {/* Trailer or backdrop */}
-        {showTrailer && item.trailerKey ? (
-          <div className="absolute inset-0 overflow-hidden">
-            <iframe
-              ref={iframeRef}
-              src={`https://www.youtube-nocookie.com/embed/${item.trailerKey}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&loop=1&playlist=${item.trailerKey}&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0&enablejsapi=1&origin=${typeof window !== "undefined" ? window.location.origin : ""}`}
-              className="pointer-events-none absolute -inset-[60px] h-[calc(100%+120px)] w-[calc(100%+120px)] border-0"
-              allow="autoplay; encrypted-media"
-              title={`${item.title} trailer`}
-            />
-          </div>
-        ) : backdropSrc ? (
-          <FadeImage
-            loader={tmdbBackdropLoader}
-            src={backdropSrc}
-            alt={item.title}
-            fill
-            className="object-cover"
-            fadeDuration={400}
-            sizes="(max-width: 640px) 100vw, 50vw"
-          />
-        ) : posterSrc ? (
-          <FadeImage
-            loader={tmdbPosterLoader}
-            src={posterSrc}
-            alt={item.title}
-            fill
-            className="object-cover blur-sm scale-110"
-            fadeDuration={400}
-            sizes="(max-width: 640px) 100vw, 50vw"
-          />
-        ) : null}
-
-        {/* Gradient overlay — less opaque during trailer */}
-        <div className={cn(
-          "absolute inset-0 transition-opacity duration-500",
-          showTrailer ? "bg-gradient-to-t from-black/80 via-transparent to-transparent" : "bg-gradient-to-t from-black/90 via-black/30 to-black/10",
-        )} />
-        <div className={cn(
-          "absolute inset-0 transition-opacity duration-500",
-          showTrailer ? "bg-gradient-to-r from-black/40 to-transparent" : "bg-gradient-to-r from-black/50 to-transparent",
-        )} />
-
-        {/* Hide button */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onHide();
-          }}
-          className={cn(
-            "absolute z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white/70 opacity-0 backdrop-blur-sm transition-all hover:bg-black/80 hover:text-white group-hover:opacity-100",
-            showTrailer ? "left-4 top-4" : "left-2.5 top-2.5",
-          )}
-          aria-label={`Hide ${item.title}`}
-        >
-          <EyeOff className="h-3.5 w-3.5" />
-        </button>
-
-        {/* Mute button */}
-        {showTrailer && item.trailerKey && (
-          <button
-            type="button"
-            onClick={toggleMute}
-            className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white/70 backdrop-blur-md transition-all hover:scale-105 hover:border-white/40 hover:bg-black/70 hover:text-white"
-          >
-            {muted ? <VolumeOff className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-          </button>
-        )}
-
-        {/* Content over backdrop */}
-        <div className="absolute inset-x-0 bottom-0 flex flex-col gap-3 p-5">
-          {/* Logo or title */}
-          {item.logoPath ? (
-            <MediaLogo src={`${TMDB_IMAGE_BASE}/w780${item.logoPath}`} alt={item.title} size="carousel" />
-          ) : (
-            <h3 className="text-lg font-bold text-white drop-shadow-lg">{item.title}</h3>
-          )}
-
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/70">
-            <span>{item.type === "movie" ? "Movie" : "TV Show"}</span>
-            {item.voteAverage != null && item.voteAverage > 0 && (
-              <>
-                <span className="text-white/30">·</span>
-                <span className="text-yellow-400">{item.voteAverage.toFixed(1)}</span>
-              </>
-            )}
-            {item.year && (
-              <>
-                <span className="text-white/30">·</span>
-                <span>{item.year}</span>
-              </>
-            )}
-          </div>
-
-          <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-            <AddToListButton
-              mediaId={item.id}
-              externalId={item.externalId}
-              provider={item.provider}
-              type={item.type}
-              title={item.title}
-              size="sm"
-            />
-          </div>
-        </div>
-      </Link>
-    </div>
   );
 }
