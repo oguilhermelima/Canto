@@ -2,6 +2,207 @@
 /*  Plex HTTP adapter — pure functions for all Plex API calls                 */
 /* -------------------------------------------------------------------------- */
 
+const PLEX_TV = "https://plex.tv";
+const PLEX_PRODUCT = "Canto";
+const PLEX_VERSION = "0.1.0";
+
+/**
+ * Authenticate a user against a Plex server token and return identity + server
+ * info. Hits the server root (`?X-Plex-Token=`) to validate the token, then
+ * `plex.tv/api/v2/user` to fetch the Plex account id/username. Callers decide
+ * how to translate errors (e.g. to TRPCError at the router boundary).
+ */
+export async function authenticatePlexServerToken(
+  url: string,
+  token: string,
+): Promise<{
+  ok: true;
+  serverName: string;
+  machineId: string;
+  user?: string;
+  userId?: string;
+} | { ok: false; status: number }> {
+  const res = await fetch(`${url}/?X-Plex-Token=${token}`, {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) return { ok: false, status: res.status };
+  const data = (await res.json()) as {
+    MediaContainer: { friendlyName: string; machineIdentifier: string };
+  };
+
+  let userId: string | undefined;
+  let user: string | undefined;
+  try {
+    const userRes = await fetch(`${PLEX_TV}/api/v2/user`, {
+      headers: {
+        Accept: "application/json",
+        "X-Plex-Product": PLEX_PRODUCT,
+        "X-Plex-Token": token,
+      },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (userRes.ok) {
+      const userData = (await userRes.json()) as { id: number; username: string };
+      userId = String(userData.id);
+      user = userData.username;
+    }
+  } catch {
+    /* Non-critical */
+  }
+
+  return {
+    ok: true,
+    serverName: data.MediaContainer.friendlyName,
+    machineId: data.MediaContainer.machineIdentifier,
+    user,
+    userId,
+  };
+}
+
+/**
+ * Sign in to plex.tv with email/password. Returns a fresh auth token + Plex
+ * account identity on success.
+ */
+export async function plexTvSignIn(
+  email: string,
+  password: string,
+): Promise<{
+  ok: true;
+  token: string;
+  userId: string;
+  username: string;
+} | { ok: false; status: number }> {
+  const res = await fetch(`${PLEX_TV}/users/sign_in.json`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "X-Plex-Client-Identifier": "canto-app",
+      "X-Plex-Product": PLEX_PRODUCT,
+      "X-Plex-Version": PLEX_VERSION,
+    },
+    body: JSON.stringify({ user: { login: email, password } }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) return { ok: false, status: res.status };
+  const data = (await res.json()) as {
+    user: { authToken: string; username: string; id: number };
+  };
+  return {
+    ok: true,
+    token: data.user.authToken,
+    userId: String(data.user.id),
+    username: data.user.username,
+  };
+}
+
+/** Create a PIN on plex.tv for the OAuth flow. Returns `{ id, code }`. */
+export async function createPlexTvPin(
+  clientId: string,
+): Promise<{ id: number; code: string }> {
+  const res = await fetch(`${PLEX_TV}/api/v2/pins?strong=true`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-Plex-Client-Identifier": clientId,
+      "X-Plex-Product": PLEX_PRODUCT,
+      "X-Plex-Version": PLEX_VERSION,
+    },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) throw new Error(`Plex PIN creation failed: ${res.status}`);
+  return (await res.json()) as { id: number; code: string };
+}
+
+/**
+ * Poll a plex.tv PIN — returns null once it's claimed (with the token),
+ * or `expired: true` once past its expiry. Prior to claim the pin shows up
+ * as authenticated=false + expired=false.
+ */
+export async function checkPlexTvPin(
+  clientId: string,
+  pinId: number,
+): Promise<
+  | { authenticated: true; token: string }
+  | { authenticated: false; expired: boolean }
+> {
+  const res = await fetch(`${PLEX_TV}/api/v2/pins/${pinId}`, {
+    headers: {
+      Accept: "application/json",
+      "X-Plex-Client-Identifier": clientId,
+      "X-Plex-Product": PLEX_PRODUCT,
+      "X-Plex-Version": PLEX_VERSION,
+    },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) return { authenticated: false, expired: true };
+
+  const data = (await res.json()) as { authToken: string | null; expiresAt: string };
+  if (!data.authToken) {
+    const expired = new Date(data.expiresAt) < new Date();
+    return { authenticated: false, expired };
+  }
+  return { authenticated: true, token: data.authToken };
+}
+
+/** Fetch the Plex account identity for a given token. */
+export async function getPlexTvUser(
+  clientId: string,
+  token: string,
+): Promise<{ userId: string; username: string } | null> {
+  try {
+    const res = await fetch(`${PLEX_TV}/api/v2/user`, {
+      headers: {
+        Accept: "application/json",
+        "X-Plex-Client-Identifier": clientId,
+        "X-Plex-Token": token,
+      },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { id: number; username: string };
+    return { userId: String(data.id), username: data.username };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * List Plex resources visible to a token and pick the best "server" entry.
+ * Used by the PIN flow to auto-discover a server when the admin hasn't
+ * pre-supplied a URL. Returns null if no server is visible.
+ */
+export async function getPlexTvServerResource(
+  clientId: string,
+  token: string,
+): Promise<{ machineId: string; serverName: string } | null> {
+  try {
+    const res = await fetch(
+      `${PLEX_TV}/api/v2/resources?includeHttps=1&includeRelay=0`,
+      {
+        headers: {
+          Accept: "application/json",
+          "X-Plex-Client-Identifier": clientId,
+          "X-Plex-Token": token,
+        },
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
+    if (!res.ok) return null;
+    const resources = (await res.json()) as Array<{
+      name: string; provides: string; clientIdentifier: string;
+      connections: Array<{ uri: string; local: boolean }>;
+    }>;
+    const server = resources.find((r) => r.provides.includes("server"));
+    if (!server) return null;
+    return { machineId: server.clientIdentifier, serverName: server.name };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Generic Plex fetch helper. Appends the token as a query parameter and
  * requests JSON responses.

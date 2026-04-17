@@ -2,8 +2,97 @@
 /*  Jellyfin HTTP adapter — pure functions for all Jellyfin API calls         */
 /* -------------------------------------------------------------------------- */
 
+const JELLYFIN_AUTH_HEADER =
+  'MediaBrowser Client="Canto", Device="Canto", DeviceId="canto-setup", Version="0.1.0"';
+
 function headers(apiKey: string): HeadersInit {
   return { "X-Emby-Token": apiKey };
+}
+
+/**
+ * Authenticate a Jellyfin user with username + password. Returns the access
+ * token and the Jellyfin user id on success. Callers decide how to translate
+ * error statuses (401 = bad credentials).
+ */
+export async function authenticateJellyfinByName(
+  url: string,
+  username: string,
+  password: string,
+): Promise<
+  | { ok: true; accessToken: string; userId: string; userName: string }
+  | { ok: false; status: number }
+> {
+  const res = await fetch(`${url}/Users/AuthenticateByName`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: JELLYFIN_AUTH_HEADER,
+    },
+    body: JSON.stringify({ Username: username, Pw: password }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) return { ok: false, status: res.status };
+  const data = (await res.json()) as {
+    AccessToken: string;
+    User: { Id: string; Name: string };
+  };
+  return {
+    ok: true,
+    accessToken: data.AccessToken,
+    userId: data.User.Id,
+    userName: data.User.Name,
+  };
+}
+
+/**
+ * Create a persistent Jellyfin API key for the `Canto` app. Best-effort —
+ * returns false if the creation request fails. The key is then retrievable
+ * via `findJellyfinApiKey`.
+ */
+export async function createJellyfinApiKey(
+  url: string,
+  accessToken: string,
+): Promise<boolean> {
+  const res = await fetch(`${url}/Auth/Keys?App=Canto`, {
+    method: "POST",
+    headers: headers(accessToken),
+    signal: AbortSignal.timeout(10_000),
+  });
+  return res.ok;
+}
+
+/** Look up the `Canto` app key in Jellyfin's key store, if present. */
+export async function findJellyfinApiKey(
+  url: string,
+  accessToken: string,
+): Promise<string | null> {
+  const res = await fetch(`${url}/Auth/Keys`, {
+    headers: headers(accessToken),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as {
+    Items: Array<{ AccessToken: string; AppName: string }>;
+  };
+  return data.Items.find((k) => k.AppName === "Canto")?.AccessToken ?? null;
+}
+
+/**
+ * Resolve the Jellyfin user id for a given API key by hitting
+ * `/Sessions/Current`. Used to confirm a token is still valid + identify the
+ * user behind it.
+ */
+export async function getJellyfinCurrentUserId(
+  url: string,
+  apiKey: string,
+): Promise<string | null> {
+  const res = await fetch(`${url}/Sessions/Current`, {
+    headers: headers(apiKey),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { UserId: string };
+  return data.UserId;
 }
 
 /**
