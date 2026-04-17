@@ -170,6 +170,18 @@
   }
 }
 
+/* While any scroll is active (page or nested), pause transitions and the
+ * pulse animation. Same trick Netflix/YouTube use — prevents hover:scale
+ * + animate-pulse from firing as cards move under the cursor, which
+ * otherwise flickers the screen. JS adds/removes .is-scrolling on <html>. */
+html.is-scrolling *,
+html.is-scrolling *::before,
+html.is-scrolling *::after {
+  transition: none !important;
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

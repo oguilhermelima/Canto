@@ -7,6 +7,7 @@ import { BottomNavbar } from "~/components/layout/bottom-navbar";
 import { trpc } from "~/lib/trpc/client";
 
 const SYNC_DEBOUNCE_MS = 30_000;
+const SCROLL_IDLE_MS = 120;
 
 function useReverseSyncOnFocus(): void {
   const syncNow = trpc.userConnection.syncNow.useMutation();
@@ -37,12 +38,40 @@ function useReverseSyncOnFocus(): void {
   }, []);
 }
 
+/**
+ * While any scroll is active (page or any nested scroll container), add
+ * `is-scrolling` to <html>. Paired with CSS in globals.css, this pauses
+ * transitions so hover effects don't flicker as cards move under the cursor.
+ */
+function useScrollPauseClass(): void {
+  useEffect(() => {
+    const root = document.documentElement;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+
+    const onScroll = (): void => {
+      root.classList.add("is-scrolling");
+      if (timeout) clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        root.classList.remove("is-scrolling");
+      }, SCROLL_IDLE_MS);
+    };
+
+    document.addEventListener("scroll", onScroll, { passive: true, capture: true });
+    return () => {
+      if (timeout) clearTimeout(timeout);
+      document.removeEventListener("scroll", onScroll, { capture: true });
+      root.classList.remove("is-scrolling");
+    };
+  }, []);
+}
+
 export default function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }): React.JSX.Element {
   useReverseSyncOnFocus();
+  useScrollPauseClass();
 
   return (
     <div className="min-h-screen bg-background">
