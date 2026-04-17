@@ -92,10 +92,6 @@ export function useWatchedToggle({
   const [selectedHistoryEntryIds, setSelectedHistoryEntryIds] = useState<
     string[]
   >([]);
-  const [modalRating, setModalRating] = useState<number | null>(null);
-  const [, setHoverRating] = useState<number | null>(null);
-  const [, setRatingBounce] = useState(false);
-  const [modalComment, setModalComment] = useState("");
 
   const orderedSeasons = useMemo(
     () =>
@@ -172,10 +168,6 @@ export function useWatchedToggle({
     setCustomWatchedAt(toDatetimeLocalString(new Date()));
     setBulkMode("all");
     setSelectedHistoryEntryIds([]);
-    setModalRating(null);
-    setHoverRating(null);
-    setRatingBounce(false);
-    setModalComment("");
 
     if (mediaType === "movie") {
       setScope("movie");
@@ -376,13 +368,6 @@ export function useWatchedToggle({
       payload.seasonNumber = seasonNumber;
     } else {
       payload.scope = "show";
-    }
-
-    if (modalRating) {
-      (payload as Record<string, unknown>).rating = modalRating;
-    }
-    if (modalComment.trim()) {
-      (payload as Record<string, unknown>).comment = modalComment.trim();
     }
 
     trackMutation.mutate(payload);
