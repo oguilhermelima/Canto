@@ -38,6 +38,10 @@ import { resolveState, formatBytes, formatEta, formatSpeed } from "~/lib/torrent
 import { TorrentCard } from "./_components/torrent-card";
 import { DeleteDialog } from "./_components/delete-dialog";
 import type { DeleteTarget } from "./_components/delete-dialog";
+import { buildFallbackMagnet } from "./_lib/build-fallback-magnet";
+import { sanitizeTorrentTitleForSearch } from "./_lib/sanitize-torrent-title";
+import { parseEpisodeNumbers } from "./_lib/parse-episode-numbers";
+import { inferImportModeFromName, type ImportMatchMode } from "./_lib/infer-import-mode";
 
 const PAGE_SIZE = 20;
 
@@ -49,7 +53,6 @@ const STATUS_TABS = [
 ] as const;
 
 type ImportStep = "select-torrent" | "select-media";
-type ImportMatchMode = "movie" | "series" | "episode";
 
 interface ClientTorrentItem {
   hash: string;
@@ -78,10 +81,6 @@ interface MediaSearchItem {
   voteAverage: number | null;
 }
 
-function buildFallbackMagnet(hash: string, title: string): string {
-  return `magnet:?xt=urn:btih:${hash}&dn=${encodeURIComponent(title)}`;
-}
-
 function getClientStateLabel(state: string, progress: number): string {
   if (progress >= 1) return "Completed";
   if (state.includes("paused")) return "Paused";
@@ -89,30 +88,6 @@ function getClientStateLabel(state: string, progress: number): string {
   if (state === "checkingDL" || state === "checkingUP" || state === "checkingResumeData") return "Checking";
   if (state === "error" || state === "missingFiles") return "Error";
   return "Downloading";
-}
-
-function inferImportModeFromName(name: string): ImportMatchMode {
-  if (/s\d{1,2}e\d{1,2}/i.test(name)) return "episode";
-  if (/season|temporada/i.test(name)) return "series";
-  return "movie";
-}
-
-function sanitizeTorrentTitleForSearch(title: string): string {
-  return title
-    .replace(/\[[^\]]*]/g, " ")
-    .replace(/\([^)]*\)/g, " ")
-    .replace(/\b(2160p|1080p|720p|x264|x265|h\.?264|h\.?265|hevc|hdr|webrip|web[- ]?dl|bluray|remux|dvdrip|proper|repack|multi|dubbed)\b/gi, " ")
-    .replace(/[._-]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function parseEpisodeNumbers(value: string): number[] {
-  const parsed = value
-    .split(/[,\s]+/)
-    .map((part) => Number(part.trim()))
-    .filter((num) => Number.isInteger(num) && num > 0);
-  return [...new Set(parsed)];
 }
 
 export default function DownloadsPage(): React.JSX.Element {
