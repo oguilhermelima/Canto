@@ -36,6 +36,8 @@ export interface MediaProviderPort {
 
   findByImdbId?(imdbId: string): Promise<SearchResult[]>;
 
+  findByTvdbId?(tvdbId: number): Promise<SearchResult[]>;
+
   getTranslations?(
     id: number,
     type: "movie" | "tv",
