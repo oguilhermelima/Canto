@@ -103,3 +103,13 @@ export const toggleLibraryInput = z.object({
   enabled: z.boolean(),
 });
 export type ToggleLibraryInput = z.infer<typeof toggleLibraryInput>;
+
+export const createQbitCategoryInput = z.object({
+  name: z
+    .string()
+    .min(1, "Category name is required")
+    .max(100)
+    .regex(/^[^\\/]+$/, "Category name cannot contain / or \\"),
+  savePath: z.string().min(1, "Save path is required").max(500),
+});
+export type CreateQbitCategoryInput = z.infer<typeof createQbitCategoryInput>;

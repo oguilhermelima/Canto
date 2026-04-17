@@ -94,9 +94,9 @@ export const applyProviderOverrideInput = z.object({
 });
 export type ApplyProviderOverrideInput = z.infer<typeof applyProviderOverrideInput>;
 
-export const recommendationsInput = z.object({
-  cursor: z.number().int().min(0).default(0),
-  pageSize: z.number().int().min(1).max(50).default(10),
+// Shared filter base for endpoints that browse media with the same TMDB-style
+// facets (recommendations, list detail, discovery). Compose via `.extend()`.
+export const mediaFilterBase = z.object({
   genreIds: z.array(z.number()).optional(),
   genreMode: z.enum(["and", "or"]).default("or").optional(),
   language: z.string().optional(),
@@ -111,6 +111,12 @@ export const recommendationsInput = z.object({
   sortBy: z.string().optional(),
   watchProviders: z.string().optional(),
   watchRegion: z.string().optional(),
+});
+export type MediaFilterBase = z.infer<typeof mediaFilterBase>;
+
+export const recommendationsInput = mediaFilterBase.extend({
+  cursor: z.number().int().min(0).default(0),
+  pageSize: z.number().int().min(1).max(50).default(10),
 });
 export type RecommendationsInput = z.infer<typeof recommendationsInput>;
 

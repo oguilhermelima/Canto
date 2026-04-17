@@ -59,3 +59,6 @@ export const setDownloadSettingsInput = z.object({
   seedCleanupFiles: z.boolean(),
 });
 export type SetDownloadSettingsInput = z.infer<typeof setDownloadSettingsInput>;
+
+export const setAutoMergeVersionsInput = z.boolean();
+export type SetAutoMergeVersionsInput = z.infer<typeof setAutoMergeVersionsInput>;

@@ -1,24 +1,12 @@
 import { z } from "zod";
 
-export const getListBySlugInput = z.object({
+import { mediaFilterBase } from "./media";
+
+export const getListBySlugInput = mediaFilterBase.extend({
   slug: z.string(),
   limit: z.number().int().min(1).max(100).default(50),
   offset: z.number().int().min(0).default(0),
   cursor: z.number().int().min(0).nullish(),
-  genreIds: z.array(z.number()).optional(),
-  genreMode: z.enum(["and", "or"]).default("or").optional(),
-  language: z.string().optional(),
-  scoreMin: z.number().optional(),
-  scoreMax: z.number().optional(),
-  yearMin: z.string().optional(),
-  yearMax: z.string().optional(),
-  runtimeMin: z.number().optional(),
-  runtimeMax: z.number().optional(),
-  certification: z.string().optional(),
-  status: z.string().optional(),
-  sortBy: z.string().optional(),
-  watchProviders: z.string().optional(),
-  watchRegion: z.string().optional(),
 });
 export type GetListBySlugInput = z.infer<typeof getListBySlugInput>;
 

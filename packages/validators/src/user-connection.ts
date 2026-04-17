@@ -28,3 +28,8 @@ export const deleteUserConnectionInput = z.object({
   id: z.string().uuid(),
 });
 export type DeleteUserConnectionInput = z.infer<typeof deleteUserConnectionInput>;
+
+export const traktDeviceCheckInput = z.object({
+  deviceCode: z.string().min(1),
+});
+export type TraktDeviceCheckInput = z.infer<typeof traktDeviceCheckInput>;

@@ -19,3 +19,9 @@ export const setUserPreferencesInput = z.object({
   isPublic: z.boolean().optional(),
 });
 export type SetUserPreferencesInput = z.infer<typeof setUserPreferencesInput>;
+
+export const updateProfileInput = z.object({
+  bio: z.string().max(500).nullable().optional(),
+  headerImage: z.string().max(500).nullable().optional(),
+});
+export type UpdateProfileInput = z.infer<typeof updateProfileInput>;
