@@ -42,17 +42,14 @@ export async function applyMediaTranslation<T extends { id: string; title: strin
  * Apply translation overlays to seasons and episodes.
  * Uses batch queries instead of N+1.
  */
-export async function applySeasonsTranslation(
+export async function applySeasonsTranslation<
+  E extends { id: string; title: string | null; overview: string | null },
+  S extends { id: string; name: string | null; overview: string | null; episodes: E[] },
+>(
   db: Database,
-  seasons: Array<{
-    id: string;
-    number: number;
-    name: string | null;
-    overview: string | null;
-    episodes: Array<{ id: string; number: number; title: string | null; overview: string | null }>;
-  }>,
+  seasons: S[],
   language: string,
-): Promise<typeof seasons> {
+): Promise<S[]> {
   if (!language || language.startsWith("en") || seasons.length === 0) return seasons;
 
   // Batch: all season translations in one query
