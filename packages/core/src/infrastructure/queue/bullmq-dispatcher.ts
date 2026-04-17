@@ -1,76 +1,74 @@
 import { Queue } from "bullmq";
-import { getSettings } from "@canto/db/settings";
+import { QUEUES, type QueueName } from "./queue-names";
+import { getRedisConnection } from "./redis-config";
 
-function createQueueGetter(name: string): () => Promise<Queue> {
+const REMOVE_ON_FAIL = 50;
+
+function createQueueGetter(name: QueueName): () => Promise<Queue> {
   let queue: Queue | null = null;
   return async () => {
     if (!queue) {
-      const { "redis.host": host, "redis.port": port } = await getSettings([
-        "redis.host",
-        "redis.port",
-      ]);
-      queue = new Queue(name, {
-        connection: { host: host ?? "localhost", port: port ?? 6379 },
-      });
+      queue = new Queue(name, { connection: getRedisConnection() });
     }
     return queue;
   };
 }
 
-const getRefreshExtrasQueue = createQueueGetter("refresh-extras");
-const getReplaceTvdbQueue = createQueueGetter("replace-tvdb");
-const getRebuildUserRecsQueue = createQueueGetter("rebuild-user-recs");
-const getRefreshAllLangQueue = createQueueGetter("refresh-all-language");
-const getTranslateEpisodesQueue = createQueueGetter("translate-episodes");
-const getJellyfinSyncQueue = createQueueGetter("jellyfin-sync");
-const getPlexSyncQueue = createQueueGetter("plex-sync");
-const getReverseSyncUserQueue = createQueueGetter("reverse-sync-user");
-const getTraktSyncUserQueue = createQueueGetter("trakt-sync-user");
-const getFolderScanQueue = createQueueGetter("folder-scan");
+const getRefreshExtrasQueue = createQueueGetter(QUEUES.refreshExtras);
+const getReconcileShowQueue = createQueueGetter(QUEUES.reconcileShow);
+const getRebuildUserRecsQueue = createQueueGetter(QUEUES.rebuildUserRecs);
+const getRefreshAllLangQueue = createQueueGetter(QUEUES.refreshAllLanguage);
+const getTranslateEpisodesQueue = createQueueGetter(QUEUES.translateEpisodes);
+const getJellyfinSyncQueue = createQueueGetter(QUEUES.jellyfinSync);
+const getPlexSyncQueue = createQueueGetter(QUEUES.plexSync);
+const getReverseSyncUserQueue = createQueueGetter(QUEUES.reverseSyncUser);
+const getTraktSyncUserQueue = createQueueGetter(QUEUES.traktSyncUser);
+const getFolderScanQueue = createQueueGetter(QUEUES.folderScan);
+const getMediaPipelineQueue = createQueueGetter(QUEUES.mediaPipeline);
 
 export async function dispatchRefreshExtras(mediaId: string): Promise<void> {
   const q = await getRefreshExtrasQueue();
-  await q.add("refresh-extras", { mediaId }, {
+  await q.add(QUEUES.refreshExtras, { mediaId }, {
     jobId: `refresh-extras-${mediaId}`,
     removeOnComplete: true,
-    removeOnFail: 100,
+    removeOnFail: REMOVE_ON_FAIL,
   });
 }
 
 export async function dispatchReconcileShow(mediaId: string): Promise<void> {
-  const q = await getReplaceTvdbQueue();
-  await q.add("replace-tvdb", { mediaId }, {
-    jobId: `replace-tvdb-${mediaId}`,
+  const q = await getReconcileShowQueue();
+  await q.add(QUEUES.reconcileShow, { mediaId }, {
+    jobId: `reconcile-show-${mediaId}`,
     removeOnComplete: true,
-    removeOnFail: 100,
+    removeOnFail: REMOVE_ON_FAIL,
   });
 }
 
 export async function dispatchRefreshAllLanguage(): Promise<void> {
   const q = await getRefreshAllLangQueue();
   await q.clean(0, 0, "failed").catch(() => {});
-  await q.add("refresh-all-language", {}, {
+  await q.add(QUEUES.refreshAllLanguage, {}, {
     jobId: "refresh-all-language",
     removeOnComplete: true,
-    removeOnFail: 5,
+    removeOnFail: REMOVE_ON_FAIL,
   });
 }
 
 export async function dispatchRebuildUserRecs(userId: string): Promise<void> {
   const q = await getRebuildUserRecsQueue();
-  await q.add("rebuild-user-recs", { userId }, {
+  await q.add(QUEUES.rebuildUserRecs, { userId }, {
     jobId: `rebuild-user-recs-${userId}`,
     removeOnComplete: true,
-    removeOnFail: 100,
+    removeOnFail: REMOVE_ON_FAIL,
   });
 }
 
 export async function dispatchTranslateEpisodes(mediaId: string, tvdbId: number, language: string): Promise<void> {
   const q = await getTranslateEpisodesQueue();
-  await q.add("translate-episodes", { mediaId, tvdbId, language }, {
+  await q.add(QUEUES.translateEpisodes, { mediaId, tvdbId, language }, {
     jobId: `translate-eps-${mediaId}-${language}`,
     removeOnComplete: true,
-    removeOnFail: 100,
+    removeOnFail: REMOVE_ON_FAIL,
   });
 }
 
@@ -92,15 +90,7 @@ export async function dispatchPlexSync(): Promise<boolean> {
  */
 export async function dispatchUserReverseSync(userId: string): Promise<boolean> {
   const q = await getReverseSyncUserQueue();
-  const jobId = `reverse-sync-user-${userId}`;
-  const existing = await q.getJob(jobId);
-  if (existing) {
-    const state = await existing.getState();
-    if (state === "active" || state === "waiting") return false;
-    await existing.remove();
-  }
-  await q.add(q.name, { userId }, { jobId, removeOnComplete: true, removeOnFail: 50 });
-  return true;
+  return dispatchUniqueJob(q, `reverse-sync-user-${userId}`, { userId });
 }
 
 /**
@@ -109,15 +99,7 @@ export async function dispatchUserReverseSync(userId: string): Promise<boolean> 
  */
 export async function dispatchUserTraktSync(userId: string): Promise<boolean> {
   const q = await getTraktSyncUserQueue();
-  const jobId = `trakt-sync-user-${userId}`;
-  const existing = await q.getJob(jobId);
-  if (existing) {
-    const state = await existing.getState();
-    if (state === "active" || state === "waiting") return false;
-    await existing.remove();
-  }
-  await q.add(q.name, { userId }, { jobId, removeOnComplete: true, removeOnFail: 50 });
-  return true;
+  return dispatchUniqueJob(q, `trakt-sync-user-${userId}`, { userId });
 }
 
 /** Dispatch an on-demand folder scan job (deduplicates active/waiting jobs). */
@@ -125,9 +107,6 @@ export async function dispatchFolderScan(): Promise<boolean> {
   const q = await getFolderScanQueue();
   return dispatchUniqueJob(q, "folder-scan-run");
 }
-
-/** Add a job only if no active/waiting job with the same ID exists. */
-const getMediaPipelineQueue = createQueueGetter("media-pipeline");
 
 export interface MediaPipelineJob {
   externalId?: number;
@@ -142,21 +121,29 @@ export async function dispatchMediaPipeline(data: MediaPipelineJob): Promise<voi
   const jobId = data.mediaId
     ? `media-pipeline-${data.mediaId}`
     : `media-pipeline-${data.provider}-${data.externalId}`;
-  await q.add("media-pipeline", data, {
+  await q.add(QUEUES.mediaPipeline, data, {
     jobId,
     removeOnComplete: true,
-    removeOnFail: 100,
+    removeOnFail: REMOVE_ON_FAIL,
   });
 }
 
 /** Add a job only if no active/waiting job with the same ID exists. */
-async function dispatchUniqueJob(queue: Queue, jobId: string): Promise<boolean> {
+async function dispatchUniqueJob(
+  queue: Queue,
+  jobId: string,
+  data: Record<string, unknown> = {},
+): Promise<boolean> {
   const existing = await queue.getJob(jobId);
   if (existing) {
     const state = await existing.getState();
     if (state === "active" || state === "waiting") return false;
     await existing.remove();
   }
-  await queue.add(queue.name, {}, { jobId });
+  await queue.add(queue.name, data, {
+    jobId,
+    removeOnComplete: true,
+    removeOnFail: REMOVE_ON_FAIL,
+  });
   return true;
 }
