@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback, useLayoutEffect } from "react";
-import { cn } from "@canto/ui/cn";
+import { cn } from "../lib/utils";
 import { Settings2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -39,7 +39,6 @@ export function TabBar({ tabs, value, onChange, leading, trailing, onFilter, fil
     const el = tabRefs.current.get(value);
     if (!el) return;
 
-    // offsetLeft is relative to the inner wrapper (positioned parent)
     setIndicator((prev) => {
       if (prev.left === el.offsetLeft && prev.width === el.offsetWidth) {
         return prev;
@@ -55,7 +54,6 @@ export function TabBar({ tabs, value, onChange, leading, trailing, onFilter, fil
     const inner = innerRef.current;
     if (!el || !scroll || !inner) return;
 
-    // Tab position in scroll container = inner wrapper offset + tab offset within inner
     const tabLeft = inner.offsetLeft + el.offsetLeft;
     const scrollLeft = tabLeft - scroll.clientWidth / 2 + el.offsetWidth / 2;
     scroll.scrollTo({ left: scrollLeft, behavior: "smooth" });
@@ -110,7 +108,6 @@ export function TabBar({ tabs, value, onChange, leading, trailing, onFilter, fil
               !onFilter && "mx-4 md:mx-0",
             )}
           >
-            {/* Sliding pill indicator */}
             <div
               className={cn(
                 "absolute top-1 bottom-1 rounded-xl bg-foreground shadow-sm",

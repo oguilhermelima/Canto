@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { cn } from "@canto/ui/cn";
+import type { ElementType } from "react";
+import { cn } from "../lib/utils";
 import type { LucideIcon } from "lucide-react";
 
 interface SectionTitleProps {
@@ -9,6 +9,8 @@ interface SectionTitleProps {
   seeMorePath?: string;
   action?: React.ReactNode;
   className?: string;
+  /** Component used to render the "See more" link. Defaults to `<a>`. Pass Next.js `Link` for soft nav. */
+  linkAs?: ElementType;
 }
 
 export function SectionTitle({
@@ -17,6 +19,7 @@ export function SectionTitle({
   seeMorePath,
   action,
   className,
+  linkAs: Link = "a",
 }: SectionTitleProps): React.JSX.Element {
   return (
     <div

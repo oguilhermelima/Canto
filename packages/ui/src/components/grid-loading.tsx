@@ -1,5 +1,5 @@
-import { Skeleton } from "@canto/ui/skeleton";
-import { cn } from "@canto/ui/cn";
+import { Skeleton } from "./skeleton";
+import { cn } from "../lib/utils";
 
 interface GridLoadingProps {
   count?: number;

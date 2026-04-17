@@ -30,6 +30,13 @@
     "./password-input": "./src/components/password-input.tsx",
     "./textarea": "./src/components/textarea.tsx",
     "./form-field": "./src/components/form-field.tsx",
+    "./tab-bar": "./src/components/tab-bar.tsx",
+    "./state-message": "./src/components/state-message.tsx",
+    "./grid-loading": "./src/components/grid-loading.tsx",
+    "./list-loading": "./src/components/list-loading.tsx",
+    "./section-title": "./src/components/section-title.tsx",
+    "./page-header": "./src/components/page-header.tsx",
+    "./presets/space-states": "./src/presets/space-states.ts",
     "./cn": "./src/lib/utils.ts"
   },
   "scripts": {
