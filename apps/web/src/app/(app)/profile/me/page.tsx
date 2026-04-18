@@ -20,6 +20,7 @@ import { MediaStatusTab } from "./_components/media-status-tab";
 import { RatingsTab } from "./_components/ratings-tab";
 import { FavoritesTab } from "./_components/favorites-tab";
 import { CollectionsTab } from "./_components/collections-tab";
+import { ProfilePageSkeleton } from "./_components/profile-skeleton";
 const TABS = [
   { value: "overview", label: "Overview", icon: LayoutGrid },
   { value: "ratings", label: "Ratings", icon: Star },
@@ -64,7 +65,7 @@ export default function ProfilePage(): React.JSX.Element {
   }, [isPending, session, router]);
 
   if (isPending || !session) {
-    return <div />;
+    return <ProfilePageSkeleton />;
   }
 
   const tabs = TABS.map((t) => {
