@@ -1,5 +1,6 @@
 "use client";
 
+import type { LucideIcon } from "lucide-react";
 import { LibraryCarousel } from "~/app/(app)/library/_components/library-carousel";
 import { useSectionInfiniteQuery } from "~/components/home/sources/use-section-query";
 import { UpcomingScheduleCard } from "~/components/media/cards/upcoming-schedule-card";
@@ -23,9 +24,11 @@ export function UpcomingScheduleSection(): React.JSX.Element {
 
 export function UpcomingScheduleSectionContent({
   title,
+  icon,
   seeAllHref,
 }: {
   title: string;
+  icon?: LucideIcon;
   seeAllHref?: string;
 }): React.JSX.Element {
   const query = trpc.userMedia.getUpcomingSchedule.useInfiniteQuery(
@@ -46,6 +49,7 @@ export function UpcomingScheduleSectionContent({
   return (
     <LibraryCarousel<UpcomingScheduleItem>
       title={title}
+      icon={icon}
       seeAllHref={seeAllHref}
       items={items}
       isLoading={isLoading}

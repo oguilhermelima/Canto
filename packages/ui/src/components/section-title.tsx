@@ -13,6 +13,8 @@ interface SectionTitleProps {
   linkAs?: ElementType;
 }
 
+const OUTER_PADDING = "px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24";
+
 export function SectionTitle({
   title,
   icon: Icon,
@@ -21,30 +23,44 @@ export function SectionTitle({
   className,
   linkAs: Link = "a",
 }: SectionTitleProps): React.JSX.Element {
+  const titleNode = (
+    <h2 className="flex min-w-0 items-center gap-2 text-base font-semibold text-foreground md:text-xl">
+      {Icon && <Icon size={18} className="text-muted-foreground" />}
+      <span className="truncate">{title}</span>
+    </h2>
+  );
+
+  if (seeMorePath) {
+    return (
+      <div className={cn(OUTER_PADDING, className)}>
+        <div className="flex items-center justify-between gap-2">
+          <Link
+            href={seeMorePath}
+            className="group/section-title -mx-3 flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl px-3 py-2 transition-colors hover:bg-muted/50"
+          >
+            {titleNode}
+            <div className="flex shrink-0 items-center gap-1 text-sm font-medium text-muted-foreground transition-colors group-hover/section-title:text-foreground">
+              <span className="hidden md:inline">See more</span>
+              <ChevronRight className="h-4 w-4" />
+            </div>
+          </Link>
+          {action}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
-        "flex items-center justify-between px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24",
+        "flex items-center justify-between",
+        OUTER_PADDING,
         className,
       )}
     >
       <div className="flex items-center gap-1">
-        <h2 className="flex items-center gap-2 text-base font-semibold text-foreground md:text-xl">
-          {Icon && <Icon size={18} className="text-muted-foreground" />}
-          {title}
-        </h2>
+        {titleNode}
         {action}
-      </div>
-      <div className="flex items-center gap-2">
-        {seeMorePath && (
-          <Link
-            href={seeMorePath}
-            className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <span className="hidden md:inline">See more</span>
-            <ChevronRight className="h-4 w-4" />
-          </Link>
-        )}
       </div>
     </div>
   );

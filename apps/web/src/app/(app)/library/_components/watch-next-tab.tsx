@@ -1,5 +1,6 @@
 "use client";
 
+import type { LucideIcon } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { useSectionInfiniteQuery } from "~/components/home/sources/use-section-query";
 import { WatchNextCard } from "~/components/media/cards/watch-next-card";
@@ -18,11 +19,13 @@ const CARD_WIDTH_CLASS = "w-[280px] sm:w-[300px] lg:w-[340px] 2xl:w-[380px]";
 export function WatchNextTab({
   view = "watch_next",
   title = "Watch Next",
+  icon,
   seeAllHref,
   mediaType,
 }: {
   view?: WatchNextView;
   title?: string;
+  icon?: LucideIcon;
   seeAllHref?: string;
   mediaType?: "movie" | "show";
 }): React.JSX.Element {
@@ -44,6 +47,7 @@ export function WatchNextTab({
   return (
     <LibraryCarousel<WatchNextItem>
       title={title}
+      icon={icon}
       seeAllHref={seeAllHref}
       items={items}
       isLoading={isLoading}
