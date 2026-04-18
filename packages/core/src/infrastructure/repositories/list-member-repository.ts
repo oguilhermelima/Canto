@@ -126,6 +126,7 @@ export async function findPendingInvitations(db: Database, listId: string) {
   return db
     .select({
       id: listInvitation.id,
+      token: listInvitation.token,
       invitedEmail: listInvitation.invitedEmail,
       invitedUserId: listInvitation.invitedUserId,
       role: listInvitation.role,
