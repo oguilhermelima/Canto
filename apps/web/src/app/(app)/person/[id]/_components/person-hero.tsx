@@ -29,7 +29,7 @@ export function PersonHero({ person }: PersonHeroProps): React.JSX.Element {
   return (
     <section className="relative -mt-16 w-full">
       {/* Backdrop */}
-      <div className="relative h-[450px] w-full overflow-hidden bg-muted md:h-[550px]">
+      <div className="relative h-[340px] w-full overflow-hidden bg-muted md:h-[550px]">
         {backdropPath ? (
           <FadeImage
             src={`https://image.tmdb.org/t/p/w1280${backdropPath}`}
@@ -46,10 +46,10 @@ export function PersonHero({ person }: PersonHeroProps): React.JSX.Element {
       </div>
 
       {/* Profile content */}
-      <div className="relative mx-auto -mt-56 w-full px-4 pb-10 md:-mt-64 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-        <div className="flex flex-col items-center gap-8 md:flex-row md:items-end">
+      <div className="relative mx-auto -mt-40 w-full px-4 pb-6 md:-mt-64 md:px-8 md:pb-10 lg:px-12 xl:px-16 2xl:px-24">
+        <div className="flex flex-col items-center gap-4 md:flex-row md:items-end md:gap-8">
           {/* Profile photo */}
-          <div className="relative h-[220px] w-[220px] shrink-0 overflow-hidden rounded-xl bg-muted shadow-2xl ring-4 ring-background md:h-[300px] md:w-[300px]">
+          <div className="relative h-[160px] w-[160px] shrink-0 overflow-hidden rounded-xl bg-muted shadow-2xl ring-4 ring-background md:h-[300px] md:w-[300px]">
             {person.profilePath ? (
               <FadeImage
                 src={`https://image.tmdb.org/t/p/h632${person.profilePath}`}
@@ -68,18 +68,18 @@ export function PersonHero({ person }: PersonHeroProps): React.JSX.Element {
           </div>
 
           {/* Info */}
-          <div className="flex flex-col items-center pb-4 text-center md:items-start md:text-left">
+          <div className="flex min-w-0 flex-col items-center text-center md:items-start md:pb-4 md:text-left">
             {person.knownForDepartment && (
-              <p className="mb-1 text-sm font-medium uppercase tracking-wider text-muted-foreground">
+              <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground md:text-sm">
                 {person.knownForDepartment}
               </p>
             )}
 
-            <h1 className="text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
               {person.name}
             </h1>
 
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground md:justify-start">
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground md:mt-4 md:gap-x-6 md:gap-y-2 md:text-sm md:justify-start">
               {person.birthday && (
                 <span className="flex items-center gap-1.5">
                   <Cake size={15} className="text-muted-foreground" />
@@ -108,21 +108,21 @@ export function PersonHero({ person }: PersonHeroProps): React.JSX.Element {
             </div>
 
             {/* Stats pills */}
-            <div className="mt-5 flex flex-wrap items-center gap-3">
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2 md:mt-5 md:justify-start md:gap-3">
               {person.movieCredits.length > 0 && (
-                <div className="flex items-center gap-1.5 rounded-full bg-muted px-4 py-2 text-xs font-medium text-foreground">
+                <div className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-foreground md:px-4 md:py-2">
                   <Film size={14} />
                   {person.movieCredits.length} Movies
                 </div>
               )}
               {person.tvCredits.length > 0 && (
-                <div className="flex items-center gap-1.5 rounded-full bg-muted px-4 py-2 text-xs font-medium text-foreground">
+                <div className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-foreground md:px-4 md:py-2">
                   <Tv size={14} />
                   {person.tvCredits.length} TV Shows
                 </div>
               )}
               {person.popularity > 0 && (
-                <div className="flex items-center gap-1.5 rounded-full bg-muted px-4 py-2 text-xs font-medium text-foreground">
+                <div className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-foreground md:px-4 md:py-2">
                   <Star
                     size={14}
                     className="fill-yellow-500 text-yellow-500"

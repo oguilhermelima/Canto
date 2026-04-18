@@ -45,12 +45,12 @@ export default function PersonPage({
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen overflow-x-hidden bg-background">
       <PersonHero person={person} />
 
       {/* Biography */}
       {person.biography && (
-        <div className="mx-auto w-full px-4 pt-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+        <div className="mx-auto w-full px-4 pt-4 md:px-8 md:pt-6 lg:px-12 xl:px-16 2xl:px-24">
           <h2 className="mb-3 text-base font-semibold text-foreground md:text-xl">
             Biography
           </h2>
@@ -66,7 +66,7 @@ export default function PersonPage({
       />
 
       {person.images.length > 1 && (
-        <div className="mt-16 pb-16 md:mt-20">
+        <div className="mt-10 pb-10 md:mt-20 md:pb-16">
           <PhotoGallery images={person.images} name={person.name} />
         </div>
       )}
