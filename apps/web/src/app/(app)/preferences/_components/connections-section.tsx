@@ -45,7 +45,7 @@ const BRAND = {
     border: "border-[#ed1c24]/20",
     ring: "ring-[#ed1c24]/30",
     label: "Trakt",
-    logo: "/trakt-logo.png",
+    logo: "/trakt-logo.svg",
   },
 } as const;
 
