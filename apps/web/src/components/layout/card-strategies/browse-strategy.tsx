@@ -17,6 +17,7 @@ function GridCard({ item }: { item: BrowseItem }): React.JSX.Element {
       posterPath={item.posterPath}
       year={item.year}
       voteAverage={item.voteAverage}
+      hideMetaRating
       slots={{
         topLeft: <RatingBadgeStack voteAverage={item.voteAverage} />,
       }}

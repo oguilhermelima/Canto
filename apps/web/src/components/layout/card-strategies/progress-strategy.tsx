@@ -82,6 +82,7 @@ function GridCard({ item }: { item: BrowseItem }): React.JSX.Element {
       year={item.year}
       voteAverage={item.voteAverage}
       progress={item.progress}
+      hideMetaRating
       slots={{
         topLeft: (
           <RatingBadgeStack

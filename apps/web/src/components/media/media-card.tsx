@@ -40,6 +40,8 @@ interface MediaCardProps {
   href?: string;
   className?: string;
   slots?: MediaCardSlots;
+  /** Suppress the inline rating in the hover overlay meta row (when caller shows its own rating badge). */
+  hideMetaRating?: boolean;
 }
 
 export function MediaCard({
@@ -55,6 +57,7 @@ export function MediaCard({
   href,
   className,
   slots,
+  hideMetaRating = false,
 }: MediaCardProps): React.JSX.Element {
   const linkHref =
     href ?? mediaHref(provider ?? "tmdb", externalId ?? id ?? "0", type);
@@ -145,7 +148,7 @@ export function MediaCard({
             )}
             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold uppercase tracking-wider text-white/80">
               <span>{type === "movie" ? "Movie" : "TV Show"}</span>
-              {voteAverage != null && voteAverage > 0 && (
+              {!hideMetaRating && voteAverage != null && voteAverage > 0 && (
                 <>
                   <span className="opacity-40" aria-hidden>•</span>
                   <RatingInline variant="public" value={voteAverage} />
