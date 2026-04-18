@@ -18,6 +18,11 @@ const BACKDROP_SIZES = [
   { max: 1280, size: "w1280" },
 ] as const;
 
+const BACKDROP_THUMB_SIZES = [
+  { max: 400, size: "w300" },
+  { max: 1_000_000, size: "w780" },
+] as const;
+
 function pickSize(width: number, sizes: readonly { max: number; size: string }[]): string {
   for (const s of sizes) {
     if (width <= s.max) return s.size;
@@ -35,4 +40,13 @@ export function tmdbPosterLoader({ src, width }: ImageLoaderProps): string {
 export function tmdbBackdropLoader({ src, width }: ImageLoaderProps): string {
   if (src.startsWith("http")) return src;
   return `https://image.tmdb.org/t/p/${pickSize(width, BACKDROP_SIZES)}${src}`;
+}
+
+/**
+ * Next.js Image loader for small backdrop thumbnails (card grids).
+ * Caps at w780 — retina cards avoid w1280 payloads.
+ */
+export function tmdbThumbLoader({ src, width }: ImageLoaderProps): string {
+  if (src.startsWith("http")) return src;
+  return `https://image.tmdb.org/t/p/${pickSize(width, BACKDROP_THUMB_SIZES)}${src}`;
 }
