@@ -3,10 +3,10 @@
 import Link from "next/link";
 import Image from "next/image";
 
-function posterSrc(path: string): string {
+function posterSrc(path: string, width: 185 | 342): string {
   return path.startsWith("http")
     ? path
-    : `https://image.tmdb.org/t/p/w342${path}`;
+    : `https://image.tmdb.org/t/p/w${width}${path}`;
 }
 
 export function CollectionCard({
@@ -22,55 +22,73 @@ export function CollectionCard({
   };
 }): React.JSX.Element {
   const posters = (list.previewPosters ?? []).slice(0, 4);
+  const count = posters.length;
 
   return (
     <Link
       href={`/collection/${list.slug}`}
-      className="group relative flex w-[260px] shrink-0 overflow-hidden rounded-xl transition-[box-shadow] duration-200 hover:z-10 hover:ring-2 hover:ring-foreground/20 sm:w-[280px] lg:w-[300px]"
+      className="group relative flex w-[300px] shrink-0 overflow-hidden rounded-2xl ring-1 ring-border/40 transition-[box-shadow,transform] duration-300 hover:ring-2 hover:ring-foreground/30 sm:w-[340px] lg:w-[380px] 2xl:w-[420px]"
     >
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-muted">
-        {posters.length >= 3 ? (
-          <div className="grid h-full w-full grid-cols-3">
-            {posters.slice(0, 3).map((poster, i) => (
-              <div key={`${poster}-${i}`} className="relative h-full overflow-hidden">
-                <Image
-                  src={posterSrc(poster)}
-                  alt=""
-                  fill
-                  className="object-cover transition-transform duration-200 group-hover:scale-[1.02]"
-                  sizes="100px"
-                />
-              </div>
-            ))}
-          </div>
-        ) : posters.length > 0 ? (
-          <Image
-            src={posterSrc(posters[0]!)}
-            alt=""
-            fill
-            className="object-cover transition-transform duration-200 group-hover:scale-[1.02]"
-            sizes="300px"
-          />
+        {count > 0 ? (
+          <>
+            <Image
+              src={posterSrc(posters[0]!, 342)}
+              alt=""
+              fill
+              className="scale-125 object-cover blur-2xl"
+              sizes="420px"
+            />
+            <div className="absolute inset-0 bg-black/40" />
+
+            <div className="absolute inset-0 flex items-center justify-center pb-1">
+              {posters.map((poster, i) => {
+                const mid = (count - 1) / 2;
+                const offset = i - mid;
+                const rotate = offset * 5;
+                const translateX = offset * 46;
+                const z = count - Math.round(Math.abs(offset));
+                return (
+                  <div
+                    key={poster}
+                    className="absolute aspect-[2/3] h-[96%] overflow-hidden rounded-xl shadow-[0_14px_34px_-10px_rgba(0,0,0,0.7)] ring-1 ring-black/20 transition-transform duration-500 group-hover:scale-[1.03]"
+                    style={{
+                      transform: `translateX(${translateX}px) rotate(${rotate}deg)`,
+                      zIndex: z,
+                    }}
+                  >
+                    <Image
+                      src={posterSrc(poster, 185)}
+                      alt=""
+                      fill
+                      className="object-cover"
+                      sizes="180px"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </>
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-muted text-muted-foreground">
-            <span className="text-3xl font-bold">
+            <span className="text-5xl font-bold">
               {list.name.charAt(0).toUpperCase()}
             </span>
           </div>
         )}
 
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-3/5 bg-gradient-to-t from-black via-black/85 via-30% to-transparent" />
 
-        <div className="absolute inset-x-0 bottom-0 px-4 pb-3.5">
-          <p className="truncate text-sm font-semibold text-white">
+        <div className="absolute inset-x-0 bottom-0 z-20 px-5 pb-4 pt-10">
+          <p className="truncate text-base font-semibold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
             {list.name}
           </p>
           <div className="mt-1 flex items-center gap-2">
-            <span className="text-xs text-white/70">
+            <span className="text-xs text-zinc-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
               {list.itemCount} {list.itemCount === 1 ? "item" : "items"}
             </span>
             {(list.type === "watchlist" || list.type === "server") && (
-              <span className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-medium text-white/80">
+              <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm">
                 System
               </span>
             )}
