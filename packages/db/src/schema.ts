@@ -33,7 +33,7 @@ export const user = pgTable("user", {
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   emailVerified: boolean("email_verified").notNull().default(false),
-  image: varchar("image", { length: 255 }),
+  image: text("image"),
   role: varchar("role", { length: 20 }).notNull().default("user"), // 'admin' | 'user'
   language: varchar("language", { length: 10 })
     .notNull()
@@ -42,7 +42,7 @@ export const user = pgTable("user", {
   watchRegion: varchar("watch_region", { length: 10 }),
   isPublic: boolean("is_public").notNull().default(false),
   bio: varchar("bio", { length: 500 }),
-  headerImage: varchar("header_image", { length: 500 }),
+  headerImage: text("header_image"),
   directSearchEnabled: boolean("direct_search_enabled").notNull().default(true),
   recsVersion: integer("recs_version").notNull().default(0),
   recsUpdatedAt: timestamp("recs_updated_at", { withTimezone: true }),
