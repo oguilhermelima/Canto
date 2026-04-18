@@ -135,10 +135,16 @@ export async function translateMediaItems<T extends { externalId: number; provid
   return items.map((item) => {
     const trans = transByKey.get(`${item.provider}-${item.externalId}`);
     if (!trans) return item;
+    const translatedTitle =
+      trans.title && trans.title.trim().length > 0 ? trans.title : null;
+    const translatedOverview =
+      trans.overview && trans.overview.trim().length > 0
+        ? trans.overview
+        : null;
     return {
       ...item,
-      title: trans.title ?? item.title,
-      overview: trans.overview ?? item.overview,
+      title: translatedTitle ?? item.title,
+      overview: translatedOverview ?? item.overview,
       ...(trans.posterPath ? { posterPath: trans.posterPath } : {}),
       ...(trans.logoPath ? { logoPath: trans.logoPath } : {}),
     };
