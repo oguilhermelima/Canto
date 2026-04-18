@@ -1,8 +1,9 @@
 import { and, asc, eq, or, isNull, desc, count, sql, inArray, max, type SQL } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { list, listItem, listMember, media, folderServerLink, userConnection, userMediaLibrary, userMediaState } from "@canto/db/schema";
+import { list, listItem, listMember, media, mediaTranslation, folderServerLink, userConnection, userMediaLibrary, userMediaState } from "@canto/db/schema";
 import type { RecsFilters } from "../../domain/types/recs-filters";
 import { buildRecsFilterConditions, recsSortOrder } from "./shared/recs-filter-builder";
+import { getUserLanguage } from "../../domain/services/user-service";
 
 // ── Lists ──
 
@@ -43,45 +44,92 @@ export async function findUserListsWithCounts(
 
   if (lists.length === 0) return [];
 
-  const counts = await db
-    .select({
-      listId: listItem.listId,
-      count: count(),
-    })
-    .from(listItem)
-    .where(
-      sql`${listItem.listId} IN (${sql.join(
-        lists.map((l) => sql`${l.id}`),
-        sql`, `,
-      )})`,
-    )
-    .groupBy(listItem.listId);
+  const serverListIds = lists.filter((l) => l.type === "server").map((l) => l.id);
+  const nonServerListIds = lists.filter((l) => l.type !== "server").map((l) => l.id);
 
-  const countMap = new Map(counts.map((c) => [c.listId, c.count]));
+  const userLang = await getUserLanguage(db, userId);
+  const translationJoin = and(
+    eq(mediaTranslation.mediaId, media.id),
+    eq(mediaTranslation.language, userLang),
+  );
+  const localizedPosterPath = sql<string | null>`COALESCE(${mediaTranslation.posterPath}, ${media.posterPath})`;
 
-  // Fetch preview posters for each list (up to 4 most recently added)
-  const previewRows = await db
-    .select({
-      listId: listItem.listId,
-      posterPath: media.posterPath,
-    })
-    .from(listItem)
-    .innerJoin(media, eq(listItem.mediaId, media.id))
-    .where(
-      sql`${listItem.listId} IN (${sql.join(
-        lists.map((l) => sql`${l.id}`),
-        sql`, `,
-      )})`,
-    )
-    .orderBy(asc(listItem.position), desc(listItem.addedAt));
-
+  const countMap = new Map<string, number>();
   const previewMap = new Map<string, string[]>();
-  for (const r of previewRows) {
-    if (!r.posterPath) continue;
-    const arr = previewMap.get(r.listId) ?? [];
+
+  const accumulatePreview = (listId: string, posterPath: string | null): void => {
+    if (!posterPath) return;
+    const arr = previewMap.get(listId) ?? [];
     if (arr.length < 4) {
-      arr.push(r.posterPath);
-      previewMap.set(r.listId, arr);
+      arr.push(posterPath);
+      previewMap.set(listId, arr);
+    }
+  };
+
+  if (nonServerListIds.length > 0) {
+    const [countRows, previewRows] = await Promise.all([
+      db
+        .select({ listId: listItem.listId, count: count() })
+        .from(listItem)
+        .where(inArray(listItem.listId, nonServerListIds))
+        .groupBy(listItem.listId),
+      db
+        .select({
+          listId: listItem.listId,
+          posterPath: localizedPosterPath,
+        })
+        .from(listItem)
+        .innerJoin(media, eq(listItem.mediaId, media.id))
+        .leftJoin(mediaTranslation, translationJoin)
+        .where(inArray(listItem.listId, nonServerListIds))
+        .orderBy(asc(listItem.position), desc(listItem.addedAt)),
+    ]);
+
+    for (const c of countRows) countMap.set(c.listId, c.count);
+    for (const r of previewRows) accumulatePreview(r.listId, r.posterPath);
+  }
+
+  if (serverListIds.length > 0) {
+    const userServerJoin = and(
+      eq(userMediaLibrary.mediaId, listItem.mediaId),
+      eq(userMediaLibrary.userId, userId),
+    );
+
+    const [countRows, previewRows] = await Promise.all([
+      db
+        .select({
+          listId: listItem.listId,
+          count: sql<number>`COUNT(DISTINCT ${listItem.mediaId})`.mapWith(Number),
+        })
+        .from(listItem)
+        .innerJoin(userMediaLibrary, userServerJoin)
+        .where(inArray(listItem.listId, serverListIds))
+        .groupBy(listItem.listId),
+      db
+        .select({
+          listId: listItem.listId,
+          mediaId: listItem.mediaId,
+          posterPath: localizedPosterPath,
+          position: listItem.position,
+          addedAt: listItem.addedAt,
+        })
+        .from(listItem)
+        .innerJoin(media, eq(listItem.mediaId, media.id))
+        .innerJoin(userMediaLibrary, userServerJoin)
+        .leftJoin(mediaTranslation, translationJoin)
+        .where(inArray(listItem.listId, serverListIds))
+        .orderBy(asc(listItem.position), desc(listItem.addedAt)),
+    ]);
+
+    for (const c of countRows) countMap.set(c.listId, c.count);
+
+    const seenPerList = new Map<string, Set<string>>();
+    for (const r of previewRows) {
+      const seen = seenPerList.get(r.listId) ?? new Set<string>();
+      if (seen.has(r.mediaId)) continue;
+      seen.add(r.mediaId);
+      seenPerList.set(r.listId, seen);
+      accumulatePreview(r.listId, r.posterPath);
     }
   }
 
