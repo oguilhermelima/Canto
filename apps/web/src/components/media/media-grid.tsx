@@ -2,6 +2,7 @@
 
 import { cn } from "@canto/ui/cn";
 import { MediaCard, MediaCardSkeleton } from "./media-card";
+import { RatingBadgeStack } from "./rating-badge";
 import { StateMessage } from "@canto/ui/state-message";
 
 interface MediaItem {
@@ -14,8 +15,7 @@ interface MediaItem {
   year?: number | null;
   voteAverage?: number | null;
   overview?: string | null;
-  totalRating?: number;
-  voteCount?: number;
+  membersAvg?: number | null;
 }
 
 interface MediaGridProps {
@@ -53,28 +53,21 @@ export function MediaGrid({
   }
 
   return (
-    <>
-      <div className={cn("grid gap-6", cols, className)}>
-        {items.map((item, i) => (
-          <div key={item.id ?? `${item.provider}-${item.externalId}-${i}`} className="relative">
-            <MediaCard
-              {...item}
-              showTypeBadge
-              showRating={false}
-              showYear={false}
-              showTitle={false}
-            />
-            {item.totalRating != null && item.voteCount != null && item.voteCount > 0 && (
-              <div className="absolute left-1.5 top-1.5 z-10 flex items-center gap-1 rounded-lg bg-primary px-2 py-0.5">
-                <span className="text-xs font-bold text-primary-foreground">{item.totalRating}</span>
-                <span className="text-[10px] text-primary-foreground">
-                  ({item.voteCount})
-                </span>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </>
+    <div className={cn("grid gap-6", cols, className)}>
+      {items.map((item, i) => (
+        <MediaCard
+          key={item.id ?? `${item.provider}-${item.externalId}-${i}`}
+          {...item}
+          slots={{
+            topLeft: (
+              <RatingBadgeStack
+                voteAverage={item.voteAverage}
+                membersAvg={item.membersAvg}
+              />
+            ),
+          }}
+        />
+      ))}
+    </div>
   );
 }

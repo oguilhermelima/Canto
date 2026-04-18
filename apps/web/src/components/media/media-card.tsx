@@ -5,29 +5,41 @@ import { FadeImage } from "~/components/ui/fade-image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
-import { EyeOff, Film, Tv } from "lucide-react";
+import { Film, Tv } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { tmdbPosterLoader } from "~/lib/tmdb-image";
 import { mediaHref } from "~/lib/media-href";
+import { RatingInline } from "./rating-badge";
+
+export interface MediaCardSlots {
+  /** Overlay rendered at top-left of the poster (e.g., rating badges). */
+  topLeft?: React.ReactNode;
+  /** Overlay rendered at top-right of the poster (e.g., episode tag, user rating). */
+  topRight?: React.ReactNode;
+  /** Optional line shown above the title in the hover overlay. */
+  hoverSubtitle?: React.ReactNode;
+  /** Optional line shown below the type/year meta in the hover overlay. */
+  hoverExtra?: React.ReactNode;
+}
 
 interface MediaCardProps {
   id?: string;
-  externalId?: string;
+  externalId?: string | number;
   provider?: string;
   type: "movie" | "show";
   title: string;
   posterPath: string | null;
   year?: number | null;
   voteAverage?: number | null;
-  overview?: string | null;
-  showTypeBadge?: boolean;
-  showRating?: boolean;
-  showYear?: boolean;
-  showTitle?: boolean;
-  progress?: { percent: number; value: number; total: number; unit: "seconds" | "episodes" } | null;
-  onHide?: () => void;
+  progress?: {
+    percent: number;
+    value?: number;
+    total?: number;
+    unit?: "seconds" | "episodes";
+  } | null;
   href?: string;
   className?: string;
+  slots?: MediaCardSlots;
 }
 
 export function MediaCard({
@@ -39,15 +51,13 @@ export function MediaCard({
   posterPath,
   year,
   voteAverage,
-  showTitle = true,
   progress,
-  onHide,
   href,
   className,
+  slots,
 }: MediaCardProps): React.JSX.Element {
   const linkHref =
     href ?? mediaHref(provider ?? "tmdb", externalId ?? id ?? "0", type);
-
   const utils = trpc.useUtils();
   const [imageReady, setImageReady] = useState(!posterPath);
 
@@ -56,8 +66,8 @@ export function MediaCard({
     if (eid) {
       void utils.media.resolve.prefetch({
         provider: (provider ?? "tmdb") as "tmdb" | "tvdb",
-        externalId: parseInt(eid, 10),
-        type: type as "movie" | "show",
+        externalId: typeof eid === "number" ? eid : parseInt(eid, 10),
+        type,
       });
     }
   }, [id, externalId, provider, type, utils]);
@@ -67,7 +77,7 @@ export function MediaCard({
       href={linkHref}
       onMouseEnter={handlePrefetch}
       className={cn(
-        "group relative flex flex-col rounded-xl transition-[box-shadow] duration-200 hover:z-10 hover:ring-2 hover:ring-foreground/20",
+        "group relative flex rounded-xl transition-[box-shadow] duration-200 hover:z-10 hover:ring-2 hover:ring-foreground/20",
         className,
       )}
     >
@@ -109,88 +119,72 @@ export function MediaCard({
           />
         </div>
 
+        {slots?.topLeft && (
+          <div className="absolute left-1.5 top-1.5 z-10">{slots.topLeft}</div>
+        )}
+        {slots?.topRight && (
+          <div className="absolute right-1.5 top-1.5 z-10">{slots.topRight}</div>
+        )}
+
         <div
           className={cn(
-            "absolute inset-0 transition-opacity duration-200",
-            imageReady ? "opacity-100" : "pointer-events-none opacity-0",
+            "absolute inset-0 flex flex-col justify-end opacity-0 transition-opacity duration-300 group-hover:opacity-100",
+            !imageReady && "pointer-events-none",
           )}
         >
-          <div className="absolute inset-0 flex flex-col justify-end opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-            <div className="bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pb-3 pt-16">
-              <p className="line-clamp-4 text-sm font-semibold leading-tight text-white">
+          <div className="bg-gradient-to-t from-black/95 via-black/60 to-transparent px-3 pb-3 pt-20">
+            {slots?.hoverSubtitle && (
+              <div className="mb-1 line-clamp-1 text-xs font-medium text-white/75">
+                {slots.hoverSubtitle}
+              </div>
+            )}
+            {title && title.trim().length > 0 && (
+              <p className="line-clamp-3 text-base font-semibold leading-tight text-white">
                 {title}
               </p>
-              <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-white/70">
-                <span>{type === "movie" ? "Movie" : "TV Show"}</span>
-                {voteAverage != null && voteAverage > 0 && (
-                  <>
-                    <span className="text-white/30">·</span>
-                    <span className="text-yellow-400">{voteAverage.toFixed(1)}</span>
-                  </>
-                )}
-                {year && (
-                  <>
-                    <span className="text-white/30">·</span>
-                    <span>{year}</span>
-                  </>
-                )}
+            )}
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold uppercase tracking-wider text-white/80">
+              <span>{type === "movie" ? "Movie" : "TV Show"}</span>
+              {voteAverage != null && voteAverage > 0 && (
+                <>
+                  <span className="opacity-40" aria-hidden>•</span>
+                  <RatingInline variant="public" value={voteAverage} />
+                </>
+              )}
+              {year && (
+                <>
+                  <span className="opacity-40" aria-hidden>•</span>
+                  <span className="tabular-nums">{year}</span>
+                </>
+              )}
+            </div>
+            {slots?.hoverExtra && (
+              <div className="mt-1 line-clamp-1 text-xs text-white/70">
+                {slots.hoverExtra}
               </div>
-            </div>
+            )}
           </div>
-
-          {onHide && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onHide();
-              }}
-              className="absolute left-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-white/70 opacity-0 backdrop-blur-sm transition-opacity hover:bg-black/80 hover:text-white group-hover:opacity-100"
-              aria-label={`Hide ${title}`}
-            >
-              <EyeOff className="h-3.5 w-3.5" />
-            </button>
-          )}
-
-          {progress && (
-            <div className="absolute inset-x-0 bottom-0 h-1.5 bg-white/20">
-              <div
-                className="h-full bg-white"
-                style={{ width: `${progress.percent}%` }}
-              />
-            </div>
-          )}
         </div>
+
+        {progress && progress.percent > 0 && (
+          <div className="absolute inset-x-0 bottom-0 h-1.5 bg-white/20">
+            <div
+              className="h-full bg-white"
+              style={{ width: `${Math.min(progress.percent, 100)}%` }}
+            />
+          </div>
+        )}
       </div>
-
-      {showTitle && (
-        <div className="mt-2 px-0.5">
-          <p className="line-clamp-2 text-sm font-medium leading-tight text-foreground">
-            {title}
-          </p>
-        </div>
-      )}
     </Link>
   );
 }
 
 export function MediaCardSkeleton({
   className,
-  showTitle = true,
 }: {
   className?: string;
-  showTitle?: boolean;
 }): React.JSX.Element {
   return (
-    <div className={cn("flex flex-col", className)}>
-      <Skeleton className="aspect-[2/3] w-full rounded-xl" />
-      {showTitle && (
-        <div className="mt-2 space-y-1.5 px-0.5">
-          <Skeleton className="h-4 w-3/4" />
-          <Skeleton className="h-4 w-12" />
-        </div>
-      )}
-    </div>
+    <Skeleton className={cn("aspect-[2/3] w-full rounded-xl", className)} />
   );
 }

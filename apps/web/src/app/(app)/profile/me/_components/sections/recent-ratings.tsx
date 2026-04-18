@@ -3,6 +3,7 @@
 import { Star, ChevronLeft, ChevronRight } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { MediaCard, MediaCardSkeleton } from "~/components/media/media-card";
+import { RatingBadge } from "~/components/media/rating-badge";
 import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
 import { mediaHref } from "~/lib/media-href";
 
@@ -43,10 +44,25 @@ export function RecentRatingsBlock({ title: _title }: { title: string }): React.
           {isLoading
             ? Array.from({ length: 6 }).map((_, i) => <MediaCardSkeleton key={i} className="w-[150px] shrink-0 sm:w-[170px]" />)
             : data?.items.map((item) => (
-                <div key={item.mediaId} className="relative w-[150px] shrink-0 sm:w-[170px]">
-                  <MediaCard id={item.mediaId} externalId={String(item.externalId)} provider={item.provider} type={item.mediaType as "movie" | "show"} title={item.title} posterPath={item.posterPath} year={item.year} href={mediaHref(item.provider, item.externalId, item.mediaType)} showTypeBadge showRating={false} showYear={false} showTitle={false} />
-                  <div className="absolute right-2 top-2 z-10 rounded-full bg-black/70 px-2 py-0.5 text-xs font-bold text-yellow-400">{item.rating}</div>
-                </div>
+                <MediaCard
+                  key={item.mediaId}
+                  id={item.mediaId}
+                  externalId={String(item.externalId)}
+                  provider={item.provider}
+                  type={item.mediaType as "movie" | "show"}
+                  title={item.title}
+                  posterPath={item.posterPath}
+                  year={item.year}
+                  href={mediaHref(item.provider, item.externalId, item.mediaType)}
+                  slots={
+                    item.rating != null
+                      ? {
+                          topLeft: <RatingBadge variant="user" value={item.rating} />,
+                        }
+                      : undefined
+                  }
+                  className="w-[150px] shrink-0 sm:w-[170px]"
+                />
               ))}
         </div>
       </div>

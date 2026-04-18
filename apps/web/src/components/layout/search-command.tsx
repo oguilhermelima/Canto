@@ -12,9 +12,10 @@ import {
 } from "@canto/ui/dialog";
 import { Input } from "@canto/ui/input";
 import { Skeleton } from "@canto/ui/skeleton";
-import { Search, Star, Film, Tv } from "lucide-react";
+import { Search, Film, Tv } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { mediaHref } from "~/lib/media-href";
+import { RatingInline } from "~/components/media/rating-badge";
 
 interface SearchCommandProps {
   open: boolean;
@@ -155,10 +156,7 @@ export function SearchCommand({
                         </span>
                       )}
                       {result.voteAverage != null && result.voteAverage > 0 && (
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-                          {result.voteAverage.toFixed(1)}
-                        </span>
+                        <RatingInline variant="public" value={result.voteAverage} className="text-xs" />
                       )}
                     </div>
                   </div>

@@ -3,12 +3,35 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, EyeOff } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { SectionTitle } from "@canto/ui/section-title";
 import { MediaCard, MediaCardSkeleton } from "./media-card";
 import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
 import { useHiddenMedia } from "~/hooks/use-hidden-media";
+
+function HideMediaButton({
+  onClick,
+  title,
+}: {
+  onClick: () => void;
+  title: string;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClick();
+      }}
+      className="flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-white/70 opacity-0 backdrop-blur-sm transition-opacity hover:bg-black/80 hover:text-white group-hover:opacity-100"
+      aria-label={`Hide ${title}`}
+    >
+      <EyeOff className="h-3.5 w-3.5" />
+    </button>
+  );
+}
 
 interface MediaItem {
   id?: string;
@@ -111,7 +134,6 @@ export function MediaCarousel({
             ? Array.from({ length: 8 }).map((_, i) => (
                 <MediaCardSkeleton
                   key={i}
-                  showTitle={false}
                   className="w-[180px] shrink-0 animate-pulse sm:w-[200px] lg:w-[220px] 2xl:w-[240px]"
                 />
               ))
@@ -119,20 +141,24 @@ export function MediaCarousel({
                 <MediaCard
                   key={item.id ?? `${item.provider}-${item.externalId}-${i}`}
                   {...item}
-                  showTypeBadge
-                  showRating={false}
-                  showYear={false}
-                  showTitle={false}
-                  onHide={
+                  slots={
                     hideable && item.externalId
-                      ? () =>
-                          hide({
-                            externalId: item.externalId!,
-                            provider: item.provider ?? "tmdb",
-                            type: item.type,
-                            title: item.title,
-                            posterPath: item.posterPath,
-                          })
+                      ? {
+                          topLeft: (
+                            <HideMediaButton
+                              onClick={() =>
+                                hide({
+                                  externalId: item.externalId!,
+                                  provider: item.provider ?? "tmdb",
+                                  type: item.type,
+                                  title: item.title,
+                                  posterPath: item.posterPath,
+                                })
+                              }
+                              title={item.title}
+                            />
+                          ),
+                        }
                       : undefined
                   }
                   className="w-[180px] shrink-0 sm:w-[200px] lg:w-[220px] 2xl:w-[240px]"
@@ -142,7 +168,6 @@ export function MediaCarousel({
             Array.from({ length: 4 }).map((_, i) => (
               <MediaCardSkeleton
                 key={`loading-${i}`}
-                showTitle={false}
                 className="w-[180px] shrink-0 animate-pulse sm:w-[200px] lg:w-[220px] 2xl:w-[240px]"
               />
             ))}

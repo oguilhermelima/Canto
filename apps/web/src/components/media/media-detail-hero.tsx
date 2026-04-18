@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { FadeImage } from "~/components/ui/fade-image";
 import { tmdbBackdropLoader } from "~/lib/tmdb-image";
@@ -15,6 +16,7 @@ import { cn } from "@canto/ui/cn";
 import { AddToListButton } from "~/components/media/add-to-list-button";
 import { MediaLogo } from "~/components/media/media-logo";
 import { RatingControl } from "~/components/media/RatingControl";
+import { RatingInline } from "~/components/media/rating-badge";
 import { WatchTrackingButton } from "~/components/media/watched-toggle-button";
 import { FavoriteButton } from "~/components/media/favorite-button";
 
@@ -94,6 +96,62 @@ interface MediaDetailHeroProps {
   rating?: number | null;
   isFavorite?: boolean;
   watchTrackingSeasons?: WatchSeason[];
+}
+
+function Overview({ text }: { text: string }): React.JSX.Element {
+  const [expanded, setExpanded] = useState(false);
+  const [isTruncated, setIsTruncated] = useState(false);
+  const [collapsedHeight, setCollapsedHeight] = useState<number | null>(null);
+  const [fullHeight, setFullHeight] = useState<number | null>(null);
+  const paragraphRef = useRef<HTMLParagraphElement>(null);
+  const measureRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    const collapsed = paragraphRef.current;
+    const full = measureRef.current;
+    if (!collapsed || !full) return;
+    setCollapsedHeight(collapsed.clientHeight);
+    setFullHeight(full.scrollHeight);
+    setIsTruncated(full.scrollHeight - 1 > collapsed.clientHeight);
+  }, [text]);
+
+  const currentHeight = expanded ? fullHeight : collapsedHeight;
+
+  return (
+    <div>
+      <div
+        className="relative overflow-hidden transition-[height] duration-300 ease-out"
+        style={currentHeight != null ? { height: currentHeight } : undefined}
+      >
+        <p
+          ref={paragraphRef}
+          className={cn(
+            "text-xs leading-relaxed text-foreground sm:text-sm",
+            !expanded && "line-clamp-3",
+          )}
+        >
+          {text}
+        </p>
+        {/* Hidden full-text clone to measure unclamped height */}
+        <p
+          ref={measureRef}
+          aria-hidden
+          className="pointer-events-none invisible absolute inset-x-0 top-0 text-xs leading-relaxed sm:text-sm"
+        >
+          {text}
+        </p>
+      </div>
+      {isTruncated && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 text-xs font-semibold text-foreground transition-colors hover:text-foreground/80 sm:text-sm"
+        >
+          {expanded ? "See less" : "See more"}
+        </button>
+      )}
+    </div>
+  );
 }
 
 export function MediaDetailHero({
@@ -220,42 +278,42 @@ export function MediaDetailHero({
           )}
 
           {/* Meta line */}
-          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-foreground sm:gap-x-3 sm:text-sm">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold uppercase tracking-wider text-foreground sm:text-xs">
             <span>{type === "movie" ? "Movie" : "TV Show"}</span>
             {voteAverage != null && voteAverage > 0 && (
               <>
-                <span className="text-foreground">|</span>
-                <span className="text-yellow-500">{voteAverage.toFixed(1)}</span>
+                <span className="opacity-40" aria-hidden>•</span>
+                <RatingInline variant="public" value={voteAverage} />
               </>
             )}
             {releaseDate && (
               <>
-                <span className="text-foreground">|</span>
-                <span>{formatDate(releaseDate)}</span>
+                <span className="opacity-40" aria-hidden>•</span>
+                <span className="tabular-nums">{formatDate(releaseDate)}</span>
               </>
             )}
             {contentRating && (
               <>
-                <span className="text-foreground">|</span>
-                <span className="rounded border border-foreground px-1.5 py-0.5 text-xs font-medium leading-none">
+                <span className="opacity-40" aria-hidden>•</span>
+                <span className="rounded border border-foreground/70 px-1.5 py-0.5 leading-none">
                   {contentRating}
                 </span>
               </>
             )}
             {runtime != null && runtime > 0 && (
               <>
-                <span className="text-foreground">|</span>
-                <span>{formatRuntime(runtime)}</span>
+                <span className="opacity-40" aria-hidden>•</span>
+                <span className="tabular-nums">{formatRuntime(runtime)}</span>
               </>
             )}
             {genres && genres.length > 0 && (
               <>
-                <span className="text-foreground">|</span>
+                <span className="opacity-40" aria-hidden>•</span>
                 {genres.map((genre, i) => {
                   const gId = genreIds?.[i];
                   return (
-                    <span key={genre} className="flex items-center gap-1.5">
-                      {i > 0 && <span className="text-foreground">,</span>}
+                    <span key={genre} className="flex items-center gap-x-2">
+                      {i > 0 && <span className="opacity-40" aria-hidden>·</span>}
                       <Link
                         href={`/search${gId ? `?genre=${gId}` : ""}`}
                         className="transition-colors hover:text-foreground"
@@ -272,9 +330,7 @@ export function MediaDetailHero({
           {/* Overview */}
           {overview && (
             <div className="max-w-2xl">
-              <p className="text-xs leading-relaxed text-foreground sm:text-sm">
-                {overview}
-              </p>
+              <Overview text={overview} />
             </div>
           )}
 

@@ -3,8 +3,9 @@
 import { useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Film, Tv, Star } from "lucide-react";
+import { Film, Tv } from "lucide-react";
 import { mediaHref } from "~/lib/media-href";
+import { RatingInline } from "~/components/media/rating-badge";
 
 interface CreditItem {
   id: number;
@@ -73,11 +74,8 @@ function TimelineCard({
         )}
 
         {credit.voteAverage != null && credit.voteAverage > 0 && (
-          <div className="mt-1.5 flex items-center gap-1">
-            <Star size={11} className="fill-yellow-500 text-yellow-500" />
-            <span className="text-xs text-muted-foreground">
-              {credit.voteAverage.toFixed(1)}
-            </span>
+          <div className="mt-1.5">
+            <RatingInline variant="public" value={credit.voteAverage} />
           </div>
         )}
       </div>
@@ -129,8 +127,8 @@ export function FilmographyTimeline({
   if (grouped.length === 0) return <></>;
 
   return (
-    <div className="mx-auto mt-16 w-full px-4 md:mt-20 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-      <h2 className="mb-10 text-base font-semibold text-foreground md:text-xl">
+    <div className="mx-auto mt-8 w-full px-4 md:mt-20 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+      <h2 className="mb-6 text-base font-semibold text-foreground md:mb-10 md:text-xl">
         Filmography
       </h2>
 

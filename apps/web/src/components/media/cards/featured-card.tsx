@@ -7,6 +7,7 @@ import { cn } from "@canto/ui/cn";
 import { FadeImage } from "~/components/ui/fade-image";
 import { AddToListButton } from "~/components/media/add-to-list-button";
 import { MediaLogo } from "~/components/media/media-logo";
+import { RatingInline } from "~/components/media/rating-badge";
 import { tmdbBackdropLoader, tmdbPosterLoader } from "~/lib/tmdb-image";
 import { mediaHref } from "~/lib/media-href";
 import type { FeaturedItem } from "~/components/media/featured-carousel";
@@ -191,18 +192,18 @@ export function FeaturedCard({
             <h3 className="text-lg font-bold text-white drop-shadow-lg">{item.title}</h3>
           )}
 
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/70">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-bold uppercase tracking-wider text-white/80">
             <span>{item.type === "movie" ? "Movie" : "TV Show"}</span>
             {item.voteAverage != null && item.voteAverage > 0 && (
               <>
-                <span className="text-white/30">·</span>
-                <span className="text-yellow-400">{item.voteAverage.toFixed(1)}</span>
+                <span className="opacity-40" aria-hidden>•</span>
+                <RatingInline variant="public" value={item.voteAverage} />
               </>
             )}
             {item.year && (
               <>
-                <span className="text-white/30">·</span>
-                <span>{item.year}</span>
+                <span className="opacity-40" aria-hidden>•</span>
+                <span className="tabular-nums">{item.year}</span>
               </>
             )}
           </div>

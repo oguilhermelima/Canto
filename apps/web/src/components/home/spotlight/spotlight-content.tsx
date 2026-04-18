@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { SpotlightActions } from "~/components/home/spotlight-actions";
 import { MediaLogo } from "~/components/media/media-logo";
+import { RatingInline } from "~/components/media/rating-badge";
 import { mediaHref } from "~/lib/media-href";
 import type { SpotlightItem } from "./spotlight-hero";
 
@@ -46,28 +47,28 @@ export function SpotlightContent({
           </h1>
         )}
       </Link>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground sm:text-sm">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground sm:text-xs">
         <span>{item.type === "movie" ? "Movie" : "TV Show"}</span>
         {item.voteAverage != null && item.voteAverage > 0 && (
           <>
-            <span className="text-muted-foreground">|</span>
-            <span className="text-yellow-400">{item.voteAverage.toFixed(1)}</span>
+            <span className="opacity-40" aria-hidden>•</span>
+            <RatingInline variant="public" value={item.voteAverage} />
           </>
         )}
         {item.year && (
           <>
-            <span className="text-muted-foreground">|</span>
-            <span>{item.year}</span>
+            <span className="opacity-40" aria-hidden>•</span>
+            <span className="tabular-nums">{item.year}</span>
           </>
         )}
         {item.genres.length > 0 && (
           <>
-            <span className="text-muted-foreground">|</span>
+            <span className="opacity-40" aria-hidden>•</span>
             {item.genres.map((genre, i) => {
               const genreId = item.genreIds[i];
               return (
-                <span key={genre} className="flex items-center gap-x-3">
-                  {i > 0 && <span className="text-muted-foreground">·</span>}
+                <span key={genre} className="flex items-center gap-x-2">
+                  {i > 0 && <span className="opacity-40" aria-hidden>·</span>}
                   <Link
                     href={`/search${genreId ? `?genre=${genreId}` : ""}`}
                     className="transition-colors hover:text-foreground"

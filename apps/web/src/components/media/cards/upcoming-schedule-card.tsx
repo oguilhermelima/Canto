@@ -9,6 +9,7 @@ import { cn } from "@canto/ui/cn";
 import { mediaHref } from "~/lib/media-href";
 import { useLogo } from "~/hooks/use-logos";
 import { MediaLogo } from "~/components/media/media-logo";
+import { tmdbThumbLoader } from "~/lib/tmdb-image";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -35,11 +36,8 @@ export interface UpcomingScheduleItem {
     | null;
 }
 
-function imageUrl(item: UpcomingScheduleItem): string | null {
-  const path = item.backdropPath ?? item.posterPath;
-  if (!path) return null;
-  if (path.startsWith("http")) return path;
-  return `https://image.tmdb.org/t/p/w780${path}`;
+function imagePath(item: UpcomingScheduleItem): string | null {
+  return item.backdropPath ?? item.posterPath;
 }
 
 function formatReleaseLabel(value: Date): string {
@@ -76,7 +74,7 @@ export function UpcomingScheduleCard({
     ? `S${String(item.episode.seasonNumber).padStart(2, "0")}E${String(item.episode.number).padStart(2, "0")}${item.episode.title ? ` · ${item.episode.title}` : ""}`
     : "Movie release";
 
-  const cardImage = imageUrl(item);
+  const cardImage = imagePath(item);
   const logoPath = useLogo(
     item.provider,
     String(item.externalId),
@@ -97,7 +95,7 @@ export function UpcomingScheduleCard({
         <Skeleton className="aspect-video w-full rounded-xl" />
         {cardImage && !imageReady && (
           <img
-            src={cardImage}
+            src={tmdbThumbLoader({ src: cardImage, width: 780, quality: 75 })}
             alt=""
             onLoad={() => setImageReady(true)}
             className="invisible absolute h-0 w-0"
@@ -115,6 +113,7 @@ export function UpcomingScheduleCard({
       <div className="relative aspect-video w-full overflow-hidden bg-muted">
         {cardImage ? (
           <Image
+            loader={tmdbThumbLoader}
             src={cardImage}
             alt={item.title}
             fill
@@ -131,7 +130,7 @@ export function UpcomingScheduleCard({
           </div>
         )}
 
-        <div className="absolute right-2.5 top-2.5 rounded-sm bg-sky-500 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-md">
+        <div className="absolute right-1.5 top-1.5 rounded-md bg-black/85 px-1.5 py-[3px] text-[10px] font-bold leading-none uppercase tracking-wider text-sky-300 shadow-md ring-1 ring-white/10 backdrop-blur-md">
           {releaseLabel}
         </div>
 

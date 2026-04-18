@@ -571,7 +571,7 @@ function StylePreview({ value }: { value: string }): React.JSX.Element {
   return (
     <div className="pointer-events-none flex justify-center">
       <MediaCard externalId="24188" provider="tmdb" type="movie" title="Il Sorpasso"
-        posterPath={example.poster} year={1962} voteAverage={8.0} showTitle={false} className="w-full max-w-[280px]" />
+        posterPath={example.poster} year={1962} voteAverage={8.0} className="w-full max-w-[280px]" />
     </div>
   );
 }

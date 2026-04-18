@@ -9,6 +9,7 @@ import { cn } from "@canto/ui/cn";
 import { mediaHref } from "~/lib/media-href";
 import { useLogo } from "~/hooks/use-logos";
 import { MediaLogo } from "~/components/media/media-logo";
+import { tmdbThumbLoader } from "~/lib/tmdb-image";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
@@ -58,11 +59,8 @@ function formatProgress(seconds: number): string {
   return `${minutes}m`;
 }
 
-function imageUrl(item: WatchNextItem): string | null {
-  const path = item.backdropPath ?? item.posterPath;
-  if (!path) return null;
-  if (path.startsWith("http")) return path;
-  return `https://image.tmdb.org/t/p/w780${path}`;
+function imagePath(item: WatchNextItem): string | null {
+  return item.backdropPath ?? item.posterPath;
 }
 
 function itemLabel(item: WatchNextItem): string {
@@ -97,7 +95,7 @@ export function WatchNextCard({
         ? `${item.progressValue}/${item.progressTotal} episodes watched`
         : null;
 
-  const cardImage = imageUrl(item);
+  const cardImage = imagePath(item);
   const logoPath = useLogo(
     item.provider,
     String(item.externalId),
@@ -118,7 +116,7 @@ export function WatchNextCard({
         <Skeleton className="aspect-video w-full rounded-xl" />
         {cardImage && !imageReady && (
           <img
-            src={cardImage}
+            src={tmdbThumbLoader({ src: cardImage, width: 780, quality: 75 })}
             alt=""
             onLoad={() => setImageReady(true)}
             className="invisible absolute h-0 w-0"
@@ -136,6 +134,7 @@ export function WatchNextCard({
       <div className="relative aspect-video w-full overflow-hidden bg-muted">
         {cardImage ? (
           <Image
+            loader={tmdbThumbLoader}
             src={cardImage}
             alt={item.title}
             fill
@@ -153,8 +152,10 @@ export function WatchNextCard({
         )}
 
         <div className={cn(
-          "absolute right-2.5 top-2.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-md",
-          view === "continue" ? "bg-white/90 text-black" : "bg-sky-500 text-white",
+          "absolute right-1.5 top-1.5 rounded-md px-1.5 py-[3px] text-[10px] font-bold leading-none uppercase tracking-wider shadow-md backdrop-blur-md ring-1",
+          view === "continue"
+            ? "bg-white/95 text-black ring-black/10"
+            : "bg-black/85 text-sky-300 ring-white/10",
         )}>
           {view === "continue" ? "CONTINUE" : "UP NEXT"}
         </div>

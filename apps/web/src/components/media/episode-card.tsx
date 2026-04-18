@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { FadeImage } from "~/components/ui/fade-image";
 import { cn } from "@canto/ui/cn";
-import { Star, CheckCircle2, Download } from "lucide-react";
+import { CheckCircle2, Download } from "lucide-react";
+import { RatingBadgeStack } from "~/components/media/rating-badge";
 
 export interface Episode {
   id: string;
@@ -79,24 +80,15 @@ export function EpisodeCard({
         )}
 
         {/* Rating badges — top left */}
-        <div className="absolute left-1.5 top-1.5 flex flex-col gap-1">
-          {episode.voteAverage != null && episode.voteAverage > 0 && (
-            <div className="flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-xs font-medium text-yellow-500 backdrop-blur-sm">
-              <Star size={10} className="fill-current" />
-              {episode.voteAverage.toFixed(1)}
-            </div>
-          )}
-          {userRating != null && (
-            <div className="flex items-center gap-0.5 rounded-md bg-black/70 px-1.5 py-0.5 text-xs font-medium text-blue-400 backdrop-blur-sm">
-              <Star size={10} className="fill-current" />
-              {userRating}
-            </div>
-          )}
-        </div>
+        <RatingBadgeStack
+          voteAverage={episode.voteAverage}
+          userRating={userRating}
+          className="absolute left-1.5 top-1.5"
+        />
 
         {/* Finale badge — bottom left */}
         {(episode.finaleType === "series" || episode.finaleType === "season" || episode.episodeType === "finale") && (
-          <div className="absolute bottom-1.5 left-1.5 rounded-md bg-amber-500/90 px-1.5 py-0.5 text-xs font-bold text-black backdrop-blur-sm">
+          <div className="absolute bottom-1.5 left-1.5 rounded-md bg-black/85 px-1.5 py-[3px] text-[10px] font-bold leading-none uppercase tracking-wider text-amber-300 shadow-md ring-1 ring-white/10 backdrop-blur-md">
             {episode.finaleType === "series" ? "Series Finale" : "Finale"}
           </div>
         )}

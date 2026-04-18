@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { MediaCard, MediaCardSkeleton } from "~/components/media/media-card";
+import { RatingBadge } from "~/components/media/rating-badge";
 import { StateMessage } from "@canto/ui/state-message";
 
 const GRID_CLASSES =
@@ -84,24 +85,23 @@ export function RatingsTab(): React.JSX.Element {
     <>
       <div className={GRID_CLASSES}>
         {items.map((item) => (
-          <div key={item.id} className="relative">
-            <MediaCard
-              id={item.id}
-              externalId={item.externalId}
-              provider={item.provider}
-              type={item.type}
-              title={item.title}
-              posterPath={item.posterPath}
-              year={item.year}
-              showTypeBadge
-              showRating={false}
-              showYear={false}
-              showTitle={false}
-            />
-            <div className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-xs font-bold text-yellow-400">
-              {item.rating}
-            </div>
-          </div>
+          <MediaCard
+            key={item.id}
+            id={item.id}
+            externalId={item.externalId}
+            provider={item.provider}
+            type={item.type}
+            title={item.title}
+            posterPath={item.posterPath}
+            year={item.year}
+            slots={
+              item.rating != null
+                ? {
+                    topLeft: <RatingBadge variant="user" value={item.rating} />,
+                  }
+                : undefined
+            }
+          />
         ))}
       </div>
 

@@ -82,6 +82,7 @@ export function MediaDetailContent({
         posterPath={media.posterPath}
         year={media.year}
         releaseDate={media.releaseDate}
+        voteAverage={media.voteAverage}
         genres={media.genres ?? undefined}
         genreIds={media.genreIds ?? undefined}
         runtime={media.runtime}

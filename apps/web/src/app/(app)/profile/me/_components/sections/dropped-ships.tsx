@@ -44,7 +44,7 @@ export function DroppedShipsBlock({ title: _title }: { title: string }): React.J
           {isLoading
             ? Array.from({ length: 4 }).map((_, i) => <MediaCardSkeleton key={i} className="w-[150px] shrink-0 opacity-60 sm:w-[170px]" />)
             : data?.items.map((item) => (
-                <MediaCard key={item.mediaId} id={item.mediaId} externalId={String(item.externalId)} provider={item.provider} type={item.mediaType as "movie" | "show"} title={item.title} posterPath={item.posterPath} year={item.year} href={mediaHref(item.provider, item.externalId, item.mediaType)} showTypeBadge showRating={false} showYear={false} showTitle={false} className="w-[150px] shrink-0 opacity-60 grayscale sm:w-[170px]" />
+                <MediaCard key={item.mediaId} id={item.mediaId} externalId={String(item.externalId)} provider={item.provider} type={item.mediaType as "movie" | "show"} title={item.title} posterPath={item.posterPath} year={item.year} href={mediaHref(item.provider, item.externalId, item.mediaType)} className="w-[150px] shrink-0 opacity-60 grayscale sm:w-[170px]" />
               ))}
         </div>
       </div>

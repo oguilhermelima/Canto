@@ -1,12 +1,13 @@
 "use client";
 
-import { Film, Tv, Star } from "lucide-react";
+import { Film, Tv } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
 import { FadeImage } from "~/components/ui/fade-image";
 import { tmdbPosterLoader } from "~/lib/tmdb-image";
 import { mediaHref } from "~/lib/media-href";
+import { RatingInline } from "./rating-badge";
 
 interface MediaItem {
   id?: string;
@@ -69,21 +70,18 @@ export function MediaListItem({ item }: { item: MediaItem }): React.JSX.Element 
         <p className="truncate text-sm font-medium text-foreground group-hover:text-primary transition-colors">
           {item.title}
         </p>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
           <span>{item.type === "movie" ? "Movie" : "TV Show"}</span>
-          {item.year && (
-            <>
-              <span className="text-border">|</span>
-              <span>{item.year}</span>
-            </>
-          )}
           {item.voteAverage != null && item.voteAverage > 0 && (
             <>
-              <span className="text-border">|</span>
-              <span className="flex items-center gap-0.5 text-yellow-500">
-                <Star className="h-3 w-3 fill-yellow-500" />
-                {item.voteAverage.toFixed(1)}
-              </span>
+              <span className="opacity-40" aria-hidden>•</span>
+              <RatingInline variant="public" value={item.voteAverage} />
+            </>
+          )}
+          {item.year && (
+            <>
+              <span className="opacity-40" aria-hidden>•</span>
+              <span className="tabular-nums">{item.year}</span>
             </>
           )}
         </div>

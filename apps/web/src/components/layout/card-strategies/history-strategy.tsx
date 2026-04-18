@@ -1,11 +1,11 @@
 "use client";
 
-import { cn } from "@canto/ui/cn";
 import {
   LibraryPlaybackCard,
 } from "~/app/(app)/library/_components/library-playback-card";
 import type { LibraryPlaybackEntry } from "~/app/(app)/library/_components/library-playback-card";
-import { BaseGridCard, BaseGridCardSkeleton } from "./base-grid-card";
+import { MediaCard, MediaCardSkeleton } from "~/components/media/media-card";
+import { RatingBadgeStack } from "~/components/media/rating-badge";
 import { GRID_COLS } from "~/components/layout/browse-layout.types";
 import type { CardStrategy, BrowseItem } from "~/components/layout/browse-layout.types";
 
@@ -33,16 +33,6 @@ function toPlaybackEntry(item: BrowseItem): LibraryPlaybackEntry {
   };
 }
 
-function statusBadge(item: BrowseItem): { label: string; className: string } | null {
-  if (item.entryType === "playback" && item.isCompleted === false) {
-    return { label: "In progress", className: "bg-amber-500/15 text-amber-500" };
-  }
-  if (item.isCompleted === true || (item.progress?.percent ?? 0) >= 100) {
-    return { label: "Watched", className: "bg-emerald-500/15 text-emerald-500" };
-  }
-  return { label: "Logged", className: "bg-muted text-muted-foreground" };
-}
-
 function formatWatchedDate(value: Date | string | null | undefined): string | null {
   if (!value) return null;
   const d = new Date(value);
@@ -50,7 +40,7 @@ function formatWatchedDate(value: Date | string | null | undefined): string | nu
   return d.toLocaleDateString(undefined, { dateStyle: "medium" });
 }
 
-function buildSubtitle(item: BrowseItem): string | null {
+function episodeLabel(item: BrowseItem): string | null {
   if (item.episode?.seasonNumber != null && item.episode?.number != null) {
     const ep = `S${String(item.episode.seasonNumber).padStart(2, "0")}E${String(item.episode.number).padStart(2, "0")}`;
     return item.episode.title ? `${ep} · ${item.episode.title}` : ep;
@@ -59,19 +49,30 @@ function buildSubtitle(item: BrowseItem): string | null {
 }
 
 function GridCard({ item }: { item: BrowseItem }): React.JSX.Element {
-  const badge = statusBadge(item);
-  const badgeNode = badge ? (
-    <div className={cn("absolute left-1.5 top-1.5 z-10 rounded-lg px-2 py-0.5 backdrop-blur-sm", badge.className)}>
-      <span className="text-xs font-semibold">{badge.label}</span>
-    </div>
-  ) : undefined;
+  const watchedLabel = formatWatchedDate(item.watchedAt);
+  const epLabel = episodeLabel(item);
 
   return (
-    <BaseGridCard
-      item={item}
-      badge={badgeNode}
-      subtitle={buildSubtitle(item)}
-      extra={formatWatchedDate(item.watchedAt)}
+    <MediaCard
+      id={item.id}
+      externalId={item.externalId}
+      provider={item.provider}
+      type={item.type}
+      title={item.title}
+      posterPath={item.posterPath}
+      year={item.year}
+      voteAverage={item.voteAverage}
+      progress={item.progress}
+      slots={{
+        topLeft: (
+          <RatingBadgeStack
+            voteAverage={item.voteAverage}
+            userRating={item.userRating}
+          />
+        ),
+        hoverSubtitle: epLabel,
+        hoverExtra: watchedLabel ? `Watched ${watchedLabel}` : undefined,
+      }}
     />
   );
 }
@@ -88,7 +89,7 @@ export const historyStrategy: CardStrategy = {
   name: "history",
   gridCard: (item) => <GridCard item={item} />,
   listCard: (item) => <ListCard item={item} />,
-  gridSkeleton: () => <BaseGridCardSkeleton />,
+  gridSkeleton: () => <MediaCardSkeleton />,
   listSkeleton: () => <ListSkeleton />,
   gridCols: GRID_COLS,
 };

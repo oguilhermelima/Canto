@@ -7,9 +7,10 @@ import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
 import { EyeOff, Film, Tv } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
-import { tmdbBackdropLoader } from "~/lib/tmdb-image";
+import { tmdbThumbLoader } from "~/lib/tmdb-image";
 import { mediaHref } from "~/lib/media-href";
 import { MediaLogo } from "./media-logo";
+import { RatingInline } from "./rating-badge";
 import { useLogo } from "~/hooks/use-logos";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
@@ -39,10 +40,10 @@ interface BackdropCardProps {
 }
 
 const BADGE_CONFIG: Record<BadgeType, { label: string; className: string }> = {
-  continue: { label: "CONTINUE", className: "bg-white text-black" },
-  trending: { label: "TRENDING", className: "bg-amber-500 text-black" },
-  new: { label: "NEW", className: "bg-emerald-500 text-white" },
-  "top-rated": { label: "TOP RATED", className: "bg-blue-500 text-white" },
+  continue: { label: "CONTINUE", className: "bg-white/95 text-black ring-black/10" },
+  trending: { label: "TRENDING", className: "bg-black/85 text-amber-300 ring-white/10" },
+  new: { label: "NEW", className: "bg-black/85 text-emerald-300 ring-white/10" },
+  "top-rated": { label: "TOP RATED", className: "bg-black/85 text-sky-300 ring-white/10" },
 };
 
 export function BackdropCard({
@@ -102,7 +103,7 @@ export function BackdropCard({
       <div className="relative aspect-video w-full overflow-hidden bg-muted">
         {backdropPath ? (
           <FadeImage
-            loader={tmdbBackdropLoader}
+            loader={tmdbThumbLoader}
             src={backdropPath}
             alt={title}
             fill
@@ -161,10 +162,10 @@ export function BackdropCard({
           )}
 
           {badge && (
-            <div className="absolute right-2.5 top-2.5 z-10">
+            <div className="absolute right-1.5 top-1.5 z-10">
               <span
                 className={cn(
-                  "rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-md",
+                  "rounded-md px-1.5 py-[3px] text-[10px] font-bold leading-none uppercase tracking-wider shadow-md ring-1 backdrop-blur-md",
                   BADGE_CONFIG[badge].className,
                 )}
               >
@@ -181,20 +182,18 @@ export function BackdropCard({
                 {title}
               </p>
             )}
-            <div className="mt-2 flex items-center gap-1.5 text-xs text-white">
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold uppercase tracking-wider text-white/85">
               <span>{type === "movie" ? "Movie" : "TV Show"}</span>
               {voteAverage != null && voteAverage > 0 && (
                 <>
-                  <span className="text-white/30">·</span>
-                  <span className="text-yellow-400">
-                    {voteAverage.toFixed(1)}
-                  </span>
+                  <span className="opacity-40" aria-hidden>•</span>
+                  <RatingInline variant="public" value={voteAverage} />
                 </>
               )}
               {year && (
                 <>
-                  <span className="text-white/30">·</span>
-                  <span>{year}</span>
+                  <span className="opacity-40" aria-hidden>•</span>
+                  <span className="tabular-nums">{year}</span>
                 </>
               )}
             </div>
