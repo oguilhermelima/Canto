@@ -60,6 +60,63 @@ interface BrowseLayoutProps {
   hideSections?: SectionId[];
   /** Expose Members Rating filter + sort (collection detail only) */
   showMembersRating?: boolean;
+  /** When provided, items are rendered in consecutive groups by label.
+   *  Return null to skip the header for an item (still renders it). */
+  groupBy?: (item: BrowseItem) => string | null;
+}
+
+interface GroupedItemsProps {
+  items: BrowseItem[];
+  groupBy: (item: BrowseItem) => string | null;
+  viewMode: ViewMode;
+  cols: string;
+  strategy: CardStrategy;
+}
+
+function GroupedItems({
+  items,
+  groupBy,
+  viewMode,
+  cols,
+  strategy,
+}: GroupedItemsProps): React.JSX.Element {
+  const groups: { label: string | null; items: BrowseItem[] }[] = [];
+  for (const item of items) {
+    const label = groupBy(item);
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) {
+      last.items.push(item);
+    } else {
+      groups.push({ label, items: [item] });
+    }
+  }
+
+  return (
+    <div className="space-y-8">
+      {groups.map((group, groupIndex) => (
+        <div key={`${group.label ?? "none"}-${groupIndex}`} className="space-y-3">
+          {group.label && (
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {group.label}
+            </h3>
+          )}
+          {viewMode === "grid" ? (
+            <div className={cn("grid gap-6", cols)}>
+              {group.items.map((item) => (
+                <div key={item.id}>{strategy.gridCard(item)}</div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {group.items.map((item) => (
+                <div key={item.id}>{strategy.listCard(item)}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function BrowseLayout({
@@ -88,6 +145,7 @@ export function BrowseLayout({
   menuGroups,
   hideSections,
   showMembersRating,
+  groupBy,
 }: BrowseLayoutProps): React.JSX.Element {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -231,7 +289,15 @@ export function BrowseLayout({
             <StateMessage preset="emptyGrid" minHeight="300px" />
           ) : (
             <>
-              {viewMode === "grid" ? (
+              {groupBy ? (
+                <GroupedItems
+                  items={items}
+                  groupBy={groupBy}
+                  viewMode={viewMode}
+                  cols={cols}
+                  strategy={strategy}
+                />
+              ) : viewMode === "grid" ? (
                 <div className={cn("grid gap-6", cols)}>
                   {items.map((item) => (
                     <div key={item.id}>{strategy.gridCard(item)}</div>
