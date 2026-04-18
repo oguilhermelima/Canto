@@ -58,7 +58,7 @@ export function LazySection({
       data-lazy-section-id={id}
       style={
         isRendered
-          ? undefined
+          ? { display: "contents" }
           : {
               minHeight: minHeightStyle,
               contentVisibility: "auto",
