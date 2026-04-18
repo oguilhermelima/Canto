@@ -4,7 +4,14 @@ import { useCallback, useMemo, useState } from "react";
 import type { BrowseItem, FilterOutput } from "~/components/layout/browse-layout";
 import { trpc } from "~/lib/trpc/client";
 
-export type LibraryView = "watched" | "history" | "watch_next" | "continue";
+export type LibraryView =
+  | "watched"
+  | "history"
+  | "watch_next"
+  | "continue"
+  | "ratings"
+  | "favorites"
+  | "dropped";
 
 const PAGE_SIZE = 40;
 
@@ -38,6 +45,8 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
   const yearMax = filters.yearMax ? Number(filters.yearMax) : undefined;
 
   const useHistory = view === "watched" || view === "history";
+  const useUserMedia =
+    view === "ratings" || view === "favorites" || view === "dropped";
 
   const historyQuery = trpc.userMedia.getLibraryHistory.useInfiniteQuery(
     {
@@ -86,13 +95,51 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
       tvStatus: filters.status,
     },
     {
-      enabled: !useHistory,
+      enabled: !useHistory && !useUserMedia,
       getNextPageParam: (lastPage) => lastPage.nextCursor,
       initialCursor: 0,
     },
   );
 
-  const active = useHistory ? historyQuery : watchNextQuery;
+  const userMediaSortBy = (() => {
+    switch (filters.sortBy) {
+      case "name_asc":
+      case "name_desc":
+        return "title" as const;
+      case "year_asc":
+      case "year_desc":
+        return "year" as const;
+      default:
+        return view === "ratings" ? ("rating" as const) : ("updatedAt" as const);
+    }
+  })();
+  const userMediaSortOrder: "asc" | "desc" =
+    filters.sortBy === "name_asc" || filters.sortBy === "year_asc"
+      ? "asc"
+      : "desc";
+
+  const userMediaQuery = trpc.userMedia.getUserMedia.useInfiniteQuery(
+    {
+      limit: PAGE_SIZE,
+      mediaType: queryMediaType,
+      hasRating: view === "ratings" ? true : undefined,
+      isFavorite: view === "favorites" ? true : undefined,
+      status: view === "dropped" ? "dropped" : undefined,
+      sortBy: userMediaSortBy,
+      sortOrder: userMediaSortOrder,
+    },
+    {
+      enabled: useUserMedia,
+      getNextPageParam: (lastPage) => lastPage.nextCursor,
+      initialCursor: 0,
+    },
+  );
+
+  const active = useHistory
+    ? historyQuery
+    : useUserMedia
+      ? userMediaQuery
+      : watchNextQuery;
 
   const items: BrowseItem[] = useMemo(() => {
     if (useHistory) {
@@ -121,6 +168,20 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
         isCompleted: entry.isCompleted ?? null,
       }));
     }
+    if (useUserMedia) {
+      return (userMediaQuery.data?.pages.flatMap((page) => page.items) ?? []).map((item) => ({
+        id: item.mediaId,
+        externalId: item.externalId,
+        provider: item.provider,
+        type: item.mediaType as "movie" | "show",
+        title: item.title,
+        posterPath: item.posterPath,
+        year: item.year ?? null,
+        voteAverage: item.voteAverage ?? null,
+        overview: item.overview ?? null,
+        userRating: item.rating ?? null,
+      }));
+    }
     return (watchNextQuery.data?.pages.flatMap((page) => page.items) ?? []).map((item) => ({
       id: item.id,
       externalId: item.externalId,
@@ -145,7 +206,7 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
         : null,
       isCompleted: false,
     }));
-  }, [useHistory, historyQuery.data, watchNextQuery.data]);
+  }, [useHistory, useUserMedia, historyQuery.data, userMediaQuery.data, watchNextQuery.data]);
 
   const onFetchNextPage = useCallback(() => {
     if (active.hasNextPage && !active.isFetchingNextPage) void active.fetchNextPage();

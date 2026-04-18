@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { SectionTitle } from "@canto/ui/section-title";
@@ -12,6 +13,7 @@ type SpaceStateKey = keyof typeof SPACE_STATES;
 
 export interface LibraryCarouselProps<T> {
   title: string;
+  icon?: LucideIcon;
   seeAllHref?: string;
   items: T[];
   isLoading: boolean;
@@ -34,6 +36,7 @@ const END_SPACER_CLASSES = "w-4 shrink-0 md:w-8 lg:w-12 xl:w-16 2xl:w-24";
 
 export const LibraryCarousel = <T,>({
   title,
+  icon,
   seeAllHref,
   items,
   isLoading,
@@ -72,7 +75,7 @@ export const LibraryCarousel = <T,>({
   if (isLoading) {
     return (
       <section className="relative">
-        <SectionTitle title={title} seeMorePath={seeAllHref} linkAs={Link} />
+        <SectionTitle title={title} icon={icon} seeMorePath={seeAllHref} linkAs={Link} />
         <div className={cn("mt-2 md:mt-4", SCROLL_CONTAINER_CLASSES)}>
           {Array.from({ length: skeletonCount }).map((_, index) => (
             <div key={index} className={skeletonClasses} />
@@ -86,7 +89,7 @@ export const LibraryCarousel = <T,>({
   if (isError) {
     return (
       <section className="relative">
-        <SectionTitle title={title} seeMorePath={seeAllHref} linkAs={Link} />
+        <SectionTitle title={title} icon={icon} seeMorePath={seeAllHref} linkAs={Link} />
         <div className="mt-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
           <StateMessage preset="error" onRetry={onRetry} minHeight="200px" />
         </div>
@@ -97,7 +100,7 @@ export const LibraryCarousel = <T,>({
   if (items.length === 0) {
     return (
       <section className="relative">
-        <SectionTitle title={title} seeMorePath={seeAllHref} linkAs={Link} />
+        <SectionTitle title={title} icon={icon} seeMorePath={seeAllHref} linkAs={Link} />
         <div className="mt-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
           <StateMessage preset={emptyPreset} minHeight="200px" />
         </div>
@@ -107,7 +110,7 @@ export const LibraryCarousel = <T,>({
 
   return (
     <section className="relative">
-      <SectionTitle title={title} seeMorePath={seeAllHref} linkAs={Link} />
+      <SectionTitle title={title} icon={icon} seeMorePath={seeAllHref} linkAs={Link} />
 
       <div className="group/carousel relative mt-4">
         {canScrollLeft && (
