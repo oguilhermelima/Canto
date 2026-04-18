@@ -26,7 +26,6 @@ import {
   Loader2,
   Mail,
   Trash2,
-  UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "~/lib/trpc/client";
@@ -85,27 +84,42 @@ export function CollectionMembersDialog({
     onError: (err) => toast.error(err.message),
   });
 
-  const handleInvite = (): void => {
-    if (!listId) return;
-    createInvitation.mutate({
-      listId,
-      email: inviteEmail.trim() || undefined,
-      role: inviteRole,
-    });
-  };
-
-  const handleInviteByLink = (): void => {
-    if (!listId) return;
-    createInvitation.mutate({ listId, role: inviteRole });
-  };
-
   const handleCopyLink = (token: string): void => {
     const link = `${window.location.origin}/invite/${token}`;
     void navigator.clipboard.writeText(link);
     setCopiedToken(token);
     setTimeout(() => setCopiedToken(null), 3000);
-    toast.success("Link copied");
+    toast.success("Invite link copied");
   };
+
+  const handleInviteByLink = (): void => {
+    if (!listId) return;
+    const email = inviteEmail.trim();
+
+    if (email) {
+      createInvitation.mutate({ listId, email, role: inviteRole });
+      return;
+    }
+
+    const existing = data?.invitations.find(
+      (inv) =>
+        !inv.invitedEmail &&
+        !inv.invitedUserId &&
+        inv.role === inviteRole &&
+        new Date(inv.expiresAt).getTime() > Date.now(),
+    );
+
+    if (existing) {
+      handleCopyLink(existing.token);
+      return;
+    }
+
+    createInvitation.mutate({ listId, role: inviteRole });
+  };
+
+  const pendingInvitations = (data?.invitations ?? []).filter(
+    (inv) => inv.invitedEmail ?? inv.invitedUserId,
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -118,17 +132,17 @@ export function CollectionMembersDialog({
         </DialogHeader>
 
         <div className="flex-1 space-y-4 overflow-y-auto pt-2">
-          {/* Invite by email */}
+          {/* Invite */}
           <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">Invite by email</label>
+            <label className="text-xs font-medium text-muted-foreground">Invite someone</label>
             <div className="flex gap-2">
               <Input
                 variant="ghost"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="user@example.com"
+                placeholder="Email (optional)"
                 className="flex-1"
-                onKeyDown={(e) => { if (e.key === "Enter") handleInvite(); }}
+                onKeyDown={(e) => { if (e.key === "Enter") handleInviteByLink(); }}
               />
               <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as "viewer" | "editor" | "admin")}>
                 <SelectTrigger className="w-28 rounded-xl border-none bg-accent text-xs">
@@ -140,26 +154,21 @@ export function CollectionMembersDialog({
                   <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
               </Select>
-              <Button size="sm" className="h-10 rounded-xl px-3" onClick={handleInvite} disabled={createInvitation.isPending}>
-                {createInvitation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <UserPlus className="h-4 w-4" />
-                )}
-              </Button>
             </div>
+            <Button
+              variant="outline"
+              className="w-full rounded-xl"
+              onClick={handleInviteByLink}
+              disabled={createInvitation.isPending}
+            >
+              {createInvitation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Link2 className="mr-2 h-4 w-4" />
+              )}
+              Invite by link
+            </Button>
           </div>
-
-          {/* Invite by link */}
-          <Button
-            variant="outline"
-            className="w-full rounded-xl"
-            onClick={handleInviteByLink}
-            disabled={createInvitation.isPending}
-          >
-            <Link2 className="mr-2 h-4 w-4" />
-            Invite by link
-          </Button>
 
           <div className="h-px bg-border/40" />
 
@@ -241,32 +250,30 @@ export function CollectionMembersDialog({
           </div>
 
           {/* Pending invitations */}
-          {data?.invitations && data.invitations.length > 0 && (
+          {pendingInvitations.length > 0 && (
             <>
               <div className="h-px bg-border/40" />
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Pending Invitations</label>
                 <div className="space-y-1">
-                  {data.invitations.map((inv) => (
+                  {pendingInvitations.map((inv) => (
                     <div key={inv.id} className="flex items-center gap-3 rounded-lg px-2 py-2">
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
                         <Mail className="h-4 w-4" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm text-foreground">{inv.invitedEmail ?? "Link invite"}</p>
+                        <p className="truncate text-sm text-foreground">{inv.invitedEmail}</p>
                         <p className="text-xs text-muted-foreground">
                           {inv.role} · expires {new Date(inv.expiresAt).toLocaleDateString()}
                         </p>
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleCopyLink(
-                          (inv as unknown as { token?: string }).token ?? inv.id
-                        )}
+                        onClick={() => handleCopyLink(inv.token)}
                         className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                         title="Copy invite link"
                       >
-                        {copiedToken === ((inv as unknown as { token?: string }).token ?? inv.id) ? (
+                        {copiedToken === inv.token ? (
                           <Check className="h-3.5 w-3.5 text-green-500" />
                         ) : (
                           <Copy className="h-3.5 w-3.5" />
