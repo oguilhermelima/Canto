@@ -6,7 +6,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { cn } from "@canto/ui/cn";
 import { Input } from "@canto/ui/input";
 import { Slider } from "@canto/ui/slider";
-import { ChevronDown, ArrowDown, ArrowUp, RotateCcw } from "lucide-react";
+import { ChevronDown, ArrowDown, ArrowUp, RotateCcw, Search, X } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import { useWatchRegion } from "~/hooks/use-watch-region";
 import type { FilterPreset } from "~/components/layout/browse-layout.types";
@@ -14,6 +14,8 @@ import type { FilterPreset } from "~/components/layout/browse-layout.types";
 /* ─── Output Type ─── */
 
 export interface FilterOutput {
+  // Free text search (title ILIKE)
+  q?: string;
   // TMDB discover params
   genres?: string;
   genreMode?: "and" | "or";
@@ -34,6 +36,8 @@ export interface FilterOutput {
   // Library filtering
   source?: "jellyfin" | "plex" | "manual";
   watchStatus?: "in_progress" | "completed" | "not_started";
+  // Collection-scoped: aggregate of list members' (+ owner) ratings
+  membersRatingMin?: number;
 }
 
 /* ─── Constants ─── */
@@ -44,6 +48,11 @@ const SORT_OPTIONS = [
   { value: "primary_release_date.desc", label: "Release Date" },
   { value: "title.asc", label: "Name A-Z" },
   { value: "title.desc", label: "Name Z-A" },
+];
+
+const MEMBERS_RATING_SORT_OPTIONS = [
+  { value: "members_rating.desc", label: "Members Rating (High)" },
+  { value: "members_rating.asc", label: "Members Rating (Low)" },
 ];
 
 const LANGUAGES = [
@@ -106,10 +115,10 @@ const WATCH_STATUS_OPTIONS = [
   { value: "not_started", label: "Not Started" },
 ] as const;
 
-export type SectionId = "sort" | "genres" | "year" | "score" | "runtime" | "language" | "status" | "certification" | "watchProviders" | "source" | "watchStatus";
+export type SectionId = "search" | "sort" | "genres" | "year" | "score" | "runtime" | "language" | "status" | "certification" | "watchProviders" | "source" | "watchStatus" | "membersRating";
 
 /** URL param keys owned by FilterSidebar — everything else is preserved. */
-const FILTER_KEYS = ["genre", "genreMode", "sort", "language", "score", "scoreMode", "yearMin", "yearMax", "runtimeMin", "runtimeMax", "certification", "status", "providers", "providerMode", "source", "watchStatus"] as const;
+const FILTER_KEYS = ["q", "genre", "genreMode", "sort", "language", "score", "scoreMode", "yearMin", "yearMax", "runtimeMin", "runtimeMax", "certification", "status", "providers", "providerMode", "source", "watchStatus", "memRating"] as const;
 
 /* ─── Sub-components ─── */
 
@@ -181,6 +190,17 @@ function Pill({
   );
 }
 
+function GroupHeader({ label, first = false }: { label: string; first?: boolean }): React.JSX.Element {
+  return (
+    <div className={cn("flex items-center gap-3", first ? "pb-3 pt-2" : "pb-3 pt-8")}>
+      <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-foreground/70">
+        {label}
+      </span>
+      <div className="h-[2px] flex-1 rounded-full bg-border" />
+    </div>
+  );
+}
+
 /* ─── Main Component ─── */
 
 export interface FilterSidebarHandle {
@@ -195,6 +215,8 @@ interface FilterSidebarProps {
   hideHeader?: boolean;
   className?: string;
   resetRef?: React.MutableRefObject<FilterSidebarHandle | null>;
+  /** Expose Members Rating filter + sort (collection detail only) */
+  showMembersRating?: boolean;
 }
 
 export function FilterSidebar({
@@ -205,6 +227,7 @@ export function FilterSidebar({
   hideHeader = false,
   className,
   resetRef,
+  showMembersRating = false,
 }: FilterSidebarProps): React.JSX.Element {
   const isLibrary = preset === "library";
   const show = (id: SectionId): boolean => !hideSections.includes(id);
@@ -246,6 +269,7 @@ export function FilterSidebar({
     new Set(v ? v.split(",").map(Number).filter(Boolean) : []);
 
   // Local state — seeded from URL params
+  const [q, setQ] = useState(searchParams.get("q") ?? "");
   const [selectedGenres, setSelectedGenres] = useState<Set<number>>(() => parseSet(searchParams.get("genre")));
   const [genreMode, setGenreMode] = useState<"and" | "or">((searchParams.get("genreMode") ?? "or") as "and" | "or");
   const [sortBy, setSortBy] = useState(searchParams.get("sort") ?? (isLibrary ? "recently_watched" : "popularity.desc"));
@@ -267,6 +291,13 @@ export function FilterSidebar({
   const [source, setSource] = useState<"jellyfin" | "plex" | "manual" | "">((searchParams.get("source") ?? "") as "jellyfin" | "plex" | "manual" | "");
   const [watchStatus, setWatchStatus] = useState<"in_progress" | "completed" | "not_started" | "">((searchParams.get("watchStatus") ?? "") as "in_progress" | "completed" | "not_started" | "");
 
+  // Collection-specific state (members rating aggregate)
+  const [membersRatingMin, setMembersRatingMin] = useState(() => {
+    const raw = searchParams.get("memRating");
+    return raw ? Number(raw) : 0;
+  });
+  const [membersRatingDisplay, setMembersRatingDisplay] = useState(membersRatingMin);
+
   // Watch providers for the region
   const { data: watchProvidersList } = trpc.provider.filterOptions.useQuery(
     { type: "watchProviders", mediaType: genreType, region: watchRegion },
@@ -276,6 +307,8 @@ export function FilterSidebar({
   // Build FilterOutput from current state
   const buildOutput = useCallback((): FilterOutput => {
     const f: FilterOutput = {};
+    const trimmedQ = q.trim();
+    if (trimmedQ) f.q = trimmedQ;
     if (selectedGenres.size > 0) {
       const ids = [...selectedGenres];
       f.genres = ids.join(genreMode === "or" ? "|" : ",");
@@ -301,8 +334,10 @@ export function FilterSidebar({
     // Library-specific fields
     if (source) f.source = source as "jellyfin" | "plex" | "manual";
     if (watchStatus) f.watchStatus = watchStatus as "in_progress" | "completed" | "not_started";
+    // Collection-specific fields
+    if (membersRatingMin > 0) f.membersRatingMin = membersRatingMin;
     return f;
-  }, [selectedGenres, genreMode, sortBy, language, scoreMode, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion, source, watchStatus]);
+  }, [q, selectedGenres, genreMode, sortBy, language, scoreMode, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion, source, watchStatus, membersRatingMin]);
 
   // Sync state → URL + emit to parent
   const emitRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -310,7 +345,8 @@ export function FilterSidebar({
 
   useEffect(() => {
     const defaultSort = isLibrary ? "recently_watched" : "popularity.desc";
-    const hasParams = selectedGenres.size > 0 || language || sortBy !== defaultSort || yearMin || yearMax || scoreMin > 0 || scoreMode !== "higher" || runtimeMin || runtimeMax || certification || status || selectedProviders.size > 0 || source || watchStatus;
+    const trimmedQ = q.trim();
+    const hasParams = !!trimmedQ || selectedGenres.size > 0 || language || sortBy !== defaultSort || yearMin || yearMax || scoreMin > 0 || scoreMode !== "higher" || runtimeMin || runtimeMax || certification || status || selectedProviders.size > 0 || source || watchStatus || membersRatingMin > 0;
 
     if (firstRender.current) {
       firstRender.current = false;
@@ -333,6 +369,7 @@ export function FilterSidebar({
       }
 
       // Set filter params
+      if (trimmedQ) params.set("q", trimmedQ);
       if (selectedGenres.size > 0) params.set("genre", [...selectedGenres].join(","));
       if (genreMode !== "or") params.set("genreMode", genreMode);
       if (sortBy !== "popularity.desc") params.set("sort", sortBy);
@@ -349,13 +386,14 @@ export function FilterSidebar({
       if (providerMode !== "or") params.set("providerMode", providerMode);
       if (source) params.set("source", source);
       if (watchStatus) params.set("watchStatus", watchStatus);
+      if (membersRatingMin > 0) params.set("memRating", String(membersRatingMin));
 
       const qs = params.toString();
       router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
     }, 300);
 
     return () => { if (emitRef.current) clearTimeout(emitRef.current); };
-  }, [selectedGenres, genreMode, sortBy, language, scoreMode, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion, source, watchStatus, onFilterChange, buildOutput, searchParams, router, pathname, isLibrary]);
+  }, [q, selectedGenres, genreMode, sortBy, language, scoreMode, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion, source, watchStatus, membersRatingMin, onFilterChange, buildOutput, searchParams, router, pathname, isLibrary]);
 
   // Handlers
   const toggleGenre = (id: number): void => {
@@ -368,6 +406,7 @@ export function FilterSidebar({
   };
 
   const handleReset = (): void => {
+    setQ("");
     setSelectedGenres(new Set());
     setGenreMode("or");
     setSortBy(isLibrary ? "recently_watched" : "popularity.desc");
@@ -385,6 +424,8 @@ export function FilterSidebar({
     setProviderMode("or");
     setSource("");
     setWatchStatus("");
+    setMembersRatingMin(0);
+    setMembersRatingDisplay(0);
   };
 
   // Expose reset to parent via ref
@@ -401,6 +442,25 @@ export function FilterSidebar({
   const showStatus = mediaType !== "movie" && show("status");
   const showCertification = show("certification");
   const certOptions = mediaType === "show" ? TV_CERTIFICATIONS : MOVIE_CERTIFICATIONS;
+
+  const hasTmdbGroup =
+    show("genres") ||
+    show("year") ||
+    show("score") ||
+    show("runtime") ||
+    show("language") ||
+    showStatus ||
+    showCertification ||
+    show("watchProviders");
+
+  const primaryGroupLabel: string | null = isLibrary
+    ? "Library"
+    : showMembersRating
+      ? "Collection"
+      : null;
+
+  // Watch status filter: available on library feeds and collection detail
+  const showWatchStatusSection = (isLibrary || showMembersRating) && show("watchStatus");
 
   return (
     <div className={cn(hideHeader ? "" : "pt-3", className)}>
@@ -420,6 +480,37 @@ export function FilterSidebar({
       )}
 
       <div className="flex flex-col">
+        {primaryGroupLabel && <GroupHeader label={primaryGroupLabel} first />}
+
+        {/* Search */}
+        {show("search") && (
+          <div className="border-b border-border py-4">
+            <div className="relative">
+              <Search
+                size={14}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                type="text"
+                placeholder="Search title..."
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className="!h-9 !rounded-xl !border-0 !bg-accent !pl-8 !pr-8 !text-[13px] !font-medium !text-foreground !placeholder:text-muted-foreground"
+              />
+              {q && (
+                <button
+                  type="button"
+                  onClick={() => setQ("")}
+                  className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  aria-label="Clear search"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Sort By */}
         {show("sort") && (
           <Section label="Sort By" defaultOpen>
@@ -429,7 +520,10 @@ export function FilterSidebar({
                 onChange={(e) => setSortBy(e.target.value)}
                 className="h-9 flex-1 appearance-none rounded-xl border-0 bg-accent px-3 text-[13px] text-foreground outline-none"
               >
-                {(isLibrary ? LIBRARY_SORT_OPTIONS : SORT_OPTIONS).map((opt) => (
+                {[
+                  ...(isLibrary ? LIBRARY_SORT_OPTIONS : SORT_OPTIONS),
+                  ...(showMembersRating ? MEMBERS_RATING_SORT_OPTIONS : []),
+                ].map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
@@ -446,11 +540,70 @@ export function FilterSidebar({
           </Section>
         )}
 
+        {/* Source (library only) */}
+        {isLibrary && show("source") && (
+          <Section label="Source" defaultOpen>
+            <div className="flex flex-wrap gap-1">
+              <Pill label="All" active={source === ""} onClick={() => setSource("")} />
+              {SOURCE_OPTIONS.map((s) => (
+                <Pill
+                  key={s.value}
+                  label={s.label}
+                  active={source === s.value}
+                  onClick={() => setSource(source === s.value ? "" : s.value)}
+                />
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* Watch Status (library feeds + collection detail) */}
+        {showWatchStatusSection && (
+          <Section label="Watch Status" defaultOpen>
+            <div className="flex flex-wrap gap-1">
+              <Pill label="All" active={watchStatus === ""} onClick={() => setWatchStatus("")} />
+              {WATCH_STATUS_OPTIONS.map((ws) => (
+                <Pill
+                  key={ws.value}
+                  label={ws.label}
+                  active={watchStatus === ws.value}
+                  onClick={() => setWatchStatus(watchStatus === ws.value ? "" : ws.value)}
+                />
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* Members Rating (collection preset) */}
+        {showMembersRating && show("membersRating") && (
+          <Section label="Members Rating" defaultOpen>
+            <div className="flex flex-col gap-1 pb-4">
+              <Slider
+                value={[membersRatingDisplay]}
+                onValueChange={(v) => setMembersRatingDisplay(v[0] ?? 0)}
+                onValueCommit={(v) => setMembersRatingMin(v[0] ?? 0)}
+                min={0}
+                max={10}
+                step={0.5}
+                showTooltip
+                formatValue={(v) => String(v)}
+                className="w-full"
+              />
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>0</span>
+                <span>10</span>
+              </div>
+            </div>
+          </Section>
+        )}
+
+        {/* ─── Media fields group ─── */}
+        {hasTmdbGroup && <GroupHeader label="Media Fields" />}
+
         {/* Genres */}
         {show("genres") && (
           <Section
             label="Genres"
-            defaultOpen
             trailing={
               <div className="flex items-center rounded-lg bg-muted/50 p-0.5">
                 <button
@@ -520,40 +673,6 @@ export function FilterSidebar({
                 onChange={(e) => setYearMax(e.target.value)}
                 className="!h-9 !rounded-xl !border-0 !bg-accent !text-[13px] !font-medium !text-foreground !placeholder:text-foreground"
               />
-            </div>
-          </Section>
-        )}
-
-        {/* Source (library only) */}
-        {isLibrary && show("source") && (
-          <Section label="Source" defaultOpen>
-            <div className="flex flex-wrap gap-1">
-              <Pill label="All" active={source === ""} onClick={() => setSource("")} />
-              {SOURCE_OPTIONS.map((s) => (
-                <Pill
-                  key={s.value}
-                  label={s.label}
-                  active={source === s.value}
-                  onClick={() => setSource(source === s.value ? "" : s.value)}
-                />
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {/* Watch Status (library only) */}
-        {isLibrary && show("watchStatus") && (
-          <Section label="Watch Status" defaultOpen>
-            <div className="flex flex-wrap gap-1">
-              <Pill label="All" active={watchStatus === ""} onClick={() => setWatchStatus("")} />
-              {WATCH_STATUS_OPTIONS.map((ws) => (
-                <Pill
-                  key={ws.value}
-                  label={ws.label}
-                  active={watchStatus === ws.value}
-                  onClick={() => setWatchStatus(watchStatus === ws.value ? "" : ws.value)}
-                />
-              ))}
             </div>
           </Section>
         )}

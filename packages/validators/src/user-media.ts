@@ -15,6 +15,7 @@ export const mediaIdUuidInput = z.object({
 export type MediaIdUuidInput = z.infer<typeof mediaIdUuidInput>;
 
 export const libraryFilterInput = z.object({
+  q: z.string().trim().max(200).optional(),
   source: z.enum(["jellyfin", "plex", "manual"]).optional(),
   sortBy: z
     .enum(["recently_watched", "name_asc", "name_desc", "year_desc", "year_asc"])
@@ -56,9 +57,10 @@ export const getLibraryWatchNextInput = libraryFilterInput.extend({
 });
 export type GetLibraryWatchNextInput = z.infer<typeof getLibraryWatchNextInput>;
 
-export const getUpcomingScheduleInput = z.object({
+export const getUpcomingScheduleInput = libraryFilterInput.extend({
   limit: z.number().int().min(1).max(100).default(24),
   cursor: z.number().int().min(0).nullish(),
+  mediaType: mediaType.optional(),
 });
 export type GetUpcomingScheduleInput = z.infer<typeof getUpcomingScheduleInput>;
 

@@ -50,6 +50,9 @@ export interface BrowseItem {
   /* Collection votes */
   totalRating?: number;
   voteCount?: number;
+  membersAvg?: number;
+  /* Current user's personal rating (1-10) */
+  userRating?: number | null;
 }
 
 /* ─── Card Strategy ─── */

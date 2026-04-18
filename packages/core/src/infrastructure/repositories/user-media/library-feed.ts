@@ -28,6 +28,7 @@ export interface UserPlaybackProgressFeedRow {
   logoPath: string | null;
   overview: string | null;
   voteAverage: number | null;
+  userRating: number | null;
   genres: unknown;
   genreIds: unknown;
   trailerKey: string | null;
@@ -42,6 +43,7 @@ export interface UserPlaybackProgressFeedRow {
 }
 
 export interface LibraryFeedFilterOptions {
+  q?: string;
   source?: "jellyfin" | "plex" | "manual";
   yearMin?: number;
   yearMax?: number;
@@ -56,6 +58,12 @@ export interface LibraryFeedFilterOptions {
   tvStatus?: string;
 }
 
+function buildTitleIlikeCondition(q: string | undefined): SQL | null {
+  if (!q || q.length === 0) return null;
+  const pattern = `%${q.replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
+  return sql`${media.title} ILIKE ${pattern}`;
+}
+
 export async function findUserPlaybackProgressFeed(
   db: Database,
   userId: string,
@@ -67,6 +75,8 @@ export async function findUserPlaybackProgressFeed(
     isNull(userPlaybackProgress.deletedAt),
   ];
   if (mediaType) conditions.push(eq(media.type, mediaType));
+  const titleLike = buildTitleIlikeCondition(filters?.q);
+  if (titleLike) conditions.push(titleLike);
   if (filters?.source) conditions.push(eq(userPlaybackProgress.source, filters.source));
   if (filters?.yearMin !== undefined) conditions.push(gte(media.year, filters.yearMin));
   if (filters?.yearMax !== undefined) conditions.push(lte(media.year, filters.yearMax));
@@ -109,6 +119,7 @@ export async function findUserPlaybackProgressFeed(
       logoPath: media.logoPath,
       overview: media.overview,
       voteAverage: media.voteAverage,
+      userRating: userMediaState.rating,
       genres: media.genres,
       genreIds: media.genreIds,
       trailerKey: sql<string | null>`(SELECT ${mediaVideo.externalKey} FROM ${mediaVideo} WHERE ${mediaVideo.mediaId} = ${media.id} AND ${mediaVideo.type} = 'Trailer' AND ${mediaVideo.site} = 'YouTube' LIMIT 1)`,
@@ -125,6 +136,13 @@ export async function findUserPlaybackProgressFeed(
     .innerJoin(media, eq(userPlaybackProgress.mediaId, media.id))
     .leftJoin(episode, eq(userPlaybackProgress.episodeId, episode.id))
     .leftJoin(season, eq(episode.seasonId, season.id))
+    .leftJoin(
+      userMediaState,
+      and(
+        eq(userMediaState.mediaId, userPlaybackProgress.mediaId),
+        eq(userMediaState.userId, userId),
+      ),
+    )
     .where(and(...conditions))
     .orderBy(...orderClauses);
 }
@@ -139,6 +157,8 @@ export interface UserWatchHistoryFeedRow {
   title: string;
   posterPath: string | null;
   year: number | null;
+  voteAverage: number | null;
+  userRating: number | null;
   externalId: number;
   provider: string;
   episodeNumber: number | null;
@@ -158,6 +178,8 @@ export async function findUserWatchHistoryFeed(
     isNull(userWatchHistory.deletedAt),
   ];
   if (mediaType) conditions.push(eq(media.type, mediaType));
+  const titleLike = buildTitleIlikeCondition(filters?.q);
+  if (titleLike) conditions.push(titleLike);
   if (filters?.source) conditions.push(eq(userWatchHistory.source, filters.source));
   if (filters?.yearMin !== undefined) conditions.push(gte(media.year, filters.yearMin));
   if (filters?.yearMax !== undefined) conditions.push(lte(media.year, filters.yearMax));
@@ -195,6 +217,8 @@ export async function findUserWatchHistoryFeed(
       title: media.title,
       posterPath: media.posterPath,
       year: media.year,
+      voteAverage: media.voteAverage,
+      userRating: userMediaState.rating,
       externalId: media.externalId,
       provider: media.provider,
       episodeNumber: episode.number,
@@ -205,6 +229,13 @@ export async function findUserWatchHistoryFeed(
     .innerJoin(media, eq(userWatchHistory.mediaId, media.id))
     .leftJoin(episode, eq(userWatchHistory.episodeId, episode.id))
     .leftJoin(season, eq(episode.seasonId, season.id))
+    .leftJoin(
+      userMediaState,
+      and(
+        eq(userMediaState.mediaId, userWatchHistory.mediaId),
+        eq(userMediaState.userId, userId),
+      ),
+    )
     .where(and(...conditions))
     .orderBy(...orderClauses)
     .limit(limit);

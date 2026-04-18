@@ -1,6 +1,6 @@
-import { and, asc, eq, or, isNull, desc, count, sql, inArray, max } from "drizzle-orm";
+import { and, asc, eq, or, isNull, desc, count, sql, inArray, max, type SQL } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { list, listItem, listMember, media, folderServerLink, userConnection, userMediaLibrary } from "@canto/db/schema";
+import { list, listItem, listMember, media, folderServerLink, userConnection, userMediaLibrary, userMediaState } from "@canto/db/schema";
 import type { RecsFilters } from "../../domain/types/recs-filters";
 import { buildRecsFilterConditions, recsSortOrder } from "./shared/recs-filter-builder";
 
@@ -98,13 +98,26 @@ export async function findListBySlug(
   slug: string,
   userId: string,
 ) {
-  // Server library has no userId
+  if (slug === "server-library") {
+    return db.query.list.findFirst({
+      where: and(eq(list.slug, slug), isNull(list.userId)),
+    });
+  }
+
+  const owned = await db.query.list.findFirst({
+    where: and(eq(list.slug, slug), eq(list.userId, userId)),
+  });
+  if (owned) return owned;
+
+  const memberListIds = db
+    .select({ listId: listMember.listId })
+    .from(listMember)
+    .where(eq(listMember.userId, userId));
+
   return db.query.list.findFirst({
     where: and(
       eq(list.slug, slug),
-      slug === "server-library"
-        ? isNull(list.userId)
-        : eq(list.userId, userId),
+      sql`${list.id} IN (${memberListIds})`,
     ),
   });
 }
@@ -208,20 +221,58 @@ export async function ensureServerLibrary(db: Database) {
 export async function findListItems(
   db: Database,
   listId: string,
-  opts: { userId?: string; limit?: number; offset?: number } & RecsFilters = {},
+  opts: {
+    userId?: string;
+    limit?: number;
+    offset?: number;
+    watchStatus?: "in_progress" | "completed" | "not_started";
+  } & RecsFilters = {},
 ) {
-  const { userId, limit: lim = 50, offset: off = 0, sortBy, ...filterOpts } = opts;
+  const {
+    userId,
+    limit: lim = 50,
+    offset: off = 0,
+    sortBy,
+    membersRatingMin,
+    memberVoteCountMin,
+    watchStatus,
+    ...filterOpts
+  } = opts;
 
   const listRow = await findListById(db, listId);
   const isServerLibrary = listRow?.type === "server";
 
-  const conditions = [
+  // Collect member userIds for vote aggregation (members + owner)
+  const memberRows = await db
+    .select({ userId: listMember.userId })
+    .from(listMember)
+    .where(eq(listMember.listId, listId));
+  const memberUserIds = memberRows.map((m) => m.userId);
+  if (listRow?.userId) memberUserIds.push(listRow.userId);
+
+  const memberVotesSubquery = db
+    .select({
+      mediaId: userMediaState.mediaId,
+      totalRating: sql<number>`COALESCE(SUM(${userMediaState.rating}), 0)`.as("member_total_rating"),
+      voteCount: sql<number>`COUNT(${userMediaState.rating})`.as("member_vote_count"),
+      avgRating: sql<number>`CAST(COALESCE(SUM(${userMediaState.rating}), 0) AS float) / NULLIF(COUNT(${userMediaState.rating}), 0)`.as("member_avg_rating"),
+    })
+    .from(userMediaState)
+    .where(
+      memberUserIds.length > 0
+        ? and(
+            inArray(userMediaState.userId, memberUserIds),
+            sql`${userMediaState.rating} IS NOT NULL`,
+          )
+        : sql`FALSE`,
+    )
+    .groupBy(userMediaState.mediaId)
+    .as("member_votes");
+
+  const conditions: SQL[] = [
     eq(listItem.listId, listId),
     ...buildRecsFilterConditions(filterOpts),
   ];
-
-  const customSort = recsSortOrder(sortBy);
-  const orderByExpr = customSort ? [customSort] : [asc(listItem.position), desc(listItem.addedAt)];
 
   if (isServerLibrary && userId) {
     // Use the canonical user_media_library table to determine what's in this user's server library.
@@ -234,26 +285,108 @@ export async function findListItems(
     conditions.push(sql`${listItem.mediaId} IN (${accessibleMediaIds})`);
   }
 
+  if (membersRatingMin != null) {
+    conditions.push(sql`COALESCE(${memberVotesSubquery.avgRating}, 0) >= ${membersRatingMin}`);
+  }
+  if (memberVoteCountMin != null) {
+    conditions.push(sql`COALESCE(${memberVotesSubquery.voteCount}, 0) >= ${memberVoteCountMin}`);
+  }
+
+  const joinCurrentUserState = !!userId;
+  if (watchStatus && userId) {
+    if (watchStatus === "in_progress") {
+      conditions.push(sql`${userMediaState.status} = 'watching'`);
+    } else if (watchStatus === "completed") {
+      conditions.push(sql`${userMediaState.status} = 'completed'`);
+    } else {
+      // not_started: no state row OR status = 'planned'
+      conditions.push(sql`(${userMediaState.status} IS NULL OR ${userMediaState.status} = 'planned')`);
+    }
+  }
+
+  const orderByExpr = (() => {
+    if (sortBy === "members_rating.desc") {
+      return [sql`${memberVotesSubquery.avgRating} DESC NULLS LAST`];
+    }
+    if (sortBy === "members_rating.asc") {
+      return [sql`${memberVotesSubquery.avgRating} ASC NULLS LAST`];
+    }
+    const customSort = recsSortOrder(sortBy);
+    if (customSort) return [customSort];
+    return [asc(listItem.position), desc(listItem.addedAt)];
+  })();
+
   const whereClause = and(...conditions);
 
-  const [items, [countRow]] = await Promise.all([
-    db
-      .select({
-        listItem: listItem,
-        media: media,
-      })
-      .from(listItem)
-      .innerJoin(media, eq(listItem.mediaId, media.id))
+  const userStateJoin = joinCurrentUserState
+    ? and(eq(userMediaState.mediaId, media.id), eq(userMediaState.userId, userId!))
+    : null;
+
+  const [rows, [countRow]] = await Promise.all([
+    (userStateJoin
+      ? db
+          .select({
+            listItem: listItem,
+            media: media,
+            memberTotalRating: memberVotesSubquery.totalRating,
+            memberVoteCount: memberVotesSubquery.voteCount,
+            memberAvgRating: memberVotesSubquery.avgRating,
+            userRating: userMediaState.rating,
+          })
+          .from(listItem)
+          .innerJoin(media, eq(listItem.mediaId, media.id))
+          .leftJoin(memberVotesSubquery, eq(memberVotesSubquery.mediaId, media.id))
+          .leftJoin(userMediaState, userStateJoin)
+      : db
+          .select({
+            listItem: listItem,
+            media: media,
+            memberTotalRating: memberVotesSubquery.totalRating,
+            memberVoteCount: memberVotesSubquery.voteCount,
+            memberAvgRating: memberVotesSubquery.avgRating,
+          })
+          .from(listItem)
+          .innerJoin(media, eq(listItem.mediaId, media.id))
+          .leftJoin(memberVotesSubquery, eq(memberVotesSubquery.mediaId, media.id))
+    )
       .where(whereClause)
       .orderBy(...orderByExpr)
       .limit(lim)
       .offset(off),
-    db
-      .select({ total: count() })
-      .from(listItem)
-      .innerJoin(media, eq(listItem.mediaId, media.id))
-      .where(whereClause),
+    (userStateJoin
+      ? db
+          .select({ total: count() })
+          .from(listItem)
+          .innerJoin(media, eq(listItem.mediaId, media.id))
+          .leftJoin(memberVotesSubquery, eq(memberVotesSubquery.mediaId, media.id))
+          .leftJoin(userMediaState, userStateJoin)
+      : db
+          .select({ total: count() })
+          .from(listItem)
+          .innerJoin(media, eq(listItem.mediaId, media.id))
+          .leftJoin(memberVotesSubquery, eq(memberVotesSubquery.mediaId, media.id))
+    ).where(whereClause),
   ]);
+
+  const items = rows.map((row) => {
+    const userRating =
+      "userRating" in row && row.userRating != null
+        ? Number(row.userRating)
+        : null;
+    return {
+      listItem: row.listItem,
+      media: row.media,
+      memberVotes:
+        row.memberVoteCount != null && Number(row.memberVoteCount) > 0
+          ? {
+              totalRating: Number(row.memberTotalRating ?? 0),
+              voteCount: Number(row.memberVoteCount),
+              avgRating: Number(row.memberAvgRating ?? 0),
+            }
+          : null,
+      userRating: userRating as number | null,
+    };
+  });
 
   return { items, total: countRow?.total ?? 0 };
 }

@@ -72,6 +72,7 @@ export default function ListDetailPage(): React.JSX.Element {
       {
         slug,
         limit: PAGE_SIZE,
+        q: filters.q,
         genreIds: filters.genreIds,
         genreMode: filters.genreMode,
         language: filters.language,
@@ -86,6 +87,8 @@ export default function ListDetailPage(): React.JSX.Element {
         sortBy: filters.sortBy,
         watchProviders: filters.watchProviders,
         watchRegion: filters.watchRegion,
+        membersRatingMin: filters.membersRatingMin,
+        watchStatus: filters.watchStatus,
       },
       {
         getNextPageParam: (lastPage, _allPages, lastPageParam) => {
@@ -100,9 +103,7 @@ export default function ListDetailPage(): React.JSX.Element {
 
   useDocumentTitle(data?.pages[0]?.list.name);
 
-  const listId = data?.pages[0]?.list.id;
-
-  const baseItems = useMemo(() => {
+  const items: BrowseItem[] = useMemo(() => {
     const all =
       data?.pages.flatMap((page) =>
         page.items.map((item) => ({
@@ -115,32 +116,15 @@ export default function ListDetailPage(): React.JSX.Element {
           year: item.media.year ?? undefined,
           voteAverage: item.media.voteAverage ?? undefined,
           overview: item.media.overview ?? undefined,
+          totalRating: item.memberVotes?.totalRating,
+          voteCount: item.memberVotes?.voteCount,
+          membersAvg: item.memberVotes?.avgRating,
+          userRating: item.userRating,
         })),
       ) ?? [];
 
     return typeFilter === "all" ? all : all.filter((i) => i.type === typeFilter);
   }, [data, typeFilter]);
-
-  const mediaIds = useMemo(() => baseItems.map((i) => i.id).filter(Boolean), [baseItems]);
-  const { data: votes } = trpc.list.getVotes.useQuery(
-    { listId: listId!, mediaIds },
-    { enabled: !!listId && mediaIds.length > 0 },
-  );
-
-  const items: BrowseItem[] = useMemo(() => {
-    const voteMap = votes && votes.length > 0
-      ? new Map(votes.map((v) => [v.mediaId, v]))
-      : null;
-
-    return baseItems.map((item) => {
-      const vote = voteMap?.get(item.id);
-      return {
-        ...item,
-        totalRating: vote?.totalRating,
-        voteCount: vote?.voteCount,
-      };
-    });
-  }, [baseItems, votes]);
 
   const handleFetchNextPage = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
@@ -215,6 +199,7 @@ export default function ListDetailPage(): React.JSX.Element {
         onFetchNextPage={handleFetchNextPage}
         filterPreset="tmdb"
         onFilterChange={setFilters}
+        showMembersRating
         mediaType={typeFilter}
         onMediaTypeChange={setTypeFilter}
         emptyState={

@@ -58,6 +58,8 @@ interface BrowseLayoutProps {
   menuGroups?: BrowseMenuGroup[];
   /** Filter sections to hide (e.g. when search mode can't support them) */
   hideSections?: SectionId[];
+  /** Expose Members Rating filter + sort (collection detail only) */
+  showMembersRating?: boolean;
 }
 
 export function BrowseLayout({
@@ -85,6 +87,7 @@ export function BrowseLayout({
   sidebarClassName,
   menuGroups,
   hideSections,
+  showMembersRating,
 }: BrowseLayoutProps): React.JSX.Element {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -171,6 +174,7 @@ export function BrowseLayout({
             onFilterChange={handleFilterChange}
             sidebarClassName={sidebarClassName}
             hideSections={hideSections}
+            showMembersRating={showMembersRating}
           />
         )}
 

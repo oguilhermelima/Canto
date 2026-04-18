@@ -1,4 +1,5 @@
 export interface RecsFilters {
+  q?: string;
   genreIds?: number[];
   genreMode?: "and" | "or";
   language?: string;
@@ -13,4 +14,7 @@ export interface RecsFilters {
   sortBy?: string;
   watchProviders?: string; // comma-separated provider IDs like "8,337"
   watchRegion?: string;    // region code like "BR"
+  // List-scoped (findListItems only): aggregate ratings across list members + owner
+  membersRatingMin?: number;
+  memberVoteCountMin?: number;
 }

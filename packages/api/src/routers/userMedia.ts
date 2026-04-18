@@ -254,6 +254,7 @@ export const userMediaRouter = createTRPCRouter({
       const now = new Date();
 
       const filters: LibraryFeedFilterOptions = {
+        q: input.q,
         source: input.source,
         yearMin: input.yearMin,
         yearMax: input.yearMax,
@@ -288,6 +289,7 @@ export const userMediaRouter = createTRPCRouter({
         logoPath: string | null;
         overview: string | null;
         voteAverage: number | null;
+        userRating: number | null;
         genres: unknown;
         genreIds: unknown;
         trailerKey: string | null;
@@ -335,6 +337,7 @@ export const userMediaRouter = createTRPCRouter({
           logoPath: row.logoPath,
           overview: row.overview,
           voteAverage: row.voteAverage,
+          userRating: row.userRating,
           genres: row.genres,
           genreIds: row.genreIds,
           trailerKey: row.trailerKey,
@@ -706,8 +709,13 @@ export const userMediaRouter = createTRPCRouter({
       const limit = input.limit;
       const cursor = input.cursor ?? 0;
       const now = new Date();
+      const qNormalized = input.q?.trim().toLowerCase() ?? "";
 
-      const listMediaRows = await findUserListMediaCandidates(ctx.db, userId);
+      const listMediaRows = await findUserListMediaCandidates(
+        ctx.db,
+        userId,
+        input.mediaType,
+      );
 
       const listMediaMap = new Map<
         string,
@@ -727,6 +735,8 @@ export const userMediaRouter = createTRPCRouter({
       >();
 
       for (const row of listMediaRows) {
+        if (qNormalized && !row.title.toLowerCase().includes(qNormalized)) continue;
+
         const existing = listMediaMap.get(row.mediaId);
         if (!existing) {
           listMediaMap.set(row.mediaId, {
@@ -933,6 +943,7 @@ export const userMediaRouter = createTRPCRouter({
       const fetchLimit = Math.max(300, (cursor + limit) * 3);
 
       const filters: LibraryFeedFilterOptions = {
+        q: input.q,
         source: input.source,
         yearMin: input.yearMin,
         yearMax: input.yearMax,
@@ -960,6 +971,8 @@ export const userMediaRouter = createTRPCRouter({
         title: string;
         posterPath: string | null;
         year: number | null;
+        voteAverage: number | null;
+        userRating: number | null;
         externalId: number;
         provider: string;
         watchedAt: Date;
@@ -1002,6 +1015,8 @@ export const userMediaRouter = createTRPCRouter({
           title: row.title,
           posterPath: row.posterPath,
           year: row.year,
+          voteAverage: row.voteAverage,
+          userRating: row.userRating,
           externalId: row.externalId,
           provider: row.provider,
           watchedAt: row.watchedAt,
@@ -1043,6 +1058,8 @@ export const userMediaRouter = createTRPCRouter({
           title: row.title,
           posterPath: row.posterPath,
           year: row.year,
+          voteAverage: row.voteAverage,
+          userRating: row.userRating,
           externalId: row.externalId,
           provider: row.provider,
           watchedAt: row.lastWatchedAt,

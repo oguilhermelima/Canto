@@ -97,6 +97,7 @@ export type ApplyProviderOverrideInput = z.infer<typeof applyProviderOverrideInp
 // Shared filter base for endpoints that browse media with the same TMDB-style
 // facets (recommendations, list detail, discovery). Compose via `.extend()`.
 export const mediaFilterBase = z.object({
+  q: z.string().trim().max(200).optional(),
   genreIds: z.array(z.number()).optional(),
   genreMode: z.enum(["and", "or"]).default("or").optional(),
   language: z.string().optional(),
@@ -111,6 +112,9 @@ export const mediaFilterBase = z.object({
   sortBy: z.string().optional(),
   watchProviders: z.string().optional(),
   watchRegion: z.string().optional(),
+  // List-scoped: aggregate ratings across list members + owner
+  membersRatingMin: z.number().min(0).max(10).optional(),
+  memberVoteCountMin: z.number().int().min(0).optional(),
 });
 export type MediaFilterBase = z.infer<typeof mediaFilterBase>;
 

@@ -178,6 +178,7 @@ export const listRouter = createTRPCRouter({
         userId: ctx.session.user.id,
         limit: input.limit,
         offset: input.cursor ?? input.offset,
+        q: input.q,
         genreIds: input.genreIds,
         genreMode: input.genreMode ?? "or",
         language: input.language,
@@ -192,6 +193,9 @@ export const listRouter = createTRPCRouter({
         sortBy: input.sortBy,
         watchProviders: input.watchProviders,
         watchRegion: input.watchRegion,
+        membersRatingMin: input.membersRatingMin,
+        memberVoteCountMin: input.memberVoteCountMin,
+        watchStatus: input.watchStatus,
       });
       const userLang = await getUserLanguage(ctx.db, ctx.session.user.id);
       const translatedMedia = await translateMediaItems(ctx.db, rawItems.map((i) => i.media), userLang);

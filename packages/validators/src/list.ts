@@ -7,6 +7,7 @@ export const getListBySlugInput = mediaFilterBase.extend({
   limit: z.number().int().min(1).max(100).default(50),
   offset: z.number().int().min(0).default(0),
   cursor: z.number().int().min(0).nullish(),
+  watchStatus: z.enum(["in_progress", "completed", "not_started"]).optional(),
 });
 export type GetListBySlugInput = z.infer<typeof getListBySlugInput>;
 

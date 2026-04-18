@@ -18,9 +18,15 @@ export default function UpcomingSchedulePage(): React.JSX.Element {
   const [filters, setFilters] = useState<FilterOutput>({});
   const [viewMode, setViewMode] = useViewMode("canto.browse.viewMode.upcoming", "grid");
 
+  const queryMediaType = mediaType === "all" ? undefined : mediaType;
+
   const { data, isLoading, isError, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
     trpc.userMedia.getUpcomingSchedule.useInfiniteQuery(
-      { limit: PAGE_SIZE },
+      {
+        limit: PAGE_SIZE,
+        mediaType: queryMediaType,
+        q: filters.q,
+      },
       { getNextPageParam: (lp) => lp.nextCursor, initialCursor: 0 },
     );
 

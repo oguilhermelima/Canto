@@ -23,6 +23,7 @@ interface AdvancedFilterProps {
   onFilterChange: (filters: FilterOutput) => void;
   sidebarClassName?: string;
   hideSections?: SectionId[];
+  showMembersRating?: boolean;
 }
 
 export function AdvancedFilter({
@@ -34,6 +35,7 @@ export function AdvancedFilter({
   onFilterChange,
   sidebarClassName,
   hideSections,
+  showMembersRating,
 }: AdvancedFilterProps): React.JSX.Element {
   const mobileResetRef = useRef<FilterSidebarHandle | null>(null);
 
@@ -54,6 +56,7 @@ export function AdvancedFilter({
           onFilterChange={onFilterChange}
           hideSections={hideSections}
           className={sidebarClassName}
+          showMembersRating={showMembersRating}
         />
       </div>
 
@@ -83,6 +86,7 @@ export function AdvancedFilter({
               hideSections={hideSections}
               hideHeader
               resetRef={mobileResetRef}
+              showMembersRating={showMembersRating}
             />
           </div>
 

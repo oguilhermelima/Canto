@@ -9,6 +9,7 @@ import type { RecsFilters } from "../../../domain/types/recs-filters";
  */
 export function buildRecsFilterConditions(filters: RecsFilters): SQL[] {
   const {
+    q,
     genreIds,
     genreMode = "or",
     language,
@@ -26,6 +27,10 @@ export function buildRecsFilterConditions(filters: RecsFilters): SQL[] {
 
   const conditions: SQL[] = [];
 
+  if (q && q.length > 0) {
+    const pattern = `%${q.replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
+    conditions.push(sql`${media.title} ILIKE ${pattern}`);
+  }
   if (genreIds && genreIds.length > 0) {
     if (genreMode === "and") {
       conditions.push(sql`${media.genreIds}::jsonb @> ${JSON.stringify(genreIds)}::jsonb`);
