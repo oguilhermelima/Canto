@@ -10,6 +10,7 @@ import { useDocumentTitle } from "~/hooks/use-document-title";
 export default function InvitePage(): React.JSX.Element {
   const params = useParams<{ token: string }>();
   const router = useRouter();
+  const utils = trpc.useUtils();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const [_listId, setListId] = useState<string | null>(null);
@@ -18,6 +19,7 @@ export default function InvitePage(): React.JSX.Element {
 
   const acceptMutation = trpc.list.acceptInvitation.useMutation({
     onSuccess: (data) => {
+      void utils.list.getAll.invalidate();
       setStatus("success");
       setListId(data.listId);
     },
