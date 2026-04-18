@@ -173,10 +173,12 @@
 /* While any scroll is active (page or nested), pause transitions and the
  * pulse animation. Same trick Netflix/YouTube use — prevents hover:scale
  * + animate-pulse from firing as cards move under the cursor, which
- * otherwise flickers the screen. JS adds/removes .is-scrolling on <html>. */
-html.is-scrolling *,
-html.is-scrolling *::before,
-html.is-scrolling *::after {
+ * otherwise flickers the screen. JS adds/removes .is-scrolling on <html>.
+ * Opt out with [data-scroll-animate] on elements whose transitions are
+ * triggered BY scroll (e.g. sticky bars shrinking/hiding). */
+html.is-scrolling *:not([data-scroll-animate], [data-scroll-animate] *),
+html.is-scrolling *:not([data-scroll-animate], [data-scroll-animate] *)::before,
+html.is-scrolling *:not([data-scroll-animate], [data-scroll-animate] *)::after {
   transition: none !important;
   animation-duration: 0s !important;
   animation-delay: 0s !important;

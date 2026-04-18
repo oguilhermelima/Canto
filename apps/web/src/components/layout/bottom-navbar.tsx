@@ -73,6 +73,7 @@ export function BottomNavbar(): React.JSX.Element {
 
   return (
     <nav
+      data-scroll-animate
       className={cn(
         "fixed bottom-0 left-0 right-0 z-40 flex items-center justify-center gap-14 border-t border-border bg-background py-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] transition-transform duration-400 ease-[cubic-bezier(0.25,1,0.5,1)] md:hidden",
         hidden && "translate-y-full",

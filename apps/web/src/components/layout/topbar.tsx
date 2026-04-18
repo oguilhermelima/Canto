@@ -314,8 +314,9 @@ export function Topbar(): React.JSX.Element {
       style={{ transform: "translateZ(0)" }}
     >
       <nav
+        data-scroll-animate
         className={cn(
-          "pointer-events-auto flex w-full items-center overflow-visible rounded-2xl border py-2.5 transition-[max-width,background-color,border-color,padding] duration-300 ease-out",
+          "pointer-events-auto flex w-full items-center overflow-visible rounded-2xl border py-2.5 transition-all duration-300 ease-out",
           scrolled
             ? "max-w-[80%] border-border bg-background px-6 xl:max-w-[60%]"
             : "max-w-full border-transparent px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24",
