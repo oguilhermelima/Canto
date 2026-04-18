@@ -111,7 +111,6 @@ export type { TabBarProps, TabItem } from "./components/tab-bar";
 
 export { StateMessage } from "./components/state-message";
 
-export { GridLoading } from "./components/grid-loading";
 export { ListLoading } from "./components/list-loading";
 
 export { SectionTitle } from "./components/section-title";
