@@ -584,30 +584,60 @@ async function getShowMetadata(
   });
 
   normalized.seasons = await Promise.all(seasonPromises);
-  if (seasonTranslations.length > 0)
-    normalized.seasonTranslations = seasonTranslations;
 
-  // Fetch episode translations for supported languages (re-fetch each season per language)
+  // Fetch per-language season + episode translations via append_to_response.
+  // One call per chunk of ≤19 seasons per language (TMDB caps append_to_response
+  // at 20 subrequests; the main endpoint counts toward that budget).
   const nonEnLangs = supportedLangs.filter((l) => !l.startsWith("en"));
-  const totalCalls = rawSeasons.length * nonEnLangs.length;
-  if (nonEnLangs.length > 0 && totalCalls <= 60) {
-    for (let i = 0; i < nonEnLangs.length; i += 3) {
-      const langBatch = nonEnLangs.slice(i, i + 3);
-      await Promise.allSettled(
-        langBatch.flatMap((lang) =>
-          rawSeasons.map(async (s) => {
-            try {
-              const data = await client.fetch<{
-                episodes?: Array<{
-                  episode_number: number;
-                  name?: string;
-                  overview?: string;
-                }>;
-              }>(`/tv/${showId}/season/${s.season_number}`, { language: lang });
-              for (const ep of data.episodes ?? []) {
+  if (nonEnLangs.length > 0 && rawSeasons.length > 0) {
+    const SEASON_APPEND_CHUNK_SIZE = 19;
+    const seasonChunks: number[][] = [];
+    for (
+      let i = 0;
+      i < rawSeasons.length;
+      i += SEASON_APPEND_CHUNK_SIZE
+    ) {
+      seasonChunks.push(
+        rawSeasons
+          .slice(i, i + SEASON_APPEND_CHUNK_SIZE)
+          .map((s) => s.season_number),
+      );
+    }
+
+    await Promise.allSettled(
+      nonEnLangs.map(async (lang) => {
+        for (const chunk of seasonChunks) {
+          const append = chunk.map((n) => `season/${n}`).join(",");
+          try {
+            const resp = await client.fetch<Record<string, unknown>>(
+              `/tv/${showId}`,
+              { language: lang, append_to_response: append },
+            );
+            for (const seasonNumber of chunk) {
+              const sub = resp[`season/${seasonNumber}`] as
+                | {
+                    name?: string;
+                    overview?: string;
+                    episodes?: Array<{
+                      episode_number: number;
+                      name?: string;
+                      overview?: string;
+                    }>;
+                  }
+                | undefined;
+              if (!sub) continue;
+              if (sub.name || sub.overview) {
+                seasonTranslations.push({
+                  seasonNumber,
+                  language: lang,
+                  name: sub.name,
+                  overview: sub.overview,
+                });
+              }
+              for (const ep of sub.episodes ?? []) {
                 if (ep.name || ep.overview) {
                   episodeTranslations.push({
-                    seasonNumber: s.season_number,
+                    seasonNumber,
                     episodeNumber: ep.episode_number,
                     language: lang,
                     title: ep.name,
@@ -615,14 +645,17 @@ async function getShowMetadata(
                   });
                 }
               }
-            } catch {
-              /* skip failed language/season combo */
             }
-          }),
-        ),
-      );
-    }
+          } catch {
+            /* skip failed language/chunk */
+          }
+        }
+      }),
+    );
   }
+
+  if (seasonTranslations.length > 0)
+    normalized.seasonTranslations = seasonTranslations;
   if (episodeTranslations.length > 0)
     normalized.episodeTranslations = episodeTranslations;
 
