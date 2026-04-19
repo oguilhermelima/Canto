@@ -44,7 +44,7 @@ export interface UserPlaybackProgressFeedRow {
 
 export interface LibraryFeedFilterOptions {
   q?: string;
-  source?: "jellyfin" | "plex" | "manual";
+  source?: "jellyfin" | "plex" | "trakt" | "manual";
   yearMin?: number;
   yearMax?: number;
   genreIds?: number[];

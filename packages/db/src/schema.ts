@@ -1165,7 +1165,7 @@ export const userPlaybackProgress = pgTable(
     positionSeconds: integer("position_seconds").notNull().default(0),
     isCompleted: boolean("is_completed").notNull().default(false),
     lastWatchedAt: timestamp("last_watched_at", { withTimezone: true }),
-    source: varchar("source", { length: 20 }), // 'jellyfin', 'plex', 'manual'
+    source: varchar("source", { length: 20 }), // 'jellyfin', 'plex', 'trakt', 'manual'
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => [

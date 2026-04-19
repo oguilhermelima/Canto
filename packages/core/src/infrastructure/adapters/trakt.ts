@@ -259,6 +259,27 @@ interface TraktHistoryItemResponse {
   episode?: { season: number; number: number };
 }
 
+interface TraktPlaybackItemResponse {
+  id: number;
+  progress: number;
+  paused_at: string;
+  type: "movie" | "episode";
+  movie?: { ids: TraktIds; runtime?: number | null };
+  show?: { ids: TraktIds };
+  episode?: { season: number; number: number; runtime?: number | null };
+}
+
+export interface TraktPlaybackProgressRef {
+  type: "movie" | "show";
+  ids: TraktIds;
+  pausedAt: string;
+  progressPercent: number;
+  runtimeMinutes: number | null;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  remotePlaybackId: number;
+}
+
 type TraktListRequestBody = {
   movies?: Array<{ ids: TraktIds; watched_at?: string }>;
   shows?: Array<{
@@ -521,6 +542,42 @@ export async function listTraktHistory(
       return { ...mapped, remoteHistoryId: row.id };
     })
     .filter((v): v is TraktMediaRef & { remoteHistoryId: number } => !!v);
+}
+
+export async function listTraktPlaybackProgress(
+  accessToken: string,
+): Promise<TraktPlaybackProgressRef[]> {
+  const rows = await traktRequest<TraktPlaybackItemResponse[]>(
+    "/sync/playback?extended=full&limit=100",
+    { accessToken },
+  );
+  const out: TraktPlaybackProgressRef[] = [];
+  for (const row of rows) {
+    if (row.type === "movie" && row.movie?.ids) {
+      out.push({
+        type: "movie",
+        ids: row.movie.ids,
+        pausedAt: row.paused_at,
+        progressPercent: row.progress,
+        runtimeMinutes: row.movie.runtime ?? null,
+        remotePlaybackId: row.id,
+      });
+      continue;
+    }
+    if (row.type === "episode" && row.show?.ids && row.episode) {
+      out.push({
+        type: "show",
+        ids: row.show.ids,
+        pausedAt: row.paused_at,
+        progressPercent: row.progress,
+        runtimeMinutes: row.episode.runtime ?? null,
+        seasonNumber: row.episode.season,
+        episodeNumber: row.episode.number,
+        remotePlaybackId: row.id,
+      });
+    }
+  }
+  return out;
 }
 
 export async function createTraktList(

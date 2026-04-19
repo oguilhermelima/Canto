@@ -17,6 +17,7 @@ import {
   pullHistory,
   pushHistory,
 } from "./sync-history";
+import { pullInProgress } from "./sync-in-progress";
 
 export async function syncTraktConnection(
   db: Database,
@@ -56,6 +57,7 @@ export async function syncTraktConnection(
   await pullHistory(ctx);
   await pushHistory(ctx);
   await linkPulledHistoryBackfill(ctx);
+  await pullInProgress(ctx);
 
   await upsertTraktSyncState(db, conn.id, {
     lastPulledAt: now,

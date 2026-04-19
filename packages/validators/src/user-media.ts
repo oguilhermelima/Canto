@@ -16,7 +16,7 @@ export type MediaIdUuidInput = z.infer<typeof mediaIdUuidInput>;
 
 export const libraryFilterInput = z.object({
   q: z.string().trim().max(200).optional(),
-  source: z.enum(["jellyfin", "plex", "manual"]).optional(),
+  source: z.enum(["jellyfin", "plex", "trakt", "manual"]).optional(),
   sortBy: z
     .enum(["recently_watched", "name_asc", "name_desc", "year_desc", "year_asc"])
     .optional(),
