@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { media, mediaRecommendation, user } from "@canto/db/schema";
-import { updateMediaFromNormalized, getSupportedLanguageCodes } from "./persist-media";
+import { updateMediaFromNormalized } from "./persist-media";
+import { getActiveUserLanguages } from "../services/user-service";
 import type { MediaType } from "@canto/providers";
 import { refreshExtras } from "./refresh-extras";
 import { rebuildUserRecs } from "./rebuild-user-recs";
@@ -16,7 +17,7 @@ export async function refreshAllLanguage(
   deps: { tmdb: MediaProviderPort; tvdb: MediaProviderPort },
 ): Promise<void> {
   // 1. Refresh all media metadata (titles, overviews, posters, logos, backdrops)
-  const supportedLangs = [...await getSupportedLanguageCodes(db)];
+  const supportedLangs = [...await getActiveUserLanguages(db)];
   const allMedia = await db.query.media.findMany({
     columns: { id: true, externalId: true, provider: true, type: true },
   });

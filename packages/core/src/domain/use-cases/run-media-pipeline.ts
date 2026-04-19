@@ -1,6 +1,7 @@
 import type { Database } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
-import { getSupportedLanguageCodes, persistFullMedia } from "./persist-media";
+import { persistFullMedia } from "./persist-media";
+import { getActiveUserLanguages } from "../services/user-service";
 import type { MediaType, ProviderName } from "@canto/providers";
 
 import type { MediaProviderPort } from "../ports/media-provider.port";
@@ -31,7 +32,7 @@ export async function runMediaPipeline(
   deps: Deps,
 ): Promise<void> {
   const globalTvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
-  const supportedLangs = [...(await getSupportedLanguageCodes(db))];
+  const supportedLangs = [...(await getActiveUserLanguages(db))];
 
   let externalId: number;
   let provider: ProviderName;

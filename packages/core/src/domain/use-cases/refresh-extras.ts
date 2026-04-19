@@ -8,7 +8,7 @@ import {
   mediaVideo,
   mediaWatchProvider,
 } from "@canto/db/schema";
-import { getSupportedLanguageCodes } from "./persist-media";
+import { getActiveUserLanguages } from "../services/user-service";
 import type { MediaType } from "@canto/providers";
 import { findMediaById } from "../../infrastructure/repositories";
 import type { MediaProviderPort } from "../ports/media-provider.port";
@@ -45,7 +45,7 @@ export async function refreshExtras(
     if (extrasExternalId === row.externalId && row.provider !== "tmdb") return; // Can't find TMDB match
   }
 
-  const supportedLangs = [...await getSupportedLanguageCodes(db)];
+  const supportedLangs = [...await getActiveUserLanguages(db)];
   const extras = await tmdb.getExtras(extrasExternalId, row.type as MediaType, { supportedLanguages: supportedLangs });
 
   // ── Pre-transaction: build recommendation items and fetch trailers/logos (NETWORK I/O) ──

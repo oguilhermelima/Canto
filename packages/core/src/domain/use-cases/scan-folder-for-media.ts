@@ -2,7 +2,8 @@ import { readdir, stat } from "node:fs/promises";
 import { join, basename, extname } from "node:path";
 
 import type { Database } from "@canto/db/client";
-import { persistMedia, getSupportedLanguageCodes } from "./persist-media";
+import { persistMedia } from "./persist-media";
+import { getActiveUserLanguages } from "../services/user-service";
 
 import { parseFolderMediaInfo } from "../rules/parsing";
 import { VIDEO_EXTENSIONS } from "../rules/naming";
@@ -107,7 +108,7 @@ export async function scanFolderForMedia(
   console.log(`[folder-scan] Found ${videosByDir.size} directories with video files in ${folderPath}`);
 
   const tmdb = await getTmdbProvider();
-  const supportedLangs = [...await getSupportedLanguageCodes(db)];
+  const supportedLangs = [...await getActiveUserLanguages(db)];
 
   let imported = 0;
   let skipped = 0;

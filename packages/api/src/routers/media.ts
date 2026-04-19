@@ -41,8 +41,8 @@ import {
   resolveMedia,
   persistMediaUseCase,
   persistFullMedia,
-  getSupportedLanguageCodes,
 } from "@canto/core/domain/use-cases/persist-media";
+import { getActiveUserLanguages } from "@canto/core/domain/services/user-service";
 import { getRecommendations } from "@canto/core/domain/use-cases/get-recommendations";
 import { fetchLogos, enrichBrowseWithLogos } from "@canto/core/domain/use-cases/fetch-logos";
 import { db as appDb } from "@canto/db/client";
@@ -192,7 +192,7 @@ export const mediaRouter = createTRPCRouter({
       const result = await getByExternal(
         ctx.db, input, ctx.session.user.id,
         getProviderWithKey,
-        () => getSupportedLanguageCodes(ctx.db).then((s) => [...s]),
+        () => getActiveUserLanguages(ctx.db).then((s) => [...s]),
       );
       return result;
     }),
@@ -247,7 +247,7 @@ export const mediaRouter = createTRPCRouter({
 
       const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
       const effectiveProvider = await getEffectiveProvider(row);
-      const supportedLangs = [...await getSupportedLanguageCodes(ctx.db)];
+      const supportedLangs = [...await getActiveUserLanguages(ctx.db)];
 
       const result = await fetchMediaMetadata(
         row.externalId, row.provider as ProviderName, row.type as MediaType,
@@ -342,7 +342,7 @@ export const mediaRouter = createTRPCRouter({
         await reconcileShowStructure(ctx.db, input.id, { tmdb, tvdb, dispatcher: jobDispatcher }, { force: true });
       } else {
         const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
-        const supportedLangs = [...await getSupportedLanguageCodes(ctx.db)];
+        const supportedLangs = [...await getActiveUserLanguages(ctx.db)];
 
         const result = await fetchMediaMetadata(
           row.externalId, row.provider as ProviderName, row.type as MediaType,

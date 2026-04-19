@@ -9,7 +9,8 @@
 
 import type { Database } from "@canto/db/client";
 import type { MediaProviderPort } from "../ports/media-provider.port";
-import { persistMedia, getSupportedLanguageCodes } from "../use-cases/persist-media";
+import { persistMedia } from "../use-cases/persist-media";
+import { getActiveUserLanguages } from "../services/user-service";
 import { getSetting, getSettings, setSettingRaw } from "@canto/db/settings";
 
 import { dispatchMediaPipeline } from "../../infrastructure/queue/bullmq-dispatcher";
@@ -380,7 +381,7 @@ export async function runSyncPipeline(
   const syncRunStart = new Date();
   const tvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
   const config = await loadServerConfig();
-  const supportedLangs = [...(await getSupportedLanguageCodes(db))];
+  const supportedLangs = [...(await getActiveUserLanguages(db))];
 
   // Phase 1 + 2 — validate + dedupe
   const validated = validateScannedItems(scannedItems, tag);

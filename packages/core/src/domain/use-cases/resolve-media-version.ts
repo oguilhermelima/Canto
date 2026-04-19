@@ -9,7 +9,8 @@
 
 import type { Database } from "@canto/db/client";
 import type { MediaProviderPort } from "../ports/media-provider.port";
-import { persistMedia, getSupportedLanguageCodes } from "./persist-media";
+import { persistMedia } from "./persist-media";
+import { getActiveUserLanguages } from "../services/user-service";
 import {
   findMediaVersionById,
   findMediaVersionsByMediaId,
@@ -89,7 +90,7 @@ export async function resolveMediaVersion(
     targetYear = existingTarget.year ?? null;
   } else {
     // Pull metadata upfront so dryRun can surface an accurate preview.
-    const supportedLangs = [...(await getSupportedLanguageCodes(db))];
+    const supportedLangs = [...(await getActiveUserLanguages(db))];
     const normalized = await tmdb.getMetadata(input.tmdbId, input.type, {
       supportedLanguages: supportedLangs,
     });

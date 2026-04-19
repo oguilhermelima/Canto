@@ -2,13 +2,13 @@ import type { Database } from "@canto/db/client";
 import { eq } from "drizzle-orm";
 import { season } from "@canto/db/schema";
 import {
-  getSupportedLanguageCodes,
   persistTranslations,
   applyTvdbSeasons,
   buildTmdbEpisodeMap,
   overlayTmdbEpisodeData,
   overlayTmdbSeasonData,
 } from "./persist-media";
+import { getActiveUserLanguages } from "../services/user-service";
 import {
   findMediaById,
   updateMedia,
@@ -73,7 +73,7 @@ export async function reconcileShowStructure(
     await applyTvdbSeasons(db, mediaId, tvdbData.seasons!, tmdbNormalized);
   }
 
-  const supportedLangs = [...(await getSupportedLanguageCodes(db))];
+  const supportedLangs = [...(await getActiveUserLanguages(db))];
 
   // For TVDB-native shows: fetch TMDB data for images, translations, and stills
   // For TMDB-native shows: stills already handled by applyTvdbSeasons above,

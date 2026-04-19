@@ -32,7 +32,7 @@ import {
 import { dispatchTranslateEpisodes } from "../../infrastructure/queue/bullmq-dispatcher";
 import { fetchMediaMetadata } from "./fetch-media-metadata";
 import { applyMediaTranslation, applySeasonsTranslation } from "../services/translation-service";
-import { getUserLanguage } from "../services/user-service";
+import { getActiveUserLanguages, getUserLanguage } from "../services/user-service";
 import { loadExtrasFromDB } from "../services/extras-service";
 import { normalizedMediaToResponse } from "../mappers/media-mapper";
 
@@ -377,7 +377,7 @@ export async function persistTranslations(
   mediaId: string,
   normalized: NormalizedMedia,
 ): Promise<void> {
-  const supported = await getSupportedLanguageCodes(db);
+  const supported = await getActiveUserLanguages(db);
 
   if (normalized.translations && normalized.translations.length > 0) {
     const mTransSeen = new Set<string>();
@@ -1155,7 +1155,7 @@ async function fetchPersistAndDispatch(
     ? getEffectiveProviderSync(existing, globalTvdbEnabled) === "tvdb"
     : globalTvdbEnabled;
 
-  const supportedLangs = [...await getSupportedLanguageCodes(db)];
+  const supportedLangs = [...await getActiveUserLanguages(db)];
 
   const result = await fetchMediaMetadata(
     input.externalId, input.provider, input.type,
