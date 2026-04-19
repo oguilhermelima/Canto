@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useState } from "react";
 import { trpc } from "~/lib/trpc/client";
 import { useResponsivePageSize } from "~/hooks/use-responsive-page-size";
 import type { SectionItem } from "../section-item";
@@ -15,9 +15,8 @@ interface UserMediaSourceProps {
 }
 
 export function UserMediaSource({ sectionId, title, style, filter }: UserMediaSourceProps): React.JSX.Element | null {
-  const current = useResponsivePageSize({ mobile: 10, tablet: 16, desktop: 24 });
-  const lockedRef = useRef(current);
-  const limit = lockedRef.current;
+  const initialLimit = useResponsivePageSize({ mobile: 10, tablet: 16, desktop: 24 });
+  const [limit] = useState(initialLimit);
 
   const query = trpc.userMedia.getUserMedia.useInfiniteQuery(
     {

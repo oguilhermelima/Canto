@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useState } from "react";
 import { trpc } from "~/lib/trpc/client";
 import { useResponsivePageSize } from "~/hooks/use-responsive-page-size";
 import type { SectionItem } from "../section-item";
@@ -14,9 +14,8 @@ interface WatchNextSourceProps {
 }
 
 export function WatchNextSource({ sectionId, title, style }: WatchNextSourceProps): React.JSX.Element | null {
-  const current = useResponsivePageSize({ mobile: 10, tablet: 16, desktop: 24 });
-  const lockedRef = useRef(current);
-  const limit = lockedRef.current;
+  const initialLimit = useResponsivePageSize({ mobile: 10, tablet: 16, desktop: 24 });
+  const [limit] = useState(initialLimit);
 
   const query = trpc.userMedia.getLibraryWatchNext.useInfiniteQuery(
     { limit, view: "watch_next" as const },

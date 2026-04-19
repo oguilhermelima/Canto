@@ -429,7 +429,13 @@ export function FilterSidebar({
   };
 
   // Expose reset to parent via ref
-  if (resetRef) resetRef.current = { reset: handleReset };
+  useEffect(() => {
+    if (!resetRef) return;
+    resetRef.current = { reset: handleReset };
+    return () => {
+      resetRef.current = null;
+    };
+  }, [resetRef, handleReset]);
 
   const isDesc = sortBy.endsWith(".desc");
   const SortIcon = isDesc ? ArrowDown : ArrowUp;

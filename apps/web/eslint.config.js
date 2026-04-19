@@ -58,6 +58,7 @@ export default [
       "react-hooks/set-state-in-effect": "off",
       "react-hooks/refs": "warn",
       "react-hooks/immutability": "warn",
+      "react-hooks/preserve-manual-memoization": "warn",
       "@next/next/no-img-element": "warn",
     },
   },
