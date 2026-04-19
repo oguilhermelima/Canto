@@ -1,19 +1,18 @@
-# Production: all services containerized.
-# Usage: docker compose -f docker-compose.prod.yaml up -d
+# Production: full Canto stack (builds from local Dockerfile).
+# Infra (VPN, qBittorrent, Jellyfin, Prowlarr) lives in a separate stack.
+# Required env: POSTGRES_PASSWORD, REDIS_PASSWORD, BETTER_AUTH_SECRET, BETTER_AUTH_URL, MEDIA_PATH.
 services:
   postgres:
     image: postgres:18
     restart: unless-stopped
-    ports:
-      - "5432:5432"
     environment:
-      POSTGRES_USER: canto
-      POSTGRES_PASSWORD: canto
-      POSTGRES_DB: canto
+      POSTGRES_USER: ${POSTGRES_USER:-canto}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-canto}
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U canto"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-canto}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -21,12 +20,11 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -36,32 +34,38 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runner
+    image: canto:latest
     command: pnpm --filter @canto/db push
     working_dir: /app
     environment:
-      DATABASE_URL: postgresql://canto:canto@postgres:5432/canto
+      DATABASE_URL: postgresql://${POSTGRES_USER:-canto}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-canto}
     depends_on:
       postgres:
         condition: service_healthy
     restart: "no"
 
   canto:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runner
+    image: canto:latest
     command: node apps/web/.next/standalone/apps/web/server.js
     working_dir: /app
     ports:
-      - "3000:3000"
-    env_file: .env
+      - "${CANTO_PORT:-3000}:3000"
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://canto:canto@postgres:5432/canto
-      REDIS_URL: redis://redis:6379
-      REDIS_HOST: redis
       HOSTNAME: "0.0.0.0"
       PORT: "3000"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-canto}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-canto}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      AUTH_TRUSTED_ORIGINS: ${AUTH_TRUSTED_ORIGINS:-}
+      TRAKT_CLIENT_ID: ${TRAKT_CLIENT_ID:-}
+      TRAKT_CLIENT_SECRET: ${TRAKT_CLIENT_SECRET:-}
+    volumes:
+      - ${MEDIA_PATH}:/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,19 +76,18 @@ services:
     restart: unless-stopped
 
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runner
+    image: canto:latest
     command: node apps/worker/dist/index.js
     working_dir: /app
-    env_file: .env
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://canto:canto@postgres:5432/canto
-      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://${POSTGRES_USER:-canto}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-canto}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       REDIS_HOST: redis
       REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - ${MEDIA_PATH}:/media
     depends_on:
       postgres:
         condition: service_healthy
