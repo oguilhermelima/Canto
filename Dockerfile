@@ -41,11 +41,15 @@ COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
 
-# Worker compiled
-COPY --from=builder /app/apps/worker/dist ./apps/worker/dist
+# Worker source + tsconfig (executed at runtime via tsx; TS ESM would need
+# rewritten extensions, which the repo uses Bundler resolution for) plus its
+# pnpm workspace node_modules (symlinks into the .pnpm store).
+COPY --from=builder /app/apps/worker/src ./apps/worker/src
+COPY --from=builder /app/apps/worker/tsconfig.json ./apps/worker/
 COPY --from=builder /app/apps/worker/package.json ./apps/worker/
+COPY --from=builder /app/apps/worker/node_modules ./apps/worker/node_modules
 
-# Shared packages (needed at runtime by worker)
+# Shared packages (needed at runtime by worker) + root node_modules (pnpm .pnpm store)
 COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/node_modules ./node_modules
 

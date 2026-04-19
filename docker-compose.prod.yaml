@@ -1,11 +1,7 @@
 # Production: full Canto stack (builds from local Dockerfile).
 # Infra (VPN, qBittorrent, Jellyfin, Prowlarr) lives in a separate stack.
 # Required env: POSTGRES_PASSWORD, REDIS_PASSWORD, BETTER_AUTH_SECRET, BETTER_AUTH_URL, MEDIA_PATH.
-x-canto-build: &canto-build
-  context: .
-  dockerfile: Dockerfile
-  target: runner
-
+# The migrate service builds canto:latest; canto and worker consume the built image.
 services:
   postgres:
     image: postgres:18
@@ -35,10 +31,13 @@ services:
       retries: 5
 
   migrate:
-    build: *canto-build
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
     image: canto:latest
     pull_policy: build
-    command: pnpm --filter @canto/db push
+    command: pnpm --filter @canto/db exec drizzle-kit push --force
     working_dir: /app
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-canto}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-canto}
@@ -48,10 +47,9 @@ services:
     restart: "no"
 
   canto:
-    build: *canto-build
     image: canto:latest
-    pull_policy: build
-    command: node apps/web/.next/standalone/apps/web/server.js
+    pull_policy: never
+    command: node apps/web/server.js
     working_dir: /app
     ports:
       - "${CANTO_PORT:-3000}:3000"
@@ -81,10 +79,9 @@ services:
     restart: unless-stopped
 
   worker:
-    build: *canto-build
     image: canto:latest
-    pull_policy: build
-    command: node apps/worker/dist/index.js
+    pull_policy: never
+    command: pnpm --filter @canto/worker exec tsx src/index.ts
     working_dir: /app
     environment:
       NODE_ENV: production
