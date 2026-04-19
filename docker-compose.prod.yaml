@@ -45,7 +45,7 @@ services:
         condition: service_healthy
     restart: "no"
 
-  web:
+  canto:
     build:
       context: .
       dockerfile: Dockerfile
@@ -85,8 +85,6 @@ services:
       REDIS_URL: redis://redis:6379
       REDIS_HOST: redis
       REDIS_PORT: "6379"
-    volumes:
-      - ./data:/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -96,36 +94,6 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
-  qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:latest
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-      - "6881:6881"
-      - "6881:6881/udp"
-    environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: America/Sao_Paulo
-      WEBUI_PORT: 8080
-    volumes:
-      - qbittorrent_config:/config
-      - ./data:/data
-
-  prowlarr:
-    image: lscr.io/linuxserver/prowlarr:latest
-    restart: unless-stopped
-    ports:
-      - "9696:9696"
-    environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: America/Sao_Paulo
-    volumes:
-      - prowlarr_config:/config
-
 volumes:
   postgres_data:
   redis_data:
-  qbittorrent_config:
-  prowlarr_config:
