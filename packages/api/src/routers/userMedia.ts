@@ -84,6 +84,14 @@ function isReleasedOnOrBefore(value: string | Date | null | undefined, now: Date
   return !parsed || parsed.getTime() <= now.getTime();
 }
 
+function hasConfirmedPastAirDate(
+  value: string | Date | null | undefined,
+  now: Date,
+): boolean {
+  const parsed = parseDateLike(value);
+  return !!parsed && parsed.getTime() <= now.getTime();
+}
+
 function resolveWatchedAt(params: {
   mode: WatchedAtMode;
   customDate: Date | null;
@@ -120,6 +128,16 @@ function toMediaType(value: string): MediaType {
 
 function isServerSource(source: string | null): source is "jellyfin" | "plex" {
   return source === "jellyfin" || source === "plex";
+}
+
+function isContinueWatchingSource(
+  source: string | null,
+): source is "jellyfin" | "plex" | "trakt" {
+  return source === "jellyfin" || source === "plex" || source === "trakt";
+}
+
+function continueSourcePriority(source: "jellyfin" | "plex" | "trakt"): number {
+  return source === "trakt" ? 1 : 0;
 }
 
 function toMinuteKey(value: Date | string): string {
@@ -296,7 +314,7 @@ export const userMediaRouter = createTRPCRouter({
         year: number | null;
         externalId: number;
         provider: string;
-        source: "jellyfin" | "plex";
+        source: "jellyfin" | "plex" | "trakt";
         progressSeconds: number;
         durationSeconds: number | null;
         progressPercent: number | null;
@@ -316,12 +334,29 @@ export const userMediaRouter = createTRPCRouter({
         sortDate: Date;
       }> = [];
 
-      for (const row of playbackRows) {
-        if (!isServerSource(row.source)) continue;
-        if (row.isCompleted) continue;
-        if (row.positionSeconds <= 0) continue;
-        if (!row.lastWatchedAt) continue;
+      const continueCandidates = playbackRows
+        .filter((row) => {
+          if (!isContinueWatchingSource(row.source)) return false;
+          if (row.isCompleted) return false;
+          if (row.positionSeconds <= 0) return false;
+          if (!row.lastWatchedAt) return false;
+          return true;
+        })
+        .sort((a, b) => {
+          const priorityDiff =
+            continueSourcePriority(a.source as "jellyfin" | "plex" | "trakt") -
+            continueSourcePriority(b.source as "jellyfin" | "plex" | "trakt");
+          if (priorityDiff !== 0) return priorityDiff;
+          return (
+            (b.lastWatchedAt?.getTime() ?? 0) -
+            (a.lastWatchedAt?.getTime() ?? 0)
+          );
+        });
+
+      for (const row of continueCandidates) {
+        if (!isContinueWatchingSource(row.source)) continue;
         if (continueMediaIds.has(row.mediaId)) continue;
+        if (!row.lastWatchedAt) continue;
 
         const durationSeconds = toDurationSeconds(row.episodeRuntime ?? row.mediaRuntime);
 
@@ -467,6 +502,21 @@ export const userMediaRouter = createTRPCRouter({
         historyByMediaId.set(row.mediaId, bucket);
       }
 
+      const lastActivityByMediaId = new Map<string, Date>();
+      const updateLastActivity = (mediaId: string, when: Date | null) => {
+        if (!when) return;
+        const current = lastActivityByMediaId.get(mediaId);
+        if (!current || when.getTime() > current.getTime()) {
+          lastActivityByMediaId.set(mediaId, when);
+        }
+      };
+      for (const row of historyRows) {
+        updateLastActivity(row.mediaId, row.watchedAt);
+      }
+      for (const row of playbackRows) {
+        updateLastActivity(row.mediaId, row.lastWatchedAt);
+      }
+
       const episodesByMediaId = new Map<
         string,
         Array<{
@@ -522,6 +572,9 @@ export const userMediaRouter = createTRPCRouter({
 
       for (const candidate of listMediaMap.values()) {
         if (continueMediaIds.has(candidate.mediaId)) continue;
+        // Watch Next is focused on shows the user has actively started.
+        // Movies in watchlist surface via the Watchlist rail, not here.
+        if (candidate.mediaType !== "show") continue;
 
         const state = stateByMediaId.get(candidate.mediaId);
         if (state?.status === "completed" || state?.status === "dropped") continue;
@@ -529,55 +582,31 @@ export const userMediaRouter = createTRPCRouter({
         const mediaHistory = historyByMediaId.get(candidate.mediaId) ?? [];
         const fromLists = [...candidate.listNames];
 
-        if (candidate.mediaType === "movie") {
-          const hasMovieHistory = mediaHistory.some(
-            (entry) => entry.episodeId === null,
-          );
-          if (hasMovieHistory) continue;
-
-          listItems.push({
-            id: `next-movie:${candidate.mediaId}`,
-            kind: "next_movie",
-            mediaId: candidate.mediaId,
-            mediaType: candidate.mediaType,
-            title: candidate.title,
-            posterPath: candidate.posterPath,
-            backdropPath: candidate.backdropPath,
-            year: candidate.year,
-            externalId: candidate.externalId,
-            provider: candidate.provider,
-            source: "list",
-            progressSeconds: 0,
-            durationSeconds: null,
-            progressPercent: null,
-            progressValue: null,
-            progressTotal: null,
-            progressUnit: null,
-            watchedAt: null,
-            episode: null,
-            fromLists,
-            sortDate: candidate.addedAt,
-          });
-          continue;
-        }
-
         const releasedEpisodes = (episodesByMediaId.get(candidate.mediaId) ?? []).filter(
-          (episode) => isReleasedOnOrBefore(episode.airDate, now),
+          (episode) =>
+            episode.seasonNumber > 0 && hasConfirmedPastAirDate(episode.airDate, now),
         );
         if (releasedEpisodes.length === 0) continue;
 
+        const releasedEpisodeIds = new Set(releasedEpisodes.map((e) => e.episodeId));
         const watchedEpisodeIds = new Set(
           mediaHistory
             .map((entry) => entry.episodeId)
             .filter((episodeId): episodeId is string => !!episodeId),
         );
-        const watchedEpisodesCount = watchedEpisodeIds.size;
+        const watchedEpisodesCount = [...watchedEpisodeIds].filter((id) =>
+          releasedEpisodeIds.has(id),
+        ).length;
+        if (watchedEpisodesCount === 0) continue;
+
         const availableEpisodesCount = releasedEpisodes.length;
 
         const nextEpisode = releasedEpisodes.find(
           (episode) => !watchedEpisodeIds.has(episode.episodeId),
         );
         if (!nextEpisode) continue;
+
+        const lastActivity = lastActivityByMediaId.get(candidate.mediaId) ?? candidate.addedAt;
 
         listItems.push({
           id: `next-episode:${candidate.mediaId}:${nextEpisode.episodeId}`,
@@ -600,7 +629,7 @@ export const userMediaRouter = createTRPCRouter({
           progressValue: watchedEpisodesCount,
           progressTotal: availableEpisodesCount,
           progressUnit: "episodes",
-          watchedAt: null,
+          watchedAt: lastActivity,
           episode: {
             id: nextEpisode.episodeId,
             seasonNumber: nextEpisode.seasonNumber,
@@ -608,35 +637,16 @@ export const userMediaRouter = createTRPCRouter({
             title: nextEpisode.episodeTitle,
           },
           fromLists,
-          sortDate: candidate.addedAt,
+          sortDate: lastActivity,
         });
       }
 
-      // Enhanced sorting for watch_next:
-      // 1. Continue items sorted by most recently watched
-      // 2. List items sorted by: watchlist priority > recency > collection items
-      const sortListItems = (items: typeof listItems) => {
-        return items.sort((a, b) => {
-          const aIsWatchlist = listMediaMap.get(a.mediaId)?.isFromWatchlist ?? false;
-          const bIsWatchlist = listMediaMap.get(b.mediaId)?.isFromWatchlist ?? false;
-          
-          if (aIsWatchlist && bIsWatchlist) {
-            return b.sortDate.getTime() - a.sortDate.getTime();
-          }
-          
-          if (aIsWatchlist !== bIsWatchlist) {
-            return aIsWatchlist ? -1 : 1;
-          }
-          
-          return b.sortDate.getTime() - a.sortDate.getTime();
-        });
-      };
+      const sortByActivityDesc = <T extends { sortDate: Date }>(items: T[]): T[] =>
+        items.sort((a, b) => b.sortDate.getTime() - a.sortDate.getTime());
 
       const merged = [
-        ...continueItems.sort(
-          (a, b) => b.sortDate.getTime() - a.sortDate.getTime(),
-        ),
-        ...sortListItems(listItems),
+        ...sortByActivityDesc(continueItems),
+        ...sortByActivityDesc(listItems),
       ]
         .map((item) => ({
           id: item.id,

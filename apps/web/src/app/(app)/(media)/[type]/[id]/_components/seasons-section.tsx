@@ -4,6 +4,25 @@ import { useMemo } from "react";
 import { SeasonTabs } from "~/components/media/season-tabs";
 import { trpc } from "~/lib/trpc/client";
 
+function hasScheduledEpisode(episodes: Array<{ airDate: string | null }>): boolean {
+  return episodes.some((episode) => {
+    if (!episode.airDate) return false;
+    const parsed = new Date(episode.airDate);
+    return !Number.isNaN(parsed.getTime());
+  });
+}
+
+function seasonHasData(season: {
+  airDate: string | null;
+  episodes: Array<{ airDate: string | null }>;
+}): boolean {
+  if (season.airDate) {
+    const parsed = new Date(season.airDate);
+    if (!Number.isNaN(parsed.getTime())) return true;
+  }
+  return hasScheduledEpisode(season.episodes);
+}
+
 interface SeasonEpisode {
   id: string;
   number: number;
@@ -59,12 +78,19 @@ export function SeasonsSection({
     return map;
   }, [userRatings]);
 
+  const visibleSeasons = useMemo(
+    () => media.seasons.filter((s) => seasonHasData(s)),
+    [media.seasons],
+  );
+
+  if (visibleSeasons.length === 0) return null;
+
   return (
     <div id="seasons-section">
       <SeasonTabs
         showExternalId={String(media.externalId)}
         userRatings={userRatingMap}
-        seasons={media.seasons.map((s) => ({
+        seasons={visibleSeasons.map((s) => ({
           id: s.id,
           seasonNumber: s.number,
           name: s.name ?? `Season ${s.number}`,
