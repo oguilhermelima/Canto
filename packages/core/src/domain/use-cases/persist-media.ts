@@ -29,7 +29,11 @@ import {
   findMediaByAnyReference,
   findMediaByIdWithSeasons,
 } from "../../infrastructure/repositories/media-repository";
-import { dispatchTranslateEpisodes } from "../../infrastructure/queue/bullmq-dispatcher";
+import {
+  dispatchEnsureMedia,
+  dispatchTranslateEpisodes,
+} from "../../infrastructure/queue/bullmq-dispatcher";
+import { detectGaps } from "./detect-gaps";
 import { fetchMediaMetadata } from "./fetch-media-metadata";
 import { applyMediaTranslation, applySeasonsTranslation } from "../services/translation-service";
 import { getActiveUserLanguages, getUserLanguage } from "../services/user-service";
@@ -44,6 +48,25 @@ export interface MediaMetadata {
   tvdbId?: number;
   /** True when TVDB season fetch was attempted but failed (API error, timeout, etc.) */
   tvdbFailed?: boolean;
+}
+
+/**
+ * Detect gaps in cached data for the user's current language and enqueue a
+ * background `ensureMedia` run so the next visit is complete. Fire-and-forget
+ * — never blocks the hot path.
+ */
+async function detectAndEnqueueLazyFill(
+  db: Database,
+  mediaId: string,
+  language: string,
+): Promise<void> {
+  if (!language || language.startsWith("en")) return;
+  const report = await detectGaps(db, mediaId, [language]);
+  if (report.gaps.length === 0) return;
+  await dispatchEnsureMedia(mediaId, {
+    languages: [language],
+    aspects: report.gaps,
+  });
 }
 
 let supportedLanguageCache: Set<string> | null = null;
@@ -1224,6 +1247,10 @@ export async function resolveMedia(
       await applySeasonsTranslation(db, translated.seasons, lang);
     }
     const extras = await loadExtrasFromDB(db, existing.id, lang);
+
+    // Lazy fill: if this user's language has gaps, enqueue an ensureMedia
+    // job in the background so the next visit has everything.
+    void detectAndEnqueueLazyFill(db, existing.id, lang).catch(() => {});
 
     return {
       source: "db" as const,
