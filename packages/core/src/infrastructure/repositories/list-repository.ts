@@ -170,6 +170,20 @@ export async function findListBySlug(
   });
 }
 
+export async function findPublicListBySlug(
+  db: Database,
+  slug: string,
+  ownerUserId: string,
+) {
+  return db.query.list.findFirst({
+    where: and(
+      eq(list.slug, slug),
+      eq(list.userId, ownerUserId),
+      eq(list.visibility, "public"),
+    ),
+  });
+}
+
 export async function findListById(db: Database, id: string) {
   return db.query.list.findFirst({
     where: eq(list.id, id),

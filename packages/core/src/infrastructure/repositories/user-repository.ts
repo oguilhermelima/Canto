@@ -66,6 +66,22 @@ export async function getUserProfile(db: Database, userId: string) {
   };
 }
 
+export async function findPublicUserProfile(db: Database, userId: string) {
+  const [row] = await db
+    .select({
+      id: user.id,
+      name: user.name,
+      image: user.image,
+      bio: user.bio,
+      headerImage: user.headerImage,
+      isPublic: user.isPublic,
+      createdAt: user.createdAt,
+    })
+    .from(user)
+    .where(eq(user.id, userId));
+  return row ?? null;
+}
+
 export async function updateUserProfile(
   db: Database,
   userId: string,
