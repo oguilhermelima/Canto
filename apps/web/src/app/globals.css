@@ -7,6 +7,7 @@
   --breakpoint-3xl: 112rem;
   --breakpoint-5xl: 137.5rem;
   --breakpoint-7xl: 175rem;
+  --font-serif: var(--font-serif), ui-serif, Georgia, serif;
 }
 
 @custom-variant dark (&:is(.dark *));
@@ -80,6 +81,21 @@
 @keyframes spotlightFadeIn {
   from { opacity: 0; transform: scale(1.05); }
   to { opacity: 1; transform: scale(1); }
+}
+
+/* Section rise — staggered entrance for profile blocks */
+@keyframes sectionRise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@utility animate-section-rise {
+  animation: sectionRise 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+/* Collapse empty section wrappers so gap doesn't leave a hole when a block returns null. */
+.animate-section-rise:empty { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-section-rise { animation: none; }
 }
 
 @keyframes contentSlideIn {
