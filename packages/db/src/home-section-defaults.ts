@@ -10,6 +10,42 @@ interface DefaultSection {
   enabled: boolean;
 }
 
+/** Canonical sections — always present, reorderable/toggleable, not editable/deletable. */
+export const CANONICAL_HOME_SECTIONS: Array<Omit<DefaultSection, "position">> = [
+  {
+    title: "Watch by provider",
+    style: "card",
+    sourceType: "db",
+    sourceKey: "watch_providers",
+    config: {},
+    enabled: true,
+  },
+  {
+    title: "Top 10 shows today",
+    style: "card",
+    sourceType: "db",
+    sourceKey: "top10_shows",
+    config: { mediaType: "show" },
+    enabled: true,
+  },
+  {
+    title: "Top 10 movies today",
+    style: "card",
+    sourceType: "db",
+    sourceKey: "top10_movies",
+    config: { mediaType: "movie" },
+    enabled: true,
+  },
+  {
+    title: "Genres",
+    style: "card",
+    sourceType: "db",
+    sourceKey: "genre_tiles",
+    config: {},
+    enabled: true,
+  },
+];
+
 export const DEFAULT_HOME_SECTIONS: DefaultSection[] = [
   {
     position: 0,
@@ -49,6 +85,42 @@ export const DEFAULT_HOME_SECTIONS: DefaultSection[] = [
   },
   {
     position: 4,
+    title: "Watch by provider",
+    style: "card",
+    sourceType: "db",
+    sourceKey: "watch_providers",
+    config: {},
+    enabled: true,
+  },
+  {
+    position: 5,
+    title: "Top 10 shows today",
+    style: "card",
+    sourceType: "db",
+    sourceKey: "top10_shows",
+    config: { mediaType: "show" },
+    enabled: true,
+  },
+  {
+    position: 6,
+    title: "Top 10 movies today",
+    style: "card",
+    sourceType: "db",
+    sourceKey: "top10_movies",
+    config: { mediaType: "movie" },
+    enabled: true,
+  },
+  {
+    position: 7,
+    title: "Genres",
+    style: "card",
+    sourceType: "db",
+    sourceKey: "genre_tiles",
+    config: {},
+    enabled: true,
+  },
+  {
+    position: 8,
     title: "Trending TV Shows",
     style: "card",
     sourceType: "tmdb",
@@ -57,7 +129,7 @@ export const DEFAULT_HOME_SECTIONS: DefaultSection[] = [
     enabled: true,
   },
   {
-    position: 5,
+    position: 9,
     title: "Action & Adventure Series",
     style: "card",
     sourceType: "tmdb",
@@ -66,7 +138,7 @@ export const DEFAULT_HOME_SECTIONS: DefaultSection[] = [
     enabled: true,
   },
   {
-    position: 6,
+    position: 10,
     title: "Trending Movies",
     style: "card",
     sourceType: "tmdb",
@@ -75,7 +147,7 @@ export const DEFAULT_HOME_SECTIONS: DefaultSection[] = [
     enabled: true,
   },
   {
-    position: 7,
+    position: 11,
     title: "Sci-Fi & Fantasy",
     style: "card",
     sourceType: "tmdb",
@@ -84,7 +156,7 @@ export const DEFAULT_HOME_SECTIONS: DefaultSection[] = [
     enabled: true,
   },
   {
-    position: 8,
+    position: 12,
     title: "Trending Anime",
     style: "card",
     sourceType: "tmdb",
@@ -93,7 +165,7 @@ export const DEFAULT_HOME_SECTIONS: DefaultSection[] = [
     enabled: true,
   },
   {
-    position: 9,
+    position: 13,
     title: "Thriller Movies",
     style: "card",
     sourceType: "tmdb",
@@ -102,7 +174,7 @@ export const DEFAULT_HOME_SECTIONS: DefaultSection[] = [
     enabled: true,
   },
   {
-    position: 10,
+    position: 14,
     title: "Trending Anime Movies",
     style: "card",
     sourceType: "tmdb",
@@ -111,7 +183,7 @@ export const DEFAULT_HOME_SECTIONS: DefaultSection[] = [
     enabled: true,
   },
   {
-    position: 11,
+    position: 15,
     title: "Crime & Mystery",
     style: "card",
     sourceType: "tmdb",
@@ -120,7 +192,7 @@ export const DEFAULT_HOME_SECTIONS: DefaultSection[] = [
     enabled: true,
   },
   {
-    position: 12,
+    position: 16,
     title: "Drama Series",
     style: "card",
     sourceType: "tmdb",

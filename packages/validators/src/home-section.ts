@@ -13,8 +13,24 @@ export const dbSourceKey = z.enum([
   "recently_added",
   "watch_next",
   "collection",
+  "watch_providers",
+  "top10_movies",
+  "top10_shows",
+  "genre_tiles",
 ]);
 export type DbSourceKey = z.infer<typeof dbSourceKey>;
+
+/** Canonical sections are always present per user. User can toggle/reorder, not edit/delete. */
+export const CANONICAL_SOURCE_KEYS = new Set<string>([
+  "watch_providers",
+  "top10_movies",
+  "top10_shows",
+  "genre_tiles",
+]);
+
+export function isCanonicalSection(sourceKey: string): boolean {
+  return CANONICAL_SOURCE_KEYS.has(sourceKey);
+}
 
 export const tmdbSourceKey = z.enum(["trending", "discover"]);
 export type TmdbSourceKey = z.infer<typeof tmdbSourceKey>;
