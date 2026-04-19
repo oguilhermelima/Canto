@@ -8,6 +8,9 @@ import { ContinueWatchingSource } from "./sources/continue-watching-source";
 import { WatchNextSource } from "./sources/watch-next-source";
 import { RecentlyAddedSource } from "./sources/recently-added-source";
 import { CollectionSource } from "./sources/collection-source";
+import { Top10Source } from "./sources/top10-source";
+import { ProvidersRow } from "./providers-row";
+import { GenresRow } from "./genres-row";
 
 interface HomeSectionRendererProps {
   section: {
@@ -40,6 +43,14 @@ export function HomeSectionRenderer({ section }: HomeSectionRendererProps): Reac
         const listId = String(cfg?.listId || "");
         return listId ? <CollectionSource sectionId={id} title={title} style={style} listId={listId} /> : null;
       }
+      case "watch_providers":
+        return <ProvidersRow title={title} />;
+      case "top10_movies":
+        return <Top10Source title={title} mediaType="movie" />;
+      case "top10_shows":
+        return <Top10Source title={title} mediaType="show" />;
+      case "genre_tiles":
+        return <GenresRow title={title} />;
       default:
         return null;
     }

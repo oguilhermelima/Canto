@@ -44,7 +44,10 @@ interface HomeSectionListProps {
   isLoading?: boolean;
 }
 
-export function HomeSectionList({ sections, isLoading = false }: HomeSectionListProps): React.JSX.Element {
+export function HomeSectionList({
+  sections,
+  isLoading = false,
+}: HomeSectionListProps): React.JSX.Element {
   const enabled = sections.filter((s) => s.enabled);
   const firstIsSpotlight = enabled.length > 0
     ? enabled[0]?.style === "spotlight"
