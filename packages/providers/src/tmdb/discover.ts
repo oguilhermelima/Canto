@@ -20,8 +20,9 @@ export async function getTrending(
   totalPages: number;
   totalResults: number;
 }> {
+  const window = opts?.timeWindow ?? "week";
   const endpoint =
-    type === "movie" ? "/trending/movie/week" : "/trending/tv/week";
+    type === "movie" ? `/trending/movie/${window}` : `/trending/tv/${window}`;
   const params: Record<string, string> = {};
   if (opts?.page) params.page = String(opts.page);
   if (opts?.language) params.language = opts.language;

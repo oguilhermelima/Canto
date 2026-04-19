@@ -203,6 +203,7 @@ export interface SearchOpts {
   page?: number;
   language?: string;
   region?: string;
+  timeWindow?: "day" | "week";
 }
 
 export interface DiscoverOpts {
