@@ -249,6 +249,40 @@ function readEnvOverride<K extends SettingKey>(
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Connection-error retry                                                    */
+/* -------------------------------------------------------------------------- */
+
+// postgres.js reopens dropped connections transparently on the next call, but
+// the in-flight query that raced the drop still rejects. Settings are hit on
+// the hot path of every worker job (getTvdbProvider, getTmdbProvider), so a
+// single stale socket there triggers a queue-wide failure storm. One retry is
+// enough to land on a freshly opened socket.
+const CONNECTION_ERROR_CODES = new Set([
+  "CONNECTION_CLOSED",
+  "CONNECTION_ENDED",
+  "CONNECTION_DESTROYED",
+  "CONNECT_TIMEOUT",
+  "ECONNRESET",
+  "ECONNREFUSED",
+  "EPIPE",
+]);
+
+function isConnectionError(err: unknown): boolean {
+  const cause = (err as { cause?: unknown })?.cause;
+  const code = (cause as { code?: unknown })?.code;
+  return typeof code === "string" && CONNECTION_ERROR_CODES.has(code);
+}
+
+async function withConnectionRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (!isConnectionError(err)) throw err;
+    return fn();
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Typed single-key API                                                      */
 /* -------------------------------------------------------------------------- */
 
@@ -261,9 +295,11 @@ export async function getSetting<K extends SettingKey>(
   const cached = getCached(key);
   if (cached.hit) return cached.value as SettingValue<K> | null;
 
-  const row = await db.query.systemSetting.findFirst({
-    where: eq(systemSetting.key, key),
-  });
+  const row = await withConnectionRetry(() =>
+    db.query.systemSetting.findFirst({
+      where: eq(systemSetting.key, key),
+    }),
+  );
 
   const decoded = row ? decodeStoredValue(key, row.value) : null;
   setCached(key, decoded);
@@ -296,10 +332,12 @@ export async function getSettings<K extends SettingKey>(
   }
 
   if (misses.length > 0) {
-    const rows = await db
-      .select()
-      .from(systemSetting)
-      .where(inArray(systemSetting.key, misses as unknown as string[]));
+    const rows = await withConnectionRetry(() =>
+      db
+        .select()
+        .from(systemSetting)
+        .where(inArray(systemSetting.key, misses as unknown as string[])),
+    );
     const byKey = new Map(rows.map((r) => [r.key, r.value] as const));
     for (const key of misses) {
       const raw = byKey.get(key);
