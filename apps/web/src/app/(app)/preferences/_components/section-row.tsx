@@ -1,8 +1,9 @@
 "use client";
 
-import { GripVertical, Pencil, Trash2 } from "lucide-react";
+import { GripVertical, Lock, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { Switch } from "@canto/ui/switch";
+import { isCanonicalSection } from "@canto/validators";
 
 const STYLE_LABELS: Record<string, string> = {
   spotlight: "Spotlight",
@@ -20,6 +21,10 @@ const SOURCE_LABELS: Record<string, string> = {
   collection: "Collection",
   trending: "Trending",
   discover: "Discover",
+  watch_providers: "Watch Providers",
+  top10_movies: "Top 10 Movies",
+  top10_shows: "Top 10 Shows",
+  genre_tiles: "Genres",
 };
 
 interface SectionRowProps {
@@ -53,6 +58,7 @@ export function SectionRow({
   onDragOver,
   onDrop,
 }: SectionRowProps): React.JSX.Element {
+  const canonical = isCanonicalSection(section.sourceKey);
   return (
     <div
       className={cn(
@@ -76,15 +82,22 @@ export function SectionRow({
       </button>
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="truncate text-sm font-medium text-foreground">
-          {section.title}
-        </span>
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center rounded-md bg-muted/60 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-            {STYLE_LABELS[section.style] ?? section.style}
+        <div className="flex items-center gap-1.5">
+          <span className="truncate text-sm font-medium text-foreground">
+            {section.title}
           </span>
+          {canonical && (
+            <Lock size={11} className="shrink-0 text-muted-foreground" aria-label="Canonical section" />
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {!canonical && (
+            <span className="inline-flex items-center rounded-md bg-muted/60 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+              {STYLE_LABELS[section.style] ?? section.style}
+            </span>
+          )}
           <span className="inline-flex items-center rounded-md bg-muted/60 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-            {section.sourceType === "db" ? "Library" : "TMDB"} · {SOURCE_LABELS[section.sourceKey] ?? section.sourceKey}
+            {canonical ? "Built-in" : section.sourceType === "db" ? "Library" : "TMDB"} · {SOURCE_LABELS[section.sourceKey] ?? section.sourceKey}
           </span>
         </div>
       </div>
@@ -95,20 +108,24 @@ export function SectionRow({
           onCheckedChange={onToggleEnabled}
           className="scale-75"
         />
-        <button
-          type="button"
-          onClick={onEdit}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <Pencil size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-        >
-          <Trash2 size={14} />
-        </button>
+        {!canonical && (
+          <>
+            <button
+              type="button"
+              onClick={onEdit}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <Pencil size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2 size={14} />
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
