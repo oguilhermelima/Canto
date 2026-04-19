@@ -1,6 +1,7 @@
 import { Queue } from "bullmq";
 import { QUEUES, type QueueName } from "./queue-names";
 import { getRedisConnection } from "./redis-config";
+import type { EnsureMediaSpec } from "../../domain/use-cases/ensure-media.types";
 
 const REMOVE_ON_FAIL = 50;
 
@@ -14,34 +15,30 @@ function createQueueGetter(name: QueueName): () => Promise<Queue> {
   };
 }
 
-const getRefreshExtrasQueue = createQueueGetter(QUEUES.refreshExtras);
-const getReconcileShowQueue = createQueueGetter(QUEUES.reconcileShow);
 const getRebuildUserRecsQueue = createQueueGetter(QUEUES.rebuildUserRecs);
 const getRefreshAllLangQueue = createQueueGetter(QUEUES.refreshAllLanguage);
-const getTranslateEpisodesQueue = createQueueGetter(QUEUES.translateEpisodes);
 const getJellyfinSyncQueue = createQueueGetter(QUEUES.jellyfinSync);
 const getPlexSyncQueue = createQueueGetter(QUEUES.plexSync);
 const getReverseSyncUserQueue = createQueueGetter(QUEUES.reverseSyncUser);
 const getTraktSyncUserQueue = createQueueGetter(QUEUES.traktSyncUser);
 const getFolderScanQueue = createQueueGetter(QUEUES.folderScan);
 const getMediaPipelineQueue = createQueueGetter(QUEUES.mediaPipeline);
+const getEnsureMediaQueue = createQueueGetter(QUEUES.ensureMedia);
 
+/**
+ * Legacy shell — redirects to the unified ensureMedia engine.
+ * The standalone `refresh-extras` queue is kept defined so any in-flight
+ * jobs from older builds still drain; new dispatches go through ensureMedia.
+ */
 export async function dispatchRefreshExtras(mediaId: string): Promise<void> {
-  const q = await getRefreshExtrasQueue();
-  await q.add(QUEUES.refreshExtras, { mediaId }, {
-    jobId: `refresh-extras-${mediaId}`,
-    removeOnComplete: true,
-    removeOnFail: REMOVE_ON_FAIL,
-  });
+  await dispatchEnsureMedia(mediaId, { aspects: ["extras"] });
 }
 
+/**
+ * Legacy shell — redirects to the unified ensureMedia engine.
+ */
 export async function dispatchReconcileShow(mediaId: string): Promise<void> {
-  const q = await getReconcileShowQueue();
-  await q.add(QUEUES.reconcileShow, { mediaId }, {
-    jobId: `reconcile-show-${mediaId}`,
-    removeOnComplete: true,
-    removeOnFail: REMOVE_ON_FAIL,
-  });
+  await dispatchEnsureMedia(mediaId, { aspects: ["structure"], force: true });
 }
 
 export async function dispatchRefreshAllLanguage(): Promise<void> {
@@ -63,12 +60,19 @@ export async function dispatchRebuildUserRecs(userId: string): Promise<void> {
   });
 }
 
-export async function dispatchTranslateEpisodes(mediaId: string, tvdbId: number, language: string): Promise<void> {
-  const q = await getTranslateEpisodesQueue();
-  await q.add(QUEUES.translateEpisodes, { mediaId, tvdbId, language }, {
-    jobId: `translate-eps-${mediaId}-${language}`,
-    removeOnComplete: true,
-    removeOnFail: REMOVE_ON_FAIL,
+/**
+ * Legacy shell — redirects to the unified ensureMedia engine, which now
+ * handles TVDB episode-translation fallback as part of the `translations`
+ * aspect.
+ */
+export async function dispatchTranslateEpisodes(
+  mediaId: string,
+  _tvdbId: number,
+  language: string,
+): Promise<void> {
+  await dispatchEnsureMedia(mediaId, {
+    aspects: ["translations"],
+    languages: [language],
   });
 }
 
@@ -126,6 +130,56 @@ export async function dispatchMediaPipeline(data: MediaPipelineJob): Promise<voi
     removeOnComplete: true,
     removeOnFail: REMOVE_ON_FAIL,
   });
+}
+
+export interface EnsureMediaJob {
+  mediaId: string;
+  spec: EnsureMediaSpec;
+}
+
+/**
+ * Enqueue an `ensureMedia` run. If a job for the same mediaId is already
+ * waiting or active, merge the spec (union of languages + aspects, OR of
+ * `force`) rather than creating a duplicate.
+ */
+export async function dispatchEnsureMedia(
+  mediaId: string,
+  spec: EnsureMediaSpec = {},
+): Promise<void> {
+  const q = await getEnsureMediaQueue();
+  const jobId = `ensure-media-${mediaId}`;
+  const existing = await q.getJob(jobId);
+  if (existing) {
+    const state = await existing.getState();
+    if (state === "waiting" || state === "delayed" || state === "active") {
+      const merged = mergeSpecs(
+        (existing.data as EnsureMediaJob | undefined)?.spec ?? {},
+        spec,
+      );
+      await existing.updateData({ mediaId, spec: merged });
+      return;
+    }
+    await existing.remove().catch(() => {});
+  }
+  await q.add(QUEUES.ensureMedia, { mediaId, spec }, {
+    jobId,
+    removeOnComplete: true,
+    removeOnFail: REMOVE_ON_FAIL,
+  });
+}
+
+function mergeSpecs(a: EnsureMediaSpec, b: EnsureMediaSpec): EnsureMediaSpec {
+  const langs = a.languages || b.languages
+    ? [...new Set([...(a.languages ?? []), ...(b.languages ?? [])])]
+    : undefined;
+  const aspects = a.aspects || b.aspects
+    ? [...new Set([...(a.aspects ?? []), ...(b.aspects ?? [])])]
+    : undefined;
+  return {
+    languages: langs,
+    aspects,
+    force: !!a.force || !!b.force,
+  };
 }
 
 /** Add a job only if no active/waiting job with the same ID exists. */

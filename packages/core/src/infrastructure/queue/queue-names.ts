@@ -23,6 +23,7 @@ export const QUEUES = {
   refreshAllLanguage: "refresh-all-language",
   translateEpisodes: "translate-episodes",
   mediaPipeline: "media-pipeline",
+  ensureMedia: "ensure-media",
 } as const;
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];

@@ -21,7 +21,11 @@ import { refreshAllLanguage } from "@canto/core/domain/use-cases/refresh-all-lan
 import { translateEpisodes } from "@canto/core/domain/use-cases/translate-episodes";
 import { runMediaPipeline } from "@canto/core/domain/use-cases/run-media-pipeline";
 import { enqueueDailyRecsRebuild } from "@canto/core/domain/use-cases/enqueue-daily-recs-rebuild";
-import type { MediaPipelineJob } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
+import { ensureMedia } from "@canto/core/domain/use-cases/ensure-media";
+import type {
+  EnsureMediaJob,
+  MediaPipelineJob,
+} from "@canto/core/infrastructure/queue/bullmq-dispatcher";
 import { QUEUES } from "@canto/core/infrastructure/queue/queue-names";
 import { getRedisConnection } from "@canto/core/infrastructure/queue/redis-config";
 import { jobDispatcher } from "@canto/core/infrastructure/adapters/job-dispatcher.adapter";
@@ -249,6 +253,18 @@ const workers = [
       await runMediaPipeline(db, data, { tmdb, tvdb });
     },
     { concurrency: 5 },
+  ),
+
+  // ── Unified ensureMedia engine (replaces refreshExtras/translateEpisodes/
+  //    reconcileShow/refreshAllLanguage over time) ──
+
+  makeWorker<EnsureMediaJob>(
+    QUEUES.ensureMedia,
+    async ({ mediaId, spec }) => {
+      const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
+      await ensureMedia(db, mediaId, spec, { tmdb, tvdb });
+    },
+    { concurrency: 3 },
   ),
 ];
 

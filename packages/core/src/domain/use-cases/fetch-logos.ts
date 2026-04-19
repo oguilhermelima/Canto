@@ -2,9 +2,10 @@ import { eq, and, sql, isNotNull, or } from "drizzle-orm";
 
 import type { Database } from "@canto/db/client";
 import { media, mediaTranslation } from "@canto/db/schema";
-import { getSupportedLanguageCodes } from "./persist-media";
+import { getActiveUserLanguages } from "../services/user-service";
 import type { MediaProviderPort } from "../ports/media-provider.port";
 import type { SearchResult } from "@canto/providers";
+import { upsertLangLogos } from "./upsert-lang-logos";
 
 /** Deduplicates concurrent getImages calls for the same externalId */
 const inflightFetches = new Map<string, Promise<string | undefined>>();
@@ -152,34 +153,12 @@ export async function fetchLogos(
       }
     }
 
-    // Store language-specific logos in media_translation
+    // Language-specific logos go through the shared helper so ensureMedia
+    // and this browse-time path use identical write semantics.
     const langLogos = langLogoMap.get(`${item.type}-${item.externalId}`);
-    if (mediaId && langLogos) {
-      // Map TMDB language codes to full supported language codes
-      // Try exact match first (e.g., "pt-BR" → "pt-BR"), then 2-letter prefix (e.g., "pt" → "pt-BR")
-      const supported = await getSupportedLanguageCodes(db);
-      const langToFull = new Map<string, string>();
-      for (const code of supported) {
-        langToFull.set(code, code); // exact match (e.g., "pt-BR")
-        const prefix = code.split("-")[0]!;
-        if (!langToFull.has(prefix)) langToFull.set(prefix, code); // 2-letter fallback
-      }
-
-      for (const [langCode, logoPath] of langLogos) {
-        const fullCode = langToFull.get(langCode);
-        if (!fullCode) continue;
-        try {
-          await db
-            .insert(mediaTranslation)
-            .values({ mediaId, language: fullCode, logoPath })
-            .onConflictDoUpdate({
-              target: [mediaTranslation.mediaId, mediaTranslation.language],
-              set: { logoPath: sql`COALESCE(EXCLUDED.logo_path, ${mediaTranslation.logoPath})` },
-            });
-        } catch {
-          // Skip on constraint errors
-        }
-      }
+    if (mediaId && langLogos && langLogos.size > 0) {
+      const supported = await getActiveUserLanguages(db);
+      await upsertLangLogos(db, mediaId, langLogos, supported);
     }
   }
 
