@@ -6,11 +6,30 @@ import {
   deleteHomeSections,
   seedHomeSectionsForUser,
 } from "@canto/core/infrastructure/repositories/home-section-repository";
-import { DEFAULT_HOME_SECTIONS } from "@canto/db/home-section-defaults";
+import {
+  DEFAULT_HOME_SECTIONS,
+  CANONICAL_HOME_SECTIONS,
+} from "@canto/db/home-section-defaults";
 
 export const homeSectionRouter = createTRPCRouter({
   list: protectedProcedure.query(async ({ ctx }) => {
-    const sections = await findHomeSections(ctx.db, ctx.session.user.id);
+    let sections = await findHomeSections(ctx.db, ctx.session.user.id);
+
+    // Reconcile: ensure every canonical section exists for this user.
+    const presentKeys = new Set(sections.map((s) => s.sourceKey));
+    const missing = CANONICAL_HOME_SECTIONS.filter((c) => !presentKeys.has(c.sourceKey));
+    if (missing.length > 0) {
+      const startPos = sections.length > 0
+        ? Math.max(...sections.map((s) => s.position)) + 1
+        : 0;
+      await seedHomeSectionsForUser(
+        ctx.db,
+        ctx.session.user.id,
+        missing.map((c, i) => ({ ...c, position: startPos + i })),
+      );
+      sections = await findHomeSections(ctx.db, ctx.session.user.id);
+    }
+
     return { sections };
   }),
 
