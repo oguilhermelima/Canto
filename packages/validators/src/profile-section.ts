@@ -1,17 +1,17 @@
 import { z } from "zod";
 
 export const profileSectionKey = z.enum([
-  // Narrative prose blocks
+  // Overview blocks
+  "year_in_progress",
+  "recent_completions",
+  "currently_watching",
+  "top_favorites",
+  "watchlist_launchpad",
+  "recent_activity",
+  // Stats narrative blocks
   "stats_dashboard",
   "taste_map",
   "insights",
-  // Media carousels
-  "top_favorites",
-  "currently_watching",
-  "recent_ratings",
-  "watchlist_launchpad",
-  "recent_activity",
-  "dropped_ships",
 ]);
 export type ProfileSectionKey = z.infer<typeof profileSectionKey>;
 
