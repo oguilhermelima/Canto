@@ -248,6 +248,9 @@ importers:
 
   packages/auth:
     dependencies:
+      '@canto/core':
+        specifier: workspace:*
+        version: link:../core
       '@canto/db':
         specifier: workspace:*
         version: link:../db
