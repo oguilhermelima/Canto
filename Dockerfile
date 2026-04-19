@@ -21,8 +21,7 @@ COPY tooling/typescript/package.json ./tooling/typescript/
 RUN pnpm install --frozen-lockfile
 
 # ── Build ──
-FROM base AS builder
-COPY --from=deps /app/node_modules ./node_modules
+FROM deps AS builder
 COPY . .
 ENV SKIP_ENV_VALIDATION=true
 RUN pnpm run build
