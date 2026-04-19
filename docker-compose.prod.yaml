@@ -1,6 +1,11 @@
 # Production: full Canto stack (builds from local Dockerfile).
 # Infra (VPN, qBittorrent, Jellyfin, Prowlarr) lives in a separate stack.
 # Required env: POSTGRES_PASSWORD, REDIS_PASSWORD, BETTER_AUTH_SECRET, BETTER_AUTH_URL, MEDIA_PATH.
+x-canto-build: &canto-build
+  context: .
+  dockerfile: Dockerfile
+  target: runner
+
 services:
   postgres:
     image: postgres:18
@@ -30,11 +35,9 @@ services:
       retries: 5
 
   migrate:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runner
+    build: *canto-build
     image: canto:latest
+    pull_policy: build
     command: pnpm --filter @canto/db push
     working_dir: /app
     environment:
@@ -45,7 +48,9 @@ services:
     restart: "no"
 
   canto:
+    build: *canto-build
     image: canto:latest
+    pull_policy: build
     command: node apps/web/.next/standalone/apps/web/server.js
     working_dir: /app
     ports:
@@ -76,7 +81,9 @@ services:
     restart: unless-stopped
 
   worker:
+    build: *canto-build
     image: canto:latest
+    pull_policy: build
     command: node apps/worker/dist/index.js
     working_dir: /app
     environment:
