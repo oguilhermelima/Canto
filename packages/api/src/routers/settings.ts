@@ -28,13 +28,16 @@ import {
   authenticatePlexInput,
   loginPlexInput,
   checkPlexPinInput,
+  refreshMediaInput,
 } from "@canto/validators";
 import type { ServiceEnum } from "@canto/validators";
 
 import { and, eq } from "drizzle-orm";
 import { media, user, supportedLanguage } from "@canto/db/schema";
 import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure, t } from "../trpc";
-import { dispatchRefreshAllLanguage, dispatchMediaPipeline, dispatchRebuildUserRecs } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
+import { dispatchMediaPipeline, dispatchRebuildUserRecs } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
+import { getActiveUserLanguages } from "@canto/core/domain/services/user-service";
+import { ensureMediaMany } from "@canto/core/domain/use-cases/ensure-media-many";
 
 // ── Extracted use-cases & services ──
 import { testService } from "@canto/core/infrastructure/adapters/service-tester";
@@ -46,6 +49,7 @@ import {
   checkPlexPin,
 } from "@canto/core/domain/use-cases/authenticate-media-server";
 import { validateServiceUrl } from "@canto/core/domain/rules/validate-service-url";
+import { invalidateActiveUserLanguages } from "@canto/core/domain/services/user-service";
 
 const setupOrAdminProcedure = t.procedure.use(async ({ ctx, next }) => {
   const completed = await getSetting("onboarding.completed");
@@ -141,10 +145,17 @@ export const settingsRouter = createTRPCRouter({
       if (!lang) {
         throw new TRPCError({ code: "BAD_REQUEST", message: `Language "${input.language}" is not supported` });
       }
+
       await ctx.db
         .update(user)
         .set({ language: input.language })
         .where(eq(user.id, ctx.session.user.id));
+
+      invalidateActiveUserLanguages();
+      // Per-media translations are filled lazily as the user visits pages
+      // (see detectGaps + dispatchEnsureMedia in the media.resolve hot path).
+      // Admins can force a bulk backfill via `media.refresh`.
+
       return { success: true };
     }),
 
@@ -155,10 +166,27 @@ export const settingsRouter = createTRPCRouter({
     }),
   ),
 
-  refreshLanguage: adminProcedure.mutation(async () => {
-    await dispatchRefreshAllLanguage();
-    return { success: true };
-  }),
+  /**
+   * Unified refresh endpoint. Replaces the old `refreshLanguage` (blanket)
+   * and `refreshMissingTranslations` (targeted translations only). Enqueues
+   * `ensureMedia` jobs for whatever is missing — or, with `force: true`,
+   * for every matched media.
+   */
+  refreshMedia: adminProcedure
+    .input(refreshMediaInput)
+    .mutation(async ({ ctx, input }) => {
+      const result = await ensureMediaMany(
+        ctx.db,
+        { mediaIds: input.mediaId ? [input.mediaId] : undefined },
+        {
+          languages: input.languages,
+          aspects: input.aspects,
+          force: input.force,
+        },
+        { dryRun: input.dryRun },
+      );
+      return result;
+    }),
 
   rebuildUserRecommendations: adminProcedure.mutation(async ({ ctx }) => {
     await dispatchRebuildUserRecs(ctx.session.user.id);

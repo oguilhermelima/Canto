@@ -960,33 +960,64 @@ function TvdbDefaultToggle(): React.JSX.Element {
 /*  MetadataProvidersSection (Services tab)                                    */
 /* -------------------------------------------------------------------------- */
 
-function RefreshMetadataButton(): React.JSX.Element {
-  const refreshLanguage = trpc.settings.refreshLanguage.useMutation({
-    onSuccess: () => toast.success("Metadata refresh started. This runs in the background and may take a few minutes."),
-    onError: () => toast.error("Failed to start metadata refresh."),
+function RefreshMediaButton(): React.JSX.Element {
+  const refresh = trpc.settings.refreshMedia.useMutation({
+    onSuccess: (res) => {
+      if (res.dispatched === 0) {
+        toast.success("Everything is up to date.");
+        return;
+      }
+      toast.success(
+        `Queued ${res.dispatched} media jobs (skipped ${res.skipped} already complete).`,
+      );
+    },
+    onError: () => toast.error("Failed to queue refresh."),
+  });
+  const refreshAll = trpc.settings.refreshMedia.useMutation({
+    onSuccess: () =>
+      toast.success(
+        "Full refresh started. This re-fetches everything and may take a while.",
+      ),
+    onError: () => toast.error("Failed to start full refresh."),
   });
 
   return (
     <div className="flex items-center justify-between px-5 py-4">
       <div className="mr-4 min-w-0">
-        <p className="text-sm font-medium text-foreground">Refresh all metadata</p>
+        <p className="text-sm font-medium text-foreground">Refresh missing data</p>
         <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
-          Re-fetch titles, overviews, posters, logos, and backdrops for all media from providers. Useful after changing language settings or fixing incorrect images.
+          Backfill titles, overviews, posters, logos, translations, and extras
+          for media missing them in your active languages. Runs in the
+          background. Safe to re-run.
         </p>
       </div>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={refreshLanguage.isPending}
-        onClick={() => refreshLanguage.mutate()}
-      >
-        {refreshLanguage.isPending ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        ) : (
-          <RefreshCw className="mr-2 h-4 w-4" />
-        )}
-        Refresh
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={refresh.isPending}
+          onClick={() => refresh.mutate({})}
+        >
+          {refresh.isPending ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="mr-2 h-4 w-4" />
+          )}
+          Refresh missing
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={refreshAll.isPending}
+          onClick={() => refreshAll.mutate({ force: true })}
+          title="Force refetch every media (slow)"
+        >
+          {refreshAll.isPending ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : null}
+          Refresh all
+        </Button>
+      </div>
     </div>
   );
 }
@@ -1009,7 +1040,7 @@ export function MetadataProvidersSection(): React.JSX.Element {
 
       <SettingsSection title="Maintenance" description="Tools for managing your metadata library.">
         <SectionCard title="Maintenance">
-          <RefreshMetadataButton />
+          <RefreshMediaButton />
         </SectionCard>
       </SettingsSection>
     </div>
@@ -1267,7 +1298,6 @@ export function MetadataSettingsSection(): React.JSX.Element {
   const setUserLanguage = trpc.settings.setUserLanguage.useMutation({
     onSuccess: () => void utils.settings.getUserLanguage.invalidate(),
   });
-  const refreshLanguage = trpc.settings.refreshLanguage.useMutation();
   const isConnected = !!allSettings?.["tvdb.token"];
   const defaultShows = allSettings?.["tvdb.defaultShows"] === true;
 
@@ -1278,8 +1308,7 @@ export function MetadataSettingsSection(): React.JSX.Element {
         onSuccess: () => {
           // Also update global setting for pool items / browse
           setMany.mutate({ settings: [{ key: "general.language", value }] });
-          toast.success("Language updated. Refreshing all metadata in background...");
-          refreshLanguage.mutate();
+          toast.success("Language updated. Items will translate as you visit them.");
         },
         onError: () => toast.error("Failed to update language"),
       },

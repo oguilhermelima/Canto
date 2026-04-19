@@ -34,7 +34,6 @@ export function PreferencesSection(): React.JSX.Element {
   const setUserLanguage = trpc.settings.setUserLanguage.useMutation({
     onSuccess: () => void utils.settings.getUserLanguage.invalidate(),
   });
-  const refreshLanguage = trpc.settings.refreshLanguage.useMutation();
 
   const handleLanguageChange = (value: string): void => {
     setUserLanguage.mutate(
@@ -42,8 +41,7 @@ export function PreferencesSection(): React.JSX.Element {
       {
         onSuccess: () => {
           setMany.mutate({ settings: [{ key: "general.language", value }] });
-          toast.success("Language updated. Refreshing all metadata in background...");
-          refreshLanguage.mutate();
+          toast.success("Language updated. Items will translate as you visit them.");
           // Invalidate media-related queries so UI reflects new language
           void utils.media.resolve.invalidate();
           void utils.library.list.invalidate();
