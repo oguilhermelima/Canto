@@ -89,9 +89,11 @@ export default function OnboardingPage(): React.JSX.Element {
     if (isCompleted === true) router.replace("/");
   }, [isCompleted, router]);
 
-  // Reset footer config when step changes + persist progress
+  // Persist progress across refreshes. Footer config isn't reset here — each
+  // step sets a complete config on mount, replacing whatever the previous step
+  // left behind. Resetting from the parent effect would race the child effect
+  // (child fires first) and wipe the step's config.
   useEffect(() => {
-    setFooterConfig({});
     if (typeof window !== "undefined") {
       window.localStorage.setItem(PROGRESS_KEY, String(currentStep));
     }
