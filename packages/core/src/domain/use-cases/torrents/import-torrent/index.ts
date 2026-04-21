@@ -8,7 +8,7 @@ import type { FileSystemPort } from "../../../ports/file-system.port";
 import { isVideoFile, buildMediaDir } from "../../../rules/naming";
 import { EP_PATTERN, isSubtitleFile } from "../../../rules/parsing";
 import { getEffectiveProviderSync } from "../../../rules/effective-provider";
-import { createNotification } from "../../create-notification";
+import { createNotification } from "../../notifications/create-notification";
 import {
   findMediaByIdWithSeasons,
   findFolderById,

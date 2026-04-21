@@ -27,7 +27,7 @@ import {
   findBlocklistEntry,
 } from "../../../../infrastructure/repositories";
 import { updateMedia } from "../../../../infrastructure/repositories/media/media-repository";
-import { createNotification } from "../../create-notification";
+import { createNotification } from "../../notifications/create-notification";
 import { resolveDownloadConfig } from "./folder-resolution";
 import { resolveEpisodeIds, detectDuplicates } from "./duplicate-detection";
 

@@ -10,7 +10,7 @@ import {
 import { findMediaFilesByMediaId } from "@canto/core/infrastructure/repositories/media/media-file-repository";
 import { setLibraryStatus } from "@canto/core/domain/use-cases/manage-library-status";
 import { findServerLibrary, removeListItem } from "@canto/core/infrastructure/repositories/list-repository";
-import { revertRequestStatus } from "@canto/core/infrastructure/repositories/request-repository";
+import { revertRequestStatus } from "@canto/core/infrastructure/repositories/requests";
 
 export const mediaLibraryRouter = createTRPCRouter({
   addToLibrary: adminProcedure
