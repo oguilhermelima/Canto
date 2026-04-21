@@ -9,3 +9,4 @@ export * from "./replace-show-with-tvdb";
 export * from "./resolve-media-version";
 export * from "./get-by-external";
 export * from "./fetch-logos";
+export * from "./toggle-tvdb-default";
