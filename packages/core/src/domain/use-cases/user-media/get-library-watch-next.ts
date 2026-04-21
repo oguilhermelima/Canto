@@ -10,7 +10,6 @@ import {
   type LibraryFeedFilterOptions,
 } from "../../../infrastructure/repositories";
 import { getUserLanguage } from "../../services/user-service";
-import { translateMediaItems } from "../../services/translation-service";
 import {
   continueSourcePriority,
   hasConfirmedPastAirDate,
@@ -99,6 +98,7 @@ interface ListCandidate {
   title: string;
   posterPath: string | null;
   backdropPath: string | null;
+  logoPath: string | null;
   year: number | null;
   externalId: number;
   provider: string;
@@ -133,12 +133,14 @@ export async function getLibraryWatchNext(
     tvStatus: input.tvStatus,
   };
 
+  const userLang = await getUserLanguage(db, userId);
+
   const [playbackRows, listMediaRows, watchingShows] = await Promise.all([
-    findUserPlaybackProgressFeed(db, userId, input.mediaType, filters),
-    findUserListMediaCandidates(db, userId, input.mediaType),
+    findUserPlaybackProgressFeed(db, userId, userLang, input.mediaType, filters),
+    findUserListMediaCandidates(db, userId, userLang, input.mediaType),
     input.mediaType === "movie"
       ? Promise.resolve([])
-      : findUserWatchingShowsMetadata(db, userId),
+      : findUserWatchingShowsMetadata(db, userId, userLang),
   ]);
 
   const continueMediaIds = new Set<string>();
@@ -156,6 +158,7 @@ export async function getLibraryWatchNext(
         candidateMediaIds.filter(
           (mediaId) => listMediaMap.get(mediaId)?.mediaType === "show",
         ),
+        userLang,
       ),
     ]);
 
@@ -193,10 +196,8 @@ export async function getLibraryWatchNext(
   const nextCursor =
     cursor + limit < filtered.length ? cursor + limit : undefined;
 
-  const userLang = await getUserLanguage(db, userId);
-  const items = await translateMediaItems(db, sliced, userLang);
-
-  return { items, total: filtered.length, nextCursor };
+  // Translation already applied at the source queries via mediaI18n / episodeI18n joins.
+  return { items: sliced, total: filtered.length, nextCursor };
 }
 
 type PlaybackRow = Awaited<
@@ -312,6 +313,7 @@ function buildListCandidateMap(
         title: row.title,
         posterPath: row.posterPath,
         backdropPath: row.backdropPath,
+        logoPath: row.logoPath ?? null,
         year: row.year,
         externalId: row.externalId,
         provider: row.provider,
@@ -336,6 +338,7 @@ function buildListCandidateMap(
       title: row.title,
       posterPath: row.posterPath,
       backdropPath: row.backdropPath,
+      logoPath: row.logoPath ?? null,
       year: row.year,
       externalId: row.externalId,
       provider: row.provider,
@@ -481,7 +484,7 @@ function buildNextListItems(params: {
       title: candidate.title,
       posterPath: candidate.posterPath,
       backdropPath: candidate.backdropPath,
-      logoPath: null,
+      logoPath: candidate.logoPath,
       overview: null,
       voteAverage: null,
       genres: null,

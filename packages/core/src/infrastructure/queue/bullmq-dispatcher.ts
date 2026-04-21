@@ -21,6 +21,7 @@ const getJellyfinSyncQueue = createQueueGetter(QUEUES.jellyfinSync);
 const getPlexSyncQueue = createQueueGetter(QUEUES.plexSync);
 const getReverseSyncUserQueue = createQueueGetter(QUEUES.reverseSyncUser);
 const getTraktSyncUserQueue = createQueueGetter(QUEUES.traktSyncUser);
+const getTraktListDeleteQueue = createQueueGetter(QUEUES.traktListDelete);
 const getFolderScanQueue = createQueueGetter(QUEUES.folderScan);
 const getMediaPipelineQueue = createQueueGetter(QUEUES.mediaPipeline);
 const getEnsureMediaQueue = createQueueGetter(QUEUES.ensureMedia);
@@ -104,6 +105,19 @@ export async function dispatchUserReverseSync(userId: string): Promise<boolean> 
 export async function dispatchUserTraktSync(userId: string): Promise<boolean> {
   const q = await getTraktSyncUserQueue();
   return dispatchUniqueJob(q, `trakt-sync-user-${userId}`, { userId });
+}
+
+/**
+ * Dispatch a Trakt list deletion job. Idempotent per `localListId` — if a
+ * delete job is already enqueued or running, this is a no-op. The worker
+ * picks up the tombstoned `list` row, calls Trakt's DELETE endpoint, then
+ * hard-deletes the local row (cascade clears the link).
+ */
+export async function dispatchTraktListDelete(
+  localListId: string,
+): Promise<boolean> {
+  const q = await getTraktListDeleteQueue();
+  return dispatchUniqueJob(q, `trakt-list-delete-${localListId}`, { localListId });
 }
 
 /** Dispatch an on-demand folder scan job (deduplicates active/waiting jobs). */

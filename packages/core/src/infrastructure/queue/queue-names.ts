@@ -10,6 +10,8 @@ export const QUEUES = {
   reverseSyncUser: "reverse-sync-user",
   traktSync: "trakt-sync",
   traktSyncUser: "trakt-sync-user",
+  traktListDelete: "trakt-list-delete",
+  traktListDeleteSweep: "trakt-list-delete-sweep",
   stallDetection: "stall-detection",
   rssSync: "rss-sync",
   dailyRecsCheck: "daily-recs-check",

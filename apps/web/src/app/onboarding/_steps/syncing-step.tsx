@@ -1,20 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Loader2, Check, Tv, Film, Sparkles, FolderSync, AlertTriangle } from "lucide-react";
+import { Tv, Film, Sparkles, FolderSync, ArrowRight } from "lucide-react";
 import { trpc } from "~/lib/trpc/client";
 import type { ConfigureFooter } from "../_components/onboarding-footer";
 import type { Settings } from "../_components/constants";
-
-type TaskStatus = "pending" | "running" | "done" | "skipped" | "failed";
-
-interface SyncTask {
-  id: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  status: TaskStatus;
-  error?: string;
-}
+import { MagicSetup, type MagicTask, type MagicTaskStatus } from "~/components/onboarding/magic-setup";
 
 export function SyncingStep({
   onNext,
@@ -25,7 +16,7 @@ export function SyncingStep({
   settings?: Settings;
   configureFooter: ConfigureFooter;
 }): React.JSX.Element {
-  const [tasks, setTasks] = useState<SyncTask[]>([]);
+  const [tasks, setTasks] = useState<MagicTask[]>([]);
   const [allDone, setAllDone] = useState(false);
   const started = useRef(false);
 
@@ -36,27 +27,25 @@ export function SyncingStep({
   const syncPlex = trpc.plex.syncLibraries.useMutation();
   const rebuildRecs = trpc.media.rebuildMyRecommendations.useMutation();
 
+  // The MagicSetup overlay sits on z-50 and covers the onboarding footer, so
+  // hide the footer entirely and render the Continue CTA inside the overlay
+  // when sync finishes. Prevents a hidden CTA users can't reach.
   useEffect(() => {
-    configureFooter({
-      onPrimary: allDone ? onNext : undefined,
-      primaryLabel: "Continue",
-      showBack: false,
-      showDots: true,
-    });
-  }, [allDone]); // eslint-disable-line react-hooks/exhaustive-deps
+    configureFooter({ showBack: false, showDots: false });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateTask = (
     id: string,
-    status: TaskStatus,
-    prev: SyncTask[],
+    status: MagicTaskStatus,
+    prev: MagicTask[],
     error?: string,
-  ): SyncTask[] => {
+  ): MagicTask[] => {
     const next = prev.map((t) => (t.id === id ? { ...t, status, error } : t));
     setTasks(next);
     return next;
   };
 
-  const runTasks = async (taskList: SyncTask[]): Promise<void> => {
+  const runTasks = async (taskList: MagicTask[]): Promise<void> => {
     let current = [...taskList];
 
     // Each step is best-effort but its outcome is recorded so a failed sync
@@ -85,13 +74,12 @@ export function SyncingStep({
     if (started.current) return;
     started.current = true;
 
-    const initial: SyncTask[] = [];
+    const initial: MagicTask[] = [];
     if (jellyfinEnabled) initial.push({ id: "jellyfin", label: "Syncing Jellyfin library", icon: Tv, status: "pending" });
     if (plexEnabled) initial.push({ id: "plex", label: "Syncing Plex library", icon: Film, status: "pending" });
     initial.push({ id: "recs", label: "Building recommendations", icon: Sparkles, status: "pending" });
 
     if (initial.length === 1) {
-      // Only recs, no media servers
       initial.unshift({ id: "organize", label: "Organizing your library", icon: FolderSync, status: "skipped" });
     }
 
@@ -100,68 +88,25 @@ export function SyncingStep({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="flex flex-col items-center gap-10 text-center pt-16 md:pt-0">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-        {allDone ? (
-          <Check className="h-8 w-8 text-emerald-400" />
-        ) : (
-          <FolderSync className="h-8 w-8 text-primary animate-pulse" />
-        )}
-      </div>
-
-      <div className="space-y-3">
-        <h1 className="text-2xl font-semibold text-foreground">
-          {allDone ? "Everything's ready" : "Setting things up"}
-        </h1>
-        <p className="mx-auto max-w-md text-base text-muted-foreground leading-relaxed">
-          {allDone
-            ? "Your library is synced and recommendations are ready. One more step to go."
-            : "Canto is syncing your media servers and preparing personalized recommendations. This will only take a moment."
-          }
-        </p>
-      </div>
-
-      {/* Task list */}
-      <div className="w-full max-w-sm space-y-3">
-        {tasks.map((task) => (
-          <div
-            key={task.id}
-            className="flex items-start gap-4 rounded-xl bg-accent/30 px-4 py-3"
-          >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center">
-              {task.status === "running" ? (
-                <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              ) : task.status === "done" ? (
-                <Check className="h-5 w-5 text-emerald-400" />
-              ) : task.status === "failed" ? (
-                <AlertTriangle className="h-5 w-5 text-amber-400" />
-              ) : task.status === "skipped" ? (
-                <task.icon className="h-5 w-5 text-muted-foreground" />
-              ) : (
-                <task.icon className="h-5 w-5 text-muted-foreground" />
-              )}
-            </div>
-            <div className="flex flex-col text-left">
-              <p className={`text-sm ${
-                task.status === "done" ? "text-foreground" :
-                task.status === "running" ? "text-foreground" :
-                task.status === "failed" ? "text-foreground" :
-                task.status === "skipped" ? "text-muted-foreground" :
-                "text-muted-foreground"
-              }`}>
-                {task.status === "done"
-                  ? task.label.replace("Syncing", "Synced").replace("Building", "Built").replace("Organizing", "Organized")
-                  : task.status === "failed"
-                    ? task.label.replace("Syncing", "Couldn't sync").replace("Building", "Couldn't build")
-                    : task.label}
-              </p>
-              {task.status === "failed" && task.error && (
-                <p className="text-xs text-amber-400/80">{task.error} — retry from Settings later.</p>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+    <MagicSetup
+      title={allDone ? "Tudo pronto" : "Estamos preparando sua experiência"}
+      subtitle={
+        allDone
+          ? "Sua biblioteca está sincronizada e as recomendações já estão prontas."
+          : "Sincronizando media servers e preparando recomendações personalizadas. Vai ser rapidinho."
+      }
+      tasks={tasks}
+    >
+      {allDone && (
+        <button
+          type="button"
+          onClick={onNext}
+          className="mt-2 inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#05030f] shadow-[0_8px_32px_rgba(167,139,250,0.45)] transition-transform hover:scale-[1.02]"
+        >
+          Continuar
+          <ArrowRight className="h-4 w-4" />
+        </button>
+      )}
+    </MagicSetup>
   );
 }

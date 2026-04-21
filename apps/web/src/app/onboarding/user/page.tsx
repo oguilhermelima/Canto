@@ -14,9 +14,10 @@ import { ContentRegionStep } from "./_steps/content-region-step";
 import { JellyfinUserStep } from "./_steps/jellyfin-step";
 import { PlexUserStep } from "./_steps/plex-step";
 import { TraktUserStep } from "./_steps/trakt-step";
+import { ProfileStep } from "./_steps/profile-step";
 import { ReadyStep } from "./_steps/ready-step";
 
-type Step = "welcome" | "content-region" | "jellyfin" | "plex" | "trakt" | "ready";
+type Step = "welcome" | "content-region" | "jellyfin" | "plex" | "trakt" | "profile" | "ready";
 
 const PROGRESS_KEY = "canto.user-onboarding.step";
 
@@ -58,7 +59,7 @@ export default function UserOnboardingPage(): React.JSX.Element {
     if (providersReady?.jellyfin) list.push("jellyfin");
     if (providersReady?.plex) list.push("plex");
     if (providersReady?.trakt) list.push("trakt");
-    list.push("ready");
+    list.push("profile", "ready");
     return list;
   }, [providersReady]);
 
@@ -152,6 +153,9 @@ export default function UserOnboardingPage(): React.JSX.Element {
                 alreadyConnected={traktConnected}
                 configureFooter={setFooterConfig}
               />
+            )}
+            {step === "profile" && (
+              <ProfileStep onNext={next} configureFooter={setFooterConfig} />
             )}
             {step === "ready" && (
               <ReadyStep onFinish={finish} configureFooter={setFooterConfig} />

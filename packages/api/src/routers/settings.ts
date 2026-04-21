@@ -26,6 +26,7 @@ import {
   toggleTvdbDefaultInput,
   authenticateJellyfinInput,
   authenticatePlexInput,
+  authenticateTraktInput,
   loginPlexInput,
   checkPlexPinInput,
   refreshMediaInput,
@@ -44,10 +45,11 @@ import { testService } from "@canto/core/infrastructure/adapters/service-tester"
 import {
   authenticateJellyfin,
   authenticatePlex,
+  authenticateTrakt,
   loginPlex,
   createPlexPin,
   checkPlexPin,
-} from "@canto/core/domain/use-cases/authenticate-media-server";
+} from "@canto/core/domain/use-cases/media-servers/authenticate";
 import { validateServiceUrl } from "@canto/core/domain/rules/validate-service-url";
 import { invalidateActiveUserLanguages } from "@canto/core/domain/services/user-service";
 
@@ -272,6 +274,10 @@ export const settingsRouter = createTRPCRouter({
   authenticateJellyfin: setupOrAdminProcedure
     .input(authenticateJellyfinInput)
     .mutation(({ input }) => authenticateJellyfin(input)),
+
+  authenticateTrakt: setupOrAdminProcedure
+    .input(authenticateTraktInput)
+    .mutation(({ input }) => authenticateTrakt(input)),
 
   authenticatePlex: setupOrAdminProcedure
     .input(authenticatePlexInput)

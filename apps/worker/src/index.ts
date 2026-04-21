@@ -14,6 +14,7 @@ import { handleSeedManagement } from "./jobs/seed-management";
 import { handleFolderScan } from "./jobs/folder-scan";
 import { handleValidateDownloads } from "./jobs/validate-downloads";
 import { handleTraktSync, handleTraktSyncUser } from "./jobs/trakt-sync";
+import { handleTraktListDelete, handleTraktListDeleteSweep } from "./jobs/trakt-list-delete";
 import { refreshExtras } from "@canto/core/domain/use-cases/content-enrichment/refresh-extras";
 import { replaceShowWithTvdb } from "@canto/core/domain/use-cases/media/replace-show-with-tvdb";
 import { rebuildUserRecs } from "@canto/core/domain/use-cases/recommendations/rebuild-user-recs";
@@ -50,6 +51,8 @@ const queues = {
   reverseSyncUser: new Queue(QUEUES.reverseSyncUser, { connection: redisConnection }),
   traktSync: new Queue(QUEUES.traktSync, { connection: redisConnection }),
   traktSyncUser: new Queue(QUEUES.traktSyncUser, { connection: redisConnection }),
+  traktListDelete: new Queue(QUEUES.traktListDelete, { connection: redisConnection }),
+  traktListDeleteSweep: new Queue(QUEUES.traktListDeleteSweep, { connection: redisConnection }),
   stallDetection: new Queue(QUEUES.stallDetection, { connection: redisConnection }),
   rssSync: new Queue(QUEUES.rssSync, { connection: redisConnection }),
   dailyRecsCheck: new Queue(QUEUES.dailyRecsCheck, { connection: redisConnection }),
@@ -102,6 +105,14 @@ async function setupSchedules(): Promise<void> {
     "trakt-sync-scheduler",
     { every: 10 * 60 * 1000, startDate: jitterStart(2 * 60 * 1000) },
     { name: QUEUES.traktSync, opts: DEFAULT_JOB_OPTS },
+  );
+
+  // Sweeper for tombstoned Trakt-linked lists. Re-dispatches per-list deletion
+  // jobs whose retry chain exhausted (Trakt down, refresh-token failure, etc.).
+  await queues.traktListDeleteSweep.upsertJobScheduler(
+    "trakt-list-delete-sweep-scheduler",
+    { every: 5 * 60 * 1000, startDate: jitterStart(60 * 1000) },
+    { name: QUEUES.traktListDeleteSweep, opts: DEFAULT_JOB_OPTS },
   );
 
   await queues.stallDetection.upsertJobScheduler(
@@ -187,6 +198,20 @@ const workers = [
     },
     { concurrency: 2 },
   ),
+
+  makeWorker<{ localListId: string }>(
+    QUEUES.traktListDelete,
+    async ({ localListId }, log) => {
+      if (!localListId) {
+        log.warn("missing localListId, skipping");
+        return;
+      }
+      await handleTraktListDelete(localListId);
+    },
+    { concurrency: 2 },
+  ),
+
+  makeWorker(QUEUES.traktListDeleteSweep, () => handleTraktListDeleteSweep()),
 
   makeWorker(QUEUES.stallDetection, () => handleStallDetection()),
 

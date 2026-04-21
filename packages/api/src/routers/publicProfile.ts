@@ -120,6 +120,7 @@ export const publicProfileRouter = createTRPCRouter({
   getOverview: protectedProcedure.input(idInput).query(async ({ ctx, input }) => {
     await requireVisibleUser(ctx.db, input.id, ctx.session.user.id);
     const userId = input.id;
+    const viewerLang = await getUserLanguage(ctx.db, ctx.session.user.id);
 
     const [
       stats,
@@ -138,35 +139,35 @@ export const publicProfileRouter = createTRPCRouter({
       findUserTopGenres(ctx.db, userId),
       findUserProfileInsights(ctx.db, userId),
       findUserRecentActivity(ctx.db, userId, 8),
-      findUserMediaPaginated(ctx.db, userId, {
+      findUserMediaPaginated(ctx.db, userId, viewerLang, {
         status: "watching",
         limit: 12,
         sortBy: "updatedAt",
         sortOrder: "desc",
         offset: 0,
       }),
-      findUserMediaPaginated(ctx.db, userId, {
+      findUserMediaPaginated(ctx.db, userId, viewerLang, {
         status: "planned",
         limit: 8,
         sortBy: "updatedAt",
         sortOrder: "desc",
         offset: 0,
       }),
-      findUserMediaPaginated(ctx.db, userId, {
+      findUserMediaPaginated(ctx.db, userId, viewerLang, {
         isFavorite: true,
         limit: 50,
         sortBy: "rating",
         sortOrder: "desc",
         offset: 0,
       }),
-      findUserMediaPaginated(ctx.db, userId, {
+      findUserMediaPaginated(ctx.db, userId, viewerLang, {
         status: "completed",
         limit: 24,
         sortBy: "updatedAt",
         sortOrder: "desc",
         offset: 0,
       }),
-      findUserMediaPaginated(ctx.db, userId, {
+      findUserMediaPaginated(ctx.db, userId, viewerLang, {
         limit: 4,
         sortBy: "updatedAt",
         sortOrder: "desc",

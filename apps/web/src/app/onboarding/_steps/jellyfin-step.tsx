@@ -47,13 +47,13 @@ export function JellyfinStep({
         toast.error(auth.error ?? "Failed to connect to Jellyfin");
         return;
       }
-      await saveSettings.mutateAsync({
-        settings: [
-          { key: "jellyfin.url", value: url },
-          { key: "jellyfin.enabled", value: true },
-          { key: "jellyfin.apiKey", value: auth.token },
-        ],
-      });
+      const settingsToSave: { key: string; value: string | boolean }[] = [
+        { key: "jellyfin.url", value: url },
+        { key: "jellyfin.enabled", value: true },
+        { key: "jellyfin.apiKey", value: auth.token },
+      ];
+      if (auth.userId) settingsToSave.push({ key: "jellyfin.adminUserId", value: auth.userId });
+      await saveSettings.mutateAsync({ settings: settingsToSave });
       setConnected(true);
       toast.success("Jellyfin server configured");
     } catch (err: unknown) {

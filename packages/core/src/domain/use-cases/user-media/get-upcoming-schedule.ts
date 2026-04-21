@@ -6,7 +6,6 @@ import {
   findUserWatchHistoryByMediaIds,
 } from "../../../infrastructure/repositories";
 import { getUserLanguage } from "../../services/user-service";
-import { translateMediaItems } from "../../services/translation-service";
 import { parseDateLike } from "../../rules/user-media-rules";
 
 export interface GetUpcomingScheduleInput {
@@ -27,6 +26,7 @@ interface ListCandidate {
   title: string;
   posterPath: string | null;
   backdropPath: string | null;
+  logoPath: string | null;
   year: number | null;
   releaseDate: string | null;
   externalId: number;
@@ -43,6 +43,7 @@ export interface UpcomingItem {
   title: string;
   posterPath: string | null;
   backdropPath: string | null;
+  logoPath: string | null;
   year: number | null;
   externalId: number;
   provider: string;
@@ -66,9 +67,11 @@ export async function getUpcomingSchedule(
   const now = new Date();
   const qNormalized = input.q?.trim().toLowerCase() ?? "";
 
+  const userLang = await getUserLanguage(db, userId);
   const listMediaRows = await findUserListMediaCandidates(
     db,
     userId,
+    userLang,
     input.mediaType,
   );
   const listMediaMap = buildListCandidateMap(listMediaRows, qNormalized);
@@ -82,6 +85,7 @@ export async function getUpcomingSchedule(
       candidateMediaIds.filter(
         (mediaId) => listMediaMap.get(mediaId)?.mediaType === "show",
       ),
+      userLang,
     ),
   ]);
 
@@ -125,10 +129,8 @@ export async function getUpcomingSchedule(
   const nextCursor =
     cursor + limit < sorted.length ? cursor + limit : undefined;
 
-  const userLang = await getUserLanguage(db, userId);
-  const items = await translateMediaItems(db, sliced, userLang);
-
-  return { items, total: sorted.length, nextCursor };
+  // Translation already applied at the source queries via mediaI18n / episodeI18n joins.
+  return { items: sliced, total: sorted.length, nextCursor };
 }
 
 function buildListCandidateMap(
@@ -147,6 +149,7 @@ function buildListCandidateMap(
         title: row.title,
         posterPath: row.posterPath,
         backdropPath: row.backdropPath,
+        logoPath: row.logoPath ?? null,
         year: row.year,
         releaseDate: row.releaseDate,
         externalId: row.externalId,
@@ -217,6 +220,7 @@ function buildUpcomingMovieItem(
     title: candidate.title,
     posterPath: candidate.posterPath,
     backdropPath: candidate.backdropPath,
+    logoPath: candidate.logoPath,
     year: candidate.year,
     externalId: candidate.externalId,
     provider: candidate.provider,
@@ -275,6 +279,7 @@ function buildUpcomingEpisodeItem(
     title: candidate.title,
     posterPath: candidate.posterPath,
     backdropPath: candidate.backdropPath,
+    logoPath: candidate.logoPath,
     year: candidate.year,
     externalId: candidate.externalId,
     provider: candidate.provider,

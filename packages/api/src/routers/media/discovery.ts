@@ -16,6 +16,7 @@ import { getTvdbProvider } from "@canto/core/lib/tvdb-client";
 import { cached } from "@canto/core/infrastructure/cache/redis";
 import { fetchLogos, enrichBrowseWithLogos } from "@canto/core/domain/use-cases/media/fetch-logos";
 import { getRecommendations } from "@canto/core/domain/use-cases/get-recommendations";
+import { getUserLanguage } from "@canto/core/domain/services/user-service";
 import type { RecsFilters } from "@canto/core/infrastructure/repositories/user-recommendation-repository";
 import { db as appDb } from "@canto/db/client";
 
@@ -140,7 +141,8 @@ export const mediaDiscoveryRouter = createTRPCRouter({
     .input(getLogoInput)
     .query(async ({ ctx, input }) => {
       const tmdb = await getTmdbProvider();
-      const result = await fetchLogos(ctx.db, tmdb, [input]);
+      const userLang = await getUserLanguage(ctx.db, ctx.session.user.id);
+      const result = await fetchLogos(ctx.db, tmdb, [input], userLang);
       const key = `${input.provider}-${input.type}-${input.externalId}`;
       return { logoPath: result[key] ?? null };
     }),

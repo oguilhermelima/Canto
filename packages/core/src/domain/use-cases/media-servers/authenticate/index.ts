@@ -9,6 +9,8 @@ export { authenticateJellyfin, type JellyfinAuthResult } from "./jellyfin";
 export {
   startTraktDeviceAuth,
   completeTraktDeviceAuth,
+  authenticateTrakt,
   type TraktDeviceAuthCheckResult,
   type CompleteTraktDeviceAuthDeps,
+  type TraktAuthResult,
 } from "./trakt";

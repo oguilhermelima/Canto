@@ -307,6 +307,115 @@ type TraktFavoritesRequestBody = {
   shows?: Array<{ ids: TraktIds }>;
 };
 
+/**
+ * Validate a Trakt client id by hitting a cheap public endpoint with it as the
+ * `trakt-api-key`. Does not touch the client secret — see
+ * `validateTraktClientCredentials` for the full-credentials check.
+ */
+export async function pingTraktClientId(
+  clientId: string,
+): Promise<{ ok: true } | { ok: false; status: number; reason: string }> {
+  try {
+    const res = await fetch(`${TRAKT_API_BASE}/genres/movies`, {
+      headers: {
+        "trakt-api-version": "2",
+        "trakt-api-key": clientId,
+        "User-Agent": "Canto/1.0 (+https://github.com)",
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (res.ok) return { ok: true };
+    const text = await res.text().catch(() => "");
+    return {
+      ok: false,
+      status: res.status,
+      reason: formatTraktErrorMessage(res.status, "/genres/movies", text, res.headers),
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      status: 0,
+      reason: err instanceof Error ? err.message : "Cannot reach Trakt",
+    };
+  }
+}
+
+/**
+ * Validate a Trakt client_id + client_secret pair without asking the user to
+ * complete a device-code flow. Trakt does not expose a dedicated "verify
+ * credentials" endpoint, so we POST a fake device_code to
+ * `/oauth/device/token`:
+ *   - If client_id / client_secret are wrong → 401 `invalid_client`.
+ *   - If credentials are valid → 400 `invalid_grant` (server proved it checked
+ *     the client credentials before rejecting the bogus device_code).
+ *   - Any 2xx should not happen (would imply Trakt accepted a fake code) but is
+ *     treated as a pass for safety.
+ */
+export async function validateTraktClientCredentials(
+  clientId: string,
+  clientSecret: string,
+): Promise<{ ok: true } | { ok: false; status: number; reason: string }> {
+  try {
+    const res = await fetch(`${TRAKT_API_BASE}/oauth/device/token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "Canto/1.0 (+https://github.com)",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        code: "canto-credential-probe",
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    if (res.ok) return { ok: true };
+
+    const text = await res.text().catch(() => "");
+    const parsed = parseOAuthError(text);
+
+    if (res.status === 401 || parsed?.error === "invalid_client") {
+      return {
+        ok: false,
+        status: 401,
+        reason: "Invalid Trakt Client Secret",
+      };
+    }
+
+    if (
+      res.status === 400
+      || res.status === 404
+      || res.status === 410
+      || parsed?.error === "invalid_grant"
+    ) {
+      return { ok: true };
+    }
+
+    return {
+      ok: false,
+      status: res.status,
+      reason: formatTraktErrorMessage(res.status, "/oauth/device/token", text, res.headers),
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      status: 0,
+      reason: err instanceof Error ? err.message : "Cannot reach Trakt",
+    };
+  }
+}
+
+function parseOAuthError(text: string): { error?: string } | null {
+  try {
+    return JSON.parse(text) as { error?: string };
+  } catch {
+    return null;
+  }
+}
+
 export async function createTraktDeviceCode(): Promise<TraktDeviceCodeResponse> {
   const { clientId } = await getTraktOAuthCredentials();
   return traktRequest<TraktDeviceCodeResponse>("/oauth/device/code", {

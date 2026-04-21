@@ -103,6 +103,15 @@ export const SETTINGS_REGISTRY = {
     secret: true,
     inputType: "password",
   }),
+  "jellyfin.adminUserId": def({
+    group: "mediaServers.jellyfin",
+    label: "Jellyfin Admin User ID",
+    help: "Jellyfin user id tied to the admin credentials; resolved once during setup because API keys are not bound to a user",
+    schema: z.string().min(1),
+    secret: false,
+    inputType: "text",
+    hidden: true,
+  }),
 
   // ── Media servers: Plex ──────────────────────────────────────────────────
   "plex.enabled": def({

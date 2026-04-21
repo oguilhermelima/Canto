@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { episode, season, userWatchHistory } from "@canto/db/schema";
+import { episode, episodeTranslation, season, userWatchHistory } from "@canto/db/schema";
+import { episodeI18n } from "../shared/media-i18n";
 
 export async function addUserWatchHistory(
   db: Database,
@@ -118,20 +119,23 @@ export interface EpisodeByMediaRow {
 export async function findEpisodesByMediaIds(
   db: Database,
   mediaIds: string[],
+  language: string,
 ): Promise<EpisodeByMediaRow[]> {
   if (mediaIds.length === 0) return [];
 
+  const i18n = episodeI18n(language);
   return db
     .select({
       mediaId: season.mediaId,
       episodeId: episode.id,
       seasonNumber: season.number,
       episodeNumber: episode.number,
-      episodeTitle: episode.title,
+      episodeTitle: i18n.title,
       airDate: episode.airDate,
     })
     .from(episode)
     .innerJoin(season, eq(episode.seasonId, season.id))
+    .leftJoin(episodeTranslation, i18n.join)
     .where(inArray(season.mediaId, mediaIds))
     .orderBy(asc(season.mediaId), asc(season.number), asc(episode.number));
 }

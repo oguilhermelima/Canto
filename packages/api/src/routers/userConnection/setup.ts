@@ -9,7 +9,7 @@ import {
   authenticateJellyfin,
   authenticatePlex,
   loginPlex,
-} from "@canto/core/domain/use-cases/authenticate-media-server";
+} from "@canto/core/domain/use-cases/media-servers/authenticate";
 import { discoverServerLibraries } from "@canto/core/domain/use-cases/discover-server-libraries";
 import { getJellyfinCurrentUserId } from "@canto/core/infrastructure/adapters/jellyfin";
 import { authenticatePlexServerToken } from "@canto/core/infrastructure/adapters/plex";
@@ -189,7 +189,14 @@ export const setupRouter = createTRPCRouter({
             message: "Jellyfin admin credentials are not configured",
           });
         }
-        const jellyfinUserId = await getJellyfinCurrentUserId(url, apiKey);
+        // Prefer the admin user id captured during onboarding — Jellyfin API
+        // keys are not bound to a user, so /Sessions/Current only works when a
+        // client is actively streaming. Fall back to the live lookup so older
+        // installations (pre-adminUserId) keep working.
+        let jellyfinUserId = await getSetting("jellyfin.adminUserId");
+        if (!jellyfinUserId) {
+          jellyfinUserId = await getJellyfinCurrentUserId(url, apiKey);
+        }
         if (!jellyfinUserId) {
           throw new TRPCError({
             code: "BAD_REQUEST",

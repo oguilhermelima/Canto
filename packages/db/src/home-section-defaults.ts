@@ -59,7 +59,7 @@ export const DEFAULT_HOME_SECTIONS: DefaultSection[] = [
   {
     position: 1,
     title: "Continue Watching",
-    style: "large_video",
+    style: "card",
     sourceType: "db",
     sourceKey: "continue_watching",
     config: {},

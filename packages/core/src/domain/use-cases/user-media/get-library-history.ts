@@ -6,6 +6,7 @@ import {
   findUserWatchHistoryFeed,
   type LibraryFeedFilterOptions,
 } from "../../../infrastructure/repositories";
+import { getUserLanguage } from "../../services/user-service";
 import {
   isReleasedOnOrBefore,
   isServerSource,
@@ -92,9 +93,10 @@ export async function getLibraryHistory(
     tvStatus: input.tvStatus,
   };
 
+  const userLang = await getUserLanguage(db, userId);
   const [historyRows, playbackRows] = await Promise.all([
-    findUserWatchHistoryFeed(db, userId, fetchLimit, input.mediaType, filters),
-    findUserPlaybackProgressFeed(db, userId, input.mediaType, filters),
+    findUserWatchHistoryFeed(db, userId, userLang, fetchLimit, input.mediaType, filters),
+    findUserPlaybackProgressFeed(db, userId, userLang, input.mediaType, filters),
   ]);
 
   const timelineEntries: TimelineEntry[] = [];
@@ -112,7 +114,7 @@ export async function getLibraryHistory(
 
   const pageItems = deduped.slice(cursor, cursor + limit);
   const [watchedEpisodesByMediaId, availableEpisodesByMediaId] =
-    await loadShowProgressMaps(db, userId, pageItems);
+    await loadShowProgressMaps(db, userId, userLang, pageItems);
 
   const items = pageItems.map((entry) =>
     decorateEntry(entry, watchedEpisodesByMediaId, availableEpisodesByMediaId),
@@ -266,6 +268,7 @@ function dedupeAndFilter(
 async function loadShowProgressMaps(
   db: Database,
   userId: string,
+  language: string,
   pageItems: TimelineEntry[],
 ): Promise<[Map<string, Set<string>>, Map<string, number>]> {
   const showMediaIds = [
@@ -279,7 +282,7 @@ async function loadShowProgressMaps(
     showMediaIds.length > 0
       ? await Promise.all([
           findUserWatchHistoryByMediaIds(db, userId, showMediaIds),
-          findEpisodesByMediaIds(db, showMediaIds),
+          findEpisodesByMediaIds(db, showMediaIds, language),
         ])
       : [[], []];
 

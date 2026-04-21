@@ -15,10 +15,13 @@ export async function findUserLists(db: Database, userId: string) {
     .where(eq(listMember.userId, userId));
 
   return db.query.list.findMany({
-    where: or(
-      eq(list.userId, userId),
-      eq(list.type, "server"),
-      sql`${list.id} IN (${memberListIds})`,
+    where: and(
+      isNull(list.deletedAt),
+      or(
+        eq(list.userId, userId),
+        eq(list.type, "server"),
+        sql`${list.id} IN (${memberListIds})`,
+      ),
     ),
     orderBy: [list.position],
   });
@@ -34,10 +37,13 @@ export async function findUserListsWithCounts(
     .where(eq(listMember.userId, userId));
 
   const lists = await db.query.list.findMany({
-    where: or(
-      eq(list.userId, userId),
-      eq(list.type, "server"),
-      sql`${list.id} IN (${memberListIds})`,
+    where: and(
+      isNull(list.deletedAt),
+      or(
+        eq(list.userId, userId),
+        eq(list.type, "server"),
+        sql`${list.id} IN (${memberListIds})`,
+      ),
     ),
     orderBy: [list.position],
   });
@@ -148,12 +154,12 @@ export async function findListBySlug(
 ) {
   if (slug === "server-library") {
     return db.query.list.findFirst({
-      where: and(eq(list.slug, slug), isNull(list.userId)),
+      where: and(eq(list.slug, slug), isNull(list.userId), isNull(list.deletedAt)),
     });
   }
 
   const owned = await db.query.list.findFirst({
-    where: and(eq(list.slug, slug), eq(list.userId, userId)),
+    where: and(eq(list.slug, slug), eq(list.userId, userId), isNull(list.deletedAt)),
   });
   if (owned) return owned;
 
@@ -165,6 +171,7 @@ export async function findListBySlug(
   return db.query.list.findFirst({
     where: and(
       eq(list.slug, slug),
+      isNull(list.deletedAt),
       sql`${list.id} IN (${memberListIds})`,
     ),
   });
@@ -180,11 +187,20 @@ export async function findPublicListBySlug(
       eq(list.slug, slug),
       eq(list.userId, ownerUserId),
       eq(list.visibility, "public"),
+      isNull(list.deletedAt),
     ),
   });
 }
 
 export async function findListById(db: Database, id: string) {
+  return db.query.list.findFirst({
+    where: and(eq(list.id, id), isNull(list.deletedAt)),
+  });
+}
+
+/** Find a list by id ignoring tombstones — for the worker that processes
+ *  pending Trakt deletions. UI/API callers should always use findListById. */
+export async function findListByIdIncludingDeleted(db: Database, id: string) {
   return db.query.list.findFirst({
     where: eq(list.id, id),
   });
@@ -268,8 +284,34 @@ export async function reorderLists(
 
 export async function findServerLibrary(db: Database) {
   return db.query.list.findFirst({
-    where: eq(list.type, "server"),
+    where: and(eq(list.type, "server"), isNull(list.deletedAt)),
   });
+}
+
+/** Lists pending Trakt deletion — drives the worker sweeper. */
+export async function findTombstonedTraktLists(db: Database) {
+  return db
+    .select({ id: list.id, deletedAt: list.deletedAt })
+    .from(list)
+    .where(sql`${list.deletedAt} IS NOT NULL`);
+}
+
+export async function softDeleteList(db: Database, id: string): Promise<void> {
+  // Rename slug so the unique (userId, slug) index doesn't block the user from
+  // re-creating a list with the same slug while the tombstone awaits the worker.
+  const now = new Date();
+  await db
+    .update(list)
+    .set({
+      deletedAt: now,
+      updatedAt: now,
+      slug: sql`${list.slug} || '-deleted-' || EXTRACT(EPOCH FROM NOW())::bigint`,
+    })
+    .where(eq(list.id, id));
+}
+
+export async function hardDeleteList(db: Database, id: string): Promise<void> {
+  await db.delete(list).where(eq(list.id, id));
 }
 
 export async function ensureServerLibrary(db: Database) {
@@ -537,6 +579,7 @@ export async function findMediaInLists(
     .where(
       and(
         eq(listItem.mediaId, mediaId),
+        isNull(list.deletedAt),
         or(eq(list.userId, userId), eq(list.type, "server")),
       ),
     );
@@ -559,6 +602,7 @@ export async function findUserListExternalIds(
     .where(
       and(
         eq(list.userId, userId),
+        isNull(list.deletedAt),
         // exclude server library — already handled by findLibraryExternalIds
         sql`${list.type} != 'server'`,
       ),

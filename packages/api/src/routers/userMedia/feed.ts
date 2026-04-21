@@ -11,6 +11,7 @@ import {
   findUserMediaCounts,
   findUserMediaPaginated,
 } from "@canto/core/infrastructure/repositories";
+import { getUserLanguage } from "@canto/core/domain/services/user-service";
 import { getLibraryWatchNext } from "@canto/core/domain/use-cases/user-media/get-library-watch-next";
 import { getUpcomingSchedule } from "@canto/core/domain/use-cases/user-media/get-upcoming-schedule";
 import { getLibraryHistory } from "@canto/core/domain/use-cases/user-media/get-library-history";
@@ -20,7 +21,8 @@ export const feedRouter = createTRPCRouter({
     .input(getUserMediaInput)
     .query(async ({ ctx, input }) => {
       const offset = input.cursor ?? 0;
-      const result = await findUserMediaPaginated(ctx.db, ctx.session.user.id, {
+      const userLang = await getUserLanguage(ctx.db, ctx.session.user.id);
+      const result = await findUserMediaPaginated(ctx.db, ctx.session.user.id, userLang, {
         status: input.status,
         hasRating: input.hasRating,
         isFavorite: input.isFavorite,

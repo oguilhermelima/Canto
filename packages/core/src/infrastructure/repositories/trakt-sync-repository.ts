@@ -15,6 +15,16 @@ export async function findTraktListLinksByConnection(
   });
 }
 
+/** Find the Trakt list link for a given local list id, if any. */
+export async function findTraktListLinkByLocalListId(
+  db: Database,
+  localListId: string,
+) {
+  return db.query.traktListLink.findFirst({
+    where: eq(traktListLink.localListId, localListId),
+  });
+}
+
 export async function upsertTraktListLink(
   db: Database,
   data: {

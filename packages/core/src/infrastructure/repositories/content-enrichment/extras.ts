@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, not, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, not, sql } from "drizzle-orm";
 import { getQualityFilters, getWeightedScoreOrder } from "../../../domain/rules/recommendation-filters";
 import type { Database } from "@canto/db/client";
 import {
@@ -73,16 +73,9 @@ export async function findRecommendedMediaWithBackdrops(db: Database, limit: num
       sql`${media.id} IN (SELECT media_id FROM media_recommendation)`,
       isNotNull(media.metadataUpdatedAt),
       isNotNull(media.backdropPath),
-      // Parens on the OR are load-bearing: drizzle's `and(...)` wraps each
-      // arg but passes `sql` templates through verbatim. Without them SQL
-      // precedence turns `X AND (A OR B) AND Y` into `X AND A OR B AND Y`,
-      // which makes `release_date IS NULL` a catch-all that explodes the
-      // result set into a full-table scan.
       sql`(${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL)`,
       ...getQualityFilters(),
     ),
-    // Rank by Bayesian weighted score so the spotlight surfaces well-known
-    // titles instead of freshly-released obscure items with zero votes.
     orderBy: [getWeightedScoreOrder()],
     limit,
   });
@@ -122,12 +115,46 @@ export async function findGlobalRecommendations(
   const customSort = recsSortOrder(filters.sortBy);
   const orderBy = customSort ? [customSort] : [getWeightedScoreOrder()];
 
-  return db.query.media.findMany({
+  const rows = await db.query.media.findMany({
     where,
     orderBy,
     limit,
     offset,
   });
+
+  if (rows.length === 0) return rows;
+
+  const trailerByMediaId = await findTrailerKeysForMediaIds(
+    db,
+    rows.map((r) => r.id),
+  );
+  return rows.map((row) => ({
+    ...row,
+    trailerKey: trailerByMediaId.get(row.id) ?? null,
+  }));
+}
+
+/** Batch-lookup YouTube trailer keys for a set of media ids. */
+export async function findTrailerKeysForMediaIds(
+  db: Database,
+  mediaIds: string[],
+): Promise<Map<string, string>> {
+  if (mediaIds.length === 0) return new Map();
+  const rows = await db
+    .select({ mediaId: mediaVideo.mediaId, externalKey: mediaVideo.externalKey })
+    .from(mediaVideo)
+    .where(
+      and(
+        inArray(mediaVideo.mediaId, mediaIds),
+        eq(mediaVideo.type, "Trailer"),
+        eq(mediaVideo.site, "YouTube"),
+      ),
+    );
+  const out = new Map<string, string>();
+  for (const row of rows) {
+    if (!out.has(row.mediaId)) out.set(row.mediaId, row.externalKey);
+  }
+  return out;
 }
 
 // ── Blocklist ──

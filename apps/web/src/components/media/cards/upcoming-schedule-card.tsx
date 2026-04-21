@@ -21,6 +21,7 @@ export interface UpcomingScheduleItem {
   title: string;
   posterPath: string | null;
   backdropPath: string | null;
+  logoPath: string | null;
   year: number | null;
   externalId: number;
   provider: string;
@@ -75,7 +76,7 @@ export function UpcomingScheduleCard({
     : "Movie release";
 
   const cardImage = imagePath(item);
-  const logoPath = useLogo(
+  const fetchedLogo = useLogo(
     item.provider,
     String(item.externalId),
     item.mediaType,
@@ -85,9 +86,11 @@ export function UpcomingScheduleCard({
       backdropPath: item.backdropPath,
       year: item.year,
     },
+    { skip: !!item.logoPath },
   );
+  const logoPath = item.logoPath ?? fetchedLogo;
   const [imageReady, setImageReady] = useState(!cardImage);
-  const logoResolved = logoPath !== undefined;
+  const logoResolved = !!item.logoPath || fetchedLogo !== undefined;
 
   if (!logoResolved || !imageReady) {
     return (

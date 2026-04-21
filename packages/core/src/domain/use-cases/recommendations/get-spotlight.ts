@@ -13,6 +13,8 @@ interface TrendingFetcher {
   (type: "movie" | "show"): Promise<{ results: SearchResult[] }>;
 }
 
+const SPOTLIGHT_LIMIT = 20;
+
 /**
  * Get per-user spotlight items for the home page hero.
  * Primary: user_recommendation with backdrops.
@@ -28,13 +30,13 @@ export async function getSpotlight(
   const { excludeSet, excludeItems } = await buildExclusionSet(db, userId);
 
   // Path 1: Per-user spotlight
-  const userItems = await findUserSpotlightItems(db, userId, excludeItems, 10);
+  const userItems = await findUserSpotlightItems(db, userId, excludeItems, SPOTLIGHT_LIMIT);
   if (userItems.length > 0) {
     return translateMediaItems(db, userItems.map(mapPoolItem), userLang);
   }
 
   // Path 2: Global pool fallback
-  const poolItems = await findRecommendedMediaWithBackdrops(db, 30);
+  const poolItems = await findRecommendedMediaWithBackdrops(db, SPOTLIGHT_LIMIT * 3);
   if (poolItems.length > 0) {
     const seen = new Set<string>();
     const unique = poolItems.filter((item) => {
@@ -43,7 +45,7 @@ export async function getSpotlight(
       seen.add(key);
       return true;
     });
-    return translateMediaItems(db, unique.slice(0, 10).map(mapPoolItem), userLang);
+    return translateMediaItems(db, unique.slice(0, SPOTLIGHT_LIMIT).map(mapPoolItem), userLang);
   }
 
   // Path 3: TMDB trending fallback (fresh install)
@@ -63,20 +65,21 @@ export async function getSpotlight(
     fetchTrending("show").catch(() => ({ results: [] as SearchResult[] })),
   ]);
 
-  const movies = moviesData.results.slice(0, 5).map((m) => ({
+  const halfLimit = Math.ceil(SPOTLIGHT_LIMIT / 2);
+  const movies = moviesData.results.slice(0, halfLimit).map((m) => ({
     externalId: m.externalId, type: "movie" as const,
     title: m.title, overview: m.overview ?? "",
     year: m.year, voteAverage: m.voteAverage ?? 0,
   }));
 
-  const shows = showsData.results.slice(0, 5).map((s) => ({
+  const shows = showsData.results.slice(0, halfLimit).map((s) => ({
     externalId: s.externalId, type: "show" as const,
     title: s.title, overview: s.overview ?? "",
     year: s.year, voteAverage: s.voteAverage ?? 0,
   }));
 
   const mixed: Array<(typeof movies)[number] | (typeof shows)[number]> = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < halfLimit; i++) {
     const show = shows[i];
     const movie = movies[i];
     if (show) mixed.push(show);
@@ -84,7 +87,7 @@ export async function getSpotlight(
   }
 
   const results = await Promise.all(
-    mixed.slice(0, 10).map(async (item) => {
+    mixed.slice(0, SPOTLIGHT_LIMIT).map(async (item) => {
       try {
         const metadata = await tmdb.getMetadata(item.externalId, item.type);
         const backdropPath = metadata.backdropPath;

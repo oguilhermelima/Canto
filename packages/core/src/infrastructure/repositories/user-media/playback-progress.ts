@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, isNull, or, type SQL } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { media, userPlaybackProgress } from "@canto/db/schema";
+import { media, mediaTranslation, userPlaybackProgress } from "@canto/db/schema";
+import { mediaI18n } from "../shared/media-i18n";
 
 export async function findUserPlaybackProgress(
   db: Database,
@@ -193,24 +194,28 @@ export async function findUserCompletedPlaybackByMediaIds(
 export async function findUserWatchingShowsMetadata(
   db: Database,
   userId: string,
+  language: string,
 ): Promise<Array<{
   mediaId: string;
   mediaType: string;
   title: string;
   posterPath: string | null;
   backdropPath: string | null;
+  logoPath: string | null;
   year: number | null;
   externalId: number;
   provider: string;
   lastActivityAt: Date | null;
 }>> {
+  const mi = mediaI18n(language);
   const rows = await db
     .selectDistinct({
       mediaId: media.id,
       mediaType: media.type,
-      title: media.title,
-      posterPath: media.posterPath,
+      title: mi.title,
+      posterPath: mi.posterPath,
       backdropPath: media.backdropPath,
+      logoPath: mi.logoPath,
       year: media.year,
       externalId: media.externalId,
       provider: media.provider,
@@ -218,6 +223,7 @@ export async function findUserWatchingShowsMetadata(
     })
     .from(userPlaybackProgress)
     .innerJoin(media, eq(userPlaybackProgress.mediaId, media.id))
+    .leftJoin(mediaTranslation, mi.join)
     .where(
       and(
         eq(userPlaybackProgress.userId, userId),

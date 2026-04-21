@@ -3,7 +3,9 @@ import {
   createTraktDeviceCode,
   exchangeTraktDeviceCode,
   getTraktUserSettings,
+  pingTraktClientId,
   TraktHttpError,
+  validateTraktClientCredentials,
   type TraktDeviceCodeResponse,
 } from "../../../../infrastructure/adapters/trakt";
 import {
@@ -11,6 +13,45 @@ import {
   findUserConnectionByProvider,
   updateUserConnection,
 } from "../../../../infrastructure/repositories/media-servers/user-connection";
+
+export interface TraktAuthResult {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Validate Trakt OAuth credentials before persisting them. Runs two checks:
+ *   1. Public API ping with the client_id as `trakt-api-key` — catches typos in
+ *      the id with a cheap GET.
+ *   2. Device-token probe with a bogus device_code — Trakt validates the
+ *      client_id + client_secret pair before rejecting the code, so 401
+ *      `invalid_client` cleanly separates bad secrets from bad codes.
+ */
+export async function authenticateTrakt(input: {
+  clientId: string;
+  clientSecret: string;
+}): Promise<TraktAuthResult> {
+  const idCheck = await pingTraktClientId(input.clientId);
+  if (!idCheck.ok) {
+    if (idCheck.status === 401 || idCheck.status === 403) {
+      return { success: false, error: "Invalid Trakt Client ID" };
+    }
+    if (idCheck.status === 0) {
+      return { success: false, error: "Cannot reach Trakt. Check your network and try again." };
+    }
+    return { success: false, error: idCheck.reason };
+  }
+
+  const secretCheck = await validateTraktClientCredentials(input.clientId, input.clientSecret);
+  if (!secretCheck.ok) {
+    if (secretCheck.status === 0) {
+      return { success: false, error: "Cannot reach Trakt. Check your network and try again." };
+    }
+    return { success: false, error: secretCheck.reason };
+  }
+
+  return { success: true };
+}
 
 /**
  * Trakt OAuth device flow.

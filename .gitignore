@@ -41,3 +41,4 @@ drizzle/meta/
 old/
 .pnpm-store/
 .superset/
+.claude/worktrees/

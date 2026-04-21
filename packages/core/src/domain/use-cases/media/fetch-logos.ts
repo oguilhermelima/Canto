@@ -26,9 +26,11 @@ export interface FetchLogoItem {
 /**
  * Fetch logos for a batch of browse items.
  *
- * 1. Check DB for existing media records with logoPath
+ * 1. Check DB for existing media records with logoPath; when `language` is
+ *    given, prefer `media_translation.logoPath` over the base English logo.
  * 2. For items without logos, batch-fetch from TMDB getImages()
- * 3. Upsert minimal media records with the fetched logos
+ * 3. Upsert minimal media records with the fetched logos (and language-specific
+ *    variants in `media_translation` so future calls hit the translated path).
  *
  * Returns a map of "provider-type-externalId" → logoPath (or null if no logo).
  */
@@ -36,23 +38,48 @@ export async function fetchLogos(
   db: Database,
   tmdb: MediaProviderPort,
   items: FetchLogoItem[],
+  language?: string,
 ): Promise<Record<string, string | null>> {
   if (items.length === 0) return {};
 
   const result: Record<string, string | null> = {};
+  const useLangJoin = !!language && !language.startsWith("en");
 
-  // 1. Query DB for existing records (match by externalId+provider+type triples)
+  // 1. Query DB for existing records (match by externalId+provider+type triples).
+  // When the user has a non-English language, also pull `media_translation.logoPath`
+  // so the translated logo wins via COALESCE.
   const conditions = items.map((i) =>
     and(eq(media.externalId, i.externalId), eq(media.provider, i.provider), eq(media.type, i.type)),
   );
-  const existingRows = await db.query.media.findMany({
-    where: or(...conditions),
-    columns: { id: true, externalId: true, type: true, logoPath: true },
-  });
+
+  const existingRows = useLangJoin
+    ? await db
+        .select({
+          id: media.id,
+          externalId: media.externalId,
+          type: media.type,
+          logoPath: sql<string | null>`COALESCE(${mediaTranslation.logoPath}, ${media.logoPath})`,
+          translatedLogoPath: mediaTranslation.logoPath,
+        })
+        .from(media)
+        .leftJoin(
+          mediaTranslation,
+          and(
+            eq(mediaTranslation.mediaId, media.id),
+            eq(mediaTranslation.language, language!),
+          ),
+        )
+        .where(or(...conditions)!)
+    : (
+        await db.query.media.findMany({
+          where: or(...conditions),
+          columns: { id: true, externalId: true, type: true, logoPath: true },
+        })
+      ).map((r) => ({ ...r, translatedLogoPath: null as string | null }));
 
   const existingByKey = new Map(existingRows.map((r) => [`${r.type}-${r.externalId}`, r]));
 
-  // 2. Classify items
+  // 2. Classify items. With a translated logo present, treat it as resolved.
   const needsFetch: FetchLogoItem[] = [];
   for (const item of items) {
     const key = `${item.provider}-${item.type}-${item.externalId}`;
@@ -119,7 +146,16 @@ export async function fetchLogos(
   // 4. Upsert media records and store language-specific logos
   for (const item of needsFetch) {
     const key = `${item.provider}-${item.type}-${item.externalId}`;
-    const logo = logoMap.get(`${item.type}-${item.externalId}`) ?? null;
+    const enLogo = logoMap.get(`${item.type}-${item.externalId}`) ?? null;
+
+    // Prefer the user's language logo when available so the card immediately
+    // renders the translated version instead of waiting for the next page load.
+    const langLogos = langLogoMap.get(`${item.type}-${item.externalId}`);
+    const langPrefix = language?.split("-")[0];
+    const langLogo = useLangJoin && langLogos
+      ? langLogos.get(language!) ?? (langPrefix ? langLogos.get(langPrefix) : undefined) ?? null
+      : null;
+    const logo = langLogo ?? enLogo;
     result[key] = logo;
 
     const existing = existingByKey.get(`${item.type}-${item.externalId}`);
@@ -164,7 +200,6 @@ export async function fetchLogos(
 
     // Language-specific logos go through the shared helper so ensureMedia
     // and this browse-time path use identical write semantics.
-    const langLogos = langLogoMap.get(`${item.type}-${item.externalId}`);
     if (mediaId && langLogos && langLogos.size > 0) {
       const supported = await getActiveUserLanguages(db);
       await upsertLangLogos(db, mediaId, langLogos, supported);

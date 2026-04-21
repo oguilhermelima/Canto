@@ -887,6 +887,10 @@ export const list = pgTable(
     visibility: varchar("visibility", { length: 20 }).notNull().default("private"), // 'public' | 'private' | 'shared'
     isSystem: boolean("is_system").notNull().default(false),
     position: integer("position").notNull().default(0),
+    // Tombstone for Trakt-linked lists awaiting remote deletion. Local row
+    // survives until the worker confirms Trakt removed the list, otherwise an
+    // orphaned remote list re-imports as an empty local list on next sync.
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -897,6 +901,7 @@ export const list = pgTable(
   (table) => [
     uniqueIndex("idx_list_user_slug").on(table.userId, table.slug),
     index("idx_list_type").on(table.type),
+    index("idx_list_pending_delete").on(table.deletedAt),
   ],
 );
 

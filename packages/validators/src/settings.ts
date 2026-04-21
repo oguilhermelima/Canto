@@ -68,6 +68,12 @@ export const loginPlexInput = z.object({
 });
 export type LoginPlexInput = z.infer<typeof loginPlexInput>;
 
+export const authenticateTraktInput = z.object({
+  clientId: z.string().min(1),
+  clientSecret: z.string().min(1),
+});
+export type AuthenticateTraktInput = z.infer<typeof authenticateTraktInput>;
+
 export const checkPlexPinInput = z.object({
   pinId: z.number(),
   clientId: z.string(),

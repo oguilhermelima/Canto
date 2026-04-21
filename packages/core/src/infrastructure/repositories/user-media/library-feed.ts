@@ -2,16 +2,18 @@ import { and, asc, count, desc, eq, gt, gte, isNull, lte, or, sql, type SQL } fr
 import type { Database } from "@canto/db/client";
 import {
   episode,
+  episodeTranslation,
   list,
   listItem,
   media,
-  mediaVideo,
+  mediaTranslation,
   season,
   userHiddenMedia,
   userMediaState,
   userPlaybackProgress,
   userWatchHistory,
 } from "@canto/db/schema";
+import { episodeI18n, mediaI18n } from "../shared/media-i18n";
 
 export interface UserPlaybackProgressFeedRow {
   id: string;
@@ -67,6 +69,7 @@ function buildTitleIlikeCondition(q: string | undefined): SQL | null {
 export async function findUserPlaybackProgressFeed(
   db: Database,
   userId: string,
+  language: string,
   mediaType?: "movie" | "show",
   filters?: LibraryFeedFilterOptions,
 ): Promise<UserPlaybackProgressFeedRow[]> {
@@ -103,6 +106,9 @@ export async function findUserPlaybackProgressFeed(
     }
   })();
 
+  const mi = mediaI18n(language);
+  const ei = episodeI18n(language);
+
   return db
     .select({
       id: userPlaybackProgress.id,
@@ -113,28 +119,30 @@ export async function findUserPlaybackProgressFeed(
       lastWatchedAt: userPlaybackProgress.lastWatchedAt,
       source: userPlaybackProgress.source,
       mediaType: media.type,
-      title: media.title,
-      posterPath: media.posterPath,
+      title: mi.title,
+      posterPath: mi.posterPath,
       backdropPath: media.backdropPath,
-      logoPath: media.logoPath,
-      overview: media.overview,
+      logoPath: mi.logoPath,
+      overview: mi.overview,
       voteAverage: media.voteAverage,
       userRating: userMediaState.rating,
       genres: media.genres,
       genreIds: media.genreIds,
-      trailerKey: sql<string | null>`(SELECT ${mediaVideo.externalKey} FROM ${mediaVideo} WHERE ${mediaVideo.mediaId} = ${media.id} AND ${mediaVideo.type} = 'Trailer' AND ${mediaVideo.site} = 'YouTube' LIMIT 1)`,
+      trailerKey: mi.trailerKey,
       year: media.year,
       mediaRuntime: media.runtime,
       externalId: media.externalId,
       provider: media.provider,
       episodeNumber: episode.number,
-      episodeTitle: episode.title,
+      episodeTitle: ei.title,
       seasonNumber: season.number,
       episodeRuntime: episode.runtime,
     })
     .from(userPlaybackProgress)
     .innerJoin(media, eq(userPlaybackProgress.mediaId, media.id))
+    .leftJoin(mediaTranslation, mi.join)
     .leftJoin(episode, eq(userPlaybackProgress.episodeId, episode.id))
+    .leftJoin(episodeTranslation, ei.join)
     .leftJoin(season, eq(episode.seasonId, season.id))
     .leftJoin(
       userMediaState,
@@ -169,6 +177,7 @@ export interface UserWatchHistoryFeedRow {
 export async function findUserWatchHistoryFeed(
   db: Database,
   userId: string,
+  language: string,
   limit = 100,
   mediaType?: "movie" | "show",
   filters?: LibraryFeedFilterOptions,
@@ -206,6 +215,9 @@ export async function findUserWatchHistoryFeed(
     }
   })();
 
+  const mi = mediaI18n(language);
+  const ei = episodeI18n(language);
+
   return db
     .select({
       id: userWatchHistory.id,
@@ -214,20 +226,22 @@ export async function findUserWatchHistoryFeed(
       watchedAt: userWatchHistory.watchedAt,
       source: userWatchHistory.source,
       mediaType: media.type,
-      title: media.title,
-      posterPath: media.posterPath,
+      title: mi.title,
+      posterPath: mi.posterPath,
       year: media.year,
       voteAverage: media.voteAverage,
       userRating: userMediaState.rating,
       externalId: media.externalId,
       provider: media.provider,
       episodeNumber: episode.number,
-      episodeTitle: episode.title,
+      episodeTitle: ei.title,
       seasonNumber: season.number,
     })
     .from(userWatchHistory)
     .innerJoin(media, eq(userWatchHistory.mediaId, media.id))
+    .leftJoin(mediaTranslation, mi.join)
     .leftJoin(episode, eq(userWatchHistory.episodeId, episode.id))
+    .leftJoin(episodeTranslation, ei.join)
     .leftJoin(season, eq(episode.seasonId, season.id))
     .leftJoin(
       userMediaState,
@@ -251,6 +265,7 @@ export interface UserListMediaCandidateRow {
   title: string;
   posterPath: string | null;
   backdropPath: string | null;
+  logoPath: string | null;
   year: number | null;
   releaseDate: string | null;
   externalId: number;
@@ -260,13 +275,17 @@ export interface UserListMediaCandidateRow {
 export async function findUserListMediaCandidates(
   db: Database,
   userId: string,
+  language: string,
   mediaType?: "movie" | "show",
 ): Promise<UserListMediaCandidateRow[]> {
   const conditions = [
     eq(list.userId, userId),
+    isNull(list.deletedAt),
     or(eq(list.type, "watchlist"), eq(list.type, "custom")),
   ];
   if (mediaType) conditions.push(eq(media.type, mediaType));
+
+  const mi = mediaI18n(language);
 
   return db
     .select({
@@ -276,9 +295,10 @@ export async function findUserListMediaCandidates(
       addedAt: listItem.addedAt,
       mediaId: media.id,
       mediaType: media.type,
-      title: media.title,
-      posterPath: media.posterPath,
+      title: mi.title,
+      posterPath: mi.posterPath,
       backdropPath: media.backdropPath,
+      logoPath: mi.logoPath,
       year: media.year,
       releaseDate: media.releaseDate,
       externalId: media.externalId,
@@ -287,6 +307,7 @@ export async function findUserListMediaCandidates(
     .from(listItem)
     .innerJoin(list, eq(listItem.listId, list.id))
     .innerJoin(media, eq(listItem.mediaId, media.id))
+    .leftJoin(mediaTranslation, mi.join)
     .where(and(...conditions))
     .orderBy(desc(listItem.addedAt), desc(listItem.id));
 }
@@ -315,6 +336,7 @@ export interface UserMediaPaginatedRow {
 export async function findUserMediaPaginated(
   db: Database,
   userId: string,
+  language: string,
   opts: {
     status?: string;
     hasRating?: boolean;
@@ -357,6 +379,8 @@ export async function findUserMediaPaginated(
     }
   })();
 
+  const mi = mediaI18n(language);
+
   const selectFields = {
     mediaId: userMediaState.mediaId,
     status: userMediaState.status,
@@ -364,29 +388,32 @@ export async function findUserMediaPaginated(
     isFavorite: userMediaState.isFavorite,
     stateUpdatedAt: userMediaState.updatedAt,
     mediaType: media.type,
-    title: media.title,
-    posterPath: media.posterPath,
+    title: mi.title,
+    posterPath: mi.posterPath,
     backdropPath: media.backdropPath,
-    logoPath: media.logoPath,
-    overview: media.overview,
+    logoPath: mi.logoPath,
+    overview: mi.overview,
     voteAverage: media.voteAverage,
     genres: media.genres,
     genreIds: media.genreIds,
-    trailerKey: sql<string | null>`(SELECT ${mediaVideo.externalKey} FROM ${mediaVideo} WHERE ${mediaVideo.mediaId} = ${media.id} AND ${mediaVideo.type} = 'Trailer' AND ${mediaVideo.site} = 'YouTube' LIMIT 1)`,
+    trailerKey: mi.trailerKey,
     year: media.year,
     externalId: media.externalId,
     provider: media.provider,
   };
 
+  const itemsQuery = db
+    .select(selectFields)
+    .from(userMediaState)
+    .innerJoin(media, eq(userMediaState.mediaId, media.id))
+    .leftJoin(mediaTranslation, mi.join)
+    .where(where)
+    .orderBy(sortDir(sortColumn), desc(userMediaState.updatedAt))
+    .limit(opts.limit)
+    .offset(opts.offset);
+
   const [items, [countRow]] = await Promise.all([
-    db
-      .select(selectFields)
-      .from(userMediaState)
-      .innerJoin(media, eq(userMediaState.mediaId, media.id))
-      .where(where)
-      .orderBy(sortDir(sortColumn), desc(userMediaState.updatedAt))
-      .limit(opts.limit)
-      .offset(opts.offset),
+    itemsQuery,
     db
       .select({ total: count() })
       .from(userMediaState)

@@ -151,6 +151,53 @@ export async function translateMediaItems<T extends { externalId: number; provid
   });
 }
 
+/**
+ * Overlay the user's language onto `item.episode.title` for a list of feed
+ * items. The Watch Next / Upcoming Schedule queries hand back the English
+ * `episode.title` from `episode.title`; this batch-loads matching rows from
+ * `episode_translation` and patches them in place. Items whose episode lacks
+ * a translation are returned unchanged (English fallback).
+ */
+export async function translateEpisodeTitlesForItems<
+  T extends { episode: { id: string; title: string | null } | null },
+>(db: Database, items: T[], language: string): Promise<T[]> {
+  if (!language || language.startsWith("en") || items.length === 0) return items;
+
+  const episodeIds = items
+    .map((i) => i.episode?.id)
+    .filter((id): id is string => !!id);
+  if (episodeIds.length === 0) return items;
+
+  const rows = await db
+    .select({ episodeId: episodeTranslation.episodeId, title: episodeTranslation.title })
+    .from(episodeTranslation)
+    .where(
+      and(
+        sql`${episodeTranslation.episodeId} IN (${sql.join(episodeIds.map((id) => sql`${id}`), sql`, `)})`,
+        eq(episodeTranslation.language, language),
+      ),
+    );
+
+  if (rows.length === 0) return items;
+
+  const titleByEpisodeId = new Map<string, string>();
+  for (const r of rows) {
+    if (r.title && r.title.trim().length > 0) {
+      titleByEpisodeId.set(r.episodeId, r.title);
+    }
+  }
+
+  return items.map((item) => {
+    if (!item.episode) return item;
+    const translated = titleByEpisodeId.get(item.episode.id);
+    if (!translated) return item;
+    return {
+      ...item,
+      episode: { ...item.episode, title: translated },
+    };
+  });
+}
+
 /** Batch-fetch media translations for a list of media IDs */
 export async function batchMediaTranslations(
   db: Database,

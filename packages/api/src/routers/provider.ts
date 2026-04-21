@@ -23,7 +23,7 @@ export const providerRouter = createTRPCRouter({
     .input(filterOptionsInput)
     .query(async ({ input }): Promise<
       | Array<{ code: string; englishName: string; nativeName: string }>
-      | Array<{ providerId: number; providerName: string; logoPath: string; displayPriority: number }>
+      | DedupedProvider[]
     > => {
       const tmdb = await getTmdbProvider();
 
@@ -42,7 +42,10 @@ export const providerRouter = createTRPCRouter({
 
       const mediaType = input.mediaType ?? "movie";
       const region = input.region ?? "US";
-      return cached(`provider:wp:${mediaType}:${region}`, 86400, async () => {
+      // v2: brand-deduped response replaces the raw flat list. Bumping the
+      // cache version prevents stale v1 payloads from breaking clients that
+      // now expect providerIds[].
+      return cached(`provider:wp:v2:${mediaType}:${region}`, 86400, async () => {
         const endpoint = mediaType === "movie" ? "/watch/providers/movie" : "/watch/providers/tv";
         const data = await fetchFromTmdb<{
           results: Array<{
@@ -50,10 +53,14 @@ export const providerRouter = createTRPCRouter({
             display_priority: number; display_priorities: Record<string, number>;
           }>;
         }>(tmdb, endpoint, { watch_region: region });
-        return data.results.map((p) => ({
-          providerId: p.provider_id, providerName: p.provider_name,
-          logoPath: p.logo_path, displayPriority: p.display_priority,
-        }));
+        return dedupeByBrand(
+          data.results.map((p) => ({
+            providerId: p.provider_id,
+            providerName: p.provider_name,
+            logoPath: p.logo_path,
+            displayPriority: p.display_priority,
+          })),
+        );
       });
     }),
 
@@ -199,37 +206,7 @@ export const providerRouter = createTRPCRouter({
           }
         }
 
-        // Group brand variants ("Apple TV", "Apple TV+", "Apple TV Channel",
-        // "Max Amazon Channel"…) into one tile. Keep every underlying
-        // provider id so the search filter can match all of them at once —
-        // clicking the Apple TV tile should surface everything the user can
-        // watch across subscription + rent/buy + channels, not just one
-        // storefront.
-        const byBrand = new Map<string, { flagship: RawProvider; ids: Set<number> }>();
-        for (const p of byId.values()) {
-          const key = canonicalBrand(p.providerName);
-          const existing = byBrand.get(key);
-          if (!existing) {
-            byBrand.set(key, { flagship: p, ids: new Set([p.providerId]) });
-          } else {
-            existing.ids.add(p.providerId);
-            if (p.displayPriority < existing.flagship.displayPriority) {
-              existing.flagship = p;
-            }
-          }
-        }
-
-        const sorted = Array.from(byBrand.values())
-          .sort((a, b) => a.flagship.displayPriority - b.flagship.displayPriority)
-          .map(({ flagship, ids }) => ({
-            providerId: flagship.providerId,
-            providerIds: Array.from(ids).sort((a, b) => a - b),
-            providerName: flagship.providerName,
-            logoPath: flagship.logoPath,
-            displayPriority: flagship.displayPriority,
-          }));
-
-        return { region, providers: sorted };
+        return { region, providers: dedupeByBrand(Array.from(byId.values())) };
       });
     }),
 
@@ -303,6 +280,53 @@ function canonicalBrand(name: string): string {
     .replace(/\+\s*$/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+export interface DedupedProvider {
+  providerId: number;
+  providerIds: number[];
+  providerName: string;
+  logoPath: string;
+  displayPriority: number;
+}
+
+/**
+ * Group TMDB watch providers by canonical brand (so "Apple TV", "Apple TV+"
+ * and "Apple TV Channel" collapse into a single tile) while preserving
+ * every underlying provider id so search filters can match the entire
+ * brand at once.
+ */
+function dedupeByBrand(
+  providers: Array<{
+    providerId: number;
+    providerName: string;
+    logoPath: string;
+    displayPriority: number;
+  }>,
+): DedupedProvider[] {
+  type Raw = (typeof providers)[number];
+  const byBrand = new Map<string, { flagship: Raw; ids: Set<number> }>();
+  for (const p of providers) {
+    const key = canonicalBrand(p.providerName);
+    const existing = byBrand.get(key);
+    if (!existing) {
+      byBrand.set(key, { flagship: p, ids: new Set([p.providerId]) });
+    } else {
+      existing.ids.add(p.providerId);
+      if (p.displayPriority < existing.flagship.displayPriority) {
+        existing.flagship = p;
+      }
+    }
+  }
+  return Array.from(byBrand.values())
+    .sort((a, b) => a.flagship.displayPriority - b.flagship.displayPriority)
+    .map(({ flagship, ids }) => ({
+      providerId: flagship.providerId,
+      providerIds: Array.from(ids).sort((a, b) => a - b),
+      providerName: flagship.providerName,
+      logoPath: flagship.logoPath,
+      displayPriority: flagship.displayPriority,
+    }));
 }
 
 /* -------------------------------------------------------------------------- */

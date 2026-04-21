@@ -28,12 +28,18 @@ export function TraktStep({
   const saveSettings = trpc.settings.setMany.useMutation({
     onSuccess: () => void utils.settings.getAll.invalidate(),
   });
+  const authenticate = trpc.settings.authenticateTrakt.useMutation();
 
   const canSubmit = clientId && clientSecret;
 
   const handleSave = async (): Promise<void> => {
     setSaving(true);
     try {
+      const auth = await authenticate.mutateAsync({ clientId, clientSecret });
+      if (!auth.success) {
+        toast.error(auth.error ?? "Invalid Trakt credentials");
+        return;
+      }
       await saveSettings.mutateAsync({
         settings: [
           { key: "trakt.clientId", value: clientId },
@@ -55,10 +61,10 @@ export function TraktStep({
       onPrimary: () => void handleSave(),
       primaryLabel: "Save & continue",
       primaryDisabled: !canSubmit || saving,
-      primaryLoading: saving,
+      primaryLoading: saving || authenticate.isPending || saveSettings.isPending,
       onSkip: onNext,
     });
-  }, [clientId, clientSecret, saving]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [clientId, clientSecret, saving, authenticate.isPending, saveSettings.isPending]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex flex-col items-center gap-8 text-center pt-16 md:pt-0">

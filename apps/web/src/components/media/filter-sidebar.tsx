@@ -844,41 +844,46 @@ export function FilterSidebar({
           >
             <div className="flex flex-wrap gap-2">
               {watchProvidersList && "providerId" in (watchProvidersList[0] ?? {}) ? (
-                (watchProvidersList as Array<{ providerId: number; providerName: string; logoPath: string; displayPriority: number }>)
-                  .slice(0, 20)
-                  .map((p) => (
-                    <div key={p.providerId} className="group relative">
-                      <button
-                        type="button"
-                        className={cn(
-                          "h-10 w-10 overflow-hidden rounded-xl border-2 transition-all",
-                          selectedProviders.has(p.providerId)
-                            ? "border-primary shadow-md scale-110"
-                            : "border-transparent opacity-60 hover:opacity-100",
-                        )}
-                        onClick={() => {
-                          setSelectedProviders((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(p.providerId)) next.delete(p.providerId);
-                            else next.add(p.providerId);
-                            return next;
-                          });
-                        }}
-                      >
-                        <Image
-                          src={`https://image.tmdb.org/t/p/w92${p.logoPath}`}
-                          alt={p.providerName}
-                          width={40}
-                          height={40}
-                          unoptimized
-                          className="h-full w-full object-cover"
-                        />
-                      </button>
-                      <span className="pointer-events-none absolute -bottom-7 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-0.5 text-[11px] font-medium text-background opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                        {p.providerName}
-                      </span>
-                    </div>
-                  ))
+                (watchProvidersList as Array<{ providerId: number; providerIds: number[]; providerName: string; logoPath: string; displayPriority: number }>)
+                  .map((p) => {
+                    const isSelected = p.providerIds.some((id) => selectedProviders.has(id));
+                    return (
+                      <div key={p.providerId} className="group relative">
+                        <button
+                          type="button"
+                          className={cn(
+                            "h-10 w-10 overflow-hidden rounded-xl border-2 transition-all",
+                            isSelected
+                              ? "border-primary shadow-md scale-110"
+                              : "border-transparent opacity-60 hover:opacity-100",
+                          )}
+                          onClick={() => {
+                            setSelectedProviders((prev) => {
+                              const next = new Set(prev);
+                              if (isSelected) {
+                                for (const id of p.providerIds) next.delete(id);
+                              } else {
+                                for (const id of p.providerIds) next.add(id);
+                              }
+                              return next;
+                            });
+                          }}
+                        >
+                          <Image
+                            src={`https://image.tmdb.org/t/p/w92${p.logoPath}`}
+                            alt={p.providerName}
+                            width={40}
+                            height={40}
+                            unoptimized
+                            className="h-full w-full object-cover"
+                          />
+                        </button>
+                        <span className="pointer-events-none absolute -bottom-7 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-0.5 text-[11px] font-medium text-background opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                          {p.providerName}
+                        </span>
+                      </div>
+                    );
+                  })
               ) : (
                 <span className="text-xs text-muted-foreground">Loading...</span>
               )}

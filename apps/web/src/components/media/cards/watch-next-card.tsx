@@ -23,6 +23,7 @@ export interface WatchNextItem {
   title: string;
   posterPath: string | null;
   backdropPath: string | null;
+  logoPath: string | null;
   year: number | null;
   externalId: number;
   provider: string;
@@ -96,7 +97,10 @@ export function WatchNextCard({
         : null;
 
   const cardImage = imagePath(item);
-  const logoPath = useLogo(
+  // Prefer the logo coming from the procedure (already localized via the
+  // mediaI18n JOIN). Fall back to the on-demand `useLogo` only when the source
+  // didn't supply one — e.g. items that haven't been enriched yet.
+  const fetchedLogo = useLogo(
     item.provider,
     String(item.externalId),
     item.mediaType,
@@ -106,9 +110,11 @@ export function WatchNextCard({
       backdropPath: item.backdropPath,
       year: item.year,
     },
+    { skip: !!item.logoPath },
   );
+  const logoPath = item.logoPath ?? fetchedLogo;
   const [imageReady, setImageReady] = useState(!cardImage);
-  const logoResolved = logoPath !== undefined;
+  const logoResolved = !!item.logoPath || fetchedLogo !== undefined;
 
   if (!logoResolved || !imageReady) {
     return (
