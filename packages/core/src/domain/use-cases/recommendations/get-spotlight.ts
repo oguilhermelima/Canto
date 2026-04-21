@@ -2,7 +2,7 @@ import type { Database } from "@canto/db/client";
 import type { MediaProviderPort } from "../../ports/media-provider.port";
 import type { SearchResult } from "@canto/providers";
 import { getSetting, setSetting } from "@canto/db/settings";
-import { buildExclusionSet } from "../../services/recommendation-service";
+import { buildExclusionSet } from "./recommendation-service";
 import { translateMediaItems } from "../../services/translation-service";
 import { getUserLanguage } from "../../services/user-service";
 import { mapPoolItem } from "../../mappers/media-mapper";
