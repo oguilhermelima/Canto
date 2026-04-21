@@ -3,11 +3,12 @@ export {
   loginPlex,
   createPlexPin,
   checkPlexPin,
-  authenticateJellyfin,
+  type PlexAuthResult,
+} from "./plex";
+export { authenticateJellyfin, type JellyfinAuthResult } from "./jellyfin";
+export {
   startTraktDeviceAuth,
   completeTraktDeviceAuth,
-  type PlexAuthResult,
-  type JellyfinAuthResult,
   type TraktDeviceAuthCheckResult,
   type CompleteTraktDeviceAuthDeps,
-} from "./media-servers/authenticate";
+} from "./trakt";
