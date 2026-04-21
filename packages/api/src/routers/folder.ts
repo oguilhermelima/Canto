@@ -44,6 +44,7 @@ import {
   removeMediaPath,
 } from "@canto/core/infrastructure/repositories/folder-repository";
 import { findMediaById } from "@canto/core/infrastructure/repositories/media-repository";
+import { findWatchProvidersByMediaId } from "@canto/core/infrastructure/repositories/extras-repository";
 import { dispatchJellyfinSync, dispatchPlexSync } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
 import { logAndSwallow } from "@canto/core/lib/log-error";
 
@@ -108,7 +109,10 @@ export const folderRouter = createTRPCRouter({
       const media = await findMediaById(ctx.db, input.mediaId);
       if (!media) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
 
-      const folders = await findAllFolders(ctx.db);
+      const [folders, watchProviders] = await Promise.all([
+        findAllFolders(ctx.db),
+        findWatchProvidersByMediaId(ctx.db, media.id),
+      ]);
       const routable: RoutableMedia = {
         type: media.type,
         genres: media.genres,
@@ -117,6 +121,11 @@ export const folderRouter = createTRPCRouter({
         originalLanguage: media.originalLanguage,
         contentRating: media.contentRating,
         provider: media.provider,
+        year: media.year,
+        runtime: media.runtime,
+        voteAverage: media.voteAverage,
+        status: media.status,
+        watchProviders: watchProviders.map((w) => ({ providerId: w.providerId, region: w.region })),
       };
 
       const folderId = resolveFolder(folders, routable);

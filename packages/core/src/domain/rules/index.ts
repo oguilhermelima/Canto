@@ -28,5 +28,5 @@ export {
   buildFileName,
 } from "./naming";
 export type { MediaNamingInfo, FileNameOptions } from "./naming";
-export { resolveFolder } from "./folder-routing";
+export { resolveFolder, normalizeFolderRules } from "./folder-routing";
 export type { RoutableMedia } from "./folder-routing";

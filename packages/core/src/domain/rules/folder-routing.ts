@@ -1,4 +1,10 @@
-import type { RuleCondition, RuleGroup } from "@canto/db/schema";
+import type {
+  RuleCondition,
+  RuleGroup,
+  RoutingRule,
+  RoutingRules,
+  PersistedFolderRules,
+} from "@canto/db/schema";
 
 /**
  * Media metadata used for rule evaluation.
@@ -12,10 +18,12 @@ export interface RoutableMedia {
   originalLanguage: string | null;
   contentRating: string | null;
   provider: string;
-}
-
-function isRuleGroup(node: RuleCondition | RuleGroup): node is RuleGroup {
-  return "operator" in node && "conditions" in node;
+  year: number | null;
+  runtime: number | null;
+  voteAverage: number | null;
+  status: string | null;
+  /** Watch-provider availability — load from `mediaWatchProvider` before calling resolveFolder. */
+  watchProviders: Array<{ providerId: number; region: string }> | null;
 }
 
 function arraysOverlap(a: unknown[] | null, b: unknown[]): boolean {
@@ -28,9 +36,6 @@ function arraysContainAll(a: unknown[] | null, b: unknown[]): boolean {
   return b.every((v) => a.includes(v));
 }
 
-/**
- * Evaluate a single condition against media metadata.
- */
 function evaluateCondition(cond: RuleCondition, media: RoutableMedia): boolean {
   switch (cond.field) {
     case "type":
@@ -66,24 +71,110 @@ function evaluateCondition(cond: RuleCondition, media: RoutableMedia): boolean {
     case "provider":
       return cond.op === "eq" && media.provider === cond.value;
 
+    case "year":
+      if (media.year == null) return false;
+      if (cond.op === "eq") return media.year === cond.value;
+      if (cond.op === "gte") return media.year >= cond.value;
+      if (cond.op === "lte") return media.year <= cond.value;
+      return false;
+
+    case "runtime":
+      if (media.runtime == null) return false;
+      if (cond.op === "gte") return media.runtime >= cond.value;
+      if (cond.op === "lte") return media.runtime <= cond.value;
+      return false;
+
+    case "voteAverage":
+      if (media.voteAverage == null) return false;
+      if (cond.op === "gte") return media.voteAverage >= cond.value;
+      if (cond.op === "lte") return media.voteAverage <= cond.value;
+      return false;
+
+    case "status":
+      if (media.status == null) return false;
+      if (cond.op === "eq") return media.status === cond.value;
+      if (cond.op === "in") return Array.isArray(cond.value) ? cond.value.includes(media.status) : media.status === cond.value;
+      return false;
+
+    case "watchProvider": {
+      if (!media.watchProviders) return false;
+      const inRegion = media.watchProviders.filter((w) => w.region === cond.value.region);
+      const hasAny = cond.value.providers.some((p) => inRegion.some((w) => w.providerId === p));
+      if (cond.op === "contains_any") return hasAny;
+      if (cond.op === "not_contains_any") return !hasAny;
+      return false;
+    }
+
     default:
       return false;
   }
 }
 
-/**
- * Recursively evaluate a rule group (AND/OR) against media metadata.
- */
-function evaluateGroup(group: RuleGroup, media: RoutableMedia): boolean {
-  if (group.operator === "AND") {
-    return group.conditions.every((node) =>
-      isRuleGroup(node) ? evaluateGroup(node, media) : evaluateCondition(node, media),
-    );
-  }
-  // OR
-  return group.conditions.some((node) =>
-    isRuleGroup(node) ? evaluateGroup(node, media) : evaluateCondition(node, media),
+function evaluateRule(rule: RoutingRule, media: RoutableMedia): boolean {
+  const includeOk = rule.include.every((c) => evaluateCondition(c, media));
+  if (!includeOk) return false;
+  const excludeAllMatch =
+    rule.exclude !== undefined &&
+    rule.exclude.length > 0 &&
+    rule.exclude.every((c) => evaluateCondition(c, media));
+  return !excludeAllMatch;
+}
+
+function evaluateRoutingRules(rules: RoutingRules, media: RoutableMedia): boolean {
+  return rules.rules.some((r) => evaluateRule(r, media));
+}
+
+/* ---------- Legacy → routing-rules normalization ---------- */
+
+function isLegacyGroup(node: unknown): node is RuleGroup {
+  return (
+    typeof node === "object" &&
+    node !== null &&
+    "operator" in node &&
+    "conditions" in node
   );
+}
+
+function isRoutingRules(node: unknown): node is RoutingRules {
+  return (
+    typeof node === "object" &&
+    node !== null &&
+    "rules" in node &&
+    Array.isArray((node as { rules: unknown }).rules)
+  );
+}
+
+/** Convert a legacy AND/OR group tree into DNF: a list of AND-lists (each becomes a rule's `include`). */
+function legacyToDNF(node: RuleCondition | RuleGroup): RuleCondition[][] {
+  if (!isLegacyGroup(node)) return [[node]];
+  const childrenDNF = node.conditions.map(legacyToDNF);
+  if (node.operator === "AND") {
+    return childrenDNF.reduce<RuleCondition[][]>((acc, cur) => {
+      if (acc.length === 0) return cur;
+      const out: RuleCondition[][] = [];
+      for (const a of acc) for (const c of cur) out.push([...a, ...c]);
+      return out;
+    }, []);
+  }
+  // OR: union of branches
+  return childrenDNF.flat();
+}
+
+function legacyToRoutingRules(group: RuleGroup): RoutingRules {
+  const branches = legacyToDNF(group).filter((b) => b.length > 0);
+  if (branches.length === 0) return { rules: [] };
+  return { rules: branches.map((include) => ({ include })) };
+}
+
+/**
+ * Normalize whatever shape is stored in `download_folder.rules` into the current `RoutingRules` shape.
+ * Accepts new shape, legacy AND/OR group, or null. Legacy data is converted via DNF expansion.
+ */
+export function normalizeFolderRules(raw: PersistedFolderRules | null | undefined): RoutingRules | null {
+  if (raw == null) return null;
+  if (isRoutingRules(raw)) return raw;
+  if (isLegacyGroup(raw)) return legacyToRoutingRules(raw);
+  return null;
 }
 
 /**
@@ -94,22 +185,25 @@ function evaluateGroup(group: RuleGroup, media: RoutableMedia): boolean {
  * 3. Fall back to the first enabled folder
  */
 export function resolveFolder(
-  folders: Array<{ id: string; rules: RuleGroup | null; isDefault: boolean; enabled: boolean }>,
+  folders: Array<{
+    id: string;
+    rules: PersistedFolderRules | null;
+    isDefault: boolean;
+    enabled: boolean;
+  }>,
   media: RoutableMedia,
 ): string | null {
   const enabled = folders.filter((f) => f.enabled);
 
-  // First pass: evaluate rules
   for (const folder of enabled) {
-    if (folder.rules && evaluateGroup(folder.rules, media)) {
+    const normalized = normalizeFolderRules(folder.rules);
+    if (normalized && evaluateRoutingRules(normalized, media)) {
       return folder.id;
     }
   }
 
-  // Fallback: default folder
   const defaultFolder = enabled.find((f) => f.isDefault);
   if (defaultFolder) return defaultFolder.id;
 
-  // Last resort: first enabled folder
   return enabled[0]?.id ?? null;
 }

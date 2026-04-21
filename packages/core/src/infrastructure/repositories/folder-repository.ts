@@ -1,6 +1,20 @@
 import { and, eq, isNull } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { downloadFolder, folderServerLink, folderMediaPath, type RuleGroup } from "@canto/db/schema";
+import {
+  downloadFolder,
+  folderServerLink,
+  folderMediaPath,
+  type PersistedFolderRules,
+  type RoutingRules,
+} from "@canto/db/schema";
+import { normalizeFolderRules } from "../../domain/rules/folder-routing";
+
+/** Converts legacy-shape `rules` into the canonical `RoutingRules` shape on read. */
+function normalizeFolderRow<T extends { rules: PersistedFolderRules | null }>(
+  row: T,
+): Omit<T, "rules"> & { rules: RoutingRules | null } {
+  return { ...row, rules: normalizeFolderRules(row.rules) };
+}
 
 type FolderInsert = typeof downloadFolder.$inferInsert;
 type FolderServerLinkInsert = typeof folderServerLink.$inferInsert;
@@ -9,28 +23,32 @@ type FolderMediaPathInsert = typeof folderMediaPath.$inferInsert;
 // ── Folder CRUD ──
 
 export async function findFolderById(db: Database, id: string) {
-  return db.query.downloadFolder.findFirst({
+  const row = await db.query.downloadFolder.findFirst({
     where: eq(downloadFolder.id, id),
   });
+  return row ? normalizeFolderRow(row) : row;
 }
 
 export async function findDefaultFolder(db: Database) {
-  return db.query.downloadFolder.findFirst({
+  const row = await db.query.downloadFolder.findFirst({
     where: eq(downloadFolder.isDefault, true),
   });
+  return row ? normalizeFolderRow(row) : row;
 }
 
 export async function findAllFolders(db: Database) {
-  return db.query.downloadFolder.findMany({
+  const rows = await db.query.downloadFolder.findMany({
     orderBy: (f, { asc }) => [asc(f.priority), asc(f.name)],
   });
+  return rows.map(normalizeFolderRow);
 }
 
 export async function findAllFoldersWithLinks(db: Database) {
-  return db.query.downloadFolder.findMany({
+  const rows = await db.query.downloadFolder.findMany({
     orderBy: (f, { asc }) => [asc(f.priority), asc(f.name)],
     with: { mediaPaths: true },
   });
+  return rows.map(normalizeFolderRow);
 }
 
 export async function createFolder(db: Database, data: FolderInsert) {
@@ -72,24 +90,32 @@ export async function setDefaultFolder(db: Database, id: string) {
 }
 
 /** Default rules for common folder types */
-const DEFAULT_RULES: Record<string, { rules: RuleGroup; priority: number }> = {
+const DEFAULT_RULES: Record<string, { rules: RoutingRules; priority: number }> = {
   movies: {
-    rules: { operator: "AND", conditions: [{ field: "type", op: "eq", value: "movie" }] },
+    rules: {
+      rules: [{ include: [{ field: "type", op: "eq", value: "movie" }] }],
+    },
     priority: 20,
   },
   shows: {
-    rules: { operator: "AND", conditions: [{ field: "type", op: "eq", value: "show" }] },
+    rules: {
+      rules: [{ include: [{ field: "type", op: "eq", value: "show" }] }],
+    },
     priority: 10,
   },
+  // "Shows AND (JP OR Animation)" expands to two rules under the new OR-of-rules model.
   animes: {
     rules: {
-      operator: "AND",
-      conditions: [
-        { field: "type", op: "eq", value: "show" },
+      rules: [
         {
-          operator: "OR",
-          conditions: [
+          include: [
+            { field: "type", op: "eq", value: "show" },
             { field: "originCountry", op: "contains_any", value: ["JP"] },
+          ],
+        },
+        {
+          include: [
+            { field: "type", op: "eq", value: "show" },
             { field: "genre", op: "contains_any", value: ["Animation"] },
           ],
         },

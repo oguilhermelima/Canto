@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from "react";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
 import {
@@ -41,6 +41,7 @@ import {
   ScanSearch,
   Download,
   ShieldCheck,
+  Copy,
 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
@@ -83,10 +84,65 @@ function AnimatedCollapse({ open, children }: { open: boolean; children: React.R
 /*  Types                                                                      */
 /* -------------------------------------------------------------------------- */
 
-import type { RuleGroupInput } from "@canto/validators";
+import type {
+  RoutingRulesInput,
+  RoutingRuleInput,
+  RuleConditionInput,
+} from "@canto/validators";
 
-type RuleGroup = RuleGroupInput;
-type RuleCondition = Exclude<RuleGroup["conditions"][number], RuleGroup>;
+type RuleCondition = RuleConditionInput;
+type RoutingRules = RoutingRulesInput;
+type RoutingRule = RoutingRuleInput;
+
+/** UI-only shape: adds a stable `id` for keys + collapse state. Stripped on save. */
+type UIRule = {
+  id: string;
+  include: RuleCondition[];
+  exclude: RuleCondition[];
+};
+type UIRules = {
+  rules: UIRule[];
+};
+
+const EMPTY_CONDITION = (): RuleCondition =>
+  ({ field: "type", op: "eq", value: "movie" }) as RuleCondition;
+
+const EMPTY_RULE = (): UIRule => ({
+  id: crypto.randomUUID(),
+  include: [],
+  exclude: [],
+});
+
+function cloneCondition(c: RuleCondition): RuleCondition {
+  return {
+    ...c,
+    value: Array.isArray(c.value) ? [...(c.value as unknown[])] : c.value,
+  } as RuleCondition;
+}
+
+function rulesToUI(rules: RoutingRules | null): UIRules {
+  if (!rules || rules.rules.length === 0) {
+    return { rules: [EMPTY_RULE()] };
+  }
+  return {
+    rules: rules.rules.map((r) => ({
+      id: crypto.randomUUID(),
+      include: r.include,
+      exclude: r.exclude ?? [],
+    })),
+  };
+}
+
+function uiToRules(ui: UIRules): RoutingRules | null {
+  const kept: RoutingRule[] = ui.rules
+    .filter((r) => r.include.length > 0)
+    .map((r) => (r.exclude.length > 0
+      ? { include: r.include, exclude: r.exclude }
+      : { include: r.include }
+    ));
+  if (kept.length === 0) return null;
+  return { rules: kept };
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Rule helpers                                                               */
@@ -98,6 +154,11 @@ const FIELD_OPTIONS = [
   { value: "originCountry", label: "Country of origin" },
   { value: "originalLanguage", label: "Original language" },
   { value: "contentRating", label: "Content rating" },
+  { value: "year", label: "Year" },
+  { value: "runtime", label: "Runtime (min)" },
+  { value: "voteAverage", label: "Public rating" },
+  { value: "status", label: "Status" },
+  { value: "watchProvider", label: "Streaming" },
 ] as const;
 
 const OPS_BY_FIELD: Record<string, Array<{ value: string; label: string }>> = {
@@ -107,7 +168,24 @@ const OPS_BY_FIELD: Record<string, Array<{ value: string; label: string }>> = {
   originCountry: [{ value: "contains_any", label: "includes" }, { value: "not_contains_any", label: "excludes" }],
   originalLanguage: [{ value: "eq", label: "is" }, { value: "neq", label: "is not" }],
   contentRating: [{ value: "eq", label: "is" }, { value: "in", label: "is one of" }],
+  year: [{ value: "eq", label: "is" }, { value: "gte", label: "≥" }, { value: "lte", label: "≤" }],
+  runtime: [{ value: "gte", label: "≥" }, { value: "lte", label: "≤" }],
+  voteAverage: [{ value: "gte", label: "≥" }, { value: "lte", label: "≤" }],
+  status: [{ value: "eq", label: "is" }, { value: "in", label: "is one of" }],
+  watchProvider: [{ value: "contains_any", label: "includes" }, { value: "not_contains_any", label: "excludes" }],
 };
+
+const STATUS_OPTIONS = [
+  { value: "Returning Series", label: "Returning Series" },
+  { value: "Ended", label: "Ended" },
+  { value: "Canceled", label: "Canceled" },
+  { value: "In Production", label: "In Production" },
+  { value: "Planned", label: "Planned" },
+  { value: "Pilot", label: "Pilot" },
+  { value: "Released", label: "Released" },
+  { value: "Post Production", label: "Post Production" },
+  { value: "Rumored", label: "Rumored" },
+];
 
 function describeCondition(c: RuleCondition): string {
   switch (c.field) {
@@ -117,85 +195,53 @@ function describeCondition(c: RuleCondition): string {
     case "originCountry": return `country ${c.op === "not_contains_any" ? "excludes" : "includes"} ${(c.value as string[]).join(", ")}`;
     case "originalLanguage": return `language ${c.op === "neq" ? "is not" : "is"} ${c.value as string}`;
     case "contentRating": return `rating ${c.op === "in" ? "is one of" : "is"} ${Array.isArray(c.value) ? (c.value as string[]).join(", ") : c.value}`;
+    case "year": return `year ${c.op === "gte" ? "≥" : c.op === "lte" ? "≤" : "="} ${c.value}`;
+    case "runtime": return `runtime ${c.op === "gte" ? "≥" : "≤"} ${c.value}min`;
+    case "voteAverage": return `rating ${c.op === "gte" ? "≥" : "≤"} ${c.value}`;
+    case "status": return `status ${c.op === "in" ? "is one of" : "is"} ${Array.isArray(c.value) ? (c.value as string[]).join(", ") : c.value}`;
+    case "watchProvider": {
+      const action = c.op === "not_contains_any" ? "not on" : "on";
+      const ids = c.value.providers.join(", ");
+      return `${action} ${ids || "(none)"} (${c.value.region})`;
+    }
     default: return "unknown";
   }
 }
 
-function _describeGroup(g: RuleGroup): string {
-  const parts = g.conditions.map((c) => {
-    if ("operator" in c) return `(${_describeGroup(c as RuleGroup)})`;
-    return describeCondition(c as RuleCondition);
-  });
-  return parts.join(g.operator === "AND" ? " + " : " or ");
-}
-
-type RuleBadgeNode = { type: "badge"; label: string; color: string } | { type: "op"; label: string };
-
-function RuleBadges({ group }: { group: RuleGroup }): React.JSX.Element {
-  function collect(g: RuleGroup): RuleBadgeNode[] {
-    const nodes: RuleBadgeNode[] = [];
-    for (let i = 0; i < g.conditions.length; i++) {
-      if (i > 0) nodes.push({ type: "op", label: g.operator });
-      const c = g.conditions[i]!;
-      if ("operator" in c) {
-        const sub = collect(c as RuleGroup);
-        nodes.push({ type: "op", label: "(" });
-        nodes.push(...sub);
-        nodes.push({ type: "op", label: ")" });
-      } else {
-        const cond = c as RuleCondition;
-        switch (cond.field) {
-          case "type":
-            nodes.push({ type: "badge", label: cond.value === "movie" ? "Movies" : "Shows", color: "bg-blue-500/15 text-blue-400" });
-            break;
-          case "genre":
-            for (const [j, v] of (cond.value as string[]).entries()) {
-              if (j > 0) nodes.push({ type: "op", label: cond.op === "contains_all" ? "AND" : "OR" });
-              const excluded = cond.op === "not_contains_any";
-              nodes.push({ type: "badge", label: `${excluded ? "!" : ""}${v}`, color: excluded ? "bg-red-500/15 text-red-400" : "bg-purple-500/15 text-purple-400" });
-            }
-            break;
-          case "originCountry":
-            for (const [j, v] of (cond.value as string[]).entries()) {
-              if (j > 0) nodes.push({ type: "op", label: "OR" });
-              nodes.push({ type: "badge", label: `${cond.op === "not_contains_any" ? "!" : ""}${v}`, color: "bg-amber-500/15 text-amber-400" });
-            }
-            break;
-          case "originalLanguage":
-            nodes.push({ type: "badge", label: `${cond.op === "neq" ? "!" : ""}${cond.value as string}`, color: "bg-emerald-500/15 text-emerald-400" });
-            break;
-          case "contentRating":
-            if (Array.isArray(cond.value)) {
-              for (const [j, v] of (cond.value as string[]).entries()) {
-                if (j > 0) nodes.push({ type: "op", label: "OR" });
-                nodes.push({ type: "badge", label: v, color: "bg-red-500/15 text-red-400" });
-              }
-            } else {
-              nodes.push({ type: "badge", label: cond.value as string, color: "bg-red-500/15 text-red-400" });
-            }
-            break;
-          default: break;
-        }
-      }
-    }
-    return nodes;
-  }
-
-  const nodes = collect(group);
-
+function FolderRulesPreview({ rules }: { rules: RoutingRules }): React.JSX.Element {
+  if (rules.rules.length === 0) return <></>;
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {nodes.map((node, i) =>
-        node.type === "badge" ? (
-          <span key={i} className={cn("rounded-md px-2 py-0.5 text-xs font-semibold", node.color)}>
-            {node.label}
-          </span>
-        ) : (
-          <span key={i} className="text-[11px] font-medium text-muted-foreground">
-            {node.label}
-          </span>
-        ),
-      )}
+      {rules.rules.map((rule, i) => (
+        <Fragment key={i}>
+          {i > 0 && (
+            <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+              or
+            </span>
+          )}
+          {rule.include.map((c, j) => (
+            <span
+              key={`i-${j}`}
+              className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-300"
+            >
+              {describeCondition(c)}
+            </span>
+          ))}
+          {rule.exclude && rule.exclude.length > 0 && (
+            <>
+              <span className="text-[11px] text-muted-foreground">except</span>
+              {rule.exclude.map((c, j) => (
+                <span
+                  key={`e-${j}`}
+                  className="rounded-md bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-300"
+                >
+                  {describeCondition(c)}
+                </span>
+              ))}
+            </>
+          )}
+        </Fragment>
+      ))}
     </div>
   );
 }
@@ -303,6 +349,76 @@ function ChipSelect({
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Watch provider input (region + providers)                                 */
+/* -------------------------------------------------------------------------- */
+
+function WatchProviderInput({
+  value,
+  onChange,
+}: {
+  value: { region: string; providers: number[] };
+  onChange: (v: { region: string; providers: number[] }) => void;
+}): React.JSX.Element {
+  const { data: regionsRaw } = trpc.provider.filterOptions.useQuery(
+    { type: "regions" },
+    { staleTime: Infinity, gcTime: 24 * 60 * 60 * 1000 },
+  );
+  const { data: movieProvidersRaw } = trpc.provider.filterOptions.useQuery(
+    { type: "watchProviders", mediaType: "movie", region: value.region },
+    { staleTime: Infinity, gcTime: 24 * 60 * 60 * 1000, enabled: !!value.region },
+  );
+  const { data: showProvidersRaw } = trpc.provider.filterOptions.useQuery(
+    { type: "watchProviders", mediaType: "show", region: value.region },
+    { staleTime: Infinity, gcTime: 24 * 60 * 60 * 1000, enabled: !!value.region },
+  );
+
+  const regionOptions = useMemo(() => {
+    const list = (regionsRaw ?? []) as Array<{ code: string; englishName: string }>;
+    return list
+      .map((r) => ({ value: r.code, label: `${r.englishName} (${r.code})` }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [regionsRaw]);
+
+  const providerOptions = useMemo(() => {
+    const map = new Map<number, { value: string; label: string }>();
+    const pushAll = (list: unknown): void => {
+      for (const p of ((list ?? []) as Array<{ providerId: number; providerName: string }>)) {
+        if (!map.has(p.providerId)) {
+          map.set(p.providerId, { value: String(p.providerId), label: p.providerName });
+        }
+      }
+    };
+    pushAll(movieProvidersRaw);
+    pushAll(showProvidersRaw);
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [movieProvidersRaw, showProvidersRaw]);
+
+  return (
+    <div className="flex w-full flex-col gap-2">
+      <Select
+        value={value.region}
+        onValueChange={(region) => onChange({ region, providers: [] })}
+      >
+        <SelectTrigger className={cn(ruleInputCn, "w-full")}>
+          <SelectValue placeholder="Region" />
+        </SelectTrigger>
+        <SelectContent>
+          {regionOptions.map((r) => (
+            <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <ChipSelect
+        value={value.providers.map(String)}
+        onChange={(v) => onChange({ region: value.region, providers: v.map(Number) })}
+        options={providerOptions}
+        placeholder={value.region ? "Select streaming services..." : "Pick a region first"}
+      />
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Condition editor                                                           */
 /* -------------------------------------------------------------------------- */
 
@@ -312,6 +428,11 @@ function defaultValueForField(field: string): unknown {
   if (field === "type") return "movie";
   if (field === "originalLanguage") return "en";
   if (field === "contentRating") return "";
+  if (field === "year") return new Date().getFullYear();
+  if (field === "runtime") return 60;
+  if (field === "voteAverage") return 7;
+  if (field === "status") return "Returning Series";
+  if (field === "watchProvider") return { region: "US", providers: [] };
   return [];
 }
 
@@ -319,10 +440,12 @@ function ConditionEditor({
   condition,
   onChange,
   onRemove,
+  showHints = true,
 }: {
   condition: RuleCondition;
   onChange: (c: RuleCondition) => void;
   onRemove: () => void;
+  showHints?: boolean;
 }): React.JSX.Element {
   const ops = OPS_BY_FIELD[condition.field] ?? [];
 
@@ -435,6 +558,43 @@ function ConditionEditor({
             options={countryOptions}
             placeholder="Select countries..."
           />
+        ) : condition.field === "year" || condition.field === "runtime" || condition.field === "voteAverage" ? (
+          <Input
+            type="number"
+            step={condition.field === "voteAverage" ? "0.1" : "1"}
+            min={condition.field === "voteAverage" ? 0 : 0}
+            max={condition.field === "voteAverage" ? 10 : undefined}
+            value={typeof condition.value === "number" ? condition.value : ""}
+            onChange={(e) => {
+              const raw = e.target.value;
+              const num = raw === "" ? 0 : Number(raw);
+              if (Number.isNaN(num)) return;
+              onChange({ ...condition, value: num } as unknown as RuleCondition);
+            }}
+            placeholder={condition.field === "year" ? "2024" : condition.field === "runtime" ? "60" : "7.0"}
+            className={ruleInputCn}
+          />
+        ) : condition.field === "status" && condition.op === "in" ? (
+          <ChipSelect
+            value={Array.isArray(condition.value) ? (condition.value as string[]) : condition.value ? [String(condition.value)] : []}
+            onChange={(v) => onChange({ ...condition, value: v } as unknown as RuleCondition)}
+            options={STATUS_OPTIONS}
+            placeholder="Select statuses..."
+          />
+        ) : condition.field === "status" ? (
+          <Select value={String(condition.value)} onValueChange={(v) => onChange({ ...condition, value: v } as unknown as RuleCondition)}>
+            <SelectTrigger className={cn(ruleInputCn, "w-full")}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((s) => (
+                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : condition.field === "watchProvider" ? (
+          <WatchProviderInput
+            value={condition.value as { region: string; providers: number[] }}
+            onChange={(v) => onChange({ ...condition, value: v } as unknown as RuleCondition)}
+          />
         ) : (
           <Input
             value={Array.isArray(condition.value) ? arrayValue.join(", ") : String(condition.value)}
@@ -455,7 +615,7 @@ function ConditionEditor({
       </button>
     </div>
     {/* Inline hint for operators that need clarification */}
-    {condition.field === "genre" && (
+    {showHints && condition.field === "genre" && (
       <p className="text-sm text-muted-foreground pl-[172px] pt-0.5">
         {condition.op === "contains_all"
           ? "The media must have every selected genre."
@@ -464,7 +624,7 @@ function ConditionEditor({
           : "The media can have any of the selected genres."}
       </p>
     )}
-    {condition.field === "originCountry" && (
+    {showHints && condition.field === "originCountry" && (
       <p className="text-sm text-muted-foreground pl-[172px] pt-0.5">
         {condition.op === "not_contains_any"
           ? "The media must not be from any of these countries."
@@ -479,172 +639,323 @@ function ConditionEditor({
 /*  Rules editor                                                               */
 /* -------------------------------------------------------------------------- */
 
-/** Static AND/OR label between items */
-function ConnectorLabel({ value }: { value: "AND" | "OR" }): React.JSX.Element {
-  const isAnd = value === "AND";
-  return (
-    <div className="flex items-center gap-2 py-1 pl-3">
-      <span className={cn(
-        "text-xs font-bold uppercase tracking-wider",
-        isAnd ? "text-blue-400/50" : "text-amber-400/50",
-      )}>
-        {isAnd ? "and" : "or"}
-      </span>
-      <div className="h-px flex-1 bg-border/20" />
-    </div>
-  );
-}
-
-/** Inline toggle to switch between ALL/ANY */
-function OperatorToggle({ value, onChange }: { value: "AND" | "OR"; onChange: (v: "AND" | "OR") => void }): React.JSX.Element {
-  const isAnd = value === "AND";
-  return (
-    <div className="inline-flex rounded-xl border border-border overflow-hidden">
-      <button
-        type="button"
-        onClick={() => onChange("AND")}
-        className={cn("px-3 py-1 text-sm font-medium transition-colors", isAnd ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")}
-      >
-        all
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("OR")}
-        className={cn("px-3 py-1 text-sm font-medium transition-colors", !isAnd ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")}
-      >
-        any
-      </button>
-    </div>
-  );
-}
-
-/** A set of conditions with its own operator */
-function ConditionSet({
-  group,
+/** A single AND-group list of conditions with a colored left bar. */
+function ConditionBlock({
+  conditions,
+  accent,
   onChange,
-  onRemove,
 }: {
-  group: RuleGroup;
-  onChange: (g: RuleGroup) => void;
-  onRemove: () => void;
+  conditions: RuleCondition[];
+  accent: "emerald" | "red";
+  onChange: (next: RuleCondition[]) => void;
 }): React.JSX.Element {
-  const isAnd = group.operator === "AND";
-  const conditions = group.conditions.filter((c) => !("operator" in c)) as RuleCondition[];
-
-  const updateCondition = (idx: number, c: RuleCondition): void => {
+  const updateCondition = (i: number, c: RuleCondition): void => {
     const next = [...conditions];
-    next[idx] = c;
-    onChange({ ...group, conditions: next });
+    next[i] = c;
+    onChange(next);
   };
-
-  const removeCondition = (idx: number): void => {
-    const next = conditions.filter((_, i) => i !== idx);
-    if (next.length === 0) { onRemove(); return; }
-    onChange({ ...group, conditions: next });
+  const removeCondition = (i: number): void => {
+    onChange(conditions.filter((_, j) => j !== i));
   };
-
   const addCondition = (): void => {
-    onChange({ ...group, conditions: [...conditions, { field: "type", op: "eq", value: "movie" } as RuleCondition] });
+    onChange([...conditions, EMPTY_CONDITION()]);
   };
+
+  const accentCn = accent === "emerald"
+    ? "border-l-emerald-500/40 bg-emerald-500/[0.03]"
+    : "border-l-red-500/40 bg-red-500/[0.03]";
 
   return (
     <div className={cn(
-      "rounded-xl border-l-[3px] border border-border p-4 space-y-2",
-      isAnd ? "border-l-blue-500/30 bg-blue-500/[0.03]" : "border-l-amber-500/30 bg-amber-500/[0.03]",
+      "rounded-xl border border-border border-l-[3px] p-3.5 space-y-2",
+      accentCn,
     )}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <OperatorToggle value={group.operator} onChange={(op) => onChange({ ...group, operator: op })} />
-          <span>of these must match</span>
-        </div>
-        <button type="button" onClick={onRemove} className="rounded-lg p-1.5 text-muted-foreground hover:text-destructive hover:bg-accent transition-colors">
-          <X className="h-4 w-4" />
-        </button>
-      </div>
       {conditions.map((c, i) => (
-        <div key={i}>
-          <ConditionEditor condition={c} onChange={(c) => updateCondition(i, c)} onRemove={() => removeCondition(i)} />
-          {i < conditions.length - 1 && <ConnectorLabel value={group.operator} />}
-        </div>
+        <ConditionEditor
+          key={i}
+          condition={c}
+          onChange={(c) => updateCondition(i, c)}
+          onRemove={() => removeCondition(i)}
+          showHints={accent === "emerald"}
+        />
       ))}
-      <button type="button" onClick={addCondition} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-        + Add new condition to this set
+      <button
+        type="button"
+        onClick={addCondition}
+        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
+        + Add condition
       </button>
+    </div>
+  );
+}
+
+/** A dashed empty-state button that creates the first condition of an AND-group. */
+function EmptyBlockButton({
+  accent,
+  label,
+  onClick,
+}: {
+  accent: "emerald" | "red";
+  label: string;
+  onClick: () => void;
+}): React.JSX.Element {
+  const accentCn = accent === "emerald"
+    ? "border-emerald-500/25 bg-emerald-500/[0.02] hover:border-emerald-500/50"
+    : "border-red-500/25 bg-red-500/[0.02] hover:border-red-500/50";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "w-full rounded-xl border border-dashed px-4 py-3 text-left text-sm text-muted-foreground hover:text-foreground transition-colors",
+        accentCn,
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+/** Compact chip row summarizing a rule for the collapsed state. */
+function RuleSummary({ rule }: { rule: UIRule }): React.JSX.Element {
+  const hasInclude = rule.include.length > 0;
+  const hasExclude = rule.exclude.length > 0;
+
+  if (!hasInclude && !hasExclude) {
+    return <span className="truncate text-sm italic text-muted-foreground">Empty rule</span>;
+  }
+
+  return (
+    <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+      {rule.include.map((c, i) => (
+        <span
+          key={`i-${i}`}
+          className="shrink-0 rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-300"
+        >
+          {describeCondition(c)}
+        </span>
+      ))}
+      {hasExclude && (
+        <>
+          <span className="shrink-0 text-xs text-muted-foreground">except</span>
+          {rule.exclude.map((c, i) => (
+            <span
+              key={`e-${i}`}
+              className="shrink-0 rounded-md bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-300"
+            >
+              {describeCondition(c)}
+            </span>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** One rule = Include (required) + Exclude (optional). */
+function RuleCard({
+  rule,
+  index,
+  total,
+  collapsed,
+  onChange,
+  onRemove,
+  onDuplicate,
+  onToggleCollapse,
+}: {
+  rule: UIRule;
+  index: number;
+  total: number;
+  collapsed: boolean;
+  onChange: (next: UIRule) => void;
+  onRemove: () => void;
+  onDuplicate: () => void;
+  onToggleCollapse: () => void;
+}): React.JSX.Element {
+  return (
+    <div className="rounded-2xl border border-border bg-muted/10 p-5">
+      {/* Rule header */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+          aria-expanded={!collapsed}
+        >
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+              collapsed && "-rotate-90",
+            )}
+          />
+          <span className="shrink-0 rounded-md bg-primary/10 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-primary">
+            Rule {index + 1}
+          </span>
+          {collapsed && (
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <RuleSummary rule={rule} />
+            </div>
+          )}
+        </button>
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={onDuplicate}
+            title="Duplicate this rule"
+            className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          >
+            <Copy className="h-4 w-4" />
+          </button>
+          {total > 1 && (
+            <button
+              type="button"
+              onClick={onRemove}
+              title="Remove this rule"
+              className="rounded-lg p-1.5 text-muted-foreground hover:text-destructive hover:bg-accent transition-colors"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Collapsible body */}
+      <AnimatedCollapse open={!collapsed}>
+        <div className="space-y-4 pt-4">
+          {/* Include */}
+          <div className="space-y-2">
+            <h4 className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+              Include — all must match
+            </h4>
+            {rule.include.length === 0 ? (
+              <EmptyBlockButton
+                accent="emerald"
+                label="+ Add the first include condition"
+                onClick={() => onChange({ ...rule, include: [EMPTY_CONDITION()] })}
+              />
+            ) : (
+              <ConditionBlock
+                conditions={rule.include}
+                accent="emerald"
+                onChange={(c) => onChange({ ...rule, include: c })}
+              />
+            )}
+          </div>
+
+          {/* Exclude */}
+          <div className="space-y-2">
+            <h4 className="text-[11px] font-bold uppercase tracking-wider text-red-400">
+              Exclude — all must match
+              <span className="ml-1.5 font-normal normal-case tracking-normal text-muted-foreground">(optional)</span>
+            </h4>
+            {rule.exclude.length === 0 ? (
+              <EmptyBlockButton
+                accent="red"
+                label="+ Add an exclusion"
+                onClick={() => onChange({ ...rule, exclude: [EMPTY_CONDITION()] })}
+              />
+            ) : (
+              <ConditionBlock
+                conditions={rule.exclude}
+                accent="red"
+                onChange={(c) => onChange({ ...rule, exclude: c })}
+              />
+            )}
+          </div>
+        </div>
+      </AnimatedCollapse>
     </div>
   );
 }
 
 function RulesEditor({
-  rules,
+  value,
   onChange,
 }: {
-  rules: RuleGroup;
-  onChange: (rules: RuleGroup) => void;
+  value: UIRules;
+  onChange: (next: UIRules) => void;
 }): React.JSX.Element {
-  const items = rules.conditions;
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
 
-  const updateItem = (idx: number, c: RuleCondition | RuleGroup): void => {
-    const next = [...items];
-    next[idx] = c;
-    onChange({ ...rules, conditions: next });
+  const toggleCollapse = (id: string): void => {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
-  const removeItem = (idx: number): void => {
-    onChange({ ...rules, conditions: items.filter((_, i) => i !== idx) });
+  const updateRule = (idx: number, next: UIRule): void => {
+    const rules = [...value.rules];
+    rules[idx] = next;
+    onChange({ rules });
   };
 
-  const addCondition = (): void => {
-    onChange({ ...rules, conditions: [...items, { field: "type", op: "eq", value: "movie" } as RuleCondition] });
+  const removeRule = (idx: number): void => {
+    const removed = value.rules[idx];
+    const rules = value.rules.filter((_, i) => i !== idx);
+    if (removed) {
+      setCollapsedIds((prev) => {
+        if (!prev.has(removed.id)) return prev;
+        const next = new Set(prev);
+        next.delete(removed.id);
+        return next;
+      });
+    }
+    onChange({ rules: rules.length === 0 ? [EMPTY_RULE()] : rules });
   };
 
-  const addSet = (): void => {
-    const inner: RuleGroup = {
-      operator: rules.operator === "AND" ? "OR" : "AND",
-      conditions: [{ field: "type", op: "eq", value: "movie" } as RuleCondition],
+  const duplicateRule = (idx: number): void => {
+    const original = value.rules[idx];
+    if (!original) return;
+    const clone: UIRule = {
+      id: crypto.randomUUID(),
+      include: original.include.map(cloneCondition),
+      exclude: original.exclude.map(cloneCondition),
     };
-    onChange({ ...rules, conditions: [...items, inner] });
+    const rules = [...value.rules];
+    rules.splice(idx + 1, 0, clone);
+    onChange({ rules });
+  };
+
+  const addRule = (): void => {
+    onChange({ rules: [...value.rules, EMPTY_RULE()] });
   };
 
   return (
     <div className="space-y-4">
-      {/* Header with operator toggle */}
-      <div className="flex items-center gap-2 text-sm">
-        <span className="text-muted-foreground">Route to this folder when</span>
-        <OperatorToggle value={rules.operator} onChange={(op) => onChange({ ...rules, operator: op })} />
-        <span className="text-muted-foreground">of these are true</span>
-      </div>
-
-      {/* Items */}
-      <div className="space-y-2">
-        {items.map((item, i) => (
-          <div key={i}>
-            {"operator" in item ? (
-              <ConditionSet
-                group={item as RuleGroup}
-                onChange={(g) => updateItem(i, g)}
-                onRemove={() => removeItem(i)}
-              />
-            ) : (
-              <ConditionEditor
-                condition={item as RuleCondition}
-                onChange={(c) => updateItem(i, c)}
-                onRemove={() => removeItem(i)}
-              />
-            )}
-            {i < items.length - 1 && <ConnectorLabel value={rules.operator} />}
-          </div>
-        ))}
-      </div>
-
-      {/* Add actions — always at the bottom */}
-      <div className="flex items-center gap-3 pt-1">
-        <button type="button" onClick={addCondition} className="text-sm text-primary hover:text-primary transition-colors font-medium">
-          + Add condition
-        </button>
-        <button type="button" onClick={addSet} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-          + Add set of conditions
-        </button>
-      </div>
+      {value.rules.map((r, i) => (
+        <div key={r.id} className="space-y-4">
+          {i > 0 && (
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-border/30" />
+              <span className="rounded-md bg-amber-500/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-400">
+                or
+              </span>
+              <div className="h-px flex-1 bg-border/30" />
+            </div>
+          )}
+          <RuleCard
+            rule={r}
+            index={i}
+            total={value.rules.length}
+            collapsed={collapsedIds.has(r.id)}
+            onChange={(n) => updateRule(i, n)}
+            onRemove={() => removeRule(i)}
+            onDuplicate={() => duplicateRule(i)}
+            onToggleCollapse={() => toggleCollapse(r.id)}
+          />
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={addRule}
+        className="w-full rounded-xl border border-dashed border-border/60 bg-muted/5 px-4 py-3 text-sm text-muted-foreground hover:border-primary/40 hover:bg-primary/[0.03] hover:text-foreground transition-colors"
+      >
+        + Add another rule
+      </button>
     </div>
   );
 }
@@ -661,37 +972,49 @@ function RulesEditorDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  rules: RuleGroup | null;
-  onSave: (rules: RuleGroup | null) => void;
+  rules: RoutingRules | null;
+  onSave: (rules: RoutingRules | null) => void;
 }): React.JSX.Element {
-  const [draft, setDraft] = useState<RuleGroup>(rules ?? { operator: "AND", conditions: [] });
+  const [draft, setDraft] = useState<UIRules>(() => rulesToUI(rules));
 
   useEffect(() => {
-    if (open) setDraft(rules ?? { operator: "AND", conditions: [] });
+    if (open) setDraft(rulesToUI(rules));
   }, [open, rules]);
 
-  const hasConditions = draft.conditions.length > 0;
+  const hasAny = draft.rules.some(
+    (r) => r.include.length > 0 || r.exclude.length > 0,
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="flex h-[85vh] max-h-[780px] max-w-2xl flex-col gap-0 p-0">
+        <DialogHeader bar>
           <DialogTitle>Auto-routing Rules</DialogTitle>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Route a download here when any rule matches. Each rule: include conditions (all required) and optional exclude conditions.
+          </p>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Define when Canto should automatically select this folder for a download.
-          Add conditions based on media type, genre, country, language, or content rating.
-        </p>
-        <div className="pt-3">
-          <RulesEditor rules={draft} onChange={setDraft} />
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+          <RulesEditor value={draft} onChange={setDraft} />
         </div>
-        <div className="flex items-center justify-between pt-5 border-t border-border">
-          <Button variant="ghost" className="text-muted-foreground rounded-xl" onClick={() => { onSave(null); onOpenChange(false); }}>
+
+        <div className="flex shrink-0 items-center justify-between border-t border-border px-6 py-4">
+          <Button
+            variant="ghost"
+            className="rounded-xl text-muted-foreground"
+            onClick={() => { onSave(null); onOpenChange(false); }}
+          >
             Clear rules
           </Button>
           <div className="flex items-center gap-2">
-            <Button variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button className="rounded-xl" onClick={() => { onSave(hasConditions ? draft : null); onOpenChange(false); }}>
+            <Button variant="outline" className="rounded-xl" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="rounded-xl"
+              onClick={() => { onSave(hasAny ? uiToRules(draft) : null); onOpenChange(false); }}
+            >
               Save rules
             </Button>
           </div>
@@ -700,51 +1023,6 @@ function RulesEditorDialog({
     </Dialog>
   );
 }
-
-/* -------------------------------------------------------------------------- */
-/*  Presets                                                                     */
-/* -------------------------------------------------------------------------- */
-
-type RuleTemplate = { label: string; rules: RuleGroup; qbitCategory: string; priority: number };
-
-const _RULE_TEMPLATES: RuleTemplate[] = [
-  {
-    label: "Movies",
-    rules: { operator: "AND", conditions: [{ field: "type", op: "eq", value: "movie" }] },
-    qbitCategory: "movies",
-    priority: 20,
-  },
-  {
-    label: "Shows",
-    rules: { operator: "AND", conditions: [{ field: "type", op: "eq", value: "show" }] },
-    qbitCategory: "shows",
-    priority: 10,
-  },
-  {
-    label: "Anime",
-    rules: {
-      operator: "AND",
-      conditions: [
-        { field: "type", op: "eq", value: "show" },
-        {
-          operator: "OR",
-          conditions: [
-            { field: "originCountry", op: "contains_any", value: ["JP"] },
-            { field: "genre", op: "contains_any", value: ["Animation"] },
-          ],
-        },
-      ],
-    },
-    qbitCategory: "animes",
-    priority: 0,
-  },
-  {
-    label: "Documentaries",
-    rules: { operator: "AND", conditions: [{ field: "genre", op: "contains_any", value: ["Documentary"] }] },
-    qbitCategory: "documentaries",
-    priority: 15,
-  },
-];
 
 /* -------------------------------------------------------------------------- */
 /*  Folder data type                                                           */
@@ -756,7 +1034,7 @@ interface FolderData {
   downloadPath: string | null;
   libraryPath: string | null;
   qbitCategory: string | null;
-  rules: RuleGroup | null;
+  rules: RoutingRules | null;
   priority: number;
   isDefault: boolean;
   enabled: boolean;
@@ -1333,7 +1611,7 @@ function FolderCard({
     });
   };
 
-  const handleSaveRules = (rules: RuleGroup | null): void => {
+  const handleSaveRules = (rules: RoutingRules | null): void => {
     updateFolder.mutate({ id: folder.id, rules });
   };
 
@@ -1508,7 +1786,7 @@ function FolderCard({
               </div>
               {folder.rules ? (
                 <div className="mt-3">
-                  <RuleBadges group={folder.rules} />
+                  <FolderRulesPreview rules={folder.rules} />
                 </div>
               ) : (
                 <p className="mt-2 text-sm text-muted-foreground italic">
@@ -1871,18 +2149,6 @@ export function DownloadFolders({ mode = "settings", importMethod: importMethodP
     }
     if (count > 0) toast.success(`Paths generated for ${count} folder${count > 1 ? "s" : ""}`);
     else toast.info("All paths already match");
-  };
-
-  const _handleAddPreset = (template: RuleTemplate): void => {
-    const root = basePath.replace(/\/+$/, "");
-    createFolder.mutate({
-      name: template.label,
-      downloadPath: root ? `${root}/downloads/${template.qbitCategory}` : undefined,
-      libraryPath: root ? `${root}/media/${template.qbitCategory}` : undefined,
-      qbitCategory: template.qbitCategory,
-      rules: template.rules,
-      priority: template.priority,
-    });
   };
 
   const handleImportFromQbit = (): void => {

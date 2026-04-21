@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// ── Rule schema (recursive AND/OR conditions) ──
+// ── Condition schema (leaves of a rule) ──
 
 const ruleCondition = z.discriminatedUnion("field", [
   z.object({ field: z.literal("type"), op: z.literal("eq"), value: z.enum(["movie", "show"]) }),
@@ -10,19 +10,54 @@ const ruleCondition = z.discriminatedUnion("field", [
   z.object({ field: z.literal("originalLanguage"), op: z.enum(["eq", "neq"]), value: z.string() }),
   z.object({ field: z.literal("contentRating"), op: z.enum(["eq", "in"]), value: z.union([z.string(), z.array(z.string())]) }),
   z.object({ field: z.literal("provider"), op: z.literal("eq"), value: z.enum(["tmdb", "tvdb"]) }),
+  z.object({ field: z.literal("year"), op: z.enum(["eq", "gte", "lte"]), value: z.number().int() }),
+  z.object({ field: z.literal("runtime"), op: z.enum(["gte", "lte"]), value: z.number().int() }),
+  z.object({ field: z.literal("voteAverage"), op: z.enum(["gte", "lte"]), value: z.number() }),
+  z.object({ field: z.literal("status"), op: z.enum(["eq", "in"]), value: z.union([z.string(), z.array(z.string())]) }),
+  z.object({
+    field: z.literal("watchProvider"),
+    op: z.enum(["contains_any", "not_contains_any"]),
+    value: z.object({
+      region: z.string().length(2),
+      providers: z.array(z.number().int()).min(1),
+    }),
+  }),
 ]);
 
-export type RuleGroupInput = {
-  operator: "AND" | "OR";
-  conditions: Array<z.infer<typeof ruleCondition> | RuleGroupInput>;
-};
+// ── Routing rules schema ──
+// A folder matches when ANY rule matches.
+// A rule matches when all its include conditions pass and its exclude conditions don't all match.
+// Rules OR together; conditions inside a rule AND together.
 
-const ruleGroup: z.ZodType<RuleGroupInput> = z.object({
-  operator: z.enum(["AND", "OR"]),
-  conditions: z.array(z.lazy(() => z.union([ruleCondition, ruleGroup]))),
+const routingRule = z.object({
+  include: z.array(ruleCondition).min(1),
+  exclude: z.array(ruleCondition).optional(),
 });
 
-export { ruleGroup, ruleCondition };
+const routingRules = z.object({
+  rules: z.array(routingRule).min(1),
+});
+
+export type RuleConditionInput = z.infer<typeof ruleCondition>;
+export type RoutingRuleInput = z.infer<typeof routingRule>;
+export type RoutingRulesInput = z.infer<typeof routingRules>;
+
+// ── Legacy recursive AND/OR schema (kept for on-read migration of stored data) ──
+
+export type LegacyRuleGroup = {
+  operator: "AND" | "OR";
+  conditions: Array<z.infer<typeof ruleCondition> | LegacyRuleGroup>;
+};
+
+const legacyRuleGroup: z.ZodType<LegacyRuleGroup> = z.object({
+  operator: z.enum(["AND", "OR"]),
+  conditions: z.array(z.lazy(() => z.union([ruleCondition, legacyRuleGroup]))),
+});
+
+/** @deprecated Use `RoutingRulesInput`. Kept for read-side migration only. */
+export type RuleGroupInput = LegacyRuleGroup;
+
+export { ruleCondition, routingRule, routingRules, legacyRuleGroup };
 
 // ── Folder CRUD inputs ──
 
@@ -31,7 +66,7 @@ export const createFolderInput = z.object({
   downloadPath: z.string().min(1).optional(),
   libraryPath: z.string().min(1).optional(),
   qbitCategory: z.string().min(1).optional(),
-  rules: ruleGroup.nullable().optional(),
+  rules: routingRules.nullable().optional(),
   priority: z.number().int().default(0),
   isDefault: z.boolean().default(false),
 });
@@ -42,7 +77,7 @@ export const updateFolderInput = z.object({
   downloadPath: z.string().min(1).nullable().optional(),
   libraryPath: z.string().min(1).nullable().optional(),
   qbitCategory: z.string().min(1).nullable().optional(),
-  rules: ruleGroup.nullable().optional(),
+  rules: routingRules.nullable().optional(),
   priority: z.number().int().optional(),
   isDefault: z.boolean().optional(),
   enabled: z.boolean().optional(),

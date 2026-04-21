@@ -32,6 +32,7 @@ import {
   findDuplicateEpisodeFile,
   findBlocklistEntry,
 } from "../../infrastructure/repositories";
+import { findWatchProvidersByMediaId } from "../../infrastructure/repositories/extras-repository";
 import { resolveFolder } from "../rules/folder-routing";
 import type { RoutableMedia } from "../rules/folder-routing";
 import { updateMedia } from "../../infrastructure/repositories/media-repository";
@@ -69,6 +70,10 @@ async function resolveDownloadConfig(
     originalLanguage: string | null;
     contentRating: string | null;
     provider: string;
+    year: number | null;
+    runtime: number | null;
+    voteAverage: number | null;
+    status: string | null;
   },
   inputFolderId?: string,
 ): Promise<{ category: string; downloadPath: string | undefined; folderId: string | undefined }> {
@@ -101,7 +106,10 @@ async function resolveDownloadConfig(
   }
 
   // 3. Auto-resolve via rules
-  const folders = await findAllFolders(db);
+  const [folders, watchProviders] = await Promise.all([
+    findAllFolders(db),
+    findWatchProvidersByMediaId(db, mediaRow.id),
+  ]);
   const routable: RoutableMedia = {
     type: mediaRow.type,
     genres: mediaRow.genres,
@@ -110,6 +118,11 @@ async function resolveDownloadConfig(
     originalLanguage: mediaRow.originalLanguage,
     contentRating: mediaRow.contentRating,
     provider: mediaRow.provider,
+    year: mediaRow.year,
+    runtime: mediaRow.runtime,
+    voteAverage: mediaRow.voteAverage,
+    status: mediaRow.status,
+    watchProviders: watchProviders.map((w) => ({ providerId: w.providerId, region: w.region })),
   };
   const resolvedId = resolveFolder(folders, routable);
   const resolved = resolvedId ? folders.find((f) => f.id === resolvedId) : null;

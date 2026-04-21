@@ -123,8 +123,11 @@ export const downloadFolder = pgTable("download_folder", {
   libraryPath: varchar("library_path", { length: 500 }),
   /** qBittorrent category name */
   qbitCategory: varchar("qbit_category", { length: 100 }),
-  /** Auto-routing rules — evaluated against media metadata to auto-select this folder */
-  rules: jsonb("rules").$type<RuleGroup | null>(),
+  /** Auto-routing rules — evaluated against media metadata to auto-select this folder.
+   *  Stored as JSONB; may hold either the current `RoutingRules` shape or the legacy
+   *  `RuleGroup` shape for rows written before the refactor. Readers normalize via
+   *  `normalizeFolderRules` in `@canto/core/domain/rules/folder-routing`. */
+  rules: jsonb("rules").$type<PersistedFolderRules | null>(),
   /** Evaluation order (lower = checked first). More specific rules should have lower priority. */
   priority: integer("priority").notNull().default(0),
   /** Fallback folder when no rules match */
@@ -282,12 +285,31 @@ export type RuleCondition =
   | { field: "originCountry"; op: "contains_any" | "not_contains_any"; value: string[] }
   | { field: "originalLanguage"; op: "eq" | "neq"; value: string }
   | { field: "contentRating"; op: "eq" | "in"; value: string | string[] }
-  | { field: "provider"; op: "eq"; value: "tmdb" | "tvdb" };
+  | { field: "provider"; op: "eq"; value: "tmdb" | "tvdb" }
+  | { field: "year"; op: "eq" | "gte" | "lte"; value: number }
+  | { field: "runtime"; op: "gte" | "lte"; value: number }
+  | { field: "voteAverage"; op: "gte" | "lte"; value: number }
+  | { field: "status"; op: "eq" | "in"; value: string | string[] }
+  | { field: "watchProvider"; op: "contains_any" | "not_contains_any"; value: { region: string; providers: number[] } };
 
+/** Current shape: folder matches when ANY rule matches; a rule matches when include all-pass and exclude doesn't all-match. */
+export type RoutingRule = {
+  include: RuleCondition[];
+  exclude?: RuleCondition[];
+};
+
+export type RoutingRules = {
+  rules: RoutingRule[];
+};
+
+/** @deprecated Pre-refactor recursive AND/OR group. Kept so we can migrate stored data on read. */
 export type RuleGroup = {
   operator: "AND" | "OR";
   conditions: Array<RuleCondition | RuleGroup>;
 };
+
+/** Union of both shapes — what may actually live in the JSONB column after the refactor. */
+export type PersistedFolderRules = RoutingRules | RuleGroup;
 
 
 // ─── Media tables ───
