@@ -14,7 +14,7 @@ import {
   fetchMediaVersionsWithMedia,
   type MediaSummary,
   type MediaVersionRow,
-} from "../../infrastructure/repositories/media-version-repository";
+} from "../../infrastructure/repositories/media/media-version-repository";
 
 export type MediaVersionGroupsTab =
   | "all"

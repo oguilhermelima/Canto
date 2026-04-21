@@ -4,8 +4,8 @@ import {
   findAllTorrentsPaginated,
   countAllTorrents,
 } from "../../../infrastructure/repositories/torrents";
-import { findMediaById } from "../../../infrastructure/repositories/media-repository";
-import { mergeLiveData } from "../merge-live-data";
+import { findMediaById } from "../../../infrastructure/repositories/media/media-repository";
+import { mergeLiveData } from "../media/merge-live-data";
 
 /**
  * List live torrent data from qBittorrent merged with DB records + media info.

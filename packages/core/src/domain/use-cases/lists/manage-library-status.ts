@@ -2,7 +2,7 @@ import type { Database } from "@canto/db/client";
 import {
   findMediaById,
   updateMedia,
-} from "../../../infrastructure/repositories/media-repository";
+} from "../../../infrastructure/repositories/media/media-repository";
 import {
   ensureServerLibrary,
   addListItem,

@@ -17,7 +17,7 @@ import {
   findFolderById,
   seedDefaultFolders,
 } from "@canto/core/infrastructure/repositories/folder-repository";
-import { findLibraryStats, listLibraryMedia, updateMedia } from "@canto/core/infrastructure/repositories/media-repository";
+import { findLibraryStats, listLibraryMedia, updateMedia } from "@canto/core/infrastructure/repositories/media/media-repository";
 import { getUserLanguage } from "@canto/core/domain/services/user-service";
 import { batchMediaTranslations } from "@canto/core/domain/services/translation-service";
 

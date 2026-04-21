@@ -22,8 +22,9 @@ import { fetchMediaMetadata } from "@canto/core/domain/use-cases/media/fetch-med
 import { getEffectiveProvider } from "@canto/core/domain/rules/effective-provider";
 import { reconcileShowStructure } from "@canto/core/domain/use-cases/media/reconcile-show-structure";
 import { jobDispatcher } from "@canto/core/infrastructure/adapters/job-dispatcher.adapter";
-import { executeReorganizeMediaFiles } from "@canto/core/domain/use-cases/reorganize-media-files";
-import { updateMediaServerMetadata } from "@canto/core/domain/use-cases/update-media-server-metadata";
+import { executeReorganizeMediaFiles } from "@canto/core/domain/use-cases/file-organization/reorganize-media-files";
+import { createNodeFileSystemAdapter } from "@canto/core/infrastructure/adapters/filesystem";
+import { updateMediaServerMetadata } from "@canto/core/domain/use-cases/media-servers/update-metadata";
 
 export const mediaVersioningRouter = createTRPCRouter({
   previewProviderOverride: adminProcedure
@@ -71,7 +72,7 @@ export const mediaVersioningRouter = createTRPCRouter({
       }
 
       if (input.renameFiles) {
-        await executeReorganizeMediaFiles(ctx.db, input.id);
+        await executeReorganizeMediaFiles(ctx.db, input.id, { fs: createNodeFileSystemAdapter() });
       }
 
       if (input.updateMediaServer) {

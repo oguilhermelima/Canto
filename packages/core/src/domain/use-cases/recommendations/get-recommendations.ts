@@ -13,7 +13,7 @@ import {
 } from "../../../infrastructure/repositories/extras-repository";
 import {
   findLibraryMediaBrief,
-} from "../../../infrastructure/repositories/media-repository";
+} from "../../../infrastructure/repositories/media/media-repository";
 
 interface GetRecommendationsInput {
   userId: string;

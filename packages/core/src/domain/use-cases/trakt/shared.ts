@@ -13,7 +13,7 @@ import type {
 import { getTmdbProvider } from "../../../lib/tmdb-client";
 import { getTvdbProvider } from "../../../lib/tvdb-client";
 import { slugify } from "../../rules/slugify";
-import { persistMediaUseCase } from "../persist-media";
+import { persistMediaUseCase } from "../media/persist";
 
 export const CONFLICT_WINDOW_MS = 10 * 60 * 1000;
 

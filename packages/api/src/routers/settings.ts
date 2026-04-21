@@ -37,7 +37,7 @@ import { media, user, supportedLanguage } from "@canto/db/schema";
 import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure, t } from "../trpc";
 import { dispatchMediaPipeline, dispatchRebuildUserRecs } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
 import { getActiveUserLanguages } from "@canto/core/domain/services/user-service";
-import { ensureMediaMany } from "@canto/core/domain/use-cases/ensure-media-many";
+import { ensureMediaMany } from "@canto/core/domain/use-cases/media/ensure-media-many";
 
 // ── Extracted use-cases & services ──
 import { testService } from "@canto/core/infrastructure/adapters/service-tester";

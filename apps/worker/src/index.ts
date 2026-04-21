@@ -14,14 +14,14 @@ import { handleSeedManagement } from "./jobs/seed-management";
 import { handleFolderScan } from "./jobs/folder-scan";
 import { handleValidateDownloads } from "./jobs/validate-downloads";
 import { handleTraktSync, handleTraktSyncUser } from "./jobs/trakt-sync";
-import { refreshExtras } from "@canto/core/domain/use-cases/refresh-extras";
-import { replaceShowWithTvdb } from "@canto/core/domain/use-cases/replace-show-with-tvdb";
-import { rebuildUserRecs } from "@canto/core/domain/use-cases/rebuild-user-recs";
-import { refreshAllLanguage } from "@canto/core/domain/use-cases/refresh-all-language";
-import { translateEpisodes } from "@canto/core/domain/use-cases/translate-episodes";
+import { refreshExtras } from "@canto/core/domain/use-cases/content-enrichment/refresh-extras";
+import { replaceShowWithTvdb } from "@canto/core/domain/use-cases/media/replace-show-with-tvdb";
+import { rebuildUserRecs } from "@canto/core/domain/use-cases/recommendations/rebuild-user-recs";
+import { refreshAllLanguage } from "@canto/core/domain/use-cases/content-enrichment/refresh-all-language";
+import { translateEpisodes } from "@canto/core/domain/use-cases/content-enrichment/translate-episodes";
 import { runMediaPipeline } from "@canto/core/domain/use-cases/run-media-pipeline";
-import { enqueueDailyRecsRebuild } from "@canto/core/domain/use-cases/enqueue-daily-recs-rebuild";
-import { ensureMedia } from "@canto/core/domain/use-cases/ensure-media";
+import { enqueueDailyRecsRebuild } from "@canto/core/domain/use-cases/recommendations/enqueue-daily-recs-rebuild";
+import { ensureMedia } from "@canto/core/domain/use-cases/media/ensure-media";
 import type {
   EnsureMediaJob,
   MediaPipelineJob,

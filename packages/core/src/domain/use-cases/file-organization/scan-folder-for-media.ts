@@ -1,7 +1,7 @@
 import { join, basename, extname } from "node:path";
 
 import type { Database } from "@canto/db/client";
-import { persistMedia } from "../persist-media";
+import { persistMedia } from "../media/persist";
 import { getActiveUserLanguages } from "../../services/user-service";
 
 import type { FileSystemPort } from "../../ports/file-system.port";
@@ -11,7 +11,7 @@ import { getTmdbProvider } from "../../../lib/tmdb-client";
 import {
   findMediaByAnyReference,
   updateMedia,
-} from "../../../infrastructure/repositories/media-repository";
+} from "../../../infrastructure/repositories/media/media-repository";
 import {
   ensureServerLibrary,
   addListItem,

@@ -4,11 +4,11 @@
 
 import type { Database } from "@canto/db/client";
 import { getSettings } from "@canto/db/settings";
-import { findMediaById } from "../../../infrastructure/repositories/media-repository";
+import { findMediaById } from "../../../infrastructure/repositories/media/media-repository";
 import {
   findMediaVersionsByMediaId,
   updateMediaVersion,
-} from "../../../infrastructure/repositories/media-version-repository";
+} from "../../../infrastructure/repositories/media/media-version-repository";
 import {
   applyJellyfinRemoteMatch,
   getJellyfinItem,

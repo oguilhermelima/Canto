@@ -1,5 +1,5 @@
 import type { Database } from "@canto/db/client";
-import { findLibraryExternalIds } from "../../../infrastructure/repositories/media-repository";
+import { findLibraryExternalIds } from "../../../infrastructure/repositories/media/media-repository";
 import { findUserListExternalIds } from "../../../infrastructure/repositories/list-repository";
 
 /** Build exclusion set: library items + user's list items (for recommendations/spotlight) */

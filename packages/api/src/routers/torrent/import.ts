@@ -16,10 +16,10 @@ import {
   mapStatusFromLive,
   waitForTorrent,
 } from "@canto/core/domain/rules/torrent-rules";
-import { resolveMedia } from "@canto/core/domain/use-cases/persist-media";
+import { resolveMedia } from "@canto/core/domain/use-cases/media/persist";
 import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
 import { getTvdbProvider } from "@canto/core/lib/tvdb-client";
-import { updateMedia } from "@canto/core/infrastructure/repositories/media-repository";
+import { updateMedia } from "@canto/core/infrastructure/repositories/media/media-repository";
 import {
   findTorrentById,
   findTorrentByHash,

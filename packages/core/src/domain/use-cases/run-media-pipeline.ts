@@ -1,6 +1,6 @@
 import type { Database } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
-import { persistFullMedia } from "./persist-media";
+import { persistFullMedia } from "./media/persist";
 import { getActiveUserLanguages } from "../services/user-service";
 import type { MediaType, ProviderName } from "@canto/providers";
 
@@ -10,7 +10,7 @@ import { findMediaById } from "../../infrastructure/repositories";
 import type { MediaPipelineJob } from "../../infrastructure/queue/bullmq-dispatcher";
 import { dispatchTranslateEpisodes } from "../../infrastructure/queue/bullmq-dispatcher";
 
-import { fetchMediaMetadata } from "./fetch-media-metadata";
+import { fetchMediaMetadata } from "./media/fetch-media-metadata";
 
 interface Deps {
   tmdb: MediaProviderPort;

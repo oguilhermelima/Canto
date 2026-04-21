@@ -17,7 +17,7 @@ import {
   updateServerLink,
   upsertServerLink,
 } from "@canto/core/infrastructure/repositories/file-organization/folder";
-import { findMediaById } from "@canto/core/infrastructure/repositories/media-repository";
+import { findMediaById } from "@canto/core/infrastructure/repositories/media/media-repository";
 import { findWatchProvidersByMediaId } from "@canto/core/infrastructure/repositories/extras-repository";
 import {
   dispatchJellyfinSync,

@@ -9,8 +9,8 @@ import {
   season,
   seasonTranslation,
 } from "@canto/db/schema";
-import type { Aspect, GapReport } from "./ensure-media.types";
-import { EXTRAS_TTL_MS, METADATA_TTL_MS } from "./ensure-media.types";
+import type { Aspect, GapReport } from "./media/ensure-media.types";
+import { EXTRAS_TTL_MS, METADATA_TTL_MS } from "./media/ensure-media.types";
 
 /**
  * Inspect DB state and compute what's missing for the given languages.
