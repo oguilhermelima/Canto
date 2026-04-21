@@ -193,6 +193,7 @@ export async function findUserRecommendations(
     .where(
       sql`${userRecommendation.userId} = ${userId}
         AND ${userRecommendation.active} = true
+        AND ${media.metadataUpdatedAt} IS NOT NULL
         AND (${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL)
         ${excludeClause}
         ${sql.join(filterClauses, sql` `)}`,
@@ -338,6 +339,7 @@ export async function findUserSpotlightItems(
       sql`${userRecommendation.userId} = ${userId}
         AND ${userRecommendation.active} = true
         AND ${media.backdropPath} IS NOT NULL
+        AND ${media.metadataUpdatedAt} IS NOT NULL
         AND (${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL)
         ${excludeClause}`,
     )

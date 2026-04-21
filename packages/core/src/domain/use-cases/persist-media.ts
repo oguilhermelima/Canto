@@ -23,6 +23,7 @@ import { getSetting } from "@canto/db/settings";
 
 import type { MediaProviderPort } from "../ports/media-provider.port";
 import { logAndSwallow } from "../../lib/log-error";
+import { dispatchMediaPipeline } from "../../infrastructure/queue/bullmq-dispatcher";
 import { getEffectiveProviderSync } from "../rules/effective-provider";
 import {
   findMediaByExternalId,
@@ -652,6 +653,11 @@ export async function persistExtras(
           .returning();
         if (inserted) {
           recMediaIdByKey.set(key, inserted.id);
+          // Stub row from TMDB's recs/similar payload — enqueue full metadata
+          // fetch so read paths (filtered on metadataUpdatedAt) can surface it.
+          void dispatchMediaPipeline({ mediaId: inserted.id }).catch(
+            logAndSwallow("persistExtras dispatchMediaPipeline"),
+          );
         } else {
           const existing = await db.query.media.findFirst({
             where: and(

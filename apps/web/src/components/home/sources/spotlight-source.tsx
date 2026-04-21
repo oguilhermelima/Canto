@@ -14,6 +14,10 @@ interface SpotlightSourceProps {
 export function SpotlightSource({ sectionId, style, title }: SpotlightSourceProps): React.JSX.Element {
   const query = trpc.provider.spotlight.useQuery(undefined, {
     staleTime: 30 * 60 * 1000,
+    // On a fresh account the recommendation pool is still being enriched.
+    // Poll every 5s while empty so the spotlight fills in without a manual
+    // refresh; stop once we have items.
+    refetchInterval: (q) => (Array.isArray(q.state.data) && q.state.data.length > 0 ? false : 5000),
   });
 
   const result = useSectionQuery(

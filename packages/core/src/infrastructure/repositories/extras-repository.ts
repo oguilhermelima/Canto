@@ -71,10 +71,19 @@ export async function findRecommendedMediaWithBackdrops(db: Database, limit: num
   return db.query.media.findMany({
     where: and(
       sql`${media.id} IN (SELECT media_id FROM media_recommendation)`,
+      isNotNull(media.metadataUpdatedAt),
       isNotNull(media.backdropPath),
-      sql`${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL`,
+      // Parens on the OR are load-bearing: drizzle's `and(...)` wraps each
+      // arg but passes `sql` templates through verbatim. Without them SQL
+      // precedence turns `X AND (A OR B) AND Y` into `X AND A OR B AND Y`,
+      // which makes `release_date IS NULL` a catch-all that explodes the
+      // result set into a full-table scan.
+      sql`(${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL)`,
+      ...getQualityFilters(),
     ),
-    orderBy: [desc(media.releaseDate)],
+    // Rank by Bayesian weighted score so the spotlight surfaces well-known
+    // titles instead of freshly-released obscure items with zero votes.
+    orderBy: [getWeightedScoreOrder()],
     limit,
   });
 }
@@ -86,7 +95,7 @@ export async function findGlobalRecommendations(
   offset: number,
   filters: RecsFilters = {},
 ) {
-  const released = sql`${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL`;
+  const released = sql`(${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL)`;
 
   const excludeConditions =
     excludeItems.length > 0
@@ -101,6 +110,7 @@ export async function findGlobalRecommendations(
 
   const where = and(
     sql`${media.id} IN (SELECT media_id FROM media_recommendation)`,
+    isNotNull(media.metadataUpdatedAt),
     released,
     ...getQualityFilters(),
     ...(excludeConditions.length > 0

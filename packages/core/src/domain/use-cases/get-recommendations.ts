@@ -41,6 +41,11 @@ export async function getRecommendations(
   const { excludeItems } = await buildExclusionSet(db, userId);
 
   // ── Path 1: Per-user recommendations ──
+  // `countUserRecommendations` counts rows regardless of media enrichment
+  // state, while `findUserRecommendations` filters out stubs. When the user
+  // has recs that all point to light media, the count is positive but the
+  // filtered query returns nothing — so fall through to the global pool
+  // instead of returning an empty list.
   const userRecCount = await countUserRecommendations(db, userId);
   if (userRecCount > 0) {
     const rows = await findUserRecommendations(
@@ -52,10 +57,12 @@ export async function getRecommendations(
       filters,
     );
 
-    const hasMore = rows.length > pageSize;
-    const items = rows.slice(0, pageSize).map(mapPoolItem);
-    const translatedItems = await translateMediaItems(db, items, userLang);
-    return { items: translatedItems, nextCursor: hasMore ? page + 1 : null, version: recsVersion };
+    if (rows.length > 0) {
+      const hasMore = rows.length > pageSize;
+      const items = rows.slice(0, pageSize).map(mapPoolItem);
+      const translatedItems = await translateMediaItems(db, items, userLang);
+      return { items: translatedItems, nextCursor: hasMore ? page + 1 : null, version: recsVersion };
+    }
   }
 
   // ── Path 2: Fallback to global pool ──

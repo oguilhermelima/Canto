@@ -13,6 +13,8 @@ import type { MediaType } from "@canto/providers";
 import { findMediaById } from "../../infrastructure/repositories";
 import type { MediaProviderPort } from "../ports/media-provider.port";
 import { mapSearchResultToMediaFields } from "../rules/pool-scoring";
+import { dispatchMediaPipeline } from "../../infrastructure/queue/bullmq-dispatcher";
+import { logAndSwallow } from "../../lib/log-error";
 
 export async function refreshExtras(
   db: Database,
@@ -180,6 +182,12 @@ export async function refreshExtras(
       }).onConflictDoNothing().returning();
       if (inserted) {
         mediaIdByExtKey.set(key, inserted.id);
+        // Stub row from TMDB's recs/similar payload — enqueue full metadata
+        // fetch so the row is filled in before any user-facing query surfaces
+        // it (read paths filter on `metadataUpdatedAt IS NOT NULL`).
+        void dispatchMediaPipeline({ mediaId: inserted.id }).catch(
+          logAndSwallow("refresh-extras dispatchMediaPipeline"),
+        );
       } else {
         const conflict = await db.query.media.findFirst({
           where: and(eq(media.externalId, fields.externalId), eq(media.provider, fields.provider), eq(media.type, fields.type)),
