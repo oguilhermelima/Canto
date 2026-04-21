@@ -4,7 +4,7 @@ import { createList } from "../../../infrastructure/repositories";
 import {
   findTraktListLinksByConnection,
   upsertTraktListLink,
-} from "../../../infrastructure/repositories/trakt-sync-repository";
+} from "../../../infrastructure/repositories/trakt/trakt-sync";
 import {
   addItemsToTraktList,
   createTraktList,
@@ -12,7 +12,7 @@ import {
   listTraktListItems,
   listTraktPersonalLists,
   removeItemsFromTraktList,
-} from "../../../infrastructure/adapters/trakt";
+} from "../../../infrastructure/adapters/trakt/client";
 import {
   findOrCreateUniqueListSlug,
   syncSingleListMembership,

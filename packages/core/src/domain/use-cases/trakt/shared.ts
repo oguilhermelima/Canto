@@ -9,7 +9,7 @@ import {
 import type {
   TraktIds,
   TraktMediaRef,
-} from "../../../infrastructure/adapters/trakt";
+} from "../../../infrastructure/adapters/trakt/client";
 import { getTmdbProvider } from "../../../lib/tmdb-client";
 import { getTvdbProvider } from "../../../lib/tvdb-client";
 import { slugify } from "../../rules/slugify";

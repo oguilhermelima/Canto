@@ -3,7 +3,7 @@ import { upsertUserPlaybackProgress } from "../../../infrastructure/repositories
 import {
   listTraktPlaybackProgress,
   type TraktPlaybackProgressRef,
-} from "../../../infrastructure/adapters/trakt";
+} from "../../../infrastructure/adapters/trakt/client";
 import {
   parseDateOrNow,
   resolveMediaFromTraktRef,

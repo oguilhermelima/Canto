@@ -7,7 +7,7 @@ export * from "./notifications";
 export * from "./recommendations";
 export * from "./requests";
 export * from "./torrents";
+export * from "./trakt";
 export * from "./user-media";
 export * from "./home-section-repository";
 export * from "./profile-section-repository";
-export * from "./trakt-sync-repository";
