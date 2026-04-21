@@ -4,7 +4,7 @@ import {
   addToTraktWatchlist,
   listTraktWatchlist,
   removeFromTraktWatchlist,
-} from "../../../infrastructure/adapters/trakt";
+} from "../../../infrastructure/adapters/trakt/client";
 import {
   syncSingleListMembership,
   toTraktListBody,

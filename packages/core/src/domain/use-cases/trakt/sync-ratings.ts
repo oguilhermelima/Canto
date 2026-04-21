@@ -11,7 +11,7 @@ import {
   removeTraktRatings,
   type TraktIds,
   type TraktMediaRef,
-} from "../../../infrastructure/adapters/trakt";
+} from "../../../infrastructure/adapters/trakt/client";
 import {
   decidePresenceAction,
   dedupeByKey,

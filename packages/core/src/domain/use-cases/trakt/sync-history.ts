@@ -6,13 +6,13 @@ import {
   createTraktHistorySync,
   findTraktHistorySyncByLocalIds,
   findTraktHistorySyncByRemoteIds,
-} from "../../../infrastructure/repositories/trakt-sync-repository";
+} from "../../../infrastructure/repositories/trakt/trakt-sync";
 import { addUserWatchHistory } from "../../../infrastructure/repositories/user-media";
 import {
   addTraktHistory,
   listTraktHistory,
   type TraktIds,
-} from "../../../infrastructure/adapters/trakt";
+} from "../../../infrastructure/adapters/trakt/client";
 import {
   mediaIdsFromRow,
   mediaRefKey,
