@@ -1,6 +1,6 @@
 import { getSettings } from "@canto/db/settings";
-import type { IndexerResult, SearchContext } from "../../domain/types/torrent";
-import type { IndexerPort } from "../../domain/ports/indexer";
+import type { IndexerResult, SearchContext } from "../../../domain/types/torrent";
+import type { IndexerPort } from "../../../domain/ports/indexer";
 import { parseTorznabXml } from "./torznab-parser";
 
 /* ── Indexer capability types ─────────────────────────────────────────────── */

@@ -1,5 +1,5 @@
 import { getSettings } from "@canto/db/settings";
-import type { IndexerPort } from "../../domain/ports/indexer";
+import type { IndexerPort } from "../../../domain/ports/indexer";
 import { getJackettClient } from "./jackett";
 import { getProwlarrClient } from "./prowlarr";
 

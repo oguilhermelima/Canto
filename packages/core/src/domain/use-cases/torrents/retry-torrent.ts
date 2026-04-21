@@ -1,11 +1,11 @@
 import type { Database } from "@canto/db/client";
-import type { DownloadClientPort } from "../ports/download-client";
+import type { DownloadClientPort } from "../../ports/download-client";
 import {
   findTorrentById,
   updateTorrent,
-} from "../../infrastructure/repositories/torrent-repository";
-import { findMediaById } from "../../infrastructure/repositories/media-repository";
-import { findFolderById, findDefaultFolder } from "../../infrastructure/repositories/folder-repository";
+} from "../../../infrastructure/repositories/torrents";
+import { findMediaById } from "../../../infrastructure/repositories/media-repository";
+import { findFolderById, findDefaultFolder } from "../../../infrastructure/repositories/folder-repository";
 
 /**
  * Re-download a torrent that was removed or errored.

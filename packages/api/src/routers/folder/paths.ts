@@ -7,7 +7,7 @@ import {
   listMediaPathsInput,
   removeMediaPathInput,
 } from "@canto/validators";
-import { getDownloadClient } from "@canto/core/infrastructure/adapters/download-client-factory";
+import { getDownloadClient } from "@canto/core/infrastructure/adapters/torrent-clients/download-client-factory";
 import { createNodeFileSystemAdapter } from "@canto/core/infrastructure/adapters/filesystem";
 import {
   addMediaPath,

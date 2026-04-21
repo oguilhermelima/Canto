@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { db } from "@canto/db/client";
 import { getSettings } from "@canto/db/settings";
-import { getDownloadClient } from "@canto/core/infrastructure/adapters/download-client-factory";
+import { getDownloadClient } from "@canto/core/infrastructure/adapters/torrent-clients/download-client-factory";
 import {
   findTorrentByHash,
   updateTorrent,

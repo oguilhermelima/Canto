@@ -1,4 +1,4 @@
-import type { DownloadClientPort } from "../../domain/ports/download-client";
+import type { DownloadClientPort } from "../../../domain/ports/download-client";
 import { getQBClient } from "./qbittorrent";
 
 /**
