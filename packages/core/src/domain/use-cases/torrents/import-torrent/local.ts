@@ -4,7 +4,7 @@ import type { Database } from "@canto/db/client";
 import type { FileSystemPort } from "../../../ports/file-system.port";
 import { buildMediaDir } from "../../../rules/naming";
 import { EP_PATTERN } from "../../../rules/parsing";
-import { createNotification } from "../../create-notification";
+import { createNotification } from "../../notifications/create-notification";
 import { findNotificationByTypeAndMedia } from "../../../../infrastructure/repositories";
 import {
   type ParsedFile,
