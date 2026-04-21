@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
-import { getSpotlight } from "@canto/core/domain/use-cases/get-spotlight";
+import { getSpotlight } from "@canto/core/domain/use-cases/recommendations/get-spotlight";
 import { getGenreTiles } from "@canto/core/domain/use-cases/recommendations/get-genre-tiles";
 import { getTop10 } from "@canto/core/domain/use-cases/recommendations/get-top-10";
 

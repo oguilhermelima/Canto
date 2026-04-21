@@ -1,15 +1,15 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
-import { findPublicUserProfile } from "@canto/core/infrastructure/repositories/user-repository";
+import { findPublicUserProfile } from "@canto/core/infrastructure/repositories/user/user";
 import {
   findUserListsWithCounts,
   findPublicListBySlug,
   findListItems,
-} from "@canto/core/infrastructure/repositories/list-repository";
+} from "@canto/core/infrastructure/repositories/lists/list";
 import { getUserLanguage } from "@canto/core/domain/services/user-service";
 import { translateMediaItems } from "@canto/core/domain/services/translation-service";
-import { findProfileSections } from "@canto/core/infrastructure/repositories/profile-section-repository";
+import { findProfileSections } from "@canto/core/infrastructure/repositories/profile/profile-section";
 import {
   findUserMediaPaginated,
   findUserMediaCounts,

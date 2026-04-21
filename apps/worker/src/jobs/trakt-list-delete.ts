@@ -4,14 +4,14 @@ import {
   findListByIdIncludingDeleted,
   findTombstonedTraktLists,
   hardDeleteList,
-} from "@canto/core/infrastructure/repositories/list-repository";
-import { findTraktListLinkByLocalListId } from "@canto/core/infrastructure/repositories/trakt-sync-repository";
-import { findUserConnectionById, updateUserConnection } from "@canto/core/infrastructure/repositories/user-connection-repository";
+} from "@canto/core/infrastructure/repositories/lists/list";
+import { findTraktListLinkByLocalListId } from "@canto/core/infrastructure/repositories/trakt/trakt-sync";
+import { findUserConnectionById, updateUserConnection } from "@canto/core/infrastructure/repositories/media-servers/user-connection";
 import {
   deleteTraktList,
   refreshTraktAccessTokenIfNeeded,
   TraktHttpError,
-} from "@canto/core/infrastructure/adapters/trakt";
+} from "@canto/core/infrastructure/adapters/trakt/client";
 import { dispatchTraktListDelete } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
 
 const SWEEP_GRACE_MS = 60_000;

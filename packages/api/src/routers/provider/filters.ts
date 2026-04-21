@@ -7,7 +7,7 @@ import {
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
 import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
-import { findWatchProviderLinks } from "@canto/core/infrastructure/repositories/extras-repository";
+import { findWatchProviderLinks } from "@canto/core/infrastructure/repositories/content-enrichment/extras";
 import { getFilterOptions } from "@canto/core/domain/use-cases/recommendations/get-filter-options";
 import { searchFilterEntities } from "@canto/core/domain/use-cases/recommendations/search-filter-entities";
 import { getUserWatchProviders } from "@canto/core/domain/use-cases/recommendations/get-user-watch-providers";

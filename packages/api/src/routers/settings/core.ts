@@ -9,7 +9,7 @@ import {
   deleteSettingRaw,
   isSettingKey,
 } from "@canto/db/settings";
-import { invalidateServiceClients } from "@canto/core/infrastructure/adapters/service-clients";
+import { invalidateServiceClients } from "@canto/core/infrastructure/adapters/media-servers/service-clients";
 import {
   getSettingInput,
   setSettingInput,
