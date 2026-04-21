@@ -41,6 +41,28 @@ export class ListInvitationNotFoundError extends DomainError {
   }
 }
 
+export class SeasonNotFoundError extends DomainError {
+  readonly code = "NOT_FOUND" as const;
+
+  constructor(identifier?: string | number) {
+    super(
+      identifier !== undefined
+        ? `Season ${identifier} not found`
+        : "Season not found",
+    );
+  }
+}
+
+export class EpisodeNotFoundError extends DomainError {
+  readonly code = "NOT_FOUND" as const;
+
+  constructor(identifier?: string) {
+    super(
+      identifier ? `Episode ${identifier} not found` : "Episode not found",
+    );
+  }
+}
+
 // ── FORBIDDEN ────────────────────────────────────────────────────────────────
 
 export class ListPermissionError extends DomainError {
@@ -70,6 +92,10 @@ export class InvalidPathError extends DomainError {
 }
 
 export class InvalidDownloadInputError extends DomainError {
+  readonly code = "BAD_REQUEST" as const;
+}
+
+export class InvalidWatchInputError extends DomainError {
   readonly code = "BAD_REQUEST" as const;
 }
 
