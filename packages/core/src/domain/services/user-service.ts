@@ -12,6 +12,24 @@ export async function getUserLanguage(db: Database, userId: string): Promise<str
   return row?.language ?? "en-US";
 }
 
+/**
+ * Resolve the user's watch region + language together. Used by discovery
+ * procedures (spotlight, top10, genre tiles) that need both to key caches.
+ */
+export async function getUserWatchPreferences(
+  db: Database,
+  userId: string,
+): Promise<{ language: string; watchRegion: string }> {
+  const row = await db.query.user.findFirst({
+    where: eq(user.id, userId),
+    columns: { language: true, watchRegion: true },
+  });
+  return {
+    language: row?.language ?? "en-US",
+    watchRegion: row?.watchRegion ?? "US",
+  };
+}
+
 let activeUserLanguagesCache: Set<string> | null = null;
 let activeUserLanguagesCacheTime = 0;
 const CACHE_TTL_MS = 5 * 60 * 1000;

@@ -13,3 +13,4 @@ export * from "./detect-gaps";
 export * from "./detect-episode-gaps";
 export * from "./resolve-external-id";
 export * from "./run-media-pipeline";
+export * from "./toggle-tvdb-default";
