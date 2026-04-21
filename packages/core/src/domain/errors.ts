@@ -33,6 +33,14 @@ export class ListNotFoundError extends DomainError {
   }
 }
 
+export class ListInvitationNotFoundError extends DomainError {
+  readonly code = "NOT_FOUND" as const;
+
+  constructor() {
+    super("Invitation not found");
+  }
+}
+
 // ── FORBIDDEN ────────────────────────────────────────────────────────────────
 
 export class ListPermissionError extends DomainError {
@@ -47,6 +55,14 @@ export class SystemListModificationError extends DomainError {
   constructor() {
     super("Cannot modify system lists");
   }
+}
+
+export class InvalidListNameError extends DomainError {
+  readonly code = "BAD_REQUEST" as const;
+}
+
+export class ListInvitationInvalidError extends DomainError {
+  readonly code = "BAD_REQUEST" as const;
 }
 
 export class InvalidPathError extends DomainError {
@@ -64,6 +80,14 @@ export class BlocklistedReleaseError extends DomainError {
 
   constructor(reason: string) {
     super(`This release is blocklisted: ${reason}`);
+  }
+}
+
+export class ListNameConflictError extends DomainError {
+  readonly code = "CONFLICT" as const;
+
+  constructor() {
+    super("A list with this name already exists");
   }
 }
 
