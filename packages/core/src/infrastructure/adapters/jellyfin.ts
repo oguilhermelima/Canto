@@ -10,6 +10,32 @@ function headers(apiKey: string): HeadersInit {
 }
 
 /**
+ * Hit Jellyfin's public system info endpoint. No auth required — used to
+ * confirm the URL points to a real Jellyfin server before attempting login.
+ * Distinguishes "server unreachable" from "bad credentials".
+ */
+export async function pingJellyfinPublic(
+  url: string,
+): Promise<
+  | { ok: true; serverName: string; version: string }
+  | { ok: false; reason: "unreachable" | "not-jellyfin"; status?: number }
+> {
+  try {
+    const res = await fetch(`${url}/System/Info/Public`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return { ok: false, reason: "not-jellyfin", status: res.status };
+    const data = (await res.json()) as { ServerName?: string; Version?: string; ProductName?: string };
+    if (!data.Version || !data.ServerName) {
+      return { ok: false, reason: "not-jellyfin" };
+    }
+    return { ok: true, serverName: data.ServerName, version: data.Version };
+  } catch {
+    return { ok: false, reason: "unreachable" };
+  }
+}
+
+/**
  * Authenticate a Jellyfin user with username + password. Returns the access
  * token and the Jellyfin user id on success. Callers decide how to translate
  * error statuses (401 = bad credentials).

@@ -14,6 +14,7 @@ import {
   authenticateJellyfinByName,
   createJellyfinApiKey,
   findJellyfinApiKey,
+  pingJellyfinPublic,
   testJellyfinConnection,
 } from "../../infrastructure/adapters/jellyfin";
 
@@ -218,6 +219,17 @@ export async function authenticateJellyfin(input: {
   const baseUrl = input.url.replace(/\/$/, "");
   try {
     validateServiceUrl(baseUrl);
+
+    const ping = await pingJellyfinPublic(baseUrl);
+    if (!ping.ok) {
+      return {
+        success: false,
+        error:
+          ping.reason === "unreachable"
+            ? "Cannot reach the Jellyfin server. Check the URL and ensure it is running."
+            : "That URL doesn't look like a Jellyfin server. Double-check the address (include the port, e.g. http://192.168.1.100:8096).",
+      };
+    }
 
     const auth = await authenticateJellyfinByName(baseUrl, input.username, input.password);
     if (!auth.ok) {
