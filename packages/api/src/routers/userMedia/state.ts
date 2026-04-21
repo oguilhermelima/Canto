@@ -7,7 +7,6 @@ import {
 } from "@canto/validators";
 import { upsertUserMediaState } from "@canto/core/infrastructure/repositories";
 import { getUserMediaState } from "@canto/core/domain/use-cases/user-media/get-user-media-state";
-import { markDropped } from "@canto/core/domain/use-cases/user-media/mark-dropped";
 import { clearTracking } from "@canto/core/domain/use-cases/user-media/clear-tracking";
 import { reconcileStatesFromPlayback } from "@canto/core/domain/use-cases/user-media/reconcile-states-from-playback";
 
@@ -51,12 +50,6 @@ export const stateRouter = createTRPCRouter({
       });
       return { success: true };
     }),
-
-  markDropped: protectedProcedure
-    .input(mediaIdInput)
-    .mutation(({ ctx, input }) =>
-      markDropped(ctx.db, ctx.session.user.id, input.mediaId),
-    ),
 
   clearTracking: protectedProcedure
     .input(mediaIdInput)

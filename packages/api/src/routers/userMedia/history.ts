@@ -6,6 +6,7 @@ import {
 } from "@canto/validators";
 import { findUserWatchHistoryByMedia } from "@canto/core/infrastructure/repositories";
 import { logWatched } from "@canto/core/domain/use-cases/user-media/log-watched";
+import { markDropped } from "@canto/core/domain/use-cases/user-media/mark-dropped";
 import { removeHistoryEntries } from "@canto/core/domain/use-cases/user-media/remove-history-entries";
 
 export const historyRouter = createTRPCRouter({
@@ -35,5 +36,11 @@ export const historyRouter = createTRPCRouter({
     .input(removeHistoryEntriesInput)
     .mutation(({ ctx, input }) =>
       removeHistoryEntries(ctx.db, ctx.session.user.id, input),
+    ),
+
+  markDropped: protectedProcedure
+    .input(mediaIdInput)
+    .mutation(({ ctx, input }) =>
+      markDropped(ctx.db, ctx.session.user.id, input.mediaId),
     ),
 });
