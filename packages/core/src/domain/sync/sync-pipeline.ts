@@ -28,7 +28,7 @@ import {
 } from "../../infrastructure/repositories";
 import { reconcileServerLibrary } from "../../infrastructure/repositories/list-repository";
 
-import { resolveExternalId, tmdbCall } from "../use-cases/resolve-external-id";
+import { resolveExternalId, tmdbCall } from "../use-cases/media/resolve-external-id";
 import {
   fetchJellyfinMediaInfo,
   fetchPlexMediaInfo,
