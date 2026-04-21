@@ -3,14 +3,14 @@
 /* -------------------------------------------------------------------------- */
 
 import type { Database } from "@canto/db/client";
-import type { DownloadClientPort } from "../ports/download-client";
-import type { IndexerPort } from "../ports/indexer";
+import type { DownloadClientPort } from "../../ports/download-client";
+import type { IndexerPort } from "../../ports/indexer";
 import { searchTorrents } from "./search-torrents";
 import { downloadTorrent } from "./download-torrent";
 import {
   createBlocklistEntry,
   findTorrentById,
-} from "../../infrastructure/repositories";
+} from "../../../infrastructure/repositories";
 
 interface StalledTorrent {
   id: string;

@@ -30,3 +30,11 @@ export {
 export type { MediaNamingInfo, FileNameOptions } from "./naming";
 export { resolveFolder, normalizeFolderRules } from "./folder-routing";
 export type { RoutableMedia } from "./folder-routing";
+export {
+  extractHashFromMagnet,
+  sleep,
+  mapStatusFromLive,
+  inferDownloadMeta,
+  waitForTorrent,
+} from "./torrent-rules";
+export type { InferredDownloadMeta, WaitForTorrentOptions, TorrentListLike } from "./torrent-rules";

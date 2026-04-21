@@ -1,5 +1,5 @@
 export * from "./media-repository";
-export * from "./torrent-repository";
+export * from "./torrents";
 export * from "./media-file-repository";
 export * from "./library-repository";
 export * from "./folder-repository";

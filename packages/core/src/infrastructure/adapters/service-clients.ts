@@ -1,6 +1,6 @@
-import { resetQBClient } from "./qbittorrent";
-import { resetProwlarrClient } from "./prowlarr";
-import { resetJackettClient } from "./jackett";
+import { resetQBClient } from "./torrent-clients/qbittorrent";
+import { resetProwlarrClient } from "./indexers/prowlarr";
+import { resetJackettClient } from "./indexers/jackett";
 
 /**
  * Drop every cached service-client singleton whose credentials live under the
