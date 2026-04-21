@@ -6,7 +6,7 @@ import type {
   ProviderName,
 } from "@canto/providers";
 
-import type { MediaProviderPort } from "../ports/media-provider.port";
+import type { MediaProviderPort } from "../../ports/media-provider.port";
 
 export interface FetchMediaMetadataOpts {
   reprocess?: boolean;

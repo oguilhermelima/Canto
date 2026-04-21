@@ -2,12 +2,12 @@ import { eq, and, sql, isNotNull, or } from "drizzle-orm";
 
 import type { Database } from "@canto/db/client";
 import { media, mediaTranslation } from "@canto/db/schema";
-import { getActiveUserLanguages } from "../services/user-service";
-import type { MediaProviderPort } from "../ports/media-provider.port";
+import { getActiveUserLanguages } from "../../services/user-service";
+import type { MediaProviderPort } from "../../ports/media-provider.port";
 import type { SearchResult } from "@canto/providers";
-import { upsertLangLogos } from "./upsert-lang-logos";
-import { dispatchMediaPipeline } from "../../infrastructure/queue/bullmq-dispatcher";
-import { logAndSwallow } from "../../lib/log-error";
+import { upsertLangLogos } from "../upsert-lang-logos";
+import { dispatchMediaPipeline } from "../../../infrastructure/queue/bullmq-dispatcher";
+import { logAndSwallow } from "../../../lib/log-error";
 
 /** Deduplicates concurrent getImages calls for the same externalId */
 const inflightFetches = new Map<string, Promise<string | undefined>>();
