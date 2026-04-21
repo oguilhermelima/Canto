@@ -46,6 +46,7 @@ export const user = pgTable("user", {
   directSearchEnabled: boolean("direct_search_enabled").notNull().default(true),
   recsVersion: integer("recs_version").notNull().default(0),
   recsUpdatedAt: timestamp("recs_updated_at", { withTimezone: true }),
+  onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
