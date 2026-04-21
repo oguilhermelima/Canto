@@ -164,7 +164,10 @@ export const providerRouter = createTRPCRouter({
         region = row?.watchRegion ?? "US";
       }
 
-      return cached(`user-watch-providers:${region}`, 86400, async () => {
+      // v2: response shape changed from single providerId to a grouped
+      // providerIds[] per canonical brand. Bumping the version invalidates
+      // cached v1 payloads that would otherwise break the client.
+      return cached(`user-watch-providers:v2:${region}`, 86400, async () => {
         const tmdb = await getTmdbProvider();
         const [movieRes, tvRes] = await Promise.all([
           fetchFromTmdb<{
@@ -181,7 +184,8 @@ export const providerRouter = createTRPCRouter({
           }>(tmdb, "/watch/providers/tv", { watch_region: region }),
         ]);
 
-        const byId = new Map<number, { providerId: number; providerName: string; logoPath: string; displayPriority: number }>();
+        type RawProvider = { providerId: number; providerName: string; logoPath: string; displayPriority: number };
+        const byId = new Map<number, RawProvider>();
         for (const p of [...movieRes.results, ...tvRes.results]) {
           const prev = byId.get(p.provider_id);
           const priority = p.display_priority;
@@ -195,17 +199,37 @@ export const providerRouter = createTRPCRouter({
           }
         }
 
-        const sorted = Array.from(byId.values())
-          .sort((a, b) => a.displayPriority - b.displayPriority);
+        // Group brand variants ("Apple TV", "Apple TV+", "Apple TV Channel",
+        // "Max Amazon Channel"…) into one tile. Keep every underlying
+        // provider id so the search filter can match all of them at once —
+        // clicking the Apple TV tile should surface everything the user can
+        // watch across subscription + rent/buy + channels, not just one
+        // storefront.
+        const byBrand = new Map<string, { flagship: RawProvider; ids: Set<number> }>();
+        for (const p of byId.values()) {
+          const key = canonicalBrand(p.providerName);
+          const existing = byBrand.get(key);
+          if (!existing) {
+            byBrand.set(key, { flagship: p, ids: new Set([p.providerId]) });
+          } else {
+            existing.ids.add(p.providerId);
+            if (p.displayPriority < existing.flagship.displayPriority) {
+              existing.flagship = p;
+            }
+          }
+        }
 
-        const enriched = await Promise.all(
-          sorted.map(async (p) => {
-            const brandLogoPath = await getBrandLogoPath(tmdb, p.providerName);
-            return { ...p, brandLogoPath };
-          }),
-        );
+        const sorted = Array.from(byBrand.values())
+          .sort((a, b) => a.flagship.displayPriority - b.flagship.displayPriority)
+          .map(({ flagship, ids }) => ({
+            providerId: flagship.providerId,
+            providerIds: Array.from(ids).sort((a, b) => a - b),
+            providerName: flagship.providerName,
+            logoPath: flagship.logoPath,
+            displayPriority: flagship.displayPriority,
+          }));
 
-        return { region, providers: enriched };
+        return { region, providers: sorted };
       });
     }),
 
@@ -240,59 +264,45 @@ const GENRE_TILE_LIST: ReadonlyArray<{ name: string; movieId: number; color: str
 ];
 
 /* -------------------------------------------------------------------------- */
-/*  Brand logo resolver — maps watch-provider names → TMDB network logo_path   */
-/*  (networks have clean wordmark logos; watch-provider logos are often icons) */
+/*  Brand canonicalization — collapses TMDB's storefront variants               */
+/*  ("Apple TV+", "Apple TV Store", "Max Amazon Channel") onto a single key.   */
 /* -------------------------------------------------------------------------- */
 
-const NETWORK_ID_BY_PROVIDER_NAME: Record<string, number> = {
-  "netflix": 213,
-  "netflix kids": 213,
-  "amazon prime video": 1024,
-  "amazon video": 1024,
-  "prime video": 1024,
-  "apple tv": 2552,
-  "apple tv+": 2552,
-  "apple tv plus": 2552,
-  "disney plus": 2739,
-  "disney+": 2739,
-  "hbo": 49,
-  "hbo max": 3186,
-  "max": 3186,
-  "max amazon channel": 3186,
-  "hulu": 453,
-  "paramount+": 4330,
-  "paramount plus": 4330,
-  "paramount+ amazon channel": 4330,
-  "peacock": 3353,
-  "peacock premium": 3353,
-  "starz": 318,
-  "starz play": 318,
-  "amc+": 174,
-  "amc+ amazon channel": 174,
-  "showtime": 67,
-  "crunchyroll": 1968,
-  "globoplay": 4415,
-  "discovery+": 4353,
-  "discovery plus": 4353,
-};
+// Explicit aliases for brands TMDB splits into multiple provider ids that
+// don't share an obvious textual pattern. Matched case-insensitively; if a
+// name matches one of these substrings, the mapped canonical key is used
+// instead of the regex-based normalization below.
+const BRAND_ALIASES: ReadonlyArray<[RegExp, string]> = [
+  [/^apple\s*tv(\s|$|[+])/i, "apple tv"],
+  [/^amazon(\s+prime)?\s*(video)?(\s|$)/i, "amazon prime video"],
+  [/^prime\s*video(\s|$)/i, "amazon prime video"],
+  [/^(hbo\s*)?max(\s|$)/i, "max"],
+  [/^hbo(\s|$)/i, "max"],
+  [/^disney(\s*\+|\s*plus)(\s|$)/i, "disney+"],
+  [/^paramount(\s*\+|\s*plus)(\s|$)/i, "paramount+"],
+  [/^peacock(\s|$)/i, "peacock"],
+  [/^discovery(\s*\+|\s*plus)(\s|$)/i, "discovery+"],
+  [/^amc\+?(\s|$)/i, "amc+"],
+  [/^starz(\s|$)/i, "starz"],
+  [/^netflix(\s|$)/i, "netflix"],
+  [/^google\s+play(\s|$)/i, "google play"],
+];
 
-async function getBrandLogoPath(
-  tmdb: unknown,
-  providerName: string,
-): Promise<string | null> {
-  const networkId = NETWORK_ID_BY_PROVIDER_NAME[providerName.toLowerCase()];
-  if (!networkId) return null;
-  return cached(`network-logo:${networkId}`, 30 * 86400, async () => {
-    try {
-      const data = await fetchFromTmdb<{ logo_path: string | null }>(
-        tmdb,
-        `/network/${networkId}`,
-      );
-      return data.logo_path ?? null;
-    } catch {
-      return null;
-    }
-  });
+function canonicalBrand(name: string): string {
+  const trimmed = name.trim();
+  for (const [pattern, canonical] of BRAND_ALIASES) {
+    if (pattern.test(trimmed)) return canonical;
+  }
+  return trimmed
+    .toLowerCase()
+    .replace(/\s+amazon\s+channel\b/g, "")
+    .replace(/\s+apple\s+tv\s+channel\b/g, "")
+    .replace(/\s+\((?:ads|with\s+ads)\)\s*$/g, "")
+    .replace(/\s+store\b/g, "")
+    .replace(/\s+plus\b/g, "+")
+    .replace(/\+\s*$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /* -------------------------------------------------------------------------- */

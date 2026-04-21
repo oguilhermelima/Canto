@@ -10,48 +10,41 @@ import { trpc } from "~/lib/trpc/client";
 import { useWatchRegion } from "~/hooks/use-watch-region";
 import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
 
-function tmdbImageUrl(path: string, size: "original" | "w300" | "w154" = "original"): string {
+function tmdbImageUrl(path: string, size: "original" | "w500" | "w300" | "w154" = "original"): string {
   return `https://image.tmdb.org/t/p/${size}${path}`;
 }
 
 function ProviderChip({
-  providerId,
+  providerIds,
   providerName,
   logoPath,
-  brandLogoPath,
 }: {
-  providerId: number;
+  providerIds: number[];
   providerName: string;
   logoPath: string;
-  brandLogoPath?: string | null;
 }): React.JSX.Element {
-  const href = `/search?providers=${providerId}`;
-  const hasWordmark = Boolean(brandLogoPath);
-  const src = brandLogoPath
-    ? tmdbImageUrl(brandLogoPath, "original")
-    : tmdbImageUrl(logoPath, "w300");
+  const href = `/search?providers=${providerIds.join(",")}`;
+  // `original` is the sharpest TMDB asset — the logos are small static PNGs
+  // (typically under ~30 KB each), so the bandwidth cost is negligible and
+  // the 112px tile renders crisp on high-DPI displays.
+  const src = tmdbImageUrl(logoPath, "original");
   return (
     <Link
       href={href}
       aria-label={providerName}
+      title={providerName}
       className={cn(
-        "group/chip relative flex shrink-0 items-center justify-center overflow-hidden rounded-2xl",
-        "h-24 w-48 sm:h-28 sm:w-56 lg:h-32 lg:w-64",
-        "bg-[#0f172a] ring-1 ring-white/5 transition",
-        "hover:scale-[1.02] hover:ring-white/20",
+        "group/chip relative block shrink-0 overflow-hidden rounded-2xl ring-1 ring-white/10 shadow-md shadow-black/30 transition duration-200",
+        "h-20 w-20 sm:h-24 sm:w-24 lg:h-28 lg:w-28",
+        "hover:-translate-y-0.5 hover:ring-white/25 hover:shadow-lg hover:shadow-black/50",
       )}
     >
       <Image
         src={src}
         alt={providerName}
-        width={hasWordmark ? 260 : 140}
-        height={hasWordmark ? 80 : 80}
-        className={cn(
-          "h-auto w-auto object-contain transition-transform",
-          hasWordmark
-            ? "max-h-[60%] max-w-[75%]"
-            : "max-h-[62%] max-w-[66%] rounded-lg",
-        )}
+        width={220}
+        height={220}
+        className="h-full w-full object-cover"
         unoptimized
       />
     </Link>
@@ -104,22 +97,21 @@ export function ProvidersRow({ title }: { title: string }): React.JSX.Element | 
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="flex gap-3 overflow-x-auto pt-2 pb-4 pl-4 scrollbar-none md:pt-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
+          className="flex gap-5 overflow-x-auto pt-2 pb-4 pl-4 scrollbar-none md:gap-6 md:pt-4 md:pl-8 lg:gap-7 lg:pl-12 xl:pl-16 2xl:pl-24"
         >
           {isLoading
             ? Array.from({ length: 8 }).map((_, i) => (
                 <Skeleton
                   key={i}
-                  className="h-24 w-48 shrink-0 rounded-2xl sm:h-28 sm:w-56 lg:h-32 lg:w-64"
+                  className="h-20 w-20 shrink-0 rounded-2xl sm:h-24 sm:w-24 lg:h-28 lg:w-28"
                 />
               ))
             : data?.providers.map((p) => (
                 <ProviderChip
                   key={p.providerId}
-                  providerId={p.providerId}
+                  providerIds={p.providerIds}
                   providerName={p.providerName}
                   logoPath={p.logoPath}
-                  brandLogoPath={p.brandLogoPath}
                 />
               ))}
           <div className="w-4 shrink-0 md:w-8 lg:w-12 xl:w-16 2xl:w-24" />
