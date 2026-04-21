@@ -9,3 +9,7 @@ export * from "./replace-show-with-tvdb";
 export * from "./resolve-media-version";
 export * from "./get-by-external";
 export * from "./fetch-logos";
+export * from "./detect-gaps";
+export * from "./detect-episode-gaps";
+export * from "./resolve-external-id";
+export * from "./run-media-pipeline";

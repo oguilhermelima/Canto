@@ -19,7 +19,7 @@ import { replaceShowWithTvdb } from "@canto/core/domain/use-cases/media/replace-
 import { rebuildUserRecs } from "@canto/core/domain/use-cases/recommendations/rebuild-user-recs";
 import { refreshAllLanguage } from "@canto/core/domain/use-cases/content-enrichment/refresh-all-language";
 import { translateEpisodes } from "@canto/core/domain/use-cases/content-enrichment/translate-episodes";
-import { runMediaPipeline } from "@canto/core/domain/use-cases/run-media-pipeline";
+import { runMediaPipeline } from "@canto/core/domain/use-cases/media/run-media-pipeline";
 import { enqueueDailyRecsRebuild } from "@canto/core/domain/use-cases/recommendations/enqueue-daily-recs-rebuild";
 import { ensureMedia } from "@canto/core/domain/use-cases/media/ensure-media";
 import type {

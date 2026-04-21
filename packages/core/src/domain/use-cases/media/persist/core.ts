@@ -17,7 +17,7 @@ import {
   dispatchEnsureMedia,
   dispatchTranslateEpisodes,
 } from "../../../../infrastructure/queue/bullmq-dispatcher";
-import { detectGaps } from "../../detect-gaps";
+import { detectGaps } from "../detect-gaps";
 import { fetchMediaMetadata, type MediaMetadata } from "../fetch-media-metadata";
 import { applyMediaTranslation, applySeasonsTranslation } from "../../../services/translation-service";
 import { getActiveUserLanguages, getUserLanguage } from "../../../services/user-service";

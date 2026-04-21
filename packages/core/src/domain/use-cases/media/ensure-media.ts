@@ -3,7 +3,7 @@ import type { ProviderName, MediaType } from "@canto/providers";
 import { findMediaById } from "../../../infrastructure/repositories";
 import type { MediaProviderPort } from "../../ports/media-provider.port";
 import { getActiveUserLanguages } from "../../services/user-service";
-import { detectGaps } from "../detect-gaps";
+import { detectGaps } from "./detect-gaps";
 import type {
   Aspect,
   EnsureMediaResult,

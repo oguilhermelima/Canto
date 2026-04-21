@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { media } from "@canto/db/schema";
-import { detectGaps } from "../detect-gaps";
+import { detectGaps } from "./detect-gaps";
 import { getActiveUserLanguages } from "../../services/user-service";
 import { dispatchEnsureMedia } from "../../../infrastructure/queue/bullmq-dispatcher";
 import type { Aspect, EnsureMediaSpec } from "./ensure-media.types";
