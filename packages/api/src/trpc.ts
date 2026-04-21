@@ -47,6 +47,7 @@ const mapDomainErrors = t.middleware(async ({ next }) => {
 
 export { t };
 export const createTRPCRouter = t.router;
+export const mergeRouters = t.mergeRouters;
 export const createCallerFactory = t.createCallerFactory;
 export const publicProcedure = t.procedure.use(mapDomainErrors);
 
