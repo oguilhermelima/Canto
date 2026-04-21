@@ -15,9 +15,9 @@ import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
 import { getTvdbProvider } from "@canto/core/lib/tvdb-client";
 import { cached } from "@canto/core/infrastructure/cache/redis";
 import { fetchLogos, enrichBrowseWithLogos } from "@canto/core/domain/use-cases/media/fetch-logos";
-import { getRecommendations } from "@canto/core/domain/use-cases/get-recommendations";
+import { getRecommendations } from "@canto/core/domain/use-cases/recommendations/get-recommendations";
 import { getUserLanguage } from "@canto/core/domain/services/user-service";
-import type { RecsFilters } from "@canto/core/infrastructure/repositories/user-recommendation-repository";
+import type { RecsFilters } from "@canto/core/infrastructure/repositories/recommendations/user-recommendation";
 import { db as appDb } from "@canto/db/client";
 
 async function getProviderWithKey(name: "tmdb" | "tvdb") {

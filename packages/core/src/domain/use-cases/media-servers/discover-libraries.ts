@@ -4,7 +4,7 @@ import { userConnection } from "@canto/db/schema";
 import { getJellyfinCredentials, getPlexCredentials } from "../../../lib/server-credentials";
 import { getJellyfinLibraryFolders } from "../../../infrastructure/adapters/media-servers/jellyfin";
 import { getPlexSections } from "../../../infrastructure/adapters/media-servers/plex";
-import { findAllServerLinks } from "../../../infrastructure/repositories/folder-repository";
+import { findAllServerLinks } from "../../../infrastructure/repositories/file-organization/folder";
 
 type DiscoveredLibrary = {
   serverType: string;

@@ -4,7 +4,7 @@ import { findUserListsWithCounts } from "../../../infrastructure/repositories/li
 import {
   findUserPreferences,
   upsertUserPreference,
-} from "../../../infrastructure/repositories/library-repository";
+} from "../../../infrastructure/repositories/file-organization/library";
 import {
   normalizeCollectionLayout,
   parseCollectionLayoutPreference,

@@ -12,12 +12,12 @@ import type {
 import { ALL_ASPECTS } from "./ensure-media.types";
 import { fetchMediaMetadata } from "./fetch-media-metadata";
 import { updateMediaFromNormalized } from "./persist";
-import { refreshExtras } from "../refresh-extras";
-import { upsertLangLogos } from "../upsert-lang-logos";
+import { refreshExtras } from "../content-enrichment/refresh-extras";
+import { upsertLangLogos } from "../content-enrichment/upsert-lang-logos";
 import { getTmdbProvider } from "../../../lib/tmdb-client";
 import { getTvdbProvider } from "../../../lib/tvdb-client";
 import { getSetting } from "@canto/db/settings";
-import { translateEpisodes } from "../translate-episodes";
+import { translateEpisodes } from "../content-enrichment/translate-episodes";
 import type { TvdbProvider } from "@canto/providers";
 
 /**

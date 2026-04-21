@@ -1,11 +1,8 @@
 import { and, eq, isNotNull } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { userConnection } from "@canto/db/schema";
-import {
-  findTraktSyncStateByConnection,
-  upsertTraktSyncState,
 } from "../../../infrastructure/repositories/trakt/trakt-sync";
-import { updateUserConnection } from "../../../infrastructure/repositories/user-connection-repository";
+import { updateUserConnection } from "../../../infrastructure/repositories/media-servers/user-connection";
 import { refreshTraktAccessTokenIfNeeded } from "../../../infrastructure/adapters/trakt/client";
 import type { SyncContext } from "./shared";
 import { syncWatchlist } from "./sync-watchlist";

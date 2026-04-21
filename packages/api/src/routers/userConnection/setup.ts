@@ -10,10 +10,10 @@ import {
   authenticatePlex,
   loginPlex,
 } from "@canto/core/domain/use-cases/media-servers/authenticate";
-import { discoverServerLibraries } from "@canto/core/domain/use-cases/discover-server-libraries";
-import { getJellyfinCurrentUserId } from "@canto/core/infrastructure/adapters/jellyfin";
-import { authenticatePlexServerToken } from "@canto/core/infrastructure/adapters/plex";
-import { upsertServerLink } from "@canto/core/infrastructure/repositories/folder-repository";
+import { discoverServerLibraries } from "@canto/core/domain/use-cases/media-servers/discover-libraries";
+import { getJellyfinCurrentUserId } from "@canto/core/infrastructure/adapters/media-servers/jellyfin";
+import { authenticatePlexServerToken } from "@canto/core/infrastructure/adapters/media-servers/plex";
+import { upsertServerLink } from "@canto/core/infrastructure/repositories/file-organization/folder";
 import {
   dispatchJellyfinSync,
   dispatchPlexSync,

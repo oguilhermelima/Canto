@@ -5,7 +5,7 @@ import {
   updateTorrent,
 } from "../../../infrastructure/repositories/torrents";
 import { findMediaById } from "../../../infrastructure/repositories/media/media-repository";
-import { findFolderById, findDefaultFolder } from "../../../infrastructure/repositories/folder-repository";
+import { findFolderById, findDefaultFolder } from "../../../infrastructure/repositories/file-organization/folder";
 
 /**
  * Re-download a torrent that was removed or errored.

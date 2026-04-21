@@ -6,7 +6,7 @@ import { buildExclusionSet } from "./recommendation-service";
 import { translateMediaItems } from "../../services/translation-service";
 import { getUserLanguage } from "../../services/user-service";
 import { mapPoolItem } from "../../mappers/media-mapper";
-import { findRecommendedMediaWithBackdrops } from "../../../infrastructure/repositories/extras-repository";
+import { findRecommendedMediaWithBackdrops } from "../../../infrastructure/repositories/content-enrichment/extras";
 import { findUserSpotlightItems } from "../../../infrastructure/repositories/recommendations/user-recommendation";
 
 interface TrendingFetcher {

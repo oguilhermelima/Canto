@@ -26,14 +26,14 @@ import {
   upsertMediaVersion,
   type MediaVersionInsert,
 } from "../../infrastructure/repositories";
-import { reconcileServerLibrary } from "../../infrastructure/repositories/list-repository";
+import { reconcileServerLibrary } from "../../infrastructure/repositories/lists/list";
 
 import { resolveExternalId, tmdbCall } from "../use-cases/media/resolve-external-id";
 import {
   fetchJellyfinMediaInfo,
   fetchPlexMediaInfo,
   type MediaFileInfo,
-} from "../use-cases/fetch-server-media-info";
+} from "../use-cases/media-servers/fetch-info";
 
 import type { ScannedMediaItem, SyncResult, SyncSummary } from "./types";
 import { emptySummary } from "./types";

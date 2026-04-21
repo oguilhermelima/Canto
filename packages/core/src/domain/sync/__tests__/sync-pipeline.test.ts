@@ -6,7 +6,7 @@ import {
   validateScannedItems,
 } from "../sync-pipeline";
 import type { ScannedMediaItem } from "../types";
-import type { MediaFileInfo } from "../../use-cases/fetch-server-media-info";
+import type { MediaFileInfo } from "../../use-cases/media-servers/fetch-info";
 
 function scanned(overrides: Partial<ScannedMediaItem> = {}): ScannedMediaItem {
   return {
