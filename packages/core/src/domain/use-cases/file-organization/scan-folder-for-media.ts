@@ -1,22 +1,22 @@
-import { readdir, stat } from "node:fs/promises";
 import { join, basename, extname } from "node:path";
 
 import type { Database } from "@canto/db/client";
-import { persistMedia } from "./persist-media";
-import { getActiveUserLanguages } from "../services/user-service";
+import { persistMedia } from "../persist-media";
+import { getActiveUserLanguages } from "../../services/user-service";
 
-import { parseFolderMediaInfo } from "../rules/parsing";
-import { VIDEO_EXTENSIONS } from "../rules/naming";
-import { getTmdbProvider } from "../../lib/tmdb-client";
+import type { FileSystemPort } from "../../ports/file-system.port";
+import { parseFolderMediaInfo } from "../../rules/parsing";
+import { VIDEO_EXTENSIONS } from "../../rules/naming";
+import { getTmdbProvider } from "../../../lib/tmdb-client";
 import {
   findMediaByAnyReference,
   updateMedia,
-} from "../../infrastructure/repositories/media-repository";
+} from "../../../infrastructure/repositories/media-repository";
 import {
   ensureServerLibrary,
   addListItem,
-} from "../../infrastructure/repositories/list-repository";
-import { dispatchMediaPipeline } from "../../infrastructure/queue/bullmq-dispatcher";
+} from "../../../infrastructure/repositories/list-repository";
+import { dispatchMediaPipeline } from "../../../infrastructure/queue/bullmq-dispatcher";
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                    */
@@ -32,6 +32,7 @@ function isVideoExt(filePath: string): boolean {
  * their immediate parent directory (each directory = one media item).
  */
 async function findVideosByDirectory(
+  fs: FileSystemPort,
   root: string,
 ): Promise<Map<string, string[]>> {
   const result = new Map<string, string[]>();
@@ -39,16 +40,16 @@ async function findVideosByDirectory(
   async function walk(dir: string): Promise<void> {
     let entries;
     try {
-      entries = await readdir(dir, { withFileTypes: true });
+      entries = await fs.readdir(dir);
     } catch {
       return; // Skip inaccessible directories
     }
 
     for (const entry of entries) {
       const fullPath = join(dir, entry.name);
-      if (entry.isDirectory()) {
+      if (entry.isDirectory) {
         await walk(fullPath);
-      } else if (entry.isFile() && isVideoExt(entry.name)) {
+      } else if (entry.isFile && isVideoExt(entry.name)) {
         const parent = dir;
         const existing = result.get(parent);
         if (existing) {
@@ -79,6 +80,7 @@ export async function scanFolderForMedia(
   db: Database,
   folderPath: string,
   libraryId: string,
+  deps: { fs: FileSystemPort },
 ): Promise<{ imported: number; skipped: number; failed: number }> {
   if (scanningFolders.has(folderPath)) {
     console.log(`[folder-scan] Already scanning ${folderPath} — skipping`);
@@ -89,8 +91,8 @@ export async function scanFolderForMedia(
   try {
   // Verify folder exists
   try {
-    const s = await stat(folderPath);
-    if (!s.isDirectory()) {
+    const s = await deps.fs.stat(folderPath);
+    if (!s.isDirectory) {
       console.log(`[folder-scan] Not a directory: ${folderPath}`);
       return { imported: 0, skipped: 0, failed: 0 };
     }
@@ -99,7 +101,7 @@ export async function scanFolderForMedia(
     return { imported: 0, skipped: 0, failed: 0 };
   }
 
-  const videosByDir = await findVideosByDirectory(folderPath);
+  const videosByDir = await findVideosByDirectory(deps.fs, folderPath);
   if (videosByDir.size === 0) {
     console.log(`[folder-scan] No video files found in ${folderPath}`);
     return { imported: 0, skipped: 0, failed: 0 };

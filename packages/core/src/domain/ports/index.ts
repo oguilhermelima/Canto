@@ -5,7 +5,10 @@ export type {
   TorrentFileInfo,
 } from "./download-client";
 export type {
+  FileAccessMode,
+  FileSystemDirEntry,
   FileSystemPort,
+  FileSystemStats,
   HardlinkOrCopyResult,
 } from "./file-system.port";
 export type { IndexerPort } from "./indexer";

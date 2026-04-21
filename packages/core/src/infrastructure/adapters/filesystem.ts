@@ -1,6 +1,18 @@
-import { copyFile, link, mkdir, stat, unlink } from "node:fs/promises";
+import {
+  access,
+  constants,
+  copyFile,
+  link,
+  mkdir,
+  readdir,
+  rename,
+  rmdir,
+  stat,
+  unlink,
+} from "node:fs/promises";
 
 import type {
+  FileAccessMode,
   FileSystemPort,
   HardlinkOrCopyResult,
 } from "../../domain/ports/file-system.port";
@@ -68,10 +80,41 @@ async function hardlinkOrCopy(
   }
 }
 
+const ACCESS_MODE: Record<FileAccessMode, number> = {
+  read: constants.R_OK,
+  write: constants.W_OK,
+  "read-write": constants.R_OK | constants.W_OK,
+};
+
 export function createNodeFileSystemAdapter(): FileSystemPort {
   return {
     mkdir: async (dirPath, opts) => {
       await mkdir(dirPath, opts ?? {});
+    },
+    rmdir: async (dirPath) => {
+      await rmdir(dirPath);
+    },
+    rename: async (source, target) => {
+      await rename(source, target);
+    },
+    readdir: async (dirPath) => {
+      const entries = await readdir(dirPath, { withFileTypes: true });
+      return entries.map((entry) => ({
+        name: entry.name,
+        isDirectory: entry.isDirectory(),
+        isFile: entry.isFile(),
+      }));
+    },
+    stat: async (targetPath) => {
+      const info = await stat(targetPath);
+      return {
+        isDirectory: info.isDirectory(),
+        isFile: info.isFile(),
+        size: info.size,
+      };
+    },
+    access: async (targetPath, mode) => {
+      await access(targetPath, ACCESS_MODE[mode]);
     },
     hardlinkOrCopy,
   };

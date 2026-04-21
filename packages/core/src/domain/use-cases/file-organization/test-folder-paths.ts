@@ -1,13 +1,27 @@
-import { access, constants } from "node:fs/promises";
 import type { Database } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
-import { findAllFolders } from "../../infrastructure/repositories/folder-repository";
 
-/** Test if a path is accessible and writable. */
-async function testPath(p: string | null): Promise<{ ok: boolean; error?: string }> {
+import type { FileSystemPort } from "../../ports/file-system.port";
+import { findAllFolders } from "../../../infrastructure/repositories/file-organization/folder";
+
+interface PathResult {
+  ok: boolean;
+  error?: string;
+}
+
+export interface FolderPathResult {
+  name: string;
+  downloadPath: PathResult;
+  libraryPath: PathResult;
+}
+
+async function testPath(
+  fs: FileSystemPort,
+  p: string | null,
+): Promise<PathResult> {
   if (!p) return { ok: false, error: "Not configured" };
   try {
-    await access(p, constants.R_OK | constants.W_OK);
+    await fs.access(p, "read-write");
     return { ok: true };
   } catch {
     return { ok: false, error: `Path "${p}" is not accessible or writable` };
@@ -18,15 +32,14 @@ async function testPath(p: string | null): Promise<{ ok: boolean; error?: string
  * Test all folder paths for accessibility.
  * Respects the import method setting (local vs remote).
  */
-export async function testFolderPaths(db: Database) {
+export async function testFolderPaths(
+  db: Database,
+  deps: { fs: FileSystemPort },
+): Promise<FolderPathResult[]> {
   const importMethod = (await getSetting("download.importMethod")) ?? "local";
   const folders = await findAllFolders(db);
 
-  const results: Array<{
-    name: string;
-    downloadPath: { ok: boolean; error?: string };
-    libraryPath: { ok: boolean; error?: string };
-  }> = [];
+  const results: FolderPathResult[] = [];
 
   for (const folder of folders) {
     if (importMethod === "remote") {
@@ -40,8 +53,8 @@ export async function testFolderPaths(db: Database) {
           : { ok: false, error: "Not configured" },
       });
     } else {
-      const dl = await testPath(folder.downloadPath);
-      const lib = await testPath(folder.libraryPath);
+      const dl = await testPath(deps.fs, folder.downloadPath);
+      const lib = await testPath(deps.fs, folder.libraryPath);
       results.push({ name: folder.name, downloadPath: dl, libraryPath: lib });
     }
   }
