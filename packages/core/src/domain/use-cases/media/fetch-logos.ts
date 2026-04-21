@@ -5,7 +5,7 @@ import { media, mediaTranslation } from "@canto/db/schema";
 import { getActiveUserLanguages } from "../../services/user-service";
 import type { MediaProviderPort } from "../../ports/media-provider.port";
 import type { SearchResult } from "@canto/providers";
-import { upsertLangLogos } from "../upsert-lang-logos";
+import { upsertLangLogos } from "../content-enrichment/upsert-lang-logos";
 import { dispatchMediaPipeline } from "../../../infrastructure/queue/bullmq-dispatcher";
 import { logAndSwallow } from "../../../lib/log-error";
 

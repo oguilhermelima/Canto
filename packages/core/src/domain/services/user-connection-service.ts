@@ -4,17 +4,17 @@ import {
   authenticateJellyfinByName,
   getJellyfinCurrentUserId,
   getJellyfinLibraryFolders,
-} from "../../infrastructure/adapters/jellyfin";
+} from "../../infrastructure/adapters/media-servers/jellyfin";
 import {
   authenticatePlexServerToken,
   getPlexSections,
-} from "../../infrastructure/adapters/plex";
+} from "../../infrastructure/adapters/media-servers/plex";
 import {
   createUserConnection,
   findUserConnectionsByUserId,
   findUserConnectionByProvider,
   updateUserConnection,
-} from "../../infrastructure/repositories/user-connection-repository";
+} from "../../infrastructure/repositories/media-servers/user-connection";
 
 export interface UserConnectionAuthResult {
   success: boolean;

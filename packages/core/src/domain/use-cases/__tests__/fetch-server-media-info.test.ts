@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractJellyfinFileInfo,
   extractPlexFileInfo,
-} from "../fetch-server-media-info";
+} from "../media-servers/fetch-info";
 
 describe("extractJellyfinFileInfo", () => {
   it("extracts HDR10 movie with multi-audio", () => {

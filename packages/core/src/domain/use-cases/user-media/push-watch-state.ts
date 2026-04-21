@@ -19,12 +19,12 @@ import {
   findJellyfinItemIdByProviderForUser,
   markJellyfinItemPlayed,
   markJellyfinItemUnplayed,
-} from "../../../infrastructure/adapters/jellyfin";
+} from "../../../infrastructure/adapters/media-servers/jellyfin";
 import {
   findPlexItemIdByProviderId,
   markPlexItemUnwatched,
   markPlexItemWatched,
-} from "../../../infrastructure/adapters/plex";
+} from "../../../infrastructure/adapters/media-servers/plex";
 
 function logError(scope: string, userId: string, err: unknown): void {
   console.error(

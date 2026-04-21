@@ -4,7 +4,7 @@ import {
   findFolderById,
   findAllFolders,
 } from "../../../../infrastructure/repositories";
-import { findWatchProvidersByMediaId } from "../../../../infrastructure/repositories/extras-repository";
+import { findWatchProvidersByMediaId } from "../../../../infrastructure/repositories/content-enrichment/extras";
 import { updateMedia } from "../../../../infrastructure/repositories/media/media-repository";
 import { resolveFolder } from "../../../rules/folder-routing";
 import type { RoutableMedia } from "../../../rules/folder-routing";

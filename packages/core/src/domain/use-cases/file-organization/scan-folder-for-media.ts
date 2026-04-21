@@ -15,7 +15,7 @@ import {
 import {
   ensureServerLibrary,
   addListItem,
-} from "../../../infrastructure/repositories/list-repository";
+} from "../../../infrastructure/repositories/lists/list";
 import { dispatchMediaPipeline } from "../../../infrastructure/queue/bullmq-dispatcher";
 
 /* -------------------------------------------------------------------------- */

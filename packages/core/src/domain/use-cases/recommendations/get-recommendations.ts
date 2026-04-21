@@ -10,7 +10,7 @@ import {
 } from "../../../infrastructure/repositories/recommendations/user-recommendation";
 import {
   findGlobalRecommendations,
-} from "../../../infrastructure/repositories/extras-repository";
+} from "../../../infrastructure/repositories/content-enrichment/extras";
 import {
   findLibraryMediaBrief,
 } from "../../../infrastructure/repositories/media/media-repository";

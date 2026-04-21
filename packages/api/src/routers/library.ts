@@ -12,11 +12,11 @@ import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
 import {
   findUserPreferences,
   upsertUserPreference,
-} from "@canto/core/infrastructure/repositories/library-repository";
+} from "@canto/core/infrastructure/repositories/file-organization/library";
 import {
   findFolderById,
   seedDefaultFolders,
-} from "@canto/core/infrastructure/repositories/folder-repository";
+} from "@canto/core/infrastructure/repositories/file-organization/folder";
 import { findLibraryStats, listLibraryMedia, updateMedia } from "@canto/core/infrastructure/repositories/media/media-repository";
 import { getUserLanguage } from "@canto/core/domain/services/user-service";
 import { batchMediaTranslations } from "@canto/core/domain/services/translation-service";

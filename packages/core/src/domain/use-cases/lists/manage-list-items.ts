@@ -1,8 +1,8 @@
 import type { Database } from "@canto/db/client";
 import { addListItem, removeListItem } from "../../../infrastructure/repositories/lists/list";
-import { removeMediaFromUserRecs, deleteUserRecommendationsForSource } from "../../../infrastructure/repositories/user-recommendation-repository";
+import { removeMediaFromUserRecs, deleteUserRecommendationsForSource } from "../../../infrastructure/repositories/recommendations/user-recommendation";
 import { dispatchMediaPipeline } from "../../../infrastructure/queue/bullmq-dispatcher";
-import { addMediaToUserRecs } from "../rebuild-user-recs";
+import { addMediaToUserRecs } from "../recommendations/rebuild-user-recs";
 import { logAndSwallow } from "../../../lib/log-error";
 import { verifyListOwnership } from "../../rules/list-rules";
 

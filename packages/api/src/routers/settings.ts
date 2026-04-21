@@ -13,7 +13,7 @@ import {
   isSettingKey,
   type SettingKey,
 } from "@canto/db/settings";
-import { invalidateServiceClients } from "@canto/core/infrastructure/adapters/service-clients";
+import { invalidateServiceClients } from "@canto/core/infrastructure/adapters/media-servers/service-clients";
 import {
   serviceEnum,
   getSettingInput,
@@ -47,7 +47,7 @@ import {
   loginPlex,
   createPlexPin,
   checkPlexPin,
-} from "@canto/core/domain/use-cases/authenticate-media-server";
+} from "@canto/core/domain/use-cases/media-servers/authenticate";
 import { validateServiceUrl } from "@canto/core/domain/rules/validate-service-url";
 import { invalidateActiveUserLanguages } from "@canto/core/domain/services/user-service";
 

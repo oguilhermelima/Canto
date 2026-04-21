@@ -6,7 +6,7 @@ import {
   findUserListsWithCounts,
   findPublicListBySlug,
   findListItems,
-} from "@canto/core/infrastructure/repositories/list-repository";
+} from "@canto/core/infrastructure/repositories/lists/list";
 import { getUserLanguage } from "@canto/core/domain/services/user-service";
 import { translateMediaItems } from "@canto/core/domain/services/translation-service";
 import { findProfileSections } from "@canto/core/infrastructure/repositories/profile-section-repository";

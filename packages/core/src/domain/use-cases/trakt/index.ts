@@ -5,7 +5,7 @@ import {
   findTraktSyncStateByConnection,
   upsertTraktSyncState,
 } from "../../../infrastructure/repositories/trakt-sync-repository";
-import { updateUserConnection } from "../../../infrastructure/repositories/user-connection-repository";
+import { updateUserConnection } from "../../../infrastructure/repositories/media-servers/user-connection";
 import { refreshTraktAccessTokenIfNeeded } from "../../../infrastructure/adapters/trakt";
 import type { SyncContext } from "./shared";
 import { syncWatchlist } from "./sync-watchlist";

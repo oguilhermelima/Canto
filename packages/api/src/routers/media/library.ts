@@ -8,8 +8,8 @@ import {
   deleteMedia,
 } from "@canto/core/infrastructure/repositories/media/media-repository";
 import { findMediaFilesByMediaId } from "@canto/core/infrastructure/repositories/media/media-file-repository";
-import { setLibraryStatus } from "@canto/core/domain/use-cases/manage-library-status";
-import { findServerLibrary, removeListItem } from "@canto/core/infrastructure/repositories/list-repository";
+import { setLibraryStatus } from "@canto/core/domain/use-cases/lists/manage-library-status";
+import { findServerLibrary, removeListItem } from "@canto/core/infrastructure/repositories/lists/list";
 import { revertRequestStatus } from "@canto/core/infrastructure/repositories/request-repository";
 
 export const mediaLibraryRouter = createTRPCRouter({

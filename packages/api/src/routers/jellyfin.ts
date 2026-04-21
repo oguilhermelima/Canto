@@ -3,14 +3,14 @@ import { TRPCError } from "@trpc/server";
 import { toggleLibraryInput, mergeJellyfinVersionsInput } from "@canto/validators";
 import { getJellyfinCredentials } from "@canto/core/lib/server-credentials";
 import { createTRPCRouter, adminProcedure } from "../trpc";
-import { syncJellyfinLibraries } from "@canto/core/domain/use-cases/sync-jellyfin-libraries";
+import { syncJellyfinLibraries } from "@canto/core/domain/use-cases/media-servers/sync-libraries/jellyfin";
 import {
   testJellyfinConnection,
   scanJellyfinLibrary,
   mergeJellyfinVersions,
   getJellyfinLibraryFolders,
-} from "@canto/core/infrastructure/adapters/jellyfin";
-import { updateFolder } from "@canto/core/infrastructure/repositories/folder-repository";
+} from "@canto/core/infrastructure/adapters/media-servers/jellyfin";
+import { updateFolder } from "@canto/core/infrastructure/repositories/file-organization/folder";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                    */

@@ -8,11 +8,11 @@ import { eq } from "drizzle-orm";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
 import { cached } from "@canto/core/infrastructure/cache/redis";
-import { findWatchProviderLinks } from "@canto/core/infrastructure/repositories/extras-repository";
+import { findWatchProviderLinks } from "@canto/core/infrastructure/repositories/content-enrichment/extras";
 import { user } from "@canto/db/schema";
 
 // ── Extracted use-case ──
-import { getSpotlight } from "@canto/core/domain/use-cases/get-spotlight";
+import { getSpotlight } from "@canto/core/domain/use-cases/recommendations/get-spotlight";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                    */

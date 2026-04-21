@@ -4,7 +4,7 @@ import { tryContinuousDownload } from "@canto/core/domain/use-cases/torrents/con
 import {
   triggerMediaServerScans,
   type ImportedMedia,
-} from "@canto/core/domain/use-cases/trigger-media-server-scans";
+} from "@canto/core/domain/use-cases/media-servers/trigger-scans";
 import { getDownloadClient } from "@canto/core/infrastructure/adapters/torrent-clients/download-client-factory";
 import { createNodeFileSystemAdapter } from "@canto/core/infrastructure/adapters/filesystem";
 import { buildIndexers } from "@canto/core/infrastructure/adapters/indexers/indexer-factory";
