@@ -10,6 +10,7 @@ export type Step =
   | "indexer"
   | "jellyfin"
   | "plex"
+  | "trakt"
   | "syncing"
   | "ready";
 

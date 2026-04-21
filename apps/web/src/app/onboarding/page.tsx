@@ -23,6 +23,7 @@ import { LibrariesTransferStep } from "./_steps/libraries-transfer-step";
 import { LibrariesConfigureStep } from "./_steps/libraries-configure-step";
 import { JellyfinStep } from "./_steps/jellyfin-step";
 import { PlexStep } from "./_steps/plex-step";
+import { TraktStep } from "./_steps/trakt-step";
 import { SyncingStep } from "./_steps/syncing-step";
 import { ReadyStep } from "./_steps/ready-step";
 
@@ -40,7 +41,7 @@ function buildSteps(torrentConnected: boolean): Step[] {
     "download-client",
   ];
   if (torrentConnected) steps.push(...LIBRARY_STEPS);
-  steps.push("jellyfin", "plex", "syncing", "ready");
+  steps.push("jellyfin", "plex", "trakt", "syncing", "ready");
   return steps;
 }
 
@@ -120,7 +121,9 @@ export default function OnboardingPage(): React.JSX.Element {
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(PROGRESS_KEY);
     }
-    router.replace("/setup");
+    // Admin flow only sets server-wide config; hand off to the user flow so
+    // the admin (and every user after them) picks a personal media account.
+    router.replace("/onboarding/user");
   }, [completeOnboarding, router]);
 
   const skipLibraries = useCallback(() => skipTo("jellyfin"), [skipTo]);
@@ -237,6 +240,13 @@ export default function OnboardingPage(): React.JSX.Element {
             )}
             {step === "plex" && (
               <PlexStep
+                onNext={next}
+                settings={allSettings}
+                configureFooter={setFooterConfig}
+              />
+            )}
+            {step === "trakt" && (
+              <TraktStep
                 onNext={next}
                 settings={allSettings}
                 configureFooter={setFooterConfig}

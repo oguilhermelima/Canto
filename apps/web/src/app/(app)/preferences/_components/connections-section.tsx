@@ -487,7 +487,10 @@ function AddConnectionForm({
     e.preventDefault();
     setLoading(true);
     if (provider === "plex") {
-      addConnection.mutate({ provider: "plex", token });
+      addConnection.mutate({
+        provider: "plex",
+        credentials: { mode: "token", token },
+      });
     } else if (provider === "trakt") {
       setLoading(false);
     } else {

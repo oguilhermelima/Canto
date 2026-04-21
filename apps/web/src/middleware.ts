@@ -72,18 +72,34 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   }
 
   // ── Onboarding guard ──
-  // Check if onboarding is completed — redirect to onboarding if not.
+  // Two gates, in order:
+  //  1. System onboarding — admin-wide config (TMDB, Jellyfin/Plex admin creds).
+  //     Only admins can complete it; non-admins wait at home until it's done.
+  //  2. User onboarding — per-account media server link. Runs for every user
+  //     after system onboarding is complete (including admins who skipped it,
+  //     though the admin finish path auto-marks it done).
   try {
-    const trpcUrl = new URL("/api/trpc/settings.isOnboardingCompleted", request.url);
-    const res = await fetch(trpcUrl, {
+    const systemUrl = new URL("/api/trpc/settings.isOnboardingCompleted", request.url);
+    const systemRes = await fetch(systemUrl, {
       headers: { cookie: request.headers.get("cookie") ?? "" },
     });
-    if (res.ok) {
-      const data = (await res.json()) as { result?: { data?: { json?: boolean } } };
-      if (data.result?.data?.json !== true) {
-        // Only admins can complete onboarding — non-admins wait on the home page
+    if (systemRes.ok) {
+      const data = (await systemRes.json()) as { result?: { data?: { json?: boolean } } };
+      const systemDone = data.result?.data?.json === true;
+      if (!systemDone) {
         if (userRole === "admin") {
           return NextResponse.redirect(new URL("/onboarding", request.url));
+        }
+      } else {
+        const userUrl = new URL("/api/trpc/auth.isOnboardingCompleted", request.url);
+        const userRes = await fetch(userUrl, {
+          headers: { cookie: request.headers.get("cookie") ?? "" },
+        });
+        if (userRes.ok) {
+          const userData = (await userRes.json()) as { result?: { data?: { json?: boolean } } };
+          if (userData.result?.data?.json !== true) {
+            return NextResponse.redirect(new URL("/onboarding/user", request.url));
+          }
         }
       }
     }

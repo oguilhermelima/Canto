@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { eq, and } from "drizzle-orm";
+import { z } from "zod";
 import type { Database } from "@canto/db/client";
 import { userConnection } from "@canto/db/schema";
 import {
@@ -13,8 +14,11 @@ import {
   createPlexPin,
   checkPlexPin,
   authenticatePlex,
+  loginPlex,
   authenticateJellyfin,
 } from "@canto/core/domain/use-cases/authenticate-media-server";
+import { getJellyfinCurrentUserId } from "@canto/core/infrastructure/adapters/jellyfin";
+import { authenticatePlexServerToken } from "@canto/core/infrastructure/adapters/plex";
 import {
   createTraktDeviceCode,
   exchangeTraktDeviceCode,
@@ -91,7 +95,13 @@ export const userConnectionRouter = createTRPCRouter({
             message: "Plex URL not configured by admin",
           });
         }
-        const result = await authenticatePlex({ url, token: input.token });
+        const result = input.credentials.mode === "email"
+          ? await loginPlex({
+              url,
+              email: input.credentials.email,
+              password: input.credentials.password,
+            })
+          : await authenticatePlex({ url, token: input.credentials.token });
         if (!result.success) {
           throw new TRPCError({
             code: "BAD_REQUEST",
@@ -164,6 +174,104 @@ export const userConnectionRouter = createTRPCRouter({
             token,
             refreshToken: null,
             tokenExpiresAt: null,
+            externalUserId,
+          })
+          .returning({ id: userConnection.id });
+        connectionId = inserted!.id;
+      }
+
+      void setupLibrariesForConnection(ctx.db, ctx.session.user.id, input.provider, connectionId);
+
+      return { success: true, id: connectionId };
+    }),
+
+  /**
+   * Link the current user to the admin-configured media-server account.
+   * Used by the user onboarding "Use the server's account" option — copies
+   * the admin token into a per-user userConnection so the user shares the
+   * admin's media library view (sensible for family/single-user setups).
+   */
+  reuseAdminCreds: protectedProcedure
+    .input(z.object({ provider: z.enum(["jellyfin", "plex"]) }))
+    .mutation(async ({ ctx, input }) => {
+      const url = await getSetting(input.provider === "jellyfin" ? "jellyfin.url" : "plex.url");
+      if (!url) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `${input.provider === "jellyfin" ? "Jellyfin" : "Plex"} is not configured on the server`,
+        });
+      }
+
+      let token: string | undefined;
+      let externalUserId: string | undefined;
+
+      if (input.provider === "jellyfin") {
+        const apiKey = await getSetting("jellyfin.apiKey");
+        if (!apiKey) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Jellyfin admin credentials are not configured",
+          });
+        }
+        const jellyfinUserId = await getJellyfinCurrentUserId(url, apiKey);
+        if (!jellyfinUserId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Could not resolve Jellyfin user from admin credentials",
+          });
+        }
+        token = apiKey;
+        externalUserId = jellyfinUserId;
+      } else {
+        const plexToken = await getSetting("plex.token");
+        if (!plexToken) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Plex admin credentials are not configured",
+          });
+        }
+        const result = await authenticatePlexServerToken(url, plexToken);
+        if (!result.ok || !result.userId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Could not validate Plex admin token",
+          });
+        }
+        token = plexToken;
+        externalUserId = result.userId;
+      }
+
+      const [existing] = await ctx.db
+        .select()
+        .from(userConnection)
+        .where(
+          and(
+            eq(userConnection.userId, ctx.session.user.id),
+            eq(userConnection.provider, input.provider),
+          ),
+        );
+
+      let connectionId: string;
+      if (existing) {
+        await ctx.db
+          .update(userConnection)
+          .set({
+            token,
+            refreshToken: null,
+            tokenExpiresAt: null,
+            externalUserId,
+            staleReason: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(userConnection.id, existing.id));
+        connectionId = existing.id;
+      } else {
+        const [inserted] = await ctx.db
+          .insert(userConnection)
+          .values({
+            userId: ctx.session.user.id,
+            provider: input.provider,
+            token,
             externalUserId,
           })
           .returning({ id: userConnection.id });

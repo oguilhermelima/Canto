@@ -248,6 +248,27 @@ export const settingsRouter = createTRPCRouter({
     return result;
   }),
 
+  /**
+   * Readiness signal for the user-onboarding flow. Tells the UI which
+   * provider steps to show without needing admin-only settings access.
+   * Trakt has no `trakt.enabled` flag, so readiness = both OAuth creds set.
+   */
+  getMediaProvidersReady: protectedProcedure.query(async () => {
+    const values = await getSettings([
+      "jellyfin.enabled",
+      "plex.enabled",
+      "trakt.clientId",
+      "trakt.clientSecret",
+    ]);
+    return {
+      jellyfin: values["jellyfin.enabled"] === true,
+      plex: values["plex.enabled"] === true,
+      trakt:
+        typeof values["trakt.clientId"] === "string" && values["trakt.clientId"].length > 0
+        && typeof values["trakt.clientSecret"] === "string" && values["trakt.clientSecret"].length > 0,
+    };
+  }),
+
   authenticateJellyfin: setupOrAdminProcedure
     .input(authenticateJellyfinInput)
     .mutation(({ input }) => authenticateJellyfin(input)),

@@ -31,19 +31,9 @@ export function JellyfinStep({
   const saveSettings = trpc.settings.setMany.useMutation({
     onSuccess: () => void utils.settings.getAll.invalidate(),
   });
-  const addConnection = trpc.userConnection.add.useMutation();
+  const authenticate = trpc.settings.authenticateJellyfin.useMutation();
 
   const canSubmit = url && username && password;
-
-  useEffect(() => {
-    configureFooter({
-      onPrimary: connected ? onNext : handleConnect,
-      primaryLabel: connected ? "Continue" : "Connect & continue",
-      primaryDisabled: !connected && (testing || !canSubmit),
-      primaryLoading: testing || saveSettings.isPending || addConnection.isPending,
-      onSkip: connected ? undefined : onNext,
-    });
-  }, [connected, testing, url, username, password, saveSettings.isPending, addConnection.isPending]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleConnect = async (): Promise<void> => {
     if (!url) {
@@ -52,23 +42,20 @@ export function JellyfinStep({
     }
     setTesting(true);
     try {
+      const auth = await authenticate.mutateAsync({ url, username, password });
+      if (!auth.success || !auth.token) {
+        toast.error(auth.error ?? "Failed to connect to Jellyfin");
+        return;
+      }
       await saveSettings.mutateAsync({
         settings: [
           { key: "jellyfin.url", value: url },
           { key: "jellyfin.enabled", value: true },
+          { key: "jellyfin.apiKey", value: auth.token },
         ],
       });
-
-      const result = await addConnection.mutateAsync({
-        provider: "jellyfin",
-        username,
-        password,
-      });
-
-      if (result.success) {
-        setConnected(true);
-        toast.success("Connected to Jellyfin — your library is being imported");
-      }
+      setConnected(true);
+      toast.success("Jellyfin server configured");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to connect to Jellyfin";
       toast.error(message);
@@ -77,23 +64,46 @@ export function JellyfinStep({
     }
   };
 
+  useEffect(() => {
+    configureFooter({
+      onPrimary: connected ? onNext : handleConnect,
+      primaryLabel: connected ? "Continue" : "Connect & continue",
+      primaryDisabled: !connected && (testing || !canSubmit),
+      primaryLoading: testing || saveSettings.isPending || authenticate.isPending,
+      onSkip: connected ? undefined : onNext,
+    });
+  }, [connected, testing, url, username, password, saveSettings.isPending, authenticate.isPending]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="flex flex-col items-center gap-8 text-center pt-16 md:pt-0">
       <ServiceLogo brand="jellyfin" alt="Jellyfin" />
       <StepHeader
         title="Jellyfin"
-        description="Connecting your Jellyfin account imports your entire library into Canto and keeps watch progress in sync."
+        description="Point Canto at your Jellyfin server. This sets up server-wide access — each user links their own account later."
       />
 
       {connected ? (
-        <div className="w-full max-w-md rounded-xl bg-muted/30 px-6 py-5 text-sm text-muted-foreground">
-          Your Jellyfin library is being imported in the background. This may take a few minutes.
+        <div className="w-full max-w-md space-y-3">
+          <div className="rounded-xl bg-muted/30 px-6 py-5 text-sm text-muted-foreground">
+            Server linked. Users will authenticate with their own Jellyfin accounts in the next step.
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setConnected(false);
+              setUsername("");
+              setPassword("");
+            }}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Change server settings
+          </button>
         </div>
       ) : (
         <div className="w-full max-w-md space-y-3">
           <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Server URL (e.g. http://192.168.1.100:8096)" variant="ghost" />
-          <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" variant="ghost" />
-          <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" variant="ghost" />
+          <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Admin username" variant="ghost" />
+          <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Admin password" variant="ghost" />
         </div>
       )}
     </div>

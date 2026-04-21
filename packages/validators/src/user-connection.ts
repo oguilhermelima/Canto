@@ -6,7 +6,14 @@ export type UserConnectionProvider = z.infer<typeof userConnectionProvider>;
 export const addUserConnectionInput = z.discriminatedUnion("provider", [
   z.object({
     provider: z.literal("plex"),
-    token: z.string().min(1),
+    credentials: z.discriminatedUnion("mode", [
+      z.object({ mode: z.literal("token"), token: z.string().min(1) }),
+      z.object({
+        mode: z.literal("email"),
+        email: z.string().email(),
+        password: z.string().min(1),
+      }),
+    ]),
   }),
   z.object({
     provider: z.literal("jellyfin"),
