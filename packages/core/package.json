@@ -10,7 +10,7 @@
     "./domain/rules": "./src/domain/rules/index.ts",
     "./domain/sync": "./src/domain/sync/index.ts",
     "./infrastructure/repositories": "./src/infrastructure/repositories/index.ts",
-    "./*": "./src/*.ts"
+    "./*": ["./src/*.ts", "./src/*/index.ts"]
   },
   "scripts": {
     "clean": "rm -rf .cache dist node_modules",

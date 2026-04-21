@@ -22,7 +22,7 @@ import {
 
 import { userConnection } from "@canto/db/schema";
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
-import { getDownloadClient } from "@canto/core/infrastructure/adapters/download-client-factory";
+import { getDownloadClient } from "@canto/core/infrastructure/adapters/torrent-clients/download-client-factory";
 import { resolveFolder } from "@canto/core/domain/rules/folder-routing";
 import type { RoutableMedia } from "@canto/core/domain/rules/folder-routing";
 import {

@@ -3,7 +3,7 @@ import { statfs } from "node:fs/promises";
 import { getSetting } from "@canto/db/settings";
 import { createTRPCRouter, adminProcedure } from "../trpc";
 import { findAllFolders } from "@canto/core/infrastructure/repositories/folder-repository";
-import { getQBClient } from "@canto/core/infrastructure/adapters/qbittorrent";
+import { getQBClient } from "@canto/core/infrastructure/adapters/torrent-clients/qbittorrent";
 
 export const systemRouter = createTRPCRouter({
   info: adminProcedure.query(async ({ ctx }) => {
