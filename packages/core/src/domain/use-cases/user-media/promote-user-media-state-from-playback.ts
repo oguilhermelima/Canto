@@ -5,29 +5,13 @@ import {
   findUserPlaybackProgressByMedia,
   findUserWatchHistoryByMedia,
   upsertUserMediaState,
-} from "../../infrastructure/repositories";
-
-type TrackingStatus = "none" | "planned" | "watching" | "completed" | "dropped";
-type MediaType = "movie" | "show";
-
-function parseDateLike(value: string | Date | null | undefined): Date | null {
-  if (!value) return null;
-  const parsed = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-function isReleasedOnOrBefore(
-  value: string | Date | null | undefined,
-  now: Date,
-): boolean {
-  const parsed = parseDateLike(value);
-  return !parsed || parsed.getTime() <= now.getTime();
-}
-
-function toMediaType(value: string): MediaType | null {
-  if (value === "movie" || value === "show") return value;
-  return null;
-}
+} from "../../../infrastructure/repositories";
+import {
+  isMediaType,
+  isReleasedOnOrBefore,
+  type MediaType,
+  type TrackingStatus,
+} from "../../rules/user-media-rules";
 
 function normalizeStatus(value: string | null | undefined): TrackingStatus {
   if (
@@ -66,9 +50,6 @@ function computePlaybackDrivenStatus(params: {
     return hasMovieProgress ? "watching" : "none";
   }
 
-  // SHOW-level completion signal: Jellyfin/Plex mark the series as "played"
-  // when all episodes on the server have been watched. Treat this as a strong
-  // "completed" signal, even if we don't have episode-level data for all episodes.
   const hasShowLevelCompletion = params.playback.some(
     (entry) => entry.episodeId === null && entry.isCompleted,
   );
@@ -93,9 +74,7 @@ function computePlaybackDrivenStatus(params: {
 
   const hasEpisodeProgress = params.playback.some(
     (entry) =>
-      !!entry.episodeId &&
-      !entry.isCompleted &&
-      entry.positionSeconds > 0,
+      !!entry.episodeId && !entry.isCompleted && entry.positionSeconds > 0,
   );
 
   const hasShowLevelProgress = params.playback.some(
@@ -109,7 +88,11 @@ function computePlaybackDrivenStatus(params: {
     return "completed";
   }
 
-  if (completedEpisodeIds.size > 0 || hasEpisodeProgress || hasShowLevelProgress) {
+  if (
+    completedEpisodeIds.size > 0 ||
+    hasEpisodeProgress ||
+    hasShowLevelProgress
+  ) {
     return "watching";
   }
 
@@ -140,8 +123,8 @@ export async function promoteUserMediaStateFromPlayback(
   const mediaRow = await findMediaByIdWithSeasons(db, params.mediaId);
   if (!mediaRow) return null;
 
-  const mediaType = toMediaType(mediaRow.type);
-  if (!mediaType) return null;
+  if (!isMediaType(mediaRow.type)) return null;
+  const mediaType: MediaType = mediaRow.type;
 
   const [currentState, historyRows, playbackRows] = await Promise.all([
     findUserMediaState(db, params.userId, params.mediaId),
