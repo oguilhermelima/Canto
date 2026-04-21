@@ -1,5 +1,5 @@
 import { and, desc, eq, isNotNull, not, sql } from "drizzle-orm";
-import { getQualityFilters, getWeightedScoreOrder } from "../../domain/rules/recommendation-filters";
+import { getQualityFilters, getWeightedScoreOrder } from "../../../domain/rules/recommendation-filters";
 import type { Database } from "@canto/db/client";
 import {
   blocklist,
@@ -10,8 +10,8 @@ import {
   mediaWatchProvider,
   watchProviderLink,
 } from "@canto/db/schema";
-import type { RecsFilters } from "../../domain/types/recs-filters";
-import { buildRecsFilterConditions, recsSortOrder } from "./shared/recs-filter-builder";
+import type { RecsFilters } from "../../../domain/types/recs-filters";
+import { buildRecsFilterConditions, recsSortOrder } from "../shared/recs-filter-builder";
 
 // ── Credits ──
 
