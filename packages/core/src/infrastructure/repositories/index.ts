@@ -6,7 +6,7 @@ export * from "./folder-repository";
 export * from "./extras-repository";
 export * from "./media-version-repository";
 export * from "./notification-repository";
-export * from "./list-repository";
+export * from "./lists";
 export * from "./request-repository";
 export * from "./user-recommendation-repository";
 export * from "./user-connection-repository";
