@@ -21,7 +21,7 @@ import {
 import type { Database } from "@canto/db/client";
 import { mediaVersion, mediaVersionEpisode, media } from "@canto/db/schema";
 
-import type { ServerSource } from "../../domain/sync/types";
+import type { ServerSource } from "../../../domain/sync/types";
 
 /* -------------------------------------------------------------------------- */
 /*  Row types                                                                  */

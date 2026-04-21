@@ -1,9 +1,9 @@
 import type { Database } from "@canto/db/client";
 import type { ProviderName, MediaType } from "@canto/providers";
-import { findMediaById } from "../../infrastructure/repositories";
-import type { MediaProviderPort } from "../ports/media-provider.port";
-import { getActiveUserLanguages } from "../services/user-service";
-import { detectGaps } from "./detect-gaps";
+import { findMediaById } from "../../../infrastructure/repositories";
+import type { MediaProviderPort } from "../../ports/media-provider.port";
+import { getActiveUserLanguages } from "../../services/user-service";
+import { detectGaps } from "../detect-gaps";
 import type {
   Aspect,
   EnsureMediaResult,
@@ -11,13 +11,13 @@ import type {
 } from "./ensure-media.types";
 import { ALL_ASPECTS } from "./ensure-media.types";
 import { fetchMediaMetadata } from "./fetch-media-metadata";
-import { updateMediaFromNormalized } from "./persist-media";
-import { refreshExtras } from "./refresh-extras";
-import { upsertLangLogos } from "./upsert-lang-logos";
-import { getTmdbProvider } from "../../lib/tmdb-client";
-import { getTvdbProvider } from "../../lib/tvdb-client";
+import { updateMediaFromNormalized } from "./persist";
+import { refreshExtras } from "../refresh-extras";
+import { upsertLangLogos } from "../upsert-lang-logos";
+import { getTmdbProvider } from "../../../lib/tmdb-client";
+import { getTvdbProvider } from "../../../lib/tvdb-client";
 import { getSetting } from "@canto/db/settings";
-import { translateEpisodes } from "./translate-episodes";
+import { translateEpisodes } from "../translate-episodes";
 import type { TvdbProvider } from "@canto/providers";
 
 /**
