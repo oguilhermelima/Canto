@@ -1,7 +1,8 @@
 import { db } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
 import { findAllFolders, findMediaPathsByFolder } from "@canto/core/infrastructure/repositories";
-import { scanFolderForMedia } from "@canto/core/domain/use-cases/scan-folder-for-media";
+import { scanFolderForMedia } from "@canto/core/domain/use-cases/file-organization/scan-folder-for-media";
+import { createNodeFileSystemAdapter } from "@canto/core/infrastructure/adapters/filesystem";
 
 export async function handleFolderScan(): Promise<void> {
   const enabled = await getSetting("sync.folderScan.enabled");
@@ -11,6 +12,7 @@ export async function handleFolderScan(): Promise<void> {
   }
 
   const folders = await findAllFolders(db);
+  const fs = createNodeFileSystemAdapter();
 
   let totalImported = 0;
   let totalSkipped = 0;
@@ -28,7 +30,7 @@ export async function handleFolderScan(): Promise<void> {
     scannedFolders++;
 
     for (const path of allPaths) {
-      const result = await scanFolderForMedia(db, path, folder.id);
+      const result = await scanFolderForMedia(db, path, folder.id, { fs });
       totalImported += result.imported;
       totalSkipped += result.skipped;
       totalFailed += result.failed;

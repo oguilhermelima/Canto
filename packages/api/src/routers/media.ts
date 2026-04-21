@@ -55,7 +55,8 @@ import { jobDispatcher } from "@canto/core/infrastructure/adapters/job-dispatche
 import { findServerLibrary, removeListItem } from "@canto/core/infrastructure/repositories/list-repository";
 import { revertRequestStatus } from "@canto/core/infrastructure/repositories/request-repository";
 import { findMediaVersionsByMediaId } from "@canto/core/infrastructure/repositories/media-version-repository";
-import { executeReorganizeMediaFiles } from "@canto/core/domain/use-cases/reorganize-media-files";
+import { executeReorganizeMediaFiles } from "@canto/core/domain/use-cases/file-organization/reorganize-media-files";
+import { createNodeFileSystemAdapter } from "@canto/core/infrastructure/adapters/filesystem";
 import { updateMediaServerMetadata } from "@canto/core/domain/use-cases/update-media-server-metadata";
 
 /* -------------------------------------------------------------------------- */
@@ -353,7 +354,9 @@ export const mediaRouter = createTRPCRouter({
       }
 
       if (input.renameFiles) {
-        await executeReorganizeMediaFiles(ctx.db, input.id);
+        await executeReorganizeMediaFiles(ctx.db, input.id, {
+          fs: createNodeFileSystemAdapter(),
+        });
       }
 
       if (input.updateMediaServer) {

@@ -1,22 +1,22 @@
 import path from "node:path";
-import { rename, mkdir, rmdir } from "node:fs/promises";
 
 import type { Database } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
-import { getEffectiveProvider } from "../rules/effective-provider";
+import { getEffectiveProvider } from "../../rules/effective-provider";
 import {
   buildMediaDir,
   buildFileName,
   type MediaNamingInfo,
-} from "../rules/naming";
-import type { DownloadClientPort } from "../ports/download-client";
+} from "../../rules/naming";
+import type { DownloadClientPort } from "../../ports/download-client";
+import type { FileSystemPort } from "../../ports/file-system.port";
 import {
   findMediaByIdWithSeasons,
   findMediaFilesByMediaId,
   findTorrentsByMediaId,
   updateMediaFile,
   updateTorrent,
-} from "../../infrastructure/repositories";
+} from "../../../infrastructure/repositories";
 
 // ── Public types ───────────────────────────────────────────────────────────
 
@@ -175,7 +175,7 @@ export async function previewReorganizeMediaFiles(
 export async function executeReorganizeMediaFiles(
   db: Database,
   mediaId: string,
-  client?: DownloadClientPort,
+  deps: { fs: FileSystemPort; client?: DownloadClientPort },
 ): Promise<ReorganizeResult> {
   const entries = await buildRenameList(db, mediaId);
   const toRename = entries.filter((e) => e.status === "rename");
@@ -196,12 +196,12 @@ export async function executeReorganizeMediaFiles(
   const result: ReorganizeResult = { renamed: 0, skipped, failed: [] };
 
   if (importMethod === "local") {
-    await executeLocalRenames(toRename, result, db);
+    await executeLocalRenames(toRename, result, db, deps.fs);
   } else {
-    if (!client) {
+    if (!deps.client) {
       throw new Error("Download client required for remote reorganize");
     }
-    await executeRemoteRenames(toRename, torrents, client, result, db);
+    await executeRemoteRenames(toRename, torrents, deps.client, result, db);
   }
 
   return result;
@@ -213,6 +213,7 @@ async function executeLocalRenames(
   toRename: RenameEntry[],
   result: ReorganizeResult,
   db: Database,
+  fs: FileSystemPort,
 ): Promise<void> {
   // Detect whether the parent media dir needs renaming (e.g. [tmdbid-X] → [tvdbid-Y])
   const oldParentDirs = new Set<string>();
@@ -237,7 +238,7 @@ async function executeLocalRenames(
     const newParent = [...newParentDirs][0]!;
     if (oldParent !== newParent) {
       try {
-        await rename(oldParent, newParent);
+        await fs.rename(oldParent, newParent);
         parentRenamedFrom.set(oldParent, newParent);
       } catch (err) {
         for (const r of toRename) {
@@ -254,7 +255,7 @@ async function executeLocalRenames(
   // Create any new season subdirectories
   const targetDirs = new Set(toRename.map((r) => path.dirname(r.newPath)));
   for (const dir of targetDirs) {
-    await mkdir(dir, { recursive: true });
+    await fs.mkdir(dir, { recursive: true });
   }
 
   // Track old season dirs for cleanup
@@ -272,7 +273,7 @@ async function executeLocalRenames(
         }
       }
 
-      await rename(effectiveOldPath, r.newPath);
+      await fs.rename(effectiveOldPath, r.newPath);
       await updateMediaFile(db, r.mediaFileId, { filePath: r.newPath });
       result.renamed++;
     } catch (err) {
@@ -293,7 +294,7 @@ async function executeLocalRenames(
       }
     }
     try {
-      await rmdir(effectiveDir);
+      await fs.rmdir(effectiveDir);
     } catch {
       // ENOTEMPTY or ENOENT — ignore
     }
