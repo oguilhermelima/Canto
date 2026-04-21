@@ -47,7 +47,7 @@ export function TmdbStep({
   };
 
   useEffect(() => {
-    configureFooter({ onPrimary: () => void handleSave(), primaryDisabled: !apiKey, primaryLoading: testing });
+    configureFooter({ onPrimary: () => void handleSave(), primaryDisabled: !apiKey, primaryLoading: testing, onSkip: onNext });
   }, [apiKey, testing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
