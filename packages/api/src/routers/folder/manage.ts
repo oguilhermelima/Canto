@@ -14,7 +14,7 @@ import {
   deleteFolder,
   setDefaultFolder,
   seedDefaultFolders,
-} from "@canto/core/infrastructure/repositories/file-organization/folder";
+} from "@canto/core/infra/file-organization/folder-repository";
 import { validatePath } from "@canto/core/domain/file-organization/rules/validate-path";
 
 import { adminProcedure } from "../../trpc";

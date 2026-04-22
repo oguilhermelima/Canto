@@ -4,20 +4,20 @@
 
 import type { Database } from "@canto/db/client";
 import { getSettings } from "@canto/db/settings";
-import { findMediaById } from "../../../infrastructure/repositories/media/media-repository";
+import { findMediaById } from "../../../infra/media/media-repository";
 import {
   findMediaVersionsByMediaId,
   updateMediaVersion,
-} from "../../../infrastructure/repositories/media/media-version-repository";
+} from "../../../infra/media/media-version-repository";
 import {
   applyJellyfinRemoteMatch,
   getJellyfinItem,
-} from "../../../infrastructure/adapters/media-servers/jellyfin";
+} from "../../../infra/media-servers/jellyfin.adapter";
 import {
   matchPlexItem,
   lockPlexFields,
   getPlexItem,
-} from "../../../infrastructure/adapters/media-servers/plex";
+} from "../../../infra/media-servers/plex.adapter";
 
 export interface ServerUpdateResult {
   jellyfin: boolean;

@@ -7,13 +7,13 @@ import {
   listMediaPathsInput,
   removeMediaPathInput,
 } from "@canto/validators";
-import { getDownloadClient } from "@canto/core/infrastructure/adapters/torrent-clients/download-client-factory";
-import { createNodeFileSystemAdapter } from "@canto/core/infrastructure/adapters/filesystem";
+import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
+import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
 import {
   addMediaPath,
   findMediaPathsByFolder,
   removeMediaPath,
-} from "@canto/core/infrastructure/repositories/file-organization/folder";
+} from "@canto/core/infra/file-organization/folder-repository";
 import { validatePath } from "@canto/core/domain/file-organization/rules/validate-path";
 import { browseFolder } from "@canto/core/domain/use-cases/file-organization/browse-folder";
 import { testFolderPaths } from "@canto/core/domain/use-cases/file-organization/test-folder-paths";

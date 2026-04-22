@@ -1,5 +1,5 @@
 import type { Database } from "@canto/db/client";
-import { findAllFolders, updateFolder } from "../../../../infrastructure/repositories";
+import { findAllFolders, updateFolder } from "../../../../infra/repositories";
 
 /**
  * Ensure at least one download folder is marked as default.

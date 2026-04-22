@@ -1,5 +1,5 @@
 import type { Database } from "@canto/db/client";
-import { findDistinctPlaybackMediaPairs } from "../../../infrastructure/repositories";
+import { findDistinctPlaybackMediaPairs } from "../../../infra/repositories";
 import { promoteUserMediaStateFromPlayback } from "./promote-user-media-state-from-playback";
 
 export interface ReconcileStatesFromPlaybackResult {

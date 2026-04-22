@@ -11,7 +11,7 @@ import {
 import {
   rebuildUserRecommendations,
   upsertUserRecommendations,
-} from "../../../infrastructure/repositories/recommendations/user-recommendation";
+} from "../../../infra/recommendations/user-recommendation-repository";
 
 const MAX_SEEDS = 10;
 const MAX_SEEDS_FROM_COLLECTIONS = 5;

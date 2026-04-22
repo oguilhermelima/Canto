@@ -3,9 +3,9 @@ import type { DownloadClientPort } from "../../shared/ports/download-client";
 import {
   findTorrentById,
   updateTorrent,
-} from "../../../infrastructure/repositories/torrents";
-import { findMediaById } from "../../../infrastructure/repositories/media/media-repository";
-import { findFolderById, findDefaultFolder } from "../../../infrastructure/repositories/file-organization/folder";
+} from "../../../infra/repositories";
+import { findMediaById } from "../../../infra/media/media-repository";
+import { findFolderById, findDefaultFolder } from "../../../infra/file-organization/folder-repository";
 
 /**
  * Re-download a torrent that was removed or errored.

@@ -13,7 +13,7 @@ import {
   createInvitation,
   getListMemberVotes,
   updateListMemberRole,
-} from "@canto/core/infrastructure/repositories/lists/member";
+} from "@canto/core/infra/lists/member-repository";
 import { getListSharing } from "@canto/core/domain/use-cases/lists/get-members";
 import { removeMemberFromList } from "@canto/core/domain/use-cases/lists/remove-member";
 import { acceptListInvitation } from "@canto/core/domain/use-cases/lists/accept-invitation";

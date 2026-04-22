@@ -2,7 +2,7 @@ import type { Database } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
 
 import type { FileSystemPort } from "../../shared/ports/file-system.port";
-import { findAllFolders } from "../../../infrastructure/repositories/file-organization/folder";
+import { findAllFolders } from "../../../infra/file-organization/folder-repository";
 
 interface PathResult {
   ok: boolean;

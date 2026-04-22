@@ -1,6 +1,6 @@
 import type { Database } from "@canto/db/client";
-import { dispatchRefreshExtras } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
-import { findMediaNeedingExtrasBackfill } from "@canto/core/infrastructure/repositories";
+import { dispatchRefreshExtras } from "@canto/core/platform/queue/bullmq-dispatcher";
+import { findMediaNeedingExtrasBackfill } from "@canto/core/infra/repositories";
 
 const STALE_DAYS = 7;
 

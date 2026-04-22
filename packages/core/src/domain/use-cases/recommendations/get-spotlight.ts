@@ -6,8 +6,8 @@ import { buildExclusionSet } from "./recommendation-service";
 import { translateMediaItems } from "../../shared/services/translation-service";
 import { getUserLanguage } from "../../shared/services/user-service";
 import { mapPoolItem } from "../../shared/mappers/media-mapper";
-import { findRecommendedMediaWithBackdrops } from "../../../infrastructure/repositories/content-enrichment/extras";
-import { findUserSpotlightItems } from "../../../infrastructure/repositories/recommendations/user-recommendation";
+import { findRecommendedMediaWithBackdrops } from "../../../infra/content-enrichment/extras-repository";
+import { findUserSpotlightItems } from "../../../infra/recommendations/user-recommendation-repository";
 
 interface TrendingFetcher {
   (type: "movie" | "show"): Promise<{ results: SearchResult[] }>;

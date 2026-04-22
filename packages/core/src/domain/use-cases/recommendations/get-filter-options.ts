@@ -1,5 +1,5 @@
-import { cached } from "../../../infrastructure/cache/redis";
-import { fetchFromTmdb } from "../../../infrastructure/adapters/tmdb-raw";
+import { cached } from "../../../platform/cache/redis";
+import { fetchFromTmdb } from "../../../platform/http/tmdb-raw";
 import { groupByBrand, type BrandedProvider } from "../../recommendations/rules/canonical-brand";
 import type { FilterOptionsInput } from "@canto/validators";
 

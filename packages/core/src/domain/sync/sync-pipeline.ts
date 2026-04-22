@@ -13,8 +13,8 @@ import { persistMedia } from "../use-cases/media/persist";
 import { getActiveUserLanguages } from "../shared/services/user-service";
 import { getSetting, getSettings, setSettingRaw } from "@canto/db/settings";
 
-import { dispatchMediaPipeline } from "../../infrastructure/queue/bullmq-dispatcher";
-import { logAndSwallow } from "../../lib/log-error";
+import { dispatchMediaPipeline } from "../../platform/queue/bullmq-dispatcher";
+import { logAndSwallow } from "../../platform/logger/log-error";
 import {
   findMediaByAnyReference,
   updateMedia,
@@ -25,8 +25,8 @@ import {
   ensureServerLibrary,
   upsertMediaVersion,
   type MediaVersionInsert,
-} from "../../infrastructure/repositories";
-import { reconcileServerLibrary } from "../../infrastructure/repositories/lists/list";
+} from "../../infra/repositories";
+import { reconcileServerLibrary } from "../../infra/lists/list-repository";
 
 import { resolveExternalId, tmdbCall } from "../use-cases/media/resolve-external-id";
 import {

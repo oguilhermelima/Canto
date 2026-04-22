@@ -9,7 +9,7 @@ import {
   findHiddenMediaPaginated,
   hideMedia,
   unhideMedia,
-} from "@canto/core/infrastructure/repositories";
+} from "@canto/core/infra/repositories";
 
 export const hiddenRouter = createTRPCRouter({
   hideMedia: protectedProcedure

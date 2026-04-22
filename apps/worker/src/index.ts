@@ -26,14 +26,14 @@ import { ensureMedia } from "@canto/core/domain/use-cases/media/ensure-media";
 import type {
   EnsureMediaJob,
   MediaPipelineJob,
-} from "@canto/core/infrastructure/queue/bullmq-dispatcher";
-import { QUEUES } from "@canto/core/infrastructure/queue/queue-names";
-import { getRedisConnection } from "@canto/core/infrastructure/queue/redis-config";
-import { jobDispatcher } from "@canto/core/infrastructure/adapters/job-dispatcher.adapter";
+} from "@canto/core/platform/queue/bullmq-dispatcher";
+import { QUEUES } from "@canto/core/platform/queue/queue-names";
+import { getRedisConnection } from "@canto/core/platform/queue/redis-config";
+import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
 import { db } from "@canto/db/client";
 import { seedLanguages } from "@canto/db";
-import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
-import { getTvdbProvider } from "@canto/core/lib/tvdb-client";
+import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
+import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
 
 import { DEFAULT_JOB_OPTS, makeWorker } from "./lib/worker-factory";
 

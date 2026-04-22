@@ -5,7 +5,7 @@
 import type { Database } from "@canto/db/client";
 import { and, eq } from "drizzle-orm";
 import { mediaFile } from "@canto/db/schema";
-import { findMediaByIdWithSeasons } from "../../../infrastructure/repositories";
+import { findMediaByIdWithSeasons } from "../../../infra/repositories";
 
 /**
  * For a given show and season, find episode numbers that don't have

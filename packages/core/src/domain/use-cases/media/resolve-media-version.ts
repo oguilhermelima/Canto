@@ -20,7 +20,7 @@ import {
   updateMedia,
   deleteMedia,
   isMediaOrphaned,
-} from "../../../infrastructure/repositories/media";
+} from "../../../infra/repositories";
 
 export type ResolveMediaVersionInput =
   | { versionId: string; tmdbId: number; type: "movie" | "show" }

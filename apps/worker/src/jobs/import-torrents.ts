@@ -5,9 +5,9 @@ import {
   triggerMediaServerScans,
   type ImportedMedia,
 } from "@canto/core/domain/use-cases/media-servers/trigger-scans";
-import { getDownloadClient } from "@canto/core/infrastructure/adapters/torrent-clients/download-client-factory";
-import { createNodeFileSystemAdapter } from "@canto/core/infrastructure/adapters/filesystem";
-import { buildIndexers } from "@canto/core/infrastructure/adapters/indexers/indexer-factory";
+import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
+import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
+import { buildIndexers } from "@canto/core/infra/indexers/indexer-factory";
 import {
   findUnimportedTorrents,
   findTorrentById,
@@ -20,8 +20,8 @@ import {
   resetStaleImports,
   updateTorrent,
   updateMedia,
-} from "@canto/core/infrastructure/repositories";
-import { logAndSwallow } from "@canto/core/lib/log-error";
+} from "@canto/core/infra/repositories";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 
 /* -------------------------------------------------------------------------- */
 /*  Main handler                                                               */

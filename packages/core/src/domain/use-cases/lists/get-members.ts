@@ -3,11 +3,11 @@ import { verifyListOwnership } from "../../lists/rules/list-rules";
 import {
   findListById,
   findListOwnerSummary,
-} from "../../../infrastructure/repositories/lists/list";
+} from "../../../infra/lists/list-repository";
 import {
   findListMembers,
   findPendingInvitations,
-} from "../../../infrastructure/repositories/lists/member";
+} from "../../../infra/lists/member-repository";
 
 export async function getListSharing(
   db: Database,

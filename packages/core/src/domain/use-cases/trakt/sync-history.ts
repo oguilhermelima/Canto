@@ -1,18 +1,18 @@
 import { and, desc, eq, isNull, ne } from "drizzle-orm";
 import { episode, media, season, userWatchHistory } from "@canto/db/schema";
-import { findEpisodeIdByMediaAndNumbers } from "../../../infrastructure/repositories";
+import { findEpisodeIdByMediaAndNumbers } from "../../../infra/repositories";
 import {
   attachRemoteIdToHistorySync,
   createTraktHistorySync,
   findTraktHistorySyncByLocalIds,
   findTraktHistorySyncByRemoteIds,
-} from "../../../infrastructure/repositories/trakt/trakt-sync";
-import { addUserWatchHistory } from "../../../infrastructure/repositories/user-media";
+} from "../../../infra/trakt/trakt-sync-repository";
+import { addUserWatchHistory } from "../../../infra/repositories";
 import {
   addTraktHistory,
   listTraktHistory,
   type TraktIds,
-} from "../../../infrastructure/adapters/trakt/client";
+} from "../../../infra/trakt/trakt.adapter";
 import {
   mediaIdsFromRow,
   mediaRefKey,

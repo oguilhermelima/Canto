@@ -14,17 +14,17 @@ import {
   findMediaById,
   findMediaVersionsByMediaId,
   findUserConnectionsByUserId,
-} from "../../../infrastructure/repositories";
+} from "../../../infra/repositories";
 import {
   findJellyfinItemIdByProviderForUser,
   markJellyfinItemPlayed,
   markJellyfinItemUnplayed,
-} from "../../../infrastructure/adapters/media-servers/jellyfin";
+} from "../../../infra/media-servers/jellyfin.adapter";
 import {
   findPlexItemIdByProviderId,
   markPlexItemUnwatched,
   markPlexItemWatched,
-} from "../../../infrastructure/adapters/media-servers/plex";
+} from "../../../infra/media-servers/plex.adapter";
 
 function logError(scope: string, userId: string, err: unknown): void {
   console.error(

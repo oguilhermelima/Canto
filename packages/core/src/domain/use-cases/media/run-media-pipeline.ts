@@ -6,9 +6,9 @@ import type { MediaType, ProviderName } from "@canto/providers";
 
 import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import { getEffectiveProviderSync } from "../../shared/rules/effective-provider";
-import { findMediaById } from "../../../infrastructure/repositories";
-import type { MediaPipelineJob } from "../../../infrastructure/queue/bullmq-dispatcher";
-import { dispatchTranslateEpisodes } from "../../../infrastructure/queue/bullmq-dispatcher";
+import { findMediaById } from "../../../infra/repositories";
+import type { MediaPipelineJob } from "../../../platform/queue/bullmq-dispatcher";
+import { dispatchTranslateEpisodes } from "../../../platform/queue/bullmq-dispatcher";
 
 import { fetchMediaMetadata } from "./fetch-media-metadata";
 

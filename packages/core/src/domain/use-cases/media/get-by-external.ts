@@ -3,13 +3,13 @@ import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import type { MediaType, ProviderName } from "@canto/providers";
 import { persistMedia } from "./persist";
 import { getSetting } from "@canto/db/settings";
-import { logAndSwallow } from "../../../lib/log-error";
+import { logAndSwallow } from "../../../platform/logger/log-error";
 import {
   findMediaByExternalId,
   findMediaByAnyReference,
   findMediaByIdWithSeasons,
-} from "../../../infrastructure/repositories/media";
-import { dispatchRefreshExtras, dispatchReconcileShow } from "../../../infrastructure/queue/bullmq-dispatcher";
+} from "../../../infra/repositories";
+import { dispatchRefreshExtras, dispatchReconcileShow } from "../../../platform/queue/bullmq-dispatcher";
 import { applyMediaTranslation, applySeasonsTranslation } from "../../shared/services/translation-service";
 import { getUserLanguage } from "../../shared/services/user-service";
 

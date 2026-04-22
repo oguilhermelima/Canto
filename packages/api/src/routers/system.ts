@@ -2,8 +2,8 @@ import { freemem, totalmem, cpus, loadavg } from "node:os";
 import { statfs } from "node:fs/promises";
 import { getSetting } from "@canto/db/settings";
 import { createTRPCRouter, adminProcedure } from "../trpc";
-import { findAllFolders } from "@canto/core/infrastructure/repositories/file-organization/folder";
-import { getQBClient } from "@canto/core/infrastructure/adapters/torrent-clients/qbittorrent";
+import { findAllFolders } from "@canto/core/infra/file-organization/folder-repository";
+import { getQBClient } from "@canto/core/infra/torrent-clients/qbittorrent.adapter";
 
 export const systemRouter = createTRPCRouter({
   info: adminProcedure.query(async ({ ctx }) => {

@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { media } from "@canto/db/schema";
 import { setSetting } from "@canto/db/settings";
-import { dispatchMediaPipeline } from "../../../infrastructure/queue/bullmq-dispatcher";
+import { dispatchMediaPipeline } from "../../../platform/queue/bullmq-dispatcher";
 
 /**
  * Flip the `tvdb.defaultShows` flag and re-run the media pipeline for every

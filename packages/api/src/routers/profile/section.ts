@@ -5,7 +5,7 @@ import {
   replaceProfileSections,
   deleteProfileSections,
   seedProfileSectionsForUser,
-} from "@canto/core/infrastructure/repositories/profile-section-repository";
+} from "@canto/core/infra/profile/profile-section-aggregate-repository";
 import {
   DEFAULT_PROFILE_SECTIONS,
   CANONICAL_SECTION_KEYS,

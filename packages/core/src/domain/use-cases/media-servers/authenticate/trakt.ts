@@ -7,12 +7,12 @@ import {
   TraktHttpError,
   validateTraktClientCredentials,
   type TraktDeviceCodeResponse,
-} from "../../../../infrastructure/adapters/trakt";
+} from "../../../../infra/trakt/trakt-shim";
 import {
   createUserConnection,
   findUserConnectionByProvider,
   updateUserConnection,
-} from "../../../../infrastructure/repositories/media-servers/user-connection";
+} from "../../../../infra/media-servers/user-connection-repository";
 
 export interface TraktAuthResult {
   success: boolean;

@@ -22,9 +22,9 @@ import {
   findMediaById,
   findMediaVersionsWithEpisodes,
   findUserConnectionsByUserId,
-} from "../../../infrastructure/repositories";
-import { setJellyfinPlaybackPosition } from "../../../infrastructure/adapters/media-servers/jellyfin";
-import { setPlexPlaybackPosition } from "../../../infrastructure/adapters/media-servers/plex";
+} from "../../../infra/repositories";
+import { setJellyfinPlaybackPosition } from "../../../infra/media-servers/jellyfin.adapter";
+import { setPlexPlaybackPosition } from "../../../infra/media-servers/plex.adapter";
 import type { ServerSource } from "../../sync/types";
 
 type Conn = Awaited<ReturnType<typeof findUserConnectionsByUserId>>[number];

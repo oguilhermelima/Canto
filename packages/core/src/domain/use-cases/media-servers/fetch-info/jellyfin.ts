@@ -3,7 +3,7 @@ import {
   fetchJellyfinShowEpisodesWithStreams,
   type JellyfinStreamItem,
   type JellyfinStreamMediaStream,
-} from "../../../../infrastructure/adapters/media-servers/jellyfin";
+} from "../../../../infra/media-servers/jellyfin.adapter";
 import {
   dedupeLangs,
   normalizeLang,

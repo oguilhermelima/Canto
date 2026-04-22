@@ -4,13 +4,13 @@
 
 import type { Database } from "@canto/db/client";
 import { getSetting, getSettings } from "@canto/db/settings";
-import { findAllServerLinks } from "../../../infrastructure/repositories";
+import { findAllServerLinks } from "../../../infra/repositories";
 import {
   triggerJellyfinScan,
   findJellyfinMoviesByProviderId,
   mergeJellyfinVersions,
-} from "../../../infrastructure/adapters/media-servers/jellyfin";
-import { scanPlexLibrary } from "../../../infrastructure/adapters/media-servers/plex";
+} from "../../../infra/media-servers/jellyfin.adapter";
+import { scanPlexLibrary } from "../../../infra/media-servers/plex.adapter";
 
 export interface ImportedMedia {
   id: string;

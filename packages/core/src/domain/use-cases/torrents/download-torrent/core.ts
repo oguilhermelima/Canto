@@ -3,8 +3,8 @@ import type { TorrentDownloadInput } from "@canto/validators";
 
 import { BlocklistedReleaseError, DownloadClientError, DuplicateDownloadError, InvalidDownloadInputError, TorrentPersistenceError } from "@canto/core/domain/torrents/errors";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
-import { logAndSwallow } from "../../../../lib/log-error";
-import { resolveDownloadUrl } from "../../../../lib/follow-redirects";
+import { logAndSwallow } from "../../../../platform/logger/log-error";
+import { resolveDownloadUrl } from "../../../../platform/http/follow-redirects";
 import { detectQuality, detectSource } from "../../../torrents/rules/quality";
 import { parseSeasons, parseEpisodes } from "../../../torrents/rules/parsing";
 import { extractHashFromMagnet } from "../../../torrents/rules/torrent-rules";
@@ -19,8 +19,8 @@ import {
   createMediaFile,
   deleteMediaFilesByTorrentId,
   findBlocklistEntry,
-} from "../../../../infrastructure/repositories";
-import { updateMedia } from "../../../../infrastructure/repositories/media/media-repository";
+} from "../../../../infra/repositories";
+import { updateMedia } from "../../../../infra/media/media-repository";
 import { createNotification } from "../../notifications/create-notification";
 import { resolveDownloadConfig } from "./folder-resolution";
 import { resolveEpisodeIds, detectDuplicates } from "./duplicate-detection";

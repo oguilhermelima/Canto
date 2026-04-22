@@ -10,11 +10,11 @@ import {
 } from "@canto/db/schema";
 import { getActiveUserLanguages } from "../../shared/services/user-service";
 import type { MediaType } from "@canto/providers";
-import { findMediaById } from "../../../infrastructure/repositories";
+import { findMediaById } from "../../../infra/repositories";
 import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import { mapSearchResultToMediaFields } from "../../content-enrichment/rules/pool-scoring";
-import { dispatchMediaPipeline } from "../../../infrastructure/queue/bullmq-dispatcher";
-import { logAndSwallow } from "../../../lib/log-error";
+import { dispatchMediaPipeline } from "../../../platform/queue/bullmq-dispatcher";
+import { logAndSwallow } from "../../../platform/logger/log-error";
 
 export async function refreshExtras(
   db: Database,

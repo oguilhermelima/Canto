@@ -1,12 +1,12 @@
 import type { Database } from "@canto/db/client";
-import { logAndSwallow } from "../../../lib/log-error";
+import { logAndSwallow } from "../../../platform/logger/log-error";
 import {
   deleteUserWatchHistoryByIds,
   findMediaByIdWithSeasons,
   findUserWatchHistoryByMedia,
   softDeleteUserPlaybackProgress,
   upsertUserMediaState,
-} from "../../../infrastructure/repositories";
+} from "../../../infra/repositories";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import {
   computeTrackingStatus,

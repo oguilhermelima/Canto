@@ -1,5 +1,5 @@
 import type { Database } from "@canto/db/client";
-import { insertNotification } from "../../../infrastructure/repositories/notifications";
+import { insertNotification } from "../../../infra/repositories";
 
 type NotificationType =
   | "import_success"

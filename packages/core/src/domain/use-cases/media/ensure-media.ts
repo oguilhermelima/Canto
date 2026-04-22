@@ -1,6 +1,6 @@
 import type { Database } from "@canto/db/client";
 import type { ProviderName, MediaType } from "@canto/providers";
-import { findMediaById } from "../../../infrastructure/repositories";
+import { findMediaById } from "../../../infra/repositories";
 import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import { getActiveUserLanguages } from "../../shared/services/user-service";
 import { detectGaps } from "./detect-gaps";
@@ -14,8 +14,8 @@ import { fetchMediaMetadata } from "./fetch-media-metadata";
 import { updateMediaFromNormalized } from "./persist";
 import { refreshExtras } from "../content-enrichment/refresh-extras";
 import { upsertLangLogos } from "../content-enrichment/upsert-lang-logos";
-import { getTmdbProvider } from "../../../lib/tmdb-client";
-import { getTvdbProvider } from "../../../lib/tvdb-client";
+import { getTmdbProvider } from "../../../platform/http/tmdb-client";
+import { getTvdbProvider } from "../../../platform/http/tvdb-client";
 import { getSetting } from "@canto/db/settings";
 import { translateEpisodes } from "../content-enrichment/translate-episodes";
 import type { TvdbProvider } from "@canto/providers";

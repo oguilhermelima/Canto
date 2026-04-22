@@ -4,7 +4,7 @@ import {
   computeAndSyncSeasonRating,
   deleteUserRating,
   findMediaByIdWithSeasons,
-} from "../../../infrastructure/repositories";
+} from "../../../infra/repositories";
 
 export interface RemoveRatingInput {
   mediaId: string;

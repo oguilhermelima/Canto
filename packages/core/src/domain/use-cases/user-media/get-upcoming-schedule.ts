@@ -4,7 +4,7 @@ import {
   findUserListMediaCandidates,
   findUserMediaStatesByMediaIds,
   findUserWatchHistoryByMediaIds,
-} from "../../../infrastructure/repositories";
+} from "../../../infra/repositories";
 import { getUserLanguage } from "../../shared/services/user-service";
 import { parseDateLike } from "../../user-media/rules/user-media-rules";
 

@@ -1,7 +1,7 @@
 import type { Database } from "@canto/db/client";
 
-import { findUsersForDailyRecsCheck } from "../../../infrastructure/repositories/recommendations/user-recommendation";
-import { dispatchRebuildUserRecs } from "../../../infrastructure/queue/bullmq-dispatcher";
+import { findUsersForDailyRecsCheck } from "../../../infra/recommendations/user-recommendation-repository";
+import { dispatchRebuildUserRecs } from "../../../platform/queue/bullmq-dispatcher";
 
 /**
  * Find every user whose recs have gone stale (null or >24h) and enqueue a

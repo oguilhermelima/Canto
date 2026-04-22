@@ -14,9 +14,9 @@ import {
   reorderLists,
   reorderListItems,
   softDeleteList,
-} from "@canto/core/infrastructure/repositories/lists/list";
-import { findTraktListLinkByLocalListId } from "@canto/core/infrastructure/repositories/trakt-sync-repository";
-import { dispatchTraktListDelete } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
+} from "@canto/core/infra/lists/list-repository";
+import { findTraktListLinkByLocalListId } from "@canto/core/infra/trakt/trakt-sync-aggregate-repository";
+import { dispatchTraktListDelete } from "@canto/core/platform/queue/bullmq-dispatcher";
 import { createListForUser } from "@canto/core/domain/use-cases/lists/create-list";
 import { updateListForUser } from "@canto/core/domain/use-cases/lists/update-list";
 import { viewListBySlug } from "@canto/core/domain/use-cases/lists/view-list";

@@ -6,17 +6,17 @@ import type { Database } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
 
 import type { MediaProviderPort } from "../../../shared/ports/media-provider.port";
-import { logAndSwallow } from "../../../../lib/log-error";
+import { logAndSwallow } from "../../../../platform/logger/log-error";
 import { getEffectiveProviderSync } from "../../../shared/rules/effective-provider";
 import {
   findMediaByExternalId,
   findMediaByAnyReference,
   findMediaByIdWithSeasons,
-} from "../../../../infrastructure/repositories/media";
+} from "../../../../infra/repositories";
 import {
   dispatchEnsureMedia,
   dispatchTranslateEpisodes,
-} from "../../../../infrastructure/queue/bullmq-dispatcher";
+} from "../../../../platform/queue/bullmq-dispatcher";
 import { detectGaps } from "../detect-gaps";
 import { fetchMediaMetadata, type MediaMetadata } from "../fetch-media-metadata";
 import { applyMediaTranslation, applySeasonsTranslation } from "../../../shared/services/translation-service";

@@ -4,9 +4,9 @@ import { userConnection } from "@canto/db/schema";
 import {
   findTraktSyncStateByConnection,
   upsertTraktSyncState,
-} from "../../../infrastructure/repositories/trakt/trakt-sync";
-import { updateUserConnection } from "../../../infrastructure/repositories/media-servers/user-connection";
-import { refreshTraktAccessTokenIfNeeded } from "../../../infrastructure/adapters/trakt/client";
+} from "../../../infra/trakt/trakt-sync-repository";
+import { updateUserConnection } from "../../../infra/media-servers/user-connection-repository";
+import { refreshTraktAccessTokenIfNeeded } from "../../../infra/trakt/trakt.adapter";
 import type { SyncContext } from "./shared";
 import { syncWatchlist } from "./sync-watchlist";
 import { syncCustomLists } from "./sync-custom-lists";

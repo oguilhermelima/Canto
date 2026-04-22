@@ -5,7 +5,7 @@ import {
   acceptInvitation,
   addListMember,
   findInvitationByToken,
-} from "../../../infrastructure/repositories/lists/member";
+} from "../../../infra/lists/member-repository";
 
 export async function acceptListInvitation(
   db: Database,

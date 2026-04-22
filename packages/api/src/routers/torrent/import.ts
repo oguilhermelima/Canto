@@ -7,8 +7,8 @@ import {
   importFromClientInput,
 } from "@canto/validators";
 
-import { getDownloadClient } from "@canto/core/infrastructure/adapters/torrent-clients/download-client-factory";
-import { createNodeFileSystemAdapter } from "@canto/core/infrastructure/adapters/filesystem";
+import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
+import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
 import { autoImportTorrent } from "@canto/core/domain/use-cases/torrents/import-torrent";
 import {
   extractHashFromMagnet,
@@ -17,16 +17,16 @@ import {
   waitForTorrent,
 } from "@canto/core/domain/torrents/rules/torrent-rules";
 import { resolveMedia } from "@canto/core/domain/use-cases/media/persist";
-import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
-import { getTvdbProvider } from "@canto/core/lib/tvdb-client";
-import { updateMedia } from "@canto/core/infrastructure/repositories/media/media-repository";
+import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
+import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
+import { updateMedia } from "@canto/core/infra/media/media-repository";
 import {
   findTorrentById,
   findTorrentByHash,
   updateTorrent,
   createTorrent,
   claimTorrentForImport,
-} from "@canto/core/infrastructure/repositories/torrents";
+} from "@canto/core/infra/repositories";
 
 import { createTRPCRouter, adminProcedure } from "../../trpc";
 

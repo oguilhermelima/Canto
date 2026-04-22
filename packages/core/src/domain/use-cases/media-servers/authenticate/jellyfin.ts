@@ -5,7 +5,7 @@ import {
   findJellyfinApiKey,
   pingJellyfinPublic,
   testJellyfinConnection,
-} from "../../../../infrastructure/adapters/media-servers/jellyfin";
+} from "../../../../infra/media-servers/jellyfin.adapter";
 import { fetchError } from "./shared";
 
 export interface JellyfinAuthResult {

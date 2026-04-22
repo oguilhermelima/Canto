@@ -1,20 +1,20 @@
 import type { Database } from "@canto/db/client";
-import { getJellyfinCredentials, getPlexCredentials } from "../../../lib/server-credentials";
+import { getJellyfinCredentials, getPlexCredentials } from "../../../platform/secrets/server-credentials";
 import {
   authenticateJellyfinByName,
   getJellyfinCurrentUserId,
   getJellyfinLibraryFolders,
-} from "../../../infrastructure/adapters/media-servers/jellyfin";
+} from "../../../infra/media-servers/jellyfin.adapter";
 import {
   authenticatePlexServerToken,
   getPlexSections,
-} from "../../../infrastructure/adapters/media-servers/plex";
+} from "../../../infra/media-servers/plex.adapter";
 import {
   createUserConnection,
   findUserConnectionsByUserId,
   findUserConnectionByProvider,
   updateUserConnection,
-} from "../../../infrastructure/repositories/media-servers/user-connection";
+} from "../../../infra/media-servers/user-connection-repository";
 
 export interface UserConnectionAuthResult {
   success: boolean;

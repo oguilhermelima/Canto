@@ -15,8 +15,8 @@ import {
   findDefaultFolder,
   findMediaFilesByTorrentId,
   updateTorrent,
-} from "../../../../infrastructure/repositories";
-import { parseVideoFiles } from "../../../../infrastructure/adapters/filesystem";
+} from "../../../../infra/repositories";
+import { parseVideoFiles } from "../../../../platform/fs/filesystem";
 
 import { resolveSavePath } from "./shared";
 import { importLocalVideoFiles, importLocalSubtitleFiles } from "./local";

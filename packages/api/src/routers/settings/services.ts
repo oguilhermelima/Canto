@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { getSetting, getSettings, setSetting } from "@canto/db/settings";
-import { invalidateServiceClients } from "@canto/core/infrastructure/adapters/media-servers/service-clients";
+import { invalidateServiceClients } from "@canto/core/infra/media-servers/service-clients";
 import {
   serviceEnum,
   toggleServiceInput,

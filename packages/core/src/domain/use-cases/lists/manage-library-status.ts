@@ -2,11 +2,11 @@ import type { Database } from "@canto/db/client";
 import {
   findMediaById,
   updateMedia,
-} from "../../../infrastructure/repositories/media/media-repository";
+} from "../../../infra/media/media-repository";
 import {
   ensureServerLibrary,
   addListItem,
-} from "../../../infrastructure/repositories/lists/list";
+} from "../../../infra/lists/list-repository";
 
 interface LibraryStatusUpdate {
   inLibrary: boolean;

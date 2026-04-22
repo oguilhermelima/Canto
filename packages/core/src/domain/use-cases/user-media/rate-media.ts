@@ -2,7 +2,7 @@ import type { Database } from "@canto/db/client";
 import {
   upsertUserMediaState,
   upsertUserRating,
-} from "../../../infrastructure/repositories";
+} from "../../../infra/repositories";
 
 export interface RateMediaInput {
   mediaId: string;

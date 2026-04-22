@@ -4,14 +4,14 @@ import {
   deleteUserRating,
   upsertUserMediaState,
   upsertUserRating,
-} from "../../../infrastructure/repositories";
+} from "../../../infra/repositories";
 import {
   addTraktRatings,
   listTraktRatings,
   removeTraktRatings,
   type TraktIds,
   type TraktMediaRef,
-} from "../../../infrastructure/adapters/trakt/client";
+} from "../../../infra/trakt/trakt.adapter";
 import {
   decidePresenceAction,
   dedupeByKey,

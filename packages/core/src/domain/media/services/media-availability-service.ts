@@ -1,5 +1,5 @@
 import type { Database } from "@canto/db/client";
-import { findMediaVersionsWithEpisodes } from "../../../infrastructure/repositories/media/media-version-repository";
+import { findMediaVersionsWithEpisodes } from "../../../infra/media/media-version-repository";
 
 /**
  * Get media availability across all sources (downloads, Jellyfin, Plex).

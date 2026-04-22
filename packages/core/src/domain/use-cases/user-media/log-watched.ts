@@ -1,5 +1,5 @@
 import type { Database } from "@canto/db/client";
-import { logAndSwallow } from "../../../lib/log-error";
+import { logAndSwallow } from "../../../platform/logger/log-error";
 import {
   addUserWatchHistory,
   computeAndSyncMediaRating,
@@ -8,7 +8,7 @@ import {
   findUserWatchHistoryByMedia,
   upsertUserMediaState,
   upsertUserRating,
-} from "../../../infrastructure/repositories";
+} from "../../../infra/repositories";
 import { EpisodeNotFoundError, InvalidWatchInputError, SeasonNotFoundError } from "@canto/core/domain/user-media/errors";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import {

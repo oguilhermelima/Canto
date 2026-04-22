@@ -5,7 +5,7 @@ import {
   findUserPlaybackProgressByMedia,
   findUserWatchHistoryByMedia,
   upsertUserMediaState,
-} from "../../../infrastructure/repositories";
+} from "../../../infra/repositories";
 import {
   isMediaType,
   isReleasedOnOrBefore,

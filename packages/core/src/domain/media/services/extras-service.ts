@@ -4,7 +4,7 @@ import {
   findVideosByMediaId,
   findWatchProvidersByMediaId,
   findRecommendationsBySource,
-} from "../../../infrastructure/repositories/content-enrichment/extras";
+} from "../../../infra/content-enrichment/extras-repository";
 import { translateMediaItems } from "../../shared/services/translation-service";
 import { mapPoolItem } from "../../shared/mappers/media-mapper";
 

@@ -7,16 +7,16 @@ import { getActiveUserLanguages } from "../../shared/services/user-service";
 import type { FileSystemPort } from "../../shared/ports/file-system.port";
 import { parseFolderMediaInfo } from "../../torrents/rules/parsing";
 import { VIDEO_EXTENSIONS } from "../../shared/rules/naming";
-import { getTmdbProvider } from "../../../lib/tmdb-client";
+import { getTmdbProvider } from "../../../platform/http/tmdb-client";
 import {
   findMediaByAnyReference,
   updateMedia,
-} from "../../../infrastructure/repositories/media/media-repository";
+} from "../../../infra/media/media-repository";
 import {
   ensureServerLibrary,
   addListItem,
-} from "../../../infrastructure/repositories/lists/list";
-import { dispatchMediaPipeline } from "../../../infrastructure/queue/bullmq-dispatcher";
+} from "../../../infra/lists/list-repository";
+import { dispatchMediaPipeline } from "../../../platform/queue/bullmq-dispatcher";
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                    */

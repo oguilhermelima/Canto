@@ -2,7 +2,7 @@ import type { Database } from "@canto/db/client";
 import {
   addListItem,
   ensureServerLibrary,
-} from "../../../infrastructure/repositories/lists/list";
+} from "../../../infra/lists/list-repository";
 
 export async function addMediaToServerLibrary(db: Database, mediaId: string) {
   const serverLib = await ensureServerLibrary(db);

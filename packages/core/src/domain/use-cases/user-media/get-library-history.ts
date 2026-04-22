@@ -5,7 +5,7 @@ import {
   findUserWatchHistoryByMediaIds,
   findUserWatchHistoryFeed,
   type LibraryFeedFilterOptions,
-} from "../../../infrastructure/repositories";
+} from "../../../infra/repositories";
 import { getUserLanguage } from "../../shared/services/user-service";
 import {
   isReleasedOnOrBefore,

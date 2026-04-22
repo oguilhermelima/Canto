@@ -1,6 +1,6 @@
 import type { Database } from "@canto/db/client";
-import { logAndSwallow } from "../../../lib/log-error";
-import { upsertUserMediaState } from "../../../infrastructure/repositories";
+import { logAndSwallow } from "../../../platform/logger/log-error";
+import { upsertUserMediaState } from "../../../infra/repositories";
 import {
   getUserMediaState,
   type UserMediaStateResponse,

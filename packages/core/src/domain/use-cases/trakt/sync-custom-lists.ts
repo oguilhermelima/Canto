@@ -1,10 +1,10 @@
 import { and, asc, eq, isNull, isNotNull } from "drizzle-orm";
 import { list, traktListLink } from "@canto/db/schema";
-import { createList } from "../../../infrastructure/repositories";
+import { createList } from "../../../infra/repositories";
 import {
   findTraktListLinksByConnection,
   upsertTraktListLink,
-} from "../../../infrastructure/repositories/trakt/trakt-sync";
+} from "../../../infra/trakt/trakt-sync-repository";
 import {
   addItemsToTraktList,
   createTraktList,
@@ -12,7 +12,7 @@ import {
   listTraktListItems,
   listTraktPersonalLists,
   removeItemsFromTraktList,
-} from "../../../infrastructure/adapters/trakt/client";
+} from "../../../infra/trakt/trakt.adapter";
 import {
   findOrCreateUniqueListSlug,
   syncSingleListMembership,

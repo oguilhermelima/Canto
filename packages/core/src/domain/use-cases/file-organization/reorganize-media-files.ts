@@ -16,7 +16,7 @@ import {
   findTorrentsByMediaId,
   updateMediaFile,
   updateTorrent,
-} from "../../../infrastructure/repositories";
+} from "../../../infra/repositories";
 
 // ── Public types ───────────────────────────────────────────────────────────
 

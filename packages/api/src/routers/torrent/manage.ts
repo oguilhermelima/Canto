@@ -9,8 +9,8 @@ import {
   getByIdInput,
 } from "@canto/validators";
 
-import { getDownloadClient } from "@canto/core/infrastructure/adapters/torrent-clients/download-client-factory";
-import { getQBClient } from "@canto/core/infrastructure/adapters/torrent-clients/qbittorrent";
+import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
+import { getQBClient } from "@canto/core/infra/torrent-clients/qbittorrent.adapter";
 import {
   downloadTorrent,
   replaceTorrent,
@@ -21,7 +21,7 @@ import {
   findTorrentById,
   updateTorrent,
   deleteTorrent as deleteTorrentRecord,
-} from "@canto/core/infrastructure/repositories/torrents";
+} from "@canto/core/infra/repositories";
 
 import { createTRPCRouter, adminProcedure } from "../../trpc";
 

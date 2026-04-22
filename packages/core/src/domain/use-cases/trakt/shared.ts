@@ -5,13 +5,13 @@ import {
   addListItem,
   findMediaByAnyReference,
   removeListItem,
-} from "../../../infrastructure/repositories";
+} from "../../../infra/repositories";
 import type {
   TraktIds,
   TraktMediaRef,
-} from "../../../infrastructure/adapters/trakt/client";
-import { getTmdbProvider } from "../../../lib/tmdb-client";
-import { getTvdbProvider } from "../../../lib/tvdb-client";
+} from "../../../infra/trakt/trakt.adapter";
+import { getTmdbProvider } from "../../../platform/http/tmdb-client";
+import { getTvdbProvider } from "../../../platform/http/tvdb-client";
 import { slugify } from "../../shared/rules/slugify";
 import { persistMediaUseCase } from "../media/persist";
 

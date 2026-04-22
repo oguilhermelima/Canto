@@ -10,8 +10,8 @@ import {
 } from "@canto/db/schema";
 import type { Database } from "@canto/db/client";
 
-import { logAndSwallow } from "../../../../lib/log-error";
-import { dispatchMediaPipeline } from "../../../../infrastructure/queue/bullmq-dispatcher";
+import { logAndSwallow } from "../../../../platform/logger/log-error";
+import { dispatchMediaPipeline } from "../../../../platform/queue/bullmq-dispatcher";
 
 /**
  * Persist media extras (credits, videos, watch providers, recommendations).

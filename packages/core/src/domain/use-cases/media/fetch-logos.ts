@@ -6,8 +6,8 @@ import { getActiveUserLanguages } from "../../shared/services/user-service";
 import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import type { SearchResult } from "@canto/providers";
 import { upsertLangLogos } from "../content-enrichment/upsert-lang-logos";
-import { dispatchMediaPipeline } from "../../../infrastructure/queue/bullmq-dispatcher";
-import { logAndSwallow } from "../../../lib/log-error";
+import { dispatchMediaPipeline } from "../../../platform/queue/bullmq-dispatcher";
+import { logAndSwallow } from "../../../platform/logger/log-error";
 
 /** Deduplicates concurrent getImages calls for the same externalId */
 const inflightFetches = new Map<string, Promise<string | undefined>>();

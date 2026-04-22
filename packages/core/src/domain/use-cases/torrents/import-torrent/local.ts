@@ -5,11 +5,11 @@ import type { FileSystemPort } from "../../../shared/ports/file-system.port";
 import { buildMediaDir } from "../../../shared/rules/naming";
 import { EP_PATTERN } from "../../../torrents/rules/parsing";
 import { createNotification } from "../../notifications/create-notification";
-import { findNotificationByTypeAndMedia } from "../../../../infrastructure/repositories";
+import { findNotificationByTypeAndMedia } from "../../../../infra/repositories";
 import {
   type ParsedFile,
   buildSubtitleName,
-} from "../../../../infrastructure/adapters/filesystem";
+} from "../../../../platform/fs/filesystem";
 import { upsertMediaFile } from "./shared";
 
 interface MediaNaming {

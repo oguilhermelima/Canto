@@ -11,14 +11,14 @@ import {
   loginPlex,
 } from "@canto/core/domain/use-cases/media-servers/authenticate";
 import { discoverServerLibraries } from "@canto/core/domain/use-cases/media-servers/discover-libraries";
-import { getJellyfinCurrentUserId } from "@canto/core/infrastructure/adapters/media-servers/jellyfin";
-import { authenticatePlexServerToken } from "@canto/core/infrastructure/adapters/media-servers/plex";
-import { upsertServerLink } from "@canto/core/infrastructure/repositories/file-organization/folder";
+import { getJellyfinCurrentUserId } from "@canto/core/infra/media-servers/jellyfin.adapter";
+import { authenticatePlexServerToken } from "@canto/core/infra/media-servers/plex.adapter";
+import { upsertServerLink } from "@canto/core/infra/file-organization/folder-repository";
 import {
   dispatchJellyfinSync,
   dispatchPlexSync,
-} from "@canto/core/infrastructure/queue/bullmq-dispatcher";
-import { logAndSwallow } from "@canto/core/lib/log-error";
+} from "@canto/core/platform/queue/bullmq-dispatcher";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
 /**

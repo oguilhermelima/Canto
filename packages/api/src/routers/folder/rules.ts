@@ -16,14 +16,14 @@ import {
   removeServerLink,
   updateServerLink,
   upsertServerLink,
-} from "@canto/core/infrastructure/repositories/file-organization/folder";
-import { findMediaById } from "@canto/core/infrastructure/repositories/media/media-repository";
-import { findWatchProvidersByMediaId } from "@canto/core/infrastructure/repositories/content-enrichment/extras";
+} from "@canto/core/infra/file-organization/folder-repository";
+import { findMediaById } from "@canto/core/infra/media/media-repository";
+import { findWatchProvidersByMediaId } from "@canto/core/infra/content-enrichment/extras-repository";
 import {
   dispatchJellyfinSync,
   dispatchPlexSync,
-} from "@canto/core/infrastructure/queue/bullmq-dispatcher";
-import { logAndSwallow } from "@canto/core/lib/log-error";
+} from "@canto/core/platform/queue/bullmq-dispatcher";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 import {
   resolveFolder,
   type RoutableMedia,

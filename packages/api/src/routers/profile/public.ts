@@ -1,25 +1,25 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
-import { findPublicUserProfile } from "@canto/core/infrastructure/repositories/user/user";
+import { findPublicUserProfile } from "@canto/core/infra/user/user-repository";
 import {
   findUserListsWithCounts,
   findPublicListBySlug,
   findListItems,
-} from "@canto/core/infrastructure/repositories/lists/list";
+} from "@canto/core/infra/lists/list-repository";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
 import { translateMediaItems } from "@canto/core/domain/shared/services/translation-service";
-import { findProfileSections } from "@canto/core/infrastructure/repositories/profile/profile-section";
+import { findProfileSections } from "@canto/core/infra/profile/profile-section-repository";
 import {
   findUserMediaPaginated,
   findUserMediaCounts,
-} from "@canto/core/infrastructure/repositories/user-media/library-feed";
-import { findUserWatchTimeStats } from "@canto/core/infrastructure/repositories/user-media/stats";
+} from "@canto/core/infra/user-media/library-feed-repository";
+import { findUserWatchTimeStats } from "@canto/core/infra/user-media/stats-repository";
 import {
   findUserTopGenres,
   findUserRecentActivity,
   findUserProfileInsights,
-} from "@canto/core/infrastructure/repositories/user-media/profile-insights";
+} from "@canto/core/infra/user-media/profile-insights-repository";
 import { DEFAULT_PROFILE_SECTIONS } from "@canto/db/profile-section-defaults";
 
 const idInput = z.object({ id: z.string().min(1) });

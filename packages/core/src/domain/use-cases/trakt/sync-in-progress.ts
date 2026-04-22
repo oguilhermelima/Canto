@@ -1,9 +1,9 @@
-import { findEpisodeIdByMediaAndNumbers } from "../../../infrastructure/repositories";
-import { upsertUserPlaybackProgress } from "../../../infrastructure/repositories/user-media";
+import { findEpisodeIdByMediaAndNumbers } from "../../../infra/repositories";
+import { upsertUserPlaybackProgress } from "../../../infra/repositories";
 import {
   listTraktPlaybackProgress,
   type TraktPlaybackProgressRef,
-} from "../../../infrastructure/adapters/trakt/client";
+} from "../../../infra/trakt/trakt.adapter";
 import {
   parseDateOrNow,
   resolveMediaFromTraktRef,

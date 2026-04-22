@@ -1,6 +1,6 @@
 import type { Database } from "@canto/db/client";
-import { cached } from "../../../infrastructure/cache/redis";
-import { getTmdbProvider } from "../../../lib/tmdb-client";
+import { cached } from "../../../platform/cache/redis";
+import { getTmdbProvider } from "../../../platform/http/tmdb-client";
 import { getUserWatchPreferences } from "../../shared/services/user-service";
 import type { SearchResult } from "@canto/providers";
 

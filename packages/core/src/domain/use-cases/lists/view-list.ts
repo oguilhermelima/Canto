@@ -4,7 +4,7 @@ import { ListNotFoundError } from "@canto/core/domain/lists/errors";
 import {
   findListBySlug,
   findListItems,
-} from "../../../infrastructure/repositories/lists/list";
+} from "../../../infra/lists/list-repository";
 import { getUserLanguage } from "../../shared/services/user-service";
 import { translateMediaItems } from "../../shared/services/translation-service";
 

@@ -4,7 +4,7 @@ import {
   type PlexStreamEntry,
   type PlexStreamMedia,
   type PlexStreamMetadataItem,
-} from "../../../../infrastructure/adapters/media-servers/plex";
+} from "../../../../infra/media-servers/plex.adapter";
 import {
   dedupeLangs,
   normalizeLang,

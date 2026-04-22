@@ -6,11 +6,11 @@ import { createTRPCRouter, adminProcedure, protectedProcedure } from "../../trpc
 import {
   updateMedia,
   deleteMedia,
-} from "@canto/core/infrastructure/repositories/media/media-repository";
-import { findMediaFilesByMediaId } from "@canto/core/infrastructure/repositories/media/media-file-repository";
+} from "@canto/core/infra/media/media-repository";
+import { findMediaFilesByMediaId } from "@canto/core/infra/media/media-file-repository";
 import { setLibraryStatus } from "@canto/core/domain/use-cases/lists/manage-library-status";
-import { findServerLibrary, removeListItem } from "@canto/core/infrastructure/repositories/lists/list";
-import { revertRequestStatus } from "@canto/core/infrastructure/repositories/requests";
+import { findServerLibrary, removeListItem } from "@canto/core/infra/lists/list-repository";
+import { revertRequestStatus } from "@canto/core/infra/repositories";
 
 export const mediaLibraryRouter = createTRPCRouter({
   addToLibrary: adminProcedure

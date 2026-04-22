@@ -4,7 +4,7 @@ import type { DownloadClientPort } from "../../../shared/ports/download-client";
 import {
   deleteMediaFile,
   findTorrentByTitle,
-} from "../../../../infrastructure/repositories";
+} from "../../../../infra/repositories";
 import { coreDownload, type DownloadInput } from "./core";
 
 type TorrentRow = NonNullable<Awaited<ReturnType<typeof findTorrentByTitle>>>;

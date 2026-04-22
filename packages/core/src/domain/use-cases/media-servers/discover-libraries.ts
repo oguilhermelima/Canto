@@ -1,10 +1,10 @@
 import { eq, and } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { userConnection } from "@canto/db/schema";
-import { getJellyfinCredentials, getPlexCredentials } from "../../../lib/server-credentials";
-import { getJellyfinLibraryFolders } from "../../../infrastructure/adapters/media-servers/jellyfin";
-import { getPlexSections } from "../../../infrastructure/adapters/media-servers/plex";
-import { findAllServerLinks } from "../../../infrastructure/repositories/file-organization/folder";
+import { getJellyfinCredentials, getPlexCredentials } from "../../../platform/secrets/server-credentials";
+import { getJellyfinLibraryFolders } from "../../../infra/media-servers/jellyfin.adapter";
+import { getPlexSections } from "../../../infra/media-servers/plex.adapter";
+import { findAllServerLinks } from "../../../infra/file-organization/folder-repository";
 
 type DiscoveredLibrary = {
   serverType: string;

@@ -10,7 +10,7 @@ import {
   findUserLibraryStats,
   findUserMediaCounts,
   findUserMediaPaginated,
-} from "@canto/core/infrastructure/repositories";
+} from "@canto/core/infra/repositories";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
 import { getLibraryWatchNext } from "@canto/core/domain/use-cases/user-media/get-library-watch-next";
 import { getUpcomingSchedule } from "@canto/core/domain/use-cases/user-media/get-upcoming-schedule";

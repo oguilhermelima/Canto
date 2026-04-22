@@ -5,8 +5,8 @@ import type { DownloadClientPort } from "../../../shared/ports/download-client";
 import {
   createMediaFileNoConflict,
   updateMediaFile,
-} from "../../../../infrastructure/repositories";
-import type { ParsedFile } from "../../../../infrastructure/adapters/filesystem";
+} from "../../../../infra/repositories";
+import type { ParsedFile } from "../../../../platform/fs/filesystem";
 
 /**
  * Resolve the save path qBittorrent reports for a given hash. Used to locate

@@ -1,10 +1,10 @@
 import type { Database } from "@canto/db/client";
 import type { UpdateCollectionLayoutInput } from "@canto/validators";
-import { findUserListsWithCounts } from "../../../infrastructure/repositories/lists/list";
+import { findUserListsWithCounts } from "../../../infra/lists/list-repository";
 import {
   findUserPreferences,
   upsertUserPreference,
-} from "../../../infrastructure/repositories/file-organization/library";
+} from "../../../infra/file-organization/library-repository";
 import {
   normalizeCollectionLayout,
   parseCollectionLayoutPreference,

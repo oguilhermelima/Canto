@@ -4,8 +4,8 @@ import type { LiveData } from "../../torrents/types/torrent";
 import {
   updateTorrent,
   updateTorrentBatch,
-} from "../../../infrastructure/repositories";
-import { logAndSwallow } from "../../../lib/log-error";
+} from "../../../infra/repositories";
+import { logAndSwallow } from "../../../platform/logger/log-error";
 
 type TorrentRow = Awaited<ReturnType<Database["query"]["torrent"]["findMany"]>>[number];
 

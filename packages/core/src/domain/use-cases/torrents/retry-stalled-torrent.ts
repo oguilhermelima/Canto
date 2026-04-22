@@ -10,7 +10,7 @@ import { downloadTorrent } from "./download-torrent";
 import {
   createBlocklistEntry,
   findTorrentById,
-} from "../../../infrastructure/repositories";
+} from "../../../infra/repositories";
 
 interface StalledTorrent {
   id: string;

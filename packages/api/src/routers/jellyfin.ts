@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 
 import { toggleLibraryInput, mergeJellyfinVersionsInput } from "@canto/validators";
-import { getJellyfinCredentials } from "@canto/core/lib/server-credentials";
+import { getJellyfinCredentials } from "@canto/core/platform/secrets/server-credentials";
 import { createTRPCRouter, adminProcedure } from "../trpc";
 import { syncJellyfinLibraries } from "@canto/core/domain/use-cases/media-servers/sync-libraries/jellyfin";
 import {
@@ -9,8 +9,8 @@ import {
   scanJellyfinLibrary,
   mergeJellyfinVersions,
   getJellyfinLibraryFolders,
-} from "@canto/core/infrastructure/adapters/media-servers/jellyfin";
-import { updateFolder } from "@canto/core/infrastructure/repositories/file-organization/folder";
+} from "@canto/core/infra/media-servers/jellyfin.adapter";
+import { updateFolder } from "@canto/core/infra/file-organization/folder-repository";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                    */

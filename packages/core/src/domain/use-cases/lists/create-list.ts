@@ -4,7 +4,7 @@ import { InvalidListNameError, ListNameConflictError } from "@canto/core/domain/
 import {
   createList,
   findUserDefaultVisibility,
-} from "../../../infrastructure/repositories/lists/list";
+} from "../../../infra/lists/list-repository";
 import { slugify } from "../../shared/rules/slugify";
 
 const RESERVED_SLUGS = new Set(["server-library", "watchlist"]);

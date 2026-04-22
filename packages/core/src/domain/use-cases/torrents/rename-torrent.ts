@@ -2,8 +2,8 @@ import type { Database } from "@canto/db/client";
 import {
   findTorrentById,
   updateTorrent,
-} from "../../../infrastructure/repositories/torrents";
-import { getQBClient } from "../../../infrastructure/adapters/torrent-clients/qbittorrent";
+} from "../../../infra/repositories";
+import { getQBClient } from "../../../infra/torrent-clients/qbittorrent.adapter";
 
 /**
  * Rename a torrent's main file in qBittorrent.

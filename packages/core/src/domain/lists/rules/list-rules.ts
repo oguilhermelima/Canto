@@ -1,7 +1,7 @@
 import type { Database } from "@canto/db/client";
 import { ListNotFoundError, ListPermissionError, SystemListModificationError } from "@canto/core/domain/lists/errors";
-import { findListById } from "../../../infrastructure/repositories/lists/list";
-import { findListMember } from "../../../infrastructure/repositories/lists/member";
+import { findListById } from "../../../infra/lists/list-repository";
+import { findListMember } from "../../../infra/lists/member-repository";
 
 // ── Ownership ──
 

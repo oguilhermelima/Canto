@@ -3,8 +3,8 @@ import type { DownloadClientPort } from "../../shared/ports/download-client";
 import {
   findAllTorrentsPaginated,
   countAllTorrents,
-} from "../../../infrastructure/repositories/torrents";
-import { findMediaById } from "../../../infrastructure/repositories/media/media-repository";
+} from "../../../infra/repositories";
+import { findMediaById } from "../../../infra/media/media-repository";
 import { mergeLiveData } from "../media/merge-live-data";
 
 /**

@@ -1,6 +1,6 @@
 import type { Database } from "@canto/db/client";
 import { verifyListOwnership } from "../../lists/rules/list-rules";
-import { removeListMember } from "../../../infrastructure/repositories/lists/member";
+import { removeListMember } from "../../../infra/lists/member-repository";
 
 export async function removeMemberFromList(
   db: Database,

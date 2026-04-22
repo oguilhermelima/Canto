@@ -9,7 +9,7 @@ import {
   getPlexTvUser,
   plexTvSignIn,
   testPlexConnection,
-} from "../../../../infrastructure/adapters/media-servers/plex";
+} from "../../../../infra/media-servers/plex.adapter";
 import { fetchError } from "./shared";
 
 async function getOrCreatePlexClientId(): Promise<string> {

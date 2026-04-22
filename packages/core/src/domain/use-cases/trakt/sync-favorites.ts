@@ -1,13 +1,13 @@
 import { and, eq } from "drizzle-orm";
 import { media, userMediaState } from "@canto/db/schema";
-import { upsertUserMediaState } from "../../../infrastructure/repositories";
+import { upsertUserMediaState } from "../../../infra/repositories";
 import {
   addTraktFavorites,
   listTraktFavorites,
   removeTraktFavorites,
   type TraktIds,
   type TraktMediaRef,
-} from "../../../infrastructure/adapters/trakt/client";
+} from "../../../infra/trakt/trakt.adapter";
 import {
   decidePresenceAction,
   dedupeByKey,

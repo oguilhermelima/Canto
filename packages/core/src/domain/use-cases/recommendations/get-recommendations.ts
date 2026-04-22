@@ -7,13 +7,13 @@ import {
   findUserRecommendations,
   countUserRecommendations,
   type RecsFilters,
-} from "../../../infrastructure/repositories/recommendations/user-recommendation";
+} from "../../../infra/recommendations/user-recommendation-repository";
 import {
   findGlobalRecommendations,
-} from "../../../infrastructure/repositories/content-enrichment/extras";
+} from "../../../infra/content-enrichment/extras-repository";
 import {
   findLibraryMediaBrief,
-} from "../../../infrastructure/repositories/media/media-repository";
+} from "../../../infra/media/media-repository";
 
 interface GetRecommendationsInput {
   userId: string;

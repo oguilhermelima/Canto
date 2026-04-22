@@ -2,7 +2,7 @@ import type { Database } from "@canto/db/client";
 import {
   findUserMediaState,
   findUserPlaybackProgress,
-} from "../../../infrastructure/repositories";
+} from "../../../infra/repositories";
 
 export interface UserMediaStateResponse {
   mediaId: string;

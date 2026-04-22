@@ -11,7 +11,7 @@ import type { IndexerPort } from "../../torrents/ports/indexer";
 import {
   findMediaById,
   findBlocklistByMediaId,
-} from "../../../infrastructure/repositories";
+} from "../../../infra/repositories";
 
 export interface SearchResult {
   guid: string;
