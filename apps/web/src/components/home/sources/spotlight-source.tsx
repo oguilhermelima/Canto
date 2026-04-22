@@ -1,6 +1,6 @@
 "use client";
 
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import type { SectionItem } from "../section-item";
 import { DynamicSection } from "../dynamic-section";
 import { useSectionQuery } from "./use-section-query";

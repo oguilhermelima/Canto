@@ -1,6 +1,6 @@
 "use client";
 
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 
 /**
  * Fetches the logo for a single media item.

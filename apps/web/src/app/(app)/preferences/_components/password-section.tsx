@@ -5,8 +5,8 @@ import { Button } from "@canto/ui/button";
 import { PasswordInput } from "@canto/ui/password-input";
 import { Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { authClient } from "~/lib/auth-client";
-import { SettingsSection } from "~/components/settings/shared";
+import { authClient } from "@/lib/auth-client";
+import { SettingsSection } from "@/components/settings/shared";
 
 export function PasswordSection(): React.JSX.Element {
   const [currentPassword, setCurrentPassword] = useState("");

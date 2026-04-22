@@ -12,8 +12,8 @@ import {
 } from "@canto/ui/dialog";
 import { Loader2, Upload, ImageIcon, X } from "lucide-react";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
-import { fileToBase64 } from "~/lib/file-to-base64";
+import { trpc } from "@/lib/trpc/client";
+import { fileToBase64 } from "@/lib/file-to-base64";
 
 const MAX_HEADER_SIZE = 4 * 1024 * 1024; // 4MB
 

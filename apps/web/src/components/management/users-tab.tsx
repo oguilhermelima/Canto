@@ -3,8 +3,8 @@
 import { Badge } from "@canto/ui/badge";
 import { Skeleton } from "@canto/ui/skeleton";
 import { ShieldCheck } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
-import { SettingsSection } from "~/components/settings/shared";
+import { trpc } from "@/lib/trpc/client";
+import { SettingsSection } from "@/components/settings/shared";
 import { StateMessage } from "@canto/ui/state-message";
 
 function formatDate(date: Date | string): string {

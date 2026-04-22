@@ -11,9 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@canto/ui/select";
-import { trpc } from "~/lib/trpc/client";
-import { useWatchRegion } from "~/hooks/use-watch-region";
-import { useDirectSearch } from "~/hooks/use-direct-search";
+import { trpc } from "@/lib/trpc/client";
+import { useWatchRegion } from "@/hooks/use-watch-region";
+import { useDirectSearch } from "@/hooks/use-direct-search";
 import type { ConfigureFooter } from "../../_components/onboarding-footer";
 import { StepHeader } from "../../_components/step-header";
 

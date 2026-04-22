@@ -9,7 +9,7 @@ import {
   ExternalLink,
   Server,
 } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import { epKey } from "./use-manage-modal";
 import type { SeasonData } from "./content-season-list";
 import type { useManageModal } from "./use-manage-modal";

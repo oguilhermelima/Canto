@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { FadeImage } from "~/components/ui/fade-image";
-import { tmdbBackdropLoader } from "~/lib/tmdb-image";
+import { FadeImage } from "@/components/ui/fade-image";
+import { tmdbBackdropLoader } from "@/lib/tmdb-image";
 import { Skeleton } from "@canto/ui/skeleton";
 import {
   Popover,
@@ -13,12 +13,12 @@ import {
 import { ChevronRight, Settings2 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
-import { AddToListButton } from "~/components/media/add-to-list-button";
-import { MediaLogo } from "~/components/media/media-logo";
-import { RatingControl } from "~/components/media/RatingControl";
-import { RatingInline } from "~/components/media/rating-badge";
-import { WatchTrackingButton } from "~/components/media/watched-toggle-button";
-import { FavoriteButton } from "~/components/media/favorite-button";
+import { AddToListButton } from "@/components/media/add-to-list-button";
+import { MediaLogo } from "@/components/media/media-logo";
+import { RatingControl } from "@/components/media/RatingControl";
+import { RatingInline } from "@/components/media/rating-badge";
+import { WatchTrackingButton } from "@/components/media/watched-toggle-button";
+import { FavoriteButton } from "@/components/media/favorite-button";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 

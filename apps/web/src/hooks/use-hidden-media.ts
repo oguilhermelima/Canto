@@ -2,7 +2,7 @@
 
 import { useMemo, useCallback } from "react";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 
 interface HideParams {
   externalId: number | string;

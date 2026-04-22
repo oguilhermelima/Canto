@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { cn } from "@canto/ui/cn";
 import { Wand2, Link2, MonitorSmartphone, ShieldCheck, ShieldAlert } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import type { ConfigureFooter } from "../_components/onboarding-footer";
 import { StepHeader } from "../_components/step-header";
 

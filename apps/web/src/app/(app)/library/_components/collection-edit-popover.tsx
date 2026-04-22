@@ -14,7 +14,7 @@ import {
 import { Popover, PopoverAnchor, PopoverContent } from "@canto/ui/popover";
 import { EllipsisVertical, Globe, Lock, Loader2, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 
 const VISIBILITY_OPTIONS = [
   { value: "private", label: "Private", icon: Lock },

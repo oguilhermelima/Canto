@@ -2,12 +2,12 @@
 
 import {
   LibraryPlaybackCard,
-} from "~/app/(app)/library/_components/library-playback-card";
-import type { LibraryPlaybackEntry } from "~/app/(app)/library/_components/library-playback-card";
-import { MediaCard, MediaCardSkeleton } from "~/components/media/media-card";
-import { RatingBadgeStack } from "~/components/media/rating-badge";
-import { GRID_COLS } from "~/components/layout/browse-layout.types";
-import type { CardStrategy, BrowseItem } from "~/components/layout/browse-layout.types";
+} from "@/app/(app)/library/_components/library-playback-card";
+import type { LibraryPlaybackEntry } from "@/app/(app)/library/_components/library-playback-card";
+import { MediaCard, MediaCardSkeleton } from "@/components/media/media-card";
+import { RatingBadgeStack } from "@/components/media/rating-badge";
+import { GRID_COLS } from "@/components/layout/browse-layout.types";
+import type { CardStrategy, BrowseItem } from "@/components/layout/browse-layout.types";
 
 function toPlaybackEntry(item: BrowseItem): LibraryPlaybackEntry {
   return {

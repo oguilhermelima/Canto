@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Bookmark, CheckCircle2, Clock3, History, Tv } from "lucide-react";
 import { cn } from "@canto/ui/cn";
-import { mediaHref } from "~/lib/media-href";
+import { mediaHref } from "@/lib/media-href";
 
 export interface LibraryPlaybackEntry {
   id: string;

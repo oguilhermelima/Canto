@@ -4,9 +4,9 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { SectionTitle } from "@canto/ui/section-title";
-import { MediaCard, MediaCardSkeleton } from "~/components/media/media-card";
-import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
-import { mediaHref } from "~/lib/media-href";
+import { MediaCard, MediaCardSkeleton } from "@/components/media/media-card";
+import { useScrollCarousel } from "@/hooks/use-scroll-carousel";
+import { mediaHref } from "@/lib/media-href";
 
 export interface Top10Item {
   externalId: number;

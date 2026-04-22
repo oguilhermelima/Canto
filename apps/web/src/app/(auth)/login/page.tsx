@@ -8,8 +8,8 @@ import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
 import { FormField } from "@canto/ui/form-field";
 import { PasswordInput } from "@canto/ui/password-input";
-import { authClient } from "~/lib/auth-client";
-import { useDocumentTitle } from "~/hooks/use-document-title";
+import { authClient } from "@/lib/auth-client";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function LoginPage(): React.JSX.Element {
   return (

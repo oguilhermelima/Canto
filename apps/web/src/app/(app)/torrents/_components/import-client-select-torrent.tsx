@@ -5,7 +5,7 @@ import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
 import { Skeleton } from "@canto/ui/skeleton";
 import { StateMessage } from "@canto/ui/state-message";
-import { formatBytes, formatEta, formatSpeed } from "~/lib/torrent-utils";
+import { formatBytes, formatEta, formatSpeed } from "@/lib/torrent-utils";
 import type { ClientTorrentItem } from "../_lib/import-types";
 
 const MODAL_INPUT_CN =

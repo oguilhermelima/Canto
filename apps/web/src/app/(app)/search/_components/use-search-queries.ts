@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from "react";
-import { trpc } from "~/lib/trpc/client";
-import type { FilterOutput } from "~/components/layout/browse-layout";
+import { trpc } from "@/lib/trpc/client";
+import type { FilterOutput } from "@/components/layout/browse-layout";
 
 interface UseSearchQueriesInput {
   query: string;

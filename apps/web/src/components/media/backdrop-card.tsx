@@ -1,17 +1,17 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { FadeImage } from "~/components/ui/fade-image";
+import { FadeImage } from "@/components/ui/fade-image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
 import { EyeOff, Film, Tv } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
-import { tmdbThumbLoader } from "~/lib/tmdb-image";
-import { mediaHref } from "~/lib/media-href";
+import { trpc } from "@/lib/trpc/client";
+import { tmdbThumbLoader } from "@/lib/tmdb-image";
+import { mediaHref } from "@/lib/media-href";
 import { MediaLogo } from "./media-logo";
 import { RatingInline } from "./rating-badge";
-import { useLogo } from "~/hooks/use-logos";
+import { useLogo } from "@/hooks/use-logos";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 

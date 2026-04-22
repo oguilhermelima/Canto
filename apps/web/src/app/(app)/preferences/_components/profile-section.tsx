@@ -7,11 +7,11 @@ import { Input } from "@canto/ui/input";
 import { Switch } from "@canto/ui/switch";
 import { Save, Camera, Loader2, Upload, ImageIcon, X } from "lucide-react";
 import { toast } from "sonner";
-import { authClient } from "~/lib/auth-client";
-import { trpc } from "~/lib/trpc/client";
-import { SettingsSection } from "~/components/settings/shared";
+import { authClient } from "@/lib/auth-client";
+import { trpc } from "@/lib/trpc/client";
+import { SettingsSection } from "@/components/settings/shared";
 import { AvatarPickerDialog } from "../../profile/me/_components/avatar-picker-dialog";
-import { fileToBase64 } from "~/lib/file-to-base64";
+import { fileToBase64 } from "@/lib/file-to-base64";
 
 const MAX_HEADER_SIZE = 4 * 1024 * 1024; // 4MB
 

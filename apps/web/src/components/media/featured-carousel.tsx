@@ -6,11 +6,11 @@ import { cn } from "@canto/ui/cn";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { SectionTitle } from "@canto/ui/section-title";
 import { Skeleton } from "@canto/ui/skeleton";
-import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
-import { useHiddenMedia } from "~/hooks/use-hidden-media";
-import { FeaturedCard } from "~/components/media/cards/featured-card";
+import { useScrollCarousel } from "@/hooks/use-scroll-carousel";
+import { useHiddenMedia } from "@/hooks/use-hidden-media";
+import { FeaturedCard } from "@/components/media/cards/featured-card";
 
-export { FeaturedCard } from "~/components/media/cards/featured-card";
+export { FeaturedCard } from "@/components/media/cards/featured-card";
 
 export interface FeaturedItem {
   id?: string;

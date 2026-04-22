@@ -7,9 +7,9 @@ import { cn } from "@canto/ui/cn";
 import { Input } from "@canto/ui/input";
 import { Slider } from "@canto/ui/slider";
 import { ChevronDown, ArrowDown, ArrowUp, RotateCcw, Search, X } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
-import { useWatchRegion } from "~/hooks/use-watch-region";
-import type { FilterPreset } from "~/components/layout/browse-layout.types";
+import { trpc } from "@/lib/trpc/client";
+import { useWatchRegion } from "@/hooks/use-watch-region";
+import type { FilterPreset } from "@/components/layout/browse-layout.types";
 
 /* ─── Output Type ─── */
 

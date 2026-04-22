@@ -1,6 +1,6 @@
 "use client";
 
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import type { HomeSectionConfig } from "@canto/db/schema";
 import type { SectionItem } from "../section-item";
 import { DynamicSection } from "../dynamic-section";

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 
 const TORRENTS_PER_PAGE = 30;
 

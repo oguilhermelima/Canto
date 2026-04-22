@@ -6,9 +6,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Camera, Pencil, Settings, Share2 } from "lucide-react";
 import { toast } from "sonner";
-import { authClient } from "~/lib/auth-client";
-import { trpc } from "~/lib/trpc/client";
-import { tmdbBackdropLoader } from "~/lib/tmdb-image";
+import { authClient } from "@/lib/auth-client";
+import { trpc } from "@/lib/trpc/client";
+import { tmdbBackdropLoader } from "@/lib/tmdb-image";
 import { AvatarPickerDialog } from "./avatar-picker-dialog";
 import { ProfileEditDialog } from "./profile-edit-dialog";
 

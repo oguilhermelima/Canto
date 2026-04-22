@@ -2,9 +2,9 @@
 
 import { useMemo } from "react";
 import { History } from "lucide-react";
-import { MediaCard } from "~/components/media/media-card";
-import { RatingBadgeStack } from "~/components/media/rating-badge";
-import { trpc } from "~/lib/trpc/client";
+import { MediaCard } from "@/components/media/media-card";
+import { RatingBadgeStack } from "@/components/media/rating-badge";
+import { trpc } from "@/lib/trpc/client";
 import { LibraryCarousel } from "./library-carousel";
 
 const PAGE_SIZE = 24;

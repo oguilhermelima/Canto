@@ -14,11 +14,11 @@ import {
   ListChecks,
 } from "lucide-react";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import { StateMessage } from "@canto/ui/state-message";
-import { SettingField } from "~/components/settings/_primitives";
-import { SettingsSection } from "~/components/settings/shared";
-import { SyncItemsDialog } from "~/components/settings/sync-items-dialog";
+import { SettingField } from "@/components/settings/_primitives";
+import { SettingsSection } from "@/components/settings/shared";
+import { SyncItemsDialog } from "@/components/settings/sync-items-dialog";
 
 /* -------------------------------------------------------------------------- */
 /*  Relative time helper                                                       */

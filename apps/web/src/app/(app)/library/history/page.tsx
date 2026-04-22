@@ -1,12 +1,12 @@
 "use client";
 
-import { BrowseLayout } from "~/components/layout/browse-layout";
-import type { BrowseItem } from "~/components/layout/browse-layout.types";
-import { historyStrategy } from "~/components/layout/card-strategies";
+import { BrowseLayout } from "@/components/layout/browse-layout";
+import type { BrowseItem } from "@/components/layout/browse-layout.types";
+import { historyStrategy } from "@/components/layout/card-strategies";
 import { StateMessage } from "@canto/ui/state-message";
-import { useDocumentTitle } from "~/hooks/use-document-title";
-import { useLibraryBrowse } from "~/hooks/use-library-browse";
-import { useViewMode } from "~/hooks/use-view-mode";
+import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useLibraryBrowse } from "@/hooks/use-library-browse";
+import { useViewMode } from "@/hooks/use-view-mode";
 
 const DAY_MS = 86_400_000;
 

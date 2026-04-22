@@ -4,8 +4,8 @@ import Image from "next/image";
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
-import { tmdbBackdropLoader } from "~/lib/tmdb-image";
+import { trpc } from "@/lib/trpc/client";
+import { tmdbBackdropLoader } from "@/lib/tmdb-image";
 
 interface PublicProfile {
   id: string;

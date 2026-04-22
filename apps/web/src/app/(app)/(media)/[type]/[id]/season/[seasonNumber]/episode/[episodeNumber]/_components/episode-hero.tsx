@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { FadeImage } from "~/components/ui/fade-image";
-import { tmdbBackdropLoader } from "~/lib/tmdb-image";
+import { FadeImage } from "@/components/ui/fade-image";
+import { tmdbBackdropLoader } from "@/lib/tmdb-image";
 import { EpisodeInfo } from "./episode-info";
 
 interface EpisodeHeroProps {

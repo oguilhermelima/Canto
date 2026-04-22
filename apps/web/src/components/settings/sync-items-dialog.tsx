@@ -22,7 +22,7 @@ import { ConfirmationDialog } from "@canto/ui/confirmation-dialog";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import { TabBar } from "@canto/ui/tab-bar";
 import { StateMessage } from "@canto/ui/state-message";
 

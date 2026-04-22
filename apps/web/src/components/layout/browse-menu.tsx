@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
 } from "@canto/ui/dropdown-menu";
 import { EllipsisVertical, LayoutGrid, List } from "lucide-react";
-import type { ViewMode, BrowseMenuGroup } from "~/components/layout/browse-layout.types";
+import type { ViewMode, BrowseMenuGroup } from "@/components/layout/browse-layout.types";
 import { ResponsiveMenu } from "./responsive-menu";
 
 interface BrowseMenuProps {

@@ -10,9 +10,9 @@ import {
   DialogTitle,
 } from "@canto/ui/dialog";
 import { RotateCcw, X } from "lucide-react";
-import { FilterSidebar } from "~/components/media/filter-sidebar";
-import type { FilterOutput, FilterSidebarHandle, SectionId } from "~/components/media/filter-sidebar";
-import type { FilterPreset } from "~/components/layout/browse-layout.types";
+import { FilterSidebar } from "@/components/media/filter-sidebar";
+import type { FilterOutput, FilterSidebarHandle, SectionId } from "@/components/media/filter-sidebar";
+import type { FilterPreset } from "@/components/layout/browse-layout.types";
 
 interface AdvancedFilterProps {
   preset: FilterPreset;

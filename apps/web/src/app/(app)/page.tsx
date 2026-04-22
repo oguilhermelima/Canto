@@ -1,8 +1,8 @@
 "use client";
 
-import { trpc } from "~/lib/trpc/client";
-import { useDocumentTitle } from "~/hooks/use-document-title";
-import { HomeSectionList } from "~/components/home/home-section-list";
+import { trpc } from "@/lib/trpc/client";
+import { useDocumentTitle } from "@/hooks/use-document-title";
+import { HomeSectionList } from "@/components/home/home-section-list";
 import { StateMessage } from "@canto/ui/state-message";
 
 export default function DiscoverPage(): React.JSX.Element {

@@ -3,12 +3,12 @@
 import type { SectionItem } from "./section-item";
 import { SpotlightHero } from "./spotlight/spotlight-hero";
 import type { SpotlightItem } from "./spotlight/spotlight-hero";
-import { FeaturedCarousel } from "~/components/media/featured-carousel";
-import { BackdropCarousel } from "~/components/media/backdrop-carousel";
-import { MediaCarousel } from "~/components/media/media-carousel";
+import { FeaturedCarousel } from "@/components/media/featured-carousel";
+import { BackdropCarousel } from "@/components/media/backdrop-carousel";
+import { MediaCarousel } from "@/components/media/media-carousel";
 import { SectionTitle } from "@canto/ui/section-title";
 import { StateMessage } from "@canto/ui/state-message";
-import { mediaHref } from "~/lib/media-href";
+import { mediaHref } from "@/lib/media-href";
 import { useSectionDedup } from "./dedup-context";
 
 interface DynamicSectionProps {

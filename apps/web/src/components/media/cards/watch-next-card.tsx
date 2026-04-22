@@ -6,10 +6,10 @@ import Image from "next/image";
 import { Bookmark, Tv } from "lucide-react";
 import { Skeleton } from "@canto/ui/skeleton";
 import { cn } from "@canto/ui/cn";
-import { mediaHref } from "~/lib/media-href";
-import { useLogo } from "~/hooks/use-logos";
-import { MediaLogo } from "~/components/media/media-logo";
-import { tmdbThumbLoader } from "~/lib/tmdb-image";
+import { mediaHref } from "@/lib/media-href";
+import { useLogo } from "@/hooks/use-logos";
+import { MediaLogo } from "@/components/media/media-logo";
+import { tmdbThumbLoader } from "@/lib/tmdb-image";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 

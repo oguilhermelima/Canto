@@ -5,11 +5,11 @@ import Link from "next/link";
 import {
   MediaDetailHero,
   MediaDetailHeroSkeleton,
-} from "~/components/media/media-detail-hero";
-import { CastSection } from "~/components/media/cast-section";
-import { SimilarSection } from "~/components/media/similar-section";
-import { ManageModal } from "~/components/media/manage/manage-modal";
-import { DownloadModal } from "~/components/media/download/download-modal";
+} from "@/components/media/media-detail-hero";
+import { CastSection } from "@/components/media/cast-section";
+import { SimilarSection } from "@/components/media/similar-section";
+import { ManageModal } from "@/components/media/manage/manage-modal";
+import { DownloadModal } from "@/components/media/download/download-modal";
 import { useMediaDetail } from "./use-media-detail";
 import { AdminActions } from "./admin-actions";
 import { RequestSection } from "./request-section";

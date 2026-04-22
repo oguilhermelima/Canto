@@ -7,9 +7,9 @@ import Image from "next/image";
 import { Star } from "lucide-react";
 import { Button } from "@canto/ui/button";
 import { Skeleton } from "@canto/ui/skeleton";
-import { PageHeader } from "~/components/page-header";
-import { trpc } from "~/lib/trpc/client";
-import { useDocumentTitle } from "~/hooks/use-document-title";
+import { PageHeader } from "@/components/page-header";
+import { trpc } from "@/lib/trpc/client";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 const typeMap: Record<string, "movie" | "show"> = {
   movies: "movie",

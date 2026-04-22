@@ -14,11 +14,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@canto/ui/popover";
-import { PageHeader } from "~/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { TabBar } from "@canto/ui/tab-bar";
-import { trpc } from "~/lib/trpc/client";
-import { useDocumentTitle } from "~/hooks/use-document-title";
-import { useInfiniteScroll } from "~/hooks/use-infinite-scroll";
+import { trpc } from "@/lib/trpc/client";
+import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 
 const PAGE_SIZE = 20;
 

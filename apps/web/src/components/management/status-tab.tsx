@@ -17,8 +17,8 @@ import {
   MemoryStick,
 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
-import { trpc } from "~/lib/trpc/client";
-import { SettingsSection } from "~/components/settings/shared";
+import { trpc } from "@/lib/trpc/client";
+import { SettingsSection } from "@/components/settings/shared";
 
 /* ─── Helpers ─── */
 

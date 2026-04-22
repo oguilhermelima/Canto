@@ -2,7 +2,7 @@
 
 import { useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import { readFileAsBase64 } from "../_lib/read-file-base64";
 
 interface UseTorrentFileUploadArgs {

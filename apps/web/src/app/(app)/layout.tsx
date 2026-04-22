@@ -2,9 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import { Toaster } from "sonner";
-import { Topbar } from "~/components/layout/topbar";
-import { BottomNavbar } from "~/components/layout/bottom-navbar";
-import { trpc } from "~/lib/trpc/client";
+import { Topbar } from "@/components/layout/topbar";
+import { BottomNavbar } from "@/components/layout/bottom-navbar";
+import { trpc } from "@/lib/trpc/client";
 
 const SYNC_DEBOUNCE_MS = 30_000;
 const SCROLL_IDLE_MS = 120;

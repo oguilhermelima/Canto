@@ -4,8 +4,8 @@ import { useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Film, Tv } from "lucide-react";
-import { mediaHref } from "~/lib/media-href";
-import { RatingInline } from "~/components/media/rating-badge";
+import { mediaHref } from "@/lib/media-href";
+import { RatingInline } from "@/components/media/rating-badge";
 
 interface CreditItem {
   id: number;

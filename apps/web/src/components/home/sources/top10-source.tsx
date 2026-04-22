@@ -1,7 +1,7 @@
 "use client";
 
-import { trpc } from "~/lib/trpc/client";
-import { useWatchRegion } from "~/hooks/use-watch-region";
+import { trpc } from "@/lib/trpc/client";
+import { useWatchRegion } from "@/hooks/use-watch-region";
 import { Top10Row } from "../top10-row";
 import type { Top10Item } from "../top10-row";
 

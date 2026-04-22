@@ -45,7 +45,7 @@ import {
 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 
 /* -------------------------------------------------------------------------- */
 /*  Animated collapse                                                          */

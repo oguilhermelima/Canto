@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import { buildFallbackMagnet } from "../_lib/build-fallback-magnet";
 
 interface TorrentActionTarget {

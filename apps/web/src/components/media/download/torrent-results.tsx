@@ -32,7 +32,7 @@ import {
   formatAge,
   formatQualityLabel,
   sourceLabel,
-} from "~/lib/torrent-utils";
+} from "@/lib/torrent-utils";
 
 interface TorrentResult {
   guid: string;

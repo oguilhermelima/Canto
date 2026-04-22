@@ -14,10 +14,10 @@ import {
 } from "@canto/ui/select";
 import { Save, Check, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
-import { useWatchRegion } from "~/hooks/use-watch-region";
-import { useDirectSearch } from "~/hooks/use-direct-search";
-import { SettingsSection } from "~/components/settings/shared";
+import { trpc } from "@/lib/trpc/client";
+import { useWatchRegion } from "@/hooks/use-watch-region";
+import { useDirectSearch } from "@/hooks/use-direct-search";
+import { SettingsSection } from "@/components/settings/shared";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 

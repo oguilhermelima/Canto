@@ -7,12 +7,12 @@ import { Skeleton } from "@canto/ui/skeleton";
 import { HomeSectionRenderer } from "./home-section-renderer";
 import { DedupProvider } from "./dedup-context";
 import { LazySection } from "./lazy-section";
-import { BackdropCardSkeleton } from "~/components/media/backdrop-card";
-import { MediaCardSkeleton } from "~/components/media/media-card";
+import { BackdropCardSkeleton } from "@/components/media/backdrop-card";
+import { MediaCardSkeleton } from "@/components/media/media-card";
 import {
   CarouselRowSkeleton,
   FeaturedCardSkeleton,
-} from "~/components/media/skeletons";
+} from "@/components/media/skeletons";
 import type { HomeSectionConfig } from "@canto/db/schema";
 
 function getMinHeightByStyle(style: string): number {

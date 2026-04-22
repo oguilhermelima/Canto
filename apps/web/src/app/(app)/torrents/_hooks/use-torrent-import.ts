@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { useDebounceValue } from "usehooks-ts";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import {
   inferImportModeFromName,
   type ImportMatchMode,

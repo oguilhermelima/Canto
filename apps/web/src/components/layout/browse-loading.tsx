@@ -1,6 +1,6 @@
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
-import { MediaCardSkeleton } from "~/components/media/media-card";
+import { MediaCardSkeleton } from "@/components/media/media-card";
 import { GRID_COLS } from "./browse-layout.types";
 
 interface BrowseLoadingProps {

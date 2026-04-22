@@ -1,14 +1,14 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { LibraryCarousel } from "~/app/(app)/library/_components/library-carousel";
-import { useSectionInfiniteQuery } from "~/components/home/sources/use-section-query";
-import { UpcomingScheduleCard } from "~/components/media/cards/upcoming-schedule-card";
-import type { UpcomingScheduleItem } from "~/components/media/cards/upcoming-schedule-card";
-import { trpc } from "~/lib/trpc/client";
+import { LibraryCarousel } from "@/app/(app)/library/_components/library-carousel";
+import { useSectionInfiniteQuery } from "@/components/home/sources/use-section-query";
+import { UpcomingScheduleCard } from "@/components/media/cards/upcoming-schedule-card";
+import type { UpcomingScheduleItem } from "@/components/media/cards/upcoming-schedule-card";
+import { trpc } from "@/lib/trpc/client";
 
-export { UpcomingScheduleCard } from "~/components/media/cards/upcoming-schedule-card";
-export type { UpcomingScheduleItem } from "~/components/media/cards/upcoming-schedule-card";
+export { UpcomingScheduleCard } from "@/components/media/cards/upcoming-schedule-card";
+export type { UpcomingScheduleItem } from "@/components/media/cards/upcoming-schedule-card";
 
 const PAGE_SIZE = 72;
 const CARD_WIDTH_CLASS = "w-[280px] sm:w-[300px] lg:w-[340px] 2xl:w-[380px]";

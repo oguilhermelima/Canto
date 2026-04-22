@@ -40,7 +40,7 @@ import {
   formatAge,
   formatQualityLabel,
   sourceLabel,
-} from "~/lib/torrent-utils";
+} from "@/lib/torrent-utils";
 import { FolderSelector } from "./folder-selector";
 
 interface TorrentResult {

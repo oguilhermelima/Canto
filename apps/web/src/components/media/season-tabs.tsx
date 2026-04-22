@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { ChevronLeft, ChevronRight, Clapperboard } from "lucide-react";
-import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
+import { useScrollCarousel } from "@/hooks/use-scroll-carousel";
 import { EpisodeCard } from "./episode-card";
 import type { Episode, EpisodeDownloadInfo } from "./episode-card";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
 import { PasswordInput } from "@canto/ui/password-input";
@@ -16,7 +16,7 @@ import {
 import { Plus, Loader2, Unlink, CheckCircle2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@canto/ui/cn";
-import { SettingsSection } from "~/components/settings/shared";
+import { SettingsSection } from "@/components/settings/shared";
 
 /* -------------------------------------------------------------------------- */
 /*  Brand config                                                               */

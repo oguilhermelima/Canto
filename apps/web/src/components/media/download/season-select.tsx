@@ -7,7 +7,7 @@ import {
   Minus,
   ChevronRight,
 } from "lucide-react";
-import { FadeImage } from "~/components/ui/fade-image";
+import { FadeImage } from "@/components/ui/fade-image";
 
 interface Episode {
   id: string;

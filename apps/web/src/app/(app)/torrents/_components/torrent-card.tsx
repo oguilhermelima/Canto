@@ -18,14 +18,14 @@ import {
   Copy,
   Rocket,
 } from "lucide-react";
-import { mediaDetailHref } from "~/lib/media-href";
-import { ResponsiveMenu } from "~/components/layout/responsive-menu";
+import { mediaDetailHref } from "@/lib/media-href";
+import { ResponsiveMenu } from "@/components/layout/responsive-menu";
 import {
   formatBytes,
   formatDownloadLabel,
   formatQualityLabel,
   resolveState,
-} from "~/lib/torrent-utils";
+} from "@/lib/torrent-utils";
 
 interface TorrentCardProps {
   torrent: {

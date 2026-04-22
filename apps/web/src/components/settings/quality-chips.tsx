@@ -1,7 +1,7 @@
 "use client";
 
 import { Monitor, Film, Sparkles, Languages, HardDrive } from "lucide-react";
-import { formatBytes } from "~/lib/torrent-utils";
+import { formatBytes } from "@/lib/torrent-utils";
 
 export interface QualityMeta {
   resolution: string | null;

@@ -1,4 +1,4 @@
-import { resolveState } from "~/lib/torrent-utils";
+import { resolveState } from "@/lib/torrent-utils";
 import type { TorrentList } from "../_components/torrent-list";
 import type { TorrentStatusCounts } from "../_components/torrent-tabs";
 

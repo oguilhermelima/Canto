@@ -7,8 +7,8 @@ import { Switch } from "@canto/ui/switch";
 import { Save, Loader2 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
-import { SettingsSection } from "~/components/settings/shared";
+import { trpc } from "@/lib/trpc/client";
+import { SettingsSection } from "@/components/settings/shared";
 
 export function AutoMergeSection(): React.JSX.Element {
   const utils = trpc.useUtils();

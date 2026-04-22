@@ -3,8 +3,8 @@
 import { useMemo } from "react";
 import { cn } from "@canto/ui/cn";
 import { Plus } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
-import { MediaCarousel } from "~/components/media/media-carousel";
+import { trpc } from "@/lib/trpc/client";
+import { MediaCarousel } from "@/components/media/media-carousel";
 import { StateMessage } from "@canto/ui/state-message";
 
 interface ListInfo {

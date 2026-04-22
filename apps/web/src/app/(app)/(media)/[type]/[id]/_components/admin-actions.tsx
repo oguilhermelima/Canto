@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@canto/ui/cn";
 import { Download } from "lucide-react";
-import { resolveState } from "~/lib/torrent-utils";
+import { resolveState } from "@/lib/torrent-utils";
 
 interface AdminActionsProps {
   media: {

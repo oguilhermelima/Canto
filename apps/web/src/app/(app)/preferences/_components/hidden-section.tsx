@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Eye, Loader2 } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
-import { useHiddenMedia } from "~/hooks/use-hidden-media";
+import { trpc } from "@/lib/trpc/client";
+import { useHiddenMedia } from "@/hooks/use-hidden-media";
 import { StateMessage } from "@canto/ui/state-message";
-import { SettingsSection } from "~/components/settings/shared";
+import { SettingsSection } from "@/components/settings/shared";
 
 export function HiddenSection(): React.JSX.Element {
   const sentinelRef = useRef<HTMLDivElement>(null);

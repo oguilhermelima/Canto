@@ -3,12 +3,12 @@
 import { useMemo, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import { StateMessage } from "@canto/ui/state-message";
-import { MediaGrid } from "~/components/media/media-grid";
-import { MediaListView } from "~/components/media/media-list-view";
-import type { FilterOutput } from "~/components/media/filter-sidebar";
-import type { ViewMode } from "~/components/layout/view-mode-toggle";
+import { MediaGrid } from "@/components/media/media-grid";
+import { MediaListView } from "@/components/media/media-list-view";
+import type { FilterOutput } from "@/components/media/filter-sidebar";
+import type { ViewMode } from "@/components/layout/view-mode-toggle";
 
 const PAGE_SIZE = 20;
 

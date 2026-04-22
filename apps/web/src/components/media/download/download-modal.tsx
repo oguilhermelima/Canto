@@ -14,7 +14,7 @@ import {
   Loader2,
   ArrowLeft,
 } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import { useDownloadModal } from "./use-download-modal";
 import { DownloadTab } from "./download-tab";
 import { TorrentResults } from "./torrent-results";

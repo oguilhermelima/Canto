@@ -7,8 +7,8 @@ import { ChevronLeft, ChevronRight, EyeOff } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { SectionTitle } from "@canto/ui/section-title";
 import { MediaCard, MediaCardSkeleton } from "./media-card";
-import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
-import { useHiddenMedia } from "~/hooks/use-hidden-media";
+import { useScrollCarousel } from "@/hooks/use-scroll-carousel";
+import { useHiddenMedia } from "@/hooks/use-hidden-media";
 
 function HideMediaButton({
   onClick,

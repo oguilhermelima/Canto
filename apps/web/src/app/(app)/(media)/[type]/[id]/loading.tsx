@@ -1,4 +1,4 @@
-import { MediaDetailHeroSkeleton } from "~/components/media/media-detail-hero";
+import { MediaDetailHeroSkeleton } from "@/components/media/media-detail-hero";
 
 export default function MediaDetailLoading(): React.JSX.Element {
   return (

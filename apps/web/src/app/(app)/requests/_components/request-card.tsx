@@ -5,7 +5,7 @@ import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Button } from "@canto/ui/button";
 import { Film, Tv, Check, X, Clock, User } from "lucide-react";
-import { mediaDetailHref } from "~/lib/media-href";
+import { mediaDetailHref } from "@/lib/media-href";
 import { STATUS_STYLES, formatDate } from "./constants";
 
 interface RequestCardProps {

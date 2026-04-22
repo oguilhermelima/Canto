@@ -7,7 +7,7 @@ import { cn } from "@canto/ui/cn";
 import { SectionTitle } from "@canto/ui/section-title";
 import { StateMessage } from "@canto/ui/state-message";
 import { SPACE_STATES } from "@canto/ui/presets/space-states";
-import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
+import { useScrollCarousel } from "@/hooks/use-scroll-carousel";
 
 type SpaceStateKey = keyof typeof SPACE_STATES;
 

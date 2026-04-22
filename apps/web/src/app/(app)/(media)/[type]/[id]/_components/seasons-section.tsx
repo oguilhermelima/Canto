@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { SeasonTabs } from "~/components/media/season-tabs";
-import { trpc } from "~/lib/trpc/client";
+import { SeasonTabs } from "@/components/media/season-tabs";
+import { trpc } from "@/lib/trpc/client";
 
 function hasScheduledEpisode(episodes: Array<{ airDate: string | null }>): boolean {
   return episodes.some((episode) => {

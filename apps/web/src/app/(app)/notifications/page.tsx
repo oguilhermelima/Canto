@@ -1,6 +1,6 @@
 "use client";
 
-import { PageHeader } from "~/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { StateMessage } from "@canto/ui/state-message";
 
 export default function NotificationsPage(): React.JSX.Element {

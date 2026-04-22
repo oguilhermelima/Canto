@@ -22,7 +22,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useState, useEffect, useCallback, useRef, memo } from "react";
 import { useTheme } from "next-themes";
-import { authClient } from "~/lib/auth-client";
+import { authClient } from "@/lib/auth-client";
 
 /* ─── Constants ─── */
 

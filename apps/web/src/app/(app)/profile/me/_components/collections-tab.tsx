@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
-import { MediaCarousel } from "~/components/media/media-carousel";
+import { trpc } from "@/lib/trpc/client";
+import { MediaCarousel } from "@/components/media/media-carousel";
 import { StateMessage } from "@canto/ui/state-message";
 import { cn } from "@canto/ui/cn";
 

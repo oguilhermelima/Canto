@@ -1,9 +1,9 @@
 "use client";
 
-import { MetadataProvidersSection } from "~/components/settings/services-section";
-import { AboutSection } from "~/components/settings/about-section";
-import { StatusTab } from "~/components/management/status-tab";
-import { UsersTab } from "~/components/management/users-tab";
+import { MetadataProvidersSection } from "@/components/settings/services-section";
+import { AboutSection } from "@/components/settings/about-section";
+import { StatusTab } from "@/components/management/status-tab";
+import { UsersTab } from "@/components/management/users-tab";
 import { MediaServersSection } from "./media-servers-section";
 import { DownloadsSection } from "./downloads-section";
 import { SearchTabSection } from "./search-tab-section";

@@ -1,17 +1,17 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
-import { useSectionInfiniteQuery } from "~/components/home/sources/use-section-query";
-import { WatchNextCard } from "~/components/media/cards/watch-next-card";
+import { trpc } from "@/lib/trpc/client";
+import { useSectionInfiniteQuery } from "@/components/home/sources/use-section-query";
+import { WatchNextCard } from "@/components/media/cards/watch-next-card";
 import type {
   WatchNextItem,
   WatchNextView,
-} from "~/components/media/cards/watch-next-card";
+} from "@/components/media/cards/watch-next-card";
 import { LibraryCarousel } from "./library-carousel";
 
-export { WatchNextCard } from "~/components/media/cards/watch-next-card";
-export type { WatchNextItem, WatchNextView } from "~/components/media/cards/watch-next-card";
+export { WatchNextCard } from "@/components/media/cards/watch-next-card";
+export type { WatchNextItem, WatchNextView } from "@/components/media/cards/watch-next-card";
 
 const PAGE_SIZE = 72;
 const CARD_WIDTH_CLASS = "w-[280px] sm:w-[300px] lg:w-[340px] 2xl:w-[380px]";
