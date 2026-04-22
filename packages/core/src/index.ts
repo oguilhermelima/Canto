@@ -1,3 +1,4 @@
-export * from "./domain/ports/index";
-export * from "./domain/types/index";
-export * from "./domain/rules/index";
+// Root entry. Consumers should import from specific subpaths
+// (e.g. @canto/core/domain/media/rules) rather than from this barrel.
+// Deliberately empty after the context-first restructure (Phase 4.5).
+export {};

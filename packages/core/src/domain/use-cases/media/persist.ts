@@ -5,12 +5,12 @@ export {
   persistFullMedia,
   persistMediaUseCase,
   resolveMedia,
-} from "./core";
-export { persistTranslations } from "./translations";
-export { persistExtras } from "./extras";
+} from "./persist/core";
+export { persistTranslations } from "./persist/translations";
+export { persistExtras } from "./persist/extras";
 export {
   buildTmdbEpisodeMap,
   overlayTmdbEpisodeData,
   overlayTmdbSeasonData,
   applyTvdbSeasons,
-} from "./tvdb-overlay";
+} from "./persist/tvdb-overlay";

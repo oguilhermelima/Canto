@@ -4,20 +4,20 @@ import { userConnection } from "@canto/db/schema";
 import {
   findTraktSyncStateByConnection,
   upsertTraktSyncState,
-} from "../../../infra/trakt/trakt-sync-repository";
-import { updateUserConnection } from "../../../infra/media-servers/user-connection-repository";
-import { refreshTraktAccessTokenIfNeeded } from "../../../infra/trakt/trakt.adapter";
-import type { SyncContext } from "./shared";
-import { syncWatchlist } from "./sync-watchlist";
-import { syncCustomLists } from "./sync-custom-lists";
-import { syncRatings } from "./sync-ratings";
-import { syncFavorites } from "./sync-favorites";
+} from "../../infra/trakt/trakt-sync-repository";
+import { updateUserConnection } from "../../infra/media-servers/user-connection-repository";
+import { refreshTraktAccessTokenIfNeeded } from "../../infra/trakt/trakt.adapter";
+import type { SyncContext } from "./trakt/shared";
+import { syncWatchlist } from "./trakt/sync-watchlist";
+import { syncCustomLists } from "./trakt/sync-custom-lists";
+import { syncRatings } from "./trakt/sync-ratings";
+import { syncFavorites } from "./trakt/sync-favorites";
 import {
   linkPulledHistoryBackfill,
   pullHistory,
   pushHistory,
-} from "./sync-history";
-import { pullInProgress } from "./sync-in-progress";
+} from "./trakt/sync-history";
+import { pullInProgress } from "./trakt/sync-in-progress";
 
 export async function syncTraktConnection(
   db: Database,

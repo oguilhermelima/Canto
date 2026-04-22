@@ -4,8 +4,8 @@ export {
   createPlexPin,
   checkPlexPin,
   type PlexAuthResult,
-} from "./plex";
-export { authenticateJellyfin, type JellyfinAuthResult } from "./jellyfin";
+} from "./authenticate/plex";
+export { authenticateJellyfin, type JellyfinAuthResult } from "./authenticate/jellyfin";
 export {
   startTraktDeviceAuth,
   completeTraktDeviceAuth,
@@ -13,4 +13,4 @@ export {
   type TraktDeviceAuthCheckResult,
   type CompleteTraktDeviceAuthDeps,
   type TraktAuthResult,
-} from "./trakt";
+} from "./authenticate/trakt";

@@ -3,28 +3,28 @@ import path from "node:path";
 import type { Database } from "@canto/db/client";
 import type { torrent as torrentSchema } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
-import type { DownloadClientPort } from "../../../shared/ports/download-client";
-import type { FileSystemPort } from "../../../shared/ports/file-system.port";
-import { isVideoFile, buildMediaDir } from "../../../shared/rules/naming";
-import { EP_PATTERN, isSubtitleFile } from "../../../torrents/rules/parsing";
-import { getEffectiveProviderSync } from "../../../shared/rules/effective-provider";
-import { createNotification } from "../../notifications/create-notification";
+import type { DownloadClientPort } from "../../shared/ports/download-client";
+import type { FileSystemPort } from "../../shared/ports/file-system.port";
+import { isVideoFile, buildMediaDir } from "../../shared/rules/naming";
+import { EP_PATTERN, isSubtitleFile } from "../../torrents/rules/parsing";
+import { getEffectiveProviderSync } from "../../shared/rules/effective-provider";
+import { createNotification } from "../notifications/create-notification";
 import {
   findMediaByIdWithSeasons,
   findFolderById,
   findDefaultFolder,
   findMediaFilesByTorrentId,
   updateTorrent,
-} from "../../../../infra/repositories";
-import { parseVideoFiles } from "../../../../platform/fs/filesystem";
+} from "../../../infra/repositories";
+import { parseVideoFiles } from "../../../platform/fs/filesystem";
 
-import { resolveSavePath } from "./shared";
-import { importLocalVideoFiles, importLocalSubtitleFiles } from "./local";
-import { importRemoteVideoFiles, importRemoteSubtitleFiles } from "./remote";
+import { resolveSavePath } from "./import-torrent/shared";
+import { importLocalVideoFiles, importLocalSubtitleFiles } from "./import-torrent/local";
+import { importRemoteVideoFiles, importRemoteSubtitleFiles } from "./import-torrent/remote";
 
-export { resolveSavePath, upsertMediaFile } from "./shared";
-export { importLocalVideoFiles, importLocalSubtitleFiles } from "./local";
-export { importRemoteVideoFiles, importRemoteSubtitleFiles } from "./remote";
+export { resolveSavePath, upsertMediaFile } from "./import-torrent/shared";
+export { importLocalVideoFiles, importLocalSubtitleFiles } from "./import-torrent/local";
+export { importRemoteVideoFiles, importRemoteSubtitleFiles } from "./import-torrent/remote";
 
 export interface ImportHooks {
   onImported?: (mediaRow: { id: string; title: string; externalId: number; provider: string; type: string; libraryId: string | null }) => void;
