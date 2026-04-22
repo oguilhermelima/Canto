@@ -6,6 +6,7 @@ import { createLogger } from "../helpers/logger.ts";
 import { loadProject } from "../helpers/ts-project.ts";
 import { requireSafeToMutate } from "../helpers/git.ts";
 import { moveSourceFile } from "../helpers/move-file.ts";
+import { rewriteCrossWorkspaceSpecifiers } from "../helpers/rewrite-cross-workspace.ts";
 
 export async function runRestructureInfra(ctx: CodemodContext): Promise<void> {
   const logger = createLogger({ repoRoot: ctx.repoRoot, subcommand: "restructure-infra", dry: ctx.dry, apply: ctx.apply });
@@ -15,16 +16,21 @@ export async function runRestructureInfra(ctx: CodemodContext): Promise<void> {
   const corePackageRoot = resolve(ctx.repoRoot, ctx.plan.packageRoot);
   const { project } = loadProject(corePackageRoot);
   const srcPrefix = "src/";
+  const stripTs = (p: string) => p.replace(/\.tsx?$/, "");
 
   let moved = 0;
   let deleted = 0;
+  const crossWorkspaceMoves: Array<{ oldSubpath: string; newSubpath: string }> = [];
 
   for (const move of ctx.plan.infraMoves) {
     const fromRel = `${srcPrefix}${move.from}`;
     const toRel = `${srcPrefix}${move.to}`;
     try {
       const r = moveSourceFile(project, corePackageRoot, fromRel, toRel, logger);
-      if (!r.skipped) moved++;
+      if (!r.skipped) {
+        moved++;
+        crossWorkspaceMoves.push({ oldSubpath: stripTs(move.from), newSubpath: stripTs(move.to) });
+      }
     } catch (err) {
       logger.log({ op: "warn", message: `infra move ${fromRel} -> ${toRel}: ${(err as Error).message}` });
     }
@@ -49,6 +55,9 @@ export async function runRestructureInfra(ctx: CodemodContext): Promise<void> {
 
   if (ctx.apply) await project.save();
 
-  logger.summary(`moved=${moved} deleted=${deleted} dry=${!ctx.apply}`);
+  const xr = rewriteCrossWorkspaceSpecifiers(ctx.repoRoot, crossWorkspaceMoves, logger, ctx.apply);
+  logger.print(`cross-workspace: ${xr.rewrites} rewrites across ${xr.files} files`);
+
+  logger.summary(`moved=${moved} deleted=${deleted} xworkspace=${xr.rewrites} dry=${!ctx.apply}`);
   logger.print(`done: moved=${moved} deleted=${deleted}`);
 }

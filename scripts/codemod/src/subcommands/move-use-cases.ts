@@ -6,6 +6,7 @@ import { createLogger } from "../helpers/logger.ts";
 import { loadProject } from "../helpers/ts-project.ts";
 import { requireSafeToMutate } from "../helpers/git.ts";
 import { moveSourceFile } from "../helpers/move-file.ts";
+import { rewriteCrossWorkspaceSpecifiers } from "../helpers/rewrite-cross-workspace.ts";
 
 /**
  * Move every file under domain/use-cases/<ctx>/ to domain/<ctx>/use-cases/.
@@ -19,6 +20,8 @@ export async function runMoveUseCases(ctx: CodemodContext): Promise<void> {
   const { project } = loadProject(corePackageRoot);
 
   let moved = 0;
+  const stripTs = (p: string) => p.replace(/\.tsx?$/, "");
+  const crossWorkspaceMoves: Array<{ oldSubpath: string; newSubpath: string }> = [];
 
   for (const m of ctx.plan.useCaseContextMoves) {
     const fromDirAbs = resolve(corePackageRoot, "src", m.from);
@@ -29,11 +32,18 @@ export async function runMoveUseCases(ctx: CodemodContext): Promise<void> {
     }
     const files = listTsFiles(fromDirAbs);
     for (const abs of files) {
-      const fileFromRel = `src/${m.from}/${relative(fromDirAbs, abs)}`;
-      const fileToRel = `src/${m.to}/${relative(fromDirAbs, abs)}`;
+      const relFromDir = relative(fromDirAbs, abs);
+      const fileFromRel = `src/${m.from}/${relFromDir}`;
+      const fileToRel = `src/${m.to}/${relFromDir}`;
       try {
         const r = moveSourceFile(project, corePackageRoot, fileFromRel, fileToRel, logger);
-        if (!r.skipped) moved++;
+        if (!r.skipped) {
+          moved++;
+          crossWorkspaceMoves.push({
+            oldSubpath: stripTs(`${m.from}/${relFromDir}`),
+            newSubpath: stripTs(`${m.to}/${relFromDir}`),
+          });
+        }
       } catch (err) {
         logger.log({ op: "warn", message: `use-case move ${fileFromRel} -> ${fileToRel}: ${(err as Error).message}` });
       }
@@ -43,7 +53,10 @@ export async function runMoveUseCases(ctx: CodemodContext): Promise<void> {
 
   if (ctx.apply) await project.save();
 
-  logger.summary(`moved=${moved} dry=${!ctx.apply}`);
+  const xr = rewriteCrossWorkspaceSpecifiers(ctx.repoRoot, crossWorkspaceMoves, logger, ctx.apply);
+  logger.print(`cross-workspace: ${xr.rewrites} rewrites across ${xr.files} files`);
+
+  logger.summary(`moved=${moved} xworkspace=${xr.rewrites} dry=${!ctx.apply}`);
   logger.print(`done: moved=${moved} files`);
 }
 

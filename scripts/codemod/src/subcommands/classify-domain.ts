@@ -6,6 +6,7 @@ import { createLogger } from "../helpers/logger.ts";
 import { loadProject } from "../helpers/ts-project.ts";
 import { requireSafeToMutate } from "../helpers/git.ts";
 import { moveSourceFile } from "../helpers/move-file.ts";
+import { rewriteCrossWorkspaceSpecifiers } from "../helpers/rewrite-cross-workspace.ts";
 import { isDomainMove } from "../plan/schema.ts";
 
 export async function runClassifyDomain(ctx: CodemodContext): Promise<void> {
@@ -21,6 +22,9 @@ export async function runClassifyDomain(ctx: CodemodContext): Promise<void> {
   let moved = 0;
   let deleted = 0;
   let kept = 0;
+  const crossWorkspaceMoves: Array<{ oldSubpath: string; newSubpath: string }> = [];
+
+  const stripTs = (p: string) => p.replace(/\.tsx?$/, "");
 
   for (const entry of ctx.plan.domainClassification) {
     const fromRel = `${srcPrefix}${entry.from}`;
@@ -29,7 +33,13 @@ export async function runClassifyDomain(ctx: CodemodContext): Promise<void> {
       const toRel = `${srcPrefix}${entry.to}`;
       try {
         const r = moveSourceFile(project, corePackageRoot, fromRel, toRel, logger);
-        if (!r.skipped) moved++;
+        if (!r.skipped) {
+          moved++;
+          crossWorkspaceMoves.push({
+            oldSubpath: stripTs(entry.from),
+            newSubpath: stripTs(entry.to),
+          });
+        }
       } catch (err) {
         logger.log({ op: "warn", message: `classify-domain: ${fromRel} -> ${toRel} failed: ${(err as Error).message}` });
       }
@@ -63,7 +73,13 @@ export async function runClassifyDomain(ctx: CodemodContext): Promise<void> {
       const toRel = `${srcPrefix}${entry.to}`;
       try {
         const r = moveSourceFile(project, corePackageRoot, fromRel, toRel, logger);
-        if (!r.skipped) moved++;
+        if (!r.skipped) {
+          moved++;
+          crossWorkspaceMoves.push({
+            oldSubpath: stripTs(entry.from),
+            newSubpath: stripTs(entry.to),
+          });
+        }
       } catch (err) {
         logger.log({ op: "warn", message: `rename-sibling ${fromRel} -> ${toRel}: ${(err as Error).message}` });
       }
@@ -78,6 +94,9 @@ export async function runClassifyDomain(ctx: CodemodContext): Promise<void> {
 
   if (ctx.apply) await project.save();
 
-  logger.summary(`moved=${moved} deleted=${deleted} kept=${kept} dry=${!ctx.apply}`);
+  const xr = rewriteCrossWorkspaceSpecifiers(ctx.repoRoot, crossWorkspaceMoves, logger, ctx.apply);
+  logger.print(`cross-workspace: ${xr.rewrites} rewrites across ${xr.files} files`);
+
+  logger.summary(`moved=${moved} deleted=${deleted} kept=${kept} xworkspace=${xr.rewrites} dry=${!ctx.apply}`);
   logger.print(`done: moved=${moved} deleted=${deleted} kept=${kept}`);
 }
