@@ -20,6 +20,7 @@
     "db:generate": "turbo run generate --filter=@canto/db",
     "db:migrate": "turbo run migrate --filter=@canto/db",
     "db:studio": "turbo run studio --filter=@canto/db",
+    "codemod": "pnpm -F @canto/codemod codemod --",
     "prod": "docker compose -f docker-compose.prod.yaml up -d --build",
     "prod:stop": "docker compose -f docker-compose.prod.yaml down"
   },

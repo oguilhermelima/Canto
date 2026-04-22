@@ -29,7 +29,7 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import { StateMessage } from "@canto/ui/state-message";
 import { CollectionEditPopover } from "./collection-edit-popover";
 import { CollectionMembersDialog } from "./collection-members-dialog";

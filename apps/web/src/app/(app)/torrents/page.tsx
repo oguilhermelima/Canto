@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PageHeader } from "~/components/page-header";
-import { trpc } from "~/lib/trpc/client";
-import { useDocumentTitle } from "~/hooks/use-document-title";
-import { useInfiniteScroll } from "~/hooks/use-infinite-scroll";
+import { PageHeader } from "@/components/page-header";
+import { trpc } from "@/lib/trpc/client";
+import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useInfiniteScroll } from "@/hooks/use-infinite-scroll";
 import { DeleteDialog } from "./_components/delete-dialog";
 import type { DeleteTarget } from "./_components/delete-dialog";
 import { ImportFromClientDialog } from "./_components/import-from-client-dialog";

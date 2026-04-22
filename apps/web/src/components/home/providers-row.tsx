@@ -6,9 +6,9 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
 import { SectionTitle } from "@canto/ui/section-title";
-import { trpc } from "~/lib/trpc/client";
-import { useWatchRegion } from "~/hooks/use-watch-region";
-import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
+import { trpc } from "@/lib/trpc/client";
+import { useWatchRegion } from "@/hooks/use-watch-region";
+import { useScrollCarousel } from "@/hooks/use-scroll-carousel";
 
 function tmdbImageUrl(path: string, size: "original" | "w500" | "w300" | "w154" = "original"): string {
   return `https://image.tmdb.org/t/p/${size}${path}`;

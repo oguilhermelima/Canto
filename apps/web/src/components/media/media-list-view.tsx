@@ -4,9 +4,9 @@ import { Film, Tv } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
-import { FadeImage } from "~/components/ui/fade-image";
-import { tmdbPosterLoader } from "~/lib/tmdb-image";
-import { mediaHref } from "~/lib/media-href";
+import { FadeImage } from "@/components/ui/fade-image";
+import { tmdbPosterLoader } from "@/lib/tmdb-image";
+import { mediaHref } from "@/lib/media-href";
 import { RatingInline } from "./rating-badge";
 
 interface MediaItem {

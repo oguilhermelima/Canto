@@ -3,11 +3,11 @@
 import { useState, useCallback, useMemo } from "react";
 import { Plus, RotateCcw, Save, Loader2 } from "lucide-react";
 import { Button } from "@canto/ui/button";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import { toast } from "sonner";
 import { SectionRow } from "./section-row";
 import { SectionEditorDialog } from "./section-editor-dialog";
-import { SettingsSection } from "~/components/settings/shared";
+import { SettingsSection } from "@/components/settings/shared";
 import type { HomeSectionConfig } from "@canto/db/schema";
 
 interface Section {

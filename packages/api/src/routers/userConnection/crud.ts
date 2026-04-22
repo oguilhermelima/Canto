@@ -4,7 +4,7 @@ import { deleteUserConnectionInput } from "@canto/validators";
 import {
   dispatchUserReverseSync,
   dispatchUserTraktSync,
-} from "@canto/core/infrastructure/queue/bullmq-dispatcher";
+} from "@canto/core/platform/queue/bullmq-dispatcher";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
 export const crudRouter = createTRPCRouter({

@@ -1,8 +1,8 @@
 "use client";
 
 import { use } from "react";
-import { trpc } from "~/lib/trpc/client";
-import { useDocumentTitle } from "~/hooks/use-document-title";
+import { trpc } from "@/lib/trpc/client";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { StateMessage } from "@canto/ui/state-message";
 import { PersonHero } from "./_components/person-hero";
 import { FilmographyTimeline } from "./_components/filmography-timeline";

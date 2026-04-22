@@ -6,11 +6,11 @@ import {
 } from "@canto/validators";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
-import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
-import { findWatchProviderLinks } from "@canto/core/infrastructure/repositories/content-enrichment/extras";
-import { getFilterOptions } from "@canto/core/domain/use-cases/recommendations/get-filter-options";
-import { searchFilterEntities } from "@canto/core/domain/use-cases/recommendations/search-filter-entities";
-import { getUserWatchProviders } from "@canto/core/domain/use-cases/recommendations/get-user-watch-providers";
+import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
+import { findWatchProviderLinks } from "@canto/core/infra/content-enrichment/extras-repository";
+import { getFilterOptions } from "@canto/core/domain/recommendations/use-cases/get-filter-options";
+import { searchFilterEntities } from "@canto/core/domain/recommendations/use-cases/search-filter-entities";
+import { getUserWatchProviders } from "@canto/core/domain/recommendations/use-cases/get-user-watch-providers";
 
 const regionInput = z.object({ region: z.string().length(2).optional() }).optional();
 

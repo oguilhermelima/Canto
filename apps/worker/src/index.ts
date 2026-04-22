@@ -15,25 +15,25 @@ import { handleFolderScan } from "./jobs/folder-scan";
 import { handleValidateDownloads } from "./jobs/validate-downloads";
 import { handleTraktSync, handleTraktSyncUser } from "./jobs/trakt-sync";
 import { handleTraktListDelete, handleTraktListDeleteSweep } from "./jobs/trakt-list-delete";
-import { refreshExtras } from "@canto/core/domain/use-cases/content-enrichment/refresh-extras";
-import { replaceShowWithTvdb } from "@canto/core/domain/use-cases/media/replace-show-with-tvdb";
-import { rebuildUserRecs } from "@canto/core/domain/use-cases/recommendations/rebuild-user-recs";
-import { refreshAllLanguage } from "@canto/core/domain/use-cases/content-enrichment/refresh-all-language";
-import { translateEpisodes } from "@canto/core/domain/use-cases/content-enrichment/translate-episodes";
-import { runMediaPipeline } from "@canto/core/domain/use-cases/media/run-media-pipeline";
-import { enqueueDailyRecsRebuild } from "@canto/core/domain/use-cases/recommendations/enqueue-daily-recs-rebuild";
-import { ensureMedia } from "@canto/core/domain/use-cases/media/ensure-media";
+import { refreshExtras } from "@canto/core/domain/content-enrichment/use-cases/refresh-extras";
+import { replaceShowWithTvdb } from "@canto/core/domain/media/use-cases/replace-show-with-tvdb";
+import { rebuildUserRecs } from "@canto/core/domain/recommendations/use-cases/rebuild-user-recs";
+import { refreshAllLanguage } from "@canto/core/domain/content-enrichment/use-cases/refresh-all-language";
+import { translateEpisodes } from "@canto/core/domain/content-enrichment/use-cases/translate-episodes";
+import { runMediaPipeline } from "@canto/core/domain/media/use-cases/run-media-pipeline";
+import { enqueueDailyRecsRebuild } from "@canto/core/domain/recommendations/use-cases/enqueue-daily-recs-rebuild";
+import { ensureMedia } from "@canto/core/domain/media/use-cases/ensure-media";
 import type {
   EnsureMediaJob,
   MediaPipelineJob,
-} from "@canto/core/infrastructure/queue/bullmq-dispatcher";
-import { QUEUES } from "@canto/core/infrastructure/queue/queue-names";
-import { getRedisConnection } from "@canto/core/infrastructure/queue/redis-config";
-import { jobDispatcher } from "@canto/core/infrastructure/adapters/job-dispatcher.adapter";
+} from "@canto/core/platform/queue/bullmq-dispatcher";
+import { QUEUES } from "@canto/core/platform/queue/queue-names";
+import { getRedisConnection } from "@canto/core/platform/queue/redis-config";
+import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
 import { db } from "@canto/db/client";
 import { seedLanguages } from "@canto/db";
-import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
-import { getTvdbProvider } from "@canto/core/lib/tvdb-client";
+import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
+import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
 
 import { DEFAULT_JOB_OPTS, makeWorker } from "./lib/worker-factory";
 

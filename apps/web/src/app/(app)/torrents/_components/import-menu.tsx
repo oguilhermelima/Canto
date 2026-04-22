@@ -3,7 +3,7 @@
 import { Download, Link2, Upload } from "lucide-react";
 import { Button } from "@canto/ui/button";
 import { DropdownMenuItem } from "@canto/ui/dropdown-menu";
-import { ResponsiveMenu } from "~/components/layout/responsive-menu";
+import { ResponsiveMenu } from "@/components/layout/responsive-menu";
 
 interface ImportMenuProps {
   onSelectTorrent: () => void;

@@ -12,7 +12,7 @@ import {
   DialogFooter,
 } from "@canto/ui/dialog";
 import { Loader2 } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import { toast } from "sonner";
 
 interface ProviderOverrideDialogProps {

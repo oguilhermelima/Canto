@@ -19,11 +19,11 @@ import {
   PopoverTrigger,
 } from "@canto/ui/popover";
 import { Bookmark, Check, ChevronLeft, ChevronRight, Eye, Server, X } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import type { HomeSectionConfig } from "@canto/db/schema";
 import { TabBar } from "@canto/ui/tab-bar";
-import { BackdropCard } from "~/components/media/backdrop-card";
-import { MediaCard } from "~/components/media/media-card";
+import { BackdropCard } from "@/components/media/backdrop-card";
+import { MediaCard } from "@/components/media/media-card";
 
 /* ─── Types ─── */
 

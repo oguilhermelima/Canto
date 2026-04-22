@@ -28,7 +28,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 
 interface CollectionMembersDialogProps {
   listId: string | null;

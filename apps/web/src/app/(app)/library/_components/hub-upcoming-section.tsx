@@ -1,7 +1,7 @@
 "use client";
 
 import { CalendarClock } from "lucide-react";
-import { UpcomingScheduleSectionContent } from "~/components/home/upcoming-schedule-section";
+import { UpcomingScheduleSectionContent } from "@/components/home/upcoming-schedule-section";
 
 export function HubUpcomingSection(): React.JSX.Element {
   return (

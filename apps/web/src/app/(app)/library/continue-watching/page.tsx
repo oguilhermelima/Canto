@@ -1,11 +1,11 @@
 "use client";
 
-import { BrowseLayout } from "~/components/layout/browse-layout";
-import { progressStrategy } from "~/components/layout/card-strategies";
+import { BrowseLayout } from "@/components/layout/browse-layout";
+import { progressStrategy } from "@/components/layout/card-strategies";
 import { StateMessage } from "@canto/ui/state-message";
-import { useDocumentTitle } from "~/hooks/use-document-title";
-import { useLibraryBrowse } from "~/hooks/use-library-browse";
-import { useViewMode } from "~/hooks/use-view-mode";
+import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useLibraryBrowse } from "@/hooks/use-library-browse";
+import { useViewMode } from "@/hooks/use-view-mode";
 
 export default function ContinueWatchingPage(): React.JSX.Element {
   useDocumentTitle("Continue Watching");

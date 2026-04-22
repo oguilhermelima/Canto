@@ -9,7 +9,7 @@
 
 import { db } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
-import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
+import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import {
   findEnabledSyncLinks,
   findAllUserConnections,
@@ -26,9 +26,9 @@ import {
   updateServerLink,
   markUserConnectionStale,
   clearUserConnectionStale,
-} from "@canto/core/infrastructure/repositories";
-import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/use-cases/user-media/promote-user-media-state-from-playback";
-import { pushPlaybackPositionToServers } from "@canto/core/domain/use-cases/user-media/push-playback-position";
+} from "@canto/core/infra/repositories";
+import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/user-media/use-cases/promote-user-media-state-from-playback";
+import { pushPlaybackPositionToServers } from "@canto/core/domain/user-media/use-cases/push-playback-position";
 import {
   scanJellyfinLibraries,
   scanPlexLibraries,

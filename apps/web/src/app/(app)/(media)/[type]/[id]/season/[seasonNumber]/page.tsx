@@ -6,10 +6,10 @@ import { notFound } from "next/navigation";
 import { Star } from "lucide-react";
 import { Button } from "@canto/ui/button";
 import { Skeleton } from "@canto/ui/skeleton";
-import { PageHeader } from "~/components/page-header";
-import { EpisodeCard } from "~/components/media/episode-card";
-import { trpc } from "~/lib/trpc/client";
-import { useDocumentTitle } from "~/hooks/use-document-title";
+import { PageHeader } from "@/components/page-header";
+import { EpisodeCard } from "@/components/media/episode-card";
+import { trpc } from "@/lib/trpc/client";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function SeasonDetailPage(): React.JSX.Element {
   const params = useParams<{

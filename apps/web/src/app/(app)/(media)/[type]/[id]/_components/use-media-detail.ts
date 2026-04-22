@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
-import { useIsAdmin } from "~/hooks/use-is-admin";
-import { useWatchRegion } from "~/hooks/use-watch-region";
-import { useDocumentTitle } from "~/hooks/use-document-title";
-import { useDirectSearch } from "~/hooks/use-direct-search";
-import { resolveState } from "~/lib/torrent-utils";
+import { trpc } from "@/lib/trpc/client";
+import { useIsAdmin } from "@/hooks/use-is-admin";
+import { useWatchRegion } from "@/hooks/use-watch-region";
+import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDirectSearch } from "@/hooks/use-direct-search";
+import { resolveState } from "@/lib/torrent-utils";
 
 export function useMediaDetail(id: string, mediaType: "movie" | "show") {
   const isAdmin = useIsAdmin();

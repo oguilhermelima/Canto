@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { BrowseLayout } from "~/components/layout/browse-layout";
-import type { FilterOutput, BrowseItem } from "~/components/layout/browse-layout";
-import { progressStrategy } from "~/components/layout/card-strategies";
+import { BrowseLayout } from "@/components/layout/browse-layout";
+import type { FilterOutput, BrowseItem } from "@/components/layout/browse-layout";
+import { progressStrategy } from "@/components/layout/card-strategies";
 import { StateMessage } from "@canto/ui/state-message";
-import { useDocumentTitle } from "~/hooks/use-document-title";
-import { useViewMode } from "~/hooks/use-view-mode";
-import { trpc } from "~/lib/trpc/client";
+import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useViewMode } from "@/hooks/use-view-mode";
+import { trpc } from "@/lib/trpc/client";
 
 const PAGE_SIZE = 24;
 

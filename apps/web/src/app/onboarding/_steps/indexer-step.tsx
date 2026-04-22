@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Input } from "@canto/ui/input";
 import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import type { ConfigureFooter } from "../_components/onboarding-footer";
 import type { Settings } from "../_components/constants";
 import { bool, str } from "../_components/constants";

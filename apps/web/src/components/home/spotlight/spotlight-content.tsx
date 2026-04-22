@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { SpotlightActions } from "~/components/home/spotlight-actions";
-import { MediaLogo } from "~/components/media/media-logo";
-import { RatingInline } from "~/components/media/rating-badge";
-import { mediaHref } from "~/lib/media-href";
+import { SpotlightActions } from "@/components/home/spotlight-actions";
+import { MediaLogo } from "@/components/media/media-logo";
+import { RatingInline } from "@/components/media/rating-badge";
+import { mediaHref } from "@/lib/media-href";
 import type { SpotlightItem } from "./spotlight-hero";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";

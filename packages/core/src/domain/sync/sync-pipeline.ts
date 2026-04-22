@@ -8,13 +8,13 @@
 /* -------------------------------------------------------------------------- */
 
 import type { Database } from "@canto/db/client";
-import type { MediaProviderPort } from "../ports/media-provider.port";
-import { persistMedia } from "../use-cases/media/persist";
-import { getActiveUserLanguages } from "../services/user-service";
+import type { MediaProviderPort } from "../shared/ports/media-provider.port";
+import { persistMedia } from "../media/use-cases/persist";
+import { getActiveUserLanguages } from "../shared/services/user-service";
 import { getSetting, getSettings, setSettingRaw } from "@canto/db/settings";
 
-import { dispatchMediaPipeline } from "../../infrastructure/queue/bullmq-dispatcher";
-import { logAndSwallow } from "../../lib/log-error";
+import { dispatchMediaPipeline } from "../../platform/queue/bullmq-dispatcher";
+import { logAndSwallow } from "../../platform/logger/log-error";
 import {
   findMediaByAnyReference,
   updateMedia,
@@ -25,15 +25,15 @@ import {
   ensureServerLibrary,
   upsertMediaVersion,
   type MediaVersionInsert,
-} from "../../infrastructure/repositories";
-import { reconcileServerLibrary } from "../../infrastructure/repositories/lists/list";
+} from "../../infra/repositories";
+import { reconcileServerLibrary } from "../../infra/lists/list-repository";
 
-import { resolveExternalId, tmdbCall } from "../use-cases/media/resolve-external-id";
+import { resolveExternalId, tmdbCall } from "../media/use-cases/resolve-external-id";
 import {
   fetchJellyfinMediaInfo,
   fetchPlexMediaInfo,
   type MediaFileInfo,
-} from "../use-cases/media-servers/fetch-info";
+} from "../media-servers/use-cases/fetch-info";
 
 import type { ScannedMediaItem, SyncResult, SyncSummary } from "./types";
 import { emptySummary } from "./types";

@@ -13,9 +13,9 @@ import {
 import { Input } from "@canto/ui/input";
 import { Skeleton } from "@canto/ui/skeleton";
 import { Search, Film, Tv } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
-import { mediaHref } from "~/lib/media-href";
-import { RatingInline } from "~/components/media/rating-badge";
+import { trpc } from "@/lib/trpc/client";
+import { mediaHref } from "@/lib/media-href";
+import { RatingInline } from "@/components/media/rating-badge";
 
 interface SearchCommandProps {
   open: boolean;

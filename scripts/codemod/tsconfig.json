@@ -1,0 +1,13 @@
+{
+  "extends": "@canto/tsconfig/internal-package.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "allowImportingTsExtensions": true
+  },
+  "include": ["bin", "src"],
+  "exclude": ["node_modules", "dist", ".cache", "__fixtures__"]
+}
+

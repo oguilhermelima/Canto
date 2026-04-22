@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
-import { trpc } from "~/lib/trpc/client";
-import { MediaCard, MediaCardSkeleton } from "~/components/media/media-card";
-import { RatingBadge } from "~/components/media/rating-badge";
+import { trpc } from "@/lib/trpc/client";
+import { MediaCard, MediaCardSkeleton } from "@/components/media/media-card";
+import { RatingBadge } from "@/components/media/rating-badge";
 import { StateMessage } from "@canto/ui/state-message";
 
 const FILTERS = [

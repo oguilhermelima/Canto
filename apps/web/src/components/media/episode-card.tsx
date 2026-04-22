@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { FadeImage } from "~/components/ui/fade-image";
+import { FadeImage } from "@/components/ui/fade-image";
 import { cn } from "@canto/ui/cn";
 import { CheckCircle2, Download } from "lucide-react";
-import { RatingBadgeStack } from "~/components/media/rating-badge";
+import { RatingBadgeStack } from "@/components/media/rating-badge";
 
 export interface Episode {
   id: string;

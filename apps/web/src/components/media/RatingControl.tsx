@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Star } from "lucide-react";
 import { cn } from "@canto/ui/cn";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 
 interface RatingControlProps {
   mediaId: string;

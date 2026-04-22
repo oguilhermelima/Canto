@@ -15,7 +15,7 @@ import {
 import type {SettingDef, SettingKey} from "@canto/db/settings-registry";
 import type { z } from "zod";
 
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import { FieldInput } from "./field-input";
 
 /**

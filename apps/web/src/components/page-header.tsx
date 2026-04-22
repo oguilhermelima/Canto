@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { PageHeader as BasePageHeader } from "@canto/ui/page-header";
-import { TitleBar } from "~/components/layout/titlebar";
+import { TitleBar } from "@/components/layout/titlebar";
 
 export type PageHeaderProps = {
   title: string;

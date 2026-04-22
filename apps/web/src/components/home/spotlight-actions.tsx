@@ -1,6 +1,6 @@
 "use client";
 
-import { AddToListButton } from "~/components/media/add-to-list-button";
+import { AddToListButton } from "@/components/media/add-to-list-button";
 
 interface SpotlightActionsProps {
   externalId: number;

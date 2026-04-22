@@ -1,7 +1,7 @@
 "use client";
 
-import { FadeImage } from "~/components/ui/fade-image";
-import { tmdbBackdropLoader } from "~/lib/tmdb-image";
+import { FadeImage } from "@/components/ui/fade-image";
+import { tmdbBackdropLoader } from "@/lib/tmdb-image";
 import type { SpotlightItem } from "./spotlight-hero";
 
 interface SpotlightBackdropProps {

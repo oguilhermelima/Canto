@@ -9,24 +9,24 @@ import {
 } from "@canto/validators";
 
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
-import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
+import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import {
   findMediaVersionsByMediaId,
   getMediaVersionCounts,
   deleteMediaVersionById,
-} from "@canto/core/infrastructure/repositories/media/media-version-repository";
-import { dispatchJellyfinSync, dispatchPlexSync, dispatchFolderScan } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
+} from "@canto/core/infra/media/media-version-repository";
+import { dispatchJellyfinSync, dispatchPlexSync, dispatchFolderScan } from "@canto/core/platform/queue/bullmq-dispatcher";
 
 // ── Extracted use-cases & services ──
 import {
   resolveMediaVersion,
   resolveMediaVersionPreview,
-} from "@canto/core/domain/use-cases/media/resolve-media-version";
-import { discoverServerLibraries } from "@canto/core/domain/use-cases/media-servers/discover-libraries";
-import { updateMediaServerMetadata } from "@canto/core/domain/use-cases/media-servers/update-metadata";
-import { getMediaAvailability } from "@canto/core/domain/services/media-availability-service";
-import { listMediaVersionGroups } from "@canto/core/domain/services/media-version-groups-service";
-import { logAndSwallow } from "@canto/core/lib/log-error";
+} from "@canto/core/domain/media/use-cases/resolve-media-version";
+import { discoverServerLibraries } from "@canto/core/domain/media-servers/use-cases/discover-libraries";
+import { updateMediaServerMetadata } from "@canto/core/domain/media-servers/use-cases/update-metadata";
+import { getMediaAvailability } from "@canto/core/domain/media/services/media-availability-service";
+import { listMediaVersionGroups } from "@canto/core/domain/media-servers/services/media-version-groups-service";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                     */

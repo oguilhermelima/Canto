@@ -1,18 +1,18 @@
 import { db } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
-import { downloadTorrent } from "@canto/core/domain/use-cases/torrents/download-torrent";
-import { detectQuality } from "@canto/core/domain/rules/quality";
-import { calculateConfidence } from "@canto/core/domain/rules/scoring";
-import { parseSeasons, parseEpisodes } from "@canto/core/domain/rules/parsing";
-import { matchRssTitle } from "@canto/core/domain/rules/rss-matching";
-import { detectMissingEpisodes } from "@canto/core/domain/use-cases/media/detect-episode-gaps";
-import { getDownloadClient } from "@canto/core/infrastructure/adapters/torrent-clients/download-client-factory";
-import { getProwlarrClient } from "@canto/core/infrastructure/adapters/indexers/prowlarr";
+import { downloadTorrent } from "@canto/core/domain/torrents/use-cases/download-torrent";
+import { detectQuality } from "@canto/core/domain/torrents/rules/quality";
+import { calculateConfidence } from "@canto/core/domain/shared/rules/scoring";
+import { parseSeasons, parseEpisodes } from "@canto/core/domain/torrents/rules/parsing";
+import { matchRssTitle } from "@canto/core/domain/torrents/rules/rss-matching";
+import { detectMissingEpisodes } from "@canto/core/domain/media/use-cases/detect-episode-gaps";
+import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
+import { getProwlarrClient } from "@canto/core/infra/indexers/prowlarr.adapter";
 import {
   findBlocklistByMediaId,
   findMediaByIdWithSeasons,
   findMonitoredShowsForRss,
-} from "@canto/core/infrastructure/repositories";
+} from "@canto/core/infra/repositories";
 
 /**
  * RSS Sync: Poll Prowlarr RSS feeds and auto-download matching releases

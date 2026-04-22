@@ -1,6 +1,6 @@
 "use client";
 
-import { FadeImage } from "~/components/ui/fade-image";
+import { FadeImage } from "@/components/ui/fade-image";
 import { Film, Tv, Star, MapPin, Cake, User } from "lucide-react";
 import { computeAge, formatDate } from "./helpers";
 

@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import type { BrowseItem, FilterOutput } from "~/components/layout/browse-layout";
-import { trpc } from "~/lib/trpc/client";
+import type { BrowseItem, FilterOutput } from "@/components/layout/browse-layout";
+import { trpc } from "@/lib/trpc/client";
 
 export type LibraryView =
   | "watched"

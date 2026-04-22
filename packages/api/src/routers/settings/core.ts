@@ -9,7 +9,7 @@ import {
   deleteSettingRaw,
   isSettingKey,
 } from "@canto/db/settings";
-import { invalidateServiceClients } from "@canto/core/infrastructure/adapters/media-servers/service-clients";
+import { invalidateServiceClients } from "@canto/core/infra/media-servers/service-clients";
 import {
   getSettingInput,
   setSettingInput,
@@ -20,9 +20,9 @@ import {
 } from "@canto/validators";
 
 import { createTRPCRouter, adminProcedure } from "../../trpc";
-import { testService } from "@canto/core/infrastructure/adapters/service-tester";
-import { dispatchRebuildUserRecs } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
-import { ensureMediaMany } from "@canto/core/domain/use-cases/media/ensure-media-many";
+import { testService } from "@canto/core/platform/testing/service-tester";
+import { dispatchRebuildUserRecs } from "@canto/core/platform/queue/bullmq-dispatcher";
+import { ensureMediaMany } from "@canto/core/domain/media/use-cases/ensure-media-many";
 
 export const settingsCoreRouter = createTRPCRouter({
   getAll: adminProcedure.query(() => getAllSettings()),

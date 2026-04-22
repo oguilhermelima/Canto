@@ -1,5 +1,5 @@
 import { Worker, type WorkerOptions } from "bullmq";
-import { getRedisConnection } from "@canto/core/infrastructure/queue/redis-config";
+import { getRedisConnection } from "@canto/core/platform/queue/redis-config";
 
 import { createJobLogger, type JobLogger } from "./job-logger";
 

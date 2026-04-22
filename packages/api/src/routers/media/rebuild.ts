@@ -1,5 +1,5 @@
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
-import { dispatchRebuildUserRecs } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
+import { dispatchRebuildUserRecs } from "@canto/core/platform/queue/bullmq-dispatcher";
 
 export const mediaRebuildRouter = createTRPCRouter({
   rebuildMyRecommendations: protectedProcedure

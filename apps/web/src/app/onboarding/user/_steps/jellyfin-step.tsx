@@ -5,7 +5,7 @@ import { Input } from "@canto/ui/input";
 import { PasswordInput } from "@canto/ui/password-input";
 import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import type { ConfigureFooter } from "../../_components/onboarding-footer";
 import { ServiceLogo } from "../../_components/service-logo";
 import { StepHeader } from "../../_components/step-header";

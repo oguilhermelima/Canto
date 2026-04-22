@@ -5,12 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./domain/ports": "./src/domain/ports/index.ts",
-    "./domain/types": "./src/domain/types/index.ts",
-    "./domain/rules": "./src/domain/rules/index.ts",
-    "./domain/sync": "./src/domain/sync/index.ts",
-    "./infrastructure/repositories": "./src/infrastructure/repositories/index.ts",
-    "./*": ["./src/*.ts", "./src/*/index.ts"]
+    "./package.json": "./package.json",
+    "./*": "./src/*.ts"
   },
   "scripts": {
     "clean": "rm -rf .cache dist node_modules",

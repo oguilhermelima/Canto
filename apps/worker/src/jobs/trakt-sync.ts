@@ -2,7 +2,7 @@ import { db } from "@canto/db/client";
 import {
   syncAllTraktConnections,
   syncUserTraktConnections,
-} from "@canto/core/domain/use-cases/trakt/index";
+} from "@canto/core/domain/trakt/use-cases";
 
 export async function handleTraktSync(): Promise<void> {
   await syncAllTraktConnections(db);

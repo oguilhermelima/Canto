@@ -4,7 +4,7 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 
 import type { Database } from "@canto/db/client";
-import { DomainError } from "@canto/core/domain/errors";
+import { DomainError } from "@canto/core/domain/shared/errors";
 
 export interface Context {
   db: Database;

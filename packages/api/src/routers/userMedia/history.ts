@@ -4,10 +4,10 @@ import {
   mediaIdInput,
   removeHistoryEntriesInput,
 } from "@canto/validators";
-import { findUserWatchHistoryByMedia } from "@canto/core/infrastructure/repositories";
-import { logWatched } from "@canto/core/domain/use-cases/user-media/log-watched";
-import { markDropped } from "@canto/core/domain/use-cases/user-media/mark-dropped";
-import { removeHistoryEntries } from "@canto/core/domain/use-cases/user-media/remove-history-entries";
+import { findUserWatchHistoryByMedia } from "@canto/core/infra/repositories";
+import { logWatched } from "@canto/core/domain/user-media/use-cases/log-watched";
+import { markDropped } from "@canto/core/domain/user-media/use-cases/mark-dropped";
+import { removeHistoryEntries } from "@canto/core/domain/user-media/use-cases/remove-history-entries";
 
 export const historyRouter = createTRPCRouter({
   logWatched: protectedProcedure

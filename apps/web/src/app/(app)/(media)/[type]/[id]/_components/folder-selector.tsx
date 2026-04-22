@@ -1,7 +1,7 @@
 "use client";
 
 import { Folder } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 
 interface FolderSelectorProps {
   mediaId: string;

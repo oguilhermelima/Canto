@@ -13,8 +13,8 @@ import {
 import { cn } from "@canto/ui/cn";
 import { Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { authClient } from "~/lib/auth-client";
-import { fileToBase64 } from "~/lib/file-to-base64";
+import { authClient } from "@/lib/auth-client";
+import { fileToBase64 } from "@/lib/file-to-base64";
 
 const DEFAULT_AVATARS = [
   { name: "Bear", src: "/avatars/bear.svg" },

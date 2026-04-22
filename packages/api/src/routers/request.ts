@@ -13,7 +13,7 @@ import {
   findAllRequestsPaginated,
   resolveRequest,
   cancelRequest,
-} from "@canto/core/infrastructure/repositories/requests";
+} from "@canto/core/infra/repositories";
 
 export const requestRouter = createTRPCRouter({
   /** Create a download request for a media item */

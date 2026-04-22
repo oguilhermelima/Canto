@@ -1,7 +1,7 @@
 import { torrentSearchInput } from "@canto/validators";
 
-import { buildIndexers } from "@canto/core/infrastructure/adapters/indexers/indexer-factory";
-import { searchTorrents } from "@canto/core/domain/use-cases/torrents/search-torrents";
+import { buildIndexers } from "@canto/core/infra/indexers/indexer-factory";
+import { searchTorrents } from "@canto/core/domain/torrents/use-cases/search-torrents";
 
 import { createTRPCRouter, adminProcedure } from "../../trpc";
 

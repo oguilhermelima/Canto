@@ -1,7 +1,7 @@
 "use client";
 
-import { trpc } from "~/lib/trpc/client";
-import { SettingsGroupForm } from "~/components/settings/_primitives";
+import { trpc } from "@/lib/trpc/client";
+import { SettingsGroupForm } from "@/components/settings/_primitives";
 import { SettingsSection } from "./shared";
 
 export function SearchSection(): React.JSX.Element {

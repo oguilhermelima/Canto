@@ -12,14 +12,14 @@ import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
 import {
   findUserPreferences,
   upsertUserPreference,
-} from "@canto/core/infrastructure/repositories/file-organization/library";
+} from "@canto/core/infra/file-organization/library-repository";
 import {
   findFolderById,
   seedDefaultFolders,
-} from "@canto/core/infrastructure/repositories/file-organization/folder";
-import { findLibraryStats, listLibraryMedia, updateMedia } from "@canto/core/infrastructure/repositories/media/media-repository";
-import { getUserLanguage } from "@canto/core/domain/services/user-service";
-import { batchMediaTranslations } from "@canto/core/domain/services/translation-service";
+} from "@canto/core/infra/file-organization/folder-repository";
+import { findLibraryStats, listLibraryMedia, updateMedia } from "@canto/core/infra/media/media-repository";
+import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
+import { batchMediaTranslations } from "@canto/core/domain/shared/services/translation-service";
 
 /* -------------------------------------------------------------------------- */
 /*  Library Router — media listing + user preferences                          */

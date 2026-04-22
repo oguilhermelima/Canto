@@ -1,10 +1,10 @@
 import { Skeleton } from "@canto/ui/skeleton";
-import { BackdropCardSkeleton } from "~/components/media/backdrop-card";
+import { BackdropCardSkeleton } from "@/components/media/backdrop-card";
 import {
   CarouselRowSkeleton,
   FeaturedCardSkeleton,
-} from "~/components/media/skeletons";
-import { MediaCardSkeleton } from "~/components/media/media-card";
+} from "@/components/media/skeletons";
+import { MediaCardSkeleton } from "@/components/media/media-card";
 
 /**
  * Spotlight hero placeholder that mirrors SpotlightHero geometry:

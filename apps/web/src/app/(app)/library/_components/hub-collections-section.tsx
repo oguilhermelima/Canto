@@ -4,12 +4,12 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { FolderHeart } from "lucide-react";
 import { SectionTitle } from "@canto/ui/section-title";
-import { trpc } from "~/lib/trpc/client";
-import { CollectionCard } from "~/components/media/cards/collection-card";
-import { NewCollectionCard } from "~/components/media/cards/new-collection-card";
+import { trpc } from "@/lib/trpc/client";
+import { CollectionCard } from "@/components/media/cards/collection-card";
+import { NewCollectionCard } from "@/components/media/cards/new-collection-card";
 
-export { CollectionCard } from "~/components/media/cards/collection-card";
-export { NewCollectionCard } from "~/components/media/cards/new-collection-card";
+export { CollectionCard } from "@/components/media/cards/collection-card";
+export { NewCollectionCard } from "@/components/media/cards/new-collection-card";
 
 export function HubCollectionsSection(): React.JSX.Element {
   const { data: lists, isLoading, isError, refetch } = trpc.list.getAll.useQuery();

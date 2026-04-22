@@ -1,6 +1,6 @@
 "use client";
 
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 
 export function useProfileStory() {
   const { data: stats, isLoading: sl } = trpc.userMedia.getWatchTimeStats.useQuery();

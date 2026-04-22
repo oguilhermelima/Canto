@@ -1,9 +1,9 @@
 "use client";
 
-import { DownloadClientSection } from "~/components/settings/services-section";
-import { ImportMethodSection, SeedingSection } from "~/components/settings/import-seeding";
-import { SettingsSection } from "~/components/settings/shared";
-import { DownloadFolders } from "~/components/settings/download-folders";
+import { DownloadClientSection } from "@/components/settings/services-section";
+import { ImportMethodSection, SeedingSection } from "@/components/settings/import-seeding";
+import { SettingsSection } from "@/components/settings/shared";
+import { DownloadFolders } from "@/components/settings/download-folders";
 
 export function DownloadsSection(): React.JSX.Element {
   return (

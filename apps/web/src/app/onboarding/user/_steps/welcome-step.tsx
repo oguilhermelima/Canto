@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Image from "next/image";
 import type { ConfigureFooter } from "../../_components/onboarding-footer";
-import { authClient } from "~/lib/auth-client";
+import { authClient } from "@/lib/auth-client";
 
 export function WelcomeStep({
   onNext,

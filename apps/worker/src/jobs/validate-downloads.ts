@@ -6,8 +6,8 @@ import {
   findDownloadedLibraryMedia,
   findImportedFilesForMedia,
   updateMedia,
-} from "@canto/core/infrastructure/repositories";
-import { createNotification } from "@canto/core/domain/use-cases/create-notification";
+} from "@canto/core/infra/repositories";
+import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
 
 /**
  * Periodic validation: checks that media marked as `downloaded` still has

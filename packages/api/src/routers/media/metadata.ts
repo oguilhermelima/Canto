@@ -11,27 +11,27 @@ import {
 } from "@canto/validators";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
-import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
-import { getTvdbProvider } from "@canto/core/lib/tvdb-client";
-import { dispatchRefreshExtras } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
-import { logAndSwallow } from "@canto/core/lib/log-error";
+import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
+import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
+import { dispatchRefreshExtras } from "@canto/core/platform/queue/bullmq-dispatcher";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 import {
   findMediaById,
   findMediaByIdWithSeasons,
-} from "@canto/core/infrastructure/repositories/media/media-repository";
-import { applyMediaTranslation, applySeasonsTranslation } from "@canto/core/domain/services/translation-service";
-import { getUserLanguage, getActiveUserLanguages } from "@canto/core/domain/services/user-service";
-import { loadExtrasFromDB } from "@canto/core/domain/services/extras-service";
-import { getByExternal } from "@canto/core/domain/use-cases/media/get-by-external";
+} from "@canto/core/infra/media/media-repository";
+import { applyMediaTranslation, applySeasonsTranslation } from "@canto/core/domain/shared/services/translation-service";
+import { getUserLanguage, getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
+import { loadExtrasFromDB } from "@canto/core/domain/media/services/extras-service";
+import { getByExternal } from "@canto/core/domain/media/use-cases/get-by-external";
 import {
   resolveMedia,
   persistMediaUseCase,
   persistFullMedia,
-} from "@canto/core/domain/use-cases/media/persist/core";
-import { fetchMediaMetadata } from "@canto/core/domain/use-cases/media/fetch-media-metadata";
-import { getEffectiveProvider } from "@canto/core/domain/rules/effective-provider";
-import { reconcileShowStructure } from "@canto/core/domain/use-cases/media/reconcile-show-structure";
-import { jobDispatcher } from "@canto/core/infrastructure/adapters/job-dispatcher.adapter";
+} from "@canto/core/domain/media/use-cases/persist/core";
+import { fetchMediaMetadata } from "@canto/core/domain/media/use-cases/fetch-media-metadata";
+import { getEffectiveProvider } from "@canto/core/domain/shared/rules/effective-provider";
+import { reconcileShowStructure } from "@canto/core/domain/media/use-cases/reconcile-show-structure";
+import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
 
 async function getProviderWithKey(name: "tmdb" | "tvdb") {
   if (name === "tmdb") return getTmdbProvider();

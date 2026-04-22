@@ -3,7 +3,7 @@
 import { Badge } from "@canto/ui/badge";
 import { Download, HardDrive } from "lucide-react";
 import { toast } from "sonner";
-import { formatBytes, resolveState } from "~/lib/torrent-utils";
+import { formatBytes, resolveState } from "@/lib/torrent-utils";
 import { ContentSeasonList } from "./content-season-list";
 import type { FileItem, SeasonData } from "./content-season-list";
 import { TorrentMiniRow, SeasonActions } from "./torrent-row";

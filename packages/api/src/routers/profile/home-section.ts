@@ -5,7 +5,7 @@ import {
   replaceHomeSections,
   deleteHomeSections,
   seedHomeSectionsForUser,
-} from "@canto/core/infrastructure/repositories/home-section-repository";
+} from "@canto/core/infra/profile/home-section-aggregate-repository";
 import {
   DEFAULT_HOME_SECTIONS,
   CANONICAL_HOME_SECTIONS,

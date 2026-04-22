@@ -3,10 +3,10 @@
 import { useState, useCallback, useMemo } from "react";
 import { RotateCcw, Save, Loader2 } from "lucide-react";
 import { Button } from "@canto/ui/button";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import { toast } from "sonner";
 import { ProfileSectionRow } from "./profile-section-row";
-import { SettingsSection } from "~/components/settings/shared";
+import { SettingsSection } from "@/components/settings/shared";
 import type { ProfileSectionConfig } from "@canto/db/schema";
 import type { ProfileSectionKey } from "@canto/validators";
 

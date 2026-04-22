@@ -5,7 +5,7 @@ import {
   findUserRecentActivity,
   findUserTopGenres,
   findUserWatchTimeStats,
-} from "@canto/core/infrastructure/repositories";
+} from "@canto/core/infra/repositories";
 
 export const analyticsRouter = createTRPCRouter({
   getRatingDistribution: protectedProcedure.query(({ ctx }) =>

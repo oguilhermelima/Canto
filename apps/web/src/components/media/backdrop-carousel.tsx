@@ -11,8 +11,8 @@ import {
   
 } from "./backdrop-card";
 import type {BadgeType} from "./backdrop-card";
-import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
-import { useHiddenMedia } from "~/hooks/use-hidden-media";
+import { useScrollCarousel } from "@/hooks/use-scroll-carousel";
+import { useHiddenMedia } from "@/hooks/use-hidden-media";
 
 interface BackdropItem {
   externalId?: string;

@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@canto/ui/select";
 import { HardDrive, RefreshCw } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import { SettingsRow } from "./settings-row";
 import { ProviderOverrideDialog } from "./provider-override-dialog";
 import type { useManageModal } from "./use-manage-modal";

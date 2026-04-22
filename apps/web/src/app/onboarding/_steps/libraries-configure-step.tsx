@@ -2,10 +2,10 @@
 
 import { useEffect } from "react";
 import { Folder } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import type { ConfigureFooter } from "../_components/onboarding-footer";
 import { StepHeader } from "../_components/step-header";
-import { DownloadFolders } from "~/components/settings/download-folders";
+import { DownloadFolders } from "@/components/settings/download-folders";
 
 export function LibrariesConfigureStep({
   onNext,

@@ -30,11 +30,11 @@ import {
 } from "@canto/ui/dialog";
 import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
-import { useWatchRegion } from "~/hooks/use-watch-region";
-import { useDirectSearch } from "~/hooks/use-direct-search";
-import { SectionCard, SettingsSection } from "~/components/settings/shared";
-import { FieldInput } from "~/components/settings/_primitives";
+import { trpc } from "@/lib/trpc/client";
+import { useWatchRegion } from "@/hooks/use-watch-region";
+import { useDirectSearch } from "@/hooks/use-direct-search";
+import { SectionCard, SettingsSection } from "@/components/settings/shared";
+import { FieldInput } from "@/components/settings/_primitives";
 import {
   SETTINGS_REGISTRY
   

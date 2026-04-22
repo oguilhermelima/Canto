@@ -2,7 +2,7 @@
 
 import { ConfirmationDialog } from "@canto/ui/confirmation-dialog";
 import { toast } from "sonner";
-import type { trpc } from "~/lib/trpc/client";
+import type { trpc } from "@/lib/trpc/client";
 
 const REMOVE_CHECKBOXES = [
   {

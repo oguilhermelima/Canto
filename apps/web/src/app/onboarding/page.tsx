@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowLeft } from "lucide-react";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import type { Step } from "./_components/constants";
 import { LIBRARY_STEPS } from "./_components/constants";
 import { FadeIn } from "./_components/fade-in";

@@ -7,24 +7,24 @@ import {
 } from "@canto/validators";
 
 import { createTRPCRouter, adminProcedure } from "../../trpc";
-import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
-import { getTvdbProvider } from "@canto/core/lib/tvdb-client";
+import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
+import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
 import {
   findMediaById,
   findMediaByIdWithSeasons,
   updateMedia,
-} from "@canto/core/infrastructure/repositories/media/media-repository";
-import { findMediaFilesByMediaId } from "@canto/core/infrastructure/repositories/media/media-file-repository";
-import { findMediaVersionsByMediaId } from "@canto/core/infrastructure/repositories/media/media-version-repository";
-import { getActiveUserLanguages } from "@canto/core/domain/services/user-service";
-import { persistFullMedia } from "@canto/core/domain/use-cases/media/persist/core";
-import { fetchMediaMetadata } from "@canto/core/domain/use-cases/media/fetch-media-metadata";
-import { getEffectiveProvider } from "@canto/core/domain/rules/effective-provider";
-import { reconcileShowStructure } from "@canto/core/domain/use-cases/media/reconcile-show-structure";
-import { jobDispatcher } from "@canto/core/infrastructure/adapters/job-dispatcher.adapter";
-import { executeReorganizeMediaFiles } from "@canto/core/domain/use-cases/file-organization/reorganize-media-files";
-import { createNodeFileSystemAdapter } from "@canto/core/infrastructure/adapters/filesystem";
-import { updateMediaServerMetadata } from "@canto/core/domain/use-cases/media-servers/update-metadata";
+} from "@canto/core/infra/media/media-repository";
+import { findMediaFilesByMediaId } from "@canto/core/infra/media/media-file-repository";
+import { findMediaVersionsByMediaId } from "@canto/core/infra/media/media-version-repository";
+import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
+import { persistFullMedia } from "@canto/core/domain/media/use-cases/persist/core";
+import { fetchMediaMetadata } from "@canto/core/domain/media/use-cases/fetch-media-metadata";
+import { getEffectiveProvider } from "@canto/core/domain/shared/rules/effective-provider";
+import { reconcileShowStructure } from "@canto/core/domain/media/use-cases/reconcile-show-structure";
+import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
+import { executeReorganizeMediaFiles } from "@canto/core/domain/file-organization/use-cases/reorganize-media-files";
+import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
+import { updateMediaServerMetadata } from "@canto/core/domain/media-servers/use-cases/update-metadata";
 
 export const mediaVersioningRouter = createTRPCRouter({
   previewProviderOverride: adminProcedure

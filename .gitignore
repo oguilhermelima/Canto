@@ -42,3 +42,6 @@ old/
 .pnpm-store/
 .superset/
 .claude/worktrees/
+
+# Codemod run logs
+.codemod/

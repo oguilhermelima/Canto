@@ -3,8 +3,8 @@
 import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
-import { resolveState } from "~/lib/torrent-utils";
+import { trpc } from "@/lib/trpc/client";
+import { resolveState } from "@/lib/torrent-utils";
 
 function epKey(sn: number, en: number): string {
   return `S${String(sn).padStart(2, "0")}E${String(en).padStart(2, "0")}`;

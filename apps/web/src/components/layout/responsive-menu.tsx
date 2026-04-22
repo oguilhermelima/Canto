@@ -15,7 +15,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@canto/ui/sheet";
-import { useIsMobile } from "~/hooks/use-is-mobile";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 
 type MobileContentRenderer = (api: { close: () => void }) => React.ReactNode;
 

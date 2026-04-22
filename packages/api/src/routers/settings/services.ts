@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { getSetting, getSettings, setSetting } from "@canto/db/settings";
-import { invalidateServiceClients } from "@canto/core/infrastructure/adapters/media-servers/service-clients";
+import { invalidateServiceClients } from "@canto/core/infra/media-servers/service-clients";
 import {
   serviceEnum,
   toggleServiceInput,
@@ -13,8 +13,8 @@ import {
 } from "@canto/validators";
 
 import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure, t } from "../../trpc";
-import { SERVICE_ENABLED_KEY } from "@canto/core/domain/rules/service-keys";
-import { toggleTvdbDefault } from "@canto/core/domain/use-cases/media/toggle-tvdb-default";
+import { SERVICE_ENABLED_KEY } from "@canto/core/domain/media-servers/rules/service-keys";
+import { toggleTvdbDefault } from "@canto/core/domain/media/use-cases/toggle-tvdb-default";
 import {
   authenticateJellyfin,
   authenticatePlex,
@@ -22,7 +22,7 @@ import {
   loginPlex,
   createPlexPin,
   checkPlexPin,
-} from "@canto/core/domain/use-cases/media-servers/authenticate";
+} from "@canto/core/domain/media-servers/use-cases/authenticate";
 
 const ALL_SERVICES = serviceEnum.options;
 

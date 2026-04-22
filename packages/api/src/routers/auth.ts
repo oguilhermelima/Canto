@@ -7,7 +7,7 @@ import {
   setUserPreferences,
   getUserProfile,
   updateUserProfile,
-} from "@canto/core/infrastructure/repositories/user-repository";
+} from "@canto/core/infra/user/user-aggregate-repository";
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
 
 export const authRouter = createTRPCRouter({

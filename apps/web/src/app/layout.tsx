@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Instrument_Serif } from "next/font/google";
 import { ThemeProvider } from "next-themes";
-import { TRPCProvider } from "~/lib/trpc/provider";
+import { TRPCProvider } from "@/lib/trpc/provider";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({

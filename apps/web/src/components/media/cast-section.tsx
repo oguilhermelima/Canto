@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { FadeImage } from "~/components/ui/fade-image";
+import { FadeImage } from "@/components/ui/fade-image";
 import Link from "next/link";
 import { Skeleton } from "@canto/ui/skeleton";
 import { User, Users, ChevronDown } from "lucide-react";

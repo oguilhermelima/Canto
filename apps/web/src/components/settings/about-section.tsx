@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { ExternalLink } from "lucide-react";
-import { SettingsSection } from "~/components/settings/shared";
+import { SettingsSection } from "@/components/settings/shared";
 
 const LINKS = [
   { href: "https://github.com/oguilhermelima/canto", name: "GitHub", desc: "Source code and issue tracker" },

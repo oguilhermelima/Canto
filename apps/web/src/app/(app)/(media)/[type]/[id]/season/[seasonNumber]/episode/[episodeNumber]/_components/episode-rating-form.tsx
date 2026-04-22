@@ -5,7 +5,7 @@ import { Star } from "lucide-react";
 import { Button } from "@canto/ui/button";
 import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 
 interface EpisodeRatingFormProps {
   mediaId: string;

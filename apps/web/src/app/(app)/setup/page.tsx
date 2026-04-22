@@ -2,9 +2,9 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { trpc } from "~/lib/trpc/client";
-import { useDocumentTitle } from "~/hooks/use-document-title";
-import { MagicSetup } from "~/components/onboarding/magic-setup";
+import { trpc } from "@/lib/trpc/client";
+import { useDocumentTitle } from "@/hooks/use-document-title";
+import { MagicSetup } from "@/components/onboarding/magic-setup";
 
 export default function SetupPage(): React.JSX.Element {
   useDocumentTitle("Setting up");

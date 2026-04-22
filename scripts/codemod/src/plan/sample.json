@@ -1,0 +1,315 @@
+{
+  "$schema": "./schema.json",
+  "branch": "refactor/core-architecture",
+  "packageRoot": "packages/core",
+  "srcRoot": "packages/core/src",
+  "contexts": [
+    "content-enrichment",
+    "file-organization",
+    "lists",
+    "media",
+    "media-servers",
+    "notifications",
+    "profile",
+    "recommendations",
+    "requests",
+    "sync",
+    "torrents",
+    "trakt",
+    "user",
+    "user-media"
+  ],
+  "sharedDomainNamespaces": ["errors", "rules", "services", "types", "ports", "mappers", "constants"],
+  "platformNamespaces": ["logger", "http", "queue", "cache", "fs", "secrets", "testing", "data"],
+
+  "domainClassification": [
+    { "from": "domain/rules/canonical-brand.ts",       "context": "recommendations",   "kind": "rules",     "to": "domain/recommendations/rules/canonical-brand.ts" },
+    { "from": "domain/rules/effective-provider.ts",    "context": "shared",            "kind": "rules",     "to": "domain/shared/rules/effective-provider.ts",
+      "reviewFlag": "3 contexts (file-organization, media, torrents). Shared." },
+    { "from": "domain/rules/folder-routing.ts",        "context": "torrents",          "kind": "rules",     "to": "domain/torrents/rules/folder-routing.ts" },
+    { "from": "domain/rules/genre-tiles.ts",           "context": "recommendations",   "kind": "rules",     "to": "domain/recommendations/rules/genre-tiles.ts" },
+    { "from": "domain/rules/list-ownership.ts",        "context": "lists",             "kind": "rules",     "to": "domain/lists/rules/list-ownership.ts" },
+    { "from": "domain/rules/list-rules.ts",            "context": "lists",             "kind": "rules",     "to": "domain/lists/rules/list-rules.ts" },
+    { "from": "domain/rules/naming.ts",                "context": "shared",            "kind": "rules",     "to": "domain/shared/rules/naming.ts",
+      "reviewFlag": "2 contexts (file-organization, torrents). Shared." },
+    { "from": "domain/rules/parsing-episodes.ts",      "context": "torrents",          "kind": "rules",     "to": "domain/torrents/rules/parsing-episodes.ts" },
+    { "from": "domain/rules/parsing-languages.ts",     "context": "torrents",          "kind": "rules",     "to": "domain/torrents/rules/parsing-languages.ts" },
+    { "from": "domain/rules/parsing-release.ts",       "context": "torrents",          "kind": "rules",     "to": "domain/torrents/rules/parsing-release.ts" },
+    { "from": "domain/rules/parsing.ts",               "context": "torrents",          "kind": "rules",     "to": "domain/torrents/rules/parsing.ts",
+      "note": "Aggregator barrel for parsing-*.ts" },
+    { "from": "domain/rules/pool-scoring.ts",          "context": "content-enrichment","kind": "rules",     "to": "domain/content-enrichment/rules/pool-scoring.ts" },
+    { "from": "domain/rules/quality.ts",               "context": "torrents",          "kind": "rules",     "to": "domain/torrents/rules/quality.ts" },
+    { "from": "domain/rules/recommendation-filters.ts","context": "recommendations",   "kind": "rules",     "to": "domain/recommendations/rules/recommendation-filters.ts" },
+    { "from": "domain/rules/rss-matching.ts",          "context": "torrents",          "kind": "rules",     "to": "domain/torrents/rules/rss-matching.ts",
+      "reviewFlag": "Inventory flagged DEAD; actually alive (apps/worker/src/jobs/rss-sync.ts)." },
+    { "from": "domain/rules/scoring.ts",               "context": "shared",            "kind": "rules",     "to": "domain/shared/rules/scoring.ts",
+      "reviewFlag": "2 contexts (content-enrichment, torrents). Shared." },
+    { "from": "domain/rules/service-keys.ts",          "context": "media-servers",     "kind": "rules",     "to": "domain/media-servers/rules/service-keys.ts",
+      "reviewFlag": "Inventory flagged DEAD; actually alive (packages/api/src/routers/settings/services.ts)." },
+    { "from": "domain/rules/slugify.ts",               "context": "shared",            "kind": "rules",     "to": "domain/shared/rules/slugify.ts",
+      "reviewFlag": "2 contexts (lists, trakt). Shared." },
+    { "from": "domain/rules/torrent-rules.ts",         "context": "torrents",          "kind": "rules",     "to": "domain/torrents/rules/torrent-rules.ts" },
+    { "from": "domain/rules/user-media-rules.ts",      "context": "user-media",        "kind": "rules",     "to": "domain/user-media/rules/user-media-rules.ts" },
+    { "from": "domain/rules/validate-path.ts",         "context": "file-organization", "kind": "rules",     "to": "domain/file-organization/rules/validate-path.ts",
+      "reviewFlag": "Inventory flagged DEAD; actually alive (packages/api/src/routers/folder/*)." },
+    { "from": "domain/rules/validate-service-url.ts",  "context": "media-servers",     "kind": "rules",     "to": "domain/media-servers/rules/validate-service-url.ts" },
+
+    { "from": "domain/services/extras-service.ts",                "context": "media",        "kind": "services", "to": "domain/media/services/extras-service.ts" },
+    { "from": "domain/services/media-availability-service.ts",    "context": "media",        "kind": "services", "to": "domain/media/services/media-availability-service.ts" },
+    { "from": "domain/services/media-version-groups-service.ts",  "context": "media-servers","kind": "services", "to": "domain/media-servers/services/media-version-groups-service.ts",
+      "reviewFlag": "Imports sync/types; fits media-servers-admin or sync. Landed media-servers." },
+    { "from": "domain/services/translation-service.ts",           "context": "shared",       "kind": "services", "to": "domain/shared/services/translation-service.ts",
+      "reviewFlag": "3 contexts (lists, media, recommendations). Shared." },
+    { "from": "domain/services/user-connection-service.ts",       "context": "media-servers","kind": "services", "to": "domain/media-servers/services/user-connection-service.ts" },
+    { "from": "domain/services/user-service.ts",                  "context": "shared",       "kind": "services", "to": "domain/shared/services/user-service.ts",
+      "reviewFlag": "6+ contexts. Shared." },
+
+    { "from": "domain/ports/cache.ts",                 "context": "shared",        "kind": "ports", "to": "domain/shared/ports/cache.ts",
+      "reviewFlag": "Only implemented by infrastructure/cache/redis.ts; no domain consumer yet. Keep." },
+    { "from": "domain/ports/download-client.ts",       "context": "shared",        "kind": "ports", "to": "domain/shared/ports/download-client.ts",
+      "reviewFlag": "3 contexts (file-organization, media, torrents). Shared." },
+    { "from": "domain/ports/file-system.port.ts",      "context": "shared",        "kind": "ports", "to": "domain/shared/ports/file-system.port.ts" },
+    { "from": "domain/ports/indexer.ts",               "context": "torrents",      "kind": "ports", "to": "domain/torrents/ports/indexer.ts" },
+    { "from": "domain/ports/job-dispatcher.port.ts",   "context": "shared",        "kind": "ports", "to": "domain/shared/ports/job-dispatcher.port.ts" },
+    { "from": "domain/ports/media-provider.port.ts",   "context": "shared",        "kind": "ports", "to": "domain/shared/ports/media-provider.port.ts" },
+    { "from": "domain/ports/media-server.port.ts",     "context": "shared",        "kind": "ports", "to": "domain/shared/ports/media-server.port.ts",
+      "reviewFlag": "5 contexts consume. Shared." },
+
+    { "from": "domain/types/common.ts",           "context": "torrents",        "kind": "types", "to": "domain/torrents/types/common.ts" },
+    { "from": "domain/types/recs-filters.ts",     "context": "recommendations", "kind": "types", "to": "domain/recommendations/types/recs-filters.ts" },
+    { "from": "domain/types/torrent.ts",          "context": "torrents",        "kind": "types", "to": "domain/torrents/types/torrent.ts" },
+
+    { "from": "domain/mappers/media-mapper.ts",   "context": "shared",          "kind": "mappers", "to": "domain/shared/mappers/media-mapper.ts",
+      "reviewFlag": "2 contexts (media, recommendations). Shared." },
+
+    { "from": "domain/constants/default-home-sections.ts", "context": "shared", "kind": "constants", "to": "domain/shared/constants/default-home-sections.ts" },
+
+    { "from": "domain/rules/index.ts",  "action": "delete", "reason": "Barrel replaced by per-context sibling barrels in sibling-barrels phase." },
+    { "from": "domain/ports/index.ts",  "action": "delete", "reason": "Barrel replaced by per-context sibling barrels." },
+    { "from": "domain/types/index.ts",  "action": "delete", "reason": "Barrel replaced by per-context sibling barrels." },
+
+    { "from": "domain/sync/index.ts",           "action": "rename-sibling", "to": "domain/sync.ts", "reason": "Sync stays flat as its own context; barrel becomes sibling." },
+    { "from": "domain/sync/types.ts",           "action": "keep", "note": "Sync context keeps flat layout." },
+    { "from": "domain/sync/plex-scanner.ts",    "action": "keep" },
+    { "from": "domain/sync/jellyfin-scanner.ts","action": "keep" },
+    { "from": "domain/sync/sync-pipeline.ts",   "action": "keep" },
+
+    { "from": "domain/errors.ts", "action": "split-errors", "reason": "Handled by split-errors subcommand per errorAssignments[]." }
+  ],
+
+  "useCaseContextMoves": [
+    { "from": "domain/use-cases/content-enrichment", "to": "domain/content-enrichment/use-cases" },
+    { "from": "domain/use-cases/file-organization",  "to": "domain/file-organization/use-cases" },
+    { "from": "domain/use-cases/lists",              "to": "domain/lists/use-cases" },
+    { "from": "domain/use-cases/media",              "to": "domain/media/use-cases" },
+    { "from": "domain/use-cases/media-servers",      "to": "domain/media-servers/use-cases" },
+    { "from": "domain/use-cases/notifications",      "to": "domain/notifications/use-cases" },
+    { "from": "domain/use-cases/recommendations",    "to": "domain/recommendations/use-cases" },
+    { "from": "domain/use-cases/torrents",           "to": "domain/torrents/use-cases" },
+    { "from": "domain/use-cases/trakt",              "to": "domain/trakt/use-cases" },
+    { "from": "domain/use-cases/user",               "to": "domain/user/use-cases" },
+    { "from": "domain/use-cases/user-media",         "to": "domain/user-media/use-cases" }
+  ],
+
+  "errorAssignments": [
+    { "className": "DomainError",                 "context": "shared" },
+    { "className": "DomainErrorCode",             "context": "shared", "kind": "type" },
+    { "className": "MediaNotFoundError",          "context": "shared",
+      "reviewFlag": "3 contexts (media, torrents, user-media). Shared keeps import surface small." },
+
+    { "className": "ListNotFoundError",           "context": "lists" },
+    { "className": "ListPermissionError",         "context": "lists" },
+    { "className": "ListNameConflictError",       "context": "lists" },
+    { "className": "InvalidListNameError",        "context": "lists" },
+    { "className": "ListInvitationNotFoundError", "context": "lists" },
+    { "className": "ListInvitationInvalidError",  "context": "lists" },
+    { "className": "SystemListModificationError", "context": "lists" },
+
+    { "className": "BlocklistedReleaseError",     "context": "torrents" },
+    { "className": "DuplicateDownloadError",      "context": "torrents" },
+    { "className": "DownloadClientError",         "context": "torrents" },
+    { "className": "IndexerSearchError",          "context": "torrents" },
+    { "className": "TorrentPersistenceError",     "context": "torrents" },
+    { "className": "InvalidDownloadInputError",   "context": "torrents" },
+
+    { "className": "SeasonNotFoundError",         "context": "user-media" },
+    { "className": "EpisodeNotFoundError",        "context": "user-media" },
+    { "className": "InvalidWatchInputError",      "context": "user-media" },
+
+    { "className": "InvalidPathError",            "context": "file-organization" }
+  ],
+
+  "infraMoves": [
+    { "from": "infrastructure/repositories/content-enrichment/extras.ts",            "to": "infra/content-enrichment/extras-repository.ts" },
+
+    { "from": "infrastructure/repositories/file-organization/folder.ts",              "to": "infra/file-organization/folder-repository.ts" },
+    { "from": "infrastructure/repositories/file-organization/library.ts",             "to": "infra/file-organization/library-repository.ts" },
+
+    { "from": "infrastructure/repositories/lists/list.ts",                            "to": "infra/lists/list-repository.ts" },
+    { "from": "infrastructure/repositories/lists/member.ts",                          "to": "infra/lists/member-repository.ts" },
+
+    { "from": "infrastructure/repositories/media/media-repository.ts",                "to": "infra/media/media-repository.ts" },
+    { "from": "infrastructure/repositories/media/media-version-repository.ts",        "to": "infra/media/media-version-repository.ts" },
+    { "from": "infrastructure/repositories/media/media-file-repository.ts",           "to": "infra/media/media-file-repository.ts" },
+
+    { "from": "infrastructure/repositories/media-servers/user-connection.ts",         "to": "infra/media-servers/user-connection-repository.ts" },
+
+    { "from": "infrastructure/repositories/notifications/notification.ts",            "to": "infra/notifications/notification-repository.ts" },
+
+    { "from": "infrastructure/repositories/profile/home-section.ts",                  "to": "infra/profile/home-section-repository.ts" },
+    { "from": "infrastructure/repositories/profile/profile-section.ts",               "to": "infra/profile/profile-section-repository.ts" },
+
+    { "from": "infrastructure/repositories/recommendations/user-recommendation.ts",   "to": "infra/recommendations/user-recommendation-repository.ts" },
+
+    { "from": "infrastructure/repositories/requests/request.ts",                      "to": "infra/requests/request-repository.ts" },
+
+    { "from": "infrastructure/repositories/torrents/torrent.ts",                      "to": "infra/torrents/torrent-repository.ts" },
+
+    { "from": "infrastructure/repositories/trakt/trakt-sync.ts",                      "to": "infra/trakt/trakt-sync-repository.ts" },
+
+    { "from": "infrastructure/repositories/user/user.ts",                             "to": "infra/user/user-repository.ts" },
+
+    { "from": "infrastructure/repositories/user-media/hidden.ts",                     "to": "infra/user-media/hidden-repository.ts" },
+    { "from": "infrastructure/repositories/user-media/library-feed.ts",               "to": "infra/user-media/library-feed-repository.ts" },
+    { "from": "infrastructure/repositories/user-media/library.ts",                    "to": "infra/user-media/library-repository.ts" },
+    { "from": "infrastructure/repositories/user-media/playback-progress.ts",          "to": "infra/user-media/playback-progress-repository.ts" },
+    { "from": "infrastructure/repositories/user-media/profile-insights.ts",           "to": "infra/user-media/profile-insights-repository.ts" },
+    { "from": "infrastructure/repositories/user-media/rating.ts",                     "to": "infra/user-media/rating-repository.ts" },
+    { "from": "infrastructure/repositories/user-media/state.ts",                      "to": "infra/user-media/state-repository.ts" },
+    { "from": "infrastructure/repositories/user-media/stats.ts",                      "to": "infra/user-media/stats-repository.ts" },
+    { "from": "infrastructure/repositories/user-media/watch-history.ts",              "to": "infra/user-media/watch-history-repository.ts" },
+
+    { "from": "infrastructure/repositories/home-section-repository.ts",               "to": "infra/profile/home-section-aggregate-repository.ts",
+      "reviewFlag": "Top-level legacy wrapper. Target: profile aggregate. Verify shape." },
+    { "from": "infrastructure/repositories/user-repository.ts",                       "to": "infra/user/user-aggregate-repository.ts",
+      "reviewFlag": "Top-level legacy wrapper. Verify shape." },
+    { "from": "infrastructure/repositories/notification-repository.ts",               "to": "infra/notifications/notification-aggregate-repository.ts",
+      "reviewFlag": "Top-level legacy wrapper. Verify shape." },
+    { "from": "infrastructure/repositories/profile-section-repository.ts",            "to": "infra/profile/profile-section-aggregate-repository.ts",
+      "reviewFlag": "Top-level legacy wrapper. Verify shape." },
+    { "from": "infrastructure/repositories/request-repository.ts",                    "to": "infra/requests/request-aggregate-repository.ts",
+      "reviewFlag": "Top-level legacy wrapper. Verify shape." },
+    { "from": "infrastructure/repositories/trakt-sync-repository.ts",                 "to": "infra/trakt/trakt-sync-aggregate-repository.ts",
+      "reviewFlag": "Top-level legacy wrapper. Verify shape." },
+
+    { "from": "infrastructure/repositories/shared/recs-filter-builder.ts",            "to": "infra/recommendations/recs-filter-builder.ts",
+      "reviewFlag": "Used by recommendations. Place under recommendations context." },
+    { "from": "infrastructure/repositories/shared/media-i18n.ts",                     "to": "infra/shared/media-i18n.ts" },
+    { "from": "infrastructure/repositories/shared/language-repository.ts",            "to": "infra/shared/language-repository.ts" },
+
+    { "from": "infrastructure/adapters/media-servers/jellyfin.ts",                    "to": "infra/media-servers/jellyfin.adapter.ts" },
+    { "from": "infrastructure/adapters/media-servers/jellyfin-server.adapter.ts",     "to": "infra/media-servers/jellyfin-server.adapter.ts" },
+    { "from": "infrastructure/adapters/media-servers/plex.ts",                        "to": "infra/media-servers/plex.adapter.ts" },
+    { "from": "infrastructure/adapters/media-servers/plex-server.adapter.ts",         "to": "infra/media-servers/plex-server.adapter.ts" },
+    { "from": "infrastructure/adapters/media-servers/service-clients.ts",             "to": "infra/media-servers/service-clients.ts" },
+
+    { "from": "infrastructure/adapters/trakt/client.ts",                              "to": "infra/trakt/trakt.adapter.ts",
+      "reviewFlag": "Originally client.ts under trakt/; renamed to make adapter role explicit." },
+    { "from": "infrastructure/adapters/trakt.ts",                                     "to": "infra/trakt/trakt-shim.ts",
+      "reviewFlag": "Legacy top-level shim; verify still needed after trakt adapter relocates. May become re-export barrel." },
+
+    { "from": "infrastructure/adapters/indexers/jackett.ts",                          "to": "infra/indexers/jackett.adapter.ts" },
+    { "from": "infrastructure/adapters/indexers/prowlarr.ts",                         "to": "infra/indexers/prowlarr.adapter.ts" },
+    { "from": "infrastructure/adapters/indexers/torznab-parser.ts",                   "to": "infra/indexers/torznab-parser.ts" },
+    { "from": "infrastructure/adapters/indexers/indexer-factory.ts",                  "to": "infra/indexers/indexer-factory.ts" },
+
+    { "from": "infrastructure/adapters/torrent-clients/qbittorrent.ts",               "to": "infra/torrent-clients/qbittorrent.adapter.ts" },
+    { "from": "infrastructure/adapters/torrent-clients/download-client-factory.ts",   "to": "infra/torrent-clients/download-client-factory.ts" },
+
+    { "from": "infrastructure/adapters/filesystem.ts",                                "to": "platform/fs/filesystem.ts" },
+    { "from": "infrastructure/adapters/job-dispatcher.adapter.ts",                    "to": "platform/queue/job-dispatcher.adapter.ts" },
+    { "from": "infrastructure/adapters/service-tester.ts",                            "to": "platform/testing/service-tester.ts" },
+    { "from": "infrastructure/adapters/tmdb-raw.ts",                                  "to": "platform/http/tmdb-raw.ts" },
+
+    { "from": "infrastructure/queue/bullmq-dispatcher.ts",                            "to": "platform/queue/bullmq-dispatcher.ts" },
+    { "from": "infrastructure/queue/queue-names.ts",                                  "to": "platform/queue/queue-names.ts" },
+    { "from": "infrastructure/queue/redis-config.ts",                                 "to": "platform/queue/redis-config.ts" },
+
+    { "from": "infrastructure/cache/redis.ts",                                        "to": "platform/cache/redis.ts" },
+
+    { "from": "lib/log-error.ts",                                                     "to": "platform/logger/log-error.ts" },
+    { "from": "lib/tmdb-client.ts",                                                   "to": "platform/http/tmdb-client.ts" },
+    { "from": "lib/tvdb-client.ts",                                                   "to": "platform/http/tvdb-client.ts" },
+    { "from": "lib/follow-redirects.ts",                                              "to": "platform/http/follow-redirects.ts" },
+    { "from": "lib/server-credentials.ts",                                            "to": "platform/secrets/server-credentials.ts" }
+  ],
+
+  "infraBarrelsToDelete": [
+    "infrastructure/adapters/media-servers/index.ts",
+    "infrastructure/adapters/trakt/index.ts",
+    "infrastructure/repositories/index.ts",
+    "infrastructure/repositories/content-enrichment/index.ts",
+    "infrastructure/repositories/file-organization/index.ts",
+    "infrastructure/repositories/lists/index.ts",
+    "infrastructure/repositories/media/index.ts",
+    "infrastructure/repositories/media-servers/index.ts",
+    "infrastructure/repositories/notifications/index.ts",
+    "infrastructure/repositories/profile/index.ts",
+    "infrastructure/repositories/recommendations/index.ts",
+    "infrastructure/repositories/requests/index.ts",
+    "infrastructure/repositories/torrents/index.ts",
+    "infrastructure/repositories/trakt/index.ts",
+    "infrastructure/repositories/user/index.ts",
+    "infrastructure/repositories/user-media/index.ts"
+  ],
+
+  "portPlan": {
+    "new": [
+      { "name": "LoggerPort",          "path": "domain/shared/ports/logger.port.ts",
+        "methods": ["info", "warn", "error", "debug", "child", "logAndSwallow", "warnAndContinue"],
+        "replaces": "lib/log-error.ts:logAndSwallow" },
+      { "name": "URLResolverPort",     "path": "domain/shared/ports/url-resolver.port.ts",
+        "methods": ["followRedirects"],
+        "replaces": "lib/follow-redirects.ts:resolveDownloadUrl" },
+      { "name": "FileParserPort",      "path": "domain/torrents/ports/file-parser.port.ts",
+        "methods": ["parseVideoFiles"],
+        "replaces": "infrastructure/adapters/filesystem.ts:parseVideoFiles" },
+      { "name": "PlexAdapterPort",     "path": "domain/media-servers/ports/plex-adapter.port.ts",
+        "methods": ["authenticateServerToken", "checkTvPin", "createTvPin", "getServerResource", "getTvUser", "signIn", "testConnection", "fetchItemWithMedia", "fetchShowLeavesWithMedia"],
+        "replaces": "infrastructure/adapters/media-servers/plex.ts (7+2 functions)" },
+      { "name": "JellyfinAdapterPort", "path": "domain/media-servers/ports/jellyfin-adapter.port.ts",
+        "methods": ["authenticateByName", "createApiKey", "findApiKey", "pingPublic", "testConnection", "fetchItemWithStreams", "fetchShowEpisodesWithStreams"],
+        "replaces": "infrastructure/adapters/media-servers/jellyfin.ts (5+2 functions)" },
+      { "name": "RepositoryPort",      "path": "domain/shared/ports/repository.port.ts",
+        "note": "Umbrella. Evaluate splitting per context after initial draft in Phase 6.",
+        "replaces": "infrastructure/repositories/* direct imports from domain" }
+    ],
+    "extend": [
+      { "name": "JobDispatcherPort", "path": "domain/shared/ports/job-dispatcher.port.ts",
+        "addMethods": ["dispatchMediaPipeline", "dispatchEnsureMedia", "dispatchTranslateEpisodes"] }
+    ],
+    "compositionRoots": [
+      "apps/worker/src/index.ts",
+      "packages/api/src/trpc.ts",
+      "packages/api/src/root.ts"
+    ],
+    "refactorTargets": [
+      "domain/sync/sync-pipeline.ts",
+      "domain/media/use-cases/persist/core.ts",
+      "domain/media/use-cases/persist/extras.ts",
+      "domain/media-servers/use-cases/authenticate/plex.ts",
+      "domain/media-servers/use-cases/authenticate/jellyfin.ts",
+      "domain/media-servers/use-cases/fetch-info/plex.ts",
+      "domain/media-servers/use-cases/fetch-info/jellyfin.ts",
+      "domain/media-servers/use-cases/sync-libraries/plex.ts",
+      "domain/media-servers/use-cases/sync-libraries/jellyfin.ts",
+      "domain/torrents/use-cases/download-torrent/core.ts",
+      "domain/torrents/use-cases/import-torrent/index.ts"
+    ]
+  },
+
+  "aliases": {
+    "rule": "Every package and app exposes a single internal alias '@/*' -> './src/*' via tsconfig paths.",
+    "apps/web": {
+      "from": "~/*",
+      "to": "@/*",
+      "expectedRewrites": 477
+    }
+  },
+
+  "exports": {
+    "packages/core/package.json": {
+      "target": { "exports": { ".": "./src/index.ts", "./package.json": "./package.json", "./*": "./src/*.ts" } }
+    }
+  }
+}

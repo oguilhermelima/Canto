@@ -6,9 +6,9 @@ import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
 import { Bookmark, Check, Eye, Loader2, Plus, X } from "lucide-react";
 import { cn } from "@canto/ui/cn";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 import { toast } from "sonner";
-import { ResponsiveMenu } from "~/components/layout/responsive-menu";
+import { ResponsiveMenu } from "@/components/layout/responsive-menu";
 
 // ── Keyframes injected once ──
 let listAnimStylesInjected = false;

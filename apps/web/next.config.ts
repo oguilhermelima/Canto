@@ -7,6 +7,7 @@ const config: NextConfig = {
   transpilePackages: [
     "@canto/api",
     "@canto/auth",
+    "@canto/core",
     "@canto/db",
     "@canto/ui",
     "@canto/validators",

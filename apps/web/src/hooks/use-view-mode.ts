@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import type { ViewMode } from "~/components/layout/browse-layout.types";
+import type { ViewMode } from "@/components/layout/browse-layout.types";
 
 /**
  * SSR-safe view mode state that persists to localStorage.

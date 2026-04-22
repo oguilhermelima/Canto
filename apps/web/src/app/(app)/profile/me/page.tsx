@@ -3,9 +3,9 @@
 import { useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { LayoutGrid, Library, BarChart3, Folders } from "lucide-react";
-import { useDocumentTitle } from "~/hooks/use-document-title";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { TabBar } from "@canto/ui/tab-bar";
-import { authClient } from "~/lib/auth-client";
+import { authClient } from "@/lib/auth-client";
 import { ProfileHeader } from "./_components/profile-header";
 import { OverviewTab } from "./_components/overview-tab";
 import { LibraryTab } from "./_components/library-tab";

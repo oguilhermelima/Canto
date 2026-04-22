@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { ExternalLink, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@canto/ui/button";
-import { FieldInput } from "~/components/settings/_primitives";
-import { SectionCard, SettingsSection } from "~/components/settings/shared";
-import { trpc } from "~/lib/trpc/client";
+import { FieldInput } from "@/components/settings/_primitives";
+import { SectionCard, SettingsSection } from "@/components/settings/shared";
+import { trpc } from "@/lib/trpc/client";
 import {
   SETTINGS_REGISTRY,
   type SettingKey,

@@ -1,4 +1,4 @@
-import { authClient } from "~/lib/auth-client";
+import { authClient } from "@/lib/auth-client";
 
 export function useIsAdmin(): boolean {
   const { data: session } = authClient.useSession();

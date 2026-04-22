@@ -13,9 +13,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@canto/ui/popover";
-import { authClient } from "~/lib/auth-client";
-import { trpc } from "~/lib/trpc/client";
-import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
+import { authClient } from "@/lib/auth-client";
+import { trpc } from "@/lib/trpc/client";
+import { useScrollCarousel } from "@/hooks/use-scroll-carousel";
 import { toast } from "sonner";
 
 const SCROLL_LIMIT = 20;

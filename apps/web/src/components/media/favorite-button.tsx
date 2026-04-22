@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Heart, HeartOff } from "lucide-react";
 import { cn } from "@canto/ui/cn";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 
 // ── Floating hearts particle ──
 

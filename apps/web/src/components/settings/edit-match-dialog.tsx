@@ -15,7 +15,7 @@ import { cn } from "@canto/ui/cn";
 import { AlertCircle, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 
 export type EditMatchTarget =
   | {

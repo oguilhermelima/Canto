@@ -5,9 +5,9 @@ import Image from "next/image";
 import { Loader2, Upload, ImageIcon, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@canto/ui/cn";
-import { authClient } from "~/lib/auth-client";
-import { trpc } from "~/lib/trpc/client";
-import { fileToBase64 } from "~/lib/file-to-base64";
+import { authClient } from "@/lib/auth-client";
+import { trpc } from "@/lib/trpc/client";
+import { fileToBase64 } from "@/lib/file-to-base64";
 import type { ConfigureFooter } from "../../_components/onboarding-footer";
 import { StepHeader } from "../../_components/step-header";
 

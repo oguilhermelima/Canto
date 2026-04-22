@@ -4,10 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Play, Star } from "lucide-react";
 import { Skeleton } from "@canto/ui/skeleton";
-import { trpc } from "~/lib/trpc/client";
-import { tmdbBackdropLoader, tmdbPosterLoader } from "~/lib/tmdb-image";
-import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
-import { mediaHref } from "~/lib/media-href";
+import { trpc } from "@/lib/trpc/client";
+import { tmdbBackdropLoader, tmdbPosterLoader } from "@/lib/tmdb-image";
+import { useScrollCarousel } from "@/hooks/use-scroll-carousel";
+import { mediaHref } from "@/lib/media-href";
 
 const TMDB_LOGO = "https://image.tmdb.org/t/p/w500";
 const ACCENT = "text-amber-400";

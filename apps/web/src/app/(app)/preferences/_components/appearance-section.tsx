@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { Check, Monitor, Sun, Moon } from "lucide-react";
 import { cn } from "@canto/ui/cn";
-import { SettingsSection } from "~/components/settings/shared";
+import { SettingsSection } from "@/components/settings/shared";
 
 const themeOptions = [
   {

@@ -9,8 +9,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@canto/ui/popover";
-import { authClient } from "~/lib/auth-client";
-import { trpc } from "~/lib/trpc/client";
+import { authClient } from "@/lib/auth-client";
+import { trpc } from "@/lib/trpc/client";
 import { DeleteReviewButton } from "./delete-review-button";
 import { EpisodeRatingForm } from "./episode-rating-form";
 import { EpisodeReviewCard } from "./episode-review-card";

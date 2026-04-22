@@ -3,13 +3,13 @@ import {
   getByMediaIdInput,
 } from "@canto/validators";
 
-import { getDownloadClient } from "@canto/core/infrastructure/adapters/torrent-clients/download-client-factory";
-import { listLiveTorrents } from "@canto/core/domain/use-cases/torrents/list-live-torrents";
-import { mergeLiveData } from "@canto/core/domain/use-cases/media/merge-live-data";
+import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
+import { listLiveTorrents } from "@canto/core/domain/torrents/use-cases/list-live-torrents";
+import { mergeLiveData } from "@canto/core/domain/media/use-cases/merge-live-data";
 import {
   findAllTorrents,
   findTorrentsByMediaId,
-} from "@canto/core/infrastructure/repositories/torrents";
+} from "@canto/core/infra/repositories";
 
 import { createTRPCRouter, adminProcedure } from "../../trpc";
 

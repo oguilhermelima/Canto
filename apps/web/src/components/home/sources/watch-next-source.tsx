@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { trpc } from "~/lib/trpc/client";
-import { useResponsivePageSize } from "~/hooks/use-responsive-page-size";
+import { trpc } from "@/lib/trpc/client";
+import { useResponsivePageSize } from "@/hooks/use-responsive-page-size";
 import type { SectionItem } from "../section-item";
 import { DynamicSection } from "../dynamic-section";
 import { useSectionInfiniteQuery } from "./use-section-query";

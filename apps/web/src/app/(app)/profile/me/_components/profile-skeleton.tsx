@@ -1,5 +1,5 @@
 import { Skeleton } from "@canto/ui/skeleton";
-import { MediaCardSkeleton } from "~/components/media/media-card";
+import { MediaCardSkeleton } from "@/components/media/media-card";
 
 const GRID_COLS =
   "grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6";

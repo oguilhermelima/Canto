@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
-import { authClient } from "~/lib/auth-client";
+import { authClient } from "@/lib/auth-client";
 
 const navItems = [
   { label: "Discover", href: "/", icon: Compass },

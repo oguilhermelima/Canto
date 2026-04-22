@@ -8,9 +8,9 @@ import {
   createPlexPin,
   completeTraktDeviceAuth,
   startTraktDeviceAuth,
-} from "@canto/core/domain/use-cases/media-servers/authenticate";
-import { TraktConfigurationError, TraktHttpError } from "@canto/core/infrastructure/adapters/trakt";
-import { dispatchUserTraktSync } from "@canto/core/infrastructure/queue/bullmq-dispatcher";
+} from "@canto/core/domain/media-servers/use-cases/authenticate";
+import { TraktConfigurationError, TraktHttpError } from "@canto/core/infra/trakt/trakt-shim";
+import { dispatchUserTraktSync } from "@canto/core/platform/queue/bullmq-dispatcher";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { setupLibrariesForConnection } from "./setup";
 

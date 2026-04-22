@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@canto/ui/select";
-import { trpc } from "~/lib/trpc/client";
+import { trpc } from "@/lib/trpc/client";
 
 type TrackingStatus = "none" | "planned" | "watching" | "completed" | "dropped";
 

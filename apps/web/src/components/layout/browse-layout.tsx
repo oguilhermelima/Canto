@@ -3,15 +3,15 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { cn } from "@canto/ui/cn";
 import { Film, Loader2, Tv } from "lucide-react";
-import { PageHeader } from "~/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { TabBar } from "@canto/ui/tab-bar";
 import { StateMessage } from "@canto/ui/state-message";
-import { BrowseMenu } from "~/components/layout/browse-menu";
-import { AdvancedFilter } from "~/components/layout/advanced-filter";
-import { useIsMobile } from "~/hooks/use-is-mobile";
-import type { FilterOutput, SectionId } from "~/components/media/filter-sidebar";
-import { GRID_COLS } from "~/components/layout/browse-layout.types";
-import type { BrowseItem, BrowseMenuItem, BrowseMenuGroup, CardStrategy, FilterPreset, ViewMode } from "~/components/layout/browse-layout.types";
+import { BrowseMenu } from "@/components/layout/browse-menu";
+import { AdvancedFilter } from "@/components/layout/advanced-filter";
+import { useIsMobile } from "@/hooks/use-is-mobile";
+import type { FilterOutput, SectionId } from "@/components/media/filter-sidebar";
+import { GRID_COLS } from "@/components/layout/browse-layout.types";
+import type { BrowseItem, BrowseMenuItem, BrowseMenuGroup, CardStrategy, FilterPreset, ViewMode } from "@/components/layout/browse-layout.types";
 
 export type { FilterOutput, SectionId, BrowseItem, BrowseMenuItem, BrowseMenuGroup, CardStrategy, FilterPreset, ViewMode };
 

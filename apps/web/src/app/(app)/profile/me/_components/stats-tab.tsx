@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import { Skeleton } from "@canto/ui/skeleton";
-import { trpc } from "~/lib/trpc/client";
-import { tmdbBackdropLoader, tmdbPosterLoader } from "~/lib/tmdb-image";
+import { trpc } from "@/lib/trpc/client";
+import { tmdbBackdropLoader, tmdbPosterLoader } from "@/lib/tmdb-image";
 import type { ProfileStoryData } from "./use-profile-story";
 import { useProfileStory } from "./use-profile-story";
 

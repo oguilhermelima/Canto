@@ -6,10 +6,10 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
 import { SectionTitle } from "@canto/ui/section-title";
-import { trpc } from "~/lib/trpc/client";
-import { useWatchRegion } from "~/hooks/use-watch-region";
-import { useScrollCarousel } from "~/hooks/use-scroll-carousel";
-import { tmdbBackdropLoader } from "~/lib/tmdb-image";
+import { trpc } from "@/lib/trpc/client";
+import { useWatchRegion } from "@/hooks/use-watch-region";
+import { useScrollCarousel } from "@/hooks/use-scroll-carousel";
+import { tmdbBackdropLoader } from "@/lib/tmdb-image";
 
 function GenreTile({
   id,
