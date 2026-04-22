@@ -9,13 +9,21 @@
   "scripts": {
     "clean": "rm -rf .cache dist node_modules",
     "typecheck": "tsc --noEmit",
-    "test": "echo 'not yet implemented' && exit 0",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "codemod": "tsx bin/codemod.ts"
   },
-  "dependencies": {},
+  "dependencies": {
+    "commander": "^12.1.0",
+    "picocolors": "^1.1.1",
+    "ts-morph": "^24.0.0",
+    "zod": "catalog:"
+  },
   "devDependencies": {
     "@canto/tsconfig": "workspace:*",
     "@types/node": "^22.13.0",
-    "typescript": "catalog:"
+    "tsx": "^4.19.2",
+    "typescript": "catalog:",
+    "vitest": "^3.2.4"
   }
 }
