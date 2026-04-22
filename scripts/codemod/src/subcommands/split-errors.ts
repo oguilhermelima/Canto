@@ -64,18 +64,50 @@ export async function runSplitErrors(ctx: CodemodContext): Promise<SplitErrorsRe
     symbolToContext.set(assignment.className, assignment.context);
   }
 
-  // Build target content per context.
+  // Build target content per context. Non-shared files import DomainError (+
+  // any other base symbols they extend) from shared/errors.
+  const sharedBases = new Set<string>();
+  const sharedSymbols = byContext.get("shared") ?? [];
+  for (const name of sharedSymbols) sharedBases.add(name);
+
   const filesCreated: { path: string; content: string }[] = [];
   for (const [context, symbols] of byContext) {
     const target = context === "shared"
       ? resolve(srcAbs, "domain/shared/errors.ts")
       : resolve(srcAbs, `domain/${context}/errors.ts`);
 
-    // Emit imports only for symbols that are referenced in the bodies we're moving.
     const emitted: string[] = [];
     if (imports.trim().length > 0) {
       emitted.push(imports);
     }
+
+    // For non-shared files, inject an import for every shared symbol referenced
+    // by the classes we're about to emit (most often DomainError; also
+    // DomainErrorCode type when referenced in `readonly code: DomainErrorCode`).
+    if (context !== "shared") {
+      const needed = new Set<string>();
+      for (const name of symbols) {
+        const cls = classDecls.get(name);
+        if (!cls) continue;
+        const text = cls.getText();
+        for (const candidate of sharedBases) {
+          if (text.includes(candidate)) needed.add(candidate);
+        }
+      }
+      if (needed.size > 0) {
+        const valueBases = [...needed].filter((n) => classDecls.has(n));
+        const typeBases = [...needed].filter((n) => typeAliases.has(n));
+        const parts: string[] = [];
+        if (valueBases.length > 0) {
+          parts.push(`import { ${valueBases.join(", ")} } from "../shared/errors";`);
+        }
+        if (typeBases.length > 0) {
+          parts.push(`import type { ${typeBases.join(", ")} } from "../shared/errors";`);
+        }
+        if (parts.length > 0) emitted.push(parts.join("\n"));
+      }
+    }
+
     for (const name of symbols) {
       const cls = classDecls.get(name);
       const ta = typeAliases.get(name);
