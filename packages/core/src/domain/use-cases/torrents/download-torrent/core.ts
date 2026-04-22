@@ -1,14 +1,8 @@
 import type { Database } from "@canto/db/client";
 import type { TorrentDownloadInput } from "@canto/validators";
 
-import {
-  BlocklistedReleaseError,
-  DownloadClientError,
-  DuplicateDownloadError,
-  InvalidDownloadInputError,
-  MediaNotFoundError,
-  TorrentPersistenceError,
-} from "../../../errors";
+import { BlocklistedReleaseError, DownloadClientError, DuplicateDownloadError, InvalidDownloadInputError, TorrentPersistenceError } from "@canto/core/domain/torrents/errors";
+import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import { logAndSwallow } from "../../../../lib/log-error";
 import { resolveDownloadUrl } from "../../../../lib/follow-redirects";
 import { detectQuality, detectSource } from "../../../rules/quality";

@@ -7,7 +7,7 @@ import {
   softDeleteUserPlaybackProgress,
   upsertUserMediaState,
 } from "../../../infrastructure/repositories";
-import { MediaNotFoundError } from "../../errors";
+import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import {
   computeTrackingStatus,
   isMediaType,

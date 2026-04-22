@@ -1,6 +1,7 @@
 import type { Database } from "@canto/db/client";
 
-import { IndexerSearchError, MediaNotFoundError } from "../../errors";
+import { IndexerSearchError } from "@canto/core/domain/torrents/errors";
+import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import { detectQuality, detectSource } from "../../rules/quality";
 import { calculateConfidence } from "../../rules/scoring";
 import { detectLanguages, detectReleaseGroup, detectCodec } from "../../rules/parsing";

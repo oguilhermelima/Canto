@@ -1,6 +1,6 @@
 import type { Database } from "@canto/db/client";
 import type { GetListBySlugInput } from "@canto/validators";
-import { ListNotFoundError } from "../../errors";
+import { ListNotFoundError } from "@canto/core/domain/lists/errors";
 import {
   findListBySlug,
   findListItems,

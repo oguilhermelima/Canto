@@ -9,12 +9,8 @@ import {
   upsertUserMediaState,
   upsertUserRating,
 } from "../../../infrastructure/repositories";
-import {
-  EpisodeNotFoundError,
-  InvalidWatchInputError,
-  MediaNotFoundError,
-  SeasonNotFoundError,
-} from "../../errors";
+import { EpisodeNotFoundError, InvalidWatchInputError, SeasonNotFoundError } from "@canto/core/domain/user-media/errors";
+import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import {
   computeTrackingStatus,
   isMediaType,

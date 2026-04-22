@@ -1,9 +1,6 @@
 import type { Database } from "@canto/db/client";
 import type { AcceptListInvitationInput } from "@canto/validators";
-import {
-  ListInvitationInvalidError,
-  ListInvitationNotFoundError,
-} from "../../errors";
+import { ListInvitationInvalidError, ListInvitationNotFoundError } from "@canto/core/domain/lists/errors";
 import {
   acceptInvitation,
   addListMember,

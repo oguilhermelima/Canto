@@ -1,9 +1,6 @@
 import type { Database } from "@canto/db/client";
 import type { CreateListInput } from "@canto/validators";
-import {
-  InvalidListNameError,
-  ListNameConflictError,
-} from "../../errors";
+import { InvalidListNameError, ListNameConflictError } from "@canto/core/domain/lists/errors";
 import {
   createList,
   findUserDefaultVisibility,

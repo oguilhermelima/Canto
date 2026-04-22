@@ -1,5 +1,5 @@
 import nodePath from "node:path";
-import { InvalidPathError } from "../errors";
+import { InvalidPathError } from "@canto/core/domain/file-organization/errors";
 
 /** Validate and normalize a filesystem path (must be absolute, no traversal). */
 export function validatePath(p: string): string {
