@@ -1,0 +1,21 @@
+{
+  "name": "@canto/codemod",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "codemod": "./bin/codemod.ts"
+  },
+  "scripts": {
+    "clean": "rm -rf .cache dist node_modules",
+    "typecheck": "tsc --noEmit",
+    "test": "echo 'not yet implemented' && exit 0",
+    "codemod": "tsx bin/codemod.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@canto/tsconfig": "workspace:*",
+    "@types/node": "^22.13.0",
+    "typescript": "catalog:"
+  }
+}

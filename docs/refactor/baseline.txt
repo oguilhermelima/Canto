@@ -1,0 +1,28 @@
+Refactor baseline — refactor/core-architecture
+Captured: Phase 1
+
+Typecheck: 10/10 packages green (turbo run typecheck)
+  - @canto/api
+  - @canto/auth
+  - @canto/codemod  (new workspace scaffold)
+  - @canto/core
+  - @canto/db
+  - @canto/providers
+  - @canto/ui
+  - @canto/validators
+  - @canto/web
+  - @canto/worker
+
+Tests: 2/2 workspaces with test script, both green
+  - @canto/codemod: placeholder (no tests yet, Phase 3)
+  - @canto/core: 59 tests across 5 test files
+      src/domain/sync/__tests__/plex-scanner.test.ts (16)
+      src/domain/sync/__tests__/jellyfin-scanner.test.ts (15)
+      src/domain/sync/__tests__/sync-pipeline.test.ts (13)
+      src/domain/use-cases/media/__tests__/resolve-external-id.test.ts (9)
+      src/domain/use-cases/__tests__/fetch-server-media-info.test.ts (6)
+
+Apps/web tsconfig paths: "~/*": ["./src/*"]
+Packages/core exports: 34 enumerated entries (tactical fix, will collapse in Phase 4.6)
+
+Starting commit: d5bae711 chore(refactor): carry-over transitional state
