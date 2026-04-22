@@ -14,9 +14,9 @@ import {
   getListMemberVotes,
   updateListMemberRole,
 } from "@canto/core/infra/lists/member-repository";
-import { getListSharing } from "@canto/core/domain/use-cases/lists/get-members";
-import { removeMemberFromList } from "@canto/core/domain/use-cases/lists/remove-member";
-import { acceptListInvitation } from "@canto/core/domain/use-cases/lists/accept-invitation";
+import { getListSharing } from "@canto/core/domain/lists/use-cases/get-members";
+import { removeMemberFromList } from "@canto/core/domain/lists/use-cases/remove-member";
+import { acceptListInvitation } from "@canto/core/domain/lists/use-cases/accept-invitation";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
 export const listSharingRouter = createTRPCRouter({

@@ -12,9 +12,9 @@ import {
   findUserMediaPaginated,
 } from "@canto/core/infra/repositories";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
-import { getLibraryWatchNext } from "@canto/core/domain/use-cases/user-media/get-library-watch-next";
-import { getUpcomingSchedule } from "@canto/core/domain/use-cases/user-media/get-upcoming-schedule";
-import { getLibraryHistory } from "@canto/core/domain/use-cases/user-media/get-library-history";
+import { getLibraryWatchNext } from "@canto/core/domain/user-media/use-cases/get-library-watch-next";
+import { getUpcomingSchedule } from "@canto/core/domain/user-media/use-cases/get-upcoming-schedule";
+import { getLibraryHistory } from "@canto/core/domain/user-media/use-cases/get-library-history";
 
 export const feedRouter = createTRPCRouter({
   getUserMedia: protectedProcedure

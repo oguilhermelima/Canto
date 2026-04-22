@@ -22,15 +22,15 @@ import {
 import { applyMediaTranslation, applySeasonsTranslation } from "@canto/core/domain/shared/services/translation-service";
 import { getUserLanguage, getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 import { loadExtrasFromDB } from "@canto/core/domain/media/services/extras-service";
-import { getByExternal } from "@canto/core/domain/use-cases/media/get-by-external";
+import { getByExternal } from "@canto/core/domain/media/use-cases/get-by-external";
 import {
   resolveMedia,
   persistMediaUseCase,
   persistFullMedia,
-} from "@canto/core/domain/use-cases/media/persist/core";
-import { fetchMediaMetadata } from "@canto/core/domain/use-cases/media/fetch-media-metadata";
+} from "@canto/core/domain/media/use-cases/persist/core";
+import { fetchMediaMetadata } from "@canto/core/domain/media/use-cases/fetch-media-metadata";
 import { getEffectiveProvider } from "@canto/core/domain/shared/rules/effective-provider";
-import { reconcileShowStructure } from "@canto/core/domain/use-cases/media/reconcile-show-structure";
+import { reconcileShowStructure } from "@canto/core/domain/media/use-cases/reconcile-show-structure";
 import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
 
 async function getProviderWithKey(name: "tmdb" | "tvdb") {

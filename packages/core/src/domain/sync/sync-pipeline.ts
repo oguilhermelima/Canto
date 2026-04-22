@@ -9,7 +9,7 @@
 
 import type { Database } from "@canto/db/client";
 import type { MediaProviderPort } from "../shared/ports/media-provider.port";
-import { persistMedia } from "../use-cases/media/persist";
+import { persistMedia } from "../media/use-cases/persist";
 import { getActiveUserLanguages } from "../shared/services/user-service";
 import { getSetting, getSettings, setSettingRaw } from "@canto/db/settings";
 
@@ -28,12 +28,12 @@ import {
 } from "../../infra/repositories";
 import { reconcileServerLibrary } from "../../infra/lists/list-repository";
 
-import { resolveExternalId, tmdbCall } from "../use-cases/media/resolve-external-id";
+import { resolveExternalId, tmdbCall } from "../media/use-cases/resolve-external-id";
 import {
   fetchJellyfinMediaInfo,
   fetchPlexMediaInfo,
   type MediaFileInfo,
-} from "../use-cases/media-servers/fetch-info";
+} from "../media-servers/use-cases/fetch-info";
 
 import type { ScannedMediaItem, SyncResult, SyncSummary } from "./types";
 import { emptySummary } from "./types";

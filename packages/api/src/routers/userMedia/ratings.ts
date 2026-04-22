@@ -13,8 +13,8 @@ import {
   findReviewById,
   findUserRatingsByMedia,
 } from "@canto/core/infra/repositories";
-import { rateMedia } from "@canto/core/domain/use-cases/user-media/rate-media";
-import { removeRating } from "@canto/core/domain/use-cases/user-media/remove-rating";
+import { rateMedia } from "@canto/core/domain/user-media/use-cases/rate-media";
+import { removeRating } from "@canto/core/domain/user-media/use-cases/remove-rating";
 
 export const ratingsRouter = createTRPCRouter({
   rate: protectedProcedure

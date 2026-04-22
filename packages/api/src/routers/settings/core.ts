@@ -22,7 +22,7 @@ import {
 import { createTRPCRouter, adminProcedure } from "../../trpc";
 import { testService } from "@canto/core/platform/testing/service-tester";
 import { dispatchRebuildUserRecs } from "@canto/core/platform/queue/bullmq-dispatcher";
-import { ensureMediaMany } from "@canto/core/domain/use-cases/media/ensure-media-many";
+import { ensureMediaMany } from "@canto/core/domain/media/use-cases/ensure-media-many";
 
 export const settingsCoreRouter = createTRPCRouter({
   getAll: adminProcedure.query(() => getAllSettings()),

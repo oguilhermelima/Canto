@@ -17,13 +17,13 @@ import {
 } from "@canto/core/infra/lists/list-repository";
 import { findTraktListLinkByLocalListId } from "@canto/core/infra/trakt/trakt-sync-aggregate-repository";
 import { dispatchTraktListDelete } from "@canto/core/platform/queue/bullmq-dispatcher";
-import { createListForUser } from "@canto/core/domain/use-cases/lists/create-list";
-import { updateListForUser } from "@canto/core/domain/use-cases/lists/update-list";
-import { viewListBySlug } from "@canto/core/domain/use-cases/lists/view-list";
+import { createListForUser } from "@canto/core/domain/lists/use-cases/create-list";
+import { updateListForUser } from "@canto/core/domain/lists/use-cases/update-list";
+import { viewListBySlug } from "@canto/core/domain/lists/use-cases/view-list";
 import {
   getCollectionLayout,
   updateCollectionLayout,
-} from "@canto/core/domain/use-cases/lists/collection-layout";
+} from "@canto/core/domain/lists/use-cases/collection-layout";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
 export const listManageRouter = createTRPCRouter({

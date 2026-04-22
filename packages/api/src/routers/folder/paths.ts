@@ -15,8 +15,8 @@ import {
   removeMediaPath,
 } from "@canto/core/infra/file-organization/folder-repository";
 import { validatePath } from "@canto/core/domain/file-organization/rules/validate-path";
-import { browseFolder } from "@canto/core/domain/use-cases/file-organization/browse-folder";
-import { testFolderPaths } from "@canto/core/domain/use-cases/file-organization/test-folder-paths";
+import { browseFolder } from "@canto/core/domain/file-organization/use-cases/browse-folder";
+import { testFolderPaths } from "@canto/core/domain/file-organization/use-cases/test-folder-paths";
 
 import { adminProcedure } from "../../trpc";
 

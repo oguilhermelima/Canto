@@ -3,7 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@canto/db/client";
 import * as schema from "@canto/db/schema";
 import { count, sql } from "drizzle-orm";
-import { onboardNewUser } from "@canto/core/domain/use-cases/onboard-new-user";
+import { onboardNewUser } from "@canto/core/domain/user/use-cases/onboard-new-user";
 
 const trustedOrigins = process.env.AUTH_TRUSTED_ORIGINS
   ? process.env.AUTH_TRUSTED_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean)

@@ -1,7 +1,7 @@
 import { db } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
 import { findAllFolders, findMediaPathsByFolder } from "@canto/core/infra/repositories";
-import { scanFolderForMedia } from "@canto/core/domain/use-cases/file-organization/scan-folder-for-media";
+import { scanFolderForMedia } from "@canto/core/domain/file-organization/use-cases/scan-folder-for-media";
 import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
 
 export async function handleFolderScan(): Promise<void> {

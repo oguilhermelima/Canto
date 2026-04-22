@@ -9,14 +9,14 @@ import {
 
 import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
 import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
-import { autoImportTorrent } from "@canto/core/domain/use-cases/torrents/import-torrent";
+import { autoImportTorrent } from "@canto/core/domain/torrents/use-cases/import-torrent";
 import {
   extractHashFromMagnet,
   inferDownloadMeta,
   mapStatusFromLive,
   waitForTorrent,
 } from "@canto/core/domain/torrents/rules/torrent-rules";
-import { resolveMedia } from "@canto/core/domain/use-cases/media/persist";
+import { resolveMedia } from "@canto/core/domain/media/use-cases/persist";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
 import { updateMedia } from "@canto/core/infra/media/media-repository";

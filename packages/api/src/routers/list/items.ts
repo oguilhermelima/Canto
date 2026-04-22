@@ -7,8 +7,8 @@ import { findMediaInLists } from "@canto/core/infra/lists/list-repository";
 import {
   addItemToList,
   removeItemFromList,
-} from "@canto/core/domain/use-cases/lists/manage-list-items";
-import { addMediaToServerLibrary } from "@canto/core/domain/use-cases/lists/add-to-server-library";
+} from "@canto/core/domain/lists/use-cases/manage-list-items";
+import { addMediaToServerLibrary } from "@canto/core/domain/lists/use-cases/add-to-server-library";
 import { createTRPCRouter, adminProcedure, protectedProcedure } from "../../trpc";
 
 export const listItemsRouter = createTRPCRouter({

@@ -4,8 +4,8 @@ import {
 } from "@canto/validators";
 
 import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
-import { listLiveTorrents } from "@canto/core/domain/use-cases/torrents/list-live-torrents";
-import { mergeLiveData } from "@canto/core/domain/use-cases/media/merge-live-data";
+import { listLiveTorrents } from "@canto/core/domain/torrents/use-cases/list-live-torrents";
+import { mergeLiveData } from "@canto/core/domain/media/use-cases/merge-live-data";
 import {
   findAllTorrents,
   findTorrentsByMediaId,

@@ -14,8 +14,8 @@ import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trp
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
 import { cached } from "@canto/core/platform/cache/redis";
-import { fetchLogos, enrichBrowseWithLogos } from "@canto/core/domain/use-cases/media/fetch-logos";
-import { getRecommendations } from "@canto/core/domain/use-cases/recommendations/get-recommendations";
+import { fetchLogos, enrichBrowseWithLogos } from "@canto/core/domain/media/use-cases/fetch-logos";
+import { getRecommendations } from "@canto/core/domain/recommendations/use-cases/get-recommendations";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
 import type { RecsFilters } from "@canto/core/infra/recommendations/user-recommendation-repository";
 import { db as appDb } from "@canto/db/client";

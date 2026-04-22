@@ -1,10 +1,10 @@
 import { db } from "@canto/db/client";
-import { autoImportTorrent } from "@canto/core/domain/use-cases/torrents/import-torrent";
-import { tryContinuousDownload } from "@canto/core/domain/use-cases/torrents/continuous-download";
+import { autoImportTorrent } from "@canto/core/domain/torrents/use-cases/import-torrent";
+import { tryContinuousDownload } from "@canto/core/domain/torrents/use-cases/continuous-download";
 import {
   triggerMediaServerScans,
   type ImportedMedia,
-} from "@canto/core/domain/use-cases/media-servers/trigger-scans";
+} from "@canto/core/domain/media-servers/use-cases/trigger-scans";
 import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
 import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
 import { buildIndexers } from "@canto/core/infra/indexers/indexer-factory";

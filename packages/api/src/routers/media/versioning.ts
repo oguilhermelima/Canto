@@ -17,14 +17,14 @@ import {
 import { findMediaFilesByMediaId } from "@canto/core/infra/media/media-file-repository";
 import { findMediaVersionsByMediaId } from "@canto/core/infra/media/media-version-repository";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
-import { persistFullMedia } from "@canto/core/domain/use-cases/media/persist/core";
-import { fetchMediaMetadata } from "@canto/core/domain/use-cases/media/fetch-media-metadata";
+import { persistFullMedia } from "@canto/core/domain/media/use-cases/persist/core";
+import { fetchMediaMetadata } from "@canto/core/domain/media/use-cases/fetch-media-metadata";
 import { getEffectiveProvider } from "@canto/core/domain/shared/rules/effective-provider";
-import { reconcileShowStructure } from "@canto/core/domain/use-cases/media/reconcile-show-structure";
+import { reconcileShowStructure } from "@canto/core/domain/media/use-cases/reconcile-show-structure";
 import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
-import { executeReorganizeMediaFiles } from "@canto/core/domain/use-cases/file-organization/reorganize-media-files";
+import { executeReorganizeMediaFiles } from "@canto/core/domain/file-organization/use-cases/reorganize-media-files";
 import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
-import { updateMediaServerMetadata } from "@canto/core/domain/use-cases/media-servers/update-metadata";
+import { updateMediaServerMetadata } from "@canto/core/domain/media-servers/use-cases/update-metadata";
 
 export const mediaVersioningRouter = createTRPCRouter({
   previewProviderOverride: adminProcedure

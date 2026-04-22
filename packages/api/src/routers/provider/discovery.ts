@@ -2,9 +2,9 @@ import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
-import { getSpotlight } from "@canto/core/domain/use-cases/recommendations/get-spotlight";
-import { getGenreTiles } from "@canto/core/domain/use-cases/recommendations/get-genre-tiles";
-import { getTop10 } from "@canto/core/domain/use-cases/recommendations/get-top-10";
+import { getSpotlight } from "@canto/core/domain/recommendations/use-cases/get-spotlight";
+import { getGenreTiles } from "@canto/core/domain/recommendations/use-cases/get-genre-tiles";
+import { getTop10 } from "@canto/core/domain/recommendations/use-cases/get-top-10";
 
 const regionInput = z.object({ region: z.string().length(2).optional() }).optional();
 

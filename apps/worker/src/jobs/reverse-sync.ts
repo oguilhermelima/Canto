@@ -27,8 +27,8 @@ import {
   markUserConnectionStale,
   clearUserConnectionStale,
 } from "@canto/core/infra/repositories";
-import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/use-cases/user-media/promote-user-media-state-from-playback";
-import { pushPlaybackPositionToServers } from "@canto/core/domain/use-cases/user-media/push-playback-position";
+import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/user-media/use-cases/promote-user-media-state-from-playback";
+import { pushPlaybackPositionToServers } from "@canto/core/domain/user-media/use-cases/push-playback-position";
 import {
   scanJellyfinLibraries,
   scanPlexLibraries,

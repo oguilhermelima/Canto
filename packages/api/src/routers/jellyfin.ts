@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { toggleLibraryInput, mergeJellyfinVersionsInput } from "@canto/validators";
 import { getJellyfinCredentials } from "@canto/core/platform/secrets/server-credentials";
 import { createTRPCRouter, adminProcedure } from "../trpc";
-import { syncJellyfinLibraries } from "@canto/core/domain/use-cases/media-servers/sync-libraries/jellyfin";
+import { syncJellyfinLibraries } from "@canto/core/domain/media-servers/use-cases/sync-libraries/jellyfin";
 import {
   testJellyfinConnection,
   scanJellyfinLibrary,

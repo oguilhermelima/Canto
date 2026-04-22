@@ -1,4 +1,4 @@
-import type { MediaFileInfo } from "../../use-cases/media-servers/fetch-info/shared";
+import type { MediaFileInfo } from "../../media-servers/use-cases/fetch-info/shared";
 
 export interface MediaServerLibrary {
   id: string;

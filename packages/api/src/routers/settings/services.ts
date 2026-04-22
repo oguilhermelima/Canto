@@ -14,7 +14,7 @@ import {
 
 import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure, t } from "../../trpc";
 import { SERVICE_ENABLED_KEY } from "@canto/core/domain/media-servers/rules/service-keys";
-import { toggleTvdbDefault } from "@canto/core/domain/use-cases/media/toggle-tvdb-default";
+import { toggleTvdbDefault } from "@canto/core/domain/media/use-cases/toggle-tvdb-default";
 import {
   authenticateJellyfin,
   authenticatePlex,
@@ -22,7 +22,7 @@ import {
   loginPlex,
   createPlexPin,
   checkPlexPin,
-} from "@canto/core/domain/use-cases/media-servers/authenticate";
+} from "@canto/core/domain/media-servers/use-cases/authenticate";
 
 const ALL_SERVICES = serviceEnum.options;
 

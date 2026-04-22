@@ -1,7 +1,7 @@
 import { Queue } from "bullmq";
 import { QUEUES, type QueueName } from "./queue-names";
 import { getRedisConnection } from "./redis-config";
-import type { EnsureMediaSpec } from "../../domain/use-cases/media/ensure-media.types";
+import type { EnsureMediaSpec } from "../../domain/media/use-cases/ensure-media.types";
 
 const REMOVE_ON_FAIL = 50;
 

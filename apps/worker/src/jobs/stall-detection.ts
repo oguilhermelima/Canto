@@ -1,8 +1,8 @@
 import { db } from "@canto/db/client";
 import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
 import { buildIndexers } from "@canto/core/infra/indexers/indexer-factory";
-import { createNotification } from "@canto/core/domain/use-cases/create-notification";
-import { retryStalledTorrent } from "@canto/core/domain/use-cases/torrents/retry-stalled-torrent";
+import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
+import { retryStalledTorrent } from "@canto/core/domain/torrents/use-cases/retry-stalled-torrent";
 import {
   findAllTorrents,
   updateTorrent,

@@ -21,9 +21,9 @@ import { dispatchJellyfinSync, dispatchPlexSync, dispatchFolderScan } from "@can
 import {
   resolveMediaVersion,
   resolveMediaVersionPreview,
-} from "@canto/core/domain/use-cases/media/resolve-media-version";
-import { discoverServerLibraries } from "@canto/core/domain/use-cases/media-servers/discover-libraries";
-import { updateMediaServerMetadata } from "@canto/core/domain/use-cases/media-servers/update-metadata";
+} from "@canto/core/domain/media/use-cases/resolve-media-version";
+import { discoverServerLibraries } from "@canto/core/domain/media-servers/use-cases/discover-libraries";
+import { updateMediaServerMetadata } from "@canto/core/domain/media-servers/use-cases/update-metadata";
 import { getMediaAvailability } from "@canto/core/domain/media/services/media-availability-service";
 import { listMediaVersionGroups } from "@canto/core/domain/media-servers/services/media-version-groups-service";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";

@@ -9,8 +9,8 @@ import {
   authenticateJellyfin,
   authenticatePlex,
   loginPlex,
-} from "@canto/core/domain/use-cases/media-servers/authenticate";
-import { discoverServerLibraries } from "@canto/core/domain/use-cases/media-servers/discover-libraries";
+} from "@canto/core/domain/media-servers/use-cases/authenticate";
+import { discoverServerLibraries } from "@canto/core/domain/media-servers/use-cases/discover-libraries";
 import { getJellyfinCurrentUserId } from "@canto/core/infra/media-servers/jellyfin.adapter";
 import { authenticatePlexServerToken } from "@canto/core/infra/media-servers/plex.adapter";
 import { upsertServerLink } from "@canto/core/infra/file-organization/folder-repository";

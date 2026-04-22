@@ -14,9 +14,9 @@ import { getQBClient } from "@canto/core/infra/torrent-clients/qbittorrent.adapt
 import {
   downloadTorrent,
   replaceTorrent,
-} from "@canto/core/domain/use-cases/torrents/download-torrent";
-import { retryTorrent } from "@canto/core/domain/use-cases/torrents/retry-torrent";
-import { renameTorrent } from "@canto/core/domain/use-cases/torrents/rename-torrent";
+} from "@canto/core/domain/torrents/use-cases/download-torrent";
+import { retryTorrent } from "@canto/core/domain/torrents/use-cases/retry-torrent";
+import { renameTorrent } from "@canto/core/domain/torrents/use-cases/rename-torrent";
 import {
   findTorrentById,
   updateTorrent,

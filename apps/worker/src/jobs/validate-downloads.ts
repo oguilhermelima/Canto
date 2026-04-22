@@ -7,7 +7,7 @@ import {
   findImportedFilesForMedia,
   updateMedia,
 } from "@canto/core/infra/repositories";
-import { createNotification } from "@canto/core/domain/use-cases/create-notification";
+import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
 
 /**
  * Periodic validation: checks that media marked as `downloaded` still has

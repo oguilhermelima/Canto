@@ -6,9 +6,9 @@ import {
   updateMediaStatusInput,
 } from "@canto/validators";
 import { upsertUserMediaState } from "@canto/core/infra/repositories";
-import { getUserMediaState } from "@canto/core/domain/use-cases/user-media/get-user-media-state";
-import { clearTracking } from "@canto/core/domain/use-cases/user-media/clear-tracking";
-import { reconcileStatesFromPlayback } from "@canto/core/domain/use-cases/user-media/reconcile-states-from-playback";
+import { getUserMediaState } from "@canto/core/domain/user-media/use-cases/get-user-media-state";
+import { clearTracking } from "@canto/core/domain/user-media/use-cases/clear-tracking";
+import { reconcileStatesFromPlayback } from "@canto/core/domain/user-media/use-cases/reconcile-states-from-playback";
 
 export const stateRouter = createTRPCRouter({
   getState: protectedProcedure
