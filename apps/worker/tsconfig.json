@@ -3,8 +3,20 @@
   "compilerOptions": {
     "tsBuildInfoFile": ".cache/tsbuildinfo.json",
     "outDir": "./dist",
-    "noEmit": false
+    "noEmit": false,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    }
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist", ".cache"]
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".cache"
+  ]
 }
