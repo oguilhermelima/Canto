@@ -1,4 +1,4 @@
-import { validateServiceUrl } from "../../../rules/validate-service-url";
+import { validateServiceUrl } from "../../../media-servers/rules/validate-service-url";
 import {
   authenticateJellyfinByName,
   createJellyfinApiKey,

@@ -1,4 +1,4 @@
-import type { MediaServerPort } from "../../../domain/ports/media-server.port";
+import type { MediaServerPort } from "../../../domain/shared/ports/media-server.port";
 import { fetchJellyfinMediaInfo } from "../../../domain/use-cases/media-servers/fetch-info/jellyfin";
 import {
   getJellyfinLibraryFolders,

@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { getSetting, setSetting } from "@canto/db/settings";
-import { validateServiceUrl } from "../../../rules/validate-service-url";
+import { validateServiceUrl } from "../../../media-servers/rules/validate-service-url";
 import {
   authenticatePlexServerToken,
   checkPlexTvPin,

@@ -1,5 +1,5 @@
 import type { Database } from "@canto/db/client";
-import type { DownloadClientPort } from "../../ports/download-client";
+import type { DownloadClientPort } from "../../shared/ports/download-client";
 import {
   findTorrentById,
   updateTorrent,

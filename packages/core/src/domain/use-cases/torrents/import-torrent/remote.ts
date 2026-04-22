@@ -1,7 +1,7 @@
 import path from "node:path";
 
 import type { Database } from "@canto/db/client";
-import type { DownloadClientPort, TorrentFileInfo } from "../../../ports/download-client";
+import type { DownloadClientPort, TorrentFileInfo } from "../../../shared/ports/download-client";
 import { createNotification } from "../../notifications/create-notification";
 import {
   type ParsedFile,

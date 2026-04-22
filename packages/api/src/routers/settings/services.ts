@@ -13,7 +13,7 @@ import {
 } from "@canto/validators";
 
 import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure, t } from "../../trpc";
-import { SERVICE_ENABLED_KEY } from "@canto/core/domain/rules/service-keys";
+import { SERVICE_ENABLED_KEY } from "@canto/core/domain/media-servers/rules/service-keys";
 import { toggleTvdbDefault } from "@canto/core/domain/use-cases/media/toggle-tvdb-default";
 import {
   authenticateJellyfin,

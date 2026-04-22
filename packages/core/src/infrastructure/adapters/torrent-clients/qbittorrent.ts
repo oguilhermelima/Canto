@@ -1,5 +1,5 @@
 import { getSettings } from "@canto/db/settings";
-import type { DownloadClientPort, TorrentInfo, TorrentFileInfo } from "../../../domain/ports/download-client";
+import type { DownloadClientPort, TorrentInfo, TorrentFileInfo } from "../../../domain/shared/ports/download-client";
 
 export class QBittorrentClient implements DownloadClientPort {
   private baseUrl: string;

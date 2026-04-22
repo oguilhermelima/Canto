@@ -2,8 +2,8 @@ import { eq, and, sql, isNotNull, or } from "drizzle-orm";
 
 import type { Database } from "@canto/db/client";
 import { media, mediaTranslation } from "@canto/db/schema";
-import { getActiveUserLanguages } from "../../services/user-service";
-import type { MediaProviderPort } from "../../ports/media-provider.port";
+import { getActiveUserLanguages } from "../../shared/services/user-service";
+import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import type { SearchResult } from "@canto/providers";
 import { upsertLangLogos } from "../content-enrichment/upsert-lang-logos";
 import { dispatchMediaPipeline } from "../../../infrastructure/queue/bullmq-dispatcher";

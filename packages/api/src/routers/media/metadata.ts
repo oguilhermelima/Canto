@@ -19,9 +19,9 @@ import {
   findMediaById,
   findMediaByIdWithSeasons,
 } from "@canto/core/infrastructure/repositories/media/media-repository";
-import { applyMediaTranslation, applySeasonsTranslation } from "@canto/core/domain/services/translation-service";
-import { getUserLanguage, getActiveUserLanguages } from "@canto/core/domain/services/user-service";
-import { loadExtrasFromDB } from "@canto/core/domain/services/extras-service";
+import { applyMediaTranslation, applySeasonsTranslation } from "@canto/core/domain/shared/services/translation-service";
+import { getUserLanguage, getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
+import { loadExtrasFromDB } from "@canto/core/domain/media/services/extras-service";
 import { getByExternal } from "@canto/core/domain/use-cases/media/get-by-external";
 import {
   resolveMedia,
@@ -29,7 +29,7 @@ import {
   persistFullMedia,
 } from "@canto/core/domain/use-cases/media/persist/core";
 import { fetchMediaMetadata } from "@canto/core/domain/use-cases/media/fetch-media-metadata";
-import { getEffectiveProvider } from "@canto/core/domain/rules/effective-provider";
+import { getEffectiveProvider } from "@canto/core/domain/shared/rules/effective-provider";
 import { reconcileShowStructure } from "@canto/core/domain/use-cases/media/reconcile-show-structure";
 import { jobDispatcher } from "@canto/core/infrastructure/adapters/job-dispatcher.adapter";
 

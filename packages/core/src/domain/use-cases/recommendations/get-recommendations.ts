@@ -1,8 +1,8 @@
 import type { Database } from "@canto/db/client";
-import type { MediaProviderPort } from "../../ports/media-provider.port";
+import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import { buildExclusionSet } from "./recommendation-service";
-import { translateMediaItems } from "../../services/translation-service";
-import { mapPoolItem } from "../../mappers/media-mapper";
+import { translateMediaItems } from "../../shared/services/translation-service";
+import { mapPoolItem } from "../../shared/mappers/media-mapper";
 import {
   findUserRecommendations,
   countUserRecommendations,

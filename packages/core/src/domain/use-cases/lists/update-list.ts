@@ -1,8 +1,8 @@
 import type { Database } from "@canto/db/client";
 import type { UpdateListInput } from "@canto/validators";
-import { verifyListOwnership } from "../../rules/list-rules";
+import { verifyListOwnership } from "../../lists/rules/list-rules";
 import { updateList } from "../../../infrastructure/repositories/lists/list";
-import { slugify } from "../../rules/slugify";
+import { slugify } from "../../shared/rules/slugify";
 
 export async function updateListForUser(
   db: Database,

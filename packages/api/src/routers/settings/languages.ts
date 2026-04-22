@@ -5,7 +5,7 @@ import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trp
 import {
   getUserLanguage,
   invalidateActiveUserLanguages,
-} from "@canto/core/domain/services/user-service";
+} from "@canto/core/domain/shared/services/user-service";
 import {
   findEnabledSupportedLanguages,
   findSupportedLanguage,

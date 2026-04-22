@@ -13,7 +13,7 @@ import {
   isMediaType,
   isReleasedOnOrBefore,
   type MediaType,
-} from "../../rules/user-media-rules";
+} from "../../user-media/rules/user-media-rules";
 import {
   getUserMediaState,
   type UserMediaStateResponse,

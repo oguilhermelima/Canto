@@ -1,9 +1,9 @@
 import path from "node:path";
 
 import type { Database } from "@canto/db/client";
-import type { FileSystemPort } from "../../../ports/file-system.port";
-import { buildMediaDir } from "../../../rules/naming";
-import { EP_PATTERN } from "../../../rules/parsing";
+import type { FileSystemPort } from "../../../shared/ports/file-system.port";
+import { buildMediaDir } from "../../../shared/rules/naming";
+import { EP_PATTERN } from "../../../torrents/rules/parsing";
 import { createNotification } from "../../notifications/create-notification";
 import { findNotificationByTypeAndMedia } from "../../../../infrastructure/repositories";
 import {

@@ -15,7 +15,7 @@ import {
   inferDownloadMeta,
   mapStatusFromLive,
   waitForTorrent,
-} from "@canto/core/domain/rules/torrent-rules";
+} from "@canto/core/domain/torrents/rules/torrent-rules";
 import { resolveMedia } from "@canto/core/domain/use-cases/media/persist";
 import { getTmdbProvider } from "@canto/core/lib/tmdb-client";
 import { getTvdbProvider } from "@canto/core/lib/tvdb-client";

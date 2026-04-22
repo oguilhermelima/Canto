@@ -10,7 +10,7 @@ import {
   parseCollectionLayoutPreference,
   uniqueIds,
   type CollectionLayoutPreference,
-} from "../../rules/list-rules";
+} from "../../lists/rules/list-rules";
 
 const COLLECTION_LAYOUT_PREF_KEY = "library.collectionLayout.v1";
 

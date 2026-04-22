@@ -9,7 +9,7 @@ import {
   mediaVideo,
   userRecommendation,
 } from "@canto/db/schema";
-import type { RecsFilters } from "../../../domain/types/recs-filters";
+import type { RecsFilters } from "../../../domain/recommendations/types/recs-filters";
 import { buildRecsFilterConditions, recsSortOrder } from "../shared/recs-filter-builder";
 
 /** Keep only the highest weight per mediaId. */
@@ -137,7 +137,7 @@ export async function upsertUserRecommendations(
 }
 
 // Re-export for consumers that import from this file
-export type { RecsFilters } from "../../../domain/types/recs-filters";
+export type { RecsFilters } from "../../../domain/recommendations/types/recs-filters";
 
 /**
  * Per-user recommendation query.

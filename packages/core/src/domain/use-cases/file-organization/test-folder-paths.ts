@@ -1,7 +1,7 @@
 import type { Database } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
 
-import type { FileSystemPort } from "../../ports/file-system.port";
+import type { FileSystemPort } from "../../shared/ports/file-system.port";
 import { findAllFolders } from "../../../infrastructure/repositories/file-organization/folder";
 
 interface PathResult {

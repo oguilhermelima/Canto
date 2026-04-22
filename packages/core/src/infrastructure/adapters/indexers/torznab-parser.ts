@@ -1,5 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
-import type { IndexerResult } from "../../../domain/types/torrent";
+import type { IndexerResult } from "../../../domain/torrents/types/torrent";
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,

@@ -8,9 +8,9 @@
 /* -------------------------------------------------------------------------- */
 
 import type { Database } from "@canto/db/client";
-import type { MediaProviderPort } from "../../ports/media-provider.port";
+import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import { persistMedia } from "./persist";
-import { getActiveUserLanguages } from "../../services/user-service";
+import { getActiveUserLanguages } from "../../shared/services/user-service";
 import {
   findMediaVersionById,
   findMediaVersionsByMediaId,

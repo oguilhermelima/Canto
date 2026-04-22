@@ -10,7 +10,7 @@ import {
 } from "@canto/db/schema";
 import type { Database } from "@canto/db/client";
 
-import { getActiveUserLanguages } from "../../../services/user-service";
+import { getActiveUserLanguages } from "../../../shared/services/user-service";
 
 export async function persistTranslations(
   db: Database,

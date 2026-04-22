@@ -11,7 +11,7 @@ import {
   isReleasedOnOrBefore,
   type MediaType,
   type TrackingStatus,
-} from "../../rules/user-media-rules";
+} from "../../user-media/rules/user-media-rules";
 
 function normalizeStatus(value: string | null | undefined): TrackingStatus {
   if (

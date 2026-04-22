@@ -1,11 +1,11 @@
 import type { Database } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
 import { persistFullMedia } from "./persist";
-import { getActiveUserLanguages } from "../../services/user-service";
+import { getActiveUserLanguages } from "../../shared/services/user-service";
 import type { MediaType, ProviderName } from "@canto/providers";
 
-import type { MediaProviderPort } from "../../ports/media-provider.port";
-import { getEffectiveProviderSync } from "../../rules/effective-provider";
+import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
+import { getEffectiveProviderSync } from "../../shared/rules/effective-provider";
 import { findMediaById } from "../../../infrastructure/repositories";
 import type { MediaPipelineJob } from "../../../infrastructure/queue/bullmq-dispatcher";
 import { dispatchTranslateEpisodes } from "../../../infrastructure/queue/bullmq-dispatcher";

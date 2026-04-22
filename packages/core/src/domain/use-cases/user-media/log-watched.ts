@@ -20,7 +20,7 @@ import {
   sourceForMode,
   type MediaType,
   type WatchedAtMode,
-} from "../../rules/user-media-rules";
+} from "../../user-media/rules/user-media-rules";
 import { getUserMediaState, type UserMediaStateResponse } from "./get-user-media-state";
 import { pushWatchStateToServers } from "./push-watch-state";
 

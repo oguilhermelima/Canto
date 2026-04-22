@@ -2,11 +2,11 @@ import { join, basename, extname } from "node:path";
 
 import type { Database } from "@canto/db/client";
 import { persistMedia } from "../media/persist";
-import { getActiveUserLanguages } from "../../services/user-service";
+import { getActiveUserLanguages } from "../../shared/services/user-service";
 
-import type { FileSystemPort } from "../../ports/file-system.port";
-import { parseFolderMediaInfo } from "../../rules/parsing";
-import { VIDEO_EXTENSIONS } from "../../rules/naming";
+import type { FileSystemPort } from "../../shared/ports/file-system.port";
+import { parseFolderMediaInfo } from "../../torrents/rules/parsing";
+import { VIDEO_EXTENSIONS } from "../../shared/rules/naming";
 import { getTmdbProvider } from "../../../lib/tmdb-client";
 import {
   findMediaByAnyReference,

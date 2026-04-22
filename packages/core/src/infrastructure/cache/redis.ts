@@ -1,4 +1,4 @@
-import type { CachePort } from "../../domain/ports/cache";
+import type { CachePort } from "../../domain/shared/ports/cache";
 import Redis from "ioredis";
 
 interface RedisConnectionOptions {

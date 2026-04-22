@@ -1,4 +1,4 @@
-import type { JobDispatcherPort } from "../../domain/ports/job-dispatcher.port";
+import type { JobDispatcherPort } from "../../domain/shared/ports/job-dispatcher.port";
 import {
   dispatchRefreshExtras,
   dispatchReconcileShow,

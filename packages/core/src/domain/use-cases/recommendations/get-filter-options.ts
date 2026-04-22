@@ -1,6 +1,6 @@
 import { cached } from "../../../infrastructure/cache/redis";
 import { fetchFromTmdb } from "../../../infrastructure/adapters/tmdb-raw";
-import { groupByBrand, type BrandedProvider } from "../../rules/canonical-brand";
+import { groupByBrand, type BrandedProvider } from "../../recommendations/rules/canonical-brand";
 import type { FilterOptionsInput } from "@canto/validators";
 
 export type RegionOption = {

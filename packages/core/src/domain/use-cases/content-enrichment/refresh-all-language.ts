@@ -2,11 +2,11 @@ import { eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { media, mediaRecommendation, user } from "@canto/db/schema";
 import { updateMediaFromNormalized } from "../media/persist";
-import { getActiveUserLanguages } from "../../services/user-service";
+import { getActiveUserLanguages } from "../../shared/services/user-service";
 import type { MediaType } from "@canto/providers";
 import { refreshExtras } from "./refresh-extras";
 import { rebuildUserRecs } from "../recommendations/rebuild-user-recs";
-import type { MediaProviderPort } from "../../ports/media-provider.port";
+import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 
 /**
  * Refresh all media metadata + recommendation items + user recs in the configured language.

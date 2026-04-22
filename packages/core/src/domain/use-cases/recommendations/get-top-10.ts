@@ -1,7 +1,7 @@
 import type { Database } from "@canto/db/client";
 import { cached } from "../../../infrastructure/cache/redis";
 import { getTmdbProvider } from "../../../lib/tmdb-client";
-import { getUserWatchPreferences } from "../../services/user-service";
+import { getUserWatchPreferences } from "../../shared/services/user-service";
 import type { SearchResult } from "@canto/providers";
 
 export type Top10Result = {

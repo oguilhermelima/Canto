@@ -24,8 +24,8 @@ import {
 } from "@canto/core/domain/use-cases/media/resolve-media-version";
 import { discoverServerLibraries } from "@canto/core/domain/use-cases/media-servers/discover-libraries";
 import { updateMediaServerMetadata } from "@canto/core/domain/use-cases/media-servers/update-metadata";
-import { getMediaAvailability } from "@canto/core/domain/services/media-availability-service";
-import { listMediaVersionGroups } from "@canto/core/domain/services/media-version-groups-service";
+import { getMediaAvailability } from "@canto/core/domain/media/services/media-availability-service";
+import { listMediaVersionGroups } from "@canto/core/domain/media-servers/services/media-version-groups-service";
 import { logAndSwallow } from "@canto/core/lib/log-error";
 
 /* -------------------------------------------------------------------------- */

@@ -1,9 +1,9 @@
 import { and, asc, eq, or, isNull, desc, count, sql, inArray, max, type SQL } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { list, listItem, listMember, media, mediaTranslation, user, userMediaLibrary, userMediaState } from "@canto/db/schema";
-import type { RecsFilters } from "../../../domain/types/recs-filters";
+import type { RecsFilters } from "../../../domain/recommendations/types/recs-filters";
 import { buildRecsFilterConditions, recsSortOrder } from "../shared/recs-filter-builder";
-import { getUserLanguage } from "../../../domain/services/user-service";
+import { getUserLanguage } from "../../../domain/shared/services/user-service";
 
 // ── Lists ──
 

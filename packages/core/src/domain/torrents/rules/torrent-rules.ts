@@ -1,4 +1,4 @@
-import type { TorrentInfo } from "../ports/download-client";
+import type { TorrentInfo } from "../../shared/ports/download-client";
 import { parseEpisodes, parseSeasons } from "./parsing";
 import { detectQuality, detectSource } from "./quality";
 

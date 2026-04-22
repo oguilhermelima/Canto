@@ -7,8 +7,8 @@ import {
   findPublicListBySlug,
   findListItems,
 } from "@canto/core/infrastructure/repositories/lists/list";
-import { getUserLanguage } from "@canto/core/domain/services/user-service";
-import { translateMediaItems } from "@canto/core/domain/services/translation-service";
+import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
+import { translateMediaItems } from "@canto/core/domain/shared/services/translation-service";
 import { findProfileSections } from "@canto/core/infrastructure/repositories/profile/profile-section";
 import {
   findUserMediaPaginated,

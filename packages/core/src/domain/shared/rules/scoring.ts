@@ -1,5 +1,5 @@
-import type { Quality, ConfidenceContext } from "../types/common";
-import { detectSource } from "./quality";
+import type { Quality, ConfidenceContext } from "../../torrents/types/common";
+import { detectSource } from "../../torrents/rules/quality";
 
 export const CAM_KEYWORDS = [
   "cam",

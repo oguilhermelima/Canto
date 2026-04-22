@@ -1,4 +1,4 @@
-import type { MediaServerPort } from "../../../domain/ports/media-server.port";
+import type { MediaServerPort } from "../../../domain/shared/ports/media-server.port";
 import { fetchPlexMediaInfo } from "../../../domain/use-cases/media-servers/fetch-info/plex";
 import {
   getPlexSections,

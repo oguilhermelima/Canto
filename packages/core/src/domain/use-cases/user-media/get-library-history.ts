@@ -6,14 +6,14 @@ import {
   findUserWatchHistoryFeed,
   type LibraryFeedFilterOptions,
 } from "../../../infrastructure/repositories";
-import { getUserLanguage } from "../../services/user-service";
+import { getUserLanguage } from "../../shared/services/user-service";
 import {
   isReleasedOnOrBefore,
   isServerSource,
   toDurationSeconds,
   toMinuteKey,
   toProgressPercent,
-} from "../../rules/user-media-rules";
+} from "../../user-media/rules/user-media-rules";
 
 type WatchStatus = "in_progress" | "completed" | "not_started";
 

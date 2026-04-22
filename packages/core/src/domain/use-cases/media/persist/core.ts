@@ -5,9 +5,9 @@ import { episode, media, season } from "@canto/db/schema";
 import type { Database } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
 
-import type { MediaProviderPort } from "../../../ports/media-provider.port";
+import type { MediaProviderPort } from "../../../shared/ports/media-provider.port";
 import { logAndSwallow } from "../../../../lib/log-error";
-import { getEffectiveProviderSync } from "../../../rules/effective-provider";
+import { getEffectiveProviderSync } from "../../../shared/rules/effective-provider";
 import {
   findMediaByExternalId,
   findMediaByAnyReference,
@@ -19,10 +19,10 @@ import {
 } from "../../../../infrastructure/queue/bullmq-dispatcher";
 import { detectGaps } from "../detect-gaps";
 import { fetchMediaMetadata, type MediaMetadata } from "../fetch-media-metadata";
-import { applyMediaTranslation, applySeasonsTranslation } from "../../../services/translation-service";
-import { getActiveUserLanguages, getUserLanguage } from "../../../services/user-service";
-import { loadExtrasFromDB } from "../../../services/extras-service";
-import { normalizedMediaToResponse } from "../../../mappers/media-mapper";
+import { applyMediaTranslation, applySeasonsTranslation } from "../../../shared/services/translation-service";
+import { getActiveUserLanguages, getUserLanguage } from "../../../shared/services/user-service";
+import { loadExtrasFromDB } from "../../../media/services/extras-service";
+import { normalizedMediaToResponse } from "../../../shared/mappers/media-mapper";
 
 import { persistTranslations } from "./translations";
 import { persistExtras } from "./extras";

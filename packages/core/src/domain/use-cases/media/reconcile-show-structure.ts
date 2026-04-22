@@ -8,15 +8,15 @@ import {
   overlayTmdbEpisodeData,
   overlayTmdbSeasonData,
 } from "./persist";
-import { getActiveUserLanguages } from "../../services/user-service";
+import { getActiveUserLanguages } from "../../shared/services/user-service";
 import {
   findMediaById,
   updateMedia,
 } from "../../../infrastructure/repositories/media";
-import type { MediaProviderPort } from "../../ports/media-provider.port";
+import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import { logAndSwallow } from "../../../lib/log-error";
-import type { JobDispatcherPort } from "../../ports/job-dispatcher.port";
-import { getEffectiveProvider } from "../../rules/effective-provider";
+import type { JobDispatcherPort } from "../../shared/ports/job-dispatcher.port";
+import { getEffectiveProvider } from "../../shared/rules/effective-provider";
 
 /**
  * Reconcile season/episode structure from TVDB without touching TMDB metadata.

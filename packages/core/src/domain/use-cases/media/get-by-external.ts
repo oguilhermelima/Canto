@@ -1,5 +1,5 @@
 import type { Database } from "@canto/db/client";
-import type { MediaProviderPort } from "../../ports/media-provider.port";
+import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import type { MediaType, ProviderName } from "@canto/providers";
 import { persistMedia } from "./persist";
 import { getSetting } from "@canto/db/settings";
@@ -10,8 +10,8 @@ import {
   findMediaByIdWithSeasons,
 } from "../../../infrastructure/repositories/media";
 import { dispatchRefreshExtras, dispatchReconcileShow } from "../../../infrastructure/queue/bullmq-dispatcher";
-import { applyMediaTranslation, applySeasonsTranslation } from "../../services/translation-service";
-import { getUserLanguage } from "../../services/user-service";
+import { applyMediaTranslation, applySeasonsTranslation } from "../../shared/services/translation-service";
+import { getUserLanguage } from "../../shared/services/user-service";
 
 interface GetByExternalInput {
   externalId: number;

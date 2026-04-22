@@ -14,7 +14,7 @@ import {
   findMediaPathsByFolder,
   removeMediaPath,
 } from "@canto/core/infrastructure/repositories/file-organization/folder";
-import { validatePath } from "@canto/core/domain/rules/validate-path";
+import { validatePath } from "@canto/core/domain/file-organization/rules/validate-path";
 import { browseFolder } from "@canto/core/domain/use-cases/file-organization/browse-folder";
 import { testFolderPaths } from "@canto/core/domain/use-cases/file-organization/test-folder-paths";
 

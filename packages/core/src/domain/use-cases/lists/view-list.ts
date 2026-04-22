@@ -5,8 +5,8 @@ import {
   findListBySlug,
   findListItems,
 } from "../../../infrastructure/repositories/lists/list";
-import { getUserLanguage } from "../../services/user-service";
-import { translateMediaItems } from "../../services/translation-service";
+import { getUserLanguage } from "../../shared/services/user-service";
+import { translateMediaItems } from "../../shared/services/translation-service";
 
 export async function viewListBySlug(
   db: Database,

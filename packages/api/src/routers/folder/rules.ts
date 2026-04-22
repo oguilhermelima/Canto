@@ -27,7 +27,7 @@ import { logAndSwallow } from "@canto/core/lib/log-error";
 import {
   resolveFolder,
   type RoutableMedia,
-} from "@canto/core/domain/rules/folder-routing";
+} from "@canto/core/domain/torrents/rules/folder-routing";
 
 import { protectedProcedure } from "../../trpc";
 

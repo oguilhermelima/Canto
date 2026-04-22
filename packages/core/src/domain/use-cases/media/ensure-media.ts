@@ -1,8 +1,8 @@
 import type { Database } from "@canto/db/client";
 import type { ProviderName, MediaType } from "@canto/providers";
 import { findMediaById } from "../../../infrastructure/repositories";
-import type { MediaProviderPort } from "../../ports/media-provider.port";
-import { getActiveUserLanguages } from "../../services/user-service";
+import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
+import { getActiveUserLanguages } from "../../shared/services/user-service";
 import { detectGaps } from "./detect-gaps";
 import type {
   Aspect,

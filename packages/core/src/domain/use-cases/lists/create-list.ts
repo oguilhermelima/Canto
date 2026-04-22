@@ -5,7 +5,7 @@ import {
   createList,
   findUserDefaultVisibility,
 } from "../../../infrastructure/repositories/lists/list";
-import { slugify } from "../../rules/slugify";
+import { slugify } from "../../shared/rules/slugify";
 
 const RESERVED_SLUGS = new Set(["server-library", "watchlist"]);
 

@@ -5,10 +5,10 @@ import { BlocklistedReleaseError, DownloadClientError, DuplicateDownloadError, I
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import { logAndSwallow } from "../../../../lib/log-error";
 import { resolveDownloadUrl } from "../../../../lib/follow-redirects";
-import { detectQuality, detectSource } from "../../../rules/quality";
-import { parseSeasons, parseEpisodes } from "../../../rules/parsing";
-import { extractHashFromMagnet } from "../../../rules/torrent-rules";
-import type { DownloadClientPort } from "../../../ports/download-client";
+import { detectQuality, detectSource } from "../../../torrents/rules/quality";
+import { parseSeasons, parseEpisodes } from "../../../torrents/rules/parsing";
+import { extractHashFromMagnet } from "../../../torrents/rules/torrent-rules";
+import type { DownloadClientPort } from "../../../shared/ports/download-client";
 import {
   findMediaByIdWithSeasons,
   findTorrentByTitle,

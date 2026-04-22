@@ -9,14 +9,14 @@ import {
   findUserWatchingShowsMetadata,
   type LibraryFeedFilterOptions,
 } from "../../../infrastructure/repositories";
-import { getUserLanguage } from "../../services/user-service";
+import { getUserLanguage } from "../../shared/services/user-service";
 import {
   continueSourcePriority,
   hasConfirmedPastAirDate,
   isContinueWatchingSource,
   toDurationSeconds,
   toProgressPercent,
-} from "../../rules/user-media-rules";
+} from "../../user-media/rules/user-media-rules";
 
 type Kind = "continue" | "next_episode" | "next_movie";
 type Source = "jellyfin" | "plex" | "trakt" | "list";

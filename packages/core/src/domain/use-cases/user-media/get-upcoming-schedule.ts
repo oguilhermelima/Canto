@@ -5,8 +5,8 @@ import {
   findUserMediaStatesByMediaIds,
   findUserWatchHistoryByMediaIds,
 } from "../../../infrastructure/repositories";
-import { getUserLanguage } from "../../services/user-service";
-import { parseDateLike } from "../../rules/user-media-rules";
+import { getUserLanguage } from "../../shared/services/user-service";
+import { parseDateLike } from "../../user-media/rules/user-media-rules";
 
 export interface GetUpcomingScheduleInput {
   limit: number;

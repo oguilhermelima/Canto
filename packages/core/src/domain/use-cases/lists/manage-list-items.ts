@@ -4,7 +4,7 @@ import { removeMediaFromUserRecs, deleteUserRecommendationsForSource } from "../
 import { dispatchMediaPipeline } from "../../../infrastructure/queue/bullmq-dispatcher";
 import { addMediaToUserRecs } from "../recommendations/rebuild-user-recs";
 import { logAndSwallow } from "../../../lib/log-error";
-import { verifyListOwnership } from "../../rules/list-rules";
+import { verifyListOwnership } from "../../lists/rules/list-rules";
 
 /**
  * Add a media item to a user's list, with side effects:

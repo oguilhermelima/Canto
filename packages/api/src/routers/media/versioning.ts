@@ -16,10 +16,10 @@ import {
 } from "@canto/core/infrastructure/repositories/media/media-repository";
 import { findMediaFilesByMediaId } from "@canto/core/infrastructure/repositories/media/media-file-repository";
 import { findMediaVersionsByMediaId } from "@canto/core/infrastructure/repositories/media/media-version-repository";
-import { getActiveUserLanguages } from "@canto/core/domain/services/user-service";
+import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 import { persistFullMedia } from "@canto/core/domain/use-cases/media/persist/core";
 import { fetchMediaMetadata } from "@canto/core/domain/use-cases/media/fetch-media-metadata";
-import { getEffectiveProvider } from "@canto/core/domain/rules/effective-provider";
+import { getEffectiveProvider } from "@canto/core/domain/shared/rules/effective-provider";
 import { reconcileShowStructure } from "@canto/core/domain/use-cases/media/reconcile-show-structure";
 import { jobDispatcher } from "@canto/core/infrastructure/adapters/job-dispatcher.adapter";
 import { executeReorganizeMediaFiles } from "@canto/core/domain/use-cases/file-organization/reorganize-media-files";

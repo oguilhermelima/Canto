@@ -4,9 +4,9 @@ import {
   findVideosByMediaId,
   findWatchProvidersByMediaId,
   findRecommendationsBySource,
-} from "../../infrastructure/repositories/content-enrichment/extras";
-import { translateMediaItems } from "./translation-service";
-import { mapPoolItem } from "../mappers/media-mapper";
+} from "../../../infrastructure/repositories/content-enrichment/extras";
+import { translateMediaItems } from "../../shared/services/translation-service";
+import { mapPoolItem } from "../../shared/mappers/media-mapper";
 
 /**
  * Load extras (credits, videos, watch providers, similar, recs) from DB tables

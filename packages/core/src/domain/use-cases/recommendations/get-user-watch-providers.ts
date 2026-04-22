@@ -5,8 +5,8 @@ import {
   groupByBrand,
   type BrandedProvider,
   type WatchProvider,
-} from "../../rules/canonical-brand";
-import { getUserWatchPreferences } from "../../services/user-service";
+} from "../../recommendations/rules/canonical-brand";
+import { getUserWatchPreferences } from "../../shared/services/user-service";
 
 export type UserWatchProvidersResult = {
   region: string;

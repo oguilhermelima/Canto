@@ -1,7 +1,7 @@
 import { asc, desc, eq, sql } from "drizzle-orm";
 import { media } from "@canto/db/schema";
 import type { SQL } from "drizzle-orm";
-import type { RecsFilters } from "../../../domain/types/recs-filters";
+import type { RecsFilters } from "../../../domain/recommendations/types/recs-filters";
 
 /**
  * Build an array of Drizzle SQL conditions from RecsFilters.

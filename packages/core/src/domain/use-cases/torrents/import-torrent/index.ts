@@ -3,11 +3,11 @@ import path from "node:path";
 import type { Database } from "@canto/db/client";
 import type { torrent as torrentSchema } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
-import type { DownloadClientPort } from "../../../ports/download-client";
-import type { FileSystemPort } from "../../../ports/file-system.port";
-import { isVideoFile, buildMediaDir } from "../../../rules/naming";
-import { EP_PATTERN, isSubtitleFile } from "../../../rules/parsing";
-import { getEffectiveProviderSync } from "../../../rules/effective-provider";
+import type { DownloadClientPort } from "../../../shared/ports/download-client";
+import type { FileSystemPort } from "../../../shared/ports/file-system.port";
+import { isVideoFile, buildMediaDir } from "../../../shared/rules/naming";
+import { EP_PATTERN, isSubtitleFile } from "../../../torrents/rules/parsing";
+import { getEffectiveProviderSync } from "../../../shared/rules/effective-provider";
 import { createNotification } from "../../notifications/create-notification";
 import {
   findMediaByIdWithSeasons,

@@ -1,5 +1,5 @@
-import { formatQualityLabel, formatSourceLabel } from "./quality";
-import { detectCodec, detectAudioCodec, detectAudioChannels, detectHdrFormat, detectEdition, detectReleaseGroup } from "./parsing";
+import { formatQualityLabel, formatSourceLabel } from "../../torrents/rules/quality";
+import { detectCodec, detectAudioCodec, detectAudioChannels, detectHdrFormat, detectEdition, detectReleaseGroup } from "../../torrents/rules/parsing";
 
 export const VIDEO_EXTENSIONS = new Set([
   ".mkv",

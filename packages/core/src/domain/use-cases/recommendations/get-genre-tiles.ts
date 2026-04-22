@@ -1,8 +1,8 @@
 import type { Database } from "@canto/db/client";
 import { cached } from "../../../infrastructure/cache/redis";
-import { GENRE_TILE_LIST } from "../../rules/genre-tiles";
+import { GENRE_TILE_LIST } from "../../recommendations/rules/genre-tiles";
 import { getTmdbProvider } from "../../../lib/tmdb-client";
-import { getUserWatchPreferences } from "../../services/user-service";
+import { getUserWatchPreferences } from "../../shared/services/user-service";
 
 export type GenreTile = {
   id: number;

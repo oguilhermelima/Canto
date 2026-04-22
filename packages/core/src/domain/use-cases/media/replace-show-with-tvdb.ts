@@ -1,7 +1,7 @@
 import type { Database } from "@canto/db/client";
 import { reconcileShowStructure } from "./reconcile-show-structure";
-import type { MediaProviderPort } from "../../ports/media-provider.port";
-import type { JobDispatcherPort } from "../../ports/job-dispatcher.port";
+import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
+import type { JobDispatcherPort } from "../../shared/ports/job-dispatcher.port";
 
 export async function replaceShowWithTvdb(
   db: Database,

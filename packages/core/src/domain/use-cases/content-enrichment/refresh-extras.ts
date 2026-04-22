@@ -8,11 +8,11 @@ import {
   mediaVideo,
   mediaWatchProvider,
 } from "@canto/db/schema";
-import { getActiveUserLanguages } from "../../services/user-service";
+import { getActiveUserLanguages } from "../../shared/services/user-service";
 import type { MediaType } from "@canto/providers";
 import { findMediaById } from "../../../infrastructure/repositories";
-import type { MediaProviderPort } from "../../ports/media-provider.port";
-import { mapSearchResultToMediaFields } from "../../rules/pool-scoring";
+import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
+import { mapSearchResultToMediaFields } from "../../content-enrichment/rules/pool-scoring";
 import { dispatchMediaPipeline } from "../../../infrastructure/queue/bullmq-dispatcher";
 import { logAndSwallow } from "../../../lib/log-error";
 

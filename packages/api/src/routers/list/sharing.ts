@@ -7,7 +7,7 @@ import {
   removeListMemberInput,
   updateListMemberInput,
 } from "@canto/validators";
-import { verifyListOwnership } from "@canto/core/domain/rules/list-rules";
+import { verifyListOwnership } from "@canto/core/domain/lists/rules/list-rules";
 import {
   addListMember,
   createInvitation,

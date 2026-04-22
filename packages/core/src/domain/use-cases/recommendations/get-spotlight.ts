@@ -1,11 +1,11 @@
 import type { Database } from "@canto/db/client";
-import type { MediaProviderPort } from "../../ports/media-provider.port";
+import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import type { SearchResult } from "@canto/providers";
 import { getSetting, setSetting } from "@canto/db/settings";
 import { buildExclusionSet } from "./recommendation-service";
-import { translateMediaItems } from "../../services/translation-service";
-import { getUserLanguage } from "../../services/user-service";
-import { mapPoolItem } from "../../mappers/media-mapper";
+import { translateMediaItems } from "../../shared/services/translation-service";
+import { getUserLanguage } from "../../shared/services/user-service";
+import { mapPoolItem } from "../../shared/mappers/media-mapper";
 import { findRecommendedMediaWithBackdrops } from "../../../infrastructure/repositories/content-enrichment/extras";
 import { findUserSpotlightItems } from "../../../infrastructure/repositories/recommendations/user-recommendation";
 

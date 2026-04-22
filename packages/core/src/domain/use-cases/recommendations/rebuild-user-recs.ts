@@ -1,5 +1,5 @@
 import { desc, eq, and, sql } from "drizzle-orm";
-import { getQualityFilters, getWeightedScoreOrder } from "../../rules/recommendation-filters";
+import { getQualityFilters, getWeightedScoreOrder } from "../../recommendations/rules/recommendation-filters";
 
 import type { Database } from "@canto/db/client";
 import {

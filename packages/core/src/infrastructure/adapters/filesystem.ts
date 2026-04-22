@@ -15,14 +15,14 @@ import type {
   FileAccessMode,
   FileSystemPort,
   HardlinkOrCopyResult,
-} from "../../domain/ports/file-system.port";
-import { buildFileName } from "../../domain/rules/naming";
+} from "../../domain/shared/ports/file-system.port";
+import { buildFileName } from "../../domain/shared/rules/naming";
 import {
   BARE_EP_PATTERN,
   EP_PATTERN,
   parseFileEpisodes,
   parseSubtitleLanguage,
-} from "../../domain/rules/parsing";
+} from "../../domain/torrents/rules/parsing";
 
 async function safeCopy(source: string, target: string): Promise<void> {
   try {

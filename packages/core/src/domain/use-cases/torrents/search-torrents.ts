@@ -2,12 +2,12 @@ import type { Database } from "@canto/db/client";
 
 import { IndexerSearchError } from "@canto/core/domain/torrents/errors";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
-import { detectQuality, detectSource } from "../../rules/quality";
-import { calculateConfidence } from "../../rules/scoring";
-import { detectLanguages, detectReleaseGroup, detectCodec } from "../../rules/parsing";
-import type { ConfidenceContext } from "../../types/common";
-import type { IndexerResult, SearchContext } from "../../types/torrent";
-import type { IndexerPort } from "../../ports/indexer";
+import { detectQuality, detectSource } from "../../torrents/rules/quality";
+import { calculateConfidence } from "../../shared/rules/scoring";
+import { detectLanguages, detectReleaseGroup, detectCodec } from "../../torrents/rules/parsing";
+import type { ConfidenceContext } from "../../torrents/types/common";
+import type { IndexerResult, SearchContext } from "../../torrents/types/torrent";
+import type { IndexerPort } from "../../torrents/ports/indexer";
 import {
   findMediaById,
   findBlocklistByMediaId,

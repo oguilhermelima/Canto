@@ -2,14 +2,14 @@ import path from "node:path";
 
 import type { Database } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
-import { getEffectiveProvider } from "../../rules/effective-provider";
+import { getEffectiveProvider } from "../../shared/rules/effective-provider";
 import {
   buildMediaDir,
   buildFileName,
   type MediaNamingInfo,
-} from "../../rules/naming";
-import type { DownloadClientPort } from "../../ports/download-client";
-import type { FileSystemPort } from "../../ports/file-system.port";
+} from "../../shared/rules/naming";
+import type { DownloadClientPort } from "../../shared/ports/download-client";
+import type { FileSystemPort } from "../../shared/ports/file-system.port";
 import {
   findMediaByIdWithSeasons,
   findMediaFilesByMediaId,
