@@ -134,7 +134,9 @@
 
     { "className": "SeasonNotFoundError",         "context": "user-media" },
     { "className": "EpisodeNotFoundError",        "context": "user-media" },
-    { "className": "InvalidWatchInputError",      "context": "user-media" }
+    { "className": "InvalidWatchInputError",      "context": "user-media" },
+
+    { "className": "InvalidPathError",            "context": "file-organization" }
   ],
 
   "infraMoves": [

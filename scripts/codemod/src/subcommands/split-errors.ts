@@ -139,12 +139,14 @@ export async function runSplitErrors(ctx: CodemodContext): Promise<SplitErrorsRe
       const namedImports = imp.getNamedImports();
       const isTypeOnly = imp.isTypeOnly();
 
+      let unknownFound = false;
       for (const spec of namedImports) {
         const name = spec.getName();
         const alias = spec.getAliasNode()?.getText();
         const target = symbolToContext.get(name);
         if (!target) {
-          logger.log({ op: "warn", message: `Unknown error symbol imported: ${name} in ${sf.getFilePath()}` });
+          unknownFound = true;
+          logger.log({ op: "warn", message: `Unknown error symbol imported: ${name} in ${sf.getFilePath()} — add to errorAssignments.` });
           continue;
         }
         const newModule = target === "shared"
@@ -173,6 +175,11 @@ export async function runSplitErrors(ctx: CodemodContext): Promise<SplitErrorsRe
       if (replacements.length > 0) {
         imp.replaceWithText(replacements.join("\n"));
         importersRewritten++;
+      }
+      if (unknownFound) {
+        throw new Error(
+          `split-errors: unknown error symbol in ${sf.getFilePath()}. Extend errorAssignments[] and re-run.`,
+        );
       }
     }
   }
