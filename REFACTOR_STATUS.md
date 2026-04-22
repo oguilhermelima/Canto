@@ -183,7 +183,7 @@ Mostly scriptable via the existing codemod with an updated `sample.json`. Remain
 5. Run `verify` to assert the target shape.
 6. Typecheck + tests must stay green.
 
-**Est**: ~4-6 focused hours on a branch `refactor/simplify-structure`. One big PR (no incremental merge — the intermediate state is too messy).
+**Est (Claude executing, not human)**: ~45-60 min of session time on branch `refactor/simplify-structure`. Codemod already has helpers for bulk moves + cross-workspace rewrites + sibling barrels; the new bits (consolidate-contexts subcommand, updated plan JSON, fold rules/services into helpers) are ~25 tool calls. Verification (typecheck + tests) adds ~3-5 cycles × ~15s each. One PR, no incremental merge — intermediate state too messy to ship.
 
 **Non-goal**: any Phase 6 / 7 work. This is pure organizational reshuffle. Behavior unchanged.
 
@@ -203,8 +203,9 @@ Mostly scriptable via the existing codemod with an updated `sample.json`. Remain
 - `domain/shared/ports/url-resolver.port.ts` (`URLResolverPort.followRedirects`).
 - Extend `domain/shared/ports/job-dispatcher.port.ts`: add `dispatchMediaPipeline`, `dispatchEnsureMedia`.
 - Adapters in `platform/{logger,http,queue}/` wrapping existing concrete functions.
-- Refactor call sites in `domain/sync/sync-pipeline.ts` (after Phase 5.5: `domain/connections/media-servers/use-cases/sync-pipeline.ts`), `domain/media/use-cases/persist/*`, `domain/torrents/use-cases/download-torrent/core.ts` to accept `{ logger, urlResolver, jobDispatcher }` via deps.
+- Refactor call sites in `domain/connections/media-servers/use-cases/sync-pipeline.ts`, `domain/media/use-cases/persist/*`, `domain/torrents/use-cases/download-torrent/core.ts` to accept `{ logger, urlResolver, jobDispatcher }` via deps.
 - **Reach**: eliminates ~15 `platform/*` imports inside `domain/`.
+- **Est (Claude)**: ~20-30 min. Small, self-contained. ~15 tool calls.
 
 ### Phase 6b — Media-server adapter ports
 
@@ -213,6 +214,7 @@ Mostly scriptable via the existing codemod with an updated `sample.json`. Remain
 - Adapter objects in `infra/media-servers/{plex,jellyfin}.adapter-bindings.ts` assembling the interface from existing concrete functions.
 - Refactor the 6 media-server use-case files.
 - **Reach**: eliminates ~14 `infra/media-servers/*.adapter` imports in `domain/`.
+- **Est (Claude)**: ~25-35 min. Interfaces are boilerplate-heavy but mechanical. ~20 tool calls.
 
 ### Phase 6c — Per-context repository ports
 
@@ -229,6 +231,7 @@ Mostly scriptable via the existing codemod with an updated `sample.json`. Remain
 - Refactor all refactor-target files to accept these ports via deps.
 - **Delete `packages/core/src/infra/repositories.ts`** (transitional aggregate).
 - **Reach**: `grep -r "from \"@/infra/\"" packages/core/src/domain` returns 0.
+- **Est (Claude)**: ~40-60 min. Biggest of the three sub-phases — touches 11 files and the composition roots. ~35 tool calls.
 
 ---
 
@@ -258,6 +261,13 @@ Mostly scriptable via the existing codemod with an updated `sample.json`. Remain
 - Update `infra/<ctx>/*-repository.ts` to call mapper at boundaries; signatures flip from row types to domain types.
 - Update callers across `domain/`, `infra/`, `packages/api/`, `apps/*`.
 
+**Est (Claude) per context**:
+- Small (1-2 entities, no complex relationships): ~10-15 min. Applies to notifications, lists, trakt, requests, recommendations, media-servers.
+- Medium (2-3 entities, some cross-type references): ~20-30 min. Applies to torrents (after file-organization merge), user (after profile merge).
+- Large (many methods, dense query shapes): ~30-45 min. Applies to user-actions/user-media, media (after content-enrichment merge).
+
+Total Phase 7: **~2.5-3.5 hours of session time** if done continuously. Safer to split across 2-3 sessions — typecheck failures in one context can cascade if callers aren't updated, and long sessions hit turn limits.
+
 ---
 
 ## Phase 8 — ESLint boundaries + CI
@@ -271,6 +281,8 @@ Mostly scriptable via the existing codemod with an updated `sample.json`. Remain
   - `platform/**` may import: externals only.
 - Synthetic violation fixture at `packages/core/src/__eslint_fixtures__/should-fail.ts`; CI expects exit 1.
 - Extend (or create) `.github/workflows/ci.yml` with `pnpm codemod verify`.
+
+**Est (Claude)**: ~20-30 min. Mostly config writing + one smoke test. ~12 tool calls.
 
 ---
 
@@ -302,16 +314,20 @@ Auto mode has not booted dev servers. Before relying on `main` beyond typecheck:
 
 Each phase is an independent branch. **Run in this order**:
 
-1. **Phase 5.5** — `refactor/simplify-structure` branch. Confirm the 5 decisions at the top of the Phase 5.5 section. Update `sample.json`. Run codemod (existing + new `consolidate-contexts` subcommand). Single PR. ~4-6 hours.
+1. **Phase 5.5** — `refactor/simplify-structure`. Confirm the 5 decisions at the top of the Phase 5.5 section. Update `sample.json`. Run codemod. Single PR. ~45-60 min session time.
 
-2. **Phase 6a** — `refactor/core-ports-shared`. LoggerPort + URLResolverPort + JobDispatcherPort extension. ~1-2 hours.
+2. **Phase 6a** — `refactor/core-ports-shared`. LoggerPort + URLResolverPort + JobDispatcherPort extension. ~20-30 min.
 
-3. **Phase 6b** — `refactor/core-ports-media-servers`. Plex + Jellyfin adapter ports. ~2 hours.
+3. **Phase 6b** — `refactor/core-ports-media-servers`. Plex + Jellyfin adapter ports. ~25-35 min.
 
-4. **Phase 6c** — `refactor/core-ports-repositories`. Per-context repo ports + delete aggregate. ~2-3 hours.
+4. **Phase 6c** — `refactor/core-ports-repositories`. Per-context repo ports + delete aggregate. ~40-60 min.
 
-5. **Phase 7** — `refactor/core-strict-types-<ctx>`. One branch per context, smallest first. ~30m-2h per context depending on entity count.
+5. **Phase 7** — `refactor/core-strict-types-<ctx>`. One branch per context, smallest first. 10-45 min per context. Total ~2.5-3.5h session time continuous, or split across 2-3 sessions.
 
-6. **Phase 8** — `chore/eslint-boundaries`. ESLint rules + CI. ~0.5 day.
+6. **Phase 8** — `chore/eslint-boundaries`. ESLint rules + CI. ~20-30 min.
+
+**Total remaining work (Claude session time)**: ~5-7 hours aggregate. Realistically splits across 3-5 sessions because of turn/token limits and verify-cycle wait time (typecheck ~15s, tests ~3s per cycle; dozens of cycles accumulate).
+
+**Reference**: Phase 1-5 were ~160 tool calls and roughly 2-3 hours of session time across one long session. The remaining phases together are roughly 2-3x that volume.
 
 After each merge: `git checkout main && git pull`. Dirty / unpushed commits stop the codemod.
