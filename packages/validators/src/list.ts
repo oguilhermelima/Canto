@@ -106,3 +106,25 @@ export const removeListItemInput = z.object({
   mediaId: z.string().uuid(),
 });
 export type RemoveListItemInput = z.infer<typeof removeListItemInput>;
+
+export const removeListItemsInput = z.object({
+  listId: z.string().uuid(),
+  mediaIds: z.array(z.string().uuid()).min(1).max(500),
+});
+export type RemoveListItemsInput = z.infer<typeof removeListItemsInput>;
+
+export const moveListItemsInput = z.object({
+  fromListId: z.string().uuid(),
+  toListId: z.string().uuid(),
+  mediaIds: z.array(z.string().uuid()).min(1).max(500),
+});
+export type MoveListItemsInput = z.infer<typeof moveListItemsInput>;
+
+export const getAllCollectionItemsInput = mediaFilterBase.extend({
+  limit: z.number().int().min(1).max(100).default(50),
+  cursor: z.number().int().min(0).nullish(),
+  watchStatus: z.enum(["in_progress", "completed", "not_started"]).optional(),
+});
+export type GetAllCollectionItemsInput = z.infer<
+  typeof getAllCollectionItemsInput
+>;

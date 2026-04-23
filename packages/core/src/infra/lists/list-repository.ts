@@ -491,6 +491,15 @@ export async function findListItems(
     ).where(whereClause),
   ]);
 
+  const membership = userId
+    ? await getMembershipForMedia(
+        db,
+        userId,
+        rows.map((r) => r.media.id),
+        listId,
+      )
+    : new Map<string, MediaMembership>();
+
   const items = rows.map((row) => {
     const userRating =
       "userRating" in row && row.userRating != null
@@ -508,6 +517,10 @@ export async function findListItems(
             }
           : null,
       userRating: userRating as number | null,
+      membership: membership.get(row.media.id) ?? {
+        inWatchlist: false,
+        otherCollections: [],
+      },
     };
   });
 
@@ -562,6 +575,117 @@ export async function removeListItem(
     .where(and(eq(listItem.listId, listId), eq(listItem.mediaId, mediaId)));
 }
 
+export async function removeListItems(
+  db: Database,
+  listId: string,
+  mediaIds: string[],
+): Promise<void> {
+  if (mediaIds.length === 0) return;
+  await db
+    .delete(listItem)
+    .where(
+      and(eq(listItem.listId, listId), inArray(listItem.mediaId, mediaIds)),
+    );
+}
+
+/**
+ * Move items from one list to another within a single transaction.
+ * Inserts into target with onConflictDoNothing (silent skip on duplicate),
+ * then deletes from source. Positions append to the target list's tail.
+ */
+export async function moveListItems(
+  db: Database,
+  fromListId: string,
+  toListId: string,
+  mediaIds: string[],
+): Promise<void> {
+  if (mediaIds.length === 0) return;
+
+  await db.transaction(async (tx) => {
+    const [maxRow] = await tx
+      .select({ maxPos: max(listItem.position) })
+      .from(listItem)
+      .where(eq(listItem.listId, toListId));
+    let nextPos = (maxRow?.maxPos ?? -1) + 1;
+
+    for (const mediaId of mediaIds) {
+      const [inserted] = await tx
+        .insert(listItem)
+        .values({ listId: toListId, mediaId, position: nextPos })
+        .onConflictDoNothing()
+        .returning({ id: listItem.id });
+      if (inserted) nextPos++;
+    }
+
+    await tx
+      .delete(listItem)
+      .where(
+        and(
+          eq(listItem.listId, fromListId),
+          inArray(listItem.mediaId, mediaIds),
+        ),
+      );
+  });
+}
+
+export interface MediaMembership {
+  inWatchlist: boolean;
+  otherCollections: Array<{ id: string; name: string; slug: string }>;
+}
+
+/**
+ * For a set of mediaIds, compute each media's membership across the current
+ * user's own lists. Used to display "also in watchlist" + "in N other
+ * collections" hints on collection detail views. Server library is ignored
+ * (admin/shared concept); watchlist is surfaced separately.
+ */
+export async function getMembershipForMedia(
+  db: Database,
+  userId: string,
+  mediaIds: string[],
+  excludeListId?: string,
+): Promise<Map<string, MediaMembership>> {
+  const result = new Map<string, MediaMembership>();
+  if (mediaIds.length === 0) return result;
+
+  const rows = await db
+    .select({
+      mediaId: listItem.mediaId,
+      listId: list.id,
+      listName: list.name,
+      listSlug: list.slug,
+      listType: list.type,
+    })
+    .from(listItem)
+    .innerJoin(list, eq(listItem.listId, list.id))
+    .where(
+      and(
+        inArray(listItem.mediaId, mediaIds),
+        eq(list.userId, userId),
+        isNull(list.deletedAt),
+      ),
+    );
+
+  for (const row of rows) {
+    const prev = result.get(row.mediaId) ?? {
+      inWatchlist: false,
+      otherCollections: [],
+    };
+    if (row.listType === "watchlist") {
+      prev.inWatchlist = true;
+    } else if (row.listType === "custom" && row.listId !== excludeListId) {
+      prev.otherCollections.push({
+        id: row.listId,
+        name: row.listName,
+        slug: row.listSlug,
+      });
+    }
+    result.set(row.mediaId, prev);
+  }
+
+  return result;
+}
+
 export async function findMediaInLists(
   db: Database,
   mediaId: string,
@@ -584,6 +708,119 @@ export async function findMediaInLists(
       ),
     );
   return items;
+}
+
+/**
+ * Aggregate across the user's visible custom collections: returns distinct
+ * media items with filters/sort/pagination. Server + watchlist lists are
+ * excluded — this powers the "all items" browse view for user collections.
+ */
+export async function findUserCustomCollectionItems(
+  db: Database,
+  userId: string,
+  hiddenListIds: string[],
+  opts: {
+    limit?: number;
+    offset?: number;
+    watchStatus?: "in_progress" | "completed" | "not_started";
+  } & RecsFilters = {},
+) {
+  const {
+    limit: lim = 50,
+    offset: off = 0,
+    sortBy,
+    watchStatus,
+    ...filterOpts
+  } = opts;
+
+  const userLists = await db
+    .select({ id: list.id })
+    .from(list)
+    .where(
+      and(
+        eq(list.userId, userId),
+        eq(list.type, "custom"),
+        isNull(list.deletedAt),
+      ),
+    );
+  const hiddenSet = new Set(hiddenListIds);
+  const scopedListIds = userLists
+    .map((l) => l.id)
+    .filter((id) => !hiddenSet.has(id));
+
+  if (scopedListIds.length === 0) return { items: [], total: 0 };
+
+  const mediaIdRows = await db
+    .selectDistinct({ mediaId: listItem.mediaId })
+    .from(listItem)
+    .where(inArray(listItem.listId, scopedListIds));
+  const mediaIds = mediaIdRows.map((r) => r.mediaId);
+
+  if (mediaIds.length === 0) return { items: [], total: 0 };
+
+  const conditions: SQL[] = [
+    inArray(media.id, mediaIds),
+    ...buildRecsFilterConditions(filterOpts),
+  ];
+
+  if (watchStatus) {
+    if (watchStatus === "in_progress") {
+      conditions.push(sql`${userMediaState.status} = 'watching'`);
+    } else if (watchStatus === "completed") {
+      conditions.push(sql`${userMediaState.status} = 'completed'`);
+    } else {
+      conditions.push(
+        sql`(${userMediaState.status} IS NULL OR ${userMediaState.status} = 'planned')`,
+      );
+    }
+  }
+
+  const userStateJoin = and(
+    eq(userMediaState.mediaId, media.id),
+    eq(userMediaState.userId, userId),
+  );
+
+  const customSort = recsSortOrder(sortBy);
+  const orderByExpr = customSort ?? sql`${media.popularity} DESC NULLS LAST`;
+
+  const whereClause = and(...conditions);
+
+  const [rows, [countRow]] = await Promise.all([
+    db
+      .select({
+        media,
+        userRating: userMediaState.rating,
+      })
+      .from(media)
+      .leftJoin(userMediaState, userStateJoin)
+      .where(whereClause)
+      .orderBy(orderByExpr)
+      .limit(lim)
+      .offset(off),
+    db
+      .select({ total: count() })
+      .from(media)
+      .leftJoin(userMediaState, userStateJoin)
+      .where(whereClause),
+  ]);
+
+  const membership = await getMembershipForMedia(
+    db,
+    userId,
+    rows.map((r) => r.media.id),
+  );
+
+  return {
+    items: rows.map((row) => ({
+      media: row.media,
+      userRating: row.userRating != null ? Number(row.userRating) : null,
+      membership: membership.get(row.media.id) ?? {
+        inWatchlist: false,
+        otherCollections: [],
+      },
+    })),
+    total: countRow?.total ?? 0,
+  };
 }
 
 /** Returns externalId+provider for all media items in the user's lists (watchlist + custom). */
