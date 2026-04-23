@@ -15,10 +15,13 @@ export function HubCollectionsSection(): React.JSX.Element {
   const { data: lists, isLoading, isError, refetch } = trpc.list.getAll.useQuery();
   const layoutQuery = trpc.list.getCollectionLayout.useQuery();
 
-  // DB returns lists in position order — filter hidden only
+  // Show only user-created collections on the /library hub. Watchlist +
+  // Server Library get their own dedicated sections above.
   const visibleLists = useMemo(() => {
     const hiddenSet = new Set(layoutQuery.data?.hiddenListIds ?? []);
-    return (lists ?? []).filter((l) => !hiddenSet.has(l.id));
+    return (lists ?? []).filter(
+      (l) => l.type === "custom" && !hiddenSet.has(l.id),
+    );
   }, [lists, layoutQuery.data]);
 
   if (isLoading || layoutQuery.isLoading) {

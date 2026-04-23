@@ -62,7 +62,7 @@ export function CollectionsTab(): React.JSX.Element {
     [layout?.hiddenListIds],
   );
 
-  const allLists = lists ?? [];
+  const allLists = (lists ?? []).filter((l) => l.type === "custom");
   const hiddenCount = allLists.filter((l) => hiddenIds.has(l.id)).length;
 
   const visibleLists = useMemo(() => {

@@ -72,9 +72,10 @@ export function CollectionsSectionsView({
   const hiddenIds = layoutQuery.data?.hiddenListIds ?? [];
   const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
 
-  // DB returns lists in position order — use directly
+  // DB returns lists in position order — show only user-created collections.
+  // Watchlist + Server Library live as top-level hub sections on /library.
   const visibleLists = useMemo(() => {
-    const all = lists ?? [];
+    const all = (lists ?? []).filter((list) => list.type === "custom");
     return showHidden
       ? all
       : all.filter((list) => !hiddenSet.has(list.id));

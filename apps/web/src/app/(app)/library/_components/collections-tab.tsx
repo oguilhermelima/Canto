@@ -108,10 +108,10 @@ export function CollectionsTab({
   const searchQuery = filters.searchQuery.trim().toLowerCase();
   const canReorder = searchQuery.length === 0;
 
-  // DB returns lists in position order — use directly.
-  // Only apply client-side sort/filter when search is active.
+  // DB returns lists in position order. Show only user-created collections;
+  // watchlist + server library are promoted to the /library hub directly.
   const mergedLists = useMemo(() => {
-    const all = lists ?? [];
+    const all = (lists ?? []).filter((list) => list.type === "custom");
     if (!searchQuery) return all;
 
     const filtered = all.filter((list) =>
@@ -181,13 +181,17 @@ export function CollectionsTab({
     if (!moved) return;
     reordered.splice(targetIndex, 0, moved);
 
-    // Optimistic: reorder the getAll cache
+    // Optimistic: reorder the getAll cache. Only custom lists are in
+    // `reordered`, so preserve non-custom rows (watchlist, server) afterwards.
     utils.list.getAll.setData(undefined, (prev) => {
       if (!prev) return prev;
       const map = new Map(prev.map((l) => [l.id, l]));
-      return reordered
+      const reorderedLists = reordered
         .map((id) => map.get(id))
         .filter((l): l is NonNullable<typeof l> => !!l);
+      const touched = new Set(reordered);
+      const untouched = prev.filter((l) => !touched.has(l.id));
+      return [...reorderedLists, ...untouched];
     });
 
     reorderMutation.mutate({ orderedIds: reordered });
@@ -218,13 +222,7 @@ export function CollectionsTab({
   };
 
   const hasAnyManagedList =
-    (lists?.some(
-      (list) =>
-        list.type === "watchlist" ||
-        list.type === "server" ||
-        list.type === "custom",
-    ) ??
-      false) === true;
+    (lists?.some((list) => list.type === "custom") ?? false) === true;
 
   return (
     <>

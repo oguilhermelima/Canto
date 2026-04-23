@@ -13,7 +13,7 @@ import {
 } from "@canto/ui/dialog";
 import { Input } from "@canto/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@canto/ui/tooltip";
-import { ArrowUpDown, Check, Eye, EyeOff, Loader2 } from "lucide-react";
+import { ArrowUpDown, Check, Eye, EyeOff, LayoutGrid, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -72,6 +72,19 @@ export default function CollectionsPage(): React.JSX.Element {
           ) : (
             <TooltipProvider delayDuration={300}>
               <div className="flex items-center gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      onClick={() => router.push("/library/collections/all-items")}
+                      aria-label="View all items across collections"
+                    >
+                      <LayoutGrid className="h-[18px] w-[18px]" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">All items</TooltipContent>
+                </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
