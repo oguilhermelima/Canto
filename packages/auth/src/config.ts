@@ -26,6 +26,14 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days
     updateAge: 60 * 60 * 24, // 1 day
+    // Sign session payload into a cookie so every tRPC call doesn't hit the
+    // session table. Without this, parallel prefetches on hover/scroll can
+    // overlap a slow getSession query, silently return null, and surface as
+    // intermittent 401s in the browser. DB is still consulted every maxAge.
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60, // 5 minutes
+    },
   },
   user: {
     additionalFields: {
