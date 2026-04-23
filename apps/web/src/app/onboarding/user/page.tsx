@@ -63,7 +63,13 @@ export default function UserOnboardingPage(): React.JSX.Element {
     return list;
   }, [providersReady]);
 
-  const step = steps[currentStep]!;
+  // Clamp rehydrated index if providers changed between sessions — otherwise
+  // the lookup returns undefined and FadeIn renders nothing.
+  useEffect(() => {
+    if (currentStep > steps.length - 1) setCurrentStep(steps.length - 1);
+  }, [steps.length, currentStep]);
+
+  const step = steps[Math.min(currentStep, steps.length - 1)]!;
 
   const jellyfinConnected = connections?.some((c) => c.provider === "jellyfin") ?? false;
   const plexConnected = connections?.some((c) => c.provider === "plex") ?? false;

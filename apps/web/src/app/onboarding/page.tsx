@@ -85,7 +85,16 @@ export default function OnboardingPage(): React.JSX.Element {
   }, [allSettings]);
 
   const steps = useMemo(() => buildSteps(torrentConnected), [torrentConnected]);
-  const step = steps[currentStep]!;
+
+  // Clamp rehydrated index if the step list shrank between sessions (e.g. the
+  // admin reached "ready" with qbit configured, then returned with it turned
+  // off and the library steps dropped out). Without this we hand FadeIn an
+  // undefined step and render a blank screen.
+  useEffect(() => {
+    if (currentStep > steps.length - 1) setCurrentStep(steps.length - 1);
+  }, [steps.length, currentStep]);
+
+  const step = steps[Math.min(currentStep, steps.length - 1)]!;
 
   useEffect(() => {
     if (isCompleted === true) router.replace("/");
