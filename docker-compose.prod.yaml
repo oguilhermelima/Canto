@@ -13,7 +13,10 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-canto}"]
+      # Pass -d explicitly so pg_isready doesn't default to a DB named after the
+      # user — harmless for the check itself but spams FATAL "database does not
+      # exist" lines into the postgres log every 5s.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-canto} -d ${POSTGRES_DB:-canto}"]
       interval: 5s
       timeout: 5s
       retries: 5
