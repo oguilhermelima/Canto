@@ -53,6 +53,11 @@ export interface BrowseItem {
   membersAvg?: number;
   /* Current user's personal rating (1-10) */
   userRating?: number | null;
+  /* Cross-list membership for collection detail + all-items views */
+  membership?: {
+    inWatchlist: boolean;
+    otherCollections: Array<{ id: string; name: string; slug: string }>;
+  };
 }
 
 /* ─── Card Strategy ─── */

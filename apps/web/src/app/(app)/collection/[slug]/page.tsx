@@ -20,15 +20,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@canto/ui/select";
-import { Eye, EyeOff, Globe, Loader2, Lock, Pencil, Trash2, Users } from "lucide-react";
+import { CheckSquare, Eye, EyeOff, Globe, Loader2, Lock, Pencil, Trash2, Users } from "lucide-react";
 import { BrowseLayout } from "@/components/layout/browse-layout";
-import type { FilterOutput, BrowseItem, BrowseMenuGroup } from "@/components/layout/browse-layout";
+import type { FilterOutput, BrowseItem, BrowseMenuGroup, CardStrategy } from "@/components/layout/browse-layout";
 import { collectionStrategy } from "@/components/layout/card-strategies";
 import { StateMessage } from "@canto/ui/state-message";
 import { trpc } from "@/lib/trpc/client";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useViewMode } from "@/hooks/use-view-mode";
 import { CollectionMembersDialog } from "../../library/_components/collection-members-dialog";
+import { CardActionsMenu } from "./_components/card-actions-menu";
+import { MoveItemsDialog } from "./_components/move-items-dialog";
+import { SelectableItem } from "./_components/selectable-item";
+import { SelectionBar } from "./_components/selection-bar";
 
 const PAGE_SIZE = 20;
 
@@ -49,6 +53,10 @@ export default function ListDetailPage(): React.JSX.Element {
   const [shareListId, setShareListId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [bulkRemoveConfirmOpen, setBulkRemoveConfirmOpen] = useState(false);
 
   const utils = trpc.useUtils();
   const layoutQuery = trpc.list.getCollectionLayout.useQuery();
@@ -120,6 +128,7 @@ export default function ListDetailPage(): React.JSX.Element {
           voteCount: item.memberVotes?.voteCount,
           membersAvg: item.memberVotes?.avgRating,
           userRating: item.userRating,
+          membership: item.membership,
         })),
       ) ?? [];
 
@@ -130,6 +139,98 @@ export default function ListDetailPage(): React.JSX.Element {
     if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  const listRow = data?.pages[0]?.list;
+
+  const canSelect =
+    listRow?.type === "custom" || listRow?.type === "watchlist";
+
+  const toggleSelected = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const exitSelection = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  const invalidateAfterMutation = useCallback(() => {
+    void utils.list.getBySlug.invalidate();
+    void utils.list.getAll.invalidate();
+    void utils.list.getAllCollectionItems.invalidate();
+  }, [utils]);
+
+  const removeItemsMutation = trpc.list.removeItems.useMutation({
+    onSuccess: (res) => {
+      toast.success(`Removed ${res.count} items`);
+      invalidateAfterMutation();
+      exitSelection();
+      setBulkRemoveConfirmOpen(false);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const moveItemsMutation = trpc.list.moveItems.useMutation({
+    onSuccess: (res) => {
+      toast.success(`Moved ${res.count} items`);
+      invalidateAfterMutation();
+      exitSelection();
+      setMoveOpen(false);
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const wrappedStrategy: CardStrategy = useMemo(() => {
+    if (selectionMode) {
+      return {
+        ...collectionStrategy,
+        gridCard: (item) => (
+          <SelectableItem
+            selected={selectedIds.has(item.id)}
+            onToggle={() => toggleSelected(item.id)}
+            variant="grid"
+          >
+            {collectionStrategy.gridCard(item)}
+          </SelectableItem>
+        ),
+        listCard: (item) => (
+          <SelectableItem
+            selected={selectedIds.has(item.id)}
+            onToggle={() => toggleSelected(item.id)}
+            variant="list"
+          >
+            {collectionStrategy.listCard(item)}
+          </SelectableItem>
+        ),
+      };
+    }
+
+    if (!listRow) return collectionStrategy;
+    const wrap = (variant: "grid" | "list") => (item: BrowseItem) => (
+      <CardActionsMenu
+        mediaId={item.id}
+        mediaTitle={item.title}
+        currentListId={listRow.id}
+        currentListName={listRow.name}
+        canRemove={canSelect}
+        variant={variant}
+      >
+        {variant === "grid"
+          ? collectionStrategy.gridCard(item)
+          : collectionStrategy.listCard(item)}
+      </CardActionsMenu>
+    );
+    return {
+      ...collectionStrategy,
+      gridCard: wrap("grid"),
+      listCard: wrap("list"),
+    };
+  }, [selectionMode, selectedIds, toggleSelected, listRow, canSelect]);
+
   if (error) {
     return (
       <StateMessage
@@ -139,8 +240,6 @@ export default function ListDetailPage(): React.JSX.Element {
       />
     );
   }
-
-  const listRow = data?.pages[0]?.list;
 
   const hiddenIds = layoutQuery.data?.hiddenListIds ?? [];
   const isHidden = listRow ? hiddenIds.includes(listRow.id) : false;
@@ -156,8 +255,27 @@ export default function ListDetailPage(): React.JSX.Element {
     toast.success(isHidden ? "Collection visible" : "Collection hidden");
   };
 
+  const enterSelection = (): void => {
+    setSelectionMode(true);
+    setSelectedIds(new Set());
+  };
+
   const menuGroups: BrowseMenuGroup[] | undefined = listRow
     ? [
+        ...(canSelect
+          ? [
+              {
+                label: "Items",
+                items: [
+                  {
+                    label: "Select items",
+                    icon: CheckSquare,
+                    onClick: enterSelection,
+                  },
+                ],
+              },
+            ]
+          : []),
         ...(listRow.type === "custom"
           ? [
               {
@@ -183,6 +301,8 @@ export default function ListDetailPage(): React.JSX.Element {
       ]
     : undefined;
 
+  const selectedArray = Array.from(selectedIds);
+
   return (
     <>
       <BrowseLayout
@@ -190,7 +310,7 @@ export default function ListDetailPage(): React.JSX.Element {
         subtitle={listRow?.description ?? undefined}
         menuGroups={menuGroups}
         items={items}
-        strategy={collectionStrategy}
+        strategy={wrappedStrategy}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         isLoading={isLoading}
@@ -209,6 +329,72 @@ export default function ListDetailPage(): React.JSX.Element {
           />
         }
       />
+
+      {selectionMode && listRow && (
+        <SelectionBar
+          count={selectedIds.size}
+          onCancel={exitSelection}
+          onRemove={() => setBulkRemoveConfirmOpen(true)}
+          onMove={() => setMoveOpen(true)}
+          removePending={removeItemsMutation.isPending}
+          movePending={moveItemsMutation.isPending}
+        />
+      )}
+
+      {listRow && (
+        <MoveItemsDialog
+          open={moveOpen}
+          onOpenChange={setMoveOpen}
+          sourceListId={listRow.id}
+          itemCount={selectedIds.size}
+          pending={moveItemsMutation.isPending}
+          onPick={(targetListId) => {
+            moveItemsMutation.mutate({
+              fromListId: listRow.id,
+              toListId: targetListId,
+              mediaIds: selectedArray,
+            });
+          }}
+        />
+      )}
+
+      <Dialog
+        open={bulkRemoveConfirmOpen}
+        onOpenChange={(open) => {
+          if (!open) setBulkRemoveConfirmOpen(false);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove {selectedIds.size} items?</DialogTitle>
+            <DialogDescription>
+              These items will be removed from &quot;{listRow?.name}&quot;. This
+              action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBulkRemoveConfirmOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-red-500 text-white hover:bg-red-600"
+              onClick={() => {
+                if (!listRow) return;
+                removeItemsMutation.mutate({
+                  listId: listRow.id,
+                  mediaIds: selectedArray,
+                });
+              }}
+              disabled={removeItemsMutation.isPending}
+            >
+              {removeItemsMutation.isPending ? "Removing..." : "Remove"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit collection dialog */}
       {listRow && listRow.type === "custom" && (
