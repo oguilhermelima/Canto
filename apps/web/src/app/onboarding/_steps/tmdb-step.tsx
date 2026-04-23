@@ -22,7 +22,7 @@ export function TmdbStep({
   const [apiKey, setApiKey] = useState(str(settings, "tmdb.apiKey"));
   const [testing, setTesting] = useState(false);
 
-  const setSetting = trpc.settings.set.useMutation();
+  const setMany = trpc.settings.setMany.useMutation();
   const testService = trpc.settings.testService.useMutation();
 
   const handleSave = async (): Promise<void> => {
@@ -36,7 +36,14 @@ export function TmdbStep({
         toast.error("Invalid API key. Check your TMDB key and try again.");
         return;
       }
-      await setSetting.mutateAsync({ key: "tmdb.apiKey", value: apiKey });
+      // Atomic write so the admin never ends up with a saved key that isn't
+      // active yet — mirrors what the Settings UI does on save.
+      await setMany.mutateAsync({
+        settings: [
+          { key: "tmdb.apiKey", value: apiKey },
+          { key: "tmdb.enabled", value: true },
+        ],
+      });
       toast.success("TMDB connected");
       onNext();
     } catch {

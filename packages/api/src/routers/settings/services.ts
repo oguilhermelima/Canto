@@ -1,5 +1,10 @@
 import { TRPCError } from "@trpc/server";
-import { getSetting, getSettings, setSetting } from "@canto/db/settings";
+import {
+  getSetting,
+  getSettings,
+  setSetting,
+  setManySettings,
+} from "@canto/db/settings";
 import { invalidateServiceClients } from "@canto/core/infra/media-servers/service-clients";
 import {
   serviceEnum,
@@ -74,7 +79,13 @@ export const settingsServicesRouter = createTRPCRouter({
         message: "TMDB must be configured before completing onboarding",
       });
     }
-    await setSetting("onboarding.completed", true);
+    // Flip tmdb.enabled alongside onboarding.completed so an admin who saved
+    // the key through an older build (which didn't toggle enabled) isn't
+    // stranded with a disabled provider after finishing setup.
+    await setManySettings([
+      { key: "tmdb.enabled", value: true },
+      { key: "onboarding.completed", value: true },
+    ]);
     return { success: true };
   }),
 

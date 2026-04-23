@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
 import type { Step } from "./_components/constants";
 import { LIBRARY_STEPS } from "./_components/constants";
@@ -117,7 +118,14 @@ export default function OnboardingPage(): React.JSX.Element {
   }, []);
 
   const finish = useCallback(async () => {
-    await completeOnboarding.mutateAsync();
+    try {
+      await completeOnboarding.mutateAsync();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to complete onboarding";
+      toast.error(message);
+      return;
+    }
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(PROGRESS_KEY);
     }
