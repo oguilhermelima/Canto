@@ -47,6 +47,16 @@ import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
 
+// crypto.randomUUID requires a secure context (https or localhost). Dev over
+// LAN IP or any plain-http origin lacks it, so fall back to a non-crypto id
+// that's only ever used as an ephemeral React list key.
+function randomId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Animated collapse                                                          */
 /* -------------------------------------------------------------------------- */
@@ -108,7 +118,7 @@ const EMPTY_CONDITION = (): RuleCondition =>
   ({ field: "type", op: "eq", value: "movie" }) as RuleCondition;
 
 const EMPTY_RULE = (): UIRule => ({
-  id: crypto.randomUUID(),
+  id: randomId(),
   include: [],
   exclude: [],
 });
@@ -126,7 +136,7 @@ function rulesToUI(rules: RoutingRules | null): UIRules {
   }
   return {
     rules: rules.rules.map((r) => ({
-      id: crypto.randomUUID(),
+      id: randomId(),
       include: r.include,
       exclude: r.exclude ?? [],
     })),
@@ -911,7 +921,7 @@ function RulesEditor({
     const original = value.rules[idx];
     if (!original) return;
     const clone: UIRule = {
-      id: crypto.randomUUID(),
+      id: randomId(),
       include: original.include.map(cloneCondition),
       exclude: original.exclude.map(cloneCondition),
     };
