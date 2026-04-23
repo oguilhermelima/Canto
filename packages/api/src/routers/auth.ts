@@ -8,12 +8,22 @@ import {
   getUserProfile,
   updateUserProfile,
 } from "@canto/core/infra/user/user-aggregate-repository";
-import { createTRPCRouter, adminProcedure, protectedProcedure } from "../trpc";
+import {
+  createTRPCRouter,
+  adminProcedure,
+  protectedProcedure,
+  publicProcedure,
+} from "../trpc";
 
 export const authRouter = createTRPCRouter({
   me: protectedProcedure.query(({ ctx }) => ctx.session.user),
 
   list: adminProcedure.query(({ ctx }) => findAllUsers(ctx.db)),
+
+  hasAnyUser: publicProcedure.query(async ({ ctx }) => {
+    const rows = await ctx.db.select({ id: user.id }).from(user).limit(1);
+    return rows.length > 0;
+  }),
 
   isOnboardingCompleted: protectedProcedure.query(async ({ ctx }) => {
     const [row] = await ctx.db

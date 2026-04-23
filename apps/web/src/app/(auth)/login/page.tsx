@@ -29,14 +29,13 @@ function LoginContent(): React.JSX.Element {
 
   useDocumentTitle("Login");
 
-  // On very first visit (middleware redirect), go to register if no users exist yet.
-  // Skip if user navigated here from another page (clicked "Sign in" link).
+  // Fresh-install redirect: only bounce to /register when the DB is empty so
+  // the first admin can bootstrap. Checking user existence (not system
+  // onboarding) avoids trapping existing users who still need to finish the
+  // admin config flow.
   useEffect(() => {
-    const isDirectAccess = !document.referrer || !document.referrer.includes(window.location.origin);
-    if (!isDirectAccess) return;
-
     let cancelled = false;
-    fetch("/api/trpc/settings.isOnboardingCompleted")
+    fetch("/api/trpc/auth.hasAnyUser")
       .then((r) => r.json())
       .then((data: { result?: { data?: { json?: boolean } } }) => {
         if (!cancelled && data.result?.data?.json === false) {
@@ -44,7 +43,9 @@ function LoginContent(): React.JSX.Element {
         }
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit(
