@@ -90,6 +90,12 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # Settings are encrypted with a key derived from BETTER_AUTH_SECRET;
+      # without it here the worker can't decrypt tmdb.apiKey, jellyfin.apiKey,
+      # plex.token, etc., and every pipeline/sync job fails with 401/auth errors.
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      TRAKT_CLIENT_ID: ${TRAKT_CLIENT_ID:-}
+      TRAKT_CLIENT_SECRET: ${TRAKT_CLIENT_SECRET:-}
     volumes:
       - ${MEDIA_PATH}:/media
     depends_on:
