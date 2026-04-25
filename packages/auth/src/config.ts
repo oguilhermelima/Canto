@@ -42,14 +42,10 @@ export const auth = betterAuth({
         defaultValue: "user",
         input: false,
       },
-      bio: {
-        type: "string",
-        required: false,
-      },
-      headerImage: {
-        type: "string",
-        required: false,
-      },
+      // bio and headerImage are profile fields fetched via tRPC, not session
+      // data. Keeping them off the session keeps cookieCache small — base64
+      // headerImage values used to push the signed cookie past Chromium's
+      // response-header cap and break sign-in with ERR_RESPONSE_HEADERS_TOO_BIG.
     },
   },
   databaseHooks: {
