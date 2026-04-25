@@ -11,7 +11,7 @@ import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/lib/trpc/client";
 import { SettingsSection } from "@/components/settings/shared";
 import { AvatarPickerDialog } from "../../profile/me/_components/avatar-picker-dialog";
-import { fileToBase64 } from "@/lib/file-to-base64";
+import { uploadImage } from "@/lib/upload-image";
 
 const MAX_HEADER_SIZE = 4 * 1024 * 1024; // 4MB
 
@@ -100,11 +100,11 @@ export function ProfileSection(): React.JSX.Element {
 
     setUploading(true);
     try {
-      const base64 = await fileToBase64(file);
-      setHeaderPreview(base64);
+      const url = await uploadImage("header", file);
+      setHeaderPreview(url);
       setProfileDirty(true);
     } catch {
-      toast.error("Failed to read image");
+      toast.error("Failed to upload image");
     } finally {
       setUploading(false);
     }

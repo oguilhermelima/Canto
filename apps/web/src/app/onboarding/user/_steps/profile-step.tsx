@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { cn } from "@canto/ui/cn";
 import { authClient } from "@/lib/auth-client";
 import { trpc } from "@/lib/trpc/client";
-import { fileToBase64 } from "@/lib/file-to-base64";
+import { uploadImage } from "@/lib/upload-image";
 import type { ConfigureFooter } from "../../_components/onboarding-footer";
 import { StepHeader } from "../../_components/step-header";
 
@@ -110,9 +110,9 @@ export function ProfileStep({
     }
     setUploadingAvatar(true);
     try {
-      setImage(await fileToBase64(file));
+      setImage(await uploadImage("avatar", file));
     } catch {
-      toast.error("Failed to read image");
+      toast.error("Failed to upload image");
     } finally {
       setUploadingAvatar(false);
       if (avatarFileRef.current) avatarFileRef.current.value = "";
@@ -130,9 +130,9 @@ export function ProfileStep({
     }
     setUploadingHeader(true);
     try {
-      setHeaderImage(await fileToBase64(file));
+      setHeaderImage(await uploadImage("header", file));
     } catch {
-      toast.error("Failed to read image");
+      toast.error("Failed to upload image");
     } finally {
       setUploadingHeader(false);
       if (headerFileRef.current) headerFileRef.current.value = "";

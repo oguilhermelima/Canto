@@ -13,7 +13,7 @@ import {
 import { Loader2, Upload, ImageIcon, X } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
-import { fileToBase64 } from "@/lib/file-to-base64";
+import { uploadImage } from "@/lib/upload-image";
 
 const MAX_HEADER_SIZE = 4 * 1024 * 1024; // 4MB
 
@@ -64,10 +64,10 @@ export function ProfileEditDialog({
 
     setUploading(true);
     try {
-      const base64 = await fileToBase64(file);
-      setHeaderPreview(base64);
+      const url = await uploadImage("header", file);
+      setHeaderPreview(url);
     } catch {
-      toast.error("Failed to read image");
+      toast.error("Failed to upload image");
     } finally {
       setUploading(false);
     }

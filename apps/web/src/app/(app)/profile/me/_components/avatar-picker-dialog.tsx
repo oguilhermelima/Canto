@@ -14,7 +14,7 @@ import { cn } from "@canto/ui/cn";
 import { Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
-import { fileToBase64 } from "@/lib/file-to-base64";
+import { uploadImage } from "@/lib/upload-image";
 
 const DEFAULT_AVATARS = [
   { name: "Bear", src: "/avatars/bear.svg" },
@@ -75,8 +75,8 @@ export function AvatarPickerDialog({
 
     setUploading(true);
     try {
-      const base64 = await fileToBase64(file);
-      await authClient.updateUser({ image: base64 });
+      const url = await uploadImage("avatar", file);
+      await authClient.updateUser({ image: url });
       toast.success("Avatar uploaded");
       onOpenChange(false);
       window.location.reload();
