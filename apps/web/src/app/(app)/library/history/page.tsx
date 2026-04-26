@@ -1,12 +1,17 @@
 "use client";
 
+import { useCallback, useMemo, useState } from "react";
 import { BrowseLayout } from "@/components/layout/browse-layout";
-import type { BrowseItem } from "@/components/layout/browse-layout.types";
+import type { BrowseItem, FilterOutput } from "@/components/layout/browse-layout";
 import { historyStrategy } from "@/components/layout/card-strategies";
 import { StateMessage } from "@canto/ui/state-message";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useLibraryBrowse } from "@/hooks/use-library-browse";
 import { useViewMode } from "@/hooks/use-view-mode";
+import {
+  HistoryCalendarFilter,
+  selectedDayToFilter,
+} from "./_components/history-calendar-filter";
 
 const DAY_MS = 86_400_000;
 
@@ -35,10 +40,39 @@ export default function HistoryPage(): React.JSX.Element {
   useDocumentTitle("Watch History");
 
   const [viewMode, setViewMode] = useViewMode("canto.browse.viewMode.history", "list");
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const browse = useLibraryBrowse({ view: "history" });
 
   const sortBy = browse.filters.sortBy;
   const groupByWatchedAt = sortBy === undefined || sortBy === "recently_watched";
+
+  const handleDateSelect = useCallback(
+    (date: Date | null) => {
+      setSelectedDate(date);
+      const next: FilterOutput = { ...browse.filters };
+      if (date) {
+        const range = selectedDayToFilter(date);
+        next.watchedFrom = range.watchedFrom;
+        next.watchedTo = range.watchedTo;
+      } else {
+        delete next.watchedFrom;
+        delete next.watchedTo;
+      }
+      browse.setFilters(next);
+    },
+    [browse],
+  );
+
+  const calendar = useMemo(
+    () => (
+      <HistoryCalendarFilter
+        selected={selectedDate}
+        onSelect={handleDateSelect}
+        className="mb-4"
+      />
+    ),
+    [selectedDate, handleDateSelect],
+  );
 
   return (
     <BrowseLayout
@@ -57,10 +91,15 @@ export default function HistoryPage(): React.JSX.Element {
       mediaType={browse.mediaType}
       onMediaTypeChange={browse.setMediaType}
       groupBy={groupByWatchedAt ? (item: BrowseItem) => formatDayLabel(item.watchedAt) : undefined}
+      header={calendar}
       emptyState={
         <StateMessage
           title="Stellar silence"
-          description="Your watch history will build up here as you journey through movies and shows."
+          description={
+            selectedDate
+              ? "No entries logged on that day."
+              : "Your watch history will build up here as you journey through movies and shows."
+          }
         />
       }
       errorState={browse.isError ? <StateMessage preset="error" onRetry={browse.refetch} /> : undefined}
