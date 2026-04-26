@@ -26,13 +26,19 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days
     updateAge: 60 * 60 * 24, // 1 day
-    // Sign session payload into a cookie so every tRPC call doesn't hit the
-    // session table. Without this, parallel prefetches on hover/scroll can
-    // overlap a slow getSession query, silently return null, and surface as
-    // intermittent 401s in the browser. DB is still consulted every maxAge.
+    // The signed session_data cookie carries the full session+user snapshot,
+    // so reads can verify HMAC and return without touching Postgres. We match
+    // the cookie's maxAge to expiresIn so the cache covers the entire session
+    // lifetime — a shorter TTL forces every request past it back through
+    // findSession+updateSession, which is where the cookie-wipe races live.
+    // Trade-off: server-side changes to user.role/email/name/image stay stale
+    // in the cookie for up to maxAge. changeEmail already wipes the cookie;
+    // for role demotions on a self-hosted box, bump `version` below to force
+    // a cluster-wide cache invalidation on next request.
     cookieCache: {
       enabled: true,
-      maxAge: 5 * 60, // 5 minutes
+      maxAge: 60 * 60 * 24 * 7, // 7 days, matches expiresIn
+      version: "1",
     },
   },
   user: {
