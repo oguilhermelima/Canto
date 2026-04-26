@@ -13,6 +13,13 @@ export const auth = betterAuth({
   trustedOrigins,
   database: drizzleAdapter(db, {
     provider: "pg",
+    // Tells the adapter to skip its default singular→plural rewrite when
+    // building Drizzle relational query includes. Combined with
+    // `experimental.joins`, this makes findSession's `join: { user: true }`
+    // resolve against our `sessionRelations.user` (singular) instead of a
+    // non-existent `users` relation. getQueryModel still resolves model
+    // names via singular-first lookup, so existing table keys keep working.
+    usePlural: true,
     schema: {
       user: schema.user,
       session: schema.session,
@@ -47,6 +54,16 @@ export const auth = betterAuth({
       // headerImage values used to push the signed cookie past Chromium's
       // response-header cap and break sign-in with ERR_RESPONSE_HEADERS_TOO_BIG.
     },
+  },
+  // Required for the Drizzle adapter to honor `join: { user: true }` in
+  // internalAdapter.findSession. Without this, the adapter silently drops
+  // the join, the result has no `user`, and findSession returns null —
+  // which trips deleteSessionCookie inside getSession on any request that
+  // misses the cookieCache (e.g. an SSR/RSC request without session_data),
+  // wiping both session_token and session_data and logging the user out
+  // mid-session. See better-auth issue #4942.
+  experimental: {
+    joins: true,
   },
   databaseHooks: {
     user: {
