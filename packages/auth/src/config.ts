@@ -5,9 +5,25 @@ import * as schema from "@canto/db/schema";
 import { count, sql } from "drizzle-orm";
 import { onboardNewUser } from "@canto/core/domain/user/use-cases/onboard-new-user";
 
+// Self-hosted boxes commonly serve over a LAN IP. If AUTH_TRUSTED_ORIGINS isn't
+// set, prefer BETTER_AUTH_URL (the canonical app origin) over a hardcoded
+// localhost fallback — otherwise sign-in from the LAN device fails with
+// INVALID_ORIGIN even though the user thought everything was configured.
+function defaultTrustedOrigin(): string {
+  const baseUrl = process.env.BETTER_AUTH_URL;
+  if (baseUrl) {
+    try {
+      return new URL(baseUrl).origin;
+    } catch {
+      // fall through
+    }
+  }
+  return "http://localhost:3000";
+}
+
 const trustedOrigins = process.env.AUTH_TRUSTED_ORIGINS
   ? process.env.AUTH_TRUSTED_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean)
-  : ["http://localhost:3000"];
+  : [defaultTrustedOrigin()];
 
 export const auth = betterAuth({
   trustedOrigins,
