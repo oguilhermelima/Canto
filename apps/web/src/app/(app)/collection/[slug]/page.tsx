@@ -231,6 +231,10 @@ export default function ListDetailPage(): React.JSX.Element {
       <CardActionsMenu
         mediaId={item.id}
         mediaTitle={item.title}
+        mediaExternalId={item.externalId}
+        mediaProvider={item.provider}
+        mediaType={item.type}
+        mediaPosterPath={item.posterPath}
         currentListId={listRow.id}
         currentListName={listRow.name}
         canRemove={canSelect}

@@ -19,6 +19,7 @@ import { cn } from "@canto/ui/cn";
 import {
   ArrowRightLeft,
   EllipsisVertical,
+  EyeOff,
   FolderOpen,
   Trash2,
 } from "lucide-react";
@@ -30,6 +31,10 @@ import { MoveItemsDialog } from "./move-items-dialog";
 interface CardActionsMenuProps {
   mediaId: string;
   mediaTitle: string;
+  mediaExternalId: number | string;
+  mediaProvider: string;
+  mediaType: "movie" | "show";
+  mediaPosterPath: string | null;
   currentListId: string;
   currentListName: string;
   canRemove: boolean;
@@ -40,6 +45,10 @@ interface CardActionsMenuProps {
 export function CardActionsMenu({
   mediaId,
   mediaTitle,
+  mediaExternalId,
+  mediaProvider,
+  mediaType,
+  mediaPosterPath,
   currentListId,
   currentListName,
   canRemove,
@@ -77,6 +86,32 @@ export function CardActionsMenu({
     },
     onError: (err) => toast.error(err.message),
   });
+
+  const hideMutation = trpc.userMedia.hideMedia.useMutation({
+    onSuccess: () => {
+      toast.success(`Hid "${mediaTitle}"`);
+      invalidate();
+      void utils.userMedia.getHiddenMedia.invalidate();
+      void utils.userMedia.getHiddenIds.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const handleHide = (): void => {
+    const externalIdNum =
+      typeof mediaExternalId === "number" ? mediaExternalId : Number(mediaExternalId);
+    if (!Number.isFinite(externalIdNum)) {
+      toast.error("Cannot hide this item");
+      return;
+    }
+    hideMutation.mutate({
+      externalId: externalIdNum,
+      provider: mediaProvider,
+      type: mediaType,
+      title: mediaTitle,
+      posterPath: mediaPosterPath,
+    });
+  };
 
   return (
     <div className={cn("group/actions relative", variant === "list" && "flex")}>
@@ -127,6 +162,10 @@ export function CardActionsMenu({
               <FolderOpen className="mr-2 h-4 w-4" />
               Show all collections
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleHide} disabled={hideMutation.isPending}>
+              <EyeOff className="mr-2 h-4 w-4" />
+              Hide this title
+            </DropdownMenuItem>
           </>
         }
         mobileContent={({ close }) => (
@@ -167,6 +206,18 @@ export function CardActionsMenu({
             >
               <FolderOpen className="h-4 w-4" />
               Show all collections
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                close();
+                handleHide();
+              }}
+              disabled={hideMutation.isPending}
+              className="flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"
+            >
+              <EyeOff className="h-4 w-4" />
+              Hide this title
             </button>
           </div>
         )}
