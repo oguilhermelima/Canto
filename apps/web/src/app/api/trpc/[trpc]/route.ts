@@ -54,6 +54,18 @@ const handler = (req: Request): Promise<Response> =>
               role: (fresh.user as { role?: string }).role ?? "user",
             },
           };
+        } else {
+          // The user has a session_token cookie but neither cookieCache nor DB
+          // lookup yielded a session. This is the exact precondition that
+          // would normally trigger deleteSessionCookie — log it so we can spot
+          // a recurrence of the join bug or a new wipe-adjacent regression.
+          const cookieHeader = req.headers.get("cookie") ?? "";
+          if (cookieHeader.includes("better-auth.session_token") || cookieHeader.includes("__Secure-better-auth.session_token")) {
+            console.warn("[auth] session_token present but session resolution failed", {
+              path: new URL(req.url).pathname,
+              hasSessionData: cookieHeader.includes("better-auth.session_data") || cookieHeader.includes("__Secure-better-auth.session_data"),
+            });
+          }
         }
       }
 
