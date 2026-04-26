@@ -64,6 +64,16 @@ export const auth = betterAuth({
         defaultValue: "user",
         input: false,
       },
+      // Surfaced on every tRPC request via the cookieCache so per-request
+      // procedures can localize without an extra `SELECT language FROM user`
+      // round trip. The cookie is rewritten on session refresh, so language
+      // changes propagate within `cookieCache.maxAge` (or immediately if the
+      // user signs out/in). Read fallback in tRPC context is "en-US".
+      language: {
+        type: "string",
+        defaultValue: "en-US",
+        input: false,
+      },
       // bio and headerImage are profile fields fetched via tRPC, not session
       // data. Keeping them off the session keeps cookieCache small — base64
       // headerImage values used to push the signed cookie past Chromium's

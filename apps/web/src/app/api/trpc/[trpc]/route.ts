@@ -11,7 +11,7 @@ const isSecure = (process.env.BETTER_AUTH_URL ?? "").startsWith("https://");
 
 interface CachedSession {
   session: { id: string; createdAt: Date; updatedAt: Date; userId: string; expiresAt: Date; token: string };
-  user: { id: string; name: string; email: string; emailVerified: boolean; createdAt: Date; updatedAt: Date; image?: string | null; role?: string };
+  user: { id: string; name: string; email: string; emailVerified: boolean; createdAt: Date; updatedAt: Date; image?: string | null; role?: string; language?: string };
   updatedAt: number;
   version?: string;
 }
@@ -27,7 +27,7 @@ const handler = (req: Request): Promise<Response> =>
       // This is what every infinite-scroll request lands on.
       const cached = await getCookieCache<CachedSession>(req, { isSecure });
 
-      let session: { user: { id: string; name: string; email: string; role: string } } | null = null;
+      let session: { user: { id: string; name: string; email: string; role: string; language: string } } | null = null;
 
       if (cached) {
         session = {
@@ -36,6 +36,7 @@ const handler = (req: Request): Promise<Response> =>
             name: cached.user.name,
             email: cached.user.email,
             role: cached.user.role ?? "user",
+            language: cached.user.language ?? "en-US",
           },
         };
       } else {
@@ -52,6 +53,7 @@ const handler = (req: Request): Promise<Response> =>
               name: fresh.user.name,
               email: fresh.user.email,
               role: (fresh.user as { role?: string }).role ?? "user",
+              language: (fresh.user as { language?: string }).language ?? "en-US",
             },
           };
         } else {

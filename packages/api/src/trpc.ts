@@ -8,7 +8,21 @@ import { DomainError } from "@canto/core/domain/shared/errors";
 
 export interface Context {
   db: Database;
-  session: { user: { id: string; name: string; email: string; role: string } } | null;
+  session: {
+    user: {
+      id: string;
+      name: string;
+      email: string;
+      role: string;
+      /**
+       * Preferred language code (e.g. "en-US", "pt-BR"). Surfaced from the
+       * better-auth cookieCache so per-request procedures can localize without
+       * a `SELECT language FROM user` round trip. Falls back to "en-US" when
+       * the cookie predates the field.
+       */
+      language: string;
+    };
+  } | null;
 }
 
 const t = initTRPC.context<Context>().create({
