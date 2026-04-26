@@ -17,7 +17,7 @@ export type WatchNextView = "continue" | "watch_next";
 
 export interface WatchNextItem {
   id: string;
-  kind: "continue" | "next_episode" | "next_movie";
+  kind: "continue" | "next_episode" | "next_movie" | "because_watched";
   mediaId: string;
   mediaType: "movie" | "show";
   title: string;
@@ -44,6 +44,11 @@ export interface WatchNextItem {
       }
     | null;
   fromLists: string[];
+  becauseOf?: {
+    mediaId: string;
+    title: string;
+    posterPath: string | null;
+  } | null;
 }
 
 function sourceLabel(source: string): string {
@@ -73,6 +78,10 @@ function itemLabel(item: WatchNextItem): string {
 
   if (item.kind === "next_episode") {
     return `S${String(item.episode?.seasonNumber ?? 0).padStart(2, "0")}E${String(item.episode?.number ?? 0).padStart(2, "0")}${item.episode?.title ? ` · ${item.episode.title}` : ""}`;
+  }
+
+  if (item.kind === "because_watched" && item.becauseOf) {
+    return `Because you watched ${item.becauseOf.title}`;
   }
 
   return "Movie to start";

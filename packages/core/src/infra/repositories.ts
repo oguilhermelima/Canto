@@ -24,6 +24,7 @@ export * from "./profile/home-section-aggregate-repository";
 export * from "./profile/profile-section-repository";
 export * from "./profile/profile-section-aggregate-repository";
 
+export * from "./recommendations/because-watched-repository";
 export * from "./recommendations/user-recommendation-repository";
 
 export * from "./requests/request-repository";

@@ -44,7 +44,7 @@ export interface GetLibraryWatchNextInput {
 
 export interface LegacyMergedItem {
   id: string;
-  kind: "continue" | "next_episode" | "next_movie";
+  kind: "continue" | "next_episode" | "next_movie" | "because_watched";
   mediaId: string;
   mediaType: string;
   title: string;
@@ -59,7 +59,7 @@ export interface LegacyMergedItem {
   year: number | null;
   externalId: number;
   provider: string;
-  source: "jellyfin" | "plex" | "trakt" | "list";
+  source: "jellyfin" | "plex" | "trakt" | "list" | "completion";
   progressSeconds: number;
   durationSeconds: number | null;
   progressPercent: number | null;
@@ -74,6 +74,11 @@ export interface LegacyMergedItem {
     title: string | null;
   } | null;
   fromLists: string[];
+  becauseOf?: {
+    mediaId: string;
+    title: string;
+    posterPath: string | null;
+  } | null;
 }
 
 function toFilterPayload(input: GetLibraryWatchNextInput) {

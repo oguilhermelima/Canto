@@ -1,6 +1,6 @@
-import { and, eq, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { userMediaState } from "@canto/db/schema";
+import { media, userMediaState, userPlaybackProgress } from "@canto/db/schema";
 
 export async function findUserMediaState(db: Database, userId: string, mediaId: string) {
   return db.query.userMediaState.findFirst({
@@ -61,6 +61,108 @@ export interface UserEngagementStateRow {
   updatedAt: Date;
 }
 
+export interface RecentlyCompletedMediaRow {
+  mediaId: string;
+  title: string;
+  posterPath: string | null;
+  type: "movie" | "show";
+  completedAt: Date;
+}
+
+/**
+ * Recently completed media. Two signals merged:
+ *
+ * - `userMediaState.status = 'completed'` — explicit (manual or sync from
+ *   Trakt/Plex/Jellyfin marking the show finished)
+ * - `userPlaybackProgress.isCompleted = true AND episodeId IS NULL` —
+ *   implicit, only meaningful for movies (there is no whole-show playback
+ *   progress row).
+ *
+ * If both fire for the same mediaId, we keep the more recent timestamp.
+ * `mediaType` filters the output without affecting the signal source.
+ */
+export async function findRecentlyCompletedMedia(
+  db: Database,
+  userId: string,
+  mediaType: "movie" | "show" | undefined,
+  limit: number,
+): Promise<RecentlyCompletedMediaRow[]> {
+  const explicit = await db
+    .select({
+      mediaId: userMediaState.mediaId,
+      title: media.title,
+      posterPath: media.posterPath,
+      type: media.type,
+      completedAt: userMediaState.updatedAt,
+    })
+    .from(userMediaState)
+    .innerJoin(media, eq(media.id, userMediaState.mediaId))
+    .where(
+      and(
+        eq(userMediaState.userId, userId),
+        eq(userMediaState.status, "completed"),
+        mediaType ? eq(media.type, mediaType) : undefined,
+      ),
+    )
+    .orderBy(desc(userMediaState.updatedAt))
+    .limit(limit * 2);
+
+  const implicit =
+    !mediaType || mediaType === "movie"
+      ? await db
+          .select({
+            mediaId: userPlaybackProgress.mediaId,
+            title: media.title,
+            posterPath: media.posterPath,
+            type: media.type,
+            completedAt: userPlaybackProgress.lastWatchedAt,
+          })
+          .from(userPlaybackProgress)
+          .innerJoin(media, eq(media.id, userPlaybackProgress.mediaId))
+          .where(
+            and(
+              eq(userPlaybackProgress.userId, userId),
+              eq(userPlaybackProgress.isCompleted, true),
+              sql`${userPlaybackProgress.episodeId} IS NULL`,
+              sql`${userPlaybackProgress.deletedAt} IS NULL`,
+              isNotNull(userPlaybackProgress.lastWatchedAt),
+              eq(media.type, "movie"),
+            ),
+          )
+          .orderBy(desc(userPlaybackProgress.lastWatchedAt))
+          .limit(limit * 2)
+      : [];
+
+  const merged = new Map<string, RecentlyCompletedMediaRow>();
+  for (const row of explicit) {
+    if (row.type !== "movie" && row.type !== "show") continue;
+    merged.set(row.mediaId, {
+      mediaId: row.mediaId,
+      title: row.title,
+      posterPath: row.posterPath,
+      type: row.type,
+      completedAt: row.completedAt,
+    });
+  }
+  for (const row of implicit) {
+    if (row.type !== "movie" && row.type !== "show") continue;
+    if (!row.completedAt) continue;
+    const existing = merged.get(row.mediaId);
+    if (!existing || row.completedAt > existing.completedAt) {
+      merged.set(row.mediaId, {
+        mediaId: row.mediaId,
+        title: row.title,
+        posterPath: row.posterPath,
+        type: row.type,
+        completedAt: row.completedAt,
+      });
+    }
+  }
+
+  return [...merged.values()]
+    .sort((a, b) => b.completedAt.getTime() - a.completedAt.getTime())
+    .slice(0, limit);
+}
 
 /**
  * All non-neutral states for a user: anything with a status, rating, or

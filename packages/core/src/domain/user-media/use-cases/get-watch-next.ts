@@ -8,10 +8,21 @@ import {
   findUserMediaStatesByMediaIds,
   findUserWatchHistoryByMediaIds,
   findUserWatchingShowsMetadata,
-  type LibraryFeedFilterOptions,
 } from "../../../infra/repositories";
 import { getUserLanguage } from "../../shared/services/user-service";
 import { hasConfirmedPastAirDate, toProgressPercent } from "../rules/user-media-rules";
+import { buildBecauseWatched } from "./build-because-watched";
+import type {
+  GetWatchNextInput,
+  GetWatchNextResult,
+  WatchNextItem,
+} from "../types/watch-next";
+
+export type {
+  GetWatchNextInput,
+  GetWatchNextResult,
+  WatchNextItem,
+} from "../types/watch-next";
 
 // JS-side ranking budget. We pull at most CANDIDATE_MULTIPLIER * limit list
 // rows + watching shows, sort, and slice. If the user genuinely has more
@@ -19,64 +30,6 @@ import { hasConfirmedPastAirDate, toProgressPercent } from "../rules/user-media-
 // than a runaway query that times out the whole page.
 const CANDIDATE_MULTIPLIER = 5;
 const MIN_CANDIDATE_BUDGET = 60;
-
-export interface GetWatchNextInput {
-  limit: number;
-  cursor?: number | null;
-  mediaType?: "movie" | "show";
-  q?: string;
-  source?: LibraryFeedFilterOptions["source"];
-  yearMin?: number;
-  yearMax?: number;
-  genreIds?: number[];
-  sortBy?: LibraryFeedFilterOptions["sortBy"];
-  scoreMin?: number;
-  scoreMax?: number;
-  runtimeMin?: number;
-  runtimeMax?: number;
-  language?: string;
-  certification?: string;
-  tvStatus?: string;
-}
-
-export interface WatchNextItem {
-  id: string;
-  kind: "next_episode" | "next_movie";
-  mediaId: string;
-  mediaType: string;
-  title: string;
-  posterPath: string | null;
-  backdropPath: string | null;
-  logoPath: string | null;
-  overview: string | null;
-  voteAverage: number | null;
-  genres: unknown;
-  genreIds: unknown;
-  trailerKey: string | null;
-  year: number | null;
-  externalId: number;
-  provider: string;
-  source: "list";
-  progressSeconds: 0;
-  durationSeconds: null;
-  progressPercent: number | null;
-  progressValue: number | null;
-  progressTotal: number | null;
-  progressUnit: "episodes" | null;
-  watchedAt: Date;
-  episode: {
-    id: string;
-    seasonNumber: number | null;
-    number: number | null;
-    title: string | null;
-  } | null;
-  fromLists: string[];
-}
-
-export interface GetWatchNextResult {
-  items: WatchNextItem[];
-  nextCursor: number | null;
-}
 
 interface ListCandidate {
   mediaId: string;
@@ -112,11 +65,15 @@ type StateRow = Awaited<
 >[number];
 
 /**
- * Watch Next feed — next-episode suggestions for shows the user is tracking.
+ * Watch Next feed — combines two sources:
  *
- * Replaces the `getLibraryWatchNext` slow path for the "watch_next" view.
- * Movies are intentionally not surfaced here (matches old behaviour: the
- * legacy code only emitted next_episode items).
+ * 1. **Next-episode items** for shows the user is tracking (current behaviour).
+ * 2. **"Because you watched X"** items: top recs derived from the user's
+ *    most recent completions. Movie or show, depending on the filter.
+ *
+ * Items are merged, deduplicated by `mediaId` (next-episode wins when there
+ * is overlap — it's a stronger signal), then sorted by `watchedAt` so the
+ * most recent activity surfaces first.
  *
  * Pagination is offset-based because the final ranking is JS-side. We pull
  * at most CANDIDATE_MULTIPLIER * limit candidate rows from each source, so
@@ -131,19 +88,67 @@ export async function getWatchNext(
 ): Promise<GetWatchNextResult> {
   const limit = input.limit;
   const cursor = input.cursor ?? 0;
-  const now = new Date();
+
+  const userLang = await getUserLanguage(db, userId);
+
+  // Next-episode items only make sense for shows. The because-watched
+  // builder is run in parallel regardless of mediaType — for movies it
+  // returns only movie-typed recs, for shows it can mix in finished-series
+  // suggestions.
+  const [nextEpisodeItems, becauseWatchedItems] = await Promise.all([
+    input.mediaType === "movie"
+      ? Promise.resolve<WatchNextItem[]>([])
+      : buildShowNextEpisodeItems(db, userId, userLang, input, cursor, limit),
+    buildBecauseWatched(db, userId, input.mediaType, userLang),
+  ]);
+
+  const nextEpisodeMediaIds = new Set(
+    nextEpisodeItems.map((item) => item.mediaId),
+  );
+  const filteredBecauseWatched = becauseWatchedItems.filter(
+    (item) => !nextEpisodeMediaIds.has(item.mediaId),
+  );
+
+  const allItems = [...nextEpisodeItems, ...filteredBecauseWatched];
+  if (allItems.length === 0) return { items: [], nextCursor: null };
+
+  allItems.sort((a, b) => b.watchedAt.getTime() - a.watchedAt.getTime());
+
+  const pageItems = allItems.slice(cursor, cursor + limit);
+  const nextCursor =
+    cursor + limit < allItems.length ? cursor + limit : null;
+
+  // Trailer keys batched for the page only — the because-watched builder
+  // already attaches its own trailers, so only patch items missing one.
+  const missingTrailerIds = pageItems
+    .filter((item) => !item.trailerKey)
+    .map((item) => item.mediaId);
+  const trailerByMediaId = await findTrailerKeysForMediaIds(
+    db,
+    missingTrailerIds,
+  );
+  const decoratedItems = pageItems.map((item) =>
+    item.trailerKey
+      ? item
+      : { ...item, trailerKey: trailerByMediaId.get(item.mediaId) ?? null },
+  );
+
+  return { items: decoratedItems, nextCursor };
+}
+
+async function buildShowNextEpisodeItems(
+  db: Database,
+  userId: string,
+  userLang: string,
+  input: GetWatchNextInput,
+  cursor: number,
+  limit: number,
+): Promise<WatchNextItem[]> {
   const candidateBudget = Math.max(
     MIN_CANDIDATE_BUDGET,
     (cursor + limit) * CANDIDATE_MULTIPLIER,
   );
-
-  // movies don't generate next_episode items — short-circuit so we don't
-  // spend round-trips on candidates we'll discard.
-  if (input.mediaType === "movie") {
-    return { items: [], nextCursor: null };
-  }
-
-  const userLang = await getUserLanguage(db, userId);
+  const now = new Date();
 
   const [listMediaRows, watchingShows, continueMediaIds] = await Promise.all([
     findUserListMediaCandidates(
@@ -168,9 +173,7 @@ export async function getWatchNext(
     listMediaMap.set(mediaId, candidate);
   }
 
-  if (listMediaMap.size === 0) {
-    return { items: [], nextCursor: null };
-  }
+  if (listMediaMap.size === 0) return [];
 
   const candidateMediaIds = [...listMediaMap.keys()];
   const [states, historyRows, completedPlaybackRows, episodeRows] =
@@ -188,7 +191,7 @@ export async function getWatchNext(
   const episodesByMediaId = buildEpisodesIndex(episodeRows);
   const lastActivityByMediaId = buildLastActivityIndex(historyRows);
 
-  const allItems = buildNextEpisodeItems({
+  return buildNextEpisodeItems({
     listMediaMap,
     stateByMediaId,
     historyByMediaId,
@@ -196,25 +199,6 @@ export async function getWatchNext(
     lastActivityByMediaId,
     now,
   });
-
-  allItems.sort((a, b) => b.watchedAt.getTime() - a.watchedAt.getTime());
-
-  const pageItems = allItems.slice(cursor, cursor + limit);
-  const nextCursor =
-    cursor + limit < allItems.length ? cursor + limit : null;
-
-  // Trailer keys batched for the page only — we don't need them for items
-  // we already sliced off.
-  const trailerByMediaId = await findTrailerKeysForMediaIds(
-    db,
-    pageItems.map((item) => item.mediaId),
-  );
-  const decoratedItems = pageItems.map((item) => ({
-    ...item,
-    trailerKey: trailerByMediaId.get(item.mediaId) ?? null,
-  }));
-
-  return { items: decoratedItems, nextCursor };
 }
 
 function buildListCandidateMap(
@@ -428,6 +412,7 @@ function buildNextEpisodeItems(params: BuildItemsParams): WatchNextItem[] {
         title: nextEpisode.episodeTitle,
       },
       fromLists,
+      becauseOf: null,
     });
   }
 
