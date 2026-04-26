@@ -43,7 +43,6 @@ export function UserMediaSource({ sectionId, title, style, filter }: UserMediaSo
       posterPath: item.posterPath,
       backdropPath: item.backdropPath,
       logoPath: item.logoPath,
-      trailerKey: item.trailerKey,
       overview: item.overview,
       voteAverage: item.voteAverage,
       genres: (item.genres as string[] | null) ?? undefined,
