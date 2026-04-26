@@ -48,6 +48,19 @@ export const auth = betterAuth({
       // response-header cap and break sign-in with ERR_RESPONSE_HEADERS_TOO_BIG.
     },
   },
+  // Without this, the drizzle adapter silently drops the `join` parameter,
+  // so internalAdapter.findSession's `findOne({ join: { user: true } })`
+  // returns the session row alone — and findSession bails with `if (!user)
+  // return null`. That null trips deleteSessionCookie inside getSession on
+  // any request that misses the cookieCache (e.g. an SSR/RSC fetch without
+  // the session_data cookie), wiping both session_token and session_data
+  // and logging the user out mid-session. The companion piece is the
+  // `users` plural relation alias on session/account in `@canto/db/schema`,
+  // which is what the adapter's plural-suffixed `with: { users: ... }`
+  // clause resolves against. See better-auth issue #4942.
+  experimental: {
+    joins: true,
+  },
   databaseHooks: {
     user: {
       create: {
