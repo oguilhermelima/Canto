@@ -1,11 +1,28 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { eq } from "drizzle-orm";
+import { getCookieCache } from "better-auth/cookies";
+import { db } from "@canto/db/client";
+import { user } from "@canto/db/schema";
+import { getSetting } from "@canto/db/settings";
 
 const publicPaths = ["/login", "/register", "/api/auth", "/api/trpc", "/api/avatar", "/icon"];
 
 /** Routes that require the admin role — non-admins see a 404. */
 const ADMIN_ROUTES = ["/manage", "/download", "/torrents"];
 const ADMIN_ROUTE_PATTERNS: RegExp[] = [];
+
+// Self-hosted boxes typically run plain HTTP behind a LAN IP, so cookies are
+// written without the __Secure- prefix. getCookieCache defaults to
+// isProduction → __Secure- and would silently miss every read otherwise.
+const isSecure = (process.env.BETTER_AUTH_URL ?? "").startsWith("https://");
+
+interface CachedSession {
+  session: { id: string; createdAt: Date; updatedAt: Date; userId: string; expiresAt: Date; token: string };
+  user: { id: string; name: string; email: string; emailVerified: boolean; createdAt: Date; updatedAt: Date; role?: string };
+  updatedAt: number;
+  version?: string;
+}
 
 function isAdminRoute(pathname: string): boolean {
   if (ADMIN_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"))) return true;
@@ -44,25 +61,14 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
-  // ── Admin route guard ──
-  // Fetch the session once for both the admin check and onboarding validation.
-  // better-auth's get-session returns { session, user } with user.role.
-  let userRole: string | undefined;
-  try {
-    const sessionRes = await fetch(new URL("/api/auth/get-session", request.url), {
-      headers: { cookie: request.headers.get("cookie") ?? "" },
-    });
-    if (sessionRes.ok) {
-      const session = (await sessionRes.json()) as { user?: { role?: string } } | null;
-      userRole = session?.user?.role;
-    }
-    // Don't wipe cookies on non-2xx — a transient 5xx (DB blip, slow query)
-    // would log the user out for what's actually a backend hiccup. Let the
-    // request through; tRPC will throw UNAUTHORIZED downstream if the session
-    // is genuinely invalid, and the client can recover via re-login.
-  } catch {
-    // If session check fails, let the app handle it
-  }
+  // Verify the signed session_data cookie locally — no internal fetch, no
+  // chance of a transient 5xx triggering the old cookie-wipe path. If the
+  // cookie is missing or invalid, fall through with no role; the admin route
+  // gate will treat the user as non-admin and the protected app routes will
+  // 401 downstream.
+  const cached = await getCookieCache<CachedSession>(request, { isSecure });
+  const userId = cached?.user.id;
+  const userRole = cached?.user.role;
 
   if (isAdminRoute(pathname) && userRole !== "admin") {
     return NextResponse.rewrite(new URL("/not-found", request.url));
@@ -76,32 +82,23 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   //     after system onboarding is complete (including admins who skipped it,
   //     though the admin finish path auto-marks it done).
   try {
-    const systemUrl = new URL("/api/trpc/settings.isOnboardingCompleted", request.url);
-    const systemRes = await fetch(systemUrl, {
-      headers: { cookie: request.headers.get("cookie") ?? "" },
-    });
-    if (systemRes.ok) {
-      const data = (await systemRes.json()) as { result?: { data?: { json?: boolean } } };
-      const systemDone = data.result?.data?.json === true;
-      if (!systemDone) {
-        if (userRole === "admin") {
-          return NextResponse.redirect(new URL("/onboarding", request.url));
-        }
-      } else {
-        const userUrl = new URL("/api/trpc/auth.isOnboardingCompleted", request.url);
-        const userRes = await fetch(userUrl, {
-          headers: { cookie: request.headers.get("cookie") ?? "" },
-        });
-        if (userRes.ok) {
-          const userData = (await userRes.json()) as { result?: { data?: { json?: boolean } } };
-          if (userData.result?.data?.json !== true) {
-            return NextResponse.redirect(new URL("/onboarding/user", request.url));
-          }
-        }
+    const systemDone = (await getSetting("onboarding.completed")) === true;
+    if (!systemDone) {
+      if (userRole === "admin") {
+        return NextResponse.redirect(new URL("/onboarding", request.url));
+      }
+    } else if (userId) {
+      const [row] = await db
+        .select({ completed: user.onboardingCompleted })
+        .from(user)
+        .where(eq(user.id, userId));
+      if (row?.completed !== true) {
+        return NextResponse.redirect(new URL("/onboarding/user", request.url));
       }
     }
   } catch {
-    // If check fails, let the app handle it
+    // If the DB read fails, let the app handle it — better to render and risk
+    // a stale onboarding state than to stall every navigation on a backend hiccup.
   }
 
   return NextResponse.next();
@@ -111,4 +108,5 @@ export const config = {
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|woff2?|ttf|css|js|map)).*)",
   ],
+  runtime: "nodejs",
 };
