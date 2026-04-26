@@ -294,14 +294,23 @@ export async function findUserRecommendations(
 ): Promise<UserRecommendationReadRow[]> {
   const useTranslations = !!language && !language.startsWith("en");
 
+  // Anti-join exclusion via NOT EXISTS — scales with library size in O(1)
+  // index lookups per row, instead of an O(N) chain of OR predicates.
   const excludeClause =
     excludeItems.length > 0
-      ? sql`AND NOT (${sql.join(
-          excludeItems.map(
-            (item) => sql`(${userRecommendation.externalId} = ${item.externalId} AND ${userRecommendation.provider} = ${item.provider})`,
-          ),
-          sql` OR `,
-        )})`
+      ? sql`AND NOT EXISTS (
+          SELECT 1 FROM media excl
+          WHERE excl.id = ${userRecommendation.mediaId}
+            AND excl.in_library = true
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM list_item excl_li
+          INNER JOIN list excl_l ON excl_l.id = excl_li.list_id
+          WHERE excl_li.media_id = ${userRecommendation.mediaId}
+            AND excl_l.user_id = ${userId}
+            AND excl_l.deleted_at IS NULL
+            AND excl_l.type != 'server'
+        )`
       : sql``;
 
   const filterConditions = buildRecsFilterConditions(filters, USER_REC_COLUMNS);
@@ -482,14 +491,23 @@ export async function findUserSpotlightItems(
 ): Promise<UserRecommendationReadRow[]> {
   const useTranslations = !!language && !language.startsWith("en");
 
+  // Anti-join exclusion via NOT EXISTS — scales with library size in O(1)
+  // index lookups per row, instead of an O(N) chain of OR predicates.
   const excludeClause =
     excludeItems.length > 0
-      ? sql`AND NOT (${sql.join(
-          excludeItems.map(
-            (item) => sql`(${userRecommendation.externalId} = ${item.externalId} AND ${userRecommendation.provider} = ${item.provider})`,
-          ),
-          sql` OR `,
-        )})`
+      ? sql`AND NOT EXISTS (
+          SELECT 1 FROM media excl
+          WHERE excl.id = ${userRecommendation.mediaId}
+            AND excl.in_library = true
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM list_item excl_li
+          INNER JOIN list excl_l ON excl_l.id = excl_li.list_id
+          WHERE excl_li.media_id = ${userRecommendation.mediaId}
+            AND excl_l.user_id = ${userId}
+            AND excl_l.deleted_at IS NULL
+            AND excl_l.type != 'server'
+        )`
       : sql``;
 
   const baseSelect = {

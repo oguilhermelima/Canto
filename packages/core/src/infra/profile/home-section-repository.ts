@@ -45,10 +45,11 @@ export async function seedHomeSectionsForUser(
     config: HomeSectionConfig;
     enabled: boolean;
   }>,
-): Promise<void> {
-  await db.insert(homeSection).values(
-    defaults.map((s) => ({ ...s, userId })),
-  );
+) {
+  return db
+    .insert(homeSection)
+    .values(defaults.map((s) => ({ ...s, userId })))
+    .returning();
 }
 
 export async function deleteHomeSections(

@@ -222,29 +222,26 @@ export async function findLibraryMediaBrief(db: Database, limit = 100) {
 }
 
 export async function findLibraryStats(db: Database) {
-  const [totalRow] = await db
-    .select({ total: count() })
-    .from(media)
-    .where(eq(media.inLibrary, true));
+  // 3 COUNTs collapsed into one scan via FILTER. Storage scans a different
+  // table so it stays parallel.
+  const [statsRows, [storageRow]] = await Promise.all([
+    db
+      .select({
+        total: sql<number>`COUNT(*) FILTER (WHERE ${media.inLibrary} = true)`.mapWith(Number),
+        movies: sql<number>`COUNT(*) FILTER (WHERE ${media.inLibrary} = true AND ${media.type} = 'movie')`.mapWith(Number),
+        shows: sql<number>`COUNT(*) FILTER (WHERE ${media.inLibrary} = true AND ${media.type} = 'show')`.mapWith(Number),
+      })
+      .from(media),
+    db
+      .select({ totalBytes: sql<string>`COALESCE(SUM(${mediaFile.sizeBytes}), 0)` })
+      .from(mediaFile),
+  ]);
 
-  const [moviesRow] = await db
-    .select({ total: count() })
-    .from(media)
-    .where(and(eq(media.inLibrary, true), eq(media.type, "movie")));
-
-  const [showsRow] = await db
-    .select({ total: count() })
-    .from(media)
-    .where(and(eq(media.inLibrary, true), eq(media.type, "show")));
-
-  const [storageRow] = await db
-    .select({ totalBytes: sql<string>`COALESCE(SUM(${mediaFile.sizeBytes}), 0)` })
-    .from(mediaFile);
-
+  const statsRow = statsRows[0];
   return {
-    total: totalRow?.total ?? 0,
-    movies: moviesRow?.total ?? 0,
-    shows: showsRow?.total ?? 0,
+    total: statsRow?.total ?? 0,
+    movies: statsRow?.movies ?? 0,
+    shows: statsRow?.shows ?? 0,
     storageBytes: BigInt(storageRow?.totalBytes ?? "0"),
   };
 }
