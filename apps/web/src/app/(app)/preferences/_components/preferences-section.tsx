@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@canto/ui/button";
 import { Switch } from "@canto/ui/switch";
 import { Skeleton } from "@canto/ui/skeleton";
@@ -22,6 +23,7 @@ import { SettingsSection } from "@/components/settings/shared";
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
 export function PreferencesSection(): React.JSX.Element {
+  const router = useRouter();
   const utils = trpc.useUtils();
   const { data: _allSettings } = trpc.settings.getAll.useQuery();
   const setMany = trpc.settings.setMany.useMutation({
@@ -31,9 +33,7 @@ export function PreferencesSection(): React.JSX.Element {
   /* Language */
   const { data: currentLanguage } = trpc.settings.getUserLanguage.useQuery();
   const { data: supportedLanguages } = trpc.settings.getSupportedLanguages.useQuery();
-  const setUserLanguage = trpc.settings.setUserLanguage.useMutation({
-    onSuccess: () => void utils.settings.getUserLanguage.invalidate(),
-  });
+  const setUserLanguage = trpc.settings.setUserLanguage.useMutation();
 
   const handleLanguageChange = (value: string): void => {
     setUserLanguage.mutate(
@@ -42,11 +42,14 @@ export function PreferencesSection(): React.JSX.Element {
         onSuccess: () => {
           setMany.mutate({ settings: [{ key: "general.language", value }] });
           toast.success("Language updated. Items will translate as you visit them.");
-          // Invalidate media-related queries so UI reflects new language
-          void utils.media.resolve.invalidate();
-          void utils.library.list.invalidate();
-          void utils.homeSection.invalidate();
-          void utils.media.getById.invalidate();
+          // Almost every server-driven view (spotlight, recs, library, watch
+          // next, profile, lists, search …) reads from the per-request
+          // language overlay, so a precise invalidation list rots the moment
+          // a new language-aware endpoint ships. Nuke React Query and refresh
+          // server components — language change is rare enough that the cost
+          // is negligible vs the maintenance hazard of a partial list.
+          void utils.invalidate();
+          router.refresh();
         },
         onError: () => toast.error("Failed to update language"),
       },

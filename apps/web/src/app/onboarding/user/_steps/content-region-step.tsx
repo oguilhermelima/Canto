@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Globe } from "lucide-react";
 import { Switch } from "@canto/ui/switch";
 import { Skeleton } from "@canto/ui/skeleton";
@@ -24,11 +25,15 @@ export function ContentRegionStep({
   onNext: () => void;
   configureFooter: ConfigureFooter;
 }): React.JSX.Element {
+  const router = useRouter();
   const utils = trpc.useUtils();
   const { data: currentLanguage } = trpc.settings.getUserLanguage.useQuery();
   const { data: supportedLanguages } = trpc.settings.getSupportedLanguages.useQuery();
   const setUserLanguage = trpc.settings.setUserLanguage.useMutation({
-    onSuccess: () => void utils.settings.getUserLanguage.invalidate(),
+    onSuccess: () => {
+      void utils.invalidate();
+      router.refresh();
+    },
   });
 
   const { region, setRegion } = useWatchRegion();

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Skeleton } from "@canto/ui/skeleton";
 import { Button } from "@canto/ui/button";
 import { Badge } from "@canto/ui/badge";
@@ -1286,6 +1287,7 @@ function PlexServerSection(): React.JSX.Element {
 /* -------------------------------------------------------------------------- */
 
 export function MetadataSettingsSection(): React.JSX.Element {
+  const router = useRouter();
   const utils = trpc.useUtils();
   const { data: allSettings } = trpc.settings.getAll.useQuery();
   const setMany = trpc.settings.setMany.useMutation({
@@ -1295,9 +1297,7 @@ export function MetadataSettingsSection(): React.JSX.Element {
 
   const { data: currentLanguage } = trpc.settings.getUserLanguage.useQuery();
   const { data: supportedLanguages } = trpc.settings.getSupportedLanguages.useQuery();
-  const setUserLanguage = trpc.settings.setUserLanguage.useMutation({
-    onSuccess: () => void utils.settings.getUserLanguage.invalidate(),
-  });
+  const setUserLanguage = trpc.settings.setUserLanguage.useMutation();
   const isConnected = !!allSettings?.["tvdb.token"];
   const defaultShows = allSettings?.["tvdb.defaultShows"] === true;
 
@@ -1309,6 +1309,11 @@ export function MetadataSettingsSection(): React.JSX.Element {
           // Also update global setting for pool items / browse
           setMany.mutate({ settings: [{ key: "general.language", value }] });
           toast.success("Language updated. Items will translate as you visit them.");
+          // Drop every cached query and refresh server components — the
+          // language overlay is per-request, so a partial invalidation list
+          // becomes stale the moment a new endpoint joins the i18n surface.
+          void utils.invalidate();
+          router.refresh();
         },
         onError: () => toast.error("Failed to update language"),
       },
