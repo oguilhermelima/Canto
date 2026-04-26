@@ -1,15 +1,18 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@canto/ui/cn";
+import { useGoBack } from "@/hooks/use-go-back";
 
 export type TitleBarProps = {
   title?: string;
   className?: string;
   border?: boolean;
   variant?: "back" | "none";
+  /** Override the back navigation. */
   onNavigate?: () => void;
+  /** Fallback path used when there's no in-app history to pop. */
+  fallback?: string;
 };
 
 export function TitleBar({
@@ -18,24 +21,9 @@ export function TitleBar({
   border = true,
   variant = "back",
   onNavigate,
+  fallback,
 }: TitleBarProps): React.JSX.Element {
-  const router = useRouter();
-
-  const handleBack = (): void => {
-    const fromSameOrigin = (() => {
-      try {
-        return !!document.referrer && new URL(document.referrer).origin === window.location.origin;
-      } catch {
-        return false;
-      }
-    })();
-
-    if (fromSameOrigin) {
-      router.back();
-    } else {
-      router.push("/");
-    }
-  };
+  const goBack = useGoBack(fallback);
 
   return (
     <div
@@ -49,7 +37,7 @@ export function TitleBar({
         {variant === "back" && (
           <button
             type="button"
-            onClick={onNavigate ?? handleBack}
+            onClick={onNavigate ?? goBack}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-foreground"
           >
             <ArrowLeft className="h-5 w-5" />

@@ -2,28 +2,36 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { ArrowLeft } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "../lib/utils";
 
 export type PageHeaderProps = {
   title: string;
   subtitle?: string;
+  icon?: LucideIcon;
   children?: ReactNode;
   action?: ReactNode;
+  /**
+   * Renders inline navigation (e.g. TabBar) at the bottom of the header block,
+   * visually grouped with the title.
+   */
+  tabs?: ReactNode;
   className?: string;
-  /** Called when the back button is pressed */
-  onBack?: () => void;
-  /** Sticky header rendered at top of viewport when the h1 scrolls out of view */
+  /**
+   * Sticky header rendered at top of viewport when the h1 scrolls out of view.
+   * Mobile-only navigation lives here — desktop relies on browser/topbar nav.
+   */
   stickyHeader?: (isTitleVisible: boolean) => ReactNode;
 };
 
 export function PageHeader({
   title,
   subtitle,
+  icon: Icon,
   children,
   action,
+  tabs,
   className,
-  onBack,
   stickyHeader,
 }: PageHeaderProps): React.JSX.Element {
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -45,31 +53,38 @@ export function PageHeader({
   return (
     <>
       {stickyHeader?.(isTitleVisible)}
-      <div className={cn("px-4 pt-16 pb-5 md:px-8 md:pt-8 md:pb-8 lg:px-12 xl:px-16 2xl:px-24", className)}>
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <h1
-              className="flex items-center gap-3 text-2xl font-bold tracking-tight text-foreground md:text-3xl"
-              ref={titleRef}
-            >
-              {onBack && (
-                <button
-                  type="button"
-                  onClick={onBack}
-                  className="hidden shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:text-foreground md:flex"
-                >
-                  <ArrowLeft size={24} />
-                </button>
+      <div
+        className={cn(
+          "px-4 pt-12 md:px-8 md:pt-16 lg:px-12 xl:px-16 2xl:px-24",
+          tabs ? "pb-0" : "pb-6 md:pb-8",
+          className,
+        )}
+      >
+        <div className="flex items-end justify-between gap-4">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <div className="flex items-center gap-3 xl:gap-4">
+              {Icon && (
+                <div className="flex shrink-0 items-center justify-center text-foreground">
+                  <Icon className="h-7 w-7 lg:h-9 lg:w-9 xl:h-11 xl:w-11" />
+                </div>
               )}
-              {title}
-            </h1>
+              <h1
+                className="text-left text-4xl font-medium tracking-tight text-foreground lg:text-5xl 2xl:text-6xl"
+                ref={titleRef}
+              >
+                {title}
+              </h1>
+            </div>
             {subtitle && (
-              <p className="mt-1.5 text-sm text-muted-foreground md:pl-9">{subtitle}</p>
+              <p className="text-left text-base text-foreground/70 lg:text-lg">
+                {subtitle}
+              </p>
             )}
-            {children && <div className="mt-1.5">{children}</div>}
+            {children && <div>{children}</div>}
           </div>
-          {action && <div className="shrink-0">{action}</div>}
+          {action && <div className="shrink-0 self-end">{action}</div>}
         </div>
+        {tabs && <div className="mt-6 md:mt-8">{tabs}</div>}
       </div>
     </>
   );

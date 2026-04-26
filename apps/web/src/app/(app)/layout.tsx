@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { Toaster } from "sonner";
 import { Topbar } from "@/components/layout/topbar";
 import { BottomNavbar } from "@/components/layout/bottom-navbar";
+import { useTrackNavigationOrigin } from "@/hooks/use-go-back";
 import { trpc } from "@/lib/trpc/client";
 
 const SYNC_DEBOUNCE_MS = 30_000;
@@ -72,6 +73,7 @@ export default function AppLayout({
 }): React.JSX.Element {
   useReverseSyncOnFocus();
   useScrollPauseClass();
+  useTrackNavigationOrigin();
 
   return (
     <div className="min-h-screen bg-background">
