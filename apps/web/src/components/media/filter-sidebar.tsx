@@ -274,6 +274,16 @@ export function FilterSidebar({
 
   // Local state — seeded from URL params
   const [q, setQ] = useState(searchParams.get("q") ?? "");
+
+  // Keep `q` synced with the URL when it's updated externally (e.g. the
+  // /search page's own debounced input). Without this, our URL-sync effect
+  // below would re-emit the stale local value (often "") and clobber the
+  // search page's update — which manifested as the input clearing itself
+  // after the user stopped typing.
+  const urlQ = searchParams.get("q") ?? "";
+  useEffect(() => {
+    setQ(urlQ);
+  }, [urlQ]);
   const [selectedGenres, setSelectedGenres] = useState<Set<number>>(() => parseSet(searchParams.get("genre")));
   const [genreMode, setGenreMode] = useState<"and" | "or">((searchParams.get("genreMode") ?? "or") as "and" | "or");
   const [sortBy, setSortBy] = useState(searchParams.get("sort") ?? (isLibrary ? "recently_watched" : "popularity.desc"));
