@@ -55,14 +55,11 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     if (sessionRes.ok) {
       const session = (await sessionRes.json()) as { user?: { role?: string } } | null;
       userRole = session?.user?.role;
-    } else {
-      // Session is invalid — clear the stale cookie and redirect to login
-      const loginUrl = new URL("/login", request.url);
-      const response = NextResponse.redirect(loginUrl);
-      response.cookies.delete("better-auth.session_token");
-      response.cookies.delete("__Secure-better-auth.session_token");
-      return response;
     }
+    // Don't wipe cookies on non-2xx — a transient 5xx (DB blip, slow query)
+    // would log the user out for what's actually a backend hiccup. Let the
+    // request through; tRPC will throw UNAUTHORIZED downstream if the session
+    // is genuinely invalid, and the client can recover via re-login.
   } catch {
     // If session check fails, let the app handle it
   }
