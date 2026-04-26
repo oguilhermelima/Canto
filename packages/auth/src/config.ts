@@ -54,7 +54,10 @@ export const auth = betterAuth({
     cookieCache: {
       enabled: true,
       maxAge: 60 * 60 * 24 * 7, // 7 days, matches expiresIn
-      version: "1",
+      // v2 — invalidates caches issued before `language` propagated through
+      // the session. Without the bump, stale "en-US" cookies survive until
+      // their natural expiry, defeating the per-request i18n overlay.
+      version: "2",
     },
   },
   user: {
