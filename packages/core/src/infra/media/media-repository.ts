@@ -4,6 +4,7 @@ import {
   count,
   desc,
   eq,
+  getTableColumns,
   gte,
   ilike,
   inArray,
@@ -17,6 +18,7 @@ import {
   episode,
   media,
   mediaFile,
+  mediaTranslation,
   mediaVersion,
   mediaVideo,
   season,
@@ -25,6 +27,7 @@ import {
   userRecommendation,
 } from "@canto/db/schema";
 import type { ListInput } from "@canto/validators";
+import { mediaI18n } from "../shared/media-i18n";
 
 type MediaRow = typeof media.$inferSelect;
 
@@ -337,6 +340,7 @@ export async function reconcileMediaInLibrary(db: Database): Promise<number> {
 export async function listLibraryMedia(
   db: Database,
   input: ListInput,
+  language: string,
   userId?: string,
 ): Promise<{ items: MediaRow[]; total: number; page: number; pageSize: number }> {
   const page = input.cursor ?? input.page;
@@ -376,10 +380,37 @@ export async function listLibraryMedia(
 
   const orderBy = buildOrderBy(input.sortBy, input.sortOrder);
 
-  const [items, [totalRow]] = await Promise.all([
-    db.query.media.findMany({ where, orderBy, limit: pageSize, offset }),
+  // Overlay translations inline via LEFT JOIN on `media_translation`. For
+  // en-US users (or any language with no row) COALESCE returns the raw column
+  // and the join is a no-op. The previous shape did a separate
+  // `batchMediaTranslations` per page in JS, costing a second round trip.
+  const mi = mediaI18n(language);
+  const mediaCols = getTableColumns(media);
+
+  const [rawItems, [totalRow]] = await Promise.all([
+    db
+      .select({
+        // Source-row passthrough — every column on the media row stays
+        // available so the caller still sees a `MediaRow`.
+        ...mediaCols,
+        title: mi.title,
+        overview: mi.overview,
+        posterPath: mi.posterPath,
+        logoPath: mi.logoPath,
+        tagline: mi.tagline,
+      })
+      .from(media)
+      .leftJoin(mediaTranslation, mi.join)
+      .where(where)
+      .orderBy(...orderBy)
+      .limit(pageSize)
+      .offset(offset),
     db.select({ total: count() }).from(media).where(where),
   ]);
+
+  // The select shape matches `MediaRow` field-for-field — drizzle infers it
+  // from `getTableColumns(media)` plus the SQL-typed overlay fields.
+  const items = rawItems as MediaRow[];
 
   return { items, total: totalRow?.total ?? 0, page, pageSize };
 }

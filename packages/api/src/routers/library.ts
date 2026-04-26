@@ -18,8 +18,6 @@ import {
   seedDefaultFolders,
 } from "@canto/core/infra/file-organization/folder-repository";
 import { findLibraryStats, listLibraryMedia, updateMedia } from "@canto/core/infra/media/media-repository";
-import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
-import { batchMediaTranslations } from "@canto/core/domain/shared/services/translation-service";
 
 /* -------------------------------------------------------------------------- */
 /*  Library Router — media listing + user preferences                          */
@@ -29,26 +27,16 @@ import { batchMediaTranslations } from "@canto/core/domain/shared/services/trans
 export const libraryRouter = createTRPCRouter({
   /**
    * Paginated + filtered library listing.
+   *
+   * Translation overlay is applied inside `listLibraryMedia` via a LEFT JOIN
+   * on `media_translation`, so this route is a thin pass-through. The previous
+   * implementation issued a separate `batchMediaTranslations` round trip per
+   * page; the new shape collapses into a single query (and skips it entirely
+   * for English-original media via COALESCE).
    */
-  list: protectedProcedure.input(listInput).query(async ({ ctx, input }) => {
-    const result = await listLibraryMedia(ctx.db, input, ctx.session.user.id);
-    const userLang = await getUserLanguage(ctx.db, ctx.session.user.id);
-    if (userLang.startsWith("en")) return result;
-
-    const translations = await batchMediaTranslations(ctx.db, result.items.map((i) => i.id), userLang);
-    const items = result.items.map((item) => {
-      const t = translations.get(item.id);
-      if (!t) return item;
-      return {
-        ...item,
-        title: t.title ?? item.title,
-        overview: t.overview ?? item.overview,
-        posterPath: t.posterPath ?? item.posterPath,
-        logoPath: t.logoPath ?? item.logoPath,
-      };
-    });
-    return { ...result, items };
-  }),
+  list: protectedProcedure.input(listInput).query(({ ctx, input }) =>
+    listLibraryMedia(ctx.db, input, ctx.session.user.language, ctx.session.user.id),
+  ),
 
   stats: protectedProcedure.query(({ ctx }) => findLibraryStats(ctx.db)),
 
