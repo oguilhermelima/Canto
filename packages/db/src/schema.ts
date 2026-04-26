@@ -1303,8 +1303,11 @@ export const userRating = pgTable(
 // ─── Relations ───
 
 export const userRelations = relations(user, ({ many }) => ({
-  sessions: many(session),
-  accounts: many(account),
+  // session and account each declare two `one(user, ...)` relations
+  // (canonical + plural alias for better-auth's drizzle adapter), so the
+  // inverse `many(...)` here must name the canonical one explicitly.
+  sessions: many(session, { relationName: "session_user" }),
+  accounts: many(account, { relationName: "account_user" }),
   preferences: many(userPreference),
   lists: many(list),
   listMemberships: many(listMember),
@@ -1345,6 +1348,16 @@ export const sessionRelations = relations(session, ({ one }) => ({
   user: one(user, {
     fields: [session.userId],
     references: [user.id],
+    relationName: "session_user",
+  }),
+  // Plural alias consumed by better-auth's drizzle adapter when
+  // `experimental.joins` is enabled. The adapter pluralizes the join key
+  // (`{ user: true }` -> `with: { users: ... }`) regardless of `usePlural`,
+  // so without this alias drizzle errors and findSession returns null.
+  users: one(user, {
+    fields: [session.userId],
+    references: [user.id],
+    relationName: "session_users",
   }),
 }));
 
@@ -1352,6 +1365,12 @@ export const accountRelations = relations(account, ({ one }) => ({
   user: one(user, {
     fields: [account.userId],
     references: [user.id],
+    relationName: "account_user",
+  }),
+  users: one(user, {
+    fields: [account.userId],
+    references: [user.id],
+    relationName: "account_users",
   }),
 }));
 
