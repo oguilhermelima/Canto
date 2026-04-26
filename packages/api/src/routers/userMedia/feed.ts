@@ -1,9 +1,11 @@
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import {
+  getContinueWatchingInput,
   getLibraryHistoryInput,
   getLibraryWatchNextInput,
   getUpcomingScheduleInput,
   getUserMediaInput,
+  getWatchNextInput,
 } from "@canto/validators";
 import {
   findLibraryGenres,
@@ -12,9 +14,11 @@ import {
   findUserMediaCounts,
   findUserMediaPaginated,
 } from "@canto/core/infra/repositories";
+import { getContinueWatching } from "@canto/core/domain/user-media/use-cases/get-continue-watching";
 import { getLibraryWatchNext } from "@canto/core/domain/user-media/use-cases/get-library-watch-next";
 import { getUpcomingSchedule } from "@canto/core/domain/user-media/use-cases/get-upcoming-schedule";
 import { getLibraryHistory } from "@canto/core/domain/user-media/use-cases/get-library-history";
+import { getWatchNext } from "@canto/core/domain/user-media/use-cases/get-watch-next";
 
 export const feedRouter = createTRPCRouter({
   getUserMedia: protectedProcedure
@@ -61,10 +65,27 @@ export const feedRouter = createTRPCRouter({
     findUserLibraryStats(ctx.db, ctx.session.user.id),
   ),
 
+  /**
+   * @deprecated Use `getContinueWatching` (view='continue') or `getWatchNext`
+   * (view='watch_next') instead. Retained for one release while frontends
+   * migrate; new callers should pick the focused endpoint.
+   */
   getLibraryWatchNext: protectedProcedure
     .input(getLibraryWatchNextInput)
     .query(({ ctx, input }) =>
       getLibraryWatchNext(ctx.db, ctx.session.user.id, input),
+    ),
+
+  getContinueWatching: protectedProcedure
+    .input(getContinueWatchingInput)
+    .query(({ ctx, input }) =>
+      getContinueWatching(ctx.db, ctx.session.user.id, input),
+    ),
+
+  getWatchNext: protectedProcedure
+    .input(getWatchNextInput)
+    .query(({ ctx, input }) =>
+      getWatchNext(ctx.db, ctx.session.user.id, input),
     ),
 
   getUpcomingSchedule: protectedProcedure

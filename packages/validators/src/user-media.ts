@@ -57,6 +57,33 @@ export const getLibraryWatchNextInput = libraryFilterInput.extend({
 });
 export type GetLibraryWatchNextInput = z.infer<typeof getLibraryWatchNextInput>;
 
+// ── Continue Watching (focused replacement for getLibraryWatchNext view='continue')
+//
+// Cursor is a keyset on (lastWatchedAt, id) — Date is preserved across the
+// wire by the superjson transformer configured on the tRPC root.
+export const continueWatchingCursor = z
+  .object({
+    lastWatchedAt: z.coerce.date(),
+    id: z.string(),
+  })
+  .nullish();
+export type ContinueWatchingCursor = z.infer<typeof continueWatchingCursor>;
+
+export const getContinueWatchingInput = libraryFilterInput.extend({
+  limit: z.number().int().min(1).max(100).default(24),
+  cursor: continueWatchingCursor,
+  mediaType: mediaType.optional(),
+});
+export type GetContinueWatchingInput = z.infer<typeof getContinueWatchingInput>;
+
+// ── Watch Next (focused replacement for getLibraryWatchNext view='watch_next')
+export const getWatchNextInput = libraryFilterInput.extend({
+  limit: z.number().int().min(1).max(100).default(24),
+  cursor: z.number().int().min(0).nullish(),
+  mediaType: mediaType.optional(),
+});
+export type GetWatchNextInput = z.infer<typeof getWatchNextInput>;
+
 export const getUpcomingScheduleInput = libraryFilterInput.extend({
   limit: z.number().int().min(1).max(100).default(24),
   cursor: z.number().int().min(0).nullish(),
