@@ -1,0 +1,435 @@
+import type { Database } from "@canto/db/client";
+import {
+  findEpisodesByMediaIds,
+  findTrailerKeysForMediaIds,
+  findUserCompletedPlaybackByMediaIds,
+  findUserContinueWatchingMediaIds,
+  findUserListMediaCandidates,
+  findUserMediaStatesByMediaIds,
+  findUserWatchHistoryByMediaIds,
+  findUserWatchingShowsMetadata,
+  type LibraryFeedFilterOptions,
+} from "../../../infra/repositories";
+import { getUserLanguage } from "../../shared/services/user-service";
+import { hasConfirmedPastAirDate, toProgressPercent } from "../rules/user-media-rules";
+
+// JS-side ranking budget. We pull at most CANDIDATE_MULTIPLIER * limit list
+// rows + watching shows, sort, and slice. If the user genuinely has more
+// active candidates than this, the response truncates at the budget — better
+// than a runaway query that times out the whole page.
+const CANDIDATE_MULTIPLIER = 5;
+const MIN_CANDIDATE_BUDGET = 60;
+
+export interface GetWatchNextInput {
+  limit: number;
+  cursor?: number | null;
+  mediaType?: "movie" | "show";
+  q?: string;
+  source?: LibraryFeedFilterOptions["source"];
+  yearMin?: number;
+  yearMax?: number;
+  genreIds?: number[];
+  sortBy?: LibraryFeedFilterOptions["sortBy"];
+  scoreMin?: number;
+  scoreMax?: number;
+  runtimeMin?: number;
+  runtimeMax?: number;
+  language?: string;
+  certification?: string;
+  tvStatus?: string;
+}
+
+export interface WatchNextItem {
+  id: string;
+  kind: "next_episode" | "next_movie";
+  mediaId: string;
+  mediaType: string;
+  title: string;
+  posterPath: string | null;
+  backdropPath: string | null;
+  logoPath: string | null;
+  overview: string | null;
+  voteAverage: number | null;
+  genres: unknown;
+  genreIds: unknown;
+  trailerKey: string | null;
+  year: number | null;
+  externalId: number;
+  provider: string;
+  source: "list";
+  progressSeconds: 0;
+  durationSeconds: null;
+  progressPercent: number | null;
+  progressValue: number | null;
+  progressTotal: number | null;
+  progressUnit: "episodes" | null;
+  watchedAt: Date;
+  episode: {
+    id: string;
+    seasonNumber: number | null;
+    number: number | null;
+    title: string | null;
+  } | null;
+  fromLists: string[];
+}
+
+export interface GetWatchNextResult {
+  items: WatchNextItem[];
+  nextCursor: number | null;
+}
+
+interface ListCandidate {
+  mediaId: string;
+  mediaType: string;
+  title: string;
+  posterPath: string | null;
+  backdropPath: string | null;
+  logoPath: string | null;
+  year: number | null;
+  externalId: number;
+  provider: string;
+  addedAt: Date;
+  listNames: Set<string>;
+  listTypes: Set<string>;
+  isFromWatchlist: boolean;
+}
+
+type ListMediaRow = Awaited<
+  ReturnType<typeof findUserListMediaCandidates>
+>[number];
+type WatchingShowRow = Awaited<
+  ReturnType<typeof findUserWatchingShowsMetadata>
+>[number];
+type HistoryRow = Awaited<
+  ReturnType<typeof findUserWatchHistoryByMediaIds>
+>[number];
+type CompletedPlaybackRow = Awaited<
+  ReturnType<typeof findUserCompletedPlaybackByMediaIds>
+>[number];
+type EpisodeRow = Awaited<ReturnType<typeof findEpisodesByMediaIds>>[number];
+type StateRow = Awaited<
+  ReturnType<typeof findUserMediaStatesByMediaIds>
+>[number];
+
+/**
+ * Watch Next feed — next-episode suggestions for shows the user is tracking.
+ *
+ * Replaces the `getLibraryWatchNext` slow path for the "watch_next" view.
+ * Movies are intentionally not surfaced here (matches old behaviour: the
+ * legacy code only emitted next_episode items).
+ *
+ * Pagination is offset-based because the final ranking is JS-side. We pull
+ * at most CANDIDATE_MULTIPLIER * limit candidate rows from each source, so
+ * the worst case is bounded regardless of how many lists / shows the user
+ * has. If the user truly exceeds the budget, the response truncates rather
+ * than timing the page out.
+ */
+export async function getWatchNext(
+  db: Database,
+  userId: string,
+  input: GetWatchNextInput,
+): Promise<GetWatchNextResult> {
+  const limit = input.limit;
+  const cursor = input.cursor ?? 0;
+  const now = new Date();
+  const candidateBudget = Math.max(
+    MIN_CANDIDATE_BUDGET,
+    (cursor + limit) * CANDIDATE_MULTIPLIER,
+  );
+
+  // movies don't generate next_episode items — short-circuit so we don't
+  // spend round-trips on candidates we'll discard.
+  if (input.mediaType === "movie") {
+    return { items: [], nextCursor: null };
+  }
+
+  const userLang = await getUserLanguage(db, userId);
+
+  const [listMediaRows, watchingShows, continueMediaIds] = await Promise.all([
+    findUserListMediaCandidates(
+      db,
+      userId,
+      userLang,
+      input.mediaType,
+      candidateBudget,
+    ),
+    findUserWatchingShowsMetadata(db, userId, userLang, candidateBudget),
+    findUserContinueWatchingMediaIds(db, userId, input.mediaType),
+  ]);
+
+  const rawListMediaMap = buildListCandidateMap(listMediaRows, watchingShows);
+
+  // Drop anything already in Continue Watching (different endpoint owns it)
+  // and anything that isn't a show (movies don't generate next_episode).
+  const listMediaMap = new Map<string, ListCandidate>();
+  for (const [mediaId, candidate] of rawListMediaMap) {
+    if (continueMediaIds.has(mediaId)) continue;
+    if (candidate.mediaType !== "show") continue;
+    listMediaMap.set(mediaId, candidate);
+  }
+
+  if (listMediaMap.size === 0) {
+    return { items: [], nextCursor: null };
+  }
+
+  const candidateMediaIds = [...listMediaMap.keys()];
+  const [states, historyRows, completedPlaybackRows, episodeRows] =
+    await Promise.all([
+      findUserMediaStatesByMediaIds(db, userId, candidateMediaIds),
+      findUserWatchHistoryByMediaIds(db, userId, candidateMediaIds),
+      findUserCompletedPlaybackByMediaIds(db, userId, candidateMediaIds),
+      findEpisodesByMediaIds(db, candidateMediaIds, userLang),
+    ]);
+
+  const stateByMediaId = new Map(
+    states.map((state) => [state.mediaId, state] as const),
+  );
+  const historyByMediaId = buildHistoryIndex(historyRows, completedPlaybackRows);
+  const episodesByMediaId = buildEpisodesIndex(episodeRows);
+  const lastActivityByMediaId = buildLastActivityIndex(historyRows);
+
+  const allItems = buildNextEpisodeItems({
+    listMediaMap,
+    stateByMediaId,
+    historyByMediaId,
+    episodesByMediaId,
+    lastActivityByMediaId,
+    now,
+  });
+
+  allItems.sort((a, b) => b.watchedAt.getTime() - a.watchedAt.getTime());
+
+  const pageItems = allItems.slice(cursor, cursor + limit);
+  const nextCursor =
+    cursor + limit < allItems.length ? cursor + limit : null;
+
+  // Trailer keys batched for the page only — we don't need them for items
+  // we already sliced off.
+  const trailerByMediaId = await findTrailerKeysForMediaIds(
+    db,
+    pageItems.map((item) => item.mediaId),
+  );
+  const decoratedItems = pageItems.map((item) => ({
+    ...item,
+    trailerKey: trailerByMediaId.get(item.mediaId) ?? null,
+  }));
+
+  return { items: decoratedItems, nextCursor };
+}
+
+function buildListCandidateMap(
+  listMediaRows: ListMediaRow[],
+  watchingShows: WatchingShowRow[],
+): Map<string, ListCandidate> {
+  const listMediaMap = new Map<string, ListCandidate>();
+
+  for (const row of listMediaRows) {
+    const existing = listMediaMap.get(row.mediaId);
+    if (!existing) {
+      const isWatchlist = row.listType === "watchlist";
+      listMediaMap.set(row.mediaId, {
+        mediaId: row.mediaId,
+        mediaType: row.mediaType,
+        title: row.title,
+        posterPath: row.posterPath,
+        backdropPath: row.backdropPath,
+        logoPath: row.logoPath ?? null,
+        year: row.year,
+        externalId: row.externalId,
+        provider: row.provider,
+        addedAt: row.addedAt,
+        listNames: new Set([row.listName]),
+        listTypes: new Set([row.listType]),
+        isFromWatchlist: isWatchlist,
+      });
+      continue;
+    }
+    existing.listNames.add(row.listName);
+    existing.listTypes.add(row.listType);
+    if (row.listType === "watchlist") existing.isFromWatchlist = true;
+    if (row.addedAt > existing.addedAt) existing.addedAt = row.addedAt;
+  }
+
+  for (const row of watchingShows) {
+    if (listMediaMap.has(row.mediaId)) continue;
+    listMediaMap.set(row.mediaId, {
+      mediaId: row.mediaId,
+      mediaType: row.mediaType,
+      title: row.title,
+      posterPath: row.posterPath,
+      backdropPath: row.backdropPath,
+      logoPath: row.logoPath ?? null,
+      year: row.year,
+      externalId: row.externalId,
+      provider: row.provider,
+      addedAt: row.lastActivityAt ?? new Date(),
+      listNames: new Set(),
+      listTypes: new Set(),
+      isFromWatchlist: false,
+    });
+  }
+
+  return listMediaMap;
+}
+
+function buildHistoryIndex(
+  historyRows: HistoryRow[],
+  completedPlaybackRows: CompletedPlaybackRow[],
+): Map<string, Array<{ episodeId: string | null }>> {
+  const index = new Map<string, Array<{ episodeId: string | null }>>();
+  for (const row of historyRows) {
+    const bucket = index.get(row.mediaId) ?? [];
+    bucket.push({ episodeId: row.episodeId });
+    index.set(row.mediaId, bucket);
+  }
+  for (const row of completedPlaybackRows) {
+    const bucket = index.get(row.mediaId) ?? [];
+    bucket.push({ episodeId: row.episodeId });
+    index.set(row.mediaId, bucket);
+  }
+  return index;
+}
+
+function buildEpisodesIndex(
+  episodeRows: EpisodeRow[],
+): Map<
+  string,
+  Array<{
+    episodeId: string;
+    seasonNumber: number;
+    episodeNumber: number;
+    episodeTitle: string | null;
+    airDate: string | null;
+  }>
+> {
+  const index = new Map<
+    string,
+    Array<{
+      episodeId: string;
+      seasonNumber: number;
+      episodeNumber: number;
+      episodeTitle: string | null;
+      airDate: string | null;
+    }>
+  >();
+  for (const row of episodeRows) {
+    const bucket = index.get(row.mediaId) ?? [];
+    bucket.push({
+      episodeId: row.episodeId,
+      seasonNumber: row.seasonNumber,
+      episodeNumber: row.episodeNumber,
+      episodeTitle: row.episodeTitle,
+      airDate: row.airDate,
+    });
+    index.set(row.mediaId, bucket);
+  }
+  return index;
+}
+
+function buildLastActivityIndex(
+  historyRows: HistoryRow[],
+): Map<string, Date> {
+  const index = new Map<string, Date>();
+  for (const row of historyRows) {
+    if (!row.watchedAt) continue;
+    const current = index.get(row.mediaId);
+    if (!current || row.watchedAt.getTime() > current.getTime()) {
+      index.set(row.mediaId, row.watchedAt);
+    }
+  }
+  return index;
+}
+
+interface BuildItemsParams {
+  listMediaMap: Map<string, ListCandidate>;
+  stateByMediaId: Map<string, StateRow>;
+  historyByMediaId: Map<string, Array<{ episodeId: string | null }>>;
+  episodesByMediaId: ReturnType<typeof buildEpisodesIndex>;
+  lastActivityByMediaId: Map<string, Date>;
+  now: Date;
+}
+
+function buildNextEpisodeItems(params: BuildItemsParams): WatchNextItem[] {
+  const items: WatchNextItem[] = [];
+
+  for (const candidate of params.listMediaMap.values()) {
+    if (candidate.mediaType !== "show") continue;
+
+    const state = params.stateByMediaId.get(candidate.mediaId);
+    if (state?.status === "completed" || state?.status === "dropped") continue;
+
+    const mediaHistory =
+      params.historyByMediaId.get(candidate.mediaId) ?? [];
+    const fromLists = [...candidate.listNames];
+
+    const releasedEpisodes = (
+      params.episodesByMediaId.get(candidate.mediaId) ?? []
+    ).filter(
+      (episode) =>
+        episode.seasonNumber > 0 &&
+        hasConfirmedPastAirDate(episode.airDate, params.now),
+    );
+    if (releasedEpisodes.length === 0) continue;
+
+    const releasedEpisodeIds = new Set(
+      releasedEpisodes.map((e) => e.episodeId),
+    );
+    const watchedEpisodeIds = new Set(
+      mediaHistory
+        .map((entry) => entry.episodeId)
+        .filter((episodeId): episodeId is string => !!episodeId),
+    );
+    const watchedEpisodesCount = [...watchedEpisodeIds].filter((id) =>
+      releasedEpisodeIds.has(id),
+    ).length;
+    if (watchedEpisodesCount === 0) continue;
+
+    const availableEpisodesCount = releasedEpisodes.length;
+    const nextEpisode = releasedEpisodes.find(
+      (episode) => !watchedEpisodeIds.has(episode.episodeId),
+    );
+    if (!nextEpisode) continue;
+
+    const lastActivity =
+      params.lastActivityByMediaId.get(candidate.mediaId) ?? candidate.addedAt;
+
+    items.push({
+      id: `next-episode:${candidate.mediaId}:${nextEpisode.episodeId}`,
+      kind: "next_episode",
+      mediaId: candidate.mediaId,
+      mediaType: candidate.mediaType,
+      title: candidate.title,
+      posterPath: candidate.posterPath,
+      backdropPath: candidate.backdropPath,
+      logoPath: candidate.logoPath,
+      overview: null,
+      voteAverage: null,
+      genres: null,
+      genreIds: null,
+      trailerKey: null,
+      year: candidate.year,
+      externalId: candidate.externalId,
+      provider: candidate.provider,
+      source: "list",
+      progressSeconds: 0,
+      durationSeconds: null,
+      progressPercent: toProgressPercent(
+        watchedEpisodesCount,
+        availableEpisodesCount,
+      ),
+      progressValue: watchedEpisodesCount,
+      progressTotal: availableEpisodesCount,
+      progressUnit: "episodes",
+      watchedAt: lastActivity,
+      episode: {
+        id: nextEpisode.episodeId,
+        seasonNumber: nextEpisode.seasonNumber,
+        number: nextEpisode.episodeNumber,
+        title: nextEpisode.episodeTitle,
+      },
+      fromLists,
+    });
+  }
+
+  return items;
+}
