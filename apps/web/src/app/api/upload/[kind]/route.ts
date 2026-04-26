@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCookieCache } from "better-auth/cookies";
 import { auth } from "@canto/auth";
 import {
   getMaxBytes,
@@ -10,9 +11,24 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const VALID_KINDS: ReadonlySet<ImageVariant> = new Set(["avatar", "header"]);
+const isSecure = (process.env.BETTER_AUTH_URL ?? "").startsWith("https://");
+
+interface CachedSession {
+  session: { id: string; createdAt: Date; updatedAt: Date; userId: string; expiresAt: Date; token: string };
+  user: { id: string; name: string; email: string; emailVerified: boolean; createdAt: Date; updatedAt: Date };
+  updatedAt: number;
+  version?: string;
+}
 
 function isImageVariant(value: string): value is ImageVariant {
   return (VALID_KINDS as ReadonlySet<string>).has(value);
+}
+
+async function getUserId(req: Request): Promise<string | null> {
+  const cached = await getCookieCache<CachedSession>(req, { isSecure });
+  if (cached) return cached.user.id;
+  const fresh = await auth.api.getSession({ headers: req.headers });
+  return fresh?.user.id ?? null;
 }
 
 export async function POST(
@@ -24,8 +40,8 @@ export async function POST(
     return NextResponse.json({ error: "invalid kind" }, { status: 400 });
   }
 
-  const session = await auth.api.getSession({ headers: req.headers });
-  if (!session) {
+  const userId = await getUserId(req);
+  if (!userId) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -43,7 +59,7 @@ export async function POST(
 
   try {
     const buffer = await file.arrayBuffer();
-    const { url } = await processAndStoreImage(kind, session.user.id, buffer);
+    const { url } = await processAndStoreImage(kind, userId, buffer);
     return NextResponse.json({ url });
   } catch {
     return NextResponse.json({ error: "failed to process image" }, { status: 500 });
