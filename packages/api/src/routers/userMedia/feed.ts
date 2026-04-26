@@ -7,11 +7,11 @@ import {
 } from "@canto/validators";
 import {
   findLibraryGenres,
+  findTrailerKeysForMediaIds,
   findUserLibraryStats,
   findUserMediaCounts,
   findUserMediaPaginated,
 } from "@canto/core/infra/repositories";
-import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
 import { getLibraryWatchNext } from "@canto/core/domain/user-media/use-cases/get-library-watch-next";
 import { getUpcomingSchedule } from "@canto/core/domain/user-media/use-cases/get-upcoming-schedule";
 import { getLibraryHistory } from "@canto/core/domain/user-media/use-cases/get-library-history";
@@ -21,7 +21,7 @@ export const feedRouter = createTRPCRouter({
     .input(getUserMediaInput)
     .query(async ({ ctx, input }) => {
       const offset = input.cursor ?? 0;
-      const userLang = await getUserLanguage(ctx.db, ctx.session.user.id);
+      const userLang = ctx.session.user.language;
       const result = await findUserMediaPaginated(ctx.db, ctx.session.user.id, userLang, {
         status: input.status,
         hasRating: input.hasRating,
@@ -33,9 +33,20 @@ export const feedRouter = createTRPCRouter({
         limit: input.limit,
         offset,
       });
+      // Trailer keys are no longer joined inline in `mediaI18n` — batch-fetch
+      // them once for the page so the UI hover-trailer feature still works
+      // without paying for the per-row correlated subquery.
+      const trailerByMediaId = await findTrailerKeysForMediaIds(
+        ctx.db,
+        result.items.map((i) => i.mediaId),
+      );
+      const items = result.items.map((item) => ({
+        ...item,
+        trailerKey: trailerByMediaId.get(item.mediaId) ?? null,
+      }));
       const nextCursor =
         offset + input.limit < result.total ? offset + input.limit : undefined;
-      return { items: result.items, total: result.total, nextCursor };
+      return { items, total: result.total, nextCursor };
     }),
 
   getUserMediaCounts: protectedProcedure.query(({ ctx }) =>

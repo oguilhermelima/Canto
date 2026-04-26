@@ -7,7 +7,6 @@ import {
   findPublicListBySlug,
   findListItems,
 } from "@canto/core/infra/lists/list-repository";
-import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
 import { translateMediaItems } from "@canto/core/domain/shared/services/translation-service";
 import { findProfileSections } from "@canto/core/infra/profile/profile-section-repository";
 import {
@@ -83,7 +82,9 @@ export const publicProfileRouter = createTRPCRouter({
 
   getCollections: protectedProcedure.input(idInput).query(async ({ ctx, input }) => {
     await requireVisibleUser(ctx.db, input.id, ctx.session.user.id);
-    const all = await findUserListsWithCounts(ctx.db, input.id);
+    // Localise preview posters using the *viewer's* language — the target
+    // user's preference is irrelevant when rendering on the viewer's screen.
+    const all = await findUserListsWithCounts(ctx.db, input.id, ctx.session.user.language);
     const publicOwned = all.filter(
       (l) => l.userId === input.id && l.visibility === "public",
     );
@@ -103,7 +104,7 @@ export const publicProfileRouter = createTRPCRouter({
         limit: input.limit,
         offset: 0,
       });
-      const viewerLang = await getUserLanguage(ctx.db, ctx.session.user.id);
+      const viewerLang = ctx.session.user.language;
       const translated = await translateMediaItems(
         ctx.db,
         rawItems.map((i) => i.media),
@@ -120,7 +121,7 @@ export const publicProfileRouter = createTRPCRouter({
   getOverview: protectedProcedure.input(idInput).query(async ({ ctx, input }) => {
     await requireVisibleUser(ctx.db, input.id, ctx.session.user.id);
     const userId = input.id;
-    const viewerLang = await getUserLanguage(ctx.db, ctx.session.user.id);
+    const viewerLang = ctx.session.user.language;
 
     const [
       stats,

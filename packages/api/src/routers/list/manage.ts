@@ -28,17 +28,17 @@ import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
 export const listManageRouter = createTRPCRouter({
   getAll: protectedProcedure.query(({ ctx }) =>
-    findUserListsWithCounts(ctx.db, ctx.session.user.id),
+    findUserListsWithCounts(ctx.db, ctx.session.user.id, ctx.session.user.language),
   ),
 
   getCollectionLayout: protectedProcedure.query(({ ctx }) =>
-    getCollectionLayout(ctx.db, ctx.session.user.id),
+    getCollectionLayout(ctx.db, ctx.session.user.id, ctx.session.user.language),
   ),
 
   updateCollectionLayout: protectedProcedure
     .input(updateCollectionLayoutInput)
     .mutation(({ ctx, input }) =>
-      updateCollectionLayout(ctx.db, ctx.session.user.id, input),
+      updateCollectionLayout(ctx.db, ctx.session.user.id, ctx.session.user.language, input),
     ),
 
   reorderCollections: protectedProcedure
@@ -63,7 +63,7 @@ export const listManageRouter = createTRPCRouter({
   getBySlug: protectedProcedure
     .input(getListBySlugInput)
     .query(({ ctx, input }) =>
-      viewListBySlug(ctx.db, ctx.session.user.id, input),
+      viewListBySlug(ctx.db, ctx.session.user.id, ctx.session.user.language, input),
     ),
 
   create: protectedProcedure

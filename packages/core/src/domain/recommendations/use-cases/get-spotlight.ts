@@ -4,7 +4,6 @@ import type { SearchResult } from "@canto/providers";
 import { getSetting, setSetting } from "@canto/db/settings";
 import { buildExclusionSet } from "./recommendation-service";
 import { translateMediaItems } from "../../shared/services/translation-service";
-import { getUserLanguage } from "../../shared/services/user-service";
 import { mapPoolItem } from "../../shared/mappers/media-mapper";
 import { findRecommendedMediaWithBackdrops } from "../../../infra/content-enrichment/extras-repository";
 import { findUserSpotlightItems } from "../../../infra/recommendations/user-recommendation-repository";
@@ -19,14 +18,18 @@ const SPOTLIGHT_LIMIT = 20;
  * Get per-user spotlight items for the home page hero.
  * Primary: user_recommendation with backdrops.
  * Fallback: global pool, then TMDB trending.
+ *
+ * `userLang` is supplied by the caller off `ctx.session.user.language` —
+ * the old shape did a `SELECT language FROM user` per render even though
+ * every caller already had the value on the session.
  */
 export async function getSpotlight(
   db: Database,
   userId: string,
+  userLang: string,
   tmdb: MediaProviderPort,
   fetchTrending: TrendingFetcher,
 ) {
-  const userLang = await getUserLanguage(db, userId);
   const { excludeSet, excludeItems } = await buildExclusionSet(db, userId);
 
   // Path 1: Per-user spotlight

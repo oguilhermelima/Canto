@@ -66,7 +66,7 @@ export const listItemsRouter = createTRPCRouter({
   getAllCollectionItems: protectedProcedure
     .input(getAllCollectionItemsInput)
     .query(({ ctx, input }) =>
-      viewAllCollectionItems(ctx.db, ctx.session.user.id, input),
+      viewAllCollectionItems(ctx.db, ctx.session.user.id, ctx.session.user.language, input),
     ),
 
   addToServerLibrary: adminProcedure

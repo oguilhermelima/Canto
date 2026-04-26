@@ -32,10 +32,11 @@ function collectValidListIds(lists: ListWithType[]): Set<string> {
 export async function getCollectionLayout(
   db: Database,
   userId: string,
+  userLang: string,
 ): Promise<CollectionLayoutPreference> {
   const [preferences, lists] = await Promise.all([
     findUserPreferences(db, userId),
-    findUserListsWithCounts(db, userId),
+    findUserListsWithCounts(db, userId, userLang),
   ]);
 
   const preferencesRecord = preferences as Record<string, unknown>;
@@ -48,9 +49,10 @@ export async function getCollectionLayout(
 export async function updateCollectionLayout(
   db: Database,
   userId: string,
+  userLang: string,
   input: UpdateCollectionLayoutInput,
 ): Promise<CollectionLayoutPreference> {
-  const lists = await findUserListsWithCounts(db, userId);
+  const lists = await findUserListsWithCounts(db, userId, userLang);
   const normalized = normalizeCollectionLayout(
     { hiddenListIds: uniqueIds(input.hiddenListIds) },
     collectValidListIds(lists),

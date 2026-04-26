@@ -3,7 +3,6 @@ import type { Database } from "@canto/db/client";
 import { list, listItem, listMember, media, mediaTranslation, user, userMediaLibrary, userMediaState } from "@canto/db/schema";
 import type { RecsFilters } from "../../domain/recommendations/types/recs-filters";
 import { buildRecsFilterConditions, recsSortOrder } from "../recommendations/recs-filter-builder";
-import { getUserLanguage } from "../../domain/shared/services/user-service";
 
 // ── Lists ──
 
@@ -27,9 +26,15 @@ export async function findUserLists(db: Database, userId: string) {
   });
 }
 
+/**
+ * `userLang` should be read off `ctx.session.user.language` by the caller —
+ * the previous implementation issued an extra `SELECT language FROM user` per
+ * call even though every caller already had the value on the session.
+ */
 export async function findUserListsWithCounts(
   db: Database,
   userId: string,
+  userLang: string,
 ) {
   const memberListIds = db
     .select({ listId: listMember.listId })
@@ -53,7 +58,6 @@ export async function findUserListsWithCounts(
   const serverListIds = lists.filter((l) => l.type === "server").map((l) => l.id);
   const nonServerListIds = lists.filter((l) => l.type !== "server").map((l) => l.id);
 
-  const userLang = await getUserLanguage(db, userId);
   const translationJoin = and(
     eq(mediaTranslation.mediaId, media.id),
     eq(mediaTranslation.language, userLang),

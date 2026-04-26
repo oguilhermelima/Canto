@@ -5,12 +5,17 @@ import {
   findListBySlug,
   findListItems,
 } from "../../../infra/lists/list-repository";
-import { getUserLanguage } from "../../shared/services/user-service";
 import { translateMediaItems } from "../../shared/services/translation-service";
 
+/**
+ * `userLang` is supplied by the caller (read from `ctx.session.user.language`
+ * in tRPC procedures) — the previous shape did a `SELECT language FROM user`
+ * per list-page render even though every caller already had the value.
+ */
 export async function viewListBySlug(
   db: Database,
   userId: string,
+  userLang: string,
   input: GetListBySlugInput,
 ) {
   const listRow = await findListBySlug(db, input.slug, userId);
@@ -40,7 +45,6 @@ export async function viewListBySlug(
     watchStatus: input.watchStatus,
   });
 
-  const userLang = await getUserLanguage(db, userId);
   const translated = await translateMediaItems(
     db,
     rawItems.map((i) => i.media),

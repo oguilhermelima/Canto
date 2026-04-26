@@ -2,15 +2,19 @@ import type { Database } from "@canto/db/client";
 import type { GetAllCollectionItemsInput } from "@canto/validators";
 import { findUserCustomCollectionItems } from "../../../infra/lists/list-repository";
 import { getCollectionLayout } from "./collection-layout";
-import { getUserLanguage } from "../../shared/services/user-service";
 import { translateMediaItems } from "../../shared/services/translation-service";
 
+/**
+ * `userLang` is supplied by the caller (read from `ctx.session.user.language`
+ * in tRPC procedures) so we don't `SELECT language FROM user` per page load.
+ */
 export async function viewAllCollectionItems(
   db: Database,
   userId: string,
+  userLang: string,
   input: GetAllCollectionItemsInput,
 ) {
-  const layout = await getCollectionLayout(db, userId);
+  const layout = await getCollectionLayout(db, userId, userLang);
 
   const { items: rawItems, total } = await findUserCustomCollectionItems(
     db,
@@ -38,7 +42,6 @@ export async function viewAllCollectionItems(
     },
   );
 
-  const userLang = await getUserLanguage(db, userId);
   const translated = await translateMediaItems(
     db,
     rawItems.map((i) => i.media),

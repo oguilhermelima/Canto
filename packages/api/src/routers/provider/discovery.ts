@@ -11,8 +11,12 @@ const regionInput = z.object({ region: z.string().length(2).optional() }).option
 export const providerDiscoveryRouter = createTRPCRouter({
   spotlight: protectedProcedure.query(async ({ ctx }) => {
     const tmdb = await getTmdbProvider();
-    return getSpotlight(ctx.db, ctx.session.user.id, tmdb, (type) =>
-      tmdb.getTrending(type, { page: 1 }),
+    return getSpotlight(
+      ctx.db,
+      ctx.session.user.id,
+      ctx.session.user.language,
+      tmdb,
+      (type) => tmdb.getTrending(type, { page: 1 }),
     );
   }),
 

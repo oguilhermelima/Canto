@@ -1,5 +1,5 @@
 import type { SearchResult } from "@canto/providers";
-import { getSetting } from "@canto/db/settings";
+import { getDefaultLanguage } from "@canto/db/settings";
 import { eq } from "drizzle-orm";
 import { user } from "@canto/db/schema";
 import { TRPCError } from "@trpc/server";
@@ -16,7 +16,6 @@ import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
 import { cached } from "@canto/core/platform/cache/redis";
 import { fetchLogos, enrichBrowseWithLogos } from "@canto/core/domain/media/use-cases/fetch-logos";
 import { getRecommendations } from "@canto/core/domain/recommendations/use-cases/get-recommendations";
-import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
 import type { RecsFilters } from "@canto/core/infra/recommendations/user-recommendation-repository";
 import { db as appDb } from "@canto/db/client";
 
@@ -30,7 +29,9 @@ export const mediaDiscoveryRouter = createTRPCRouter({
     .input(browseMediaInput)
     .query(async ({ input }) => {
       const page = input.cursor ?? input.page;
-      const browseSettingsLang = (await getSetting("general.language")) ?? "en-US";
+      // 60s in-process TTL — browse is hit on every public page load (logged-in
+      // and anonymous) so the global setting read used to dominate p50.
+      const browseSettingsLang = await getDefaultLanguage();
 
       if (input.mode === "search") {
         if (!input.query) {
@@ -141,7 +142,7 @@ export const mediaDiscoveryRouter = createTRPCRouter({
     .input(getLogoInput)
     .query(async ({ ctx, input }) => {
       const tmdb = await getTmdbProvider();
-      const userLang = await getUserLanguage(ctx.db, ctx.session.user.id);
+      const userLang = ctx.session.user.language;
       const result = await fetchLogos(ctx.db, tmdb, [input], userLang);
       const key = `${input.provider}-${input.type}-${input.externalId}`;
       return { logoPath: result[key] ?? null };
@@ -171,15 +172,17 @@ export const mediaDiscoveryRouter = createTRPCRouter({
         watchRegion: input?.watchRegion,
       };
 
+      // Only fetch recsVersion now — language comes off the session, so we
+      // skip the round trip when we already have it on `ctx.session.user`.
       const userRow = await ctx.db.query.user.findFirst({
         where: eq(user.id, userId),
-        columns: { recsVersion: true, language: true },
+        columns: { recsVersion: true },
       });
 
       const tmdb = await getTmdbProvider();
       return getRecommendations(ctx.db, {
         userId, page, pageSize, filters: recsFilters,
-        userLang: userRow?.language ?? "en-US",
+        userLang: ctx.session.user.language,
         recsVersion: userRow?.recsVersion ?? 0,
       }, tmdb);
     }),
