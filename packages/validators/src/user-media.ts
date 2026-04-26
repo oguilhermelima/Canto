@@ -31,6 +31,10 @@ export const libraryFilterInput = z.object({
   language: z.string().optional(),
   certification: z.string().optional(),
   tvStatus: z.string().optional(),
+  /** ISO datetime: include watch entries on or after this instant. */
+  watchedFrom: z.string().datetime().optional(),
+  /** ISO datetime: include watch entries on or before this instant. */
+  watchedTo: z.string().datetime().optional(),
 });
 export type LibraryFilterInput = z.infer<typeof libraryFilterInput>;
 

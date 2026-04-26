@@ -57,6 +57,8 @@ export interface LibraryFeedFilterOptions {
   language?: string;
   certification?: string;
   tvStatus?: string;
+  watchedFrom?: string;
+  watchedTo?: string;
 }
 
 function buildTitleIlikeCondition(q: string | undefined): SQL | null {
@@ -92,6 +94,10 @@ export async function findUserPlaybackProgressFeed(
   if (filters?.language) conditions.push(eq(media.originalLanguage, filters.language));
   if (filters?.certification) conditions.push(eq(media.contentRating, filters.certification));
   if (filters?.tvStatus) conditions.push(eq(media.status, filters.tvStatus));
+  if (filters?.watchedFrom)
+    conditions.push(gte(userPlaybackProgress.lastWatchedAt, new Date(filters.watchedFrom)));
+  if (filters?.watchedTo)
+    conditions.push(lte(userPlaybackProgress.lastWatchedAt, new Date(filters.watchedTo)));
 
   const orderClauses = (() => {
     switch (filters?.sortBy) {
@@ -202,6 +208,10 @@ export async function findUserWatchHistoryFeed(
   if (filters?.language) conditions.push(eq(media.originalLanguage, filters.language));
   if (filters?.certification) conditions.push(eq(media.contentRating, filters.certification));
   if (filters?.tvStatus) conditions.push(eq(media.status, filters.tvStatus));
+  if (filters?.watchedFrom)
+    conditions.push(gte(userWatchHistory.watchedAt, new Date(filters.watchedFrom)));
+  if (filters?.watchedTo)
+    conditions.push(lte(userWatchHistory.watchedAt, new Date(filters.watchedTo)));
 
   const orderClauses = (() => {
     switch (filters?.sortBy) {

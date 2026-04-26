@@ -36,6 +36,10 @@ export interface FilterOutput {
   // Library filtering
   source?: "jellyfin" | "plex" | "manual";
   watchStatus?: "in_progress" | "completed" | "not_started";
+  /** ISO datetime — inclusive lower bound for history watched-at filter. */
+  watchedFrom?: string;
+  /** ISO datetime — inclusive upper bound for history watched-at filter. */
+  watchedTo?: string;
   // Collection-scoped: aggregate of list members' (+ owner) ratings
   membersRatingMin?: number;
 }

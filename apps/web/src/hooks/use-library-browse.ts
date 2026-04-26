@@ -67,6 +67,8 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
       language: filters.language,
       certification: filters.certification,
       tvStatus: filters.status,
+      watchedFrom: filters.watchedFrom,
+      watchedTo: filters.watchedTo,
     },
     {
       enabled: useHistory,

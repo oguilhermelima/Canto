@@ -36,6 +36,8 @@ export interface GetLibraryHistoryInput {
   language?: string;
   certification?: string;
   tvStatus?: string;
+  watchedFrom?: string;
+  watchedTo?: string;
 }
 
 interface TimelineEntry {
@@ -93,6 +95,8 @@ export async function getLibraryHistory(
     language: input.language,
     certification: input.certification,
     tvStatus: input.tvStatus,
+    watchedFrom: input.watchedFrom,
+    watchedTo: input.watchedTo,
   };
 
   const userLang = await getUserLanguage(db, userId);
