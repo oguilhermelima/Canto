@@ -45,6 +45,8 @@ interface TimelineEntry {
   mediaType: string;
   title: string;
   posterPath: string | null;
+  backdropPath: string | null;
+  logoPath: string | null;
   year: number | null;
   voteAverage: number | null;
   userRating: number | null;
@@ -147,6 +149,8 @@ function buildHistoryEntry(row: HistoryFeedRow): TimelineEntry | null {
     mediaType: row.mediaType,
     title: row.title,
     posterPath: row.posterPath,
+    backdropPath: row.backdropPath,
+    logoPath: row.logoPath,
     year: row.year,
     voteAverage: row.voteAverage,
     userRating: row.userRating,
@@ -190,6 +194,8 @@ function buildPlaybackEntry(row: PlaybackFeedRow): TimelineEntry | null {
     mediaType: row.mediaType,
     title: row.title,
     posterPath: row.posterPath,
+    backdropPath: row.backdropPath,
+    logoPath: row.logoPath,
     year: row.year,
     voteAverage: row.voteAverage,
     userRating: row.userRating,

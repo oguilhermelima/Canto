@@ -162,6 +162,8 @@ export interface UserWatchHistoryFeedRow {
   mediaType: string;
   title: string;
   posterPath: string | null;
+  backdropPath: string | null;
+  logoPath: string | null;
   year: number | null;
   voteAverage: number | null;
   userRating: number | null;
@@ -226,6 +228,8 @@ export async function findUserWatchHistoryFeed(
       mediaType: media.type,
       title: mi.title,
       posterPath: mi.posterPath,
+      backdropPath: media.backdropPath,
+      logoPath: mi.logoPath,
       year: media.year,
       voteAverage: media.voteAverage,
       userRating: userMediaState.rating,
