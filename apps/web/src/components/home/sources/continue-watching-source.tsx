@@ -18,9 +18,9 @@ export function ContinueWatchingSource({ sectionId, title, style }: ContinueWatc
   const lockedRef = useRef(current);
   const limit = lockedRef.current;
 
-  const query = trpc.userMedia.getLibraryWatchNext.useInfiniteQuery(
-    { limit, view: "continue" as const },
-    { getNextPageParam: (lp) => lp.nextCursor, initialCursor: 0 },
+  const query = trpc.userMedia.getContinueWatching.useInfiniteQuery(
+    { limit },
+    { getNextPageParam: (lp) => lp.nextCursor ?? undefined, initialCursor: null },
   );
 
   const result = useSectionInfiniteQuery(

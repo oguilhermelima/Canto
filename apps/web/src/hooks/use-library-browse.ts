@@ -75,10 +75,39 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
     },
   );
 
-  const watchNextQuery = trpc.userMedia.getLibraryWatchNext.useInfiniteQuery(
+  const useWatchNext = !useHistory && !useUserMedia && view === "watch_next";
+  const useContinueWatching =
+    !useHistory && !useUserMedia && view === "continue";
+
+  const continueWatchingQuery =
+    trpc.userMedia.getContinueWatching.useInfiniteQuery(
+      {
+        limit: PAGE_SIZE,
+        mediaType: queryMediaType,
+        q: filters.q,
+        source: filters.source,
+        sortBy,
+        yearMin,
+        yearMax,
+        genreIds: filters.genreIds,
+        scoreMin: filters.scoreMin,
+        scoreMax: filters.scoreMax,
+        runtimeMin: filters.runtimeMin,
+        runtimeMax: filters.runtimeMax,
+        language: filters.language,
+        certification: filters.certification,
+        tvStatus: filters.status,
+      },
+      {
+        enabled: useContinueWatching,
+        getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+        initialCursor: null,
+      },
+    );
+
+  const watchNextQuery = trpc.userMedia.getWatchNext.useInfiniteQuery(
     {
       limit: PAGE_SIZE,
-      view: view === "watch_next" ? "watch_next" : "continue",
       mediaType: queryMediaType,
       q: filters.q,
       source: filters.source,
@@ -95,8 +124,8 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
       tvStatus: filters.status,
     },
     {
-      enabled: !useHistory && !useUserMedia,
-      getNextPageParam: (lastPage) => lastPage.nextCursor,
+      enabled: useWatchNext,
+      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
       initialCursor: 0,
     },
   );
@@ -139,7 +168,9 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
     ? historyQuery
     : useUserMedia
       ? userMediaQuery
-      : watchNextQuery;
+      : useContinueWatching
+        ? continueWatchingQuery
+        : watchNextQuery;
 
   const items: BrowseItem[] = useMemo(() => {
     if (useHistory) {
@@ -182,6 +213,32 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
         userRating: item.rating ?? null,
       }));
     }
+    if (useContinueWatching) {
+      return (continueWatchingQuery.data?.pages.flatMap((page) => page.items) ?? []).map((item) => ({
+        id: item.id,
+        externalId: item.externalId,
+        provider: item.provider,
+        type: item.mediaType as "movie" | "show",
+        title: item.title,
+        posterPath: item.posterPath,
+        year: item.year,
+        voteAverage: item.voteAverage ?? null,
+        userRating: null,
+        entryType: "playback" as const,
+        watchedAt: item.watchedAt,
+        source: item.source,
+        episode: item.episode,
+        progress: item.progressPercent != null
+          ? {
+              percent: item.progressPercent,
+              value: item.progressValue ?? 0,
+              total: item.progressTotal ?? 0,
+              unit: (item.progressUnit ?? "seconds") as "seconds" | "episodes",
+            }
+          : null,
+        isCompleted: false,
+      }));
+    }
     return (watchNextQuery.data?.pages.flatMap((page) => page.items) ?? []).map((item) => ({
       id: item.id,
       externalId: item.externalId,
@@ -190,10 +247,10 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
       title: item.title,
       posterPath: item.posterPath,
       year: item.year,
-      voteAverage: "voteAverage" in item ? (item as { voteAverage?: number | null }).voteAverage ?? null : null,
-      userRating: "userRating" in item ? (item as { userRating?: number | null }).userRating ?? null : null,
+      voteAverage: item.voteAverage ?? null,
+      userRating: null,
       entryType: "playback" as const,
-      watchedAt: item.watchedAt ?? new Date(),
+      watchedAt: item.watchedAt,
       source: item.source,
       episode: item.episode,
       progress: item.progressPercent != null
@@ -206,7 +263,15 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
         : null,
       isCompleted: false,
     }));
-  }, [useHistory, useUserMedia, historyQuery.data, userMediaQuery.data, watchNextQuery.data]);
+  }, [
+    useHistory,
+    useUserMedia,
+    useContinueWatching,
+    historyQuery.data,
+    userMediaQuery.data,
+    continueWatchingQuery.data,
+    watchNextQuery.data,
+  ]);
 
   const onFetchNextPage = useCallback(() => {
     if (active.hasNextPage && !active.isFetchingNextPage) void active.fetchNextPage();

@@ -13,7 +13,9 @@ import { LibraryCarousel } from "./library-carousel";
 export { WatchNextCard } from "@/components/media/cards/watch-next-card";
 export type { WatchNextItem, WatchNextView } from "@/components/media/cards/watch-next-card";
 
-const PAGE_SIZE = 72;
+// Page size dropped from 72 → 24. The backend now applies LIMIT in SQL, so
+// asking for 72 just to render 24 above the fold was pure waste.
+const PAGE_SIZE = 24;
 const CARD_WIDTH_CLASS = "w-[280px] sm:w-[300px] lg:w-[340px] 2xl:w-[380px]";
 
 export function WatchNextTab({
@@ -29,20 +31,38 @@ export function WatchNextTab({
   seeAllHref?: string;
   mediaType?: "movie" | "show";
 }): React.JSX.Element {
-  const query = trpc.userMedia.getLibraryWatchNext.useInfiniteQuery(
-    { limit: PAGE_SIZE, view, mediaType },
+  const isContinue = view === "continue";
+
+  const continueQuery = trpc.userMedia.getContinueWatching.useInfiniteQuery(
+    { limit: PAGE_SIZE, mediaType },
     {
-      getNextPageParam: (lastPage) => lastPage.nextCursor,
+      enabled: isContinue,
+      getNextPageParam: (lp) => lp.nextCursor ?? undefined,
+      initialCursor: null,
+    },
+  );
+  const watchNextQuery = trpc.userMedia.getWatchNext.useInfiniteQuery(
+    { limit: PAGE_SIZE, mediaType },
+    {
+      enabled: !isContinue,
+      getNextPageParam: (lp) => lp.nextCursor ?? undefined,
       initialCursor: 0,
     },
   );
 
+  const continueResult = useSectionInfiniteQuery(
+    continueQuery,
+    (page) => page.items,
+    (raw): WatchNextItem => raw as unknown as WatchNextItem,
+  );
+  const watchNextResult = useSectionInfiniteQuery(
+    watchNextQuery,
+    (page) => page.items,
+    (raw): WatchNextItem => raw as unknown as WatchNextItem,
+  );
+
   const { items, isLoading, isError, isFetchingMore, onLoadMore, onRetry } =
-    useSectionInfiniteQuery(
-      query,
-      (page) => page.items,
-      (raw): WatchNextItem => raw as WatchNextItem,
-    );
+    isContinue ? continueResult : watchNextResult;
 
   return (
     <LibraryCarousel<WatchNextItem>
@@ -55,7 +75,7 @@ export function WatchNextTab({
       isFetchingMore={isFetchingMore}
       onLoadMore={onLoadMore}
       onRetry={onRetry}
-      emptyPreset={view === "continue" ? "emptyContinueWatching" : "emptyWatchNext"}
+      emptyPreset={isContinue ? "emptyContinueWatching" : "emptyWatchNext"}
       renderCard={(item) => (
         <WatchNextCard key={item.id} item={item} view={view} />
       )}

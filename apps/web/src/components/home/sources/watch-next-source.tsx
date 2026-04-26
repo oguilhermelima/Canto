@@ -17,9 +17,9 @@ export function WatchNextSource({ sectionId, title, style }: WatchNextSourceProp
   const initialLimit = useResponsivePageSize({ mobile: 10, tablet: 16, desktop: 24 });
   const [limit] = useState(initialLimit);
 
-  const query = trpc.userMedia.getLibraryWatchNext.useInfiniteQuery(
-    { limit, view: "watch_next" as const },
-    { getNextPageParam: (lp) => lp.nextCursor, initialCursor: 0 },
+  const query = trpc.userMedia.getWatchNext.useInfiniteQuery(
+    { limit },
+    { getNextPageParam: (lp) => lp.nextCursor ?? undefined, initialCursor: 0 },
   );
 
   const result = useSectionInfiniteQuery(
