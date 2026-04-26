@@ -58,12 +58,6 @@ export async function findUserListsWithCounts(
   const serverListIds = lists.filter((l) => l.type === "server").map((l) => l.id);
   const nonServerListIds = lists.filter((l) => l.type !== "server").map((l) => l.id);
 
-  const translationJoin = and(
-    eq(mediaTranslation.mediaId, media.id),
-    eq(mediaTranslation.language, userLang),
-  );
-  const localizedPosterPath = sql<string | null>`COALESCE(${mediaTranslation.posterPath}, ${media.posterPath})`;
-
   const countMap = new Map<string, number>();
   const previewMap = new Map<string, string[]>();
 
@@ -83,20 +77,32 @@ export async function findUserListsWithCounts(
         .from(listItem)
         .where(inArray(listItem.listId, nonServerListIds))
         .groupBy(listItem.listId),
-      db
-        .select({
-          listId: listItem.listId,
-          posterPath: localizedPosterPath,
-        })
-        .from(listItem)
-        .innerJoin(media, eq(listItem.mediaId, media.id))
-        .leftJoin(mediaTranslation, translationJoin)
-        .where(inArray(listItem.listId, nonServerListIds))
-        .orderBy(asc(listItem.position), desc(listItem.addedAt)),
+      // Top-4-per-list via window function — pulls 4N rows total instead of all
+      // list_item rows. The previous version fetched the full list and trimmed
+      // to 4 in JS, so a 1k-item list cost 1k rows + 1k translation joins.
+      db.execute<{ list_id: string; poster_path: string | null }>(sql`
+        SELECT list_id, poster_path FROM (
+          SELECT li.list_id,
+                 COALESCE(mt.poster_path, m.poster_path) AS poster_path,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY li.list_id
+                   ORDER BY li.position ASC, li.added_at DESC
+                 ) AS rn
+          FROM list_item li
+          INNER JOIN media m ON m.id = li.media_id
+          LEFT JOIN media_translation mt
+                 ON mt.media_id = m.id AND mt.language = ${userLang}
+          WHERE li.list_id IN (${sql.join(nonServerListIds.map((id) => sql`${id}::uuid`), sql`, `)})
+        ) ranked
+        WHERE rn <= 4
+        ORDER BY list_id, rn
+      `),
     ]);
 
     for (const c of countRows) countMap.set(c.listId, c.count);
-    for (const r of previewRows) accumulatePreview(r.listId, r.posterPath);
+    for (const r of previewRows as Array<{ list_id: string; poster_path: string | null }>) {
+      accumulatePreview(r.list_id, r.poster_path);
+    }
   }
 
   if (serverListIds.length > 0) {
@@ -115,31 +121,30 @@ export async function findUserListsWithCounts(
         .innerJoin(userMediaLibrary, userServerJoin)
         .where(inArray(listItem.listId, serverListIds))
         .groupBy(listItem.listId),
-      db
-        .select({
-          listId: listItem.listId,
-          mediaId: listItem.mediaId,
-          posterPath: localizedPosterPath,
-          position: listItem.position,
-          addedAt: listItem.addedAt,
-        })
-        .from(listItem)
-        .innerJoin(media, eq(listItem.mediaId, media.id))
-        .innerJoin(userMediaLibrary, userServerJoin)
-        .leftJoin(mediaTranslation, translationJoin)
-        .where(inArray(listItem.listId, serverListIds))
-        .orderBy(asc(listItem.position), desc(listItem.addedAt)),
+      db.execute<{ list_id: string; poster_path: string | null }>(sql`
+        SELECT list_id, poster_path FROM (
+          SELECT li.list_id,
+                 COALESCE(mt.poster_path, m.poster_path) AS poster_path,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY li.list_id
+                   ORDER BY li.position ASC, li.added_at DESC
+                 ) AS rn
+          FROM list_item li
+          INNER JOIN media m ON m.id = li.media_id
+          INNER JOIN user_media_library uml
+                 ON uml.media_id = li.media_id AND uml.user_id = ${userId}
+          LEFT JOIN media_translation mt
+                 ON mt.media_id = m.id AND mt.language = ${userLang}
+          WHERE li.list_id IN (${sql.join(serverListIds.map((id) => sql`${id}::uuid`), sql`, `)})
+        ) ranked
+        WHERE rn <= 4
+        ORDER BY list_id, rn
+      `),
     ]);
 
     for (const c of countRows) countMap.set(c.listId, c.count);
-
-    const seenPerList = new Map<string, Set<string>>();
-    for (const r of previewRows) {
-      const seen = seenPerList.get(r.listId) ?? new Set<string>();
-      if (seen.has(r.mediaId)) continue;
-      seen.add(r.mediaId);
-      seenPerList.set(r.listId, seen);
-      accumulatePreview(r.listId, r.posterPath);
+    for (const r of previewRows as Array<{ list_id: string; poster_path: string | null }>) {
+      accumulatePreview(r.list_id, r.poster_path);
     }
   }
 
@@ -369,32 +374,44 @@ export async function findListItems(
   const listRow = await findListById(db, listId);
   const isServerLibrary = listRow?.type === "server";
 
-  // Collect member userIds for vote aggregation (members + owner)
-  const memberRows = await db
-    .select({ userId: listMember.userId })
-    .from(listMember)
-    .where(eq(listMember.listId, listId));
-  const memberUserIds = memberRows.map((m) => m.userId);
-  if (listRow?.userId) memberUserIds.push(listRow.userId);
+  // The members-vote aggregation scans `user_media_state` for every member of
+  // the list — heavy for shared collections. Skip it when the caller doesn't
+  // filter or sort by it; the vast majority of carousel reads don't.
+  const needsMemberVotes =
+    membersRatingMin != null ||
+    memberVoteCountMin != null ||
+    sortBy === "members_rating.desc" ||
+    sortBy === "members_rating.asc";
 
-  const memberVotesSubquery = db
-    .select({
-      mediaId: userMediaState.mediaId,
-      totalRating: sql<number>`COALESCE(SUM(${userMediaState.rating}), 0)`.as("member_total_rating"),
-      voteCount: sql<number>`COUNT(${userMediaState.rating})`.as("member_vote_count"),
-      avgRating: sql<number>`CAST(COALESCE(SUM(${userMediaState.rating}), 0) AS float) / NULLIF(COUNT(${userMediaState.rating}), 0)`.as("member_avg_rating"),
-    })
-    .from(userMediaState)
-    .where(
-      memberUserIds.length > 0
-        ? and(
-            inArray(userMediaState.userId, memberUserIds),
-            sql`${userMediaState.rating} IS NOT NULL`,
+  const memberVotesSubquery = needsMemberVotes
+    ? await (async () => {
+        const memberRows = await db
+          .select({ userId: listMember.userId })
+          .from(listMember)
+          .where(eq(listMember.listId, listId));
+        const memberUserIds = memberRows.map((m) => m.userId);
+        if (listRow?.userId) memberUserIds.push(listRow.userId);
+
+        return db
+          .select({
+            mediaId: userMediaState.mediaId,
+            totalRating: sql<number>`COALESCE(SUM(${userMediaState.rating}), 0)`.as("member_total_rating"),
+            voteCount: sql<number>`COUNT(${userMediaState.rating})`.as("member_vote_count"),
+            avgRating: sql<number>`CAST(COALESCE(SUM(${userMediaState.rating}), 0) AS float) / NULLIF(COUNT(${userMediaState.rating}), 0)`.as("member_avg_rating"),
+          })
+          .from(userMediaState)
+          .where(
+            memberUserIds.length > 0
+              ? and(
+                  inArray(userMediaState.userId, memberUserIds),
+                  sql`${userMediaState.rating} IS NOT NULL`,
+                )
+              : sql`FALSE`,
           )
-        : sql`FALSE`,
-    )
-    .groupBy(userMediaState.mediaId)
-    .as("member_votes");
+          .groupBy(userMediaState.mediaId)
+          .as("member_votes");
+      })()
+    : null;
 
   const conditions: SQL[] = [
     eq(listItem.listId, listId),
@@ -402,8 +419,6 @@ export async function findListItems(
   ];
 
   if (isServerLibrary && userId) {
-    // Use the canonical user_media_library table to determine what's in this user's server library.
-    // This is cleaner than the old sync_item-based approach and avoids duplicates.
     const accessibleMediaIds = db
       .select({ mediaId: userMediaLibrary.mediaId })
       .from(userMediaLibrary)
@@ -412,10 +427,10 @@ export async function findListItems(
     conditions.push(sql`${listItem.mediaId} IN (${accessibleMediaIds})`);
   }
 
-  if (membersRatingMin != null) {
+  if (memberVotesSubquery && membersRatingMin != null) {
     conditions.push(sql`COALESCE(${memberVotesSubquery.avgRating}, 0) >= ${membersRatingMin}`);
   }
-  if (memberVoteCountMin != null) {
+  if (memberVotesSubquery && memberVoteCountMin != null) {
     conditions.push(sql`COALESCE(${memberVotesSubquery.voteCount}, 0) >= ${memberVoteCountMin}`);
   }
 
@@ -426,16 +441,15 @@ export async function findListItems(
     } else if (watchStatus === "completed") {
       conditions.push(sql`${userMediaState.status} = 'completed'`);
     } else {
-      // not_started: no state row OR status = 'planned'
       conditions.push(sql`(${userMediaState.status} IS NULL OR ${userMediaState.status} = 'planned')`);
     }
   }
 
   const orderByExpr = (() => {
-    if (sortBy === "members_rating.desc") {
+    if (memberVotesSubquery && sortBy === "members_rating.desc") {
       return [sql`${memberVotesSubquery.avgRating} DESC NULLS LAST`];
     }
-    if (sortBy === "members_rating.asc") {
+    if (memberVotesSubquery && sortBy === "members_rating.asc") {
       return [sql`${memberVotesSubquery.avgRating} ASC NULLS LAST`];
     }
     const customSort = recsSortOrder(sortBy);
@@ -449,51 +463,110 @@ export async function findListItems(
     ? and(eq(userMediaState.mediaId, media.id), eq(userMediaState.userId, userId!))
     : null;
 
-  const [rows, [countRow]] = await Promise.all([
-    (userStateJoin
-      ? db
-          .select({
-            listItem: listItem,
-            media: media,
-            memberTotalRating: memberVotesSubquery.totalRating,
-            memberVoteCount: memberVotesSubquery.voteCount,
-            memberAvgRating: memberVotesSubquery.avgRating,
-            userRating: userMediaState.rating,
-          })
-          .from(listItem)
-          .innerJoin(media, eq(listItem.mediaId, media.id))
-          .leftJoin(memberVotesSubquery, eq(memberVotesSubquery.mediaId, media.id))
-          .leftJoin(userMediaState, userStateJoin)
-      : db
-          .select({
-            listItem: listItem,
-            media: media,
-            memberTotalRating: memberVotesSubquery.totalRating,
-            memberVoteCount: memberVotesSubquery.voteCount,
-            memberAvgRating: memberVotesSubquery.avgRating,
-          })
-          .from(listItem)
-          .innerJoin(media, eq(listItem.mediaId, media.id))
-          .leftJoin(memberVotesSubquery, eq(memberVotesSubquery.mediaId, media.id))
-    )
+  // Four query shapes — picked to keep Drizzle's chained query builder happy
+  // (the builder loses type info when joins are added through a mutable
+  // variable). Each branch owns its full SELECT/JOIN chain end-to-end.
+  type ItemRow = {
+    listItem: typeof listItem.$inferSelect;
+    media: typeof media.$inferSelect;
+    memberTotalRating?: number | null;
+    memberVoteCount?: number | null;
+    memberAvgRating?: number | null;
+    userRating?: number | null;
+  };
+
+  const itemsP: Promise<ItemRow[]> = (async () => {
+    if (memberVotesSubquery && userStateJoin) {
+      return db
+        .select({
+          listItem,
+          media,
+          memberTotalRating: memberVotesSubquery.totalRating,
+          memberVoteCount: memberVotesSubquery.voteCount,
+          memberAvgRating: memberVotesSubquery.avgRating,
+          userRating: userMediaState.rating,
+        })
+        .from(listItem)
+        .innerJoin(media, eq(listItem.mediaId, media.id))
+        .leftJoin(memberVotesSubquery, eq(memberVotesSubquery.mediaId, media.id))
+        .leftJoin(userMediaState, userStateJoin)
+        .where(whereClause)
+        .orderBy(...orderByExpr)
+        .limit(lim)
+        .offset(off);
+    }
+    if (memberVotesSubquery) {
+      return db
+        .select({
+          listItem,
+          media,
+          memberTotalRating: memberVotesSubquery.totalRating,
+          memberVoteCount: memberVotesSubquery.voteCount,
+          memberAvgRating: memberVotesSubquery.avgRating,
+        })
+        .from(listItem)
+        .innerJoin(media, eq(listItem.mediaId, media.id))
+        .leftJoin(memberVotesSubquery, eq(memberVotesSubquery.mediaId, media.id))
+        .where(whereClause)
+        .orderBy(...orderByExpr)
+        .limit(lim)
+        .offset(off);
+    }
+    if (userStateJoin) {
+      return db
+        .select({ listItem, media, userRating: userMediaState.rating })
+        .from(listItem)
+        .innerJoin(media, eq(listItem.mediaId, media.id))
+        .leftJoin(userMediaState, userStateJoin)
+        .where(whereClause)
+        .orderBy(...orderByExpr)
+        .limit(lim)
+        .offset(off);
+    }
+    return db
+      .select({ listItem, media })
+      .from(listItem)
+      .innerJoin(media, eq(listItem.mediaId, media.id))
       .where(whereClause)
       .orderBy(...orderByExpr)
       .limit(lim)
-      .offset(off),
-    (userStateJoin
-      ? db
-          .select({ total: count() })
-          .from(listItem)
-          .innerJoin(media, eq(listItem.mediaId, media.id))
-          .leftJoin(memberVotesSubquery, eq(memberVotesSubquery.mediaId, media.id))
-          .leftJoin(userMediaState, userStateJoin)
-      : db
-          .select({ total: count() })
-          .from(listItem)
-          .innerJoin(media, eq(listItem.mediaId, media.id))
-          .leftJoin(memberVotesSubquery, eq(memberVotesSubquery.mediaId, media.id))
-    ).where(whereClause),
-  ]);
+      .offset(off);
+  })();
+
+  const countP: Promise<Array<{ total: number }>> = (async () => {
+    if (memberVotesSubquery && userStateJoin) {
+      return db
+        .select({ total: count() })
+        .from(listItem)
+        .innerJoin(media, eq(listItem.mediaId, media.id))
+        .leftJoin(memberVotesSubquery, eq(memberVotesSubquery.mediaId, media.id))
+        .leftJoin(userMediaState, userStateJoin)
+        .where(whereClause);
+    }
+    if (memberVotesSubquery) {
+      return db
+        .select({ total: count() })
+        .from(listItem)
+        .innerJoin(media, eq(listItem.mediaId, media.id))
+        .leftJoin(memberVotesSubquery, eq(memberVotesSubquery.mediaId, media.id))
+        .where(whereClause);
+    }
+    if (userStateJoin) {
+      return db
+        .select({ total: count() })
+        .from(listItem)
+        .innerJoin(media, eq(listItem.mediaId, media.id))
+        .leftJoin(userMediaState, userStateJoin)
+        .where(whereClause);
+    }
+    return db
+      .select({ total: count() })
+      .from(listItem)
+      .innerJoin(media, eq(listItem.mediaId, media.id))
+      .where(whereClause);
+  })();
+
+  const [rows, [countRow]] = await Promise.all([itemsP, countP]);
 
   const membership = userId
     ? await getMembershipForMedia(
@@ -506,9 +579,7 @@ export async function findListItems(
 
   const items = rows.map((row) => {
     const userRating =
-      "userRating" in row && row.userRating != null
-        ? Number(row.userRating)
-        : null;
+      row.userRating != null ? Number(row.userRating) : null;
     return {
       listItem: row.listItem,
       media: row.media,

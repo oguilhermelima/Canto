@@ -14,7 +14,7 @@ interface LazySectionProps {
 export function LazySection({
   id,
   minHeight,
-  rootMargin = "800px 0px",
+  rootMargin = "200px 0px",
   eager = false,
   keepMounted = true,
   children,
