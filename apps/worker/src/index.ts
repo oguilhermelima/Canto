@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
 
+import { handleBackfillUserRecDenorm } from "./jobs/backfill-user-rec-denorm";
 import { handleImportTorrents } from "./jobs/import-torrents";
 import {
   handleJellyfinSync,
@@ -337,6 +338,14 @@ async function main(): Promise<void> {
   await probeRedis();
   await setupSchedules();
   await seedLanguages(db);
+
+  // One-shot denormalization backfill. Idempotent (skips fully-populated
+  // rows via WHERE), runs only when there's something to fix. Heals users
+  // whose recs were rebuilt before a denorm column was added.
+  handleBackfillUserRecDenorm(db).catch((err) => {
+    console.error("[worker] backfill-user-rec-denorm failed at boot:", err);
+  });
+
   console.log("Workers started. Waiting for jobs...");
 }
 

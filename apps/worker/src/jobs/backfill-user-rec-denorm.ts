@@ -19,7 +19,12 @@ export async function handleBackfillUserRecDenorm(db: Database): Promise<void> {
   let cursor: string | null = null;
   let totalUpdated = 0;
 
-  // Iterate by primary-key range to keep each statement bounded.
+  // Iterate by primary-key range to keep each statement bounded. The WHERE
+  // covers two stale shapes:
+  //  1. `title IS NULL` — pre-denorm rows from the first migration deploy.
+  //  2. `overview IS NULL AND genres IS NULL` — rows from a deploy that
+  //     ran between the title denorm and the overview/genres denorm.
+  // Both heal idempotently in one pass.
   // eslint-disable-next-line no-constant-condition
   while (true) {
     const result = await db.execute(
@@ -27,7 +32,7 @@ export async function handleBackfillUserRecDenorm(db: Database): Promise<void> {
         WITH batch AS (
           SELECT ur.id
           FROM user_recommendation ur
-          WHERE ur.title IS NULL
+          WHERE (ur.title IS NULL OR (ur.overview IS NULL AND ur.genres IS NULL))
             ${cursor ? sql`AND ur.id > ${cursor}` : sql``}
           ORDER BY ur.id
           LIMIT ${CHUNK_SIZE}
@@ -39,12 +44,14 @@ export async function handleBackfillUserRecDenorm(db: Database): Promise<void> {
             provider = m.provider,
             type = m.type,
             title = m.title,
+            overview = m.overview,
             poster_path = m.poster_path,
             backdrop_path = m.backdrop_path,
             logo_path = m.logo_path,
             vote_average = m.vote_average,
             year = m.year,
             release_date = m.release_date,
+            genres = m.genres,
             genre_ids = m.genre_ids,
             runtime = m.runtime,
             original_language = m.original_language,
