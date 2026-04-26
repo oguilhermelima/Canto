@@ -186,4 +186,21 @@ export const mediaDiscoveryRouter = createTRPCRouter({
         recsVersion: userRow?.recsVersion ?? 0,
       }, tmdb);
     }),
+
+  /**
+   * Light polling endpoint: returns just the rec version + last-updated
+   * timestamp from the `user` row. Lets the client cheaply detect when the
+   * heavy `recommendations` query needs to be invalidated, without paying
+   * for the full denormalized read each tick.
+   */
+  recommendationsVersion: protectedProcedure.query(async ({ ctx }) => {
+    const row = await ctx.db.query.user.findFirst({
+      where: eq(user.id, ctx.session.user.id),
+      columns: { recsVersion: true, recsUpdatedAt: true },
+    });
+    return {
+      recsVersion: row?.recsVersion ?? 0,
+      recsUpdatedAt: row?.recsUpdatedAt ?? null,
+    };
+  }),
 });

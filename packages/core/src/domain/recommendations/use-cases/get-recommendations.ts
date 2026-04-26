@@ -48,6 +48,9 @@ export async function getRecommendations(
   // instead of returning an empty list.
   const userRecCount = await countUserRecommendations(db, userId);
   if (userRecCount > 0) {
+    // The repo applies translation overlay inline via a LEFT JOIN on
+    // `media_translation`, so we skip the post-query `translateMediaItems`
+    // call — it would just re-resolve the same translation row.
     const rows = await findUserRecommendations(
       db,
       userId,
@@ -55,13 +58,13 @@ export async function getRecommendations(
       pageSize + 1,
       offset,
       filters,
+      userLang,
     );
 
     if (rows.length > 0) {
       const hasMore = rows.length > pageSize;
       const items = rows.slice(0, pageSize).map(mapPoolItem);
-      const translatedItems = await translateMediaItems(db, items, userLang);
-      return { items: translatedItems, nextCursor: hasMore ? page + 1 : null, version: recsVersion };
+      return { items, nextCursor: hasMore ? page + 1 : null, version: recsVersion };
     }
   }
 

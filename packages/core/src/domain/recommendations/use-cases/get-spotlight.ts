@@ -32,10 +32,11 @@ export async function getSpotlight(
 ) {
   const { excludeSet, excludeItems } = await buildExclusionSet(db, userId);
 
-  // Path 1: Per-user spotlight
-  const userItems = await findUserSpotlightItems(db, userId, excludeItems, SPOTLIGHT_LIMIT);
+  // Path 1: Per-user spotlight — repo applies translation overlay inline via
+  // LEFT JOIN on `media_translation`, so we skip the post-query overlay call.
+  const userItems = await findUserSpotlightItems(db, userId, excludeItems, SPOTLIGHT_LIMIT, userLang);
   if (userItems.length > 0) {
-    return translateMediaItems(db, userItems.map(mapPoolItem), userLang);
+    return userItems.map(mapPoolItem);
   }
 
   // Path 2: Global pool fallback

@@ -765,6 +765,30 @@ export const userRecommendation = pgTable(
     weight: real("weight").notNull().default(1.0),
     version: integer("version").notNull().default(0),
     active: boolean("active").notNull().default(true),
+
+    // ─── Denormalized media columns (perf) ──────────────────────────────
+    // Populated by `rebuildUserRecommendations` / `upsertUserRecommendations`.
+    // All nullable to allow gradual backfill of pre-existing rows; the daily
+    // safety-net rebuild in `enqueueDailyRecsRebuild` self-heals stale users
+    // within 24h. `findUserRecommendations` filters out rows whose `title` is
+    // null (proxy for "not yet backfilled").
+    externalId: integer("external_id"),
+    provider: varchar("provider", { length: 20 }),
+    type: varchar("type", { length: 10 }),
+    title: varchar("title", { length: 500 }),
+    posterPath: varchar("poster_path", { length: 255 }),
+    backdropPath: varchar("backdrop_path", { length: 255 }),
+    logoPath: varchar("logo_path", { length: 255 }),
+    voteAverage: real("vote_average"),
+    year: integer("year"),
+    releaseDate: date("release_date"),
+    genreIds: jsonb("genre_ids").$type<number[]>(),
+    runtime: integer("runtime"),
+    originalLanguage: varchar("original_language", { length: 10 }),
+    contentRating: varchar("content_rating", { length: 20 }),
+    status: varchar("status", { length: 50 }),
+    popularity: real("popularity"),
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -772,6 +796,10 @@ export const userRecommendation = pgTable(
   (table) => [
     uniqueIndex("idx_user_rec_user_media_ver").on(table.userId, table.mediaId, table.version),
     index("idx_user_rec_user_active").on(table.userId, table.active),
+    // Hot read-path: `findUserRecommendations` filters by (userId, active) and
+    // sorts by `weight DESC`. The composite covers both halves so Postgres can
+    // do an index scan + early-stop limit instead of a heap sort.
+    index("idx_user_rec_hot").on(table.userId, table.active, sql`${table.weight} DESC`),
   ],
 );
 

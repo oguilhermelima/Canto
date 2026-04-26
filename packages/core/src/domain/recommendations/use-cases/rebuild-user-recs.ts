@@ -11,6 +11,7 @@ import {
 import {
   rebuildUserRecommendations,
   upsertUserRecommendations,
+  type UserRecommendationRow,
 } from "../../../infra/recommendations/user-recommendation-repository";
 
 const MAX_SEEDS = 10;
@@ -19,6 +20,75 @@ const MAX_SERVER_SOURCES = 10;
 const MAX_POOL_RANK = 20;
 const SERVER_BASE_WEIGHT = 0.4;
 const COLLECTION_BASE_WEIGHT = 0.6;
+
+/**
+ * Columns we read from `media` in every seed-recommendation query so we can
+ * persist them denormalized on `user_recommendation`. Centralized here so the
+ * SELECT shape stays in lockstep across the watchlist / collection / server
+ * paths.
+ */
+const recCandidateColumns = {
+  mediaId: mediaRecommendation.mediaId,
+  externalId: media.externalId,
+  provider: media.provider,
+  type: media.type,
+  title: media.title,
+  posterPath: media.posterPath,
+  backdropPath: media.backdropPath,
+  logoPath: media.logoPath,
+  voteAverage: media.voteAverage,
+  year: media.year,
+  releaseDate: media.releaseDate,
+  genreIds: media.genreIds,
+  runtime: media.runtime,
+  originalLanguage: media.originalLanguage,
+  contentRating: media.contentRating,
+  status: media.status,
+  popularity: media.popularity,
+};
+
+type RecCandidate = {
+  mediaId: string;
+  externalId: number;
+  provider: string;
+  type: string;
+  title: string;
+  posterPath: string | null;
+  backdropPath: string | null;
+  logoPath: string | null;
+  voteAverage: number | null;
+  year: number | null;
+  releaseDate: string | null;
+  genreIds: number[] | null;
+  runtime: number | null;
+  originalLanguage: string | null;
+  contentRating: string | null;
+  status: string | null;
+  popularity: number | null;
+};
+
+function toRecRow(candidate: RecCandidate, weight: number): UserRecommendationRow {
+  return {
+    mediaId: candidate.mediaId,
+    weight,
+    externalId: candidate.externalId,
+    provider: candidate.provider,
+    type: candidate.type,
+    title: candidate.title,
+    posterPath: candidate.posterPath,
+    backdropPath: candidate.backdropPath,
+    logoPath: candidate.logoPath,
+    voteAverage: candidate.voteAverage,
+    year: candidate.year,
+    releaseDate: candidate.releaseDate,
+    genreIds: candidate.genreIds,
+    runtime: candidate.runtime,
+    originalLanguage: candidate.originalLanguage,
+    contentRating: candidate.contentRating,
+    status: candidate.status,
+    popularity: candidate.popularity,
+  };
+}
 
 /**
  * Weight multiplier based on rank within a source's recommendation items.
@@ -125,13 +195,13 @@ export async function rebuildUserRecs(
     Math.min(MAX_SEEDS_FROM_COLLECTIONS, MAX_SEEDS - seedMediaIds.length),
   );
 
-  const rows: Array<{ mediaId: string; weight: number }> = [];
+  const rows: UserRecommendationRow[] = [];
 
   // 3. Process watchlist seeds (primary source)
   for (let pos = 0; pos < seedMediaIds.length; pos++) {
     const sw = sourceWeight(pos);
     const recItems = await db
-      .select({ mediaId: mediaRecommendation.mediaId })
+      .select(recCandidateColumns)
       .from(mediaRecommendation)
       .innerJoin(media, eq(media.id, mediaRecommendation.mediaId))
       .where(and(
@@ -142,10 +212,7 @@ export async function rebuildUserRecs(
       .limit(MAX_POOL_RANK);
 
     for (let rank = 0; rank < recItems.length; rank++) {
-      rows.push({
-        mediaId: recItems[rank]!.mediaId,
-        weight: sw * rankMultiplier(rank + 1),
-      });
+      rows.push(toRecRow(recItems[rank]!, sw * rankMultiplier(rank + 1)));
     }
   }
 
@@ -153,7 +220,7 @@ export async function rebuildUserRecs(
   for (let pos = 0; pos < collectionSeedMediaIds.length; pos++) {
     const sw = COLLECTION_BASE_WEIGHT * (1.0 - (pos / MAX_SEEDS_FROM_COLLECTIONS) * 0.4);
     const recItems = await db
-      .select({ mediaId: mediaRecommendation.mediaId })
+      .select(recCandidateColumns)
       .from(mediaRecommendation)
       .innerJoin(media, eq(media.id, mediaRecommendation.mediaId))
       .where(and(
@@ -164,10 +231,7 @@ export async function rebuildUserRecs(
       .limit(MAX_POOL_RANK);
 
     for (let rank = 0; rank < recItems.length; rank++) {
-      rows.push({
-        mediaId: recItems[rank]!.mediaId,
-        weight: sw * rankMultiplier(rank + 1),
-      });
+      rows.push(toRecRow(recItems[rank]!, sw * rankMultiplier(rank + 1)));
     }
   }
 
@@ -186,7 +250,7 @@ export async function rebuildUserRecs(
 
     for (const source of serverSources) {
       const recItems = await db
-        .select({ mediaId: mediaRecommendation.mediaId })
+        .select(recCandidateColumns)
         .from(mediaRecommendation)
         .innerJoin(media, eq(media.id, mediaRecommendation.mediaId))
         .where(and(
@@ -197,10 +261,7 @@ export async function rebuildUserRecs(
         .limit(8);
 
       for (let rank = 0; rank < recItems.length; rank++) {
-        rows.push({
-          mediaId: recItems[rank]!.mediaId,
-          weight: SERVER_BASE_WEIGHT * rankMultiplier(rank + 1),
-        });
+        rows.push(toRecRow(recItems[rank]!, SERVER_BASE_WEIGHT * rankMultiplier(rank + 1)));
       }
     }
   }
@@ -228,7 +289,7 @@ export async function addMediaToUserRecs(
   mediaId: string,
 ): Promise<void> {
   const recItems = await db
-    .select({ mediaId: mediaRecommendation.mediaId })
+    .select(recCandidateColumns)
     .from(mediaRecommendation)
     .innerJoin(media, eq(media.id, mediaRecommendation.mediaId))
     .where(and(
@@ -241,10 +302,7 @@ export async function addMediaToUserRecs(
   if (recItems.length === 0) return;
 
   // New item gets top sourceWeight (position 0)
-  const rows = recItems.map((p, rank) => ({
-    mediaId: p.mediaId,
-    weight: 1.0 * rankMultiplier(rank + 1),
-  }));
+  const rows = recItems.map((p, rank) => toRecRow(p, 1.0 * rankMultiplier(rank + 1)));
 
   await upsertUserRecommendations(db, userId, rows);
 

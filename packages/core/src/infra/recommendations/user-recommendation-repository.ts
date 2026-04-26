@@ -2,23 +2,73 @@ import { and, desc, eq, sql, count } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
   user,
-  list,
-  listItem,
-  media,
   mediaRecommendation,
+  mediaTranslation,
   mediaVideo,
   userRecommendation,
 } from "@canto/db/schema";
 import type { RecsFilters } from "../../domain/recommendations/types/recs-filters";
-import { buildRecsFilterConditions, recsSortOrder } from "./recs-filter-builder";
+import {
+  buildRecsFilterConditions,
+  recsSortOrder,
+  USER_REC_COLUMNS,
+} from "./recs-filter-builder";
 
-/** Keep only the highest weight per mediaId. */
-function bestWeightByMedia(rows: Array<{ mediaId: string; weight: number }>): Map<string, number> {
-  const best = new Map<string, number>();
+/**
+ * Row shape carried through `rebuildUserRecommendations` /
+ * `upsertUserRecommendations`. Everything past `weight` is denormalized
+ * directly from the source `media` row so the read path can skip the JOIN.
+ */
+export interface UserRecommendationRow {
+  mediaId: string;
+  weight: number;
+  externalId: number | null;
+  provider: string | null;
+  type: string | null;
+  title: string | null;
+  posterPath: string | null;
+  backdropPath: string | null;
+  logoPath: string | null;
+  voteAverage: number | null;
+  year: number | null;
+  releaseDate: string | null;
+  genreIds: number[] | null;
+  runtime: number | null;
+  originalLanguage: string | null;
+  contentRating: string | null;
+  status: string | null;
+  popularity: number | null;
+}
+
+/**
+ * Read shape returned by `findUserRecommendations` / `findUserSpotlightItems`.
+ * The fields we *guarantee* by the WHERE clause (`title IS NOT NULL` implies
+ * the row was populated by the denormalizing rebuild) are narrowed to
+ * non-null here so callers don't have to re-check.
+ */
+export interface UserRecommendationReadRow {
+  id: string;
+  externalId: number;
+  provider: string;
+  mediaType: "movie" | "show";
+  title: string;
+  posterPath: string | null;
+  backdropPath: string | null;
+  logoPath: string | null;
+  releaseDate: string | null;
+  voteAverage: number | null;
+  genreIds: number[] | null;
+  trailerKey: string | null;
+  relevance: number;
+}
+
+/** Keep only the highest weight per mediaId, preserving denormalized fields. */
+function bestRowByMedia(rows: UserRecommendationRow[]): Map<string, UserRecommendationRow> {
+  const best = new Map<string, UserRecommendationRow>();
   for (const r of rows) {
     const existing = best.get(r.mediaId);
-    if (existing === undefined || r.weight > existing) {
-      best.set(r.mediaId, r.weight);
+    if (existing === undefined || r.weight > existing.weight) {
+      best.set(r.mediaId, r);
     }
   }
   return best;
@@ -34,7 +84,7 @@ function bestWeightByMedia(rows: Array<{ mediaId: string; weight: number }>): Ma
 export async function rebuildUserRecommendations(
   db: Database,
   userId: string,
-  rows: Array<{ mediaId: string; weight: number }>,
+  rows: UserRecommendationRow[],
 ): Promise<void> {
   // Get current version
   const userRow = await db.query.user.findFirst({
@@ -44,12 +94,28 @@ export async function rebuildUserRecommendations(
   const currentVersion = userRow?.recsVersion ?? 0;
   const nextVersion = currentVersion + 1;
 
-  const deduped = [...bestWeightByMedia(rows).entries()].map(([mediaId, weight]) => ({
+  const deduped = [...bestRowByMedia(rows).values()].map((r) => ({
     userId,
-    mediaId,
-    weight,
+    mediaId: r.mediaId,
+    weight: r.weight,
     version: nextVersion,
     active: false,
+    externalId: r.externalId,
+    provider: r.provider,
+    type: r.type,
+    title: r.title,
+    posterPath: r.posterPath,
+    backdropPath: r.backdropPath,
+    logoPath: r.logoPath,
+    voteAverage: r.voteAverage,
+    year: r.year,
+    releaseDate: r.releaseDate,
+    genreIds: r.genreIds,
+    runtime: r.runtime,
+    originalLanguage: r.originalLanguage,
+    contentRating: r.contentRating,
+    status: r.status,
+    popularity: r.popularity,
   }));
 
   // Step 1: Insert new rows as inactive (outside transaction for performance)
@@ -110,7 +176,7 @@ export async function rebuildUserRecommendations(
 export async function upsertUserRecommendations(
   db: Database,
   userId: string,
-  rows: Array<{ mediaId: string; weight: number }>,
+  rows: UserRecommendationRow[],
 ): Promise<void> {
   if (rows.length === 0) return;
 
@@ -120,12 +186,28 @@ export async function upsertUserRecommendations(
   });
   const currentVersion = userRow?.recsVersion ?? 0;
 
-  const deduped = [...bestWeightByMedia(rows).entries()].map(([mediaId, weight]) => ({
+  const deduped = [...bestRowByMedia(rows).values()].map((r) => ({
     userId,
-    mediaId,
-    weight,
+    mediaId: r.mediaId,
+    weight: r.weight,
     version: currentVersion,
     active: true,
+    externalId: r.externalId,
+    provider: r.provider,
+    type: r.type,
+    title: r.title,
+    posterPath: r.posterPath,
+    backdropPath: r.backdropPath,
+    logoPath: r.logoPath,
+    voteAverage: r.voteAverage,
+    year: r.year,
+    releaseDate: r.releaseDate,
+    genreIds: r.genreIds,
+    runtime: r.runtime,
+    originalLanguage: r.originalLanguage,
+    contentRating: r.contentRating,
+    status: r.status,
+    popularity: r.popularity,
   }));
 
   for (let i = 0; i < deduped.length; i += 500) {
@@ -140,9 +222,66 @@ export async function upsertUserRecommendations(
 export type { RecsFilters } from "../../domain/recommendations/types/recs-filters";
 
 /**
+ * Narrow the raw row to `UserRecommendationReadRow`. The query's WHERE clause
+ * already guarantees `title IS NOT NULL`, and rebuilds always populate
+ * `externalId` / `provider` / `type` together with `title`, so the runtime
+ * filter is defensive — TS just doesn't know that.
+ */
+function narrowReadRow(r: {
+  id: string;
+  externalId: number | null;
+  provider: string | null;
+  mediaType: string | null;
+  title: string | null;
+  posterPath: string | null;
+  backdropPath: string | null;
+  logoPath: string | null;
+  releaseDate: string | null;
+  voteAverage: number | null;
+  genreIds: number[] | null;
+  trailerKey?: string | null;
+  relevance: number;
+}): UserRecommendationReadRow | null {
+  if (
+    r.externalId === null
+    || r.provider === null
+    || r.mediaType === null
+    || r.title === null
+  ) {
+    return null;
+  }
+  if (r.mediaType !== "movie" && r.mediaType !== "show") return null;
+
+  return {
+    id: r.id,
+    externalId: r.externalId,
+    provider: r.provider,
+    mediaType: r.mediaType,
+    title: r.title,
+    posterPath: r.posterPath,
+    backdropPath: r.backdropPath,
+    logoPath: r.logoPath,
+    releaseDate: r.releaseDate,
+    voteAverage: r.voteAverage,
+    genreIds: r.genreIds,
+    trailerKey: r.trailerKey ?? null,
+    relevance: r.relevance,
+  };
+}
+
+/**
  * Per-user recommendation query.
- * Only reads active rows. JOINs with media,
- * groups by media fields to dedup, orders by SUM(weight).
+ *
+ * Reads denormalized columns directly off `user_recommendation` — no JOIN with
+ * `media` and no GROUP BY/SUM, since the row is already 1-per-(user, media)
+ * with the desired weight stored in place.
+ *
+ * Translation is overlaid via a LEFT JOIN on `media_translation` keyed on the
+ * existing `mediaId` FK, so we only pay one extra index lookup per row when a
+ * non-English language is set on the user.
+ *
+ * Rows whose `title` column is null are skipped — they are pre-denormalization
+ * artefacts and will self-heal on the next daily rebuild.
  */
 export async function findUserRecommendations(
   db: Database,
@@ -151,73 +290,108 @@ export async function findUserRecommendations(
   limit: number,
   offset: number,
   filters: RecsFilters = {},
-) {
+  language = "en-US",
+): Promise<UserRecommendationReadRow[]> {
+  const useTranslations = !!language && !language.startsWith("en");
+
   const excludeClause =
     excludeItems.length > 0
       ? sql`AND NOT (${sql.join(
           excludeItems.map(
-            (item) => sql`(${media.externalId} = ${item.externalId} AND ${media.provider} = ${item.provider})`,
+            (item) => sql`(${userRecommendation.externalId} = ${item.externalId} AND ${userRecommendation.provider} = ${item.provider})`,
           ),
           sql` OR `,
         )})`
       : sql``;
 
-  const filterConditions = buildRecsFilterConditions(filters);
+  const filterConditions = buildRecsFilterConditions(filters, USER_REC_COLUMNS);
   const filterClauses = filterConditions.map((c) => sql`AND ${c}`);
 
-  const customSort = recsSortOrder(filters.sortBy);
+  const customSort = recsSortOrder(filters.sortBy, USER_REC_COLUMNS);
 
-  return db
-    .select({
-      id: media.id,
-      externalId: media.externalId,
-      provider: media.provider,
-      mediaType: media.type,
-      title: media.title,
-      overview: media.overview,
-      posterPath: media.posterPath,
-      backdropPath: media.backdropPath,
-      logoPath: media.logoPath,
-      releaseDate: media.releaseDate,
-      voteAverage: media.voteAverage,
-      genres: media.genres,
-      genreIds: media.genreIds,
-      trailerKey: sql<string | null>`(SELECT ${mediaVideo.externalKey} FROM ${mediaVideo} WHERE ${mediaVideo.mediaId} = ${media.id} AND ${mediaVideo.type} = 'Trailer' AND ${mediaVideo.site} = 'YouTube' LIMIT 1)`,
-      relevance: sql<number>`SUM(${userRecommendation.weight})`,
-    })
+  const baseSelect = {
+    id: userRecommendation.mediaId,
+    externalId: userRecommendation.externalId,
+    provider: userRecommendation.provider,
+    mediaType: userRecommendation.type,
+    title: userRecommendation.title,
+    posterPath: userRecommendation.posterPath,
+    backdropPath: userRecommendation.backdropPath,
+    logoPath: userRecommendation.logoPath,
+    releaseDate: userRecommendation.releaseDate,
+    voteAverage: userRecommendation.voteAverage,
+    genreIds: userRecommendation.genreIds,
+    trailerKey: sql<string | null>`(SELECT ${mediaVideo.externalKey} FROM ${mediaVideo} WHERE ${mediaVideo.mediaId} = ${userRecommendation.mediaId} AND ${mediaVideo.type} = 'Trailer' AND ${mediaVideo.site} = 'YouTube' LIMIT 1)`,
+    relevance: userRecommendation.weight,
+  };
+
+  const where = sql`${userRecommendation.userId} = ${userId}
+    AND ${userRecommendation.active} = true
+    AND ${userRecommendation.title} IS NOT NULL
+    AND (${userRecommendation.releaseDate} <= CURRENT_DATE OR ${userRecommendation.releaseDate} IS NULL)
+    ${excludeClause}
+    ${sql.join(filterClauses, sql` `)}`;
+
+  if (useTranslations) {
+    const rows = await db
+      .select({
+        ...baseSelect,
+        translatedTitle: mediaTranslation.title,
+        translatedPosterPath: mediaTranslation.posterPath,
+        translatedLogoPath: mediaTranslation.logoPath,
+      })
+      .from(userRecommendation)
+      .leftJoin(
+        mediaTranslation,
+        and(
+          eq(mediaTranslation.mediaId, userRecommendation.mediaId),
+          eq(mediaTranslation.language, language),
+        ),
+      )
+      .where(where)
+      .orderBy(customSort ?? desc(userRecommendation.weight))
+      .limit(limit)
+      .offset(offset);
+
+    const out: UserRecommendationReadRow[] = [];
+    for (const r of rows) {
+      const narrowed = narrowReadRow({
+        id: r.id,
+        externalId: r.externalId,
+        provider: r.provider,
+        mediaType: r.mediaType,
+        title:
+          r.translatedTitle && r.translatedTitle.trim().length > 0
+            ? r.translatedTitle
+            : r.title,
+        posterPath: r.translatedPosterPath ?? r.posterPath,
+        backdropPath: r.backdropPath,
+        logoPath: r.translatedLogoPath ?? r.logoPath,
+        releaseDate: r.releaseDate,
+        voteAverage: r.voteAverage,
+        genreIds: r.genreIds,
+        trailerKey: r.trailerKey,
+        relevance: r.relevance,
+      });
+      if (narrowed) out.push(narrowed);
+    }
+    return out;
+  }
+
+  const rows = await db
+    .select(baseSelect)
     .from(userRecommendation)
-    .innerJoin(
-      media,
-      eq(media.id, userRecommendation.mediaId),
-    )
-    .where(
-      sql`${userRecommendation.userId} = ${userId}
-        AND ${userRecommendation.active} = true
-        AND ${media.metadataUpdatedAt} IS NOT NULL
-        AND (${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL)
-        ${excludeClause}
-        ${sql.join(filterClauses, sql` `)}`,
-    )
-    .groupBy(
-      media.id,
-      media.externalId,
-      media.provider,
-      media.type,
-      media.title,
-      media.overview,
-      media.posterPath,
-      media.backdropPath,
-      media.logoPath,
-      media.releaseDate,
-      media.voteAverage,
-      media.genres,
-      media.genreIds,
-    )
-    .orderBy(
-      customSort ?? desc(sql`SUM(${userRecommendation.weight})`),
-    )
+    .where(where)
+    .orderBy(customSort ?? desc(userRecommendation.weight))
     .limit(limit)
     .offset(offset);
+
+  const out: UserRecommendationReadRow[] = [];
+  for (const r of rows) {
+    const narrowed = narrowReadRow(r);
+    if (narrowed) out.push(narrowed);
+  }
+  return out;
 }
 
 /** Count active user_recommendation rows for a user (to decide fallback). */
@@ -232,6 +406,7 @@ export async function countUserRecommendations(
       and(
         eq(userRecommendation.userId, userId),
         eq(userRecommendation.active, true),
+        sql`${userRecommendation.title} IS NOT NULL`,
       ),
     );
   return row?.count ?? 0;
@@ -295,72 +470,105 @@ export async function findUsersForDailyRecsCheck(
 
 /**
  * Per-user spotlight: top-weighted active items from user_recommendation
- * that have a backdrop, grouped/deduped by media fields.
+ * that have a backdrop. Reads denormalized columns directly — no JOIN with
+ * `media`, no GROUP BY/SUM. Translation overlay matches `findUserRecommendations`.
  */
 export async function findUserSpotlightItems(
   db: Database,
   userId: string,
   excludeItems: Array<{ externalId: number; provider: string }>,
   limit: number,
-) {
+  language = "en-US",
+): Promise<UserRecommendationReadRow[]> {
+  const useTranslations = !!language && !language.startsWith("en");
+
   const excludeClause =
     excludeItems.length > 0
       ? sql`AND NOT (${sql.join(
           excludeItems.map(
-            (item) => sql`(${media.externalId} = ${item.externalId} AND ${media.provider} = ${item.provider})`,
+            (item) => sql`(${userRecommendation.externalId} = ${item.externalId} AND ${userRecommendation.provider} = ${item.provider})`,
           ),
           sql` OR `,
         )})`
       : sql``;
 
-  return db
-    .select({
-      id: media.id,
-      externalId: media.externalId,
-      provider: media.provider,
-      mediaType: media.type,
-      title: media.title,
-      overview: media.overview,
-      posterPath: media.posterPath,
-      backdropPath: media.backdropPath,
-      logoPath: media.logoPath,
-      releaseDate: media.releaseDate,
-      voteAverage: media.voteAverage,
-      genres: media.genres,
-      genreIds: media.genreIds,
-      relevance: sql<number>`SUM(${userRecommendation.weight})`,
-    })
+  const baseSelect = {
+    id: userRecommendation.mediaId,
+    externalId: userRecommendation.externalId,
+    provider: userRecommendation.provider,
+    mediaType: userRecommendation.type,
+    title: userRecommendation.title,
+    posterPath: userRecommendation.posterPath,
+    backdropPath: userRecommendation.backdropPath,
+    logoPath: userRecommendation.logoPath,
+    releaseDate: userRecommendation.releaseDate,
+    voteAverage: userRecommendation.voteAverage,
+    genreIds: userRecommendation.genreIds,
+    relevance: userRecommendation.weight,
+  };
+
+  const where = sql`${userRecommendation.userId} = ${userId}
+    AND ${userRecommendation.active} = true
+    AND ${userRecommendation.title} IS NOT NULL
+    AND ${userRecommendation.backdropPath} IS NOT NULL
+    AND (${userRecommendation.releaseDate} <= CURRENT_DATE OR ${userRecommendation.releaseDate} IS NULL)
+    ${excludeClause}`;
+
+  if (useTranslations) {
+    const rows = await db
+      .select({
+        ...baseSelect,
+        translatedTitle: mediaTranslation.title,
+        translatedPosterPath: mediaTranslation.posterPath,
+        translatedLogoPath: mediaTranslation.logoPath,
+      })
+      .from(userRecommendation)
+      .leftJoin(
+        mediaTranslation,
+        and(
+          eq(mediaTranslation.mediaId, userRecommendation.mediaId),
+          eq(mediaTranslation.language, language),
+        ),
+      )
+      .where(where)
+      .orderBy(desc(userRecommendation.weight))
+      .limit(limit);
+
+    const out: UserRecommendationReadRow[] = [];
+    for (const r of rows) {
+      const narrowed = narrowReadRow({
+        id: r.id,
+        externalId: r.externalId,
+        provider: r.provider,
+        mediaType: r.mediaType,
+        title:
+          r.translatedTitle && r.translatedTitle.trim().length > 0
+            ? r.translatedTitle
+            : r.title,
+        posterPath: r.translatedPosterPath ?? r.posterPath,
+        backdropPath: r.backdropPath,
+        logoPath: r.translatedLogoPath ?? r.logoPath,
+        releaseDate: r.releaseDate,
+        voteAverage: r.voteAverage,
+        genreIds: r.genreIds,
+        relevance: r.relevance,
+      });
+      if (narrowed) out.push(narrowed);
+    }
+    return out;
+  }
+
+  const rows = await db
+    .select(baseSelect)
     .from(userRecommendation)
-    .innerJoin(
-      media,
-      eq(media.id, userRecommendation.mediaId),
-    )
-    .where(
-      sql`${userRecommendation.userId} = ${userId}
-        AND ${userRecommendation.active} = true
-        AND ${media.backdropPath} IS NOT NULL
-        AND ${media.metadataUpdatedAt} IS NOT NULL
-        AND (${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL)
-        ${excludeClause}`,
-    )
-    .groupBy(
-      media.id,
-      media.externalId,
-      media.provider,
-      media.type,
-      media.title,
-      media.overview,
-      media.backdropPath,
-      media.logoPath,
-      media.releaseDate,
-      media.voteAverage,
-      media.genres,
-      media.genreIds,
-    )
-    .orderBy(
-      desc(
-        sql`SUM(${userRecommendation.weight})`,
-      ),
-    )
+    .where(where)
+    .orderBy(desc(userRecommendation.weight))
     .limit(limit);
+
+  const out: UserRecommendationReadRow[] = [];
+  for (const r of rows) {
+    const narrowed = narrowReadRow(r);
+    if (narrowed) out.push(narrowed);
+  }
+  return out;
 }
