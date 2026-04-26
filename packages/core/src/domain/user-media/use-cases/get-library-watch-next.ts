@@ -266,7 +266,9 @@ function buildContinueItems(
       voteAverage: row.voteAverage,
       genres: row.genres,
       genreIds: row.genreIds,
-      trailerKey: row.trailerKey,
+      // Trailer keys no longer come from the playback feed query — populated
+      // below via `findTrailerKeysForMediaIds` once we know the final id set.
+      trailerKey: null as string | null,
       year: row.year,
       externalId: row.externalId,
       provider: row.provider,

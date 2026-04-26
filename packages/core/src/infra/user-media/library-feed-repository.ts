@@ -33,7 +33,6 @@ export interface UserPlaybackProgressFeedRow {
   userRating: number | null;
   genres: unknown;
   genreIds: unknown;
-  trailerKey: string | null;
   year: number | null;
   mediaRuntime: number | null;
   externalId: number;
@@ -128,7 +127,6 @@ export async function findUserPlaybackProgressFeed(
       userRating: userMediaState.rating,
       genres: media.genres,
       genreIds: media.genreIds,
-      trailerKey: mi.trailerKey,
       year: media.year,
       mediaRuntime: media.runtime,
       externalId: media.externalId,
@@ -327,7 +325,6 @@ export interface UserMediaPaginatedRow {
   voteAverage: number | null;
   genres: unknown;
   genreIds: unknown;
-  trailerKey: string | null;
   year: number | null;
   externalId: number;
   provider: string;
@@ -396,7 +393,6 @@ export async function findUserMediaPaginated(
     voteAverage: media.voteAverage,
     genres: media.genres,
     genreIds: media.genreIds,
-    trailerKey: mi.trailerKey,
     year: media.year,
     externalId: media.externalId,
     provider: media.provider,

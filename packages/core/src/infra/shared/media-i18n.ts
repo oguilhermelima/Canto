@@ -25,7 +25,6 @@ export interface MediaI18n {
   posterPath: SQL<string | null>;
   logoPath: SQL<string | null>;
   tagline: SQL<string | null>;
-  trailerKey: SQL<string | null>;
 }
 
 export function mediaI18n(language: string): MediaI18n {
@@ -39,13 +38,10 @@ export function mediaI18n(language: string): MediaI18n {
     posterPath: sql<string | null>`COALESCE(${mediaTranslation.posterPath}, ${media.posterPath})`,
     logoPath: sql<string | null>`COALESCE(${mediaTranslation.logoPath}, ${media.logoPath})`,
     tagline: sql<string | null>`COALESCE(NULLIF(TRIM(${mediaTranslation.tagline}), ''), ${media.tagline})`,
-    // Translation-specific trailer key first; fall back to any YouTube trailer.
-    trailerKey: sql<string | null>`COALESCE(${mediaTranslation.trailerKey}, (
-      SELECT external_key FROM media_video
-      WHERE media_id = ${media.id}
-        AND type = 'Trailer' AND site = 'YouTube'
-      LIMIT 1
-    ))`,
+    // Trailer keys are intentionally NOT joined here — the correlated subquery
+    // they used to need ran once per row in the main result set, swamping
+    // larger feeds. Callers that need them should run
+    // `findTrailerKeysForMediaIds` once on the final list of media ids.
   };
 }
 

@@ -813,7 +813,13 @@ export const mediaVideo = pgTable(
     language: varchar("language", { length: 10 }),
     publishedAt: timestamp("published_at", { withTimezone: true }),
   },
-  (table) => [index("idx_video_media").on(table.mediaId)],
+  (table) => [
+    index("idx_video_media").on(table.mediaId),
+    // Powers the trailer-key batch lookup (`findTrailerKeysForMediaIds`) used
+    // after the main media-list query. Replaces the per-row correlated
+    // subquery that previously lived inside `mediaI18n.trailerKey`.
+    index("idx_video_media_type_site").on(table.mediaId, table.type, table.site),
+  ],
 );
 
 // ─── Media watch providers (replaces extrasCache watchProviders) ───
