@@ -313,6 +313,16 @@ export async function findUserRecommendations(
         )`
       : sql``;
 
+  // Negative-signal exclusion: drop or rating ≤ 3 means the user explicitly
+  // disliked the media — never surface it, even if it was a rec at rebuild
+  // time and the dislike came after.
+  const negativeClause = sql`AND NOT EXISTS (
+    SELECT 1 FROM user_media_state ums_neg
+    WHERE ums_neg.user_id = ${userId}
+      AND ums_neg.media_id = ${userRecommendation.mediaId}
+      AND (ums_neg.status = 'dropped' OR (ums_neg.rating IS NOT NULL AND ums_neg.rating <= 3))
+  )`;
+
   const filterConditions = buildRecsFilterConditions(filters, USER_REC_COLUMNS);
   const filterClauses = filterConditions.map((c) => sql`AND ${c}`);
 
@@ -339,6 +349,7 @@ export async function findUserRecommendations(
     AND ${userRecommendation.title} IS NOT NULL
     AND (${userRecommendation.releaseDate} <= CURRENT_DATE OR ${userRecommendation.releaseDate} IS NULL)
     ${excludeClause}
+    ${negativeClause}
     ${sql.join(filterClauses, sql` `)}`;
 
   if (useTranslations) {
@@ -510,6 +521,15 @@ export async function findUserSpotlightItems(
         )`
       : sql``;
 
+  // Negative-signal exclusion: drop or rating ≤ 3 means the user explicitly
+  // disliked the media — never surface it in spotlight either.
+  const negativeClause = sql`AND NOT EXISTS (
+    SELECT 1 FROM user_media_state ums_neg
+    WHERE ums_neg.user_id = ${userId}
+      AND ums_neg.media_id = ${userRecommendation.mediaId}
+      AND (ums_neg.status = 'dropped' OR (ums_neg.rating IS NOT NULL AND ums_neg.rating <= 3))
+  )`;
+
   const baseSelect = {
     id: userRecommendation.mediaId,
     externalId: userRecommendation.externalId,
@@ -530,7 +550,8 @@ export async function findUserSpotlightItems(
     AND ${userRecommendation.title} IS NOT NULL
     AND ${userRecommendation.backdropPath} IS NOT NULL
     AND (${userRecommendation.releaseDate} <= CURRENT_DATE OR ${userRecommendation.releaseDate} IS NULL)
-    ${excludeClause}`;
+    ${excludeClause}
+    ${negativeClause}`;
 
   if (useTranslations) {
     const rows = await db

@@ -1,5 +1,10 @@
 import { desc, eq, and, sql } from "drizzle-orm";
 import { getQualityFilters, getWeightedScoreOrder } from "../rules/recommendation-filters";
+import {
+  engagementMultiplier,
+  isNegativeSignal,
+  type EngagementSignal,
+} from "../rules/engagement-signals";
 
 import type { Database } from "@canto/db/client";
 import {
@@ -13,13 +18,16 @@ import {
   upsertUserRecommendations,
   type UserRecommendationRow,
 } from "../../../infra/recommendations/user-recommendation-repository";
+import { findUserEngagementStates } from "../../../infra/user-media/state-repository";
 
 const MAX_SEEDS = 10;
 const MAX_SEEDS_FROM_COLLECTIONS = 5;
+const MAX_ENGAGEMENT_SEEDS = 5;
 const MAX_SERVER_SOURCES = 10;
 const MAX_POOL_RANK = 20;
 const SERVER_BASE_WEIGHT = 0.4;
 const COLLECTION_BASE_WEIGHT = 0.6;
+const ENGAGEMENT_BASE_WEIGHT = 0.85;
 
 /**
  * Columns we read from `media` in every seed-recommendation query so we can
@@ -152,21 +160,107 @@ function selectSeeds(
   return seeds;
 }
 
+interface ProcessSeedDeps {
+  db: Database;
+  rows: UserRecommendationRow[];
+  signalByMedia: Map<string, EngagementSignal>;
+  negativeMedia: Set<string>;
+  rankCap: number;
+}
+
+/**
+ * Resolve recs for a single seed and append weighted rows. Skips recs the
+ * user has explicitly disliked (dropped / rating ≤ 3). Boosts weight when
+ * the seed itself carries a positive engagement signal.
+ */
+async function processSeed(
+  seedMediaId: string,
+  baseWeight: number,
+  deps: ProcessSeedDeps,
+): Promise<void> {
+  const seedSignal = deps.signalByMedia.get(seedMediaId);
+  const seedBoost = seedSignal ? engagementMultiplier(seedSignal) : 1.0;
+
+  const recItems = await deps.db
+    .select(recCandidateColumns)
+    .from(mediaRecommendation)
+    .innerJoin(media, eq(media.id, mediaRecommendation.mediaId))
+    .where(and(
+      eq(mediaRecommendation.sourceMediaId, seedMediaId),
+      ...getQualityFilters(),
+    ))
+    .orderBy(getWeightedScoreOrder())
+    .limit(deps.rankCap);
+
+  for (let rank = 0; rank < recItems.length; rank++) {
+    const candidate = recItems[rank]!;
+    if (deps.negativeMedia.has(candidate.mediaId)) continue;
+    deps.rows.push(
+      toRecRow(candidate, baseWeight * seedBoost * rankMultiplier(rank + 1)),
+    );
+  }
+}
+
+/**
+ * Engagement-only seeds: media the user has watched / rated / favorited but
+ * never added to a list. Sorted by recency of engagement, capped at
+ * MAX_ENGAGEMENT_SEEDS, and excluding anything already used as a watchlist
+ * or collection seed.
+ */
+function selectEngagementSeeds(
+  signalByMedia: Map<string, EngagementSignal>,
+  updatedAtByMedia: Map<string, Date>,
+  alreadySeeded: Set<string>,
+  limit: number,
+): string[] {
+  const candidates: Array<{ mediaId: string; updatedAt: Date }> = [];
+  for (const [mediaId, signal] of signalByMedia) {
+    if (alreadySeeded.has(mediaId)) continue;
+    if (engagementMultiplier(signal) <= 1.0) continue;
+    const updatedAt = updatedAtByMedia.get(mediaId);
+    if (!updatedAt) continue;
+    candidates.push({ mediaId, updatedAt });
+  }
+  candidates.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  return candidates.slice(0, limit).map((c) => c.mediaId);
+}
+
 /**
  * Rebuild per-user recommendations with granular weights.
  *
  * Sources (in priority order):
  * 1. User's watchlist items (primary) via genre round-robin (max 10 seeds)
  * 2. User's collection items (secondary) for additional diversity (max 5 seeds)
- * 3. Server library items (if user has few personal items)
+ * 3. Engagement-only items: watched / rated / favorited but not in any list (max 5 seeds)
+ * 4. Server library items (if user has few personal items)
  *
- * Weight = sourceWeight(seedPosition) × rankMultiplier(recRank)
+ * Weight = sourceWeight × engagementBoost(seed) × rankMultiplier(recRank).
+ * Recs derived from a seed the user rated highly or marked favorite get a
+ * stronger weight; recs that point to dropped/disliked media are excluded.
  */
 export async function rebuildUserRecs(
   db: Database,
   userId: string,
 ): Promise<void> {
-  // 1. Get all user list items with genres (newest first)
+  // 0. Engagement signals — used both to boost seeds and to exclude
+  // dropped/disliked recs from the output.
+  const engagementStates = await findUserEngagementStates(db, userId);
+  const signalByMedia = new Map<string, EngagementSignal>();
+  const updatedAtByMedia = new Map<string, Date>();
+  const negativeMedia = new Set<string>();
+  for (const state of engagementStates) {
+    const signal: EngagementSignal = {
+      status: state.status,
+      rating: state.rating,
+      isFavorite: state.isFavorite,
+    };
+    signalByMedia.set(state.mediaId, signal);
+    updatedAtByMedia.set(state.mediaId, state.updatedAt);
+    if (isNegativeSignal(signal)) negativeMedia.add(state.mediaId);
+  }
+
+  // 1. Get all user list items with genres (newest first), excluding any
+  // mediaIds the user has explicitly dropped or rated low.
   const allUserItems = await db
     .select({
       mediaId: listItem.mediaId,
@@ -184,9 +278,13 @@ export async function rebuildUserRecs(
     )
     .orderBy(desc(listItem.addedAt));
 
+  const filteredItems = allUserItems.filter(
+    (item) => !negativeMedia.has(item.mediaId),
+  );
+
   // Separate watchlist from collections
-  const watchlistItems = allUserItems.filter((i) => i.listType === "watchlist");
-  const collectionItems = allUserItems.filter((i) => i.listType !== "watchlist");
+  const watchlistItems = filteredItems.filter((i) => i.listType === "watchlist");
+  const collectionItems = filteredItems.filter((i) => i.listType !== "watchlist");
 
   // 2. Select diverse seeds: watchlist primary, collections secondary
   const seedMediaIds = selectSeeds(watchlistItems, MAX_SEEDS);
@@ -195,49 +293,54 @@ export async function rebuildUserRecs(
     Math.min(MAX_SEEDS_FROM_COLLECTIONS, MAX_SEEDS - seedMediaIds.length),
   );
 
+  const seededSet = new Set<string>([
+    ...seedMediaIds,
+    ...collectionSeedMediaIds,
+  ]);
+
+  // 3. Engagement-only seeds: media the user watched/rated/favorited but
+  // never added to a list.
+  const engagementSeedMediaIds = selectEngagementSeeds(
+    signalByMedia,
+    updatedAtByMedia,
+    seededSet,
+    MAX_ENGAGEMENT_SEEDS,
+  );
+
   const rows: UserRecommendationRow[] = [];
+  const seedDeps: ProcessSeedDeps = {
+    db,
+    rows,
+    signalByMedia,
+    negativeMedia,
+    rankCap: MAX_POOL_RANK,
+  };
 
-  // 3. Process watchlist seeds (primary source)
+  // 4. Watchlist seeds (primary)
   for (let pos = 0; pos < seedMediaIds.length; pos++) {
-    const sw = sourceWeight(pos);
-    const recItems = await db
-      .select(recCandidateColumns)
-      .from(mediaRecommendation)
-      .innerJoin(media, eq(media.id, mediaRecommendation.mediaId))
-      .where(and(
-        eq(mediaRecommendation.sourceMediaId, seedMediaIds[pos]!),
-        ...getQualityFilters(),
-      ))
-      .orderBy(getWeightedScoreOrder())
-      .limit(MAX_POOL_RANK);
-
-    for (let rank = 0; rank < recItems.length; rank++) {
-      rows.push(toRecRow(recItems[rank]!, sw * rankMultiplier(rank + 1)));
-    }
+    await processSeed(seedMediaIds[pos]!, sourceWeight(pos), seedDeps);
   }
 
-  // 4. Process collection seeds (secondary source, lower base weight)
+  // 5. Collection seeds (secondary, lower base weight)
   for (let pos = 0; pos < collectionSeedMediaIds.length; pos++) {
-    const sw = COLLECTION_BASE_WEIGHT * (1.0 - (pos / MAX_SEEDS_FROM_COLLECTIONS) * 0.4);
-    const recItems = await db
-      .select(recCandidateColumns)
-      .from(mediaRecommendation)
-      .innerJoin(media, eq(media.id, mediaRecommendation.mediaId))
-      .where(and(
-        eq(mediaRecommendation.sourceMediaId, collectionSeedMediaIds[pos]!),
-        ...getQualityFilters(),
-      ))
-      .orderBy(getWeightedScoreOrder())
-      .limit(MAX_POOL_RANK);
-
-    for (let rank = 0; rank < recItems.length; rank++) {
-      rows.push(toRecRow(recItems[rank]!, sw * rankMultiplier(rank + 1)));
-    }
+    const baseWeight =
+      COLLECTION_BASE_WEIGHT * (1.0 - (pos / MAX_SEEDS_FROM_COLLECTIONS) * 0.4);
+    await processSeed(collectionSeedMediaIds[pos]!, baseWeight, seedDeps);
   }
 
-  // 5. Server library: include if user has few items
+  // 6. Engagement-only seeds (between collection and server in priority)
+  for (let pos = 0; pos < engagementSeedMediaIds.length; pos++) {
+    const baseWeight =
+      ENGAGEMENT_BASE_WEIGHT * (1.0 - (pos / MAX_ENGAGEMENT_SEEDS) * 0.4);
+    await processSeed(engagementSeedMediaIds[pos]!, baseWeight, seedDeps);
+  }
+
+  // 7. Server library: include if user has few personal items
   let serverSourceCount = 0;
-  const totalOwnSeeds = seedMediaIds.length + collectionSeedMediaIds.length;
+  const totalOwnSeeds =
+    seedMediaIds.length
+    + collectionSeedMediaIds.length
+    + engagementSeedMediaIds.length;
   if (totalOwnSeeds < MAX_SEEDS) {
     const serverSources = await db
       .selectDistinct({ sourceMediaId: mediaRecommendation.sourceMediaId })
@@ -248,25 +351,13 @@ export async function rebuildUserRecs(
 
     serverSourceCount = serverSources.length;
 
+    const serverDeps: ProcessSeedDeps = { ...seedDeps, rankCap: 8 };
     for (const source of serverSources) {
-      const recItems = await db
-        .select(recCandidateColumns)
-        .from(mediaRecommendation)
-        .innerJoin(media, eq(media.id, mediaRecommendation.mediaId))
-        .where(and(
-          eq(mediaRecommendation.sourceMediaId, source.sourceMediaId),
-          ...getQualityFilters(),
-        ))
-        .orderBy(getWeightedScoreOrder())
-        .limit(8);
-
-      for (let rank = 0; rank < recItems.length; rank++) {
-        rows.push(toRecRow(recItems[rank]!, SERVER_BASE_WEIGHT * rankMultiplier(rank + 1)));
-      }
+      await processSeed(source.sourceMediaId, SERVER_BASE_WEIGHT, serverDeps);
     }
   }
 
-  // 6. Rebuild with granular weights (dedup keeps highest weight per mediaId)
+  // 8. Rebuild with granular weights (dedup keeps highest weight per mediaId)
   await rebuildUserRecommendations(db, userId, rows);
 
   const genreBreakdown = seedMediaIds.length > 0
@@ -274,7 +365,7 @@ export async function rebuildUserRecs(
     : "";
 
   console.log(
-    `[rebuild-user-recs] User ${userId}: ${seedMediaIds.length} watchlist + ${collectionSeedMediaIds.length} collection seeds${genreBreakdown}, ${rows.length} weighted recs, ${serverSourceCount} server sources`,
+    `[rebuild-user-recs] User ${userId}: ${seedMediaIds.length} watchlist + ${collectionSeedMediaIds.length} collection + ${engagementSeedMediaIds.length} engagement seeds${genreBreakdown}, ${rows.length} weighted recs, ${serverSourceCount} server sources, ${negativeMedia.size} excluded as negative`,
   );
 }
 
@@ -301,8 +392,29 @@ export async function addMediaToUserRecs(
 
   if (recItems.length === 0) return;
 
-  // New item gets top sourceWeight (position 0)
-  const rows = recItems.map((p, rank) => toRecRow(p, 1.0 * rankMultiplier(rank + 1)));
+  // Skip recs the user has explicitly dropped or low-rated.
+  const engagementStates = await findUserEngagementStates(db, userId);
+  const negativeMedia = new Set<string>();
+  for (const state of engagementStates) {
+    if (
+      isNegativeSignal({
+        status: state.status,
+        rating: state.rating,
+        isFavorite: state.isFavorite,
+      })
+    ) {
+      negativeMedia.add(state.mediaId);
+    }
+  }
+
+  // New item gets top sourceWeight (position 0). Rank is preserved against
+  // the original ordering — filtering negatives mid-flight would shift it.
+  const rows: UserRecommendationRow[] = [];
+  for (let rank = 0; rank < recItems.length; rank++) {
+    const candidate = recItems[rank]!;
+    if (negativeMedia.has(candidate.mediaId)) continue;
+    rows.push(toRecRow(candidate, 1.0 * rankMultiplier(rank + 1)));
+  }
 
   await upsertUserRecommendations(db, userId, rows);
 

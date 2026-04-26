@@ -3,6 +3,8 @@ import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import { buildExclusionSet } from "./recommendation-service";
 import { translateMediaItems } from "../../shared/services/translation-service";
 import { mapPoolItem } from "../../shared/mappers/media-mapper";
+import { rankByMmr } from "../rules/mmr-diversity";
+import { exploreSlotPositions, mixExploreSlots } from "../rules/explore-mix";
 import {
   findUserRecommendations,
   countUserRecommendations,
@@ -25,6 +27,19 @@ interface GetRecommendationsInput {
 }
 
 /**
+ * λ used for the Maximal Marginal Relevance re-rank. 0.7 keeps relevance
+ * dominant while breaking up genre clusters in the top of the list.
+ */
+const MMR_LAMBDA = 0.7;
+
+/**
+ * On the first page (only) we oversample 3× and re-rank with MMR for
+ * genre diversity. Later pages use plain SQL offset — sortBy filters
+ * also bypass MMR because relevance ordering is no longer the goal.
+ */
+const MMR_OVERSAMPLE = 3;
+
+/**
  * Get per-user recommendations with 3-path fallback:
  * 1. Per-user pre-computed recs
  * 2. Global pool fallback
@@ -37,6 +52,7 @@ export async function getRecommendations(
 ) {
   const { userId, page, pageSize, filters, userLang, recsVersion } = input;
   const offset = page * pageSize;
+  const useMmr = page === 0 && !filters.sortBy;
 
   const { excludeItems } = await buildExclusionSet(db, userId);
 
@@ -51,11 +67,12 @@ export async function getRecommendations(
     // The repo applies translation overlay inline via a LEFT JOIN on
     // `media_translation`, so we skip the post-query `translateMediaItems`
     // call — it would just re-resolve the same translation row.
+    const fetchSize = useMmr ? pageSize * MMR_OVERSAMPLE + 1 : pageSize + 1;
     const rows = await findUserRecommendations(
       db,
       userId,
       excludeItems,
-      pageSize + 1,
+      fetchSize,
       offset,
       filters,
       userLang,
@@ -63,7 +80,30 @@ export async function getRecommendations(
 
     if (rows.length > 0) {
       const hasMore = rows.length > pageSize;
-      const items = rows.slice(0, pageSize).map(mapPoolItem);
+      const ranked = useMmr
+        ? rankByMmr(
+            rows.map((row) => ({ row, relevance: row.relevance, genreIds: row.genreIds ?? [] })),
+            MMR_LAMBDA,
+            pageSize,
+          ).map((entry) => entry.row)
+        : rows.slice(0, pageSize);
+      const personalizedItems = ranked.map(mapPoolItem);
+
+      // Explore slot: only on a full first page when MMR is in play.
+      // Replaces a handful of personalised picks with global high-quality
+      // items the user hasn't engaged with — keeps discovery alive without
+      // the user paying for it via missed recs.
+      const items =
+        useMmr && personalizedItems.length === pageSize
+          ? await mixWithExploreSlot(
+              db,
+              personalizedItems,
+              excludeItems,
+              userLang,
+              filters,
+            )
+          : personalizedItems;
+
       return { items, nextCursor: hasMore ? page + 1 : null, version: recsVersion };
     }
   }
@@ -81,7 +121,18 @@ export async function getRecommendations(
       return true;
     });
     const hasMore = unique.length > pageSize;
-    const items = unique.slice(0, pageSize).map(mapPoolItem);
+    const ranked = useMmr
+      ? rankByMmr(
+          unique.map((item) => ({
+            item,
+            relevance: item.voteAverage ?? 0,
+            genreIds: item.genreIds ?? [],
+          })),
+          MMR_LAMBDA,
+          pageSize,
+        ).map((entry) => entry.item)
+      : unique.slice(0, pageSize);
+    const items = ranked.map(mapPoolItem);
     const translatedPoolItems = await translateMediaItems(db, items, userLang);
     return { items: translatedPoolItems, nextCursor: hasMore ? page + 1 : null, version: recsVersion };
   }
@@ -131,4 +182,54 @@ export async function getRecommendations(
   const hasMore = sorted.length > pageSize || allLibrary.length > (page + 1) * 3;
   const translatedFallback = await translateMediaItems(db, pageItems, userLang);
   return { items: translatedFallback, nextCursor: hasMore ? page + 1 : null, version: recsVersion };
+}
+
+type MappedPoolItem = ReturnType<typeof mapPoolItem>;
+
+/**
+ * Pull a small global high-quality pool that excludes the personalised page
+ * and the user's already-known items, then drop those picks into fixed
+ * "explore" slots in the ranked list. Translates the explore items only —
+ * the personalised ones already passed through the SQL translation overlay.
+ */
+async function mixWithExploreSlot(
+  db: Database,
+  personalized: MappedPoolItem[],
+  excludeItems: Array<{ externalId: number; provider: string }>,
+  userLang: string,
+  filters: RecsFilters,
+): Promise<MappedPoolItem[]> {
+  const slots = exploreSlotPositions(personalized.length);
+  if (slots.length === 0) return personalized;
+
+  const personalizedExclude = personalized.map((item) => ({
+    externalId: item.externalId,
+    provider: item.provider,
+  }));
+  const exploreExcludes = [...excludeItems, ...personalizedExclude];
+
+  // Pull 2× the slot count so we can dedup against `personalizedExclude`
+  // even when the global pool has overlap with the personalised page.
+  const pool = await findGlobalRecommendations(
+    db,
+    exploreExcludes,
+    slots.length * 2,
+    0,
+    filters,
+  );
+  if (pool.length === 0) return personalized;
+
+  const seen = new Set(personalized.map((item) => `${item.provider}-${item.externalId}`));
+  const explore: MappedPoolItem[] = [];
+  for (const item of pool) {
+    if (!item.posterPath) continue;
+    const key = `${item.provider}-${item.externalId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    explore.push(mapPoolItem(item));
+    if (explore.length >= slots.length) break;
+  }
+
+  const translatedExplore = await translateMediaItems(db, explore, userLang);
+  return mixExploreSlots(personalized, translatedExplore);
 }
