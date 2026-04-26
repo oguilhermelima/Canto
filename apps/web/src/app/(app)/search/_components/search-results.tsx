@@ -79,6 +79,7 @@ export function SearchResults({
       mediaType={searchType === "multi" ? "all" : searchType}
       filterPreset="tmdb"
       onFilterChange={onFilterChange}
+      hideSections={["search"]}
       sidebarClassName="pt-8"
       header={header}
       items={browseItems}
