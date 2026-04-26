@@ -137,6 +137,13 @@ interface CacheEntry {
 }
 const valueCache = new Map<string, CacheEntry>();
 
+// Dedicated cache for the global `general.language` lookup. The browse
+// endpoint hits it on every public page load, so we keep a separate slot with
+// a longer TTL and an explicit invalidator that fires when `general.language`
+// is written.
+const DEFAULT_LANGUAGE_TTL_MS = 60_000;
+let defaultLanguageCache: { value: string; expires: number } | null = null;
+
 function getCached(key: string): { hit: true; value: unknown } | { hit: false } {
   const entry = valueCache.get(key);
   if (!entry) return { hit: false };
@@ -157,6 +164,12 @@ function invalidateCache(key: string): void {
 
 export function clearSettingsCache(): void {
   valueCache.clear();
+  defaultLanguageCache = null;
+}
+
+/** Bust the default-language cache (call after `general.language` changes). */
+export function invalidateDefaultLanguage(): void {
+  defaultLanguageCache = null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -316,6 +329,23 @@ export async function getSettingOrThrow<K extends SettingKey>(
   return value;
 }
 
+/**
+ * Resolve the global `general.language` setting with a dedicated 60s TTL
+ * in-process cache. The `browse` discovery endpoint reads this on every public
+ * page load, so we keep a separate cache slot from the regular `getSetting`
+ * cache to avoid cross-key churn. Returns `"en-US"` when the setting is unset.
+ */
+export async function getDefaultLanguage(): Promise<string> {
+  const now = Date.now();
+  if (defaultLanguageCache && defaultLanguageCache.expires > now) {
+    return defaultLanguageCache.value;
+  }
+  const stored = await getSetting("general.language");
+  const value = stored ?? "en-US";
+  defaultLanguageCache = { value, expires: now + DEFAULT_LANGUAGE_TTL_MS };
+  return value;
+}
+
 export async function getSettings<K extends SettingKey>(
   keys: readonly K[],
 ): Promise<{ [P in K]: SettingValue<P> | null }> {
@@ -363,6 +393,7 @@ export async function setSetting<K extends SettingKey>(
       set: { value: stored, updatedAt: new Date() },
     });
   invalidateCache(key);
+  if (key === "general.language") invalidateDefaultLanguage();
 }
 
 /**
@@ -405,12 +436,14 @@ export async function setManySettings(
   // Phase 3: invalidate cache for keys we actually cache (typed only).
   for (const { key, typed } of encoded) {
     if (typed) invalidateCache(key);
+    if (key === "general.language") invalidateDefaultLanguage();
   }
 }
 
 export async function deleteSetting<K extends SettingKey>(key: K): Promise<void> {
   await db.delete(systemSetting).where(eq(systemSetting.key, key));
   invalidateCache(key);
+  if (key === "general.language") invalidateDefaultLanguage();
 }
 
 /* -------------------------------------------------------------------------- */
