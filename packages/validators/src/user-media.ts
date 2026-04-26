@@ -88,6 +88,12 @@ export const getUpcomingScheduleInput = libraryFilterInput.extend({
   limit: z.number().int().min(1).max(100).default(24),
   cursor: z.number().int().min(0).nullish(),
   mediaType: mediaType.optional(),
+  /**
+   * "next" returns the next unwatched upcoming episode per show (default).
+   * "all" returns every unwatched upcoming episode — useful for calendar views
+   * that need to render multiple episodes per series in a date range.
+   */
+  mode: z.enum(["next", "all"]).default("next"),
 });
 export type GetUpcomingScheduleInput = z.infer<typeof getUpcomingScheduleInput>;
 

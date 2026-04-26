@@ -13,6 +13,7 @@ export interface GetUpcomingScheduleInput {
   cursor?: number | null;
   mediaType?: "movie" | "show";
   q?: string;
+  mode?: "next" | "all";
 }
 
 type ListMediaRow = Awaited<
@@ -113,13 +114,14 @@ export async function getUpcomingSchedule(
       continue;
     }
 
-    const episodeItem = buildUpcomingEpisodeItem(
+    const episodeItems = buildUpcomingEpisodeItems(
       candidate,
       mediaHistory,
       episodesByMediaId.get(candidate.mediaId) ?? [],
       now,
+      input.mode ?? "next",
     );
-    if (episodeItem) scheduleItems.push(episodeItem);
+    for (const item of episodeItems) scheduleItems.push(item);
   }
 
   const sorted = scheduleItems.sort(
@@ -230,7 +232,7 @@ function buildUpcomingMovieItem(
   };
 }
 
-function buildUpcomingEpisodeItem(
+function buildUpcomingEpisodeItems(
   candidate: ListCandidate,
   mediaHistory: Array<{ episodeId: string | null }>,
   episodes: Array<{
@@ -241,7 +243,8 @@ function buildUpcomingEpisodeItem(
     airDate: string | null;
   }>,
   now: Date,
-): UpcomingItem | null {
+  mode: "next" | "all",
+): UpcomingItem[] {
   const watchedEpisodeIds = new Set(
     mediaHistory
       .map((entry) => entry.episodeId)
@@ -263,16 +266,34 @@ function buildUpcomingEpisodeItem(
     )
     .sort((a, b) => a.airDate.getTime() - b.airDate.getTime());
 
-  if (upcomingEpisodes.length === 0) return null;
+  if (upcomingEpisodes.length === 0) return [];
 
-  const nextUpcomingEpisode =
-    upcomingEpisodes.find(
-      (episode) => !watchedEpisodeIds.has(episode.episodeId),
-    ) ?? upcomingEpisodes[0];
-  if (!nextUpcomingEpisode) return null;
+  const unwatched = upcomingEpisodes.filter(
+    (episode) => !watchedEpisodeIds.has(episode.episodeId),
+  );
 
+  if (mode === "all") {
+    const source = unwatched.length > 0 ? unwatched : upcomingEpisodes;
+    return source.map((ep) => toUpcomingItem(candidate, ep));
+  }
+
+  const nextUpcomingEpisode = unwatched[0] ?? upcomingEpisodes[0];
+  if (!nextUpcomingEpisode) return [];
+  return [toUpcomingItem(candidate, nextUpcomingEpisode)];
+}
+
+function toUpcomingItem(
+  candidate: ListCandidate,
+  episode: {
+    episodeId: string;
+    seasonNumber: number;
+    episodeNumber: number;
+    episodeTitle: string | null;
+    airDate: Date;
+  },
+): UpcomingItem {
   return {
-    id: `upcoming-episode:${candidate.mediaId}:${nextUpcomingEpisode.episodeId}`,
+    id: `upcoming-episode:${candidate.mediaId}:${episode.episodeId}`,
     kind: "upcoming_episode",
     mediaId: candidate.mediaId,
     mediaType: candidate.mediaType,
@@ -284,12 +305,12 @@ function buildUpcomingEpisodeItem(
     externalId: candidate.externalId,
     provider: candidate.provider,
     fromLists: [...candidate.listNames],
-    releaseAt: nextUpcomingEpisode.airDate,
+    releaseAt: episode.airDate,
     episode: {
-      id: nextUpcomingEpisode.episodeId,
-      seasonNumber: nextUpcomingEpisode.seasonNumber,
-      number: nextUpcomingEpisode.episodeNumber,
-      title: nextUpcomingEpisode.episodeTitle,
+      id: episode.episodeId,
+      seasonNumber: episode.seasonNumber,
+      number: episode.episodeNumber,
+      title: episode.episodeTitle,
     },
   };
 }
