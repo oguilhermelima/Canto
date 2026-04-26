@@ -60,6 +60,8 @@ interface BrowseLayoutProps {
   hideSections?: SectionId[];
   /** Expose Members Rating filter + sort (collection detail only) */
   showMembersRating?: boolean;
+  /** Initial sort value for the FilterSidebar when no `?sort=` URL param is present. */
+  defaultSort?: string;
   /** When provided, items are rendered in consecutive groups by label.
    *  Return null to skip the header for an item (still renders it). */
   groupBy?: (item: BrowseItem) => string | null;
@@ -145,6 +147,7 @@ export function BrowseLayout({
   menuGroups,
   hideSections,
   showMembersRating,
+  defaultSort,
   groupBy,
 }: BrowseLayoutProps): React.JSX.Element {
   const isMobile = useIsMobile();
@@ -233,6 +236,7 @@ export function BrowseLayout({
             sidebarClassName={sidebarClassName}
             hideSections={hideSections}
             showMembersRating={showMembersRating}
+            defaultSort={defaultSort}
           />
         )}
 

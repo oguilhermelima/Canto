@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
+import { Switch } from "@canto/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +43,17 @@ const VISIBILITY_OPTIONS = [
   { value: "public", label: "Public", icon: Globe },
 ] as const;
 
+const DEFAULT_SORT_OPTIONS = [
+  { value: "date_added.desc", label: "Date Added (Newest)" },
+  { value: "date_added.asc", label: "Date Added (Oldest)" },
+  { value: "title.asc", label: "Name A–Z" },
+  { value: "title.desc", label: "Name Z–A" },
+  { value: "primary_release_date.desc", label: "Release Date (Newest)" },
+  { value: "primary_release_date.asc", label: "Release Date (Oldest)" },
+  { value: "vote_average.desc", label: "Public Rating" },
+  { value: "members_rating.desc", label: "Members Rating" },
+] as const;
+
 export default function ListDetailPage(): React.JSX.Element {
   const params = useParams<{ slug: string }>();
   const router = useRouter();
@@ -75,6 +87,10 @@ export default function ListDetailPage(): React.JSX.Element {
     onError: (err) => toast.error(err.message),
   });
 
+  const watchStatuses = filters.watchStatuses as
+    | ("planned" | "watching" | "completed" | "dropped" | "none")[]
+    | undefined;
+
   const { data, isLoading, error, hasNextPage, isFetchingNextPage, fetchNextPage } =
     trpc.list.getBySlug.useInfiniteQuery(
       {
@@ -96,7 +112,7 @@ export default function ListDetailPage(): React.JSX.Element {
         watchProviders: filters.watchProviders,
         watchRegion: filters.watchRegion,
         membersRatingMin: filters.membersRatingMin,
-        watchStatus: filters.watchStatus,
+        watchStatuses,
       },
       {
         getNextPageParam: (lastPage, _allPages, lastPageParam) => {
@@ -128,6 +144,7 @@ export default function ListDetailPage(): React.JSX.Element {
           voteCount: item.memberVotes?.voteCount,
           membersAvg: item.memberVotes?.avgRating,
           userRating: item.userRating,
+          userStatus: item.userStatus as BrowseItem["userStatus"],
           membership: item.membership,
         })),
       ) ?? [];
@@ -303,6 +320,18 @@ export default function ListDetailPage(): React.JSX.Element {
 
   const selectedArray = Array.from(selectedIds);
 
+  const groupByFn = listRow?.groupByStatus
+    ? (item: BrowseItem): string | null => {
+        switch (item.userStatus) {
+          case "watching": return "Watching";
+          case "completed": return "Completed";
+          case "planned": return "Planning";
+          case "dropped": return "Dropped";
+          default: return "Not Tracked";
+        }
+      }
+    : undefined;
+
   return (
     <>
       <BrowseLayout
@@ -320,6 +349,8 @@ export default function ListDetailPage(): React.JSX.Element {
         filterPreset="tmdb"
         onFilterChange={setFilters}
         showMembersRating
+        defaultSort={listRow?.defaultSortBy}
+        groupBy={groupByFn}
         mediaType={typeFilter}
         onMediaTypeChange={setTypeFilter}
         emptyState={
@@ -437,18 +468,35 @@ export default function ListDetailPage(): React.JSX.Element {
 
 /* ─── Edit Collection Dialog ─── */
 
+interface EditCollectionList {
+  id: string;
+  name: string;
+  description: string | null;
+  visibility?: string;
+  defaultSortBy?: string;
+  groupByStatus?: boolean;
+  hideCompleted?: boolean;
+  hideDropped?: boolean;
+  showHidden?: boolean;
+}
+
 function EditCollectionDialog({
   list,
   open,
   onOpenChange,
 }: {
-  list: { id: string; name: string; description: string | null; visibility?: string };
+  list: EditCollectionList;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }): React.JSX.Element {
   const [editName, setEditName] = useState(list.name);
   const [editDescription, setEditDescription] = useState(list.description ?? "");
   const [editVisibility, setEditVisibility] = useState(list.visibility ?? "private");
+  const [editDefaultSort, setEditDefaultSort] = useState(list.defaultSortBy ?? "date_added.desc");
+  const [editGroupByStatus, setEditGroupByStatus] = useState(list.groupByStatus ?? false);
+  const [editHideCompleted, setEditHideCompleted] = useState(list.hideCompleted ?? false);
+  const [editHideDropped, setEditHideDropped] = useState(list.hideDropped ?? false);
+  const [editShowHidden, setEditShowHidden] = useState(list.showHidden ?? false);
   const utils = trpc.useUtils();
 
   const updateMutation = trpc.list.update.useMutation({
@@ -464,21 +512,32 @@ function EditCollectionDialog({
   const handleSave = (): void => {
     const trimmedName = editName.trim();
     if (!trimmedName) return;
-    const changes: { id: string; name?: string; description?: string; visibility?: "public" | "private" | "shared" } = { id: list.id };
+    const changes: Parameters<typeof updateMutation.mutate>[0] = { id: list.id };
     if (trimmedName !== list.name) changes.name = trimmedName;
     const trimmedDesc = editDescription.trim();
     if (trimmedDesc !== (list.description ?? "")) changes.description = trimmedDesc;
     if (editVisibility !== (list.visibility ?? "private")) changes.visibility = editVisibility as "public" | "private" | "shared";
-    if (!changes.name && !changes.description && !changes.visibility) { onOpenChange(false); return; }
+    if (editDefaultSort !== (list.defaultSortBy ?? "date_added.desc")) {
+      changes.defaultSortBy = editDefaultSort as typeof changes.defaultSortBy;
+    }
+    if (editGroupByStatus !== (list.groupByStatus ?? false)) changes.groupByStatus = editGroupByStatus;
+    if (editHideCompleted !== (list.hideCompleted ?? false)) changes.hideCompleted = editHideCompleted;
+    if (editHideDropped !== (list.hideDropped ?? false)) changes.hideDropped = editHideDropped;
+    if (editShowHidden !== (list.showHidden ?? false)) changes.showHidden = editShowHidden;
+    if (Object.keys(changes).length === 1) { onOpenChange(false); return; }
     updateMutation.mutate(changes);
   };
 
-  // Reset fields when dialog opens
   const handleOpenChange = (v: boolean): void => {
     if (v) {
       setEditName(list.name);
       setEditDescription(list.description ?? "");
       setEditVisibility(list.visibility ?? "private");
+      setEditDefaultSort(list.defaultSortBy ?? "date_added.desc");
+      setEditGroupByStatus(list.groupByStatus ?? false);
+      setEditHideCompleted(list.hideCompleted ?? false);
+      setEditHideDropped(list.hideDropped ?? false);
+      setEditShowHidden(list.showHidden ?? false);
     }
     onOpenChange(v);
   };
@@ -489,7 +548,7 @@ function EditCollectionDialog({
         <DialogHeader className="text-left">
           <DialogTitle>Edit Collection</DialogTitle>
         </DialogHeader>
-        <div className="flex-1 space-y-4">
+        <div className="flex-1 space-y-4 overflow-y-auto">
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Name</label>
             <Input
@@ -527,6 +586,48 @@ function EditCollectionDialog({
               </SelectContent>
             </Select>
           </div>
+
+          <div className="border-t border-border pt-4 space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Default Sort</label>
+              <Select value={editDefaultSort} onValueChange={setEditDefaultSort}>
+                <SelectTrigger className="rounded-xl border-none bg-accent">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DEFAULT_SORT_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <ToggleRow
+              label="Group by status"
+              hint="Group items by Watching, Completed, etc."
+              checked={editGroupByStatus}
+              onCheckedChange={setEditGroupByStatus}
+            />
+            <ToggleRow
+              label="Hide completed"
+              hint="Skip items you've already completed"
+              checked={editHideCompleted}
+              onCheckedChange={setEditHideCompleted}
+            />
+            <ToggleRow
+              label="Hide dropped"
+              hint="Skip items you've dropped"
+              checked={editHideDropped}
+              onCheckedChange={setEditHideDropped}
+            />
+            <ToggleRow
+              label="Show hidden media"
+              hint="Reveal items you've hidden from cards"
+              checked={editShowHidden}
+              onCheckedChange={setEditShowHidden}
+            />
+          </div>
         </div>
         <div className="flex flex-col gap-2 pt-4">
           <Button className="w-full rounded-xl" onClick={handleSave} disabled={!editName.trim() || updateMutation.isPending}>
@@ -537,5 +638,27 @@ function EditCollectionDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ToggleRow({
+  label,
+  hint,
+  checked,
+  onCheckedChange,
+}: {
+  label: string;
+  hint: string;
+  checked: boolean;
+  onCheckedChange: (next: boolean) => void;
+}): React.JSX.Element {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div>
+        <div className="text-sm font-medium text-foreground">{label}</div>
+        <div className="text-xs text-muted-foreground">{hint}</div>
+      </div>
+      <Switch checked={checked} onCheckedChange={onCheckedChange} />
+    </div>
   );
 }

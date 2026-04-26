@@ -42,6 +42,8 @@ export interface FilterOutput {
   watchedTo?: string;
   // Collection-scoped: aggregate of list members' (+ owner) ratings
   membersRatingMin?: number;
+  // Collection-scoped multi-select watch status (planned/watching/completed/dropped/none)
+  watchStatuses?: string[];
 }
 
 /* ─── Constants ─── */
@@ -58,6 +60,19 @@ const MEMBERS_RATING_SORT_OPTIONS = [
   { value: "members_rating.desc", label: "Members Rating (High)" },
   { value: "members_rating.asc", label: "Members Rating (Low)" },
 ];
+
+const COLLECTION_SORT_OPTIONS = [
+  { value: "date_added.desc", label: "Date Added (Newest)" },
+  { value: "date_added.asc", label: "Date Added (Oldest)" },
+];
+
+const COLLECTION_WATCH_STATUS_OPTIONS = [
+  { value: "planned", label: "Planned" },
+  { value: "watching", label: "Watching" },
+  { value: "completed", label: "Completed" },
+  { value: "dropped", label: "Dropped" },
+  { value: "none", label: "Not Tracked" },
+] as const;
 
 const LANGUAGES = [
   { value: "", label: "All Languages" },
@@ -122,7 +137,7 @@ const WATCH_STATUS_OPTIONS = [
 export type SectionId = "search" | "sort" | "genres" | "year" | "score" | "runtime" | "language" | "status" | "certification" | "watchProviders" | "source" | "watchStatus" | "membersRating";
 
 /** URL param keys owned by FilterSidebar — everything else is preserved. */
-const FILTER_KEYS = ["q", "genre", "genreMode", "sort", "language", "score", "scoreMode", "yearMin", "yearMax", "runtimeMin", "runtimeMax", "certification", "status", "providers", "providerMode", "source", "watchStatus", "memRating"] as const;
+const FILTER_KEYS = ["q", "genre", "genreMode", "sort", "language", "score", "scoreMode", "yearMin", "yearMax", "runtimeMin", "runtimeMax", "certification", "status", "providers", "providerMode", "source", "watchStatus", "watchStatuses", "memRating"] as const;
 
 /* ─── Sub-components ─── */
 
@@ -221,6 +236,9 @@ interface FilterSidebarProps {
   resetRef?: React.MutableRefObject<FilterSidebarHandle | null>;
   /** Expose Members Rating filter + sort (collection detail only) */
   showMembersRating?: boolean;
+  /** Initial sort value when no `?sort=` URL param is present.
+   *  Used by the collection page to honour the list's `defaultSortBy`. */
+  defaultSort?: string;
 }
 
 export function FilterSidebar({
@@ -232,6 +250,7 @@ export function FilterSidebar({
   className,
   resetRef,
   showMembersRating = false,
+  defaultSort,
 }: FilterSidebarProps): React.JSX.Element {
   const isLibrary = preset === "library";
   const show = (id: SectionId): boolean => !hideSections.includes(id);
@@ -286,7 +305,8 @@ export function FilterSidebar({
   }, [urlQ]);
   const [selectedGenres, setSelectedGenres] = useState<Set<number>>(() => parseSet(searchParams.get("genre")));
   const [genreMode, setGenreMode] = useState<"and" | "or">((searchParams.get("genreMode") ?? "or") as "and" | "or");
-  const [sortBy, setSortBy] = useState(searchParams.get("sort") ?? (isLibrary ? "recently_watched" : "popularity.desc"));
+  const fallbackSort = defaultSort ?? (isLibrary ? "recently_watched" : "popularity.desc");
+  const [sortBy, setSortBy] = useState(searchParams.get("sort") ?? fallbackSort);
   const [language, setLanguage] = useState(searchParams.get("language") ?? "");
   const [scoreMode, setScoreMode] = useState<"higher" | "lower">((searchParams.get("scoreMode") ?? "higher") as "higher" | "lower");
   const [scoreMin, setScoreMin] = useState(searchParams.get("score") ? Number(searchParams.get("score")) : 0);
@@ -304,6 +324,11 @@ export function FilterSidebar({
   // Library-specific state
   const [source, setSource] = useState<"jellyfin" | "plex" | "manual" | "">((searchParams.get("source") ?? "") as "jellyfin" | "plex" | "manual" | "");
   const [watchStatus, setWatchStatus] = useState<"in_progress" | "completed" | "not_started" | "">((searchParams.get("watchStatus") ?? "") as "in_progress" | "completed" | "not_started" | "");
+  // Collection-specific multi-select watch statuses
+  const [watchStatuses, setWatchStatuses] = useState<Set<string>>(() => {
+    const raw = searchParams.get("watchStatuses");
+    return new Set(raw ? raw.split(",").filter(Boolean) : []);
+  });
 
   // Collection-specific state (members rating aggregate)
   const [membersRatingMin, setMembersRatingMin] = useState(() => {
@@ -350,17 +375,17 @@ export function FilterSidebar({
     if (watchStatus) f.watchStatus = watchStatus as "in_progress" | "completed" | "not_started";
     // Collection-specific fields
     if (membersRatingMin > 0) f.membersRatingMin = membersRatingMin;
+    if (watchStatuses.size > 0) f.watchStatuses = [...watchStatuses];
     return f;
-  }, [q, selectedGenres, genreMode, sortBy, language, scoreMode, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion, source, watchStatus, membersRatingMin]);
+  }, [q, selectedGenres, genreMode, sortBy, language, scoreMode, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion, source, watchStatus, membersRatingMin, watchStatuses]);
 
   // Sync state → URL + emit to parent
   const emitRef = useRef<ReturnType<typeof setTimeout>>(null);
   const firstRender = useRef(true);
 
   useEffect(() => {
-    const defaultSort = isLibrary ? "recently_watched" : "popularity.desc";
     const trimmedQ = q.trim();
-    const hasParams = !!trimmedQ || selectedGenres.size > 0 || language || sortBy !== defaultSort || yearMin || yearMax || scoreMin > 0 || scoreMode !== "higher" || runtimeMin || runtimeMax || certification || status || selectedProviders.size > 0 || source || watchStatus || membersRatingMin > 0;
+    const hasParams = !!trimmedQ || selectedGenres.size > 0 || language || sortBy !== fallbackSort || yearMin || yearMax || scoreMin > 0 || scoreMode !== "higher" || runtimeMin || runtimeMax || certification || status || selectedProviders.size > 0 || source || watchStatus || watchStatuses.size > 0 || membersRatingMin > 0;
 
     if (firstRender.current) {
       firstRender.current = false;
@@ -386,7 +411,7 @@ export function FilterSidebar({
       if (trimmedQ) params.set("q", trimmedQ);
       if (selectedGenres.size > 0) params.set("genre", [...selectedGenres].join(","));
       if (genreMode !== "or") params.set("genreMode", genreMode);
-      if (sortBy !== "popularity.desc") params.set("sort", sortBy);
+      if (sortBy !== fallbackSort) params.set("sort", sortBy);
       if (language) params.set("language", language);
       if (scoreMin > 0) params.set("score", String(scoreMin));
       if (scoreMode !== "higher") params.set("scoreMode", scoreMode);
@@ -400,6 +425,7 @@ export function FilterSidebar({
       if (providerMode !== "or") params.set("providerMode", providerMode);
       if (source) params.set("source", source);
       if (watchStatus) params.set("watchStatus", watchStatus);
+      if (watchStatuses.size > 0) params.set("watchStatuses", [...watchStatuses].join(","));
       if (membersRatingMin > 0) params.set("memRating", String(membersRatingMin));
 
       const qs = params.toString();
@@ -407,7 +433,7 @@ export function FilterSidebar({
     }, 300);
 
     return () => { if (emitRef.current) clearTimeout(emitRef.current); };
-  }, [q, selectedGenres, genreMode, sortBy, language, scoreMode, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion, source, watchStatus, membersRatingMin, onFilterChange, buildOutput, searchParams, router, pathname, isLibrary]);
+  }, [q, selectedGenres, genreMode, sortBy, language, scoreMode, scoreMin, yearMin, yearMax, runtimeMin, runtimeMax, certification, status, selectedProviders, providerMode, watchRegion, source, watchStatus, watchStatuses, membersRatingMin, onFilterChange, buildOutput, searchParams, router, pathname, fallbackSort]);
 
   // Handlers
   const toggleGenre = (id: number): void => {
@@ -423,7 +449,7 @@ export function FilterSidebar({
     setQ("");
     setSelectedGenres(new Set());
     setGenreMode("or");
-    setSortBy(isLibrary ? "recently_watched" : "popularity.desc");
+    setSortBy(fallbackSort);
     setLanguage("");
     setScoreMode("higher");
     setScoreMin(0);
@@ -438,6 +464,7 @@ export function FilterSidebar({
     setProviderMode("or");
     setSource("");
     setWatchStatus("");
+    setWatchStatuses(new Set());
     setMembersRatingMin(0);
     setMembersRatingDisplay(0);
   };
@@ -542,7 +569,7 @@ export function FilterSidebar({
               >
                 {[
                   ...(isLibrary ? LIBRARY_SORT_OPTIONS : SORT_OPTIONS),
-                  ...(showMembersRating ? MEMBERS_RATING_SORT_OPTIONS : []),
+                  ...(showMembersRating ? [...COLLECTION_SORT_OPTIONS, ...MEMBERS_RATING_SORT_OPTIONS] : []),
                 ].map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
@@ -577,8 +604,34 @@ export function FilterSidebar({
           </Section>
         )}
 
-        {/* Watch Status (library feeds + collection detail) */}
-        {showWatchStatusSection && (
+        {/* Watch Status — collection: multi-select; library: single-select */}
+        {showWatchStatusSection && showMembersRating && (
+          <Section label="Watch Status" defaultOpen>
+            <div className="flex flex-wrap gap-1">
+              <Pill
+                label="All"
+                active={watchStatuses.size === 0}
+                onClick={() => setWatchStatuses(new Set())}
+              />
+              {COLLECTION_WATCH_STATUS_OPTIONS.map((ws) => (
+                <Pill
+                  key={ws.value}
+                  label={ws.label}
+                  active={watchStatuses.has(ws.value)}
+                  onClick={() => {
+                    setWatchStatuses((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(ws.value)) next.delete(ws.value);
+                      else next.add(ws.value);
+                      return next;
+                    });
+                  }}
+                />
+              ))}
+            </div>
+          </Section>
+        )}
+        {showWatchStatusSection && !showMembersRating && (
           <Section label="Watch Status" defaultOpen>
             <div className="flex flex-wrap gap-1">
               <Pill label="All" active={watchStatus === ""} onClick={() => setWatchStatus("")} />

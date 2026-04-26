@@ -37,12 +37,15 @@ export async function viewListBySlug(
     runtimeMax: input.runtimeMax,
     certification: input.certification,
     status: input.status,
-    sortBy: input.sortBy,
+    sortBy: input.sortBy ?? listRow.defaultSortBy,
     watchProviders: input.watchProviders,
     watchRegion: input.watchRegion,
     membersRatingMin: input.membersRatingMin,
     memberVoteCountMin: input.memberVoteCountMin,
-    watchStatus: input.watchStatus,
+    watchStatuses: input.watchStatuses,
+    hideCompleted: input.hideCompleted ?? listRow.hideCompleted,
+    hideDropped: input.hideDropped ?? listRow.hideDropped,
+    showHidden: input.showHidden ?? listRow.showHidden,
   });
 
   const translated = await translateMediaItems(

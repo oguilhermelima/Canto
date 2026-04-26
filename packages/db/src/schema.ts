@@ -923,6 +923,14 @@ export const list = pgTable(
     visibility: varchar("visibility", { length: 20 }).notNull().default("private"), // 'public' | 'private' | 'shared'
     isSystem: boolean("is_system").notNull().default(false),
     position: integer("position").notNull().default(0),
+    // Per-collection configuration knobs surfaced in EditCollectionDialog.
+    defaultSortBy: varchar("default_sort_by", { length: 50 })
+      .notNull()
+      .default("date_added.desc"),
+    groupByStatus: boolean("group_by_status").notNull().default(false),
+    hideCompleted: boolean("hide_completed").notNull().default(false),
+    hideDropped: boolean("hide_dropped").notNull().default(false),
+    showHidden: boolean("show_hidden").notNull().default(false),
     // Tombstone for Trakt-linked lists awaiting remote deletion. Local row
     // survives until the worker confirms Trakt removed the list, otherwise an
     // orphaned remote list re-imports as an empty local list on next sync.

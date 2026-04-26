@@ -1,8 +1,25 @@
 import { and, asc, eq, or, isNull, desc, count, sql, inArray, max, type SQL } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { list, listItem, listMember, media, mediaTranslation, user, userMediaLibrary, userMediaState } from "@canto/db/schema";
+import { list, listItem, listMember, media, mediaTranslation, user, userHiddenMedia, userMediaLibrary, userMediaState } from "@canto/db/schema";
+import type { CollectionWatchStatus } from "@canto/validators";
 import type { RecsFilters } from "../../domain/recommendations/types/recs-filters";
 import { buildRecsFilterConditions, recsSortOrder } from "../recommendations/recs-filter-builder";
+
+/** Build a SQL condition for the multi-select collection watch-status filter.
+ *  `none` → row missing or `status IS NULL`; the others map 1:1 to the DB. */
+function buildWatchStatusesCondition(
+  statuses: CollectionWatchStatus[] | undefined,
+): SQL | null {
+  if (!statuses || statuses.length === 0) return null;
+  const dbStatuses = statuses.filter((s): s is Exclude<CollectionWatchStatus, "none"> => s !== "none");
+  const includeNone = statuses.includes("none");
+  const inExpr = dbStatuses.length
+    ? sql`${userMediaState.status} IN (${sql.join(dbStatuses.map((s) => sql`${s}`), sql`, `)})`
+    : null;
+  if (inExpr && includeNone) return sql`(${userMediaState.status} IS NULL OR ${inExpr})`;
+  if (inExpr) return inExpr;
+  return sql`${userMediaState.status} IS NULL`;
+}
 
 // ── Lists ──
 
@@ -257,7 +274,21 @@ export async function createList(
 export async function updateList(
   db: Database,
   id: string,
-  data: Partial<Pick<typeof list.$inferInsert, "name" | "slug" | "description" | "position" | "visibility">>,
+  data: Partial<
+    Pick<
+      typeof list.$inferInsert,
+      | "name"
+      | "slug"
+      | "description"
+      | "position"
+      | "visibility"
+      | "defaultSortBy"
+      | "groupByStatus"
+      | "hideCompleted"
+      | "hideDropped"
+      | "showHidden"
+    >
+  >,
 ) {
   const [row] = await db
     .update(list)
@@ -357,7 +388,10 @@ export async function findListItems(
     userId?: string;
     limit?: number;
     offset?: number;
-    watchStatus?: "in_progress" | "completed" | "not_started";
+    watchStatuses?: CollectionWatchStatus[];
+    hideCompleted?: boolean;
+    hideDropped?: boolean;
+    showHidden?: boolean;
   } & RecsFilters = {},
 ) {
   const {
@@ -367,7 +401,10 @@ export async function findListItems(
     sortBy,
     membersRatingMin,
     memberVoteCountMin,
-    watchStatus,
+    watchStatuses,
+    hideCompleted,
+    hideDropped,
+    showHidden,
     ...filterOpts
   } = opts;
 
@@ -435,13 +472,22 @@ export async function findListItems(
   }
 
   const joinCurrentUserState = !!userId;
-  if (watchStatus && userId) {
-    if (watchStatus === "in_progress") {
-      conditions.push(sql`${userMediaState.status} = 'watching'`);
-    } else if (watchStatus === "completed") {
-      conditions.push(sql`${userMediaState.status} = 'completed'`);
-    } else {
-      conditions.push(sql`(${userMediaState.status} IS NULL OR ${userMediaState.status} = 'planned')`);
+  if (userId) {
+    const wsCondition = buildWatchStatusesCondition(watchStatuses);
+    if (wsCondition) conditions.push(wsCondition);
+    if (hideCompleted) {
+      conditions.push(sql`${userMediaState.status} IS DISTINCT FROM 'completed'`);
+    }
+    if (hideDropped) {
+      conditions.push(sql`${userMediaState.status} IS DISTINCT FROM 'dropped'`);
+    }
+    if (!showHidden) {
+      conditions.push(sql`NOT EXISTS (
+        SELECT 1 FROM ${userHiddenMedia}
+        WHERE ${userHiddenMedia.userId} = ${userId}
+        AND ${userHiddenMedia.externalId} = ${media.externalId}
+        AND ${userHiddenMedia.provider} = ${media.provider}
+      )`);
     }
   }
 
@@ -452,6 +498,8 @@ export async function findListItems(
     if (memberVotesSubquery && sortBy === "members_rating.asc") {
       return [sql`${memberVotesSubquery.avgRating} ASC NULLS LAST`];
     }
+    if (sortBy === "date_added.desc") return [desc(listItem.addedAt)];
+    if (sortBy === "date_added.asc") return [asc(listItem.addedAt)];
     const customSort = recsSortOrder(sortBy);
     if (customSort) return [customSort];
     return [asc(listItem.position), desc(listItem.addedAt)];
@@ -473,6 +521,7 @@ export async function findListItems(
     memberVoteCount?: number | null;
     memberAvgRating?: number | null;
     userRating?: number | null;
+    userStatus?: string | null;
   };
 
   const itemsP: Promise<ItemRow[]> = (async () => {
@@ -485,6 +534,7 @@ export async function findListItems(
           memberVoteCount: memberVotesSubquery.voteCount,
           memberAvgRating: memberVotesSubquery.avgRating,
           userRating: userMediaState.rating,
+          userStatus: userMediaState.status,
         })
         .from(listItem)
         .innerJoin(media, eq(listItem.mediaId, media.id))
@@ -514,7 +564,12 @@ export async function findListItems(
     }
     if (userStateJoin) {
       return db
-        .select({ listItem, media, userRating: userMediaState.rating })
+        .select({
+          listItem,
+          media,
+          userRating: userMediaState.rating,
+          userStatus: userMediaState.status,
+        })
         .from(listItem)
         .innerJoin(media, eq(listItem.mediaId, media.id))
         .leftJoin(userMediaState, userStateJoin)
@@ -592,6 +647,7 @@ export async function findListItems(
             }
           : null,
       userRating: userRating as number | null,
+      userStatus: row.userStatus ?? null,
       membership: membership.get(row.media.id) ?? {
         inWatchlist: false,
         otherCollections: [],
@@ -797,14 +853,20 @@ export async function findUserCustomCollectionItems(
   opts: {
     limit?: number;
     offset?: number;
-    watchStatus?: "in_progress" | "completed" | "not_started";
+    watchStatuses?: CollectionWatchStatus[];
+    hideCompleted?: boolean;
+    hideDropped?: boolean;
+    showHidden?: boolean;
   } & RecsFilters = {},
 ) {
   const {
     limit: lim = 50,
     offset: off = 0,
     sortBy,
-    watchStatus,
+    watchStatuses,
+    hideCompleted,
+    hideDropped,
+    showHidden,
     ...filterOpts
   } = opts;
 
@@ -838,16 +900,21 @@ export async function findUserCustomCollectionItems(
     ...buildRecsFilterConditions(filterOpts),
   ];
 
-  if (watchStatus) {
-    if (watchStatus === "in_progress") {
-      conditions.push(sql`${userMediaState.status} = 'watching'`);
-    } else if (watchStatus === "completed") {
-      conditions.push(sql`${userMediaState.status} = 'completed'`);
-    } else {
-      conditions.push(
-        sql`(${userMediaState.status} IS NULL OR ${userMediaState.status} = 'planned')`,
-      );
-    }
+  const wsCondition = buildWatchStatusesCondition(watchStatuses);
+  if (wsCondition) conditions.push(wsCondition);
+  if (hideCompleted) {
+    conditions.push(sql`${userMediaState.status} IS DISTINCT FROM 'completed'`);
+  }
+  if (hideDropped) {
+    conditions.push(sql`${userMediaState.status} IS DISTINCT FROM 'dropped'`);
+  }
+  if (!showHidden) {
+    conditions.push(sql`NOT EXISTS (
+      SELECT 1 FROM ${userHiddenMedia}
+      WHERE ${userHiddenMedia.userId} = ${userId}
+      AND ${userHiddenMedia.externalId} = ${media.externalId}
+      AND ${userHiddenMedia.provider} = ${media.provider}
+    )`);
   }
 
   const userStateJoin = and(
@@ -856,7 +923,10 @@ export async function findUserCustomCollectionItems(
   );
 
   const customSort = recsSortOrder(sortBy);
-  const orderByExpr = customSort ?? sql`${media.popularity} DESC NULLS LAST`;
+  const orderByExpr =
+    sortBy === "date_added.desc" || sortBy === "date_added.asc"
+      ? sql`${media.popularity} DESC NULLS LAST`
+      : (customSort ?? sql`${media.popularity} DESC NULLS LAST`);
 
   const whereClause = and(...conditions);
 

@@ -49,7 +49,9 @@ export default function AllCollectionItemsPage(): React.JSX.Element {
       sortBy: filters.sortBy,
       watchProviders: filters.watchProviders,
       watchRegion: filters.watchRegion,
-      watchStatus: filters.watchStatus,
+      watchStatuses: filters.watchStatuses as
+        | ("planned" | "watching" | "completed" | "dropped" | "none")[]
+        | undefined,
     },
     {
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {

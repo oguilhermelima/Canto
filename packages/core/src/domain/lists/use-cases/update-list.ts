@@ -21,5 +21,10 @@ export async function updateListForUser(
   }
   if (input.description !== undefined) data.description = input.description;
   if (input.visibility !== undefined) data.visibility = input.visibility;
+  if (input.defaultSortBy !== undefined) data.defaultSortBy = input.defaultSortBy;
+  if (input.groupByStatus !== undefined) data.groupByStatus = input.groupByStatus;
+  if (input.hideCompleted !== undefined) data.hideCompleted = input.hideCompleted;
+  if (input.hideDropped !== undefined) data.hideDropped = input.hideDropped;
+  if (input.showHidden !== undefined) data.showHidden = input.showHidden;
   return updateList(db, input.id, data);
 }

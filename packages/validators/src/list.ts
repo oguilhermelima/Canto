@@ -2,12 +2,26 @@ import { z } from "zod";
 
 import { mediaFilterBase } from "./media";
 
+/** Multi-select filter: matches DB `user_media_state.status` plus `none`
+ *  (= no row). Replaces the legacy 3-value `watchStatus` enum. */
+export const collectionWatchStatus = z.enum([
+  "planned",
+  "watching",
+  "completed",
+  "dropped",
+  "none",
+]);
+export type CollectionWatchStatus = z.infer<typeof collectionWatchStatus>;
+
 export const getListBySlugInput = mediaFilterBase.extend({
   slug: z.string(),
   limit: z.number().int().min(1).max(100).default(50),
   offset: z.number().int().min(0).default(0),
   cursor: z.number().int().min(0).nullish(),
-  watchStatus: z.enum(["in_progress", "completed", "not_started"]).optional(),
+  watchStatuses: z.array(collectionWatchStatus).optional(),
+  hideCompleted: z.boolean().optional(),
+  hideDropped: z.boolean().optional(),
+  showHidden: z.boolean().optional(),
 });
 export type GetListBySlugInput = z.infer<typeof getListBySlugInput>;
 
@@ -24,11 +38,30 @@ export const createListInput = z.object({
 });
 export type CreateListInput = z.infer<typeof createListInput>;
 
+/** Sort options surfaced as the per-collection default in EditCollectionDialog.
+ *  These are the same values the FilterSidebar emits via `?sort=`. */
+export const collectionDefaultSort = z.enum([
+  "date_added.desc",
+  "date_added.asc",
+  "title.asc",
+  "title.desc",
+  "primary_release_date.desc",
+  "primary_release_date.asc",
+  "vote_average.desc",
+  "members_rating.desc",
+]);
+export type CollectionDefaultSort = z.infer<typeof collectionDefaultSort>;
+
 export const updateListInput = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(200).optional(),
   description: z.string().max(1000).optional(),
   visibility: listVisibility.optional(),
+  defaultSortBy: collectionDefaultSort.optional(),
+  groupByStatus: z.boolean().optional(),
+  hideCompleted: z.boolean().optional(),
+  hideDropped: z.boolean().optional(),
+  showHidden: z.boolean().optional(),
 });
 export type UpdateListInput = z.infer<typeof updateListInput>;
 
@@ -123,7 +156,10 @@ export type MoveListItemsInput = z.infer<typeof moveListItemsInput>;
 export const getAllCollectionItemsInput = mediaFilterBase.extend({
   limit: z.number().int().min(1).max(100).default(50),
   cursor: z.number().int().min(0).nullish(),
-  watchStatus: z.enum(["in_progress", "completed", "not_started"]).optional(),
+  watchStatuses: z.array(collectionWatchStatus).optional(),
+  hideCompleted: z.boolean().optional(),
+  hideDropped: z.boolean().optional(),
+  showHidden: z.boolean().optional(),
 });
 export type GetAllCollectionItemsInput = z.infer<
   typeof getAllCollectionItemsInput

@@ -38,7 +38,10 @@ export async function viewAllCollectionItems(
       sortBy: input.sortBy,
       watchProviders: input.watchProviders,
       watchRegion: input.watchRegion,
-      watchStatus: input.watchStatus,
+      watchStatuses: input.watchStatuses,
+      hideCompleted: input.hideCompleted,
+      hideDropped: input.hideDropped,
+      showHidden: input.showHidden,
     },
   );
 

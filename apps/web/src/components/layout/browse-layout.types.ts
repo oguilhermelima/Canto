@@ -53,6 +53,8 @@ export interface BrowseItem {
   membersAvg?: number;
   /* Current user's personal rating (1-10) */
   userRating?: number | null;
+  /* Current user's tracking status — drives groupByStatus on collection page */
+  userStatus?: "planned" | "watching" | "completed" | "dropped" | null;
   /* Cross-list membership for collection detail + all-items views */
   membership?: {
     inWatchlist: boolean;

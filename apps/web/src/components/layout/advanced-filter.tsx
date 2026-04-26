@@ -24,6 +24,7 @@ interface AdvancedFilterProps {
   sidebarClassName?: string;
   hideSections?: SectionId[];
   showMembersRating?: boolean;
+  defaultSort?: string;
 }
 
 export function AdvancedFilter({
@@ -36,6 +37,7 @@ export function AdvancedFilter({
   sidebarClassName,
   hideSections,
   showMembersRating,
+  defaultSort,
 }: AdvancedFilterProps): React.JSX.Element {
   const mobileResetRef = useRef<FilterSidebarHandle | null>(null);
 
@@ -51,12 +53,14 @@ export function AdvancedFilter({
         )}
       >
         <FilterSidebar
+          key={defaultSort ?? "_pending"}
           preset={preset}
           mediaType={mediaType}
           onFilterChange={onFilterChange}
           hideSections={hideSections}
           className={sidebarClassName}
           showMembersRating={showMembersRating}
+          defaultSort={defaultSort}
         />
       </div>
 
@@ -80,6 +84,7 @@ export function AdvancedFilter({
 
           <div className="flex-1 overflow-y-auto px-6">
             <FilterSidebar
+              key={defaultSort ?? "_pending"}
               preset={preset}
               mediaType={mediaType}
               onFilterChange={onFilterChange}
@@ -87,6 +92,7 @@ export function AdvancedFilter({
               hideHeader
               resetRef={mobileResetRef}
               showMembersRating={showMembersRating}
+              defaultSort={defaultSort}
             />
           </div>
 
