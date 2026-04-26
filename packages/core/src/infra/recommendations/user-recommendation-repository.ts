@@ -26,12 +26,14 @@ export interface UserRecommendationRow {
   provider: string | null;
   type: string | null;
   title: string | null;
+  overview: string | null;
   posterPath: string | null;
   backdropPath: string | null;
   logoPath: string | null;
   voteAverage: number | null;
   year: number | null;
   releaseDate: string | null;
+  genres: string[] | null;
   genreIds: number[] | null;
   runtime: number | null;
   originalLanguage: string | null;
@@ -52,11 +54,13 @@ export interface UserRecommendationReadRow {
   provider: string;
   mediaType: "movie" | "show";
   title: string;
+  overview: string | null;
   posterPath: string | null;
   backdropPath: string | null;
   logoPath: string | null;
   releaseDate: string | null;
   voteAverage: number | null;
+  genres: string[] | null;
   genreIds: number[] | null;
   trailerKey: string | null;
   relevance: number;
@@ -104,12 +108,14 @@ export async function rebuildUserRecommendations(
     provider: r.provider,
     type: r.type,
     title: r.title,
+    overview: r.overview,
     posterPath: r.posterPath,
     backdropPath: r.backdropPath,
     logoPath: r.logoPath,
     voteAverage: r.voteAverage,
     year: r.year,
     releaseDate: r.releaseDate,
+    genres: r.genres,
     genreIds: r.genreIds,
     runtime: r.runtime,
     originalLanguage: r.originalLanguage,
@@ -196,12 +202,14 @@ export async function upsertUserRecommendations(
     provider: r.provider,
     type: r.type,
     title: r.title,
+    overview: r.overview,
     posterPath: r.posterPath,
     backdropPath: r.backdropPath,
     logoPath: r.logoPath,
     voteAverage: r.voteAverage,
     year: r.year,
     releaseDate: r.releaseDate,
+    genres: r.genres,
     genreIds: r.genreIds,
     runtime: r.runtime,
     originalLanguage: r.originalLanguage,
@@ -233,11 +241,13 @@ function narrowReadRow(r: {
   provider: string | null;
   mediaType: string | null;
   title: string | null;
+  overview: string | null;
   posterPath: string | null;
   backdropPath: string | null;
   logoPath: string | null;
   releaseDate: string | null;
   voteAverage: number | null;
+  genres: string[] | null;
   genreIds: number[] | null;
   trailerKey?: string | null;
   relevance: number;
@@ -258,11 +268,13 @@ function narrowReadRow(r: {
     provider: r.provider,
     mediaType: r.mediaType,
     title: r.title,
+    overview: r.overview,
     posterPath: r.posterPath,
     backdropPath: r.backdropPath,
     logoPath: r.logoPath,
     releaseDate: r.releaseDate,
     voteAverage: r.voteAverage,
+    genres: r.genres,
     genreIds: r.genreIds,
     trailerKey: r.trailerKey ?? null,
     relevance: r.relevance,
@@ -334,11 +346,13 @@ export async function findUserRecommendations(
     provider: userRecommendation.provider,
     mediaType: userRecommendation.type,
     title: userRecommendation.title,
+    overview: userRecommendation.overview,
     posterPath: userRecommendation.posterPath,
     backdropPath: userRecommendation.backdropPath,
     logoPath: userRecommendation.logoPath,
     releaseDate: userRecommendation.releaseDate,
     voteAverage: userRecommendation.voteAverage,
+    genres: userRecommendation.genres,
     genreIds: userRecommendation.genreIds,
     trailerKey: sql<string | null>`(SELECT ${mediaVideo.externalKey} FROM ${mediaVideo} WHERE ${mediaVideo.mediaId} = ${userRecommendation.mediaId} AND ${mediaVideo.type} = 'Trailer' AND ${mediaVideo.site} = 'YouTube' LIMIT 1)`,
     relevance: userRecommendation.weight,
@@ -357,6 +371,7 @@ export async function findUserRecommendations(
       .select({
         ...baseSelect,
         translatedTitle: mediaTranslation.title,
+        translatedOverview: mediaTranslation.overview,
         translatedPosterPath: mediaTranslation.posterPath,
         translatedLogoPath: mediaTranslation.logoPath,
       })
@@ -375,6 +390,10 @@ export async function findUserRecommendations(
 
     const out: UserRecommendationReadRow[] = [];
     for (const r of rows) {
+      const translatedOverview =
+        r.translatedOverview && r.translatedOverview.trim().length > 0
+          ? r.translatedOverview
+          : null;
       const narrowed = narrowReadRow({
         id: r.id,
         externalId: r.externalId,
@@ -384,11 +403,13 @@ export async function findUserRecommendations(
           r.translatedTitle && r.translatedTitle.trim().length > 0
             ? r.translatedTitle
             : r.title,
+        overview: translatedOverview ?? r.overview,
         posterPath: r.translatedPosterPath ?? r.posterPath,
         backdropPath: r.backdropPath,
         logoPath: r.translatedLogoPath ?? r.logoPath,
         releaseDate: r.releaseDate,
         voteAverage: r.voteAverage,
+        genres: r.genres,
         genreIds: r.genreIds,
         trailerKey: r.trailerKey,
         relevance: r.relevance,
@@ -536,11 +557,13 @@ export async function findUserSpotlightItems(
     provider: userRecommendation.provider,
     mediaType: userRecommendation.type,
     title: userRecommendation.title,
+    overview: userRecommendation.overview,
     posterPath: userRecommendation.posterPath,
     backdropPath: userRecommendation.backdropPath,
     logoPath: userRecommendation.logoPath,
     releaseDate: userRecommendation.releaseDate,
     voteAverage: userRecommendation.voteAverage,
+    genres: userRecommendation.genres,
     genreIds: userRecommendation.genreIds,
     relevance: userRecommendation.weight,
   };
@@ -558,6 +581,7 @@ export async function findUserSpotlightItems(
       .select({
         ...baseSelect,
         translatedTitle: mediaTranslation.title,
+        translatedOverview: mediaTranslation.overview,
         translatedPosterPath: mediaTranslation.posterPath,
         translatedLogoPath: mediaTranslation.logoPath,
       })
@@ -575,6 +599,10 @@ export async function findUserSpotlightItems(
 
     const out: UserRecommendationReadRow[] = [];
     for (const r of rows) {
+      const translatedOverview =
+        r.translatedOverview && r.translatedOverview.trim().length > 0
+          ? r.translatedOverview
+          : null;
       const narrowed = narrowReadRow({
         id: r.id,
         externalId: r.externalId,
@@ -584,11 +612,13 @@ export async function findUserSpotlightItems(
           r.translatedTitle && r.translatedTitle.trim().length > 0
             ? r.translatedTitle
             : r.title,
+        overview: translatedOverview ?? r.overview,
         posterPath: r.translatedPosterPath ?? r.posterPath,
         backdropPath: r.backdropPath,
         logoPath: r.translatedLogoPath ?? r.logoPath,
         releaseDate: r.releaseDate,
         voteAverage: r.voteAverage,
+        genres: r.genres,
         genreIds: r.genreIds,
         relevance: r.relevance,
       });

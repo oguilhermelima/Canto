@@ -41,12 +41,14 @@ const recCandidateColumns = {
   provider: media.provider,
   type: media.type,
   title: media.title,
+  overview: media.overview,
   posterPath: media.posterPath,
   backdropPath: media.backdropPath,
   logoPath: media.logoPath,
   voteAverage: media.voteAverage,
   year: media.year,
   releaseDate: media.releaseDate,
+  genres: media.genres,
   genreIds: media.genreIds,
   runtime: media.runtime,
   originalLanguage: media.originalLanguage,
@@ -61,12 +63,14 @@ type RecCandidate = {
   provider: string;
   type: string;
   title: string;
+  overview: string | null;
   posterPath: string | null;
   backdropPath: string | null;
   logoPath: string | null;
   voteAverage: number | null;
   year: number | null;
   releaseDate: string | null;
+  genres: string[] | null;
   genreIds: number[] | null;
   runtime: number | null;
   originalLanguage: string | null;
@@ -83,12 +87,14 @@ function toRecRow(candidate: RecCandidate, weight: number): UserRecommendationRo
     provider: candidate.provider,
     type: candidate.type,
     title: candidate.title,
+    overview: candidate.overview,
     posterPath: candidate.posterPath,
     backdropPath: candidate.backdropPath,
     logoPath: candidate.logoPath,
     voteAverage: candidate.voteAverage,
     year: candidate.year,
     releaseDate: candidate.releaseDate,
+    genres: candidate.genres,
     genreIds: candidate.genreIds,
     runtime: candidate.runtime,
     originalLanguage: candidate.originalLanguage,
