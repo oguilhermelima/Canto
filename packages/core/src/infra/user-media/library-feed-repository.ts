@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, gte, isNull, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
   episode,
@@ -275,6 +275,7 @@ export async function findUserListMediaCandidates(
   userId: string,
   language: string,
   mediaType?: "movie" | "show",
+  limit?: number,
 ): Promise<UserListMediaCandidateRow[]> {
   const conditions = [
     eq(list.userId, userId),
@@ -285,7 +286,7 @@ export async function findUserListMediaCandidates(
 
   const mi = mediaI18n(language);
 
-  return db
+  const query = db
     .select({
       listId: list.id,
       listName: list.name,
@@ -308,6 +309,194 @@ export async function findUserListMediaCandidates(
     .leftJoin(mediaTranslation, mi.join)
     .where(and(...conditions))
     .orderBy(desc(listItem.addedAt), desc(listItem.id));
+
+  return limit !== undefined ? query.limit(limit) : query;
+}
+
+// ── Continue Watching feed ─────────────────────────────────────────────────
+//
+// Focused query for the "Continue Watching" rail / library tab. Unlike
+// `findUserPlaybackProgressFeed`, the source-IN ('jellyfin','plex','trakt')
+// + is_completed=false + position>0 predicates are pushed into SQL so we
+// don't fetch rows we'll throw away in JS, and pagination is keyset on
+// (lastWatchedAt, id) so the index `idx_user_playback_active` can serve the
+// page directly.
+//
+// Trailer keys are intentionally NOT selected here — callers should batch
+// them via `findTrailerKeysForMediaIds` after the main query, mirroring the
+// pattern used by recommendations. This keeps the planner away from the
+// per-row correlated subquery in `mediaI18n.trailerKey`.
+
+export interface ContinueWatchingFeedRow {
+  id: string;
+  mediaId: string;
+  episodeId: string | null;
+  positionSeconds: number;
+  isCompleted: boolean;
+  lastWatchedAt: Date;
+  source: "jellyfin" | "plex" | "trakt";
+  mediaType: string;
+  title: string;
+  posterPath: string | null;
+  backdropPath: string | null;
+  logoPath: string | null;
+  overview: string | null;
+  voteAverage: number | null;
+  genres: unknown;
+  genreIds: unknown;
+  year: number | null;
+  mediaRuntime: number | null;
+  externalId: number;
+  provider: string;
+  episodeNumber: number | null;
+  episodeTitle: string | null;
+  seasonNumber: number | null;
+  episodeRuntime: number | null;
+}
+
+export interface ContinueWatchingKeysetCursor {
+  lastWatchedAt: Date;
+  id: string;
+}
+
+const CONTINUE_WATCHING_SOURCES = ["jellyfin", "plex", "trakt"] as const;
+
+export async function findContinueWatchingFeed(
+  db: Database,
+  userId: string,
+  language: string,
+  opts: {
+    limit: number;
+    cursor?: ContinueWatchingKeysetCursor | null;
+    mediaType?: "movie" | "show";
+    filters?: LibraryFeedFilterOptions;
+  },
+): Promise<ContinueWatchingFeedRow[]> {
+  const { limit, cursor, mediaType, filters } = opts;
+
+  const conditions: SQL[] = [
+    eq(userPlaybackProgress.userId, userId),
+    isNull(userPlaybackProgress.deletedAt),
+    eq(userPlaybackProgress.isCompleted, false),
+    gt(userPlaybackProgress.positionSeconds, 0),
+    isNotNull(userPlaybackProgress.lastWatchedAt),
+  ];
+
+  // Constrain to the three sources that actually back Continue Watching.
+  // If the caller also passes a more specific filter, the intersection
+  // collapses naturally (e.g., source=manual yields zero rows).
+  if (filters?.source) {
+    if (
+      (CONTINUE_WATCHING_SOURCES as readonly string[]).includes(filters.source)
+    ) {
+      conditions.push(eq(userPlaybackProgress.source, filters.source));
+    } else {
+      // Asked for a non-continue source (e.g., 'manual') — return empty.
+      conditions.push(sql`false`);
+    }
+  } else {
+    conditions.push(
+      inArray(
+        userPlaybackProgress.source,
+        CONTINUE_WATCHING_SOURCES as unknown as string[],
+      ),
+    );
+  }
+
+  if (mediaType) conditions.push(eq(media.type, mediaType));
+  const titleLike = buildTitleIlikeCondition(filters?.q);
+  if (titleLike) conditions.push(titleLike);
+  if (filters?.yearMin !== undefined)
+    conditions.push(gte(media.year, filters.yearMin));
+  if (filters?.yearMax !== undefined)
+    conditions.push(lte(media.year, filters.yearMax));
+  if (filters?.genreIds && filters.genreIds.length > 0) {
+    conditions.push(
+      sql`${media.genreIds}::jsonb @> ${JSON.stringify(filters.genreIds)}::jsonb`,
+    );
+  }
+  if (filters?.scoreMin !== undefined)
+    conditions.push(gte(media.voteAverage, filters.scoreMin));
+  if (filters?.scoreMax !== undefined)
+    conditions.push(lte(media.voteAverage, filters.scoreMax));
+  if (filters?.runtimeMin !== undefined)
+    conditions.push(gte(media.runtime, filters.runtimeMin));
+  if (filters?.runtimeMax !== undefined)
+    conditions.push(lte(media.runtime, filters.runtimeMax));
+  if (filters?.language)
+    conditions.push(eq(media.originalLanguage, filters.language));
+  if (filters?.certification)
+    conditions.push(eq(media.contentRating, filters.certification));
+  if (filters?.tvStatus) conditions.push(eq(media.status, filters.tvStatus));
+
+  // Keyset cursor on (lastWatchedAt DESC, id DESC). The partial index
+  // `idx_user_playback_active` orders rows the same way, so the planner can
+  // skip directly to the cursor row.
+  if (cursor) {
+    conditions.push(
+      or(
+        lt(userPlaybackProgress.lastWatchedAt, cursor.lastWatchedAt),
+        and(
+          eq(userPlaybackProgress.lastWatchedAt, cursor.lastWatchedAt),
+          lt(userPlaybackProgress.id, cursor.id),
+        ),
+      )!,
+    );
+  }
+
+  const mi = mediaI18n(language);
+  const ei = episodeI18n(language);
+
+  const rows = await db
+    .select({
+      id: userPlaybackProgress.id,
+      mediaId: userPlaybackProgress.mediaId,
+      episodeId: userPlaybackProgress.episodeId,
+      positionSeconds: userPlaybackProgress.positionSeconds,
+      isCompleted: userPlaybackProgress.isCompleted,
+      lastWatchedAt: userPlaybackProgress.lastWatchedAt,
+      source: userPlaybackProgress.source,
+      mediaType: media.type,
+      title: mi.title,
+      posterPath: mi.posterPath,
+      backdropPath: media.backdropPath,
+      logoPath: mi.logoPath,
+      overview: mi.overview,
+      voteAverage: media.voteAverage,
+      genres: media.genres,
+      genreIds: media.genreIds,
+      year: media.year,
+      mediaRuntime: media.runtime,
+      externalId: media.externalId,
+      provider: media.provider,
+      episodeNumber: episode.number,
+      episodeTitle: ei.title,
+      seasonNumber: season.number,
+      episodeRuntime: episode.runtime,
+    })
+    .from(userPlaybackProgress)
+    .innerJoin(media, eq(userPlaybackProgress.mediaId, media.id))
+    .leftJoin(mediaTranslation, mi.join)
+    .leftJoin(episode, eq(userPlaybackProgress.episodeId, episode.id))
+    .leftJoin(episodeTranslation, ei.join)
+    .leftJoin(season, eq(episode.seasonId, season.id))
+    .where(and(...conditions))
+    .orderBy(desc(userPlaybackProgress.lastWatchedAt), desc(userPlaybackProgress.id))
+    .limit(limit);
+
+  return rows
+    .filter(
+      (
+        row,
+      ): row is typeof row & {
+        lastWatchedAt: Date;
+        source: "jellyfin" | "plex" | "trakt";
+      } =>
+        row.lastWatchedAt !== null &&
+        (row.source === "jellyfin" ||
+          row.source === "plex" ||
+          row.source === "trakt"),
+    );
 }
 
 export interface UserMediaPaginatedRow {

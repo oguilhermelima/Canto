@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, or, type SQL } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { media, mediaTranslation, userPlaybackProgress } from "@canto/db/schema";
 import { mediaI18n } from "../shared/media-i18n";
@@ -195,6 +195,7 @@ export async function findUserWatchingShowsMetadata(
   db: Database,
   userId: string,
   language: string,
+  limit?: number,
 ): Promise<Array<{
   mediaId: string;
   mediaType: string;
@@ -208,7 +209,7 @@ export async function findUserWatchingShowsMetadata(
   lastActivityAt: Date | null;
 }>> {
   const mi = mediaI18n(language);
-  const rows = await db
+  const baseQuery = db
     .selectDistinct({
       mediaId: media.id,
       mediaType: media.type,
@@ -233,6 +234,11 @@ export async function findUserWatchingShowsMetadata(
     )
     .orderBy(desc(userPlaybackProgress.lastWatchedAt));
 
+  // Pull a bounded slice when callers request it. selectDistinct may still
+  // emit duplicate mediaIds (multiple episodes per show), so we over-fetch
+  // by 2x to leave room for the dedupe pass below.
+  const rows = limit !== undefined ? await baseQuery.limit(limit * 2) : await baseQuery;
+
   // Dedupe by mediaId (selectDistinct doesn't dedupe on multi-column select)
   const seen = new Set<string>();
   const deduped: typeof rows = [];
@@ -240,6 +246,46 @@ export async function findUserWatchingShowsMetadata(
     if (seen.has(row.mediaId)) continue;
     seen.add(row.mediaId);
     deduped.push(row);
+    if (limit !== undefined && deduped.length >= limit) break;
   }
   return deduped;
+}
+
+/**
+ * Return the set of mediaIds that should appear in Continue Watching for the
+ * user — i.e. rows with active playback from a server source. Used by
+ * `getWatchNext` to exclude items already covered by Continue Watching.
+ */
+export async function findUserContinueWatchingMediaIds(
+  db: Database,
+  userId: string,
+  mediaType?: "movie" | "show",
+): Promise<Set<string>> {
+  const conditions: SQL[] = [
+    eq(userPlaybackProgress.userId, userId),
+    isNull(userPlaybackProgress.deletedAt),
+    eq(userPlaybackProgress.isCompleted, false),
+    gt(userPlaybackProgress.positionSeconds, 0),
+    inArray(userPlaybackProgress.source, [
+      "jellyfin",
+      "plex",
+      "trakt",
+    ]),
+  ];
+
+  if (mediaType) {
+    // Inline subquery on media.type to keep this a single round-trip.
+    conditions.push(
+      sql`${userPlaybackProgress.mediaId} IN (
+        SELECT id FROM media WHERE type = ${mediaType}
+      )`,
+    );
+  }
+
+  const rows = await db
+    .selectDistinct({ mediaId: userPlaybackProgress.mediaId })
+    .from(userPlaybackProgress)
+    .where(and(...conditions));
+
+  return new Set(rows.map((r) => r.mediaId));
 }
