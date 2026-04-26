@@ -21,7 +21,7 @@ const handler = (req: Request): Promise<Response> =>
     endpoint: "/api/trpc",
     req,
     router: appRouter,
-    createContext: async () => {
+    createContext: async ({ resHeaders }) => {
       // Hot path: verify the signed session_data cookie locally — no DB hit,
       // no Set-Cookie writes, no chance of triggering deleteSessionCookie.
       // This is what every infinite-scroll request lands on.
@@ -71,7 +71,7 @@ const handler = (req: Request): Promise<Response> =>
         }
       }
 
-      return { db, session };
+      return { db, session, req, resHeaders };
     },
   });
 

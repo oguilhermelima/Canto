@@ -23,6 +23,19 @@ export interface Context {
       language: string;
     };
   } | null;
+  /**
+   * Raw request — exposed so mutations that need to interact with better-auth
+   * APIs (e.g. forcing a session refresh after changing `user.language`) can
+   * pass the original request headers through. Most procedures should ignore
+   * this.
+   */
+  req: Request;
+  /**
+   * Mutable response headers — append `Set-Cookie` entries here to refresh
+   * the session cookie mid-request. The tRPC fetch handler folds this into
+   * the actual response.
+   */
+  resHeaders: Headers;
 }
 
 const t = initTRPC.context<Context>().create({
