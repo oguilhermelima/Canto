@@ -19,6 +19,7 @@ export {
   detectEdition,
   detectRepackCount,
   isHybridRelease,
+  detectStreamingService,
 } from "./parsing-release";
 export { classifyReleaseGroup } from "./release-groups";
 export type { ReleaseGroupTier } from "./release-groups";
