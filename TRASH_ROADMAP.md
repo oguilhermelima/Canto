@@ -4,10 +4,11 @@ Companion to `DOWNLOAD_BACKLOG.md`. The backlog enumerates the gaps; this
 document sequences them into shippable phases with concrete file paths,
 schema changes, and decision points.
 
-> **Status (2026-04-27): Phases 1–5 complete. Phase 6 partial — fan-out
-> and AV1 stance shipped, repack data plumbed, auto-supersede scheduler
-> and per-indexer streaming UI deferred. See `DOWNLOAD_BACKLOG.md` for
-> the line-by-line snapshot.**
+> **Status (2026-04-27): Phases 1–5 complete. Phase 6b (streaming UI)
+> shipped — slow indexers no longer block fast ones. Phase 6a's
+> auto-supersede scheduler is the only meaningful gap remaining;
+> repack data is already plumbed. See `DOWNLOAD_BACKLOG.md` for the
+> line-by-line snapshot.**
 
 ## Phase status
 
@@ -19,10 +20,10 @@ schema changes, and decision points.
 | 3. Tiered groups + anime flavor | ✅ shipped | `97c06a58` |
 | 4. Settings UI (download prefs) | ✅ shipped | `e5f5c58d`, `7ea5ec7b`, `78cf8daf` |
 | 5. Quality Profile + Cutoff | ✅ shipped | `f5aaa9e7`, `f0d64ca2`, `85c4defa`, `46a23bac`, `70a24e75` |
+| 6b. Per-indexer streaming UI | ✅ shipped | `f2f347e6`, `b030569a` |
 | 6c. "Complete" fan-out | ✅ shipped | `5b3eef9b` |
 | 6d. AV1 stance | ✅ shipped | `62eaa150` |
 | 6a. Repack auto-supersede (data) | 🟡 partial — column populated; scheduler+notifications deferred | `9c98d1b8` |
-| 6b. Per-indexer streaming UI | ⏸️ parked — needs tRPC subscription transport | — |
 
 ## TL;DR
 

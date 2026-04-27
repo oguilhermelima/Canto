@@ -73,6 +73,14 @@ UI lives in:
 - [x] Full-show fan-out: title + `${title} Complete` (catches season packs indexed under "Complete")
 - [x] Custom query: text-only, ID params skipped
 
+### Per-indexer streaming UI
+- [x] Indexers expose `id` + `name` for chip rendering
+- [x] Backend split: `searchTorrents` (batch), `searchOnIndexer` (single), shared `prepareSearch` + `runOneIndexer` + `scoreRawResults` helpers
+- [x] tRPC `torrent.listIndexers` + `torrent.searchOnIndexer`
+- [x] Client `useTorrentSearchStream` hook fans out via `useQueries`
+- [x] Scanning state shows per-indexer chips (pending / success+count+ms / error)
+- [x] Results render as soon as the first indexer responds; slow indexers never block fast ones
+
 ### Data plumbing
 - [x] `torrent.repackCount` persisted at download time — sets up data for the auto-supersede job (Phase 6a full version, deferred)
 
@@ -93,19 +101,6 @@ starts (commit `9c98d1b8`).
 - Notification UX for "We just superseded X with REPACK".
 
 **Effort:** M. Defer until repack triage by hand becomes painful.
-
-### Phase 6b — Per-indexer streaming in the scanning state
-**What:** Replace the batch `Promise.allSettled` indexer fan-out with a
-streaming flow so the scanning UI can light up per-indexer chips as
-each indexer responds.
-
-**Why parked:** Needs a tRPC subscription transport (SSE on Vercel; WS
-elsewhere), a streaming variant of `searchTorrents`, and progressive
-de-duplication on the client. Net cost is high; payoff is a polish
-improvement on a screen the user sees for ~5 seconds per search.
-
-**Effort:** M-L. Defer until a slow indexer becomes a real complaint
-or until tRPC subscriptions land for an unrelated reason.
 
 ### Anime-specific scoring tweaks
 **What:** Source preference flattening (BluRay isn't strictly > WEB-DL
