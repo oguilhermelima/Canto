@@ -42,6 +42,7 @@ import {
   Download,
   ShieldCheck,
   Copy,
+  SatelliteDish,
 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { toast } from "sonner";
@@ -2059,6 +2060,230 @@ function ScanFoldersDialog({
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Add-from-qBittorrent dialog                                                */
+/* -------------------------------------------------------------------------- */
+
+function AddFromQbittorrentDialog({
+  open,
+  onOpenChange,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: () => void;
+}): React.JSX.Element {
+  const utils = trpc.useUtils();
+  const { data: qbitData, isLoading: qbitLoading } =
+    trpc.folder.qbitCategories.useQuery(undefined, { enabled: open });
+  const { data: folders } = trpc.folder.list.useQuery(undefined, { enabled: open });
+
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const importedKeys = useMemo(
+    () =>
+      new Set(
+        (folders ?? [])
+          .map((f) => f.qbitCategory?.toLowerCase())
+          .filter((v): v is string => Boolean(v)),
+      ),
+    [folders],
+  );
+
+  const rows = useMemo(() => {
+    if (!qbitData) return [] as { name: string; savePath: string; imported: boolean }[];
+    return Object.entries(qbitData.categories).map(([name, cat]) => ({
+      name,
+      savePath: cat.savePath || "",
+      imported: importedKeys.has(name.toLowerCase()),
+    }));
+  }, [qbitData, importedKeys]);
+
+  const selectableRows = useMemo(() => rows.filter((r) => !r.imported), [rows]);
+  const allSelected = selectableRows.length > 0 && selectableRows.every((r) => selected.has(r.name));
+
+  useEffect(() => {
+    if (!open) setSelected(new Set());
+  }, [open]);
+
+  const toggle = (name: string): void => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
+  const toggleAll = (): void => {
+    setSelected(allSelected ? new Set() : new Set(selectableRows.map((r) => r.name)));
+  };
+
+  const createFolder = trpc.folder.create.useMutation({
+    onError: (err) => toast.error(err.message),
+  });
+
+  const handleSubmit = async (): Promise<void> => {
+    if (!qbitData || selected.size === 0) return;
+    const defaultPath = qbitData.defaultSavePath.replace(/\/+$/, "");
+    let imported = 0;
+    for (const name of selected) {
+      const cat = qbitData.categories[name];
+      if (!cat) continue;
+      const dlPath = cat.savePath || (defaultPath ? `${defaultPath}/${name}` : undefined);
+      try {
+        await createFolder.mutateAsync({
+          name: name.charAt(0).toUpperCase() + name.slice(1),
+          downloadPath: dlPath,
+          qbitCategory: name,
+          priority: 10,
+        });
+        imported++;
+      } catch {
+        // toast already fired by mutation onError
+      }
+    }
+    if (imported > 0) {
+      toast.success(`Added ${imported} folder${imported > 1 ? "s" : ""}`);
+      void utils.folder.list.invalidate();
+      onCreated();
+      onOpenChange(false);
+    }
+  };
+
+  const isPending = createFolder.isPending;
+  const empty = !qbitLoading && rows.length === 0;
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (isPending) return;
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent className="sm:max-w-[480px]">
+        <DialogHeader>
+          <DialogTitle>Add from qBittorrent</DialogTitle>
+        </DialogHeader>
+
+        {qbitLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : empty ? (
+          <div className="py-6 text-center space-y-1">
+            <SatelliteDish className="mx-auto h-10 w-10 text-muted-foreground" />
+            <p className="text-sm font-medium text-foreground">No signals from qBittorrent</p>
+            <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+              Create a category in qBittorrent first — Canto can&apos;t bootstrap remote paths.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3 pt-1">
+            <button
+              type="button"
+              onClick={toggleAll}
+              disabled={selectableRows.length === 0}
+              className="flex w-full items-center gap-3 px-3 py-2 text-sm text-left rounded-xl border border-border hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <div
+                className={cn(
+                  "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors",
+                  allSelected ? "border-primary bg-primary text-primary-foreground" : "border-border",
+                )}
+              >
+                {allSelected && <Check className="h-3 w-3" />}
+              </div>
+              <span className="font-medium text-foreground">
+                {allSelected ? "Deselect all" : "Select all"}
+              </span>
+              <span className="ml-auto text-xs text-muted-foreground">
+                {selected.size}/{selectableRows.length}
+              </span>
+            </button>
+
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="max-h-[320px] overflow-y-auto">
+                {rows.map((row) => {
+                  const isSelected = selected.has(row.name);
+                  const disabled = row.imported;
+                  return (
+                    <button
+                      key={row.name}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => toggle(row.name)}
+                      className={cn(
+                        "flex w-full items-center gap-3 px-3 py-2.5 text-sm text-left border-b border-border last:border-0 transition-colors min-w-0",
+                        disabled
+                          ? "text-muted-foreground cursor-not-allowed bg-muted/20"
+                          : isSelected
+                            ? "bg-primary/5 text-foreground"
+                            : "text-foreground hover:bg-accent",
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors",
+                          disabled
+                            ? "border-border bg-muted"
+                            : isSelected
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border",
+                        )}
+                      >
+                        {(isSelected || disabled) && <Check className="h-3 w-3" />}
+                      </div>
+                      <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate font-medium">{row.name}</span>
+                        {row.savePath && (
+                          <span className="truncate text-xs text-muted-foreground font-mono">
+                            {row.savePath}
+                          </span>
+                        )}
+                      </div>
+                      {disabled && (
+                        <Badge variant="secondary" className="shrink-0 text-[10px]">
+                          Added
+                        </Badge>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button
+            variant="outline"
+            className="rounded-xl"
+            onClick={() => onOpenChange(false)}
+            disabled={isPending}
+          >
+            Cancel
+          </Button>
+          <Button
+            className="rounded-xl"
+            disabled={selected.size === 0 || isPending || empty}
+            onClick={() => void handleSubmit()}
+          >
+            {isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="mr-2 h-4 w-4" />
+            )}
+            Add {selected.size > 0 ? `${selected.size} folder${selected.size > 1 ? "s" : ""}` : "selected"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Main component                                                             */
 /* -------------------------------------------------------------------------- */
 
@@ -2085,6 +2310,7 @@ export function DownloadFolders({ mode = "settings", importMethod: importMethodP
   const [scanOpen, setScanOpen] = useState(false);
   const [scanPathType, setScanPathType] = useState<"download" | "library">("library");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [addQbitOpen, setAddQbitOpen] = useState(false);
 
   const { data: folders, isLoading } = trpc.folder.list.useQuery();
   const { data: qbitData } = trpc.folder.qbitCategories.useQuery(undefined, { enabled: effectiveMethod === "remote" });
@@ -2093,10 +2319,6 @@ export function DownloadFolders({ mode = "settings", importMethod: importMethodP
       toast.success("Default folders created");
       void utils.folder.list.invalidate();
     },
-    onError: (err) => toast.error(err.message),
-  });
-  const createFolder = trpc.folder.create.useMutation({
-    onSuccess: () => void utils.folder.list.invalidate(),
     onError: (err) => toast.error(err.message),
   });
   const updateFolder = trpc.folder.update.useMutation({
@@ -2161,27 +2383,6 @@ export function DownloadFolders({ mode = "settings", importMethod: importMethodP
     else toast.info("All paths already match");
   };
 
-  const handleImportFromQbit = (): void => {
-    if (!qbitData) return;
-    const existing = new Set(allFolders.map((f) => f.qbitCategory?.toLowerCase()));
-    const defaultPath = qbitData.defaultSavePath.replace(/\/+$/, "");
-    let count = 0;
-    for (const [catName, cat] of Object.entries(qbitData.categories)) {
-      if (existing.has(catName.toLowerCase())) continue;
-      // Use category save path, or build from default + category name
-      const dlPath = cat.savePath || (defaultPath ? `${defaultPath}/${catName}` : undefined);
-      createFolder.mutate({
-        name: catName.charAt(0).toUpperCase() + catName.slice(1),
-        downloadPath: dlPath,
-        qbitCategory: catName,
-        priority: 10,
-      });
-      count++;
-    }
-    if (count > 0) toast.success(`Importing ${count} categories from qBittorrent`);
-    else toast.info("No new categories found in qBittorrent");
-  };
-
   /* Loading */
   if (isLoading) {
     return (
@@ -2216,30 +2417,35 @@ export function DownloadFolders({ mode = "settings", importMethod: importMethodP
         )}
 
         {/* Action buttons */}
-        <div className="flex flex-wrap gap-2">
-          {effectiveMethod === "local" ? (
+        {effectiveMethod === "local" ? (
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" className="rounded-xl gap-2" onClick={() => { setScanPathType("library"); setScanOpen(true); }}>
               <ScanSearch className="h-4 w-4" />
               Import from filesystem
             </Button>
-          ) : (
-            <Button variant="outline" className="rounded-xl gap-2" onClick={handleImportFromQbit} disabled={!qbitData || createFolder.isPending}>
-              <Download className="h-4 w-4" />
-              Import from qBittorrent
+            <Button variant="outline" className="rounded-xl gap-2" onClick={() => setCustomOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Custom library
             </Button>
-          )}
-          <Button variant="outline" className="rounded-xl gap-2" onClick={() => setCustomOpen(true)}>
+            <Button variant="outline" className="rounded-xl gap-2" onClick={() => seedFolders.mutate()}>
+              <Wand2 className="h-4 w-4" />
+              Create suggested libraries
+            </Button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAddQbitOpen(true)}
+            className="group flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-muted-foreground/25 bg-muted/[0.03] px-4 py-3 text-sm font-medium text-muted-foreground transition-all hover:border-primary/50 hover:bg-primary/[0.04] hover:text-foreground"
+          >
             <Plus className="h-4 w-4" />
-            Custom library
-          </Button>
-          <Button variant="outline" className="rounded-xl gap-2" onClick={() => seedFolders.mutate()}>
-            <Wand2 className="h-4 w-4" />
-            Create suggested libraries
-          </Button>
-        </div>
+            Add from qBittorrent
+          </button>
+        )}
 
         <CustomFolderDialog open={customOpen} onOpenChange={setCustomOpen} onCreated={refresh} basePath={basePath} importMethod={effectiveMethod} />
         <ScanFoldersDialog open={scanOpen} onOpenChange={setScanOpen} onCreated={refresh} pathType={scanPathType} />
+        <AddFromQbittorrentDialog open={addQbitOpen} onOpenChange={setAddQbitOpen} onCreated={refresh} />
       </div>
     );
   }
@@ -2281,27 +2487,31 @@ export function DownloadFolders({ mode = "settings", importMethod: importMethodP
       )}
 
       {/* Action buttons */}
-      <div className="flex flex-wrap gap-2">
-        {effectiveMethod === "local" ? (
+      {effectiveMethod === "local" ? (
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" className="rounded-xl gap-2" onClick={() => { setScanPathType("library"); setScanOpen(true); }}>
             <ScanSearch className="h-4 w-4" />
             Import from filesystem
           </Button>
-        ) : (
-          <Button variant="outline" className="rounded-xl gap-2" onClick={handleImportFromQbit} disabled={!qbitData || createFolder.isPending}>
-            <Download className="h-4 w-4" />
-            Import from qBittorrent
+          <Button variant="outline" className="rounded-xl gap-2" onClick={() => setCustomOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Custom library
           </Button>
-        )}
-        <Button variant="outline" className="rounded-xl gap-2" onClick={() => setCustomOpen(true)}>
+          <Button variant="outline" className="rounded-xl gap-2" onClick={() => seedFolders.mutate()} disabled={seedFolders.isPending}>
+            {seedFolders.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+            Create suggested libraries
+          </Button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAddQbitOpen(true)}
+          className="group flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-muted-foreground/25 bg-muted/[0.03] px-4 py-3 text-sm font-medium text-muted-foreground transition-all hover:border-primary/50 hover:bg-primary/[0.04] hover:text-foreground"
+        >
           <Plus className="h-4 w-4" />
-          Custom library
-        </Button>
-        <Button variant="outline" className="rounded-xl gap-2" onClick={() => seedFolders.mutate()} disabled={seedFolders.isPending}>
-          {seedFolders.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-          Create suggested libraries
-        </Button>
-      </div>
+          Add from qBittorrent
+        </button>
+      )}
 
       {/* Folder cards */}
       <div className="space-y-3">
@@ -2320,6 +2530,7 @@ export function DownloadFolders({ mode = "settings", importMethod: importMethodP
 
       <CustomFolderDialog open={customOpen} onOpenChange={setCustomOpen} onCreated={refresh} basePath={basePath} importMethod={effectiveMethod} />
       <ScanFoldersDialog open={scanOpen} onOpenChange={setScanOpen} onCreated={refresh} pathType={scanPathType} />
+      <AddFromQbittorrentDialog open={addQbitOpen} onOpenChange={setAddQbitOpen} onCreated={refresh} />
     </div>
   );
 }
