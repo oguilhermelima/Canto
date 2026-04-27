@@ -1,0 +1,113 @@
+import { and, eq } from "drizzle-orm";
+import type { Database } from "@canto/db/client";
+import { qualityProfile } from "@canto/db/schema";
+import type { QualityProfile } from "@canto/core/domain/torrents/rules/quality-profile";
+import type {
+  Quality,
+  Source,
+} from "@canto/core/domain/torrents/types/common";
+import type { ReleaseFlavor } from "@canto/core/domain/torrents/rules/release-groups";
+
+/**
+ * Decode a `quality_profile` row into the {@link QualityProfile} domain
+ * shape. Throws-narrowing happens at the column level so unknown values
+ * coming from older rows don't silently break scoring.
+ */
+function decodeProfile(row: typeof qualityProfile.$inferSelect): QualityProfile {
+  return {
+    id: row.id,
+    name: row.name,
+    flavor: row.flavor as ReleaseFlavor,
+    allowedFormats: row.allowedFormats.map((f) => ({
+      quality: f.quality as Quality,
+      source: f.source as Source,
+      weight: f.weight,
+    })),
+    cutoffQuality: (row.cutoffQuality as Quality | null) ?? null,
+    cutoffSource: (row.cutoffSource as Source | null) ?? null,
+    minTotalScore: row.minTotalScore,
+    isDefault: row.isDefault,
+  };
+}
+
+export async function findQualityProfileById(
+  db: Database,
+  id: string,
+): Promise<QualityProfile | null> {
+  const row = await db.query.qualityProfile.findFirst({
+    where: eq(qualityProfile.id, id),
+  });
+  return row ? decodeProfile(row) : null;
+}
+
+export async function findDefaultQualityProfile(
+  db: Database,
+  flavor: ReleaseFlavor,
+): Promise<QualityProfile | null> {
+  const row = await db.query.qualityProfile.findFirst({
+    where: and(
+      eq(qualityProfile.flavor, flavor),
+      eq(qualityProfile.isDefault, true),
+    ),
+  });
+  return row ? decodeProfile(row) : null;
+}
+
+export async function findAllQualityProfiles(
+  db: Database,
+): Promise<QualityProfile[]> {
+  const rows = await db.query.qualityProfile.findMany({
+    orderBy: (p, { asc }) => [asc(p.flavor), asc(p.name)],
+  });
+  return rows.map(decodeProfile);
+}
+
+export async function findQualityProfilesByFlavor(
+  db: Database,
+  flavor: ReleaseFlavor,
+): Promise<QualityProfile[]> {
+  const rows = await db.query.qualityProfile.findMany({
+    where: eq(qualityProfile.flavor, flavor),
+    orderBy: (p, { asc }) => [asc(p.name)],
+  });
+  return rows.map(decodeProfile);
+}
+
+/**
+ * Resolve the active quality profile for a media using the precedence
+ * chain:
+ *   1. media.qualityProfileId (snapshot-on-add)
+ *   2. folderQualityProfileId (the folder media routes into)
+ *   3. system default profile for media's flavor
+ *   4. null — no profile, use {@link DEFAULT_SCORING_RULES}
+ *
+ * The caller decides who supplies `folderQualityProfileId`. For new
+ * downloads coming from `searchTorrents`, that's the result of running
+ * the folder router against the media; for already-downloaded media it
+ * could be the persisted folder linkage. Either way, this function only
+ * cares about the value, not how it was obtained.
+ */
+export async function findActiveQualityProfile(
+  db: Database,
+  args: {
+    mediaQualityProfileId: string | null;
+    folderQualityProfileId: string | null;
+    flavor: ReleaseFlavor;
+  },
+): Promise<QualityProfile | null> {
+  if (args.mediaQualityProfileId) {
+    const profile = await findQualityProfileById(
+      db,
+      args.mediaQualityProfileId,
+    );
+    if (profile) return profile;
+  }
+  if (args.folderQualityProfileId) {
+    const profile = await findQualityProfileById(
+      db,
+      args.folderQualityProfileId,
+    );
+    if (profile) return profile;
+  }
+  return findDefaultQualityProfile(db, args.flavor);
+}

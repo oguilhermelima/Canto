@@ -12,6 +12,11 @@ import {
   parseReleaseAttributes,
   type ReleaseAttributes,
 } from "../rules/release-attributes";
+import {
+  applyQualityProfile,
+  meetsCutoff,
+  type QualityProfile,
+} from "../rules/quality-profile";
 import type { ConfidenceContext } from "../types/common";
 import type { IndexerResult, SearchContext } from "../types/torrent";
 import type { IndexerPort } from "../ports/indexer";
@@ -19,6 +24,7 @@ import {
   findMediaById,
   findBlocklistByMediaId,
 } from "../../../infra/repositories";
+import { findActiveQualityProfile } from "../../../infra/torrents/quality-profile-repository";
 
 export interface SearchResult extends ReleaseAttributes {
   guid: string;
@@ -32,6 +38,10 @@ export interface SearchResult extends ReleaseAttributes {
   categories: Array<{ id: number; name: string }>;
   indexerLanguage: string | null;
   confidence: number;
+  /** True when this release meets or exceeds the active profile's cutoff.
+   *  False when the profile has no cutoff or the release falls below.
+   *  Drives upgrade-flow decisions and the UI cutoff badge. */
+  aboveCutoff: boolean;
 }
 
 export interface PaginatedSearchResults {
@@ -162,6 +172,19 @@ export async function searchTorrents(
     genreIds: row.genreIds,
   });
 
+  // Resolve and apply the active quality profile. When media has its
+  // qualityProfileId snapshotted (post-add) we use that; otherwise fall
+  // back to the system default for the flavor. Phase 5+ may layer
+  // folder.qualityProfileId between the two.
+  const profile = await findActiveQualityProfile(db, {
+    mediaQualityProfileId: row.qualityProfileId ?? null,
+    folderQualityProfileId: null,
+    flavor,
+  });
+  const activeRules: ScoringRules = profile
+    ? applyQualityProfile(rules, profile)
+    : rules;
+
   const scored: SearchResult[] = results
     .map((r) => {
       const attrs = parseReleaseAttributes({
@@ -183,7 +206,10 @@ export async function searchTorrents(
         leechers: r.leechers,
         categories: r.categories,
         indexerLanguage: r.indexerLanguage ?? null,
-        confidence: calculateConfidence(attrs, confidenceCtx, rules),
+        confidence: calculateConfidence(attrs, confidenceCtx, activeRules),
+        aboveCutoff: profile
+          ? meetsCutoff(profile, attrs.quality, attrs.source)
+          : false,
       };
     })
     .filter((r) => r.confidence > 0)

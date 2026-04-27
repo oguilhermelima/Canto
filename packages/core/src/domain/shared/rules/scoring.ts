@@ -65,16 +65,27 @@ export function calculateConfidence(
     }
   }
 
-  // Quality
-  score += rules.quality[attrs.quality] ?? 0;
+  // Format scoring — quality + source. Two modes:
+  //  • allowedFormats whitelist (Phase 5 quality profile): the (quality,
+  //    source) combo must appear in the list, otherwise reject. Earns
+  //    the entry's joint weight.
+  //  • per-axis fallback (no profile): independent quality + source
+  //    lookups, summed.
+  if (rules.allowedFormats) {
+    const entry = rules.allowedFormats.find(
+      (f) => f.quality === attrs.quality && f.source === attrs.source,
+    );
+    if (!entry) return 0;
+    score += entry.weight;
+  } else {
+    score += rules.quality[attrs.quality] ?? 0;
+    score += rules.source[attrs.source] ?? 0;
+  }
 
   // Codec — context-aware on quality, with `default` fallback
   const codecTable =
     rules.codec.byQuality[attrs.quality] ?? rules.codec.byQuality.default;
   if (attrs.codec) score += codecTable[attrs.codec] ?? 0;
-
-  // Source
-  score += rules.source[attrs.source] ?? 0;
 
   // HDR
   if (attrs.hdrFormat) score += rules.hdr[attrs.hdrFormat] ?? 0;
@@ -170,5 +181,10 @@ export function calculateConfidence(
 
   // Normalise to 0–100
   const normalized = Math.round((score / rules.maxRaw) * 100);
-  return Math.max(0, Math.min(100, normalized));
+  const clamped = Math.max(0, Math.min(100, normalized));
+
+  // Final-cut threshold (used by Phase 5 profiles to drop sub-quality
+  // releases before they ever reach the UI).
+  if (clamped < rules.minTotalScore) return 0;
+  return clamped;
 }

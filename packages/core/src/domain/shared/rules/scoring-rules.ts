@@ -18,8 +18,18 @@ export interface ScoringRules {
   /** Freshness by age in days. First entry where `age <= threshold` wins. */
   freshness: Array<{ threshold: number; bonus: number }>;
 
+  /** Per-axis fallback for the (quality, source) score contribution.
+   *  Used when {@link allowedFormats} is null; ignored otherwise. */
   quality: Record<Quality, number>;
   source: Record<Source, number>;
+  /** Whitelist of (quality, source) combos with their joint weight. When
+   *  set, the engine ignores the per-axis lookups and rejects any release
+   *  whose combo isn't on the list. Null = no whitelist (fallback to
+   *  per-axis). Phase 5 quality profiles populate this field; without a
+   *  profile it stays null. */
+  allowedFormats:
+    | Array<{ quality: Quality; source: Source; weight: number }>
+    | null;
   hdr: Record<string, number>;
   audioCodec: Record<string, number>;
   audioChannels: Record<string, number>;
@@ -68,6 +78,12 @@ export interface ScoringRules {
 
   /** Used for normalising the raw score to 0–100. */
   maxRaw: number;
+
+  /** Final filter on the normalised score (0–100). Releases below this
+   *  threshold are returned as 0 (i.e. dropped by the search). 0 = no
+   *  threshold. Phase 5 quality profiles populate this from the profile;
+   *  defaults expose it for convenience but leave it disabled. */
+  minTotalScore: number;
 }
 
 /**
@@ -108,6 +124,7 @@ export const DEFAULT_SCORING_RULES: ScoringRules = {
     cam: -40,
     unknown: 0,
   },
+  allowedFormats: null,
   hdr: {
     "DV-HDR10": 13,
     DV: 12,
@@ -190,6 +207,7 @@ export const DEFAULT_SCORING_RULES: ScoringRules = {
     avoidedEdition: -3,
   },
   maxRaw: 170,
+  minTotalScore: 0,
 };
 
 /**
