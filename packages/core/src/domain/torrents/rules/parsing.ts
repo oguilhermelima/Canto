@@ -17,4 +17,8 @@ export {
   detectHdrFormat,
   detectAudioChannels,
   detectEdition,
+  detectRepackCount,
+  isHybridRelease,
 } from "./parsing-release";
+export { classifyReleaseGroup } from "./release-groups";
+export type { ReleaseGroupTier } from "./release-groups";

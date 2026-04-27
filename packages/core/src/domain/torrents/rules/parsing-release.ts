@@ -91,6 +91,28 @@ export function detectAudioChannels(title: string): string | null {
   return null;
 }
 
+/* ── Repack / Proper detection ── */
+
+/**
+ * Detect repack/proper count. Higher count means newer fix.
+ * - "REPACK", "PROPER", "RERIP" → 1
+ * - "REPACK2", "PROPER2"        → 2
+ * - "REPACK3", "PROPER3"        → 3
+ * Returns 0 if none.
+ */
+export function detectRepackCount(title: string): number {
+  const match = /\b(?:repack|proper|rerip)(\d+)?\b/i.exec(title);
+  if (!match) return 0;
+  const n = match[1] ? parseInt(match[1], 10) : 1;
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+/* ── Hybrid release detection ── */
+
+export function isHybridRelease(title: string): boolean {
+  return /\bhybrid\b/i.test(title);
+}
+
 /* ── Edition detection ── */
 
 const EDITION_MAP: Array<[RegExp, string]> = [

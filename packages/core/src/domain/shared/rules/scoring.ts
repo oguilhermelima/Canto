@@ -1,5 +1,14 @@
 import type { Quality, ConfidenceContext } from "../../torrents/types/common";
 import { detectSource } from "../../torrents/rules/quality";
+import {
+  detectCodec,
+  detectAudioCodec,
+  detectHdrFormat,
+  detectReleaseGroup,
+  detectRepackCount,
+  isHybridRelease,
+} from "../../torrents/rules/parsing-release";
+import { classifyReleaseGroup } from "../../torrents/rules/release-groups";
 
 export const CAM_KEYWORDS = [
   "cam",
@@ -21,6 +30,27 @@ export const CAM_KEYWORDS = [
   "tvrip",
 ];
 
+/**
+ * TRaSH-aligned confidence score (0–100).
+ *
+ * Components (max raw 160):
+ *   Health (0–40)         — seeder count, dead-torrent guard
+ *   Quality (0–30)        — UHD > FullHD > HD > SD
+ *   Source (−40 to +15)   — Remux > BluRay > WEB-DL > … > Telesync > CAM
+ *   Codec (0–12)          — context-aware: H.265 rewarded only for UHD,
+ *                           H.264 preferred at 1080p/720p, AV1 rewarded
+ *   HDR (0–12)            — DV > HDR10+ > HDR10 > HDR > HLG
+ *   Audio (0–10)          — TrueHD Atmos > DTS-HD MA > TrueHD > DTS-HD > …
+ *   Freshness (0–10)      — newer releases preferred
+ *   Group tier (−20 to +12) — TRaSH-style HQ vs LQ release groups
+ *   Repack/Proper (0–6)   — fix releases beat the broken original
+ *   Hybrid (0–3)          — best-of-both BluRay+WEB
+ *   Bonus flags (0–7)     — freeleech, double-upload
+ *
+ * Penalties (additive on top, can drive score below 0):
+ *   CAM keywords: −80 if a digital release should exist, else −15
+ *   Nuked flag:   −100
+ */
 export function calculateConfidence(
   title: string,
   quality: Quality,
@@ -58,9 +88,18 @@ export function calculateConfidence(
       break;
   }
 
-  // Encoding (0–15)
-  if (/\b(h\.?265|hevc|x\.?265)\b/i.test(lower)) score += 15;
-  else if (/\b(h\.?264|x\.?264|avc)\b/i.test(lower)) score += 8;
+  // Codec (0–12) — context-aware. TRaSH rewards H.264 at HD/FullHD because
+  // H.265 at those resolutions is usually a re-encode (lossy on lossy).
+  const codec = detectCodec(title);
+  if (quality === "uhd") {
+    if (codec === "h265") score += 12;
+    else if (codec === "av1") score += 10;
+    else if (codec === "h264") score += 4;
+  } else {
+    if (codec === "h264") score += 10;
+    else if (codec === "av1") score += 8;
+    else if (codec === "h265") score += 4;
+  }
 
   // Source (−40 to +15)
   const source = detectSource(title);
@@ -88,6 +127,26 @@ export function calculateConfidence(
       break;
   }
 
+  // HDR (0–12) — DV is the most demanding format; HDR10+ adds dynamic metadata.
+  const hdr = detectHdrFormat(title);
+  if (hdr === "DV") score += 12;
+  else if (hdr === "HDR10+") score += 10;
+  else if (hdr === "HDR10") score += 8;
+  else if (hdr === "HDR") score += 5;
+  else if (hdr === "HLG") score += 3;
+
+  // Audio (0–10)
+  const audio = detectAudioCodec(title);
+  if (audio === "TrueHD Atmos") score += 10;
+  else if (audio === "DTS-HD MA") score += 9;
+  else if (audio === "TrueHD") score += 8;
+  else if (audio === "DTS-HD") score += 7;
+  else if (audio === "DTS") score += 5;
+  else if (audio === "FLAC") score += 4;
+  else if (audio === "EAC3") score += 3;
+  else if (audio === "AC3") score += 2;
+  else if (audio === "AAC") score += 1;
+
   // Freshness (0–10)
   if (age <= 1) score += 10;
   else if (age <= 7) score += 8;
@@ -95,7 +154,20 @@ export function calculateConfidence(
   else if (age <= 90) score += 3;
   else if (age <= 365) score += 1;
 
-  // Bonus (0–5)
+  // Release group tier (−20 to +12)
+  const group = detectReleaseGroup(title);
+  const tier = classifyReleaseGroup(group);
+  if (tier === "gold") score += 12;
+  else if (tier === "avoid") score -= 20;
+
+  // Repack / Proper (0–6) — newer fix releases beat the broken original.
+  const repackCount = detectRepackCount(title);
+  if (repackCount > 0) score += Math.min(6, repackCount * 3);
+
+  // Hybrid releases (combo BluRay + WEB) — TRaSH rewards them.
+  if (isHybridRelease(title)) score += 3;
+
+  // Indexer flag bonuses (0–7)
   const lowerFlags = flags.map((f) => f.toLowerCase());
   if (lowerFlags.includes("freeleech")) score += 5;
   else if (lowerFlags.includes("freeleech75")) score += 4;
@@ -117,8 +189,9 @@ export function calculateConfidence(
 
   if (lowerFlags.includes("nuked")) score -= 100;
 
-  // Normalize to 0–100
-  const MAX_RAW = 115;
+  // Normalize to 0–100. MAX_RAW reflects the achievable positive ceiling
+  // when all bonuses align (UHD remux DV TrueHD-Atmos gold-group repack…).
+  const MAX_RAW = 160;
   const normalized = Math.round((score / MAX_RAW) * 100);
   return Math.max(0, Math.min(100, normalized));
 }
