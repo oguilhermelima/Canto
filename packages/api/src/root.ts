@@ -6,6 +6,7 @@ import { libraryRouter } from "./routers/library";
 import { listRouter } from "./routers/list";
 import { mediaRouter } from "./routers/media";
 import { plexRouter } from "./routers/plex";
+import { preferencesRouter } from "./routers/preferences";
 import { providerRouter } from "./routers/provider";
 import { requestRouter } from "./routers/request";
 import { settingsRouter } from "./routers/settings";
@@ -26,6 +27,7 @@ export const appRouter = createTRPCRouter({
   media: mediaRouter,
   library: libraryRouter,
   plex: plexRouter,
+  preferences: preferencesRouter,
   request: requestRouter,
   torrent: torrentRouter,
   provider: providerRouter,

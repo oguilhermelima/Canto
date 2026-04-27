@@ -13,3 +13,4 @@ export * from "./user-media-tracking";
 export * from "./user-media";
 export * from "./home-section";
 export * from "./profile-section";
+export * from "./preferences";
