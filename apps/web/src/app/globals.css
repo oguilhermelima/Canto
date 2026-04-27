@@ -179,7 +179,10 @@
     @apply border-border;
   }
   html {
-    overflow-y: scroll;
+    /* Reserve scrollbar space without forcing a scrollbar. Lets
+     * Radix Dialog's scroll-lock work cleanly while preventing the
+     * layout shift you get when content height crosses the viewport. */
+    scrollbar-gutter: stable;
   }
   body {
     @apply bg-background text-foreground antialiased;
