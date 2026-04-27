@@ -74,6 +74,9 @@ export interface ScoringRules {
     perPreferredStreamingService: number;
     preferredEdition: number;
     avoidedEdition: number;
+    /** Magnitude of the AV1 stance bump (added when "prefer", subtracted
+     *  when "avoid"). Tuned so it doesn't drown source/quality signals. */
+    av1Stance: number;
   };
 
   /** Used for normalising the raw score to 0–100. */
@@ -205,10 +208,16 @@ export const DEFAULT_SCORING_RULES: ScoringRules = {
     perPreferredStreamingService: 3,
     preferredEdition: 2,
     avoidedEdition: -3,
+    av1Stance: 5,
   },
   maxRaw: 170,
   minTotalScore: 0,
 };
+
+/** Codec stance toward AV1. Default is "neutral" — AV1 is treated like
+ *  any other modern codec by the rules. "prefer"/"avoid" bump the
+ *  AV1-specific entries in {@link ScoringRules.codec.byQuality}. */
+export type Av1Stance = "neutral" | "prefer" | "avoid";
 
 /**
  * Per-user download preferences expressed as flat lists. The downstream
@@ -224,6 +233,8 @@ export interface DownloadPreferences {
   preferredEditions: string[];
   /** Editions that should rank below their absence. */
   avoidedEditions: string[];
+  /** Whether to nudge AV1 releases up, down, or leave them alone. */
+  av1Stance: Av1Stance;
 }
 
 export const EMPTY_DOWNLOAD_PREFERENCES: DownloadPreferences = {
@@ -231,6 +242,7 @@ export const EMPTY_DOWNLOAD_PREFERENCES: DownloadPreferences = {
   preferredStreamingServices: [],
   preferredEditions: [],
   avoidedEditions: [],
+  av1Stance: "neutral",
 };
 
 /**
@@ -253,6 +265,7 @@ export function applyDownloadPreferences(
     perPreferredStreamingService,
     preferredEdition,
     avoidedEdition,
+    av1Stance: av1Bump,
   } = base.preferenceBonuses;
 
   const languageBonuses = { ...base.languageBonuses };
@@ -274,11 +287,32 @@ export function applyDownloadPreferences(
     editionBonuses[ed] = (editionBonuses[ed] ?? 0) + avoidedEdition;
   }
 
+  // AV1 stance: nudge AV1 entries in the codec table up or down. Applied
+  // to every quality bucket so the user's stance carries over regardless
+  // of resolution.
+  let codec = base.codec;
+  if (prefs.av1Stance !== "neutral") {
+    const delta = prefs.av1Stance === "prefer" ? av1Bump : -av1Bump;
+    const byQuality: typeof base.codec.byQuality = {
+      ...base.codec.byQuality,
+      default: { ...base.codec.byQuality.default },
+    };
+    byQuality.default.av1 = (byQuality.default.av1 ?? 0) + delta;
+    for (const q of ["uhd", "fullhd", "hd", "sd"] as const) {
+      const table = byQuality[q];
+      if (table) {
+        byQuality[q] = { ...table, av1: (table.av1 ?? 0) + delta };
+      }
+    }
+    codec = { byQuality };
+  }
+
   return {
     ...base,
     languageBonuses,
     streamingServiceBonuses,
     editionBonuses,
+    codec,
   };
 }
 

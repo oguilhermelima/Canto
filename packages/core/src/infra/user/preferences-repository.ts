@@ -4,6 +4,7 @@ import type { Database } from "@canto/db/client";
 import { userPreference } from "@canto/db/schema";
 import {
   EMPTY_DOWNLOAD_PREFERENCES,
+  type Av1Stance,
   type DownloadPreferences,
 } from "@canto/core/domain/shared/rules/scoring-rules";
 
@@ -17,9 +18,11 @@ export const DOWNLOAD_PREFERENCE_KEYS = {
   preferredStreamingServices: "download.preferredStreamingServices",
   preferredEditions: "download.preferredEditions",
   avoidedEditions: "download.avoidedEditions",
+  av1Stance: "download.av1Stance",
 } as const;
 
 const stringArray = z.array(z.string());
+const av1StanceSchema = z.enum(["neutral", "prefer", "avoid"]);
 
 /**
  * Read every download.* preference for a user and decode them into the
@@ -43,6 +46,12 @@ export async function findDownloadPreferences(
   const prefs: DownloadPreferences = { ...EMPTY_DOWNLOAD_PREFERENCES };
 
   for (const row of rows) {
+    if (row.key === DOWNLOAD_PREFERENCE_KEYS.av1Stance) {
+      const parsed = av1StanceSchema.safeParse(row.value);
+      if (parsed.success) prefs.av1Stance = parsed.data;
+      continue;
+    }
+
     const parsed = stringArray.safeParse(row.value);
     if (!parsed.success) continue;
 
@@ -66,13 +75,14 @@ export async function findDownloadPreferences(
 }
 
 /**
- * Persist a single download preference list. Phase 4's settings UI calls
- * this through a tRPC procedure; for now it's also useful for tests.
+ * Persist a single string-array download preference. Phase 4's settings
+ * UI calls this through a tRPC procedure; for now it's also useful for
+ * tests.
  */
 export async function upsertDownloadPreference(
   db: Database,
   userId: string,
-  key: keyof typeof DOWNLOAD_PREFERENCE_KEYS,
+  key: Exclude<keyof typeof DOWNLOAD_PREFERENCE_KEYS, "av1Stance">,
   value: string[],
 ): Promise<void> {
   await db
@@ -80,6 +90,26 @@ export async function upsertDownloadPreference(
     .values({
       userId,
       key: DOWNLOAD_PREFERENCE_KEYS[key],
+      value,
+    })
+    .onConflictDoUpdate({
+      target: [userPreference.userId, userPreference.key],
+      set: { value },
+    });
+}
+
+/** Persist the AV1 stance scalar. Separate from the array writer because
+ *  it's a single enum value, not a list. */
+export async function upsertAv1Stance(
+  db: Database,
+  userId: string,
+  value: Av1Stance,
+): Promise<void> {
+  await db
+    .insert(userPreference)
+    .values({
+      userId,
+      key: DOWNLOAD_PREFERENCE_KEYS.av1Stance,
       value,
     })
     .onConflictDoUpdate({

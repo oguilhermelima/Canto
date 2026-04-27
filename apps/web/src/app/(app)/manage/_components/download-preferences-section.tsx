@@ -4,15 +4,25 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@canto/ui/cn";
 import { Button } from "@canto/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@canto/ui/select";
 import { Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { SettingsSection } from "@/components/settings/shared";
+
+type Av1Stance = "neutral" | "prefer" | "avoid";
 
 type Prefs = {
   preferredLanguages: string[];
   preferredStreamingServices: string[];
   preferredEditions: string[];
   avoidedEditions: string[];
+  av1Stance: Av1Stance;
 };
 
 const LANGUAGE_OPTIONS: Array<{ value: string; label: string }> = [
@@ -98,7 +108,8 @@ export function DownloadPreferencesSection(): React.JSX.Element {
         draft.preferredStreamingServices,
       ) ||
       !arraysEqual(data.preferredEditions, draft.preferredEditions) ||
-      !arraysEqual(data.avoidedEditions, draft.avoidedEditions)
+      !arraysEqual(data.avoidedEditions, draft.avoidedEditions) ||
+      data.av1Stance !== draft.av1Stance
     );
   }, [data, draft]);
 
@@ -110,8 +121,10 @@ export function DownloadPreferencesSection(): React.JSX.Element {
     );
   }
 
+  type ListKey = Exclude<keyof Prefs, "av1Stance">;
+
   const toggleIn =
-    (key: keyof Prefs) =>
+    (key: ListKey) =>
     (value: string): void => {
       setDraft((prev) => {
         if (!prev) return prev;
@@ -167,6 +180,36 @@ export function DownloadPreferencesSection(): React.JSX.Element {
           onToggle={toggleIn("avoidedEditions")}
           tone="negative"
         />
+
+        <div>
+          <div className="mb-2">
+            <p className="text-sm font-medium text-foreground">
+              AV1 codec stance
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              AV1 is newer and more efficient but support is uneven. Pick
+              "Prefer" if your devices play AV1 well, or "Avoid" to fall
+              back to H.264/H.265.
+            </p>
+          </div>
+          <Select
+            value={draft.av1Stance}
+            onValueChange={(v) =>
+              setDraft((prev) =>
+                prev ? { ...prev, av1Stance: v as Av1Stance } : prev,
+              )
+            }
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="neutral">Neutral</SelectItem>
+              <SelectItem value="prefer">Prefer AV1</SelectItem>
+              <SelectItem value="avoid">Avoid AV1</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </SettingsSection>
 
       {dirty && (

@@ -1,6 +1,7 @@
 import { downloadPreferencesInput } from "@canto/validators";
 import {
   findDownloadPreferences,
+  upsertAv1Stance,
   upsertDownloadPreference,
 } from "@canto/core/infra/user/preferences-repository";
 
@@ -15,8 +16,9 @@ export const preferencesDownloadsRouter = createTRPCRouter({
     .input(downloadPreferencesInput)
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-      // Each list is its own userPreference row; setting them in parallel
-      // keeps the procedure single-round-trip-fast.
+      // Each list (and the AV1 stance scalar) is its own userPreference
+      // row; setting them in parallel keeps the procedure
+      // single-round-trip-fast.
       await Promise.all([
         upsertDownloadPreference(
           ctx.db,
@@ -42,6 +44,7 @@ export const preferencesDownloadsRouter = createTRPCRouter({
           "avoidedEditions",
           input.avoidedEditions,
         ),
+        upsertAv1Stance(ctx.db, userId, input.av1Stance),
       ]);
       return { success: true };
     }),
