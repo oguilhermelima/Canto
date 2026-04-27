@@ -4,7 +4,14 @@ import { IndexerSearchError } from "@canto/core/domain/torrents/errors";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import { detectQuality, detectSource } from "../rules/quality";
 import { calculateConfidence } from "../../shared/rules/scoring";
-import { detectLanguages, detectReleaseGroup, detectCodec } from "../rules/parsing";
+import {
+  detectAudioChannels,
+  detectCodec,
+  detectEdition,
+  detectLanguages,
+  detectReleaseGroup,
+  detectStreamingService,
+} from "../rules/parsing";
 import type { ConfidenceContext } from "../types/common";
 import type { IndexerResult, SearchContext } from "../types/torrent";
 import type { IndexerPort } from "../ports/indexer";
@@ -34,6 +41,9 @@ export interface SearchResult {
   indexerLanguage: string | null;
   releaseGroup: string | null;
   codec: string | null;
+  streamingService: string | null;
+  audioChannels: string | null;
+  edition: string | null;
 }
 
 export interface PaginatedSearchResults {
@@ -179,6 +189,9 @@ export async function searchTorrents(
         indexerLanguage: r.indexerLanguage ?? null,
         releaseGroup: detectReleaseGroup(r.title),
         codec: detectCodec(r.title),
+        streamingService: detectStreamingService(r.title),
+        audioChannels: detectAudioChannels(r.title),
+        edition: detectEdition(r.title),
       };
     })
     .filter((r) => r.confidence > 0)
