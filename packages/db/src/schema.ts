@@ -587,6 +587,30 @@ export const mediaContentRating = pgTable(
   ],
 );
 
+/**
+ * Catalog of valid certifications per region, mirrored from TMDB's
+ * `/certification/{type}/list`. Cached so the filter sidebar can render
+ * region-correct options without hitting TMDB on every request.
+ */
+export const tmdbCertification = pgTable(
+  "tmdb_certification",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    type: varchar("type", { length: 10 }).notNull(), // 'movie' | 'tv'
+    region: varchar("region", { length: 10 }).notNull(),
+    rating: varchar("rating", { length: 50 }).notNull(),
+    meaning: text("meaning"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("idx_tmdb_certification_unique").on(table.type, table.region, table.rating),
+    index("idx_tmdb_certification_type_region").on(table.type, table.region),
+  ],
+);
+
 export const torrent = pgTable("torrent", {
   id: uuid("id").primaryKey().defaultRandom(),
   mediaId: uuid("media_id").references(() => media.id, { onDelete: "set null" }),

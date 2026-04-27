@@ -35,4 +35,5 @@ export async function getProvider(
 
 export * from "./types";
 export { TmdbProvider } from "./tmdb/index";
+export type { CertificationEntry } from "./tmdb/certifications";
 export { TvdbProvider } from "./tvdb";

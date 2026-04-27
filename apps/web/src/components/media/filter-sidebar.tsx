@@ -96,21 +96,6 @@ const TV_STATUS = [
   { value: "5", label: "Pilot" },
 ];
 
-const MOVIE_CERTIFICATIONS = [
-  { value: "G", label: "G" },
-  { value: "PG", label: "PG" },
-  { value: "PG-13", label: "PG-13" },
-  { value: "R", label: "R" },
-  { value: "NC-17", label: "NC-17" },
-];
-
-const TV_CERTIFICATIONS = [
-  { value: "TV-Y", label: "TV-Y" },
-  { value: "TV-G", label: "TV-G" },
-  { value: "TV-PG", label: "TV-PG" },
-  { value: "TV-14", label: "TV-14" },
-  { value: "TV-MA", label: "TV-MA" },
-];
 
 /* ─── Library preset constants ─── */
 
@@ -364,7 +349,10 @@ export function FilterSidebar({
     if (yearMax) f.yearMax = yearMax;
     if (runtimeMin) f.runtimeMin = Number(runtimeMin);
     if (runtimeMax) f.runtimeMax = Number(runtimeMax);
-    if (certification) f.certification = certification;
+    if (certification) {
+      f.certification = certification;
+      f.watchRegion = watchRegion;
+    }
     if (status) f.status = status;
     if (selectedProviders.size > 0) {
       f.watchProviders = [...selectedProviders].join(providerMode === "or" ? "|" : ",");
@@ -488,7 +476,22 @@ export function FilterSidebar({
 
   const showStatus = mediaType !== "movie" && show("status");
   const showCertification = show("certification");
-  const certOptions = mediaType === "show" ? TV_CERTIFICATIONS : MOVIE_CERTIFICATIONS;
+  const certType: "movie" | "tv" = mediaType === "show" ? "tv" : "movie";
+  const { data: certByRegion } = trpc.provider.certifications.useQuery(
+    { type: certType },
+    { staleTime: 60 * 60 * 1000, enabled: showCertification },
+  );
+  const certOptions = certByRegion?.[watchRegion] ?? certByRegion?.US ?? [];
+
+  useEffect(() => {
+    if (
+      certByRegion &&
+      certification &&
+      !certOptions.some((c) => c.value === certification)
+    ) {
+      setCertification("");
+    }
+  }, [certification, certOptions, certByRegion]);
 
   const hasTmdbGroup =
     show("genres") ||

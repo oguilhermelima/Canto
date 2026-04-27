@@ -13,6 +13,7 @@ import type {
 import { TmdbClient } from "./client";
 import { discover, getTrending, getTrendingFiltered } from "./discover";
 import { findByImdbId, findByTvdbId } from "./find";
+import { getCertifications, type CertificationEntry } from "./certifications";
 import { getGenres } from "./genres";
 import {
   getExtras,
@@ -125,6 +126,12 @@ export class TmdbProvider implements MetadataProvider {
 
   getGenres(type: MediaType): Promise<Array<{ id: number; name: string }>> {
     return getGenres(this.client, type);
+  }
+
+  /* ── Certifications ─────────────────────────────────────────────────── */
+
+  getCertifications(type: "movie" | "tv"): Promise<CertificationEntry[]> {
+    return getCertifications(this.client, type);
   }
 
   /* ── Person ─────────────────────────────────────────────────────────── */
