@@ -8,6 +8,7 @@ import { mediaRouter } from "./routers/media";
 import { plexRouter } from "./routers/plex";
 import { preferencesRouter } from "./routers/preferences";
 import { providerRouter } from "./routers/provider";
+import { qualityProfileRouter } from "./routers/quality-profile";
 import { requestRouter } from "./routers/request";
 import { settingsRouter } from "./routers/settings";
 import { syncRouter } from "./routers/sync";
@@ -28,6 +29,7 @@ export const appRouter = createTRPCRouter({
   library: libraryRouter,
   plex: plexRouter,
   preferences: preferencesRouter,
+  qualityProfile: qualityProfileRouter,
   request: requestRouter,
   torrent: torrentRouter,
   provider: providerRouter,
