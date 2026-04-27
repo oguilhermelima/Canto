@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { toast } from "sonner";
 import { FadeImage } from "@/components/ui/fade-image";
 import { tmdbBackdropLoader } from "@/lib/tmdb-image";
 import { Skeleton } from "@canto/ui/skeleton";
@@ -71,6 +72,8 @@ interface MediaDetailHeroProps {
   logoPath?: string | null;
   externalId?: number | null;
   provider?: string | null;
+  imdbId?: string | null;
+  tvdbId?: number | null;
   availableSources?: Array<{
     type: "jellyfin" | "plex";
     resolution?: string | null;
@@ -169,6 +172,8 @@ export function MediaDetailHero({
   logoPath,
   externalId,
   provider,
+  imdbId,
+  tvdbId,
   isAdmin,
   showManageAction,
   onOpenManage,
@@ -209,6 +214,30 @@ export function MediaDetailHero({
   };
 
   const logoUrl = logoPath ? resolveImage(logoPath, "w780") : null;
+
+  const copyTitle = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(title);
+      toast.success("Title copied");
+    } catch {
+      toast.error("Failed to copy title");
+    }
+  };
+
+  const tmdbType = type === "movie" ? "movie" : "tv";
+  const tmdbUrl =
+    provider === "tmdb" && externalId
+      ? `https://www.themoviedb.org/${tmdbType}/${externalId}`
+      : null;
+  const tvdbUrl = tvdbId
+    ? `https://thetvdb.com/dereferrer/${type === "movie" ? "movie" : "series"}/${tvdbId}`
+    : null;
+  const imdbUrl = imdbId ? `https://www.imdb.com/title/${imdbId}/` : null;
+  const traktUrl = imdbId
+    ? `https://trakt.tv/search/imdb/${imdbId}`
+    : provider === "tmdb" && externalId
+      ? `https://trakt.tv/search/tmdb/${externalId}?id_type=${type === "movie" ? "movie" : "show"}`
+      : null;
 
   // Director/Creator
   const director = (crew ?? []).find(
@@ -255,14 +284,22 @@ export function MediaDetailHero({
       {/* Info section */}
       <div className="relative mx-auto w-full px-4 pb-6 pt-[30dvh] md:pt-[25dvh] md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         <div className="max-w-3xl space-y-4">
-          {/* Logo or Title */}
-          {logoUrl ? (
-            <MediaLogo src={logoUrl} alt={title} size="hero" className="max-w-[60vw]" />
-          ) : (
-            <h1 className="text-2xl font-extrabold tracking-tight text-foreground drop-shadow-lg sm:text-3xl md:text-4xl xl:text-5xl">
-              {title}
-            </h1>
-          )}
+          {/* Logo or Title — click to copy */}
+          <button
+            type="button"
+            onClick={copyTitle}
+            aria-label={`Copy title: ${title}`}
+            title="Click to copy title"
+            className="block cursor-pointer text-left transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40 rounded-md"
+          >
+            {logoUrl ? (
+              <MediaLogo src={logoUrl} alt={title} size="hero" className="max-w-[60vw]" />
+            ) : (
+              <h1 className="text-2xl font-extrabold tracking-tight text-foreground drop-shadow-lg sm:text-3xl md:text-4xl xl:text-5xl">
+                {title}
+              </h1>
+            )}
+          </button>
 
           {/* Director/Creator */}
           {director && (
@@ -326,6 +363,41 @@ export function MediaDetailHero({
               </>
             )}
           </div>
+
+          {/* External links */}
+          {(tmdbUrl || tvdbUrl || imdbUrl || traktUrl) && (
+            <div className="flex flex-wrap items-center gap-2">
+              {tmdbUrl && (
+                <ExternalLinkIcon
+                  href={tmdbUrl}
+                  src="/tmdb.svg"
+                  label="View on TMDB"
+                />
+              )}
+              {tvdbUrl && (
+                <ExternalLinkIcon
+                  href={tvdbUrl}
+                  src="/tvdb.svg"
+                  label="View on TVDB"
+                  invertOnDark
+                />
+              )}
+              {imdbUrl && (
+                <ExternalLinkIcon
+                  href={imdbUrl}
+                  src="/imdb.svg"
+                  label="View on IMDb"
+                />
+              )}
+              {traktUrl && (
+                <ExternalLinkIcon
+                  href={traktUrl}
+                  src="/trakt-logo.svg"
+                  label="View on Trakt"
+                />
+              )}
+            </div>
+          )}
 
           {/* Overview */}
           {overview && (
@@ -493,6 +565,41 @@ export function MediaDetailHero({
         </div>
       )}
     </div>
+  );
+}
+
+/* ─── External Link Icon ─── */
+
+function ExternalLinkIcon({
+  href,
+  src,
+  label,
+  invertOnDark,
+}: {
+  href: string;
+  src: string;
+  label: string;
+  invertOnDark?: boolean;
+}): React.JSX.Element {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={label}
+      title={label}
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm transition-colors hover:bg-white/20"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        className={cn(
+          "h-5 w-5 object-contain",
+          invertOnDark && "dark:invert",
+        )}
+      />
+    </a>
   );
 }
 

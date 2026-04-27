@@ -90,6 +90,8 @@ export function MediaDetailContent({
         logoPath={media.logoPath}
         externalId={media.externalId}
         provider={media.provider}
+        imdbId={media.imdbId}
+        tvdbId={media.tvdbId}
         isAdmin={detail.isAdmin}
         servers={detail.mediaServers.data}
         flatrateProviders={detail.flatrateProviders}
