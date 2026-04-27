@@ -18,6 +18,8 @@ interface IndexerCapability {
 /* ── ProwlarrClient ───────────────────────────────────────────────────────── */
 
 export class ProwlarrClient implements IndexerPort {
+  readonly id = "prowlarr";
+  readonly name = "Prowlarr";
   private baseUrl: string;
   private apiKey: string;
   private cachedIndexers: IndexerCapability[] | null = null;

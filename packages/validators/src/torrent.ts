@@ -13,6 +13,13 @@ export const torrentSearchInput = z.object({
 });
 export type TorrentSearchInput = z.infer<typeof torrentSearchInput>;
 
+export const torrentSearchOnIndexerInput = torrentSearchInput.extend({
+  indexerId: z.string().min(1),
+});
+export type TorrentSearchOnIndexerInput = z.infer<
+  typeof torrentSearchOnIndexerInput
+>;
+
 export const torrentDownloadInput = z.object({
   mediaId: z.string().uuid(),
   magnetUrl: z.string().url().optional(),

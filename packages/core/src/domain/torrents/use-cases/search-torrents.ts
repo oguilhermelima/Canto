@@ -17,6 +17,7 @@ import {
   meetsCutoff,
   type QualityProfile,
 } from "../rules/quality-profile";
+import type { ReleaseFlavor } from "../rules/release-groups";
 import type { ConfidenceContext } from "../types/common";
 import type { IndexerResult, SearchContext } from "../types/torrent";
 import type { IndexerPort } from "../ports/indexer";
@@ -61,22 +62,32 @@ export interface SearchInput {
   pageSize?: number;
 }
 
-export async function searchTorrents(
+/* ─── Shared prep + scoring helpers ─── */
+
+/**
+ * Everything a search needs that *isn't* the indexer roundtrip itself.
+ * Built once per search invocation so per-indexer fan-out (Phase 6b) can
+ * reuse it cheaply across parallel calls.
+ */
+interface PreparedSearch {
+  ctx: SearchContext;
+  queryVariants: string[];
+  rules: ScoringRules;
+  profile: QualityProfile | null;
+  confidenceCtx: ConfidenceContext;
+  flavor: ReleaseFlavor;
+  blockedTitles: Set<string>;
+  page: number;
+  pageSize: number;
+}
+
+async function prepareSearch(
   db: Database,
   input: SearchInput,
-  indexers: IndexerPort[],
-  /** Per-call scoring rules. Callers that have a user context (the tRPC
-   *  search procedure) layer the user's download preferences on top of
-   *  the defaults via {@link applyDownloadPreferences}. Background jobs
-   *  with no user (continuous-download, rss-sync) fall through to the
-   *  defaults. */
-  rules: ScoringRules = DEFAULT_SCORING_RULES,
-): Promise<PaginatedSearchResults> {
+  rules: ScoringRules,
+): Promise<PreparedSearch> {
   const row = await findMediaById(db, input.mediaId);
-
-  if (!row) {
-    throw new MediaNotFoundError(input.mediaId);
-  }
+  if (!row) throw new MediaNotFoundError(input.mediaId);
 
   const page = input.page ?? 0;
   const pageSize = input.pageSize ?? 50;
@@ -103,16 +114,9 @@ export async function searchTorrents(
     }
   }
 
-  if (indexers.length === 0) {
-    return { results: [], page, pageSize, hasMore: false };
-  }
-
-  // Build structured search context with external IDs + pagination
-  // Custom queries use text-only search (no ID params) for maximum flexibility
   const ctx: SearchContext = {
     query,
     mediaType: row.type as "movie" | "show",
-    // Custom queries skip ID-based search — use text only
     tmdbId: isCustomQuery ? undefined : (row.provider === "tmdb" ? row.externalId : undefined),
     imdbId: isCustomQuery ? undefined : (row.imdbId ?? undefined),
     tvdbId: isCustomQuery ? undefined : (row.tvdbId ?? undefined),
@@ -123,61 +127,26 @@ export async function searchTorrents(
     offset: page * pageSize,
   };
 
-  // For full-show searches (no season/episode and not a custom query), fan
-  // out an extra query with " Complete" appended. Some indexers index
-  // season packs under that token rather than the bare title; combining
-  // the two surfaces packs that the bare title misses without losing the
-  // bare-title results. Dedup by title catches overlap.
+  // Full-show fan-out: also fire `${title} Complete` so indexers that
+  // index season packs under that token aren't missed. Dedupe-by-title
+  // collapses overlap.
   const isShowFullScan =
     !isCustomQuery &&
     row.type === "show" &&
     input.seasonNumber === undefined;
-
   const queryVariants: string[] = isShowFullScan
     ? [query, `${query} Complete`]
     : [query];
 
-  const searches: Promise<IndexerResult[]>[] = queryVariants.flatMap((q) =>
-    indexers.map((idx) => idx.search({ ...ctx, query: q })),
-  );
-
-  let results: IndexerResult[];
-  try {
-    const settled = await Promise.allSettled(searches);
-    results = [];
-    for (const s of settled) {
-      if (s.status === "fulfilled") results.push(...s.value);
-    }
-    // Deduplicate by title
-    const seen = new Set<string>();
-    results = results.filter((r) => {
-      const key = r.title.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unknown error";
-    throw new IndexerSearchError(`Indexer search failed: ${message}`);
-  }
-
-  // Filter out blocklisted titles
-  const blockedRows = await findBlocklistByMediaId(db, input.mediaId);
-  if (blockedRows.length > 0) {
-    const blockedTitles = new Set(blockedRows.map((b) => b.title.toLowerCase()));
-    results = results.filter((r) => !blockedTitles.has(r.title.toLowerCase()));
-  }
-
-  // Determine if media has a digital release
+  // Determine if media has a digital release (drives CAM penalty)
   const isShow = row.type === "show";
   const releaseDate = row.releaseDate ? new Date(row.releaseDate) : null;
   const monthsSinceRelease = releaseDate
     ? (Date.now() - releaseDate.getTime()) / (1000 * 60 * 60 * 24 * 30)
     : Infinity;
   const hasDigitalRelease = isShow || monthsSinceRelease > 3;
-
   const confidenceCtx: ConfidenceContext = { hasDigitalRelease };
+
   const flavor = resolveMediaFlavor({
     type: row.type as "movie" | "show",
     originCountry: row.originCountry,
@@ -186,10 +155,9 @@ export async function searchTorrents(
     genreIds: row.genreIds,
   });
 
-  // Resolve and apply the active quality profile. When media has its
-  // qualityProfileId snapshotted (post-add) we use that; otherwise fall
-  // back to the system default for the flavor. Phase 5+ may layer
-  // folder.qualityProfileId between the two.
+  // Resolve and apply the active quality profile. media.qualityProfileId
+  // wins (snapshot-on-add); fallback to system default per flavor.
+  // Phase 5+ may layer folder.qualityProfileId between the two.
   const profile = await findActiveQualityProfile(db, {
     mediaQualityProfileId: row.qualityProfileId ?? null,
     folderQualityProfileId: null,
@@ -199,39 +167,215 @@ export async function searchTorrents(
     ? applyQualityProfile(rules, profile)
     : rules;
 
-  const scored: SearchResult[] = results
-    .map((r) => {
-      const attrs = parseReleaseAttributes({
-        title: r.title,
-        seeders: r.seeders,
-        age: r.age ?? 0,
-        flags: r.indexerFlags ?? [],
-        flavor,
-      });
-      return {
-        ...attrs,
-        guid: r.guid,
-        size: r.size,
-        publishDate: r.publishDate,
-        downloadUrl: r.downloadUrl,
-        magnetUrl: r.magnetUrl,
-        infoUrl: r.infoUrl,
-        indexer: r.indexer,
-        leechers: r.leechers,
-        categories: r.categories,
-        indexerLanguage: r.indexerLanguage ?? null,
-        confidence: calculateConfidence(attrs, confidenceCtx, activeRules),
-        aboveCutoff: profile
-          ? meetsCutoff(profile, attrs.quality, attrs.source)
-          : false,
-      };
-    })
-    .filter((r) => r.confidence > 0)
-    .sort((a, b) => b.confidence - a.confidence);
+  // Blocklist
+  const blockedRows = await findBlocklistByMediaId(db, input.mediaId);
+  const blockedTitles = new Set(
+    blockedRows.map((b) => b.title.toLowerCase()),
+  );
 
-  // Truncate to pageSize and detect if there's more
-  const hasMore = scored.length > pageSize;
-  const truncated = scored.slice(0, pageSize);
+  return {
+    ctx,
+    queryVariants,
+    rules: activeRules,
+    profile,
+    confidenceCtx,
+    flavor,
+    blockedTitles,
+    page,
+    pageSize,
+  };
+}
 
-  return { results: truncated, page, pageSize, hasMore };
+/**
+ * Run a single indexer with the prepared context, for every query
+ * variant, and concatenate the raw results. Errors are swallowed —
+ * caller decides whether one indexer's failure is fatal.
+ */
+async function runOneIndexer(
+  idx: IndexerPort,
+  prep: PreparedSearch,
+): Promise<IndexerResult[]> {
+  const settled = await Promise.allSettled(
+    prep.queryVariants.map((q) => idx.search({ ...prep.ctx, query: q })),
+  );
+  const out: IndexerResult[] = [];
+  for (const s of settled) {
+    if (s.status === "fulfilled") out.push(...s.value);
+  }
+  return out;
+}
+
+/**
+ * Score the raw indexer results against the prepared profile + rules,
+ * filtering out blocked titles and zero-confidence releases. Caller
+ * decides ordering (per-indexer streaming may want chronological;
+ * batch wants confidence-sorted).
+ */
+function scoreRawResults(
+  raw: IndexerResult[],
+  prep: PreparedSearch,
+): SearchResult[] {
+  const out: SearchResult[] = [];
+
+  for (const r of raw) {
+    if (prep.blockedTitles.has(r.title.toLowerCase())) continue;
+
+    const attrs = parseReleaseAttributes({
+      title: r.title,
+      seeders: r.seeders,
+      age: r.age ?? 0,
+      flags: r.indexerFlags ?? [],
+      flavor: prep.flavor,
+    });
+    const confidence = calculateConfidence(
+      attrs,
+      prep.confidenceCtx,
+      prep.rules,
+    );
+    if (confidence <= 0) continue;
+
+    out.push({
+      ...attrs,
+      guid: r.guid,
+      size: r.size,
+      publishDate: r.publishDate,
+      downloadUrl: r.downloadUrl,
+      magnetUrl: r.magnetUrl,
+      infoUrl: r.infoUrl,
+      indexer: r.indexer,
+      leechers: r.leechers,
+      categories: r.categories,
+      indexerLanguage: r.indexerLanguage ?? null,
+      confidence,
+      aboveCutoff: prep.profile
+        ? meetsCutoff(prep.profile, attrs.quality, attrs.source)
+        : false,
+    });
+  }
+
+  return out;
+}
+
+/* ─── Public use-cases ─── */
+
+export async function searchTorrents(
+  db: Database,
+  input: SearchInput,
+  indexers: IndexerPort[],
+  /** Per-call scoring rules. Callers that have a user context (the tRPC
+   *  search procedure) layer the user's download preferences on top of
+   *  the defaults via {@link applyDownloadPreferences}. Background jobs
+   *  with no user (continuous-download, rss-sync) fall through to the
+   *  defaults. */
+  rules: ScoringRules = DEFAULT_SCORING_RULES,
+): Promise<PaginatedSearchResults> {
+  const prep = await prepareSearch(db, input, rules);
+
+  if (indexers.length === 0) {
+    return { results: [], page: prep.page, pageSize: prep.pageSize, hasMore: false };
+  }
+
+  let raw: IndexerResult[];
+  try {
+    const indexerResults = await Promise.allSettled(
+      indexers.map((idx) => runOneIndexer(idx, prep)),
+    );
+    raw = [];
+    for (const r of indexerResults) {
+      if (r.status === "fulfilled") raw.push(...r.value);
+    }
+    // Dedupe by title across indexers
+    const seen = new Set<string>();
+    raw = raw.filter((r) => {
+      const key = r.title.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    throw new IndexerSearchError(`Indexer search failed: ${message}`);
+  }
+
+  const scored = scoreRawResults(raw, prep).sort(
+    (a, b) => b.confidence - a.confidence,
+  );
+
+  const hasMore = scored.length > prep.pageSize;
+  const truncated = scored.slice(0, prep.pageSize);
+  return { results: truncated, page: prep.page, pageSize: prep.pageSize, hasMore };
+}
+
+export interface SearchOnIndexerInput extends SearchInput {
+  indexerId: string;
+}
+
+export interface IndexerSearchResult {
+  indexer: { id: string; name: string };
+  results: SearchResult[];
+  /** Wall-clock duration of the indexer roundtrip + scoring, ms. */
+  tookMs: number;
+}
+
+/**
+ * Single-indexer search. Used by the per-indexer streaming UI (Phase 6b)
+ * via tRPC `useQueries` — each enabled indexer becomes its own query so
+ * the modal lights up chips as each one responds rather than waiting for
+ * the slowest.
+ *
+ * Reuses the same prep + scoring helpers as {@link searchTorrents}; the
+ * only difference is who orchestrates the fan-out (server here vs
+ * client).
+ */
+export async function searchOnIndexer(
+  db: Database,
+  input: SearchOnIndexerInput,
+  indexers: IndexerPort[],
+  rules: ScoringRules = DEFAULT_SCORING_RULES,
+): Promise<IndexerSearchResult> {
+  const idx = indexers.find((i) => i.id === input.indexerId);
+  if (!idx) {
+    return {
+      indexer: { id: input.indexerId, name: input.indexerId },
+      results: [],
+      tookMs: 0,
+    };
+  }
+
+  const prep = await prepareSearch(db, input, rules);
+
+  const start = Date.now();
+  const raw = await runOneIndexer(idx, prep);
+  // Dedupe within this indexer (same release returned twice across
+  // query variants — e.g. bare title + " Complete")
+  const seen = new Set<string>();
+  const deduped = raw.filter((r) => {
+    const key = r.title.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const scored = scoreRawResults(deduped, prep).sort(
+    (a, b) => b.confidence - a.confidence,
+  );
+
+  return {
+    indexer: { id: idx.id, name: idx.name },
+    results: scored.slice(0, prep.pageSize),
+    tookMs: Date.now() - start,
+  };
+}
+
+export interface IndexerInfo {
+  id: string;
+  name: string;
+}
+
+/**
+ * Snapshot of every enabled indexer's id + display name. Used by the
+ * Phase 6b streaming UI to render one chip per indexer before any
+ * search fires.
+ */
+export function listIndexerInfo(indexers: IndexerPort[]): IndexerInfo[] {
+  return indexers.map((idx) => ({ id: idx.id, name: idx.name }));
 }

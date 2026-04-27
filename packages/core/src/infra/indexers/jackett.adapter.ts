@@ -4,6 +4,8 @@ import type { IndexerPort } from "../../domain/torrents/ports/indexer";
 import { parseTorznabXml } from "./torznab-parser";
 
 export class JackettClient implements IndexerPort {
+  readonly id = "jackett";
+  readonly name = "Jackett";
   private baseUrl: string;
   private apiKey: string;
   private static DEFAULT_TIMEOUT_MS = 15_000;
