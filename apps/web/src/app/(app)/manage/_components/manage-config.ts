@@ -8,6 +8,7 @@ import {
   Link2,
   FolderSearch,
   Info,
+  Sliders,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -44,6 +45,7 @@ export const MANAGE_SECTIONS: ManageSectionGroup[] = [
     groupLabel: "Storage",
     items: [
       { key: "downloads", label: "Libraries", icon: HardDrive, description: "Download client, folders, and seeding" },
+      { key: "download-preferences", label: "Download Preferences", icon: Sliders, description: "Languages, services, and editions to prefer in search" },
       { key: "manual-scan", label: "Manual Scan", icon: FolderSearch, description: "Detect and match existing media" },
       { key: "about", label: "About", icon: Info, description: "Version and instance information" },
     ],

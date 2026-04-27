@@ -72,7 +72,7 @@ function arraysEqual(a: string[], b: string[]): boolean {
   return sa.every((v, i) => v === sb[i]);
 }
 
-export function DownloadsSection(): React.JSX.Element {
+export function DownloadPreferencesSection(): React.JSX.Element {
   const { data, isLoading } = trpc.preferences.downloads.get.useQuery();
   const utils = trpc.useUtils();
   const setMutation = trpc.preferences.downloads.set.useMutation({
