@@ -64,6 +64,7 @@ export function ImportMethodSection(): React.JSX.Element {
 
   return (
     <SettingsSection
+      variant="grid"
       title="Transfer Mode"
       description="How completed downloads are moved from the download path to the storage path."
     >
@@ -96,10 +97,11 @@ export function ImportMethodSection(): React.JSX.Element {
           >
             <span className="text-sm font-semibold">qBittorrent API (remote)</span>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              qBittorrent runs on a different machine. Canto tells qBittorrent to move files to the storage path via its API. No shared filesystem needed.
+              Canto and qBittorrent don&apos;t share a filesystem. Canto coordinates moves through qBittorrent&apos;s API — files copy to the storage path (2× disk space), and save paths must already exist on the qBittorrent host.
             </p>
           </button>
         </div>
+
         {dirty && (
           <div className="flex justify-end gap-2">
             <Button size="sm" variant="outline" onClick={() => { setImportMethod(dlSettingsQuery.data?.importMethod ?? "local"); setDirty(false); }} className="rounded-xl">
@@ -152,6 +154,7 @@ export function SeedingSection(): React.JSX.Element {
 
   return (
     <SettingsSection
+      variant="grid"
       title="Seeding"
       description="When to stop seeding and whether to clean up download files afterward."
     >

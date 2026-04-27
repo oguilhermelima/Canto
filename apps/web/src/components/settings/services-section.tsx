@@ -1038,7 +1038,7 @@ export function MetadataProvidersSection(): React.JSX.Element {
 
 export function DownloadClientSection(): React.JSX.Element {
   return (
-    <SettingsSection title="Download Client" description="Torrent client for downloading and managing media files.">
+    <SettingsSection variant="grid" title="Download Client" description="Torrent client for downloading and managing media files.">
       <SectionCard title="qBittorrent">
         <ServiceRow
           title="qBittorrent"

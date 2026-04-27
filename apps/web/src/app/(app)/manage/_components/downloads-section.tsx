@@ -11,19 +11,13 @@ export function DownloadsSection(): React.JSX.Element {
       <DownloadClientSection />
       <ImportMethodSection />
       <SettingsSection
+        variant="grid"
         title="Libraries"
-        description="Each library defines where files are downloaded, where your media is stored, and how new downloads are routed."
+        description="Per-category routing. Each library maps a qBittorrent category to its download path, storage path, and routing rules."
       >
-        <div className="mb-4 rounded-xl border border-border bg-muted/5 px-4 py-3">
-          <p className="text-sm text-muted-foreground">
-            Canto renames and organizes files in the storage path so media servers can recognize them:
-          </p>
-          <p className="mt-1.5 font-mono text-xs text-muted-foreground leading-relaxed">
-            Movie Title (2024) [tmdbid-12345]/<br />
-            <span className="pl-4">Movie Title (2024) [Bluray-1080p][h265].mkv</span>
-          </p>
+        <div className="rounded-2xl bg-muted/[0.04] p-4 sm:p-5">
+          <DownloadFolders mode="settings" />
         </div>
-        <DownloadFolders mode="settings" />
       </SettingsSection>
       <SeedingSection />
     </div>
