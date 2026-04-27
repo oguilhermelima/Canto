@@ -59,6 +59,7 @@ export async function ensureMediaMany(
     translations: 0,
     logos: 0,
     extras: 0,
+    contentRatings: 0,
   };
   const byLanguage: Record<string, number> = {};
 

@@ -97,7 +97,16 @@ export const refreshMediaInput = z.object({
   mediaId: z.string().uuid().optional(),
   languages: z.array(z.string().min(2).max(10)).optional(),
   aspects: z
-    .array(z.enum(["metadata", "structure", "translations", "logos", "extras"]))
+    .array(
+      z.enum([
+        "metadata",
+        "structure",
+        "translations",
+        "logos",
+        "extras",
+        "contentRatings",
+      ]),
+    )
     .optional(),
   force: z.boolean().optional(),
   dryRun: z.boolean().optional(),

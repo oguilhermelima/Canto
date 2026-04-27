@@ -68,15 +68,17 @@ export async function ensureMedia(
     tvdb: await getTvdbProvider(),
   };
 
-  // Fuse metadata + translations — both served by a single fetchMediaMetadata
-  // call with per-lang append_to_response chunks inside the TMDB normalizer.
+  // Fuse metadata + translations + contentRatings — all served by the same
+  // fetchMediaMetadata call (TMDB returns release_dates/content_ratings via
+  // append_to_response inside getMetadata).
   const runMetadata = aspectsToRun.includes("metadata");
   const runTranslations = aspectsToRun.includes("translations");
   const runStructure = aspectsToRun.includes("structure");
   const runLogos = aspectsToRun.includes("logos");
   const runExtras = aspectsToRun.includes("extras");
+  const runContentRatings = aspectsToRun.includes("contentRatings");
 
-  if (runMetadata || runTranslations || runStructure) {
+  if (runMetadata || runTranslations || runStructure || runContentRatings) {
     const useTVDBSeasons = mediaRow.type === "show"
       && !!mediaRow.tvdbId
       && (await getSetting("tvdb.defaultShows")) === true;
@@ -104,6 +106,10 @@ export async function ensureMedia(
     if (runStructure) result.aspectsExecuted.push("structure");
     if (runMetadata) result.aspectsExecuted.push("metadata");
     if (runTranslations) result.aspectsExecuted.push("translations");
+    if (runContentRatings) {
+      result.aspectsExecuted.push("contentRatings");
+      result.writes.contentRatings = fetched.media.contentRatings?.length ?? 0;
+    }
 
     // TVDB episode-translation fallback for shows that TMDB didn't cover.
     // Runs sequentially inside this job so the worker doesn't dispatch a
@@ -166,6 +172,7 @@ function initResult(mediaId: string): EnsureMediaResult {
       translationsEpisode: 0,
       logos: 0,
       extras: 0,
+      contentRatings: 0,
     },
     skipped: {},
     durationMs: 0,

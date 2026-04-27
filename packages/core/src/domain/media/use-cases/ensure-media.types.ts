@@ -11,11 +11,12 @@
 
 /** The different categories of data that can be ensured. */
 export type Aspect =
-  | "metadata"       // base fields on media/season/episode (EN canonical)
-  | "structure"      // seasons + episodes scaffolding (usually TVDB-driven)
-  | "translations"   // media/season/episode_translation rows (title/overview/tagline/posterPath)
-  | "logos"          // per-lang logoPath via TMDB /images
-  | "extras";        // credits, videos, recommendations, watch providers
+  | "metadata"        // base fields on media/season/episode (EN canonical)
+  | "structure"       // seasons + episodes scaffolding (usually TVDB-driven)
+  | "translations"    // media/season/episode_translation rows (title/overview/tagline/posterPath)
+  | "logos"           // per-lang logoPath via TMDB /images
+  | "extras"          // credits, videos, recommendations, watch providers
+  | "contentRatings"; // per-region content ratings (media_content_rating)
 
 export const ALL_ASPECTS: Aspect[] = [
   "metadata",
@@ -23,6 +24,7 @@ export const ALL_ASPECTS: Aspect[] = [
   "translations",
   "logos",
   "extras",
+  "contentRatings",
 ];
 
 export interface EnsureMediaSpec {
@@ -48,6 +50,7 @@ export interface GapReport {
     >;
     logosMissingByLang: string[];
     extrasStale: boolean;
+    contentRatingsMissing: boolean;
   };
 }
 
@@ -65,6 +68,7 @@ export interface EnsureMediaResult {
     translationsEpisode: number;
     logos: number;
     extras: number;
+    contentRatings: number;
   };
   /** Aspects that were requested/detected but skipped (with reason). */
   skipped: Partial<Record<Aspect, string>>;

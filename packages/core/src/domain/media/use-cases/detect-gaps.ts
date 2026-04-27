@@ -4,6 +4,7 @@ import {
   episode,
   episodeTranslation,
   media,
+  mediaContentRating,
   mediaCredit,
   mediaTranslation,
   season,
@@ -46,6 +47,7 @@ export async function detectGaps(
         translationsMissingByLang: {},
         logosMissingByLang: [],
         extrasStale: false,
+        contentRatingsMissing: false,
       },
     };
   }
@@ -59,6 +61,7 @@ export async function detectGaps(
     translationCounts,
     logoLangs,
     extrasRows,
+    contentRatingCount,
   ] = await Promise.all([
     isShow ? countSeasons(db, mediaId) : Promise.resolve(0),
     isShow ? countEpisodes(db, mediaId) : Promise.resolve(0),
@@ -69,6 +72,7 @@ export async function detectGaps(
       ? listLogoLangs(db, mediaId)
       : Promise.resolve<string[]>([]),
     countExtrasQuick(db, mediaId),
+    countContentRatings(db, mediaId),
   ]);
 
   const now = Date.now();
@@ -105,12 +109,15 @@ export async function detectGaps(
     now - mediaRow.extrasUpdatedAt.getTime() > EXTRAS_TTL_MS ||
     extrasRows === 0;
 
+  const contentRatingsMissing = contentRatingCount === 0;
+
   const gaps: Aspect[] = [];
   if (metadataStale) gaps.push("metadata");
   if (structureMissing) gaps.push("structure");
   if (Object.keys(translationsMissingByLang).length > 0) gaps.push("translations");
   if (logosMissingByLang.length > 0) gaps.push("logos");
   if (extrasStale) gaps.push("extras");
+  if (contentRatingsMissing) gaps.push("contentRatings");
 
   return {
     mediaId,
@@ -122,6 +129,7 @@ export async function detectGaps(
       translationsMissingByLang,
       logosMissingByLang,
       extrasStale,
+      contentRatingsMissing,
     },
   };
 }
@@ -244,5 +252,13 @@ async function countExtrasQuick(db: Database, mediaId: string): Promise<number> 
     .select({ n: sql<number>`count(*)::int` })
     .from(mediaCredit)
     .where(eq(mediaCredit.mediaId, mediaId));
+  return row?.n ?? 0;
+}
+
+async function countContentRatings(db: Database, mediaId: string): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(mediaContentRating)
+    .where(eq(mediaContentRating.mediaId, mediaId));
   return row?.n ?? 0;
 }
