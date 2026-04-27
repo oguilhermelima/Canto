@@ -27,6 +27,7 @@ import {
   Globe,
   SlidersHorizontal,
   Satellite,
+  Award,
 } from "lucide-react";
 import {
   formatBytes,
@@ -51,6 +52,7 @@ interface TorrentResult {
   indexerLanguage?: string | null;
   languages: string[];
   flags: string[];
+  aboveCutoff?: boolean;
 }
 
 interface TorrentResultsProps {
@@ -418,11 +420,19 @@ export function TorrentResults({
                 >
                   {/* Header */}
                   <div className="flex items-center justify-between px-5 py-2.5 text-xs font-medium text-muted-foreground">
-                    <span>
-                      {t.indexer || "Unknown"}
-                      {t.indexerLanguage && (
-                        <span className="ml-1 text-muted-foreground">
-                          ({t.indexerLanguage})
+                    <span className="flex items-center gap-2">
+                      <span>
+                        {t.indexer || "Unknown"}
+                        {t.indexerLanguage && (
+                          <span className="ml-1 text-muted-foreground">
+                            ({t.indexerLanguage})
+                          </span>
+                        )}
+                      </span>
+                      {t.aboveCutoff && (
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                          <Award size={9} />
+                          Above cutoff
                         </span>
                       )}
                     </span>
