@@ -123,8 +123,22 @@ export async function searchTorrents(
     offset: page * pageSize,
   };
 
-  const searches: Promise<IndexerResult[]>[] = indexers.map((idx) =>
-    idx.search(ctx),
+  // For full-show searches (no season/episode and not a custom query), fan
+  // out an extra query with " Complete" appended. Some indexers index
+  // season packs under that token rather than the bare title; combining
+  // the two surfaces packs that the bare title misses without losing the
+  // bare-title results. Dedup by title catches overlap.
+  const isShowFullScan =
+    !isCustomQuery &&
+    row.type === "show" &&
+    input.seasonNumber === undefined;
+
+  const queryVariants: string[] = isShowFullScan
+    ? [query, `${query} Complete`]
+    : [query];
+
+  const searches: Promise<IndexerResult[]>[] = queryVariants.flatMap((q) =>
+    indexers.map((idx) => idx.search({ ...ctx, query: q })),
   );
 
   let results: IndexerResult[];
