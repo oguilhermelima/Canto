@@ -1,8 +1,8 @@
 import { db } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
 import { downloadTorrent } from "@canto/core/domain/torrents/use-cases/download-torrent";
-import { detectQuality } from "@canto/core/domain/torrents/rules/quality";
 import { calculateConfidence } from "@canto/core/domain/shared/rules/scoring";
+import { parseReleaseAttributes } from "@canto/core/domain/torrents/rules/release-attributes";
 import { parseSeasons, parseEpisodes } from "@canto/core/domain/torrents/rules/parsing";
 import { matchRssTitle } from "@canto/core/domain/torrents/rules/rss-matching";
 import { detectMissingEpisodes } from "@canto/core/domain/media/use-cases/detect-episode-gaps";
@@ -69,11 +69,15 @@ export async function handleRssSync(): Promise<void> {
       if (!matchedShow) continue;
 
       // Check scoring
-      const quality = detectQuality(item.title);
-      const confidence = calculateConfidence(
-        item.title, quality, item.indexerFlags ?? [], item.seeders, item.age ?? 0,
-        { hasDigitalRelease: true },
-      );
+      const attrs = parseReleaseAttributes({
+        title: item.title,
+        seeders: item.seeders,
+        age: item.age ?? 0,
+        flags: item.indexerFlags ?? [],
+      });
+      const confidence = calculateConfidence(attrs, {
+        hasDigitalRelease: true,
+      });
       if (confidence <= 0) continue;
 
       // Check blocklist

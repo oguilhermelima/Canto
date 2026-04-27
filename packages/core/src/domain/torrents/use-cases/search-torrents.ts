@@ -2,16 +2,11 @@ import type { Database } from "@canto/db/client";
 
 import { IndexerSearchError } from "@canto/core/domain/torrents/errors";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
-import { detectQuality, detectSource } from "../rules/quality";
 import { calculateConfidence } from "../../shared/rules/scoring";
 import {
-  detectAudioChannels,
-  detectCodec,
-  detectEdition,
-  detectLanguages,
-  detectReleaseGroup,
-  detectStreamingService,
-} from "../rules/parsing";
+  parseReleaseAttributes,
+  type ReleaseAttributes,
+} from "../rules/release-attributes";
 import type { ConfidenceContext } from "../types/common";
 import type { IndexerResult, SearchContext } from "../types/torrent";
 import type { IndexerPort } from "../ports/indexer";
@@ -20,30 +15,18 @@ import {
   findBlocklistByMediaId,
 } from "../../../infra/repositories";
 
-export interface SearchResult {
+export interface SearchResult extends ReleaseAttributes {
   guid: string;
-  title: string;
   size: number;
   publishDate: string;
   downloadUrl: string | null;
   magnetUrl: string | null;
   infoUrl: string | null;
   indexer: string;
-  seeders: number;
   leechers: number;
-  age: number;
-  flags: string[];
-  quality: string;
-  source: string;
-  confidence: number;
   categories: Array<{ id: number; name: string }>;
-  languages: string[];
   indexerLanguage: string | null;
-  releaseGroup: string | null;
-  codec: string | null;
-  streamingService: string | null;
-  audioChannels: string | null;
-  edition: string | null;
+  confidence: number;
 }
 
 export interface PaginatedSearchResults {
@@ -161,37 +144,27 @@ export async function searchTorrents(
 
   const confidenceCtx: ConfidenceContext = { hasDigitalRelease };
 
-  const scored = results
+  const scored: SearchResult[] = results
     .map((r) => {
-      const flags = r.indexerFlags ?? [];
-      const quality = detectQuality(r.title);
-      const confidence = calculateConfidence(
-        r.title, quality, flags, r.seeders, r.age ?? 0, confidenceCtx,
-      );
-      return {
-        guid: r.guid,
+      const attrs = parseReleaseAttributes({
         title: r.title,
+        seeders: r.seeders,
+        age: r.age ?? 0,
+        flags: r.indexerFlags ?? [],
+      });
+      return {
+        ...attrs,
+        guid: r.guid,
         size: r.size,
         publishDate: r.publishDate,
         downloadUrl: r.downloadUrl,
         magnetUrl: r.magnetUrl,
         infoUrl: r.infoUrl,
         indexer: r.indexer,
-        seeders: r.seeders,
         leechers: r.leechers,
-        age: r.age ?? 0,
-        flags,
-        quality,
-        source: detectSource(r.title),
-        confidence,
         categories: r.categories,
-        languages: detectLanguages(r.title),
         indexerLanguage: r.indexerLanguage ?? null,
-        releaseGroup: detectReleaseGroup(r.title),
-        codec: detectCodec(r.title),
-        streamingService: detectStreamingService(r.title),
-        audioChannels: detectAudioChannels(r.title),
-        edition: detectEdition(r.title),
+        confidence: calculateConfidence(attrs, confidenceCtx),
       };
     })
     .filter((r) => r.confidence > 0)
