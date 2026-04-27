@@ -43,10 +43,15 @@ const STREAMING_LANGUAGE_META = new Set(["multi", "dual", "multi-subs"]);
  *   Quality (0–30)           — UHD > FullHD > HD > SD
  *   Source (−40 to +15)      — Remux > BluRay > WEB-DL > … > Telesync > CAM
  *   Codec (0–12)             — context-aware: H.265 rewarded only for UHD,
- *                              H.264 preferred at 1080p/720p, AV1 rewarded
- *   HDR (−10 to +13)         — DV-HDR10 > DV > HDR10+ > HDR10 > HDR > HLG.
- *                              UHD without HDR is penalised (-10) since 4K
- *                              SDR doesn't justify the bandwidth cost.
+ *                              H.264 preferred at 1080p/720p (H.265 there
+ *                              gets 0 — TRaSH treats it as a re-encode
+ *                              signal), AV1 rewarded everywhere.
+ *   HDR (−10 to +13)         — DV-HDR10 > DV > HDR10+ > HDR10 ≈ HDR > HLG.
+ *                              Unqualified "HDR" is treated as HDR10 (the
+ *                              baseline) since untagged HDR is almost
+ *                              always HDR10. UHD without HDR is penalised
+ *                              (−10) since 4K SDR doesn't justify the
+ *                              bandwidth cost.
  *   Audio codec (0–10)       — TrueHD Atmos > DTS-HD MA > TrueHD > … > AAC
  *   Audio channels (0–3)     — 7.1 > 5.1 > 2.0
  *   Multi-audio (0–2)        — MULTi/DUAL token or two+ language tracks
@@ -54,7 +59,9 @@ const STREAMING_LANGUAGE_META = new Set(["multi", "dual", "multi-subs"]);
  *                              (NF/AMZN/ATVP/DSNP/HMAX/HULU/PCOK/STAN/PMTP/CR);
  *                              Phase 2 promotes this to user-configurable
  *   Freshness (0–10)         — newer releases preferred
- *   Group tier (−20 to +12)  — TRaSH-style HQ vs LQ release groups
+ *   Group tier (−40 to +12)  — TRaSH HQ groups boosted; LQ groups buried.
+ *                              Avoid penalty matches TRaSH's "this group
+ *                              should never win unless nothing else exists".
  *   Repack/Proper (0–6)      — fix releases beat the broken original
  *   Hybrid (0–3)             — best-of-both BluRay+WEB
  *   Combo bonus (0–5)        — UHD Remux + DV/DV-HDR10 + Atmos jackpot
@@ -102,7 +109,8 @@ export function calculateConfidence(
   }
 
   // Codec (0–12) — context-aware. TRaSH rewards H.264 at HD/FullHD because
-  // H.265 at those resolutions is usually a re-encode (lossy on lossy).
+  // H.265 at those resolutions is usually a re-encode (lossy on lossy);
+  // H.265 there earns nothing.
   const codec = detectCodec(title);
   if (quality === "uhd") {
     if (codec === "h265") score += 12;
@@ -111,7 +119,8 @@ export function calculateConfidence(
   } else {
     if (codec === "h264") score += 10;
     else if (codec === "av1") score += 8;
-    else if (codec === "h265") score += 4;
+    // H.265 / HEVC at non-UHD: no bonus. The implicit gap to h264
+    // (+10) is the TRaSH-aligned "prefer x264 here" signal.
   }
 
   // Source (−40 to +15)
@@ -141,13 +150,13 @@ export function calculateConfidence(
   }
 
   // HDR (0–13) — DV with HDR10 fallback ranks above pure DV because pure DV
-  // black-frames on non-DV displays.
+  // black-frames on non-DV displays. Unqualified "HDR" collapses into the
+  // HDR10 score because in indexer titles it almost always means HDR10.
   const hdr = detectHdrFormat(title);
   if (hdr === "DV-HDR10") score += 13;
   else if (hdr === "DV") score += 12;
   else if (hdr === "HDR10+") score += 10;
-  else if (hdr === "HDR10") score += 8;
-  else if (hdr === "HDR") score += 5;
+  else if (hdr === "HDR10" || hdr === "HDR") score += 8;
   else if (hdr === "HLG") score += 3;
 
   // UHD-without-HDR penalty — 4K SDR isn't worth the bandwidth, TRaSH ranks
@@ -194,11 +203,12 @@ export function calculateConfidence(
   else if (age <= 90) score += 3;
   else if (age <= 365) score += 1;
 
-  // Release group tier (−20 to +12)
+  // Release group tier (−40 to +12). Avoid penalty is large enough that an
+  // LQ-group release should never win against a neutral-group equivalent.
   const group = detectReleaseGroup(title);
   const tier = classifyReleaseGroup(group);
   if (tier === "gold") score += 12;
-  else if (tier === "avoid") score -= 20;
+  else if (tier === "avoid") score -= 40;
 
   // Repack / Proper (0–6) — newer fix releases beat the broken original.
   const repackCount = detectRepackCount(title);
