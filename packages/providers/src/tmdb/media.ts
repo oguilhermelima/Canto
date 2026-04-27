@@ -159,9 +159,18 @@ function enrichTranslationsWithImages(
 }
 
 /**
- * Fetch locale-specific poster_path for translations that share the same 2-letter prefix.
- * TMDB images only tag with iso_639_1 (2 letters), so pt-BR and pt-PT get the same poster.
- * This makes a lightweight call per locale to get the correct region-specific poster.
+ * Disambiguate region-specific posters when multiple variants share a 2-letter prefix.
+ *
+ * TMDB tags images by iso_639_1 (2 letters), so pt-BR and pt-PT share the same "pt"
+ * poster from `enrichTranslationsWithImages`. When supported langs include both
+ * variants AND path 1 already found a tagged poster for that prefix, we hit the
+ * per-locale endpoint to pick the regional one.
+ *
+ * We deliberately skip the system-language case here: TMDB's `/tv/{id}?language=X`
+ * falls back to the show's *original-language* poster when no localized poster
+ * exists (e.g. Japanese for an anime queried with pt-BR), which is wrong — we want
+ * the EN base poster as fallback. Path 1 already handles tagged-language matching
+ * correctly without that bad fallback.
  */
 async function enrichTranslationsWithLocalePoster(
   client: TmdbClient,
@@ -169,7 +178,6 @@ async function enrichTranslationsWithLocalePoster(
   endpoint: string,
   supportedLangs: string[],
 ): Promise<void> {
-  // Group supported langs by 2-letter prefix to find ambiguous cases (e.g., pt-BR + pt-PT)
   const byPrefix = new Map<string, string[]>();
   for (const lang of supportedLangs) {
     if (lang.startsWith("en")) continue;
@@ -179,15 +187,18 @@ async function enrichTranslationsWithLocalePoster(
     byPrefix.set(prefix, list);
   }
 
-  // Only fetch for languages where there are multiple regional variants OR it's the system language
+  // Prefixes where path 1 (tagged-image match) found a poster — safe to disambiguate.
+  const prefixesWithPoster = new Set<string>();
+  for (const t of translations) {
+    if (t.posterPath) prefixesWithPoster.add(t.language.split("-")[0]!);
+  }
+
   const langsToFetch = new Set<string>();
-  for (const [, langs] of byPrefix) {
-    if (langs.length > 1) {
+  for (const [prefix, langs] of byPrefix) {
+    if (langs.length > 1 && prefixesWithPoster.has(prefix)) {
       for (const l of langs) langsToFetch.add(l);
     }
   }
-  // Always fetch for the configured system language
-  if (!client.language.startsWith("en")) langsToFetch.add(client.language);
 
   if (langsToFetch.size === 0) return;
 
