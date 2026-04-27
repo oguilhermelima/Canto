@@ -39,6 +39,7 @@ export const folderManageProcedures = {
         rules: input.rules ?? null,
         priority: input.priority,
         isDefault: input.isDefault,
+        qualityProfileId: input.qualityProfileId ?? null,
       }),
     ),
 
@@ -64,6 +65,8 @@ export const folderManageProcedures = {
       if (input.priority !== undefined) data.priority = input.priority;
       if (input.isDefault !== undefined) data.isDefault = input.isDefault;
       if (input.enabled !== undefined) data.enabled = input.enabled;
+      if (input.qualityProfileId !== undefined)
+        data.qualityProfileId = input.qualityProfileId;
 
       return updateFolder(ctx.db, input.id, data);
     }),

@@ -12,6 +12,7 @@ import {
   findAllQualityProfiles,
   findQualityProfileById,
   findQualityProfilesByFlavor,
+  seedDefaultQualityProfiles,
 } from "@canto/core/infra/torrents/quality-profile-repository";
 
 import { createTRPCRouter, adminProcedure } from "../../trpc";
@@ -25,6 +26,13 @@ export const qualityProfileRouter = createTRPCRouter({
       }
       return findAllQualityProfiles(ctx.db);
     }),
+
+  /**
+   * Seed the curated TRaSH-aligned default profiles (one per flavor,
+   * marked default). Idempotent — does nothing if any profile rows
+   * already exist.
+   */
+  seed: adminProcedure.mutation(({ ctx }) => seedDefaultQualityProfiles(ctx.db)),
 
   get: adminProcedure
     .input(setDefaultQualityProfileInput)

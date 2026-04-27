@@ -1,6 +1,9 @@
 import { and, eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { qualityProfile } from "@canto/db/schema";
+import {
+  qualityProfile,
+  type QualityProfileAllowedFormat,
+} from "@canto/db/schema";
 import type { QualityProfile } from "@canto/core/domain/torrents/rules/quality-profile";
 import type {
   Quality,
@@ -71,6 +74,78 @@ export async function findQualityProfilesByFlavor(
     orderBy: (p, { asc }) => [asc(p.name)],
   });
   return rows.map(decodeProfile);
+}
+
+/* ── Default profile seed ── */
+
+interface SeedProfile {
+  name: string;
+  flavor: ReleaseFlavor;
+  allowedFormats: QualityProfileAllowedFormat[];
+  cutoffQuality: string | null;
+  cutoffSource: string | null;
+  minTotalScore: number;
+}
+
+const DEFAULT_PROFILES: SeedProfile[] = [
+  {
+    name: "1080p Preferred",
+    flavor: "movie",
+    allowedFormats: [
+      { quality: "uhd", source: "remux", weight: 35 },
+      { quality: "uhd", source: "bluray", weight: 32 },
+      { quality: "fullhd", source: "remux", weight: 45 },
+      { quality: "fullhd", source: "bluray", weight: 42 },
+      { quality: "fullhd", source: "webdl", weight: 38 },
+      { quality: "fullhd", source: "webrip", weight: 30 },
+      { quality: "hd", source: "bluray", weight: 22 },
+    ],
+    cutoffQuality: "fullhd",
+    cutoffSource: "bluray",
+    minTotalScore: 0,
+  },
+  {
+    name: "1080p Preferred",
+    flavor: "show",
+    allowedFormats: [
+      { quality: "uhd", source: "webdl", weight: 35 },
+      { quality: "fullhd", source: "webdl", weight: 45 },
+      { quality: "fullhd", source: "bluray", weight: 40 },
+      { quality: "fullhd", source: "webrip", weight: 35 },
+      { quality: "hd", source: "webdl", weight: 22 },
+    ],
+    cutoffQuality: "fullhd",
+    cutoffSource: "webdl",
+    minTotalScore: 0,
+  },
+  {
+    name: "Anime BluRay Preferred",
+    flavor: "anime",
+    allowedFormats: [
+      { quality: "fullhd", source: "bluray", weight: 45 },
+      { quality: "fullhd", source: "webdl", weight: 42 },
+      { quality: "fullhd", source: "webrip", weight: 36 },
+      { quality: "hd", source: "webdl", weight: 24 },
+    ],
+    cutoffQuality: "fullhd",
+    cutoffSource: "bluray",
+    minTotalScore: 0,
+  },
+];
+
+/**
+ * Idempotent seeder. Inserts the curated default profiles (one per
+ * flavor, marked default) on first install. Skips if any profile rows
+ * already exist — re-running won't overwrite a customised setup.
+ */
+export async function seedDefaultQualityProfiles(db: Database) {
+  const existing = await db.query.qualityProfile.findMany();
+  if (existing.length > 0) return existing;
+
+  return db
+    .insert(qualityProfile)
+    .values(DEFAULT_PROFILES.map((p) => ({ ...p, isDefault: true })))
+    .returning();
 }
 
 /**

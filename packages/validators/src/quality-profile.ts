@@ -3,10 +3,16 @@ import { qualityType, sourceType } from "./torrent";
 
 const releaseFlavor = z.enum(["movie", "show", "anime"]);
 
+/**
+ * Weight range. Stays within the same magnitude as the other rule
+ * bonuses (HDR/audio/group/etc each cap around 10–13) so a profile entry
+ * doesn't drown them out after the engine normalises to 0–100.
+ * Recommended scale: 30 = baseline acceptable, 45 = top preference.
+ */
 export const allowedFormatEntry = z.object({
   quality: qualityType,
   source: sourceType,
-  weight: z.number().int().min(0).max(10000),
+  weight: z.number().int().min(0).max(100),
 });
 
 const baseQualityProfileFields = {
