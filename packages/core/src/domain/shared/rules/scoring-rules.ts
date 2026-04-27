@@ -56,6 +56,16 @@ export interface ScoringRules {
   camWithDigitalPenalty: number;
   camNoDigitalPenalty: number;
 
+  /** Bonuses applied when user preferences match. Used by
+   *  {@link applyDownloadPreferences} to layer per-user bumps onto the
+   *  dictionary fields. */
+  preferenceBonuses: {
+    perPreferredLanguage: number;
+    perPreferredStreamingService: number;
+    preferredEdition: number;
+    avoidedEdition: number;
+  };
+
   /** Used for normalising the raw score to 0–100. */
   maxRaw: number;
 }
@@ -171,8 +181,86 @@ export const DEFAULT_SCORING_RULES: ScoringRules = {
   uhdNoHdrPenalty: -10,
   camWithDigitalPenalty: -80,
   camNoDigitalPenalty: -15,
+  preferenceBonuses: {
+    perPreferredLanguage: 4,
+    perPreferredStreamingService: 3,
+    preferredEdition: 2,
+    avoidedEdition: -3,
+  },
   maxRaw: 170,
 };
+
+/**
+ * Per-user download preferences expressed as flat lists. The downstream
+ * scoring engine never reads these directly — {@link applyDownloadPreferences}
+ * folds them into a {@link ScoringRules} as bumps to the dictionary fields.
+ */
+export interface DownloadPreferences {
+  /** ISO codes (matches {@link detectLanguages}'s output). */
+  preferredLanguages: string[];
+  /** Tag codes from {@link detectStreamingService} (NF/AMZN/...). */
+  preferredStreamingServices: string[];
+  /** Edition strings from {@link detectEdition} ("IMAX", "Director's Cut", …). */
+  preferredEditions: string[];
+  /** Editions that should rank below their absence. */
+  avoidedEditions: string[];
+}
+
+export const EMPTY_DOWNLOAD_PREFERENCES: DownloadPreferences = {
+  preferredLanguages: [],
+  preferredStreamingServices: [],
+  preferredEditions: [],
+  avoidedEditions: [],
+};
+
+/**
+ * Layer a user's download preferences onto a base {@link ScoringRules}.
+ *
+ * Bonuses live in `base.preferenceBonuses` so a Phase-5 quality profile
+ * could change the weights without rewriting this function. Each preferred
+ * language adds `perPreferredLanguage` to that language's `languageBonuses`
+ * entry (additive — Phase 5 profile language boosts compose with user
+ * boosts). Streaming services and editions follow the same pattern.
+ *
+ * Pure — returns a new rules object; the input is not mutated.
+ */
+export function applyDownloadPreferences(
+  base: ScoringRules,
+  prefs: DownloadPreferences,
+): ScoringRules {
+  const {
+    perPreferredLanguage,
+    perPreferredStreamingService,
+    preferredEdition,
+    avoidedEdition,
+  } = base.preferenceBonuses;
+
+  const languageBonuses = { ...base.languageBonuses };
+  for (const lang of prefs.preferredLanguages) {
+    languageBonuses[lang] = (languageBonuses[lang] ?? 0) + perPreferredLanguage;
+  }
+
+  const streamingServiceBonuses = { ...base.streamingServiceBonuses };
+  for (const svc of prefs.preferredStreamingServices) {
+    streamingServiceBonuses[svc] =
+      (streamingServiceBonuses[svc] ?? 0) + perPreferredStreamingService;
+  }
+
+  const editionBonuses = { ...base.editionBonuses };
+  for (const ed of prefs.preferredEditions) {
+    editionBonuses[ed] = (editionBonuses[ed] ?? 0) + preferredEdition;
+  }
+  for (const ed of prefs.avoidedEditions) {
+    editionBonuses[ed] = (editionBonuses[ed] ?? 0) + avoidedEdition;
+  }
+
+  return {
+    ...base,
+    languageBonuses,
+    streamingServiceBonuses,
+    editionBonuses,
+  };
+}
 
 /**
  * Type-safe per-key merge for the dictionary-shaped rule fields.

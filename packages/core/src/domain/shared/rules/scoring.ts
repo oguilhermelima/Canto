@@ -5,8 +5,13 @@ import {
   type ScoringRules,
 } from "./scoring-rules";
 
-export { DEFAULT_SCORING_RULES, mergeRecord } from "./scoring-rules";
-export type { ScoringRules } from "./scoring-rules";
+export {
+  DEFAULT_SCORING_RULES,
+  EMPTY_DOWNLOAD_PREFERENCES,
+  applyDownloadPreferences,
+  mergeRecord,
+} from "./scoring-rules";
+export type { ScoringRules, DownloadPreferences } from "./scoring-rules";
 
 /**
  * Confidence engine. Pure function over `(attrs, ctx, rules)`.

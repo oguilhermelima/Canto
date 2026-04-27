@@ -4,6 +4,10 @@ import { IndexerSearchError } from "@canto/core/domain/torrents/errors";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import { calculateConfidence } from "../../shared/rules/scoring";
 import {
+  DEFAULT_SCORING_RULES,
+  type ScoringRules,
+} from "../../shared/rules/scoring-rules";
+import {
   parseReleaseAttributes,
   type ReleaseAttributes,
 } from "../rules/release-attributes";
@@ -50,6 +54,12 @@ export async function searchTorrents(
   db: Database,
   input: SearchInput,
   indexers: IndexerPort[],
+  /** Per-call scoring rules. Callers that have a user context (the tRPC
+   *  search procedure) layer the user's download preferences on top of
+   *  the defaults via {@link applyDownloadPreferences}. Background jobs
+   *  with no user (continuous-download, rss-sync) fall through to the
+   *  defaults. */
+  rules: ScoringRules = DEFAULT_SCORING_RULES,
 ): Promise<PaginatedSearchResults> {
   const row = await findMediaById(db, input.mediaId);
 
@@ -164,7 +174,7 @@ export async function searchTorrents(
         leechers: r.leechers,
         categories: r.categories,
         indexerLanguage: r.indexerLanguage ?? null,
-        confidence: calculateConfidence(attrs, confidenceCtx),
+        confidence: calculateConfidence(attrs, confidenceCtx, rules),
       };
     })
     .filter((r) => r.confidence > 0)
