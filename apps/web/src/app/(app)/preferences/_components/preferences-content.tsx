@@ -5,6 +5,7 @@ import { PasswordSection } from "./password-section";
 import { AppearanceSection } from "./appearance-section";
 import { PreferencesSection } from "./preferences-section";
 import { ConnectionsSection } from "./connections-section";
+import { DownloadsSection } from "./downloads-section";
 import { HomeSectionsEditor } from "./home-sections-editor";
 import { ProfileSectionsEditor } from "./profile-sections-editor";
 import { HiddenSection } from "./hidden-section";
@@ -14,6 +15,7 @@ const SECTION_COMPONENTS: Record<string, React.ComponentType> = {
   password: PasswordSection,
   appearance: AppearanceSection,
   "content-region": PreferencesSection,
+  downloads: DownloadsSection,
   connections: ConnectionsSection,
   "home-sections": HomeSectionsEditor,
   "profile-sections": ProfileSectionsEditor,

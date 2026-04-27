@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   UserCircle,
   EyeOff,
+  Download,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -35,6 +36,7 @@ export const PREFERENCES_SECTIONS: PreferencesSectionGroup[] = [
     items: [
       { key: "appearance", label: "Appearance", icon: Palette, description: "Theme and display" },
       { key: "content-region", label: "Content & Region", icon: Globe, description: "Language, streaming region, search" },
+      { key: "downloads", label: "Downloads", icon: Download, description: "Languages, services, editions" },
       { key: "connections", label: "Connections", icon: Cable, description: "Plex & Jellyfin accounts" },
     ],
   },
