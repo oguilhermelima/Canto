@@ -491,18 +491,22 @@ export async function findListItems(
     }
   }
 
+  // Stable tiebreaker — without it, ties in the primary sort key let offset
+  // pagination pull the same row into two consecutive pages, producing
+  // duplicate React keys on the client.
+  const tiebreaker = desc(media.id);
   const orderByExpr = (() => {
     if (memberVotesSubquery && sortBy === "members_rating.desc") {
-      return [sql`${memberVotesSubquery.avgRating} DESC NULLS LAST`];
+      return [sql`${memberVotesSubquery.avgRating} DESC NULLS LAST`, tiebreaker];
     }
     if (memberVotesSubquery && sortBy === "members_rating.asc") {
-      return [sql`${memberVotesSubquery.avgRating} ASC NULLS LAST`];
+      return [sql`${memberVotesSubquery.avgRating} ASC NULLS LAST`, tiebreaker];
     }
-    if (sortBy === "date_added.desc") return [desc(listItem.addedAt)];
-    if (sortBy === "date_added.asc") return [asc(listItem.addedAt)];
+    if (sortBy === "date_added.desc") return [desc(listItem.addedAt), tiebreaker];
+    if (sortBy === "date_added.asc") return [asc(listItem.addedAt), tiebreaker];
     const customSort = recsSortOrder(sortBy);
-    if (customSort) return [customSort];
-    return [asc(listItem.position), desc(listItem.addedAt)];
+    if (customSort) return [customSort, tiebreaker];
+    return [asc(listItem.position), desc(listItem.addedAt), tiebreaker];
   })();
 
   const whereClause = and(...conditions);
