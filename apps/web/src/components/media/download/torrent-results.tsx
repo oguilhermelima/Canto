@@ -26,6 +26,7 @@ import {
   Zap,
   Globe,
   SlidersHorizontal,
+  Satellite,
 } from "lucide-react";
 import {
   formatBytes,
@@ -55,6 +56,10 @@ interface TorrentResult {
 interface TorrentResultsProps {
   mediaId: string;
   mediaTitle: string;
+  torrentSearchContext: {
+    seasonNumber?: number;
+    episodeNumbers?: number[];
+  } | null;
   torrentSearchQuery: string;
   setTorrentSearchQuery: (q: string) => void;
   torrentPage: number;
@@ -90,7 +95,8 @@ interface TorrentResultsProps {
 
 export function TorrentResults({
   mediaId: _mediaId,
-  mediaTitle: _mediaTitle,
+  mediaTitle,
+  torrentSearchContext,
   torrentSearchQuery,
   setTorrentSearchQuery,
   torrentPage,
@@ -373,37 +379,12 @@ export function TorrentResults({
       {/* Results */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {torrentSearch.isLoading ? (
-          <div className="flex min-h-[300px] flex-col items-center justify-center gap-6 px-5 py-16">
-            <div className="relative flex h-20 w-20 items-center justify-center">
-              <div
-                className="absolute h-20 w-20 animate-ping rounded-full border border-primary"
-                style={{ animationDuration: "2s" }}
-              />
-              <div
-                className="absolute h-14 w-14 animate-ping rounded-full border border-primary"
-                style={{
-                  animationDuration: "2s",
-                  animationDelay: "0.4s",
-                }}
-              />
-              <div
-                className="absolute h-8 w-8 animate-ping rounded-full border border-primary"
-                style={{
-                  animationDuration: "2s",
-                  animationDelay: "0.8s",
-                }}
-              />
-              <Search size={20} className="relative z-10 text-primary" />
-            </div>
-            <div className="text-center">
-              <p className="text-sm font-medium text-foreground">
-                Scanning indexers
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Searching across all connected sources...
-              </p>
-            </div>
-          </div>
+          <ScanningState
+            mediaTitle={mediaTitle}
+            torrentSearchContext={torrentSearchContext}
+            advancedSearch={advancedSearch}
+            committedQuery={committedQuery}
+          />
         ) : torrentSearch.isError ? (
           <div className="px-5 py-12 text-center">
             <p className="text-sm font-medium text-destructive">
@@ -608,6 +589,91 @@ export function TorrentResults({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─── Scanning State (loading) ─── */
+
+function buildSearchSummary(
+  mediaTitle: string,
+  ctx: { seasonNumber?: number; episodeNumbers?: number[] } | null,
+  advancedSearch: boolean,
+  committedQuery: string,
+): string {
+  if (advancedSearch && committedQuery) return committedQuery;
+  if (ctx?.seasonNumber === undefined) return mediaTitle;
+  const ss = String(ctx.seasonNumber).padStart(2, "0");
+  const eps = ctx.episodeNumbers ?? [];
+  if (eps.length === 0) return `${mediaTitle} · S${ss}`;
+  if (eps.length === 1) {
+    return `${mediaTitle} · S${ss}E${String(eps[0]).padStart(2, "0")}`;
+  }
+  const sorted = [...eps].sort((a, b) => a - b);
+  const first = String(sorted[0]).padStart(2, "0");
+  const last = String(sorted[sorted.length - 1]).padStart(2, "0");
+  return `${mediaTitle} · S${ss}E${first}–E${last}`;
+}
+
+function ScanningState({
+  mediaTitle,
+  torrentSearchContext,
+  advancedSearch,
+  committedQuery,
+}: {
+  mediaTitle: string;
+  torrentSearchContext: { seasonNumber?: number; episodeNumbers?: number[] } | null;
+  advancedSearch: boolean;
+  committedQuery: string;
+}): React.JSX.Element {
+  const summary = buildSearchSummary(
+    mediaTitle,
+    torrentSearchContext,
+    advancedSearch,
+    committedQuery,
+  );
+
+  return (
+    <div className="flex min-h-[420px] flex-col items-center justify-center gap-8 px-5 py-12">
+      {/* Radar pulse */}
+      <div className="relative flex h-44 w-44 items-center justify-center">
+        <div
+          className="absolute h-44 w-44 animate-ping rounded-full border border-primary/20"
+          style={{ animationDuration: "3s" }}
+        />
+        <div
+          className="absolute h-32 w-32 animate-ping rounded-full border border-primary/30"
+          style={{ animationDuration: "3s", animationDelay: "0.6s" }}
+        />
+        <div
+          className="absolute h-20 w-20 animate-ping rounded-full border border-primary/40"
+          style={{ animationDuration: "3s", animationDelay: "1.2s" }}
+        />
+        <div className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/30">
+          <Satellite
+            size={26}
+            className="animate-pulse text-primary"
+            style={{ animationDuration: "1.6s" }}
+          />
+        </div>
+      </div>
+
+      {/* Copy */}
+      <div className="max-w-md text-center">
+        <p className="text-base font-semibold text-foreground">
+          Pinging the cosmos
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Sweeping every connected indexer for
+        </p>
+        <p className="mt-1.5 inline-block max-w-full truncate rounded-full bg-muted/60 px-3 py-1 text-xs font-medium text-foreground">
+          {summary}
+        </p>
+      </div>
+
+      <p className="text-[11px] text-muted-foreground/70">
+        First contact may take a few seconds.
+      </p>
     </div>
   );
 }

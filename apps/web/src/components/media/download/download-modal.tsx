@@ -9,12 +9,7 @@ import {
   DialogTitle,
 } from "@canto/ui/dialog";
 import { ConfirmationDialog } from "@canto/ui/confirmation-dialog";
-import {
-  X,
-  Loader2,
-  ArrowLeft,
-} from "lucide-react";
-import { trpc } from "@/lib/trpc/client";
+import { X, Loader2, ArrowLeft } from "lucide-react";
 import { useDownloadModal } from "./use-download-modal";
 import { DownloadTab } from "./download-tab";
 import { TorrentResults } from "./torrent-results";
@@ -103,12 +98,6 @@ export function DownloadModal({
                 <DialogDescription className="mt-0.5 flex h-6 items-center gap-1.5 text-sm text-muted-foreground">
                   {showingResults ? (
                     <span>Search and download torrents</span>
-                  ) : isAdmin && mediaId ? (
-                    <LibrarySelector
-                      mediaId={mediaId}
-                      selectedFolderId={modal.selectedFolderId}
-                      onSelect={modal.setSelectedFolderId}
-                    />
                   ) : (
                     <span>Select what to download</span>
                   )}
@@ -130,66 +119,75 @@ export function DownloadModal({
             <div className="flex min-h-[200px] items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
+          ) : !showingResults ? (
+            <div
+              key="step-picker"
+              className="flex min-h-0 flex-1 flex-col animate-in fade-in slide-in-from-left-3 duration-300 ease-out"
+            >
+              <DownloadTab
+                mediaId={mediaId}
+                mediaType={mediaType}
+                isAdmin={isAdmin}
+                seasons={seasons}
+                selectedSeasons={modal.selectedSeasons}
+                setSelectedSeasons={modal.setSelectedSeasons}
+                selectedEpisodes={modal.selectedEpisodes}
+                setSelectedEpisodes={modal.setSelectedEpisodes}
+                hasSelection={modal.hasSelection}
+                selectedFolderId={modal.selectedFolderId}
+                setSelectedFolderId={modal.setSelectedFolderId}
+                onSearchGranular={() => modal.goToStep2(seasons)}
+                onSearchAdvanced={(query) => {
+                  modal.setAdvancedSearch(true);
+                  modal.setAdvancedQuery(query);
+                  modal.setCommittedQuery(query);
+                  modal.setTorrentSearchContext(null);
+                  modal.setTorrentPage(0);
+                  modal.setStep2Direct();
+                }}
+                onDownloadAuto={() => {
+                  modal.setTorrentSearchContext(null);
+                  modal.setAdvancedSearch(false);
+                  modal.setTorrentPage(0);
+                  modal.setStep2Direct();
+                }}
+              />
+            </div>
           ) : (
-            <>
-              {!showingResults && (
-                <DownloadTab
-                  mediaType={mediaType}
-                  seasons={seasons}
-                  selectedSeasons={modal.selectedSeasons}
-                  setSelectedSeasons={modal.setSelectedSeasons}
-                  selectedEpisodes={modal.selectedEpisodes}
-                  setSelectedEpisodes={modal.setSelectedEpisodes}
-                  hasSelection={modal.hasSelection}
-                  onSearchGranular={() => modal.goToStep2(seasons)}
-                  onSearchAdvanced={(query) => {
-                    modal.setAdvancedSearch(true);
-                    modal.setAdvancedQuery(query);
-                    modal.setCommittedQuery(query);
-                    modal.setTorrentSearchContext(null);
-                    modal.setTorrentPage(0);
-                    modal.setStep2Direct();
-                  }}
-                  onDownloadAuto={() => {
-                    modal.setTorrentSearchContext(null);
-                    modal.setAdvancedSearch(false);
-                    modal.setTorrentPage(0);
-                    modal.setStep2Direct();
-                  }}
-                />
-              )}
-
-              {showingResults && (
-                <TorrentResults
-                  mediaId={mediaId}
-                  mediaTitle={mediaTitle}
-                  torrentSearchQuery={modal.torrentSearchQuery}
-                  setTorrentSearchQuery={modal.setTorrentSearchQuery}
-                  torrentPage={modal.torrentPage}
-                  setTorrentPage={modal.setTorrentPage}
-                  torrentQualityFilter={modal.torrentQualityFilter}
-                  setTorrentQualityFilter={modal.setTorrentQualityFilter}
-                  torrentSourceFilter={modal.torrentSourceFilter}
-                  setTorrentSourceFilter={modal.setTorrentSourceFilter}
-                  torrentSizeFilter={modal.torrentSizeFilter}
-                  setTorrentSizeFilter={modal.setTorrentSizeFilter}
-                  torrentSort={modal.torrentSort}
-                  torrentSortDir={modal.torrentSortDir}
-                  toggleSort={modal.toggleSort}
-                  advancedSearch={modal.advancedSearch}
-                  committedQuery={modal.committedQuery}
-                  mobileFiltersOpen={modal.mobileFiltersOpen}
-                  setMobileFiltersOpen={modal.setMobileFiltersOpen}
-                  torrentSearch={modal.torrentSearch}
-                  paginatedTorrents={modal.paginatedTorrents}
-                  allFilteredTorrents={modal.allFilteredTorrents}
-                  hasMore={modal.hasMore}
-                  handleDownload={modal.handleDownload}
-                  downloadTorrent={modal.downloadTorrent}
-                  setLastDownloadAttempt={modal.setLastDownloadAttempt}
-                />
-              )}
-            </>
+            <div
+              key="step-results"
+              className="flex min-h-0 flex-1 flex-col animate-in fade-in slide-in-from-right-3 duration-300 ease-out"
+            >
+              <TorrentResults
+                mediaId={mediaId}
+                mediaTitle={mediaTitle}
+                torrentSearchContext={modal.torrentSearchContext}
+                torrentSearchQuery={modal.torrentSearchQuery}
+                setTorrentSearchQuery={modal.setTorrentSearchQuery}
+                torrentPage={modal.torrentPage}
+                setTorrentPage={modal.setTorrentPage}
+                torrentQualityFilter={modal.torrentQualityFilter}
+                setTorrentQualityFilter={modal.setTorrentQualityFilter}
+                torrentSourceFilter={modal.torrentSourceFilter}
+                setTorrentSourceFilter={modal.setTorrentSourceFilter}
+                torrentSizeFilter={modal.torrentSizeFilter}
+                setTorrentSizeFilter={modal.setTorrentSizeFilter}
+                torrentSort={modal.torrentSort}
+                torrentSortDir={modal.torrentSortDir}
+                toggleSort={modal.toggleSort}
+                advancedSearch={modal.advancedSearch}
+                committedQuery={modal.committedQuery}
+                mobileFiltersOpen={modal.mobileFiltersOpen}
+                setMobileFiltersOpen={modal.setMobileFiltersOpen}
+                torrentSearch={modal.torrentSearch}
+                paginatedTorrents={modal.paginatedTorrents}
+                allFilteredTorrents={modal.allFilteredTorrents}
+                hasMore={modal.hasMore}
+                handleDownload={modal.handleDownload}
+                downloadTorrent={modal.downloadTorrent}
+                setLastDownloadAttempt={modal.setLastDownloadAttempt}
+              />
+            </div>
           )}
         </div>
       </DialogContent>
@@ -208,42 +206,3 @@ export function DownloadModal({
   );
 }
 
-/* ─── Library Selector ─── */
-
-function LibrarySelector({
-  mediaId,
-  selectedFolderId,
-  onSelect,
-}: {
-  mediaId: string;
-  selectedFolderId: string | undefined;
-  onSelect: (id: string | undefined) => void;
-}): React.JSX.Element | null {
-  const { data: folders } = trpc.folder.list.useQuery();
-  const { data: resolved } = trpc.folder.resolve.useQuery({ mediaId });
-
-  const enabledFolders = (folders ?? []).filter((f) => f.enabled);
-  if (enabledFolders.length === 0) return null;
-
-  const autoLabel = resolved?.folderName
-    ? `Auto (${resolved.folderName})`
-    : "Auto";
-
-  return (
-    <>
-      <span>Saving to</span>
-      <select
-        value={selectedFolderId ?? ""}
-        onChange={(e) => onSelect(e.target.value || undefined)}
-        className="cursor-pointer rounded-md bg-muted/60 px-1.5 py-0.5 text-sm font-medium text-foreground outline-none transition-colors hover:bg-muted"
-      >
-        <option value="">{autoLabel}</option>
-        {enabledFolders.map((f) => (
-          <option key={f.id} value={f.id}>
-            {f.name}
-          </option>
-        ))}
-      </select>
-    </>
-  );
-}

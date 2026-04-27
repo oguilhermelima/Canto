@@ -120,21 +120,13 @@ export function SeasonSelect({
 
   return (
     <div>
-      {/* Title */}
-      <h3 className="text-base font-semibold text-foreground">
-        Granular
-      </h3>
-      <p className="mt-0.5 text-sm text-muted-foreground">
-        Select specific seasons or episodes to search.
-      </p>
-
       {/* Season list with select-all aligned to season checkboxes */}
-      <div className="mt-3 flex flex-col gap-2">
-        {/* Select all — matches season block structure exactly: outer p-1 + inner px-3/sm:px-4 */}
+      <div className="flex flex-col gap-1.5">
+        {/* Select all — matches season block structure: outer p-1 + inner px-3 */}
         <div className="rounded-xl bg-card p-1">
-          <div className="flex items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4">
+          <div className="flex items-center gap-3 px-3 py-2">
             <div className="min-w-0 flex-1">
-              <span className="text-sm font-medium text-muted-foreground">
+              <span className="text-xs font-medium text-muted-foreground">
                 Select all
               </span>
             </div>
@@ -142,7 +134,7 @@ export function SeasonSelect({
               type="button"
               onClick={selectAllSeasons}
               className={cn(
-                "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 transition-all",
+                "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all",
                 allSeasonsSelected
                   ? "border-primary bg-primary text-primary-foreground"
                   : hasSelection
@@ -152,9 +144,9 @@ export function SeasonSelect({
               title="Select all"
             >
               {allSeasonsSelected ? (
-                <Check size={13} strokeWidth={3} />
+                <Check size={11} strokeWidth={3} />
               ) : hasSelection ? (
-                <Minus size={13} strokeWidth={3} className="text-primary" />
+                <Minus size={11} strokeWidth={3} className="text-primary" />
               ) : null}
             </button>
           </div>
@@ -237,41 +229,39 @@ function SeasonBlock({
             onToggleExpand();
           }
         }}
-        className="flex cursor-pointer items-center gap-2 px-3 py-3 sm:gap-3 sm:px-4"
+        className="flex cursor-pointer items-center gap-3 px-3 py-2.5"
       >
         <ChevronRight
-          size={20}
+          size={16}
           className={cn(
             "shrink-0 text-muted-foreground transition-transform duration-200",
             isExpanded && "rotate-90",
           )}
         />
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-bold leading-tight sm:text-base">
+          <h3 className="truncate text-sm font-semibold leading-tight">
             {isSpecials ? (
               <span>{seasonTitle}</span>
             ) : (
               <>
                 <span>S{sNum}</span>
-                <span className="mx-1.5 text-foreground sm:mx-2">
-                  |
-                </span>
+                <span className="mx-1.5 text-muted-foreground/60">|</span>
                 <span>{seasonTitle}</span>
               </>
             )}
           </h3>
-          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground sm:text-sm">
+          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <span>{epCount} episodes</span>
             {year && (
               <>
-                <span className="text-muted-foreground">·</span>
+                <span className="text-muted-foreground/60">·</span>
                 <span>{year}</span>
               </>
             )}
           </div>
         </div>
         <div
-          className="flex items-center gap-3"
+          className="flex items-center"
           onClick={(e) => e.stopPropagation()}
         >
           <button
@@ -281,7 +271,7 @@ function SeasonBlock({
               onToggleSeasonSelect();
             }}
             className={cn(
-              "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 transition-all",
+              "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all",
               isSeasonSelected
                 ? "border-primary bg-primary text-primary-foreground"
                 : allEpsSelected
@@ -292,9 +282,9 @@ function SeasonBlock({
             )}
           >
             {isSeasonSelected || allEpsSelected ? (
-              <Check size={13} strokeWidth={3} />
+              <Check size={11} strokeWidth={3} />
             ) : selectedCount > 0 ? (
-              <Minus size={13} strokeWidth={3} className="text-primary" />
+              <Minus size={11} strokeWidth={3} className="text-primary" />
             ) : null}
           </button>
         </div>
@@ -331,14 +321,14 @@ function SeasonBlock({
                     }
                   } : undefined}
                   className={cn(
-                    "group flex items-center gap-4 py-3 pr-3 pl-3 transition-colors sm:pr-4 sm:pl-4",
+                    "group flex items-center gap-3 px-3 py-2 transition-colors",
                     isFuture && "pointer-events-none opacity-40",
                     isInteractive && "cursor-pointer hover:bg-muted/40",
                     !isFuture && isMuted && "opacity-40",
                   )}
                 >
                   {/* Thumbnail */}
-                  <div className="relative hidden h-16 w-28 shrink-0 overflow-hidden rounded-lg bg-muted sm:block">
+                  <div className="relative hidden h-12 w-20 shrink-0 overflow-hidden rounded-md bg-muted sm:block">
                     {ep.stillPath ? (
                       <FadeImage
                         src={
@@ -364,27 +354,22 @@ function SeasonBlock({
 
                   {/* Info */}
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <span className="font-medium">E{num}</span>
                       {ep.airDate && (
                         <>
-                          <span className="text-muted-foreground">
-                            ·
-                          </span>
+                          <span className="text-muted-foreground/60">·</span>
                           <span>
-                            {new Date(ep.airDate).toLocaleDateString(
-                              "en-US",
-                              {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              },
-                            )}
+                            {new Date(ep.airDate).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
                           </span>
                         </>
                       )}
                     </div>
-                    <p className="mt-0.5 line-clamp-1 text-sm font-bold leading-snug">
+                    <p className="mt-0.5 line-clamp-1 text-xs font-semibold leading-snug">
                       {ep.title || `Episode ${ep.number}`}
                     </p>
                   </div>
@@ -392,7 +377,7 @@ function SeasonBlock({
                   {/* Checkbox */}
                   <div
                     className={cn(
-                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 transition-all",
+                      "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all",
                       isSelected && !isMuted
                         ? "border-primary bg-primary text-primary-foreground"
                         : isMuted
@@ -401,7 +386,7 @@ function SeasonBlock({
                     )}
                   >
                     {isSelected && !isMuted && (
-                      <Check size={13} strokeWidth={3} />
+                      <Check size={11} strokeWidth={3} />
                     )}
                   </div>
                 </div>
