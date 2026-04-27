@@ -4,10 +4,13 @@ import {
   detectCodec,
   detectAudioCodec,
   detectHdrFormat,
+  detectAudioChannels,
   detectReleaseGroup,
   detectRepackCount,
+  detectStreamingService,
   isHybridRelease,
 } from "../../torrents/rules/parsing-release";
+import { detectLanguages } from "../../torrents/rules/parsing-languages";
 import { classifyReleaseGroup } from "../../torrents/rules/release-groups";
 
 export const CAM_KEYWORDS = [
@@ -30,22 +33,32 @@ export const CAM_KEYWORDS = [
   "tvrip",
 ];
 
+const STREAMING_LANGUAGE_META = new Set(["multi", "dual", "multi-subs"]);
+
 /**
  * TRaSH-aligned confidence score (0–100).
  *
- * Components (max raw 160):
- *   Health (0–40)         — seeder count, dead-torrent guard
- *   Quality (0–30)        — UHD > FullHD > HD > SD
- *   Source (−40 to +15)   — Remux > BluRay > WEB-DL > … > Telesync > CAM
- *   Codec (0–12)          — context-aware: H.265 rewarded only for UHD,
- *                           H.264 preferred at 1080p/720p, AV1 rewarded
- *   HDR (0–12)            — DV > HDR10+ > HDR10 > HDR > HLG
- *   Audio (0–10)          — TrueHD Atmos > DTS-HD MA > TrueHD > DTS-HD > …
- *   Freshness (0–10)      — newer releases preferred
- *   Group tier (−20 to +12) — TRaSH-style HQ vs LQ release groups
- *   Repack/Proper (0–6)   — fix releases beat the broken original
- *   Hybrid (0–3)          — best-of-both BluRay+WEB
- *   Bonus flags (0–7)     — freeleech, double-upload
+ * Components (max raw 170):
+ *   Health (0–40)            — seeder count, dead-torrent guard
+ *   Quality (0–30)           — UHD > FullHD > HD > SD
+ *   Source (−40 to +15)      — Remux > BluRay > WEB-DL > … > Telesync > CAM
+ *   Codec (0–12)             — context-aware: H.265 rewarded only for UHD,
+ *                              H.264 preferred at 1080p/720p, AV1 rewarded
+ *   HDR (−10 to +13)         — DV-HDR10 > DV > HDR10+ > HDR10 > HDR > HLG.
+ *                              UHD without HDR is penalised (-10) since 4K
+ *                              SDR doesn't justify the bandwidth cost.
+ *   Audio codec (0–10)       — TrueHD Atmos > DTS-HD MA > TrueHD > … > AAC
+ *   Audio channels (0–3)     — 7.1 > 5.1 > 2.0
+ *   Multi-audio (0–2)        — MULTi/DUAL token or two+ language tracks
+ *   Streaming source (0–1)   — small static bonus for known streaming tags
+ *                              (NF/AMZN/ATVP/DSNP/HMAX/HULU/PCOK/STAN/PMTP/CR);
+ *                              Phase 2 promotes this to user-configurable
+ *   Freshness (0–10)         — newer releases preferred
+ *   Group tier (−20 to +12)  — TRaSH-style HQ vs LQ release groups
+ *   Repack/Proper (0–6)      — fix releases beat the broken original
+ *   Hybrid (0–3)             — best-of-both BluRay+WEB
+ *   Combo bonus (0–5)        — UHD Remux + DV/DV-HDR10 + Atmos jackpot
+ *   Bonus flags (0–7)        — freeleech, double-upload
  *
  * Penalties (additive on top, can drive score below 0):
  *   CAM keywords: −80 if a digital release should exist, else −15
@@ -127,15 +140,21 @@ export function calculateConfidence(
       break;
   }
 
-  // HDR (0–12) — DV is the most demanding format; HDR10+ adds dynamic metadata.
+  // HDR (0–13) — DV with HDR10 fallback ranks above pure DV because pure DV
+  // black-frames on non-DV displays.
   const hdr = detectHdrFormat(title);
-  if (hdr === "DV") score += 12;
+  if (hdr === "DV-HDR10") score += 13;
+  else if (hdr === "DV") score += 12;
   else if (hdr === "HDR10+") score += 10;
   else if (hdr === "HDR10") score += 8;
   else if (hdr === "HDR") score += 5;
   else if (hdr === "HLG") score += 3;
 
-  // Audio (0–10)
+  // UHD-without-HDR penalty — 4K SDR isn't worth the bandwidth, TRaSH ranks
+  // it below 1080p HDR.
+  if (quality === "uhd" && !hdr) score -= 10;
+
+  // Audio codec (0–10)
   const audio = detectAudioCodec(title);
   if (audio === "TrueHD Atmos") score += 10;
   else if (audio === "DTS-HD MA") score += 9;
@@ -146,6 +165,27 @@ export function calculateConfidence(
   else if (audio === "EAC3") score += 3;
   else if (audio === "AC3") score += 2;
   else if (audio === "AAC") score += 1;
+
+  // Audio channels (0–3)
+  const channels = detectAudioChannels(title);
+  if (channels === "7.1") score += 3;
+  else if (channels === "5.1") score += 2;
+
+  // Multi / dual audio (0–2). Either an explicit MULTi/DUAL token OR at
+  // least two non-meta language codes. Capped so we don't double-reward.
+  const languages = detectLanguages(title);
+  const hasMultiToken =
+    languages.includes("multi") || languages.includes("dual");
+  const distinctLangs = languages.filter(
+    (l) => !STREAMING_LANGUAGE_META.has(l),
+  ).length;
+  if (hasMultiToken) score += 2;
+  else if (distinctLangs >= 2) score += 1;
+
+  // Streaming service (0–1) — small static bonus for tagged WEB-DL/WEBRip
+  // releases. Phase 2 will turn this into a per-user configurable boost.
+  const streamingService = detectStreamingService(title);
+  if (streamingService) score += 1;
 
   // Freshness (0–10)
   if (age <= 1) score += 10;
@@ -166,6 +206,18 @@ export function calculateConfidence(
 
   // Hybrid releases (combo BluRay + WEB) — TRaSH rewards them.
   if (isHybridRelease(title)) score += 3;
+
+  // Combo jackpot (+5) — UHD Remux with Dolby Vision (fallback or pure)
+  // and TrueHD Atmos audio. Stacks on top of the individual bonuses so
+  // this release outranks any near-equivalent.
+  if (
+    quality === "uhd" &&
+    source === "remux" &&
+    (hdr === "DV-HDR10" || hdr === "DV") &&
+    audio === "TrueHD Atmos"
+  ) {
+    score += 5;
+  }
 
   // Indexer flag bonuses (0–7)
   const lowerFlags = flags.map((f) => f.toLowerCase());
@@ -190,8 +242,9 @@ export function calculateConfidence(
   if (lowerFlags.includes("nuked")) score -= 100;
 
   // Normalize to 0–100. MAX_RAW reflects the achievable positive ceiling
-  // when all bonuses align (UHD remux DV TrueHD-Atmos gold-group repack…).
-  const MAX_RAW = 160;
+  // when every bonus aligns (UHD Remux DV-HDR10 TrueHD-Atmos 7.1 streaming
+  // gold-group repack hybrid combo + freeleech + doubleupload).
+  const MAX_RAW = 170;
   const normalized = Math.round((score / MAX_RAW) * 100);
   return Math.max(0, Math.min(100, normalized));
 }
