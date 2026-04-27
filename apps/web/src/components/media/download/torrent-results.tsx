@@ -27,7 +27,7 @@ import {
   Globe,
   SlidersHorizontal,
   Satellite,
-  Award,
+  Target,
 } from "lucide-react";
 import {
   formatBytes,
@@ -440,9 +440,12 @@ export function TorrentResults({
                         )}
                       </span>
                       {t.aboveCutoff && (
-                        <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                          <Award size={9} />
-                          Above cutoff
+                        <span
+                          className="inline-flex items-center gap-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
+                          title="Hits your quality profile's target. Downloading this stops the search for further upgrades."
+                        >
+                          <Target size={9} />
+                          Meets target
                         </span>
                       )}
                     </span>
