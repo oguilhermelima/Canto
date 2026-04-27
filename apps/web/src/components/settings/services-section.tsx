@@ -963,21 +963,14 @@ function TvdbDefaultToggle(): React.JSX.Element {
 
 function RefreshMediaButton(): React.JSX.Element {
   const refresh = trpc.settings.refreshMedia.useMutation({
-    onSuccess: (res) => {
-      if (res.dispatched === 0) {
-        toast.success("Everything is up to date.");
-        return;
-      }
-      toast.success(
-        `Queued ${res.dispatched} media jobs (skipped ${res.skipped} already complete).`,
-      );
-    },
-    onError: () => toast.error("Failed to queue refresh."),
+    onSuccess: () =>
+      toast.success("Refresh started. Runs in the background."),
+    onError: () => toast.error("Failed to start refresh."),
   });
   const refreshAll = trpc.settings.refreshMedia.useMutation({
     onSuccess: () =>
       toast.success(
-        "Full refresh started. This re-fetches everything and may take a while.",
+        "Full refresh started. Re-fetches everything in the background.",
       ),
     onError: () => toast.error("Failed to start full refresh."),
   });
@@ -996,26 +989,17 @@ function RefreshMediaButton(): React.JSX.Element {
         <Button
           variant="outline"
           size="sm"
-          disabled={refresh.isPending}
           onClick={() => refresh.mutate({})}
         >
-          {refresh.isPending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="mr-2 h-4 w-4" />
-          )}
+          <RefreshCw className="mr-2 h-4 w-4" />
           Refresh missing
         </Button>
         <Button
           variant="ghost"
           size="sm"
-          disabled={refreshAll.isPending}
           onClick={() => refreshAll.mutate({ force: true })}
           title="Force refetch every media (slow)"
         >
-          {refreshAll.isPending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : null}
           Refresh all
         </Button>
       </div>

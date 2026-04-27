@@ -23,6 +23,8 @@ import { createTRPCRouter, adminProcedure } from "../../trpc";
 import { testService } from "@canto/core/platform/testing/service-tester";
 import { dispatchRebuildUserRecs } from "@canto/core/platform/queue/bullmq-dispatcher";
 import { ensureMediaMany } from "@canto/core/domain/media/use-cases/ensure-media-many";
+import { syncTmdbCertifications } from "@canto/core/domain/content-enrichment/use-cases/sync-tmdb-certifications";
+import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 
 export const settingsCoreRouter = createTRPCRouter({
   getAll: adminProcedure.query(() => getAllSettings()),
@@ -79,14 +81,52 @@ export const settingsCoreRouter = createTRPCRouter({
    */
   refreshMedia: adminProcedure
     .input(refreshMediaInput)
-    .mutation(({ ctx, input }) =>
-      ensureMediaMany(
-        ctx.db,
-        { mediaIds: input.mediaId ? [input.mediaId] : undefined },
-        { languages: input.languages, aspects: input.aspects, force: input.force },
-        { dryRun: input.dryRun },
-      ),
-    ),
+    .mutation(({ ctx, input }) => {
+      const filter = {
+        mediaIds: input.mediaId ? [input.mediaId] : undefined,
+      };
+      const spec = {
+        languages: input.languages,
+        aspects: input.aspects,
+        force: input.force,
+      };
+
+      // Bulk runs (no specific mediaId) iterate the entire media table and
+      // run gap detection per-row, which can take minutes on large libraries.
+      // Fire-and-forget so the HTTP response returns immediately. Errors are
+      // logged; per-media job failures are handled by the worker independently.
+      // Also refreshes the TMDB certification catalog once per sweep so the
+      // filter sidebar's region options stay in sync without a separate UI.
+      if (!input.mediaId && !input.dryRun) {
+        void (async () => {
+          try {
+            const tmdb = await getTmdbProvider();
+            await syncTmdbCertifications(ctx.db, tmdb);
+          } catch (err) {
+            console.error("[settings.refreshMedia] cert sync failed:", err);
+          }
+          await ensureMediaMany(ctx.db, filter, spec);
+        })().catch((err) => {
+          console.error("[settings.refreshMedia] bulk dispatch failed:", err);
+        });
+        return {
+          dispatched: 0,
+          skipped: 0,
+          byAspect: {
+            metadata: 0,
+            structure: 0,
+            translations: 0,
+            logos: 0,
+            extras: 0,
+            contentRatings: 0,
+          },
+          byLanguage: {},
+          started: true as const,
+        };
+      }
+
+      return ensureMediaMany(ctx.db, filter, spec, { dryRun: input.dryRun });
+    }),
 
   rebuildUserRecommendations: adminProcedure.mutation(async ({ ctx }) => {
     await dispatchRebuildUserRecs(ctx.session.user.id);
