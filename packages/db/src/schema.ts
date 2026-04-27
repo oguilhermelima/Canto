@@ -639,6 +639,10 @@ export const torrent = pgTable("torrent", {
   importAttempts: integer("import_attempts").notNull().default(0),
   importMethod: varchar("import_method", { length: 10 }),
   usenet: boolean("usenet").notNull().default(false),
+  /** Repack/proper count parsed from the title at download time. 0 = not
+   *  a repack. Higher counts (REPACK2, PROPER3) supersede lower; the
+   *  future auto-supersede job uses this to decide whether to replace. */
+  repackCount: integer("repack_count").notNull().default(0),
 
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

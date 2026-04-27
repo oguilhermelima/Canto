@@ -1,0 +1,1 @@
+ALTER TABLE "torrent" ADD COLUMN "repack_count" integer DEFAULT 0 NOT NULL;
