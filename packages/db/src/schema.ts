@@ -135,6 +135,12 @@ export const downloadFolder = pgTable("download_folder", {
   isDefault: boolean("is_default").notNull().default(false),
   /** Whether this folder accepts downloads */
   enabled: boolean("enabled").notNull().default(true),
+  /** Default quality profile applied to media that lands in this folder
+   *  via routing. Snapshotted onto media.qualityProfileId at add-time. */
+  qualityProfileId: uuid("quality_profile_id").references(
+    () => qualityProfile.id,
+    { onDelete: "set null" },
+  ),
 
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -757,13 +763,43 @@ export const watchProviderLink = pgTable("watch_provider_link", {
 
 // ─── Quality profiles ───
 
+/**
+ * One entry in {@link qualityProfile.allowedFormats}. Each entry expresses
+ * "this (quality, source) combo is acceptable, and this is its base
+ * weight in the score". Higher weight = more preferred. Entries are
+ * order-independent; weight is the source of truth.
+ */
+export type QualityProfileAllowedFormat = {
+  quality: string;
+  source: string;
+  weight: number;
+};
+
 export const qualityProfile = pgTable("quality_profile", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 100 }).notNull(),
-  qualities: jsonb("qualities").$type<string[]>().notNull(),
-  cutoff: varchar("cutoff", { length: 50 }).notNull(),
+  /** Which media flavor this profile may be assigned to. */
+  flavor: varchar("flavor", { length: 10 }).notNull(),
+  /** Acceptable (quality, source) combos with their base weights. Releases
+   *  whose (quality, source) is not in this list are rejected by the
+   *  scoring engine. */
+  allowedFormats: jsonb("allowed_formats")
+    .$type<QualityProfileAllowedFormat[]>()
+    .notNull(),
+  /** Cutoff combo. Releases at or above the cutoff don't trigger upgrade
+   *  searches. Both columns are null when the profile has no cutoff. */
+  cutoffQuality: varchar("cutoff_quality", { length: 20 }),
+  cutoffSource: varchar("cutoff_source", { length: 20 }),
+  /** Minimum total (profile + bonuses) score for a release to be kept.
+   *  Defaults to 0 = no filter beyond the allowedFormats whitelist. */
+  minTotalScore: integer("min_total_score").notNull().default(0),
+  /** One default per flavor. Used as the fallback when neither a media
+   *  nor its folder has an explicit profile. */
   isDefault: boolean("is_default").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
@@ -1458,9 +1494,13 @@ export const accountRelations = relations(account, ({ one }) => ({
   }),
 }));
 
-export const downloadFolderRelations = relations(downloadFolder, ({ many }) => ({
+export const downloadFolderRelations = relations(downloadFolder, ({ many, one }) => ({
   media: many(media),
   mediaPaths: many(folderMediaPath),
+  qualityProfile: one(qualityProfile, {
+    fields: [downloadFolder.qualityProfileId],
+    references: [qualityProfile.id],
+  }),
 }));
 
 export const folderMediaPathRelations = relations(folderMediaPath, ({ one }) => ({
@@ -1613,6 +1653,7 @@ export const mediaVersionEpisodeRelations = relations(mediaVersionEpisode, ({ on
 
 export const qualityProfileRelations = relations(qualityProfile, ({ many }) => ({
   media: many(media),
+  folders: many(downloadFolder),
 }));
 
 export const mediaRecommendationRelations = relations(

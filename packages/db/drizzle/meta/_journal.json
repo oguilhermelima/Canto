@@ -155,6 +155,13 @@
       "when": 1777279896145,
       "tag": "0021_outstanding_typhoid_mary",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1777298170326,
+      "tag": "0022_smooth_tag",
+      "breakpoints": true
     }
   ]
 }
