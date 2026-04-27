@@ -74,6 +74,11 @@ export interface EpisodeTranslation {
   overview?: string;
 }
 
+export interface ContentRating {
+  region: string; // iso_3166_1: "US", "BR", "JP", ...
+  rating: string; // "PG-13", "TV-MA", "L", "16", ...
+}
+
 export interface NormalizedMedia {
   externalId: number;
   provider: ProviderName;
@@ -89,6 +94,7 @@ export interface NormalizedMedia {
   genres: string[];
   genreIds?: number[];
   contentRating?: string;
+  contentRatings?: ContentRating[];
   originalLanguage?: string;
   spokenLanguages?: string[];
   originCountry?: string[];

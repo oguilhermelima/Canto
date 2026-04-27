@@ -7,6 +7,7 @@ export {
   resolveMedia,
 } from "./persist/core";
 export { persistTranslations } from "./persist/translations";
+export { persistContentRatings } from "./persist/content-ratings";
 export { persistExtras } from "./persist/extras";
 export {
   buildTmdbEpisodeMap,

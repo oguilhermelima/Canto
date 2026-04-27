@@ -110,7 +110,9 @@ export const mediaDiscoveryRouter = createTRPCRouter({
           firstAirDateTo: input.type === "show" ? (input.dateTo ?? today) : undefined,
           releaseDateTo: input.type === "movie" ? (input.dateTo ?? today) : undefined,
           certification: input.certification,
-          certification_country: input.certification ? "US" : undefined,
+          certification_country: input.certification
+            ? (input.watchRegion ?? "US")
+            : undefined,
           with_status: input.status,
           watchProviderIds: input.watchProviders,
           watchRegion: input.watchRegion,

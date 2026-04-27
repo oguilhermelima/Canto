@@ -20,11 +20,13 @@ import {
 import { detectGaps } from "../detect-gaps";
 import { fetchMediaMetadata, type MediaMetadata } from "../fetch-media-metadata";
 import { applyMediaTranslation, applySeasonsTranslation } from "../../../shared/services/translation-service";
-import { getActiveUserLanguages, getUserLanguage } from "../../../shared/services/user-service";
+import { applyMediaContentRating } from "../../../shared/services/content-rating-service";
+import { getActiveUserLanguages, getUserWatchPreferences } from "../../../shared/services/user-service";
 import { loadExtrasFromDB } from "../../services/extras-service";
 import { normalizedMediaToResponse } from "../../../shared/mappers/media-mapper";
 
 import { persistTranslations } from "./translations";
+import { persistContentRatings } from "./content-ratings";
 import { persistExtras } from "./extras";
 import { applyTvdbSeasons } from "./tvdb-overlay";
 
@@ -139,6 +141,7 @@ export async function persistMedia(
 
   await persistSeasons(db, inserted.id, normalized);
   await persistTranslations(db, inserted.id, normalized);
+  await persistContentRatings(db, inserted.id, normalized);
   return inserted;
 }
 
@@ -218,6 +221,7 @@ export async function updateMediaFromNormalized(
   }
 
   await persistTranslations(db, mediaId, normalized);
+  await persistContentRatings(db, mediaId, normalized);
 
   return updated;
 }
@@ -489,10 +493,11 @@ export async function resolveMedia(
   const existing = await findMediaByExternalId(db, input.externalId, input.provider, input.type);
 
   if (existing?.metadataUpdatedAt && existing.extrasUpdatedAt) {
-    const lang = await getUserLanguage(db, userId);
+    const { language: lang, watchRegion } = await getUserWatchPreferences(db, userId);
     const translated = await applyMediaTranslation(db, existing, lang);
-    if (translated.seasons) {
-      await applySeasonsTranslation(db, translated.seasons, lang);
+    const withRating = await applyMediaContentRating(db, translated, watchRegion);
+    if (withRating.seasons) {
+      await applySeasonsTranslation(db, withRating.seasons, lang);
     }
     const extras = await loadExtrasFromDB(db, existing.id, lang);
 
@@ -502,7 +507,7 @@ export async function resolveMedia(
 
     return {
       source: "db" as const,
-      media: translated,
+      media: withRating,
       extras,
       persisted: true,
       mediaId: existing.id,
@@ -514,16 +519,17 @@ export async function resolveMedia(
   const { mediaId, result } = await fetchPersistAndDispatch(db, input, providers, existing, "resolveMedia");
   const persisted = await findMediaByIdWithSeasons(db, mediaId);
   if (persisted) {
-    const lang = await getUserLanguage(db, userId);
+    const { language: lang, watchRegion } = await getUserWatchPreferences(db, userId);
     const translated = await applyMediaTranslation(db, persisted, lang);
-    if (translated.seasons) {
-      await applySeasonsTranslation(db, translated.seasons, lang);
+    const withRating = await applyMediaContentRating(db, translated, watchRegion);
+    if (withRating.seasons) {
+      await applySeasonsTranslation(db, withRating.seasons, lang);
     }
     const extras = await loadExtrasFromDB(db, persisted.id, lang);
 
     return {
       source: "db" as const,
-      media: translated,
+      media: withRating,
       extras,
       persisted: true,
       mediaId,
@@ -533,7 +539,7 @@ export async function resolveMedia(
   }
 
   // Fallback: return live data if re-read somehow fails
-  const lang = await getUserLanguage(db, userId);
+  const { language: lang, watchRegion } = await getUserWatchPreferences(db, userId);
   const response = normalizedMediaToResponse(result.media, result.tvdbSeasons);
   if (lang && !lang.startsWith("en") && result.media.translations) {
     const trans = result.media.translations.find((t) => t.language === lang);
@@ -544,6 +550,10 @@ export async function resolveMedia(
       if (trans.posterPath) response.posterPath = trans.posterPath;
       if (trans.logoPath) response.logoPath = trans.logoPath;
     }
+  }
+  if (watchRegion && watchRegion !== "US" && result.media.contentRatings) {
+    const rating = result.media.contentRatings.find((c) => c.region === watchRegion);
+    if (rating) response.contentRating = rating.rating;
   }
 
   return {

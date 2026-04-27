@@ -228,23 +228,22 @@ function normalizeMovie(data: Record<string, unknown>): NormalizedMedia {
   const genres = rawGenres.map((g) => g.name);
   const genreIds = rawGenres.map((g) => g.id);
 
-  // Extract content rating from release_dates (US certification)
-  let contentRating: string | undefined;
+  // Extract content ratings per region from release_dates. For each region we
+  // pick the first non-empty certification across the release-date entries
+  // (TMDB sometimes emits multiple per region for different release types).
+  const contentRatings: Array<{ region: string; rating: string }> = [];
   const releaseDates = data.release_dates as
     | { results?: TmdbReleaseDate[] }
     | undefined;
   if (releaseDates?.results) {
-    const usRelease = releaseDates.results.find(
-      (rd) => rd.iso_3166_1 === "US",
-    );
-    if (usRelease) {
-      // Prefer theatrical (type 3) or regular (type 3,4,5) certification
-      const cert = usRelease.release_dates.find(
+    for (const r of releaseDates.results) {
+      const cert = r.release_dates.find(
         (rd) => rd.certification && rd.certification.length > 0,
       );
-      if (cert) contentRating = cert.certification;
+      if (cert) contentRatings.push({ region: r.iso_3166_1, rating: cert.certification });
     }
   }
+  const contentRating = contentRatings.find((c) => c.region === "US")?.rating;
 
   // Extract logo from images
   let logoPath: string | undefined;
@@ -318,6 +317,7 @@ function normalizeMovie(data: Record<string, unknown>): NormalizedMedia {
     genres,
     genreIds,
     contentRating,
+    contentRatings: contentRatings.length > 0 ? contentRatings : undefined,
     originalLanguage: (data.original_language as string) ?? undefined,
     spokenLanguages,
     originCountry,
@@ -343,17 +343,17 @@ function normalizeShow(data: Record<string, unknown>): NormalizedMedia {
   const genres = rawGenres.map((g) => g.name);
   const genreIds = rawGenres.map((g) => g.id);
 
-  // Extract content rating (TV)
-  let contentRating: string | undefined;
-  const contentRatings = data.content_ratings as
+  // Extract content ratings per region (TV).
+  const contentRatings: Array<{ region: string; rating: string }> = [];
+  const contentRatingsRaw = data.content_ratings as
     | { results?: TmdbContentRating[] }
     | undefined;
-  if (contentRatings?.results) {
-    const usRating = contentRatings.results.find(
-      (cr) => cr.iso_3166_1 === "US",
-    );
-    if (usRating) contentRating = usRating.rating;
+  if (contentRatingsRaw?.results) {
+    for (const r of contentRatingsRaw.results) {
+      if (r.rating) contentRatings.push({ region: r.iso_3166_1, rating: r.rating });
+    }
   }
+  const contentRating = contentRatings.find((c) => c.region === "US")?.rating;
 
   // Extract logo from images
   let logoPath: string | undefined;
@@ -440,6 +440,7 @@ function normalizeShow(data: Record<string, unknown>): NormalizedMedia {
     genres,
     genreIds,
     contentRating,
+    contentRatings: contentRatings.length > 0 ? contentRatings : undefined,
     originalLanguage: (data.original_language as string) ?? undefined,
     spokenLanguages,
     originCountry,

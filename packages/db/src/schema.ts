@@ -571,6 +571,22 @@ export const episodeTranslation = pgTable(
   ],
 );
 
+export const mediaContentRating = pgTable(
+  "media_content_rating",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    region: varchar("region", { length: 10 }).notNull(),
+    rating: varchar("rating", { length: 50 }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_media_content_rating_unique").on(table.mediaId, table.region),
+    index("idx_media_content_rating_media").on(table.mediaId),
+  ],
+);
+
 export const torrent = pgTable("torrent", {
   id: uuid("id").primaryKey().defaultRandom(),
   mediaId: uuid("media_id").references(() => media.id, { onDelete: "set null" }),
@@ -1457,6 +1473,7 @@ export const mediaRelations = relations(media, ({ many, one }) => ({
   recommendationsFor: many(mediaRecommendation, { relationName: "sourceMedia" }),
   listItems: many(listItem),
   translations: many(mediaTranslation),
+  contentRatings: many(mediaContentRating),
   userStates: many(userMediaState),
   playbackProgress: many(userPlaybackProgress),
   watchHistory: many(userWatchHistory),
@@ -1507,6 +1524,13 @@ export const userRatingRelations = relations(userRating, ({ one }) => ({
 export const mediaTranslationRelations = relations(mediaTranslation, ({ one }) => ({
   media: one(media, {
     fields: [mediaTranslation.mediaId],
+    references: [media.id],
+  }),
+}));
+
+export const mediaContentRatingRelations = relations(mediaContentRating, ({ one }) => ({
+  media: one(media, {
+    fields: [mediaContentRating.mediaId],
     references: [media.id],
   }),
 }));
