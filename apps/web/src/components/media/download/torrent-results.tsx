@@ -83,9 +83,18 @@ interface TorrentResultsProps {
   setMobileFiltersOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
   torrentSearch: {
     isLoading: boolean;
+    isAnyPending: boolean;
     isError: boolean;
-    error?: { message: string } | null;
+    errorMessage?: string;
     refetch: () => void;
+    indexers: Array<{
+      id: string;
+      name: string;
+      status: "pending" | "success" | "error";
+      count: number;
+      tookMs: number | null;
+      errorMessage: string | null;
+    }>;
   };
   paginatedTorrents: TorrentResult[];
   allFilteredTorrents: TorrentResult[];
@@ -386,6 +395,7 @@ export function TorrentResults({
             torrentSearchContext={torrentSearchContext}
             advancedSearch={advancedSearch}
             committedQuery={committedQuery}
+            indexers={torrentSearch.indexers}
           />
         ) : torrentSearch.isError ? (
           <div className="px-5 py-12 text-center">
@@ -393,7 +403,7 @@ export function TorrentResults({
               Search failed
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {torrentSearch.error?.message ?? "Could not reach indexer."}
+              {torrentSearch.errorMessage ?? "Could not reach indexer."}
             </p>
             <Button
               variant="outline"
@@ -625,16 +635,27 @@ function buildSearchSummary(
   return `${mediaTitle} · S${ss}E${first}–E${last}`;
 }
 
+interface IndexerChipData {
+  id: string;
+  name: string;
+  status: "pending" | "success" | "error";
+  count: number;
+  tookMs: number | null;
+  errorMessage: string | null;
+}
+
 function ScanningState({
   mediaTitle,
   torrentSearchContext,
   advancedSearch,
   committedQuery,
+  indexers,
 }: {
   mediaTitle: string;
   torrentSearchContext: { seasonNumber?: number; episodeNumbers?: number[] } | null;
   advancedSearch: boolean;
   committedQuery: string;
+  indexers: IndexerChipData[];
 }): React.JSX.Element {
   const summary = buildSearchSummary(
     mediaTitle,
@@ -681,9 +702,67 @@ function ScanningState({
         </p>
       </div>
 
+      {/* Per-indexer chips */}
+      {indexers.length > 0 && (
+        <div className="flex max-w-md flex-wrap items-center justify-center gap-2">
+          {indexers.map((idx) => (
+            <IndexerChip key={idx.id} indexer={idx} />
+          ))}
+        </div>
+      )}
+
       <p className="text-[11px] text-muted-foreground/70">
         First contact may take a few seconds.
       </p>
     </div>
+  );
+}
+
+function IndexerChip({
+  indexer,
+}: {
+  indexer: IndexerChipData;
+}): React.JSX.Element {
+  const seconds =
+    indexer.tookMs !== null ? (indexer.tookMs / 1000).toFixed(1) : null;
+
+  if (indexer.status === "success") {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary"
+        title={
+          indexer.count === 0
+            ? `${indexer.name} returned no results`
+            : `${indexer.name} returned ${indexer.count} result${indexer.count === 1 ? "" : "s"} in ${seconds}s`
+        }
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+        {indexer.name}
+        <span className="text-primary/70">
+          {indexer.count} · {seconds}s
+        </span>
+      </span>
+    );
+  }
+
+  if (indexer.status === "error") {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-2.5 py-1 text-[11px] font-medium text-destructive"
+        title={indexer.errorMessage ?? `${indexer.name} failed`}
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
+        {indexer.name}
+        <span className="text-destructive/70">failed</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/40 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-muted-foreground/50" />
+      {indexer.name}
+      <span className="text-muted-foreground/70">scanning…</span>
+    </span>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
+import { useTorrentSearchStream } from "./use-torrent-search-stream";
 
 const TORRENTS_PER_PAGE = 30;
 
@@ -77,7 +78,9 @@ export function useDownloadModal(
   } | null>(null);
 
   // ── tRPC Queries ──
-  const torrentSearch = trpc.torrent.search.useQuery(
+  // Per-indexer streaming search. Each enabled indexer becomes its own
+  // query so a slow indexer doesn't block results from the fast ones.
+  const torrentSearch = useTorrentSearchStream(
     {
       mediaId: mediaId ?? "",
       query: advancedSearch && committedQuery ? committedQuery : undefined,
@@ -87,7 +90,6 @@ export function useDownloadModal(
       episodeNumbers: advancedSearch
         ? undefined
         : torrentSearchContext?.episodeNumbers,
-      page: torrentPage,
       pageSize: TORRENTS_PER_PAGE,
     },
     {
@@ -96,8 +98,6 @@ export function useDownloadModal(
         step === 2 &&
         !!mediaId &&
         (!advancedSearch || committedQuery.length > 0),
-      retry: 1,
-      staleTime: 0,
     },
   );
 
