@@ -7,6 +7,7 @@ import {
   DEFAULT_SCORING_RULES,
   type ScoringRules,
 } from "../../shared/rules/scoring-rules";
+import { resolveMediaFlavor } from "../../shared/rules/media-flavor";
 import {
   parseReleaseAttributes,
   type ReleaseAttributes,
@@ -153,6 +154,13 @@ export async function searchTorrents(
   const hasDigitalRelease = isShow || monthsSinceRelease > 3;
 
   const confidenceCtx: ConfidenceContext = { hasDigitalRelease };
+  const flavor = resolveMediaFlavor({
+    type: row.type as "movie" | "show",
+    originCountry: row.originCountry,
+    originalLanguage: row.originalLanguage,
+    genres: row.genres,
+    genreIds: row.genreIds,
+  });
 
   const scored: SearchResult[] = results
     .map((r) => {
@@ -161,6 +169,7 @@ export async function searchTorrents(
         seeders: r.seeders,
         age: r.age ?? 0,
         flags: r.indexerFlags ?? [],
+        flavor,
       });
       return {
         ...attrs,

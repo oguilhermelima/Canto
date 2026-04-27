@@ -414,7 +414,9 @@ export async function listLibraryMedia(
 
 /**
  * Shows marked for continuous-download RSS monitoring. Returned shape matches
- * what the RSS matcher needs (id/title/externalId/provider/type).
+ * what the RSS matcher needs (id/title/externalId/provider/type) and what
+ * the scoring layer needs to derive media flavor (origin country, original
+ * language, genres) for tier-aware release-group classification.
  */
 export async function findMonitoredShowsForRss(db: Database) {
   return db
@@ -424,6 +426,10 @@ export async function findMonitoredShowsForRss(db: Database) {
       externalId: media.externalId,
       provider: media.provider,
       type: media.type,
+      originCountry: media.originCountry,
+      originalLanguage: media.originalLanguage,
+      genres: media.genres,
+      genreIds: media.genreIds,
     })
     .from(media)
     .where(and(eq(media.type, "show"), eq(media.continuousDownload, true)));

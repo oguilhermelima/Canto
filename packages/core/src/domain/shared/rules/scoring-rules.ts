@@ -134,7 +134,9 @@ export const DEFAULT_SCORING_RULES: ScoringRules = {
     "1.0": 0,
   },
   groupTier: {
-    gold: 12,
+    tier1: 12,
+    tier2: 8,
+    tier3: 5,
     neutral: 0,
     avoid: -40,
   },

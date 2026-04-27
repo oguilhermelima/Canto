@@ -2,6 +2,7 @@ import { db } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
 import { downloadTorrent } from "@canto/core/domain/torrents/use-cases/download-torrent";
 import { calculateConfidence } from "@canto/core/domain/shared/rules/scoring";
+import { resolveMediaFlavor } from "@canto/core/domain/shared/rules/media-flavor";
 import { parseReleaseAttributes } from "@canto/core/domain/torrents/rules/release-attributes";
 import { parseSeasons, parseEpisodes } from "@canto/core/domain/torrents/rules/parsing";
 import { matchRssTitle } from "@canto/core/domain/torrents/rules/rss-matching";
@@ -69,11 +70,19 @@ export async function handleRssSync(): Promise<void> {
       if (!matchedShow) continue;
 
       // Check scoring
+      const flavor = resolveMediaFlavor({
+        type: matchedShow.type as "movie" | "show",
+        originCountry: matchedShow.originCountry,
+        originalLanguage: matchedShow.originalLanguage,
+        genres: matchedShow.genres,
+        genreIds: matchedShow.genreIds,
+      });
       const attrs = parseReleaseAttributes({
         title: item.title,
         seeders: item.seeders,
         age: item.age ?? 0,
         flags: item.indexerFlags ?? [],
+        flavor,
       });
       const confidence = calculateConfidence(attrs, {
         hasDigitalRelease: true,
