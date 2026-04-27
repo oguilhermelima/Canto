@@ -4,7 +4,7 @@ import { media } from "@canto/db/schema";
 import { detectGaps } from "./detect-gaps";
 import { getActiveUserLanguages } from "../../shared/services/user-service";
 import { dispatchEnsureMedia } from "../../../platform/queue/bullmq-dispatcher";
-import type { Aspect, EnsureMediaSpec } from "./ensure-media.types";
+import { ALL_ASPECTS, type Aspect, type EnsureMediaSpec } from "./ensure-media.types";
 
 export interface EnsureMediaManyFilter {
   mediaIds?: string[];
@@ -66,10 +66,14 @@ export async function ensureMediaMany(
   let skipped = 0;
 
   for (const row of rows) {
-    // If caller gave explicit aspects and force, skip gap detection.
+    // Skip gap detection when caller forces a refresh: explicit aspects when
+    // provided, otherwise refetch every aspect. Gap detection is read-only and
+    // wouldn't catch already-populated-but-stale data (e.g. wrong-language
+    // posters that we want to overwrite).
     let aspectsToDispatch: Aspect[];
-    if (spec.force && spec.aspects && spec.aspects.length > 0) {
-      aspectsToDispatch = spec.aspects;
+    if (spec.force) {
+      aspectsToDispatch =
+        spec.aspects && spec.aspects.length > 0 ? spec.aspects : ALL_ASPECTS;
     } else {
       const gaps = await detectGaps(db, row.id, languages);
       aspectsToDispatch = spec.aspects
