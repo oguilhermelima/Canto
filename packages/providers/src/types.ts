@@ -114,6 +114,8 @@ export interface NormalizedMedia {
   numberOfEpisodes?: number;
   inProduction?: boolean;
   nextAirDate?: string;
+  /** Daily airing slot in network-local time, e.g. "21:00". TVDB-only. */
+  airsTime?: string;
   // Movie
   budget?: number;
   revenue?: number;

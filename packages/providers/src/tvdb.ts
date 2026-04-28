@@ -58,6 +58,7 @@ interface TvdbSeriesExtended {
   lastAired: string | null;
   status: { name: string } | null;
   originalLanguage: string | null;
+  originalCountry: string | null;
   genres: Array<{ id: number; name: string }> | null;
   artworks: TvdbArtwork[] | null;
   remoteIds: TvdbRemoteId[] | null;
@@ -65,6 +66,7 @@ interface TvdbSeriesExtended {
   originalNetwork: { name: string } | null;
   latestNetwork: { name: string } | null;
   averageRuntime: number | null;
+  airsTime: string | null;
   episodes: TvdbEpisode[] | null;
   year: string | null;
   nextAired: string | null;
@@ -129,6 +131,27 @@ function findArtwork(
     if (langMatch) return langMatch.image;
   }
   return ofType[0]!.image;
+}
+
+/**
+ * TVDB returns ISO 3166-1 alpha-3 country codes (e.g. "usa", "jpn") while
+ * the rest of the codebase keys off TMDB's alpha-2 ("US", "JP"). Map the
+ * common TV-producing countries; unknowns fall through uppercased so we
+ * still persist *something* for downstream consumers.
+ */
+const ISO_COUNTRY_3_TO_2: Record<string, string> = {
+  usa: "US", gbr: "GB", jpn: "JP", kor: "KR", chn: "CN", twn: "TW",
+  can: "CA", aus: "AU", nzl: "NZ", bra: "BR", mex: "MX", arg: "AR",
+  chl: "CL", col: "CO", deu: "DE", fra: "FR", esp: "ES", ita: "IT",
+  nld: "NL", swe: "SE", nor: "NO", dnk: "DK", fin: "FI", pol: "PL",
+  tur: "TR", rus: "RU", ind: "IN", irl: "IE", isl: "IS", bel: "BE",
+  prt: "PT", grc: "GR", aut: "AT", che: "CH", isr: "IL", tha: "TH",
+  vnm: "VN", idn: "ID", mys: "MY", phl: "PH",
+};
+
+function normalizeCountryCode(code: string): string {
+  const lower = code.toLowerCase();
+  return ISO_COUNTRY_3_TO_2[lower] ?? code.toUpperCase();
 }
 
 /* -------------------------------------------------------------------------- */
@@ -444,6 +467,10 @@ export class TvdbProvider implements MetadataProvider {
 
     // Episode translations are handled separately via translate-episodes queue (async, per-language)
 
+    const originCountry = series.originalCountry
+      ? [normalizeCountryCode(series.originalCountry)]
+      : undefined;
+
     return {
       externalId: series.id,
       provider: "tvdb",
@@ -457,12 +484,14 @@ export class TvdbProvider implements MetadataProvider {
       status: mapStatus(statusName),
       genres: (series.genres ?? []).map((g) => g.name),
       originalLanguage: series.originalLanguage ?? undefined,
+      originCountry,
       runtime: series.averageRuntime ?? undefined,
       posterPath,
       backdropPath,
       imdbId: extractImdbId(series.remoteIds),
       tvdbId: series.id,
       nextAirDate: series.nextAired || undefined,
+      airsTime: series.airsTime ?? undefined,
       seasons,
       networks: networks.length > 0 ? networks : undefined,
       numberOfSeasons: regularSeasons.length > 0 ? regularSeasons.length : undefined,
