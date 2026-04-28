@@ -27,6 +27,22 @@ import {
 } from "../../../infra/repositories";
 import { findActiveDownloadProfile } from "../../../infra/torrents/download-profile-repository";
 import { findReleaseGroupLookups } from "../../../infra/torrents/download-config-repository";
+import { extractHashFromMagnet } from "../rules/torrent-rules";
+
+/**
+ * Stable dedupe key. Prefers the magnet info-hash so the same release
+ * picked up by two indexers collapses regardless of title casing /
+ * trailing tag differences. Falls back to lowercased title when the
+ * indexer didn't expose a magnet (rare; usually means a .torrent file
+ * whose hash isn't surfaced until we add it to the client).
+ */
+function dedupeKey(r: { magnetUrl: string | null; title: string }): string {
+  if (r.magnetUrl) {
+    const hash = extractHashFromMagnet(r.magnetUrl);
+    if (hash) return `hash:${hash}`;
+  }
+  return `title:${r.title.toLowerCase()}`;
+}
 
 export interface SearchResult extends ReleaseAttributes {
   guid: string;
@@ -289,10 +305,11 @@ export async function searchTorrents(
     for (const r of indexerResults) {
       if (r.status === "fulfilled") raw.push(...r.value);
     }
-    // Dedupe by title across indexers
+    // Dedupe across indexers — same release on two trackers shares the
+    // info-hash even if titles differ slightly.
     const seen = new Set<string>();
     raw = raw.filter((r) => {
-      const key = r.title.toLowerCase();
+      const key = dedupeKey(r);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -352,10 +369,12 @@ export async function searchOnIndexer(
   const start = Date.now();
   const raw = await runOneIndexer(idx, prep);
   // Dedupe within this indexer (same release returned twice across
-  // query variants — e.g. bare title + " Complete")
+  // query variants — e.g. bare title + " Complete"). Hash-based so the
+  // collision check is stable when an indexer normalises the title
+  // differently between query variants.
   const seen = new Set<string>();
   const deduped = raw.filter((r) => {
-    const key = r.title.toLowerCase();
+    const key = dedupeKey(r);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

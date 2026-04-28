@@ -8,6 +8,21 @@ import { trpc } from "@/lib/trpc/client";
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 type SearchResult = RouterOutputs["torrent"]["search"]["results"][number];
 
+/**
+ * Stable dedupe key for cross-indexer merging. Prefers the magnet
+ * info-hash since the same release uploaded to two indexers will share
+ * the hash even if the titles differ in casing or trailing tags.
+ * Falls back to lowercased title for results without a magnet URL
+ * (rare — usually .torrent files where the hash isn't surfaced yet).
+ */
+function dedupeKey(r: SearchResult): string {
+  if (r.magnetUrl) {
+    const match = /xt=urn:btih:([a-zA-Z0-9]+)/i.exec(r.magnetUrl);
+    if (match?.[1]) return `hash:${match[1].toLowerCase()}`;
+  }
+  return `title:${r.title.toLowerCase()}`;
+}
+
 export type IndexerStatus = {
   id: string;
   name: string;
@@ -157,7 +172,7 @@ export function useTorrentSearchStream(
     const seen = new Set<string>();
     const deduped: SearchResult[] = [];
     for (const r of all) {
-      const key = r.title.toLowerCase();
+      const key = dedupeKey(r);
       if (seen.has(key)) continue;
       seen.add(key);
       deduped.push(r);
