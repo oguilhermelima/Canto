@@ -24,7 +24,6 @@ interface FilterToolbarProps {
   };
   mobileOpen: boolean;
   onToggleMobile: () => void;
-  onResetPage: () => void;
 }
 
 export function FilterToolbar({
@@ -33,23 +32,18 @@ export function FilterToolbar({
   sort,
   mobileOpen,
   onToggleMobile,
-  onResetPage,
 }: FilterToolbarProps): React.JSX.Element {
   const handleSearch = (value: string): void => {
     search.onChange(value);
-    onResetPage();
   };
   const handleQuality = (value: string): void => {
     filters.setQuality(value);
-    onResetPage();
   };
   const handleSource = (value: string): void => {
     filters.setSource(value);
-    onResetPage();
   };
   const handleSize = (value: string): void => {
     filters.setSize(value);
-    onResetPage();
   };
 
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@canto/api";
 import { trpc } from "@/lib/trpc/client";
@@ -9,11 +9,11 @@ type RouterOutputs = inferRouterOutputs<AppRouter>;
 type SearchResult = RouterOutputs["torrent"]["search"]["results"][number];
 
 /**
- * Stable dedupe key for cross-indexer merging. Prefers the magnet
- * info-hash since the same release uploaded to two indexers will share
- * the hash even if the titles differ in casing or trailing tags.
- * Falls back to lowercased title for results without a magnet URL
- * (rare — usually .torrent files where the hash isn't surfaced yet).
+ * Stable dedupe key for cross-indexer + cross-page merging. Prefers the
+ * magnet info-hash since the same release uploaded to two indexers (or
+ * fetched on overlapping pages from the same indexer) shares the hash
+ * even if the titles differ in casing or trailing tags. Falls back to
+ * lowercased title for results without a magnet URL.
  */
 function dedupeKey(r: SearchResult): string {
   if (r.magnetUrl) {
@@ -27,16 +27,18 @@ export type IndexerStatus = {
   id: string;
   name: string;
   status: "pending" | "success" | "error";
-  /** Result count from this indexer alone, after scoring + filter. */
+  /** Result count from this indexer across every fetched page, after
+   *  scoring + filter. */
   count: number;
-  /** Indexer roundtrip time in ms (null until the response arrives). */
+  /** Page-0 indexer roundtrip time in ms (null until response arrives).
+   *  Drives the chip latency display — later pages aren't shown to
+   *  avoid replacing a "0.4s" with "1.2s" when the user scrolls. */
   tookMs: number | null;
   errorMessage: string | null;
 };
 
 export interface TorrentSearchStreamData {
   results: SearchResult[];
-  hasMore: boolean;
 }
 
 interface UseTorrentSearchStreamArgs {
@@ -53,33 +55,39 @@ interface UseTorrentSearchStreamOptions {
 
 export interface UseTorrentSearchStreamReturn {
   indexers: IndexerStatus[];
-  /** Merged + deduped + sorted results from every indexer that has
-   *  responded so far. Undefined while the very first response is in
-   *  flight; defined (possibly empty) once at least one indexer has
+  /** Merged + deduped + sorted results from every indexer × page that
+   *  has responded so far. Undefined while the very first response is
+   *  in flight; defined (possibly empty) once at least one indexer has
    *  returned, regardless of whether the rest are still loading. */
   data: TorrentSearchStreamData | undefined;
-  /** True until the first successful indexer response. After that we
-   *  always have *some* data, even if the slow indexers haven't
-   *  resolved — the UI renders the partial set and shows pending chips
-   *  for the rest. */
+  /** True until the first successful page-0 response. */
   isLoading: boolean;
-  /** True while at least one indexer query is still in flight. Drives
+  /** True while at least one page-0 query is still in flight. Drives
    *  the per-indexer chip statuses on the scanning state. */
   isAnyPending: boolean;
-  /** True only when *every* indexer errored — partial-failure cases
-   *  are reflected through `indexers[].status` instead. */
+  /** True only when *every* page-0 query errored. */
   isError: boolean;
   errorMessage?: string;
+  /** True when at least one indexer's most-recently-fetched page came
+   *  back full (`results.length >= pageSize`) — there's likely more to
+   *  fetch. Drives the infinite-scroll sentinel. */
+  hasMore: boolean;
+  /** True while the queries for the most recently requested page are
+   *  still in flight. Distinct from {@link isLoading} which only covers
+   *  the very first scan. */
+  isLoadingMore: boolean;
+  loadMore: () => void;
   refetch: () => void;
 }
 
 /**
- * Drives the per-indexer streaming search UI. Hits
+ * Drives the per-indexer streaming + infinite-scroll search UI. Hits
  * `torrent.listIndexers` to learn which sources are enabled, then fans
- * out one parallel `torrent.searchOnIndexer` query per indexer via
- * tRPC's `useQueries`. The merged + deduped + sorted result set updates
- * progressively as each indexer responds, so a slow indexer can no
- * longer block the fast ones.
+ * out one parallel `torrent.searchOnIndexer` query per (indexer × page)
+ * via tRPC's `useQueries`. The merged + deduped + sorted result set
+ * updates progressively as each indexer responds, and {@link loadMore}
+ * bumps every indexer one page forward in a single batch — slow
+ * indexers can no longer block fast ones.
  */
 export function useTorrentSearchStream(
   args: UseTorrentSearchStreamArgs,
@@ -94,60 +102,71 @@ export function useTorrentSearchStream(
     [indexerListQuery.data],
   );
 
+  const [pageCount, setPageCount] = useState(1);
+
+  // Reset to page-0-only whenever the search args change. The fingerprint
+  // covers every input that changes the result set so the user can't
+  // accidentally carry a deep page index across a query change.
+  const argsKey = `${args.mediaId}|${args.query ?? ""}|${args.seasonNumber ?? ""}|${(args.episodeNumbers ?? []).join(",")}`;
+  useEffect(() => {
+    setPageCount(1);
+  }, [argsKey]);
+
+  const N = indexerList.length;
+
+  // Layout: [p0i0, p0i1, ..., p0i(N-1), p1i0, p1i1, ..., p(K-1)i(N-1)]
+  // Page-outer keeps slicing to "latest page" trivial.
   const queries = trpc.useQueries((t) =>
-    indexerList.map((idx) =>
-      t.torrent.searchOnIndexer(
-        {
-          mediaId: args.mediaId,
-          indexerId: idx.id,
-          query: args.query,
-          seasonNumber: args.seasonNumber,
-          episodeNumbers: args.episodeNumbers,
-          page: 0,
-          pageSize: args.pageSize,
-        },
-        {
-          enabled: options.enabled && indexerList.length > 0,
-          retry: 1,
-          staleTime: 0,
-        },
+    Array.from({ length: pageCount }, (_, page) =>
+      indexerList.map((idx) =>
+        t.torrent.searchOnIndexer(
+          {
+            mediaId: args.mediaId,
+            indexerId: idx.id,
+            query: args.query,
+            seasonNumber: args.seasonNumber,
+            episodeNumbers: args.episodeNumbers,
+            page,
+            pageSize: args.pageSize,
+          },
+          {
+            enabled: options.enabled && N > 0,
+            retry: 1,
+            staleTime: 0,
+          },
+        ),
       ),
-    ),
+    ).flat(),
   );
 
   const indexers: IndexerStatus[] = useMemo(
     () =>
       indexerList.map((idx, i) => {
-        const q = queries[i];
-        if (!q) {
-          return {
-            id: idx.id,
-            name: idx.name,
-            status: "pending",
-            count: 0,
-            tookMs: null,
-            errorMessage: null,
-          };
+        const page0 = queries[i];
+        let count = 0;
+        for (let p = 0; p < pageCount; p++) {
+          const q = queries[p * N + i];
+          if (q?.data) count += q.data.results.length;
         }
-        const status: IndexerStatus["status"] = q.isError
+        const status: IndexerStatus["status"] = page0?.isError
           ? "error"
-          : q.isSuccess
+          : page0?.isSuccess
             ? "success"
             : "pending";
         return {
           id: idx.id,
           name: idx.name,
           status,
-          count: q.data?.results.length ?? 0,
-          tookMs: q.data?.tookMs ?? null,
-          errorMessage: q.error?.message ?? null,
+          count,
+          tookMs: page0?.data?.tookMs ?? null,
+          errorMessage: page0?.error?.message ?? null,
         };
       }),
-    [indexerList, queries],
+    [indexerList, queries, pageCount, N],
   );
 
-  // Merge fingerprint: changes whenever any per-indexer query's data or
-  // status changes. Using dataUpdatedAt + status keeps the memo cheap.
+  // Merge fingerprint changes whenever any query's data or status changes.
+  // dataUpdatedAt + status keeps the memo cheap.
   const queryFingerprint = queries
     .map((q) => `${q.status}:${q.dataUpdatedAt}`)
     .join("|");
@@ -155,18 +174,17 @@ export function useTorrentSearchStream(
   const merged = useMemo<TorrentSearchStreamData | undefined>(() => {
     if (queries.length === 0) return undefined;
 
-    const anySuccess = queries.some((q) => q.isSuccess);
-    const everyDone = queries.every((q) => !q.isLoading);
-    // Wait for the first response before returning data — otherwise the
-    // UI would flicker from "scanning" to "no results" to "results".
+    // Wait for the first page-0 response before returning data —
+    // otherwise the UI flickers from "scanning" to "no results" to
+    // "results".
+    const page0 = queries.slice(0, N);
+    const anySuccess = page0.some((q) => q.isSuccess);
+    const everyDone = page0.every((q) => !q.isLoading);
     if (!anySuccess && !everyDone) return undefined;
 
     const all: SearchResult[] = [];
-    let hasMore = false;
     for (const q of queries) {
-      if (!q.data) continue;
-      all.push(...q.data.results);
-      if (q.data.results.length >= args.pageSize) hasMore = true;
+      if (q.data) all.push(...q.data.results);
     }
 
     const seen = new Set<string>();
@@ -178,19 +196,46 @@ export function useTorrentSearchStream(
       deduped.push(r);
     }
     deduped.sort((a, b) => b.confidence - a.confidence);
-    return { results: deduped, hasMore };
+    return { results: deduped };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryFingerprint, args.pageSize]);
+  }, [queryFingerprint, N]);
+
+  // hasMore: any indexer's most-recent page came back full.
+  const hasMore = useMemo(() => {
+    if (pageCount === 0 || N === 0) return false;
+    const start = (pageCount - 1) * N;
+    for (let i = 0; i < N; i++) {
+      const q = queries[start + i];
+      if (q?.data && q.data.results.length >= args.pageSize) return true;
+    }
+    return false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryFingerprint, pageCount, N, args.pageSize]);
+
+  const isLoadingMore = useMemo(() => {
+    if (pageCount <= 1) return false;
+    const start = (pageCount - 1) * N;
+    for (let i = 0; i < N; i++) {
+      const q = queries[start + i];
+      if (q?.isLoading) return true;
+    }
+    return false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryFingerprint, pageCount, N]);
+
+  const loadMore = useCallback(() => {
+    setPageCount((c) => c + 1);
+  }, []);
 
   const isLoading =
-    indexerListQuery.isLoading ||
-    (indexerList.length > 0 && merged === undefined);
-  const isAnyPending = queries.some((q) => q.isLoading);
+    indexerListQuery.isLoading || (N > 0 && merged === undefined);
+  const isAnyPending = queries.slice(0, N).some((q) => q.isLoading);
   const isError =
-    queries.length > 0 && queries.every((q) => q.isError);
+    N > 0 && queries.slice(0, N).every((q) => q.isError);
   const errorMessage = queries.find((q) => q.error)?.error?.message;
 
   const refetch = useCallback(() => {
+    setPageCount(1);
     void indexerListQuery.refetch();
     queries.forEach((q) => {
       void q.refetch();
@@ -205,6 +250,9 @@ export function useTorrentSearchStream(
     isAnyPending,
     isError,
     errorMessage,
+    hasMore,
+    isLoadingMore,
+    loadMore,
     refetch,
   };
 }

@@ -59,57 +59,56 @@ export function DownloadModal({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className={`flex h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-border bg-background p-0 md:max-w-3xl md:rounded-[2rem] [&>button:last-child]:hidden ${showingResults ? "md:h-[65vh] md:max-h-[65vh]" : mediaType === "show" ? "md:h-auto md:min-h-[50vh] md:max-h-[65vh]" : "md:h-auto md:max-h-[65vh]"}`}>
-        {/* Header — fixed two-row height on both screens */}
-        <div className="shrink-0 border-b border-border px-5 py-4">
-          <div className="flex items-start gap-3">
-            {showingResults && (
-              <button
-                onClick={modal.goBackToStep1}
-                className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <ArrowLeft size={18} />
-              </button>
-            )}
-            <div className="min-w-0 flex-1">
-              <DialogHeader className="p-0">
-                <DialogTitle className="truncate text-lg font-semibold leading-7">
-                  {showingResults ? (
-                    <>
-                      {mediaTitle}
-                      {modal.torrentSearchContext?.seasonNumber !== undefined && (
-                        <span className="text-muted-foreground">
-                          {" "}— S{String(modal.torrentSearchContext.seasonNumber).padStart(2, "0")}
-                          {modal.torrentSearchContext.episodeNumbers &&
-                            modal.torrentSearchContext.episodeNumbers.length > 0 && (
-                              <span>
-                                E{modal.torrentSearchContext.episodeNumbers
-                                  .map((n) => String(n).padStart(2, "0"))
-                                  .join(", E")}
-                              </span>
-                            )}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <>Download — {mediaTitle}</>
-                  )}
-                </DialogTitle>
-                <DialogDescription className="mt-0.5 flex h-6 items-center gap-1.5 text-sm text-muted-foreground">
-                  {showingResults ? (
-                    <span>Search and download torrents</span>
-                  ) : (
-                    <span>Select what to download</span>
-                  )}
-                </DialogDescription>
-              </DialogHeader>
-            </div>
+        {/* Header */}
+        <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-5">
+          {showingResults && (
             <button
-              onClick={() => onOpenChange(false)}
-              className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
+              onClick={modal.goBackToStep1}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              <X size={14} />
+              <ArrowLeft size={18} />
             </button>
-          </div>
+          )}
+          <DialogHeader className="min-w-0 flex-1 space-y-0 text-left">
+            <DialogTitle className="truncate text-base font-semibold leading-none">
+              {showingResults ? (
+                <>
+                  {mediaTitle ? mediaTitle : "Search and download torrents"}
+                  {modal.torrentSearchContext?.seasonNumber !== undefined && (
+                    <span className="text-muted-foreground">
+                      {" "}— S{String(modal.torrentSearchContext.seasonNumber).padStart(2, "0")}
+                      {modal.torrentSearchContext.episodeNumbers &&
+                        modal.torrentSearchContext.episodeNumbers.length > 0 && (
+                          <span>
+                            E{modal.torrentSearchContext.episodeNumbers
+                              .map((n) => String(n).padStart(2, "0"))
+                              .join(", E")}
+                          </span>
+                        )}
+                    </span>
+                  )}
+                </>
+              ) : mediaTitle ? (
+                <>
+                  <span className="text-muted-foreground">Download —</span>{" "}
+                  {mediaTitle}
+                </>
+              ) : (
+                <>Download</>
+              )}
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              {showingResults
+                ? `Search and download torrents for ${mediaTitle}`
+                : "Select what to download"}
+            </DialogDescription>
+          </DialogHeader>
+          <button
+            onClick={() => onOpenChange(false)}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
+          >
+            <X size={14} />
+          </button>
         </div>
 
         {/* Content */}
@@ -141,13 +140,11 @@ export function DownloadModal({
                   modal.setAdvancedQuery(query);
                   modal.setCommittedQuery(query);
                   modal.setTorrentSearchContext(null);
-                  modal.setTorrentPage(0);
                   modal.setStep2Direct();
                 }}
                 onDownloadAuto={() => {
                   modal.setTorrentSearchContext(null);
                   modal.setAdvancedSearch(false);
-                  modal.setTorrentPage(0);
                   modal.setStep2Direct();
                 }}
               />
@@ -163,8 +160,6 @@ export function DownloadModal({
                 torrentSearchContext={modal.torrentSearchContext}
                 torrentSearchQuery={modal.torrentSearchQuery}
                 setTorrentSearchQuery={modal.setTorrentSearchQuery}
-                torrentPage={modal.torrentPage}
-                setTorrentPage={modal.setTorrentPage}
                 torrentQualityFilter={modal.torrentQualityFilter}
                 setTorrentQualityFilter={modal.setTorrentQualityFilter}
                 torrentSourceFilter={modal.torrentSourceFilter}
@@ -179,9 +174,7 @@ export function DownloadModal({
                 mobileFiltersOpen={modal.mobileFiltersOpen}
                 setMobileFiltersOpen={modal.setMobileFiltersOpen}
                 torrentSearch={modal.torrentSearch}
-                paginatedTorrents={modal.paginatedTorrents}
-                allFilteredTorrents={modal.allFilteredTorrents}
-                hasMore={modal.hasMore}
+                visibleTorrents={modal.visibleTorrents}
                 handleDownload={modal.handleDownload}
                 downloadTorrent={modal.downloadTorrent}
                 setLastDownloadAttempt={modal.setLastDownloadAttempt}

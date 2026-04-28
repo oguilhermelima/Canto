@@ -50,7 +50,6 @@ export function useDownloadModal(
     episodeNumbers?: number[];
   } | null>(null);
   const [torrentSearchQuery, setTorrentSearchQuery] = useState("");
-  const [torrentPage, setTorrentPage] = useState(0);
   const [torrentQualityFilter, setTorrentQualityFilter] = useState("all");
   const [torrentSourceFilter, setTorrentSourceFilter] = useState("all");
   const [torrentSizeFilter, setTorrentSizeFilter] = useState("all");
@@ -202,7 +201,6 @@ export function useDownloadModal(
         });
       }
 
-      setTorrentPage(0);
       setStep(2);
     },
     [selectedSeasons, selectedEpisodes],
@@ -216,7 +214,6 @@ export function useDownloadModal(
     setStep(1);
     setTorrentSearchContext(null);
     setTorrentSearchQuery("");
-    setTorrentPage(0);
     setAdvancedSearch(false);
     setAdvancedQuery("");
     setCommittedQuery("");
@@ -228,7 +225,6 @@ export function useDownloadModal(
     setSelectedEpisodes(new Set());
     setTorrentSearchContext(null);
     setTorrentSearchQuery("");
-    setTorrentPage(0);
     setTorrentQualityFilter("all");
     setTorrentSourceFilter("all");
     setTorrentSizeFilter("all");
@@ -251,13 +247,11 @@ export function useDownloadModal(
         setTorrentSort(col);
         setTorrentSortDir("desc");
       }
-      setTorrentPage(0);
     },
     [torrentSort],
   );
 
   // ── Derived ──
-  const hasMore = torrentSearch.data?.hasMore ?? false;
   const allFilteredTorrents = useMemo(
     () =>
       (torrentSearch.data?.results ?? [])
@@ -310,7 +304,7 @@ export function useDownloadModal(
       torrentSortDir,
     ],
   );
-  const paginatedTorrents =
+  const visibleTorrents =
     advancedSearch && !committedQuery ? [] : allFilteredTorrents;
 
   const hasSelection = selectedSeasons.size > 0 || selectedEpisodes.size > 0;
@@ -335,8 +329,6 @@ export function useDownloadModal(
     setTorrentSearchContext,
     torrentSearchQuery,
     setTorrentSearchQuery,
-    torrentPage,
-    setTorrentPage,
     torrentQualityFilter,
     setTorrentQualityFilter,
     torrentSourceFilter,
@@ -357,9 +349,8 @@ export function useDownloadModal(
     selectedFolderId,
     setSelectedFolderId,
     torrentSearch,
-    paginatedTorrents,
+    visibleTorrents,
     allFilteredTorrents,
-    hasMore,
     lastDownloadAttempt,
     setLastDownloadAttempt,
     handleDownload,

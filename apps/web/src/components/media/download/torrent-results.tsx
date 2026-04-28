@@ -1,8 +1,8 @@
 "use client";
 
-import { Button } from "@canto/ui/button";
+import { useEffect, useMemo, useRef } from "react";
 import { StateMessage } from "@canto/ui/state-message";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import { FilterToolbar } from "./filter-toolbar";
 import { ScanningState } from "./scanning-state";
 import { TorrentCard, type TorrentResult } from "./torrent-card";
@@ -16,8 +16,6 @@ interface TorrentResultsProps {
   } | null;
   torrentSearchQuery: string;
   setTorrentSearchQuery: (q: string) => void;
-  torrentPage: number;
-  setTorrentPage: (p: number | ((prev: number) => number)) => void;
   torrentQualityFilter: string;
   setTorrentQualityFilter: (f: string) => void;
   torrentSourceFilter: string;
@@ -47,10 +45,11 @@ interface TorrentResultsProps {
       tookMs: number | null;
       errorMessage: string | null;
     }>;
+    hasMore: boolean;
+    isLoadingMore: boolean;
+    loadMore: () => void;
   };
-  paginatedTorrents: TorrentResult[];
-  allFilteredTorrents: TorrentResult[];
-  hasMore: boolean;
+  visibleTorrents: TorrentResult[];
   handleDownload: (url: string, title: string) => void;
   downloadTorrent: { isPending: boolean };
   setLastDownloadAttempt: (v: { url: string; title: string } | null) => void;
@@ -62,8 +61,6 @@ export function TorrentResults({
   torrentSearchContext,
   torrentSearchQuery,
   setTorrentSearchQuery,
-  torrentPage,
-  setTorrentPage,
   torrentQualityFilter,
   setTorrentQualityFilter,
   torrentSourceFilter,
@@ -78,14 +75,48 @@ export function TorrentResults({
   mobileFiltersOpen,
   setMobileFiltersOpen,
   torrentSearch,
-  paginatedTorrents,
-  allFilteredTorrents,
-  hasMore,
+  visibleTorrents,
   handleDownload,
   downloadTorrent,
   setLastDownloadAttempt: _setLastDownloadAttempt,
 }: TorrentResultsProps): React.JSX.Element {
-  const resetPage = (): void => setTorrentPage(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // IntersectionObserver — when the sentinel approaches the viewport
+  // bottom, request the next page from every indexer that hasn't
+  // exhausted yet. Bound to the scrollable container so it works inside
+  // the modal's flex layout. `rootMargin` fires the load slightly before
+  // the sentinel is fully visible to feel seamless.
+  useEffect(() => {
+    if (!torrentSearch.hasMore) return;
+    if (torrentSearch.isLoadingMore) return;
+    const root = scrollRef.current;
+    const target = sentinelRef.current;
+    if (!root || !target) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting) {
+          torrentSearch.loadMore();
+        }
+      },
+      { root, rootMargin: "200px 0px", threshold: 0 },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [torrentSearch]);
+
+  // Distinct sub-trackers contributing to the visible result set.
+  // Prowlarr is the only local indexer, so the per-indexer chip is always
+  // 1/1 — the meaningful breadth metric is how many sub-trackers (BitSearch,
+  // Knaben, LimeTorrents…) actually returned releases that survived the
+  // intent filter.
+  const trackerCount = useMemo(
+    () => new Set(visibleTorrents.map((t) => t.indexer)).size,
+    [visibleTorrents],
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -109,11 +140,10 @@ export function TorrentResults({
         }}
         mobileOpen={mobileFiltersOpen}
         onToggleMobile={() => setMobileFiltersOpen((o) => !o)}
-        onResetPage={resetPage}
       />
 
       {/* Results */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         {torrentSearch.isLoading ? (
           <ScanningState
             mediaTitle={mediaTitle}
@@ -128,9 +158,9 @@ export function TorrentResults({
             onRetry={() => void torrentSearch.refetch()}
             minHeight="240px"
           />
-        ) : paginatedTorrents.length > 0 ? (
+        ) : visibleTorrents.length > 0 ? (
           <div className="flex flex-col gap-3 px-5 py-4">
-            {paginatedTorrents.map((t, i) => (
+            {visibleTorrents.map((t, i) => (
               <TorrentCard
                 key={`${t.guid}-${i}`}
                 torrent={t}
@@ -138,6 +168,21 @@ export function TorrentResults({
                 downloadDisabled={downloadTorrent.isPending}
               />
             ))}
+
+            {/* Infinite-scroll sentinel + loading indicator */}
+            {torrentSearch.hasMore && (
+              <div
+                ref={sentinelRef}
+                className="flex items-center justify-center py-4"
+              >
+                {torrentSearch.isLoadingMore && (
+                  <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Sweeping deeper…
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         ) : advancedSearch && !committedQuery ? (
           <StateMessage
@@ -151,41 +196,25 @@ export function TorrentResults({
         )}
       </div>
 
-      {/* Pagination footer */}
-      {(torrentPage > 0 || hasMore) && (
-        <div className="flex shrink-0 items-center justify-between border-t border-border px-5 py-3">
-          <span className="text-xs text-muted-foreground">
-            Page {torrentPage + 1}
-            {allFilteredTorrents.length > 0 && (
+      {/* Footer counter */}
+      {visibleTorrents.length > 0 && (
+        <div className="flex shrink-0 items-center justify-between border-t border-border px-5 py-3 text-xs text-muted-foreground">
+          <span>
+            {visibleTorrents.length} result
+            {visibleTorrents.length !== 1 ? "s" : ""}
+            {trackerCount > 0 && (
               <>
-                {" "}
-                &middot; {allFilteredTorrents.length} result
-                {allFilteredTorrents.length !== 1 ? "s" : ""}
+                {" · "}
+                {trackerCount} tracker{trackerCount !== 1 ? "s" : ""}
               </>
             )}
           </span>
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs"
-              disabled={torrentPage === 0}
-              onClick={() => setTorrentPage((p) => p - 1)}
-            >
-              <ChevronLeft size={16} />
-              Prev
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs"
-              disabled={!hasMore}
-              onClick={() => setTorrentPage((p) => p + 1)}
-            >
-              Next
-              <ChevronRight size={16} />
-            </Button>
-          </div>
+          {torrentSearch.isAnyPending && (
+            <span className="inline-flex items-center gap-1.5">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              still scanning
+            </span>
+          )}
         </div>
       )}
     </div>
