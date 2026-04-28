@@ -5,6 +5,7 @@ import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@canto/ui/button";
 import { ConfirmationDialog } from "@canto/ui/confirmation-dialog";
+import { StateMessage } from "@canto/ui/state-message";
 import { trpc } from "@/lib/trpc/client";
 import { SettingsSection } from "@/components/settings/shared";
 import {
@@ -115,30 +116,26 @@ export function DownloadProfilesSection(): React.JSX.Element {
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : typedProfiles.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border px-6 py-10 text-center">
-            <p className="text-sm font-medium text-foreground">
-              No download profiles yet
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Seed the TRaSH-aligned defaults (one per flavor) or create your
-              own.
-            </p>
-            <div className="mt-4 flex items-center justify-center gap-2">
-              <Button onClick={() => seed.mutate()} disabled={seed.isPending}>
-                {seed.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                    Seeding…
-                  </>
-                ) : (
-                  "Seed defaults"
-                )}
-              </Button>
-              <Button variant="ghost" onClick={() => openCreate("movie")}>
-                <Plus className="mr-1 h-3.5 w-3.5" />
-                New profile
-              </Button>
-            </div>
+          <div className="flex flex-col items-center">
+            <StateMessage
+              preset="emptyServerLibrary"
+              title="No profiles in orbit"
+              description="Seed the TRaSH-aligned defaults (one per flavor) or build your own."
+              action={{
+                label: seed.isPending ? "Seeding…" : "Seed defaults",
+                onClick: () => seed.mutate(),
+              }}
+              minHeight="240px"
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-2 rounded-xl"
+              onClick={() => openCreate("movie")}
+            >
+              <Plus className="mr-1 h-3.5 w-3.5" />
+              New profile
+            </Button>
           </div>
         ) : (
           <div className="space-y-6">
