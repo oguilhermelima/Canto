@@ -90,7 +90,7 @@ export function SpotlightHero({
   return (
     <div
       className={cn(
-        "group/spotlight spotlight relative min-h-[70vh] w-full overflow-x-clip",
+        "group/spotlight spotlight relative min-h-[80vh] w-full overflow-x-clip",
         className,
       )}
     >
@@ -107,7 +107,7 @@ export function SpotlightHero({
       />
 
       <div
-        className="relative mx-auto flex min-h-[70vh] w-full flex-col justify-end px-4 pb-8 pt-24 md:px-8 lg:px-12 xl:px-16 2xl:px-24"
+        className="relative mx-auto flex min-h-[80vh] w-full flex-col justify-end px-4 pb-8 pt-24 md:px-8 lg:px-12 xl:px-16 2xl:px-24"
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === "ArrowLeft") prevSpotlight();

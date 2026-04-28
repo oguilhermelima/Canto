@@ -119,7 +119,7 @@ export function HomeSectionList({
 function SpotlightSkeleton(): React.JSX.Element {
   return (
     <section className="relative -mt-16 w-full bg-gradient-to-b from-muted/20 to-background">
-      <div className="flex min-h-[70vh] w-full items-end px-4 pt-24 pb-8 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+      <div className="flex min-h-[80vh] w-full items-end px-4 pt-24 pb-8 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         <div className="flex w-full max-w-2xl flex-col gap-5">
           <Skeleton className="h-16 w-[min(24rem,70%)] bg-foreground/10 md:h-20" />
           <div className="flex flex-wrap items-center gap-2">

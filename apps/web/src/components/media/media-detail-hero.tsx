@@ -282,7 +282,7 @@ export function MediaDetailHero({
       )}
 
       {/* Info section */}
-      <div className="relative mx-auto w-full px-4 pb-6 pt-[30dvh] md:pt-[25dvh] md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+      <div className="relative mx-auto w-full px-4 pb-6 pt-[40dvh] md:pt-[35dvh] md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         <div className="max-w-3xl space-y-4">
           {/* Logo or Title — click to copy */}
           <button
@@ -698,7 +698,7 @@ export function MediaDetailHeroSkeleton(): React.JSX.Element {
   return (
     <div className="relative -mt-16 w-full">
       <div className="absolute inset-x-0 top-0 h-dvh bg-gradient-to-b from-muted/30 to-background" />
-      <div className="relative mx-auto w-full px-4 pb-6 pt-[30dvh] md:pt-[25dvh] md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+      <div className="relative mx-auto w-full px-4 pb-6 pt-[40dvh] md:pt-[35dvh] md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         <div className="max-w-3xl space-y-4">
           <Skeleton className="h-12 w-80 max-w-full md:h-16" />
           <Skeleton className="h-4 w-48" />
