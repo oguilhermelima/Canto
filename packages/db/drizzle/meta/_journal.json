@@ -169,6 +169,13 @@
       "when": 1777300091248,
       "tag": "0023_cynical_fat_cobra",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1777349965796,
+      "tag": "0024_black_sentinel",
+      "breakpoints": true
     }
   ]
 }

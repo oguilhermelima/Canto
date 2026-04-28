@@ -808,6 +808,63 @@ export const qualityProfile = pgTable("quality_profile", {
     .defaultNow(),
 });
 
+// ─── Download admin config (single-row, system-wide) ───
+
+/**
+ * Server-wide download knobs. Holds the scoring rule blob plus
+ * admin-level preferences that apply to every download decision
+ * regardless of which user triggered the search. Editions and AV1 stance
+ * are admin policy (which edition the household downloads, what codec
+ * the playback infra supports), not per-user taste — those live here.
+ *
+ * Single-row table. Repository upserts the row by id, defaulting to a
+ * fixed sentinel when no row exists yet.
+ */
+export const downloadConfig = pgTable("download_config", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** Full {@link ScoringRules} blob from `@canto/core`. Validated on read
+   *  via Zod in the repository — typed `unknown` here to keep the schema
+   *  package free of core imports. */
+  scoringRules: jsonb("scoring_rules").$type<Record<string, unknown>>().notNull(),
+  /** Editions to boost (e.g. ["IMAX", "Extended"]). */
+  preferredEditions: jsonb("preferred_editions").$type<string[]>().notNull().default([]),
+  /** Editions to penalise (e.g. ["Theatrical"]). */
+  avoidedEditions: jsonb("avoided_editions").$type<string[]>().notNull().default([]),
+  /** "neutral" | "prefer" | "avoid" — applied to the AV1 codec entries. */
+  av1Stance: varchar("av1_stance", { length: 10 }).notNull().default("neutral"),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// ─── Curated release-group tiers (system-wide, per flavor) ───
+
+/**
+ * Release-group classification. PK is `(name_lower, flavor)` so the same
+ * group can carry different tiers across flavors (NTb is movie-tier1 +
+ * show-tier1 but absent from anime). `name_lower` is the lowercased
+ * lookup form; `displayName` preserves the canonical casing for admin UI.
+ *
+ * "neutral" is implicit (= group not in this table). Only tier1/tier2/
+ * tier3/avoid rows live here.
+ */
+export const downloadReleaseGroup = pgTable(
+  "download_release_group",
+  {
+    nameLower: varchar("name_lower", { length: 100 }).notNull(),
+    flavor: varchar("flavor", { length: 10 }).notNull(),
+    tier: varchar("tier", { length: 10 }).notNull(),
+    displayName: varchar("display_name", { length: 100 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.nameLower, table.flavor] }),
+    index("idx_download_release_group_flavor_tier").on(table.flavor, table.tier),
+  ],
+);
+
 // ─── Media recommendations (junction table) ───
 
 export const mediaRecommendation = pgTable(
