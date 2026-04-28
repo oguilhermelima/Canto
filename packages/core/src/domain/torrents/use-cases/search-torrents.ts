@@ -31,6 +31,10 @@ import {
 import { findActiveDownloadProfile } from "../../../infra/torrents/download-profile-repository";
 import { findReleaseGroupLookups } from "../../../infra/torrents/download-config-repository";
 import { extractHashFromMagnet } from "../rules/torrent-rules";
+import {
+  matchesSearchIntent,
+  type SearchIntent,
+} from "../rules/parsing-episodes";
 
 /**
  * Stable dedupe key. Prefers the magnet info-hash so the same release
@@ -102,6 +106,10 @@ interface PreparedSearch {
   flavor: ReleaseFlavor;
   releaseGroupLookups: ReleaseGroupTierSets;
   blockedTitles: Set<string>;
+  /** Null for movies and custom (advanced) queries. Set for show
+   *  searches so {@link matchesSearchIntent} can drop releases that
+   *  target the wrong season/episode bucket. */
+  intent: SearchIntent | null;
   page: number;
   pageSize: number;
 }
@@ -200,6 +208,15 @@ async function prepareSearch(
     blockedRows.map((b) => b.title.toLowerCase()),
   );
 
+  const intent: SearchIntent | null =
+    !isCustomQuery && row.type === "show"
+      ? {
+          type: "show",
+          seasonNumber: input.seasonNumber,
+          episodeNumbers: input.episodeNumbers ?? null,
+        }
+      : null;
+
   return {
     ctx,
     queryVariants,
@@ -209,6 +226,7 @@ async function prepareSearch(
     flavor,
     releaseGroupLookups: allLookups[flavor],
     blockedTitles,
+    intent,
     page,
     pageSize,
   };
@@ -247,6 +265,7 @@ function scoreRawResults(
 
   for (const r of raw) {
     if (prep.blockedTitles.has(r.title.toLowerCase())) continue;
+    if (prep.intent && !matchesSearchIntent(r.title, prep.intent)) continue;
 
     const attrs = parseReleaseAttributes({
       title: r.title,

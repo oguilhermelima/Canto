@@ -168,6 +168,68 @@ export function parseEpisodes(title: string): number[] {
   return [];
 }
 
+/**
+ * User search intent. Drives whether we accept a given release title for
+ * the current modal state — the user picked "Full show", a specific
+ * season, or specific episodes.
+ */
+export interface SearchIntent {
+  /** Show entity. Movies don't carry season/episode intent so they don't
+   *  go through this matcher at all. */
+  type: "show";
+  /** Undefined = "Full show" mode. */
+  seasonNumber?: number;
+  /** Undefined or empty = season-only mode. Set = specific episodes. */
+  episodeNumbers?: number[] | null;
+}
+
+/**
+ * Decide whether a release title matches the user's search intent.
+ *
+ * Indexers don't know what the user picked, so a search for "Euphoria"
+ * happily returns single S03E03 releases mixed with season packs. This
+ * function is the server-side rejection step that mirrors Sonarr's
+ * "release rejected — wrong episode count" rule.
+ *
+ * Rules:
+ * - Full show (no season): keep season packs and full-series packs;
+ *   drop single/multi-episode releases.
+ * - Specific season (season set, no episodes): keep that season's pack
+ *   and full-series packs; drop other-season packs and any episode
+ *   release.
+ * - Specific episodes: keep matching-episode releases (must contain
+ *   ALL requested episode numbers when episode tokens are present),
+ *   plus that season's pack and full-series packs.
+ */
+export function matchesSearchIntent(
+  title: string,
+  intent: SearchIntent,
+): boolean {
+  const seasons = parseSeasons(title);
+  const episodes = parseEpisodes(title);
+
+  // Full show mode — only season packs and full-series packs.
+  if (intent.seasonNumber === undefined) {
+    return episodes.length === 0;
+  }
+
+  // Wrong-season pack always rejected. Empty `seasons` = full-series
+  // pack ("Show Complete"), accepted across season/episode modes.
+  if (seasons.length > 0 && !seasons.includes(intent.seasonNumber)) {
+    return false;
+  }
+
+  // Season-only mode — drop any episode release.
+  if (!intent.episodeNumbers || intent.episodeNumbers.length === 0) {
+    return episodes.length === 0;
+  }
+
+  // Specific episodes — season pack / full-series acceptable, otherwise
+  // the episode tokens must cover every requested number.
+  if (episodes.length === 0) return true;
+  return intent.episodeNumbers.every((e) => episodes.includes(e));
+}
+
 /* Subtitle helpers */
 
 export const SUBTITLE_EXTENSIONS = new Set([
