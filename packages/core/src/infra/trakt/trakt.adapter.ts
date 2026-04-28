@@ -185,11 +185,19 @@ async function traktPaginatedRequest<T>(
     if (data.length === 0) break;
     out.push(...data);
 
-    const pageCount = Number.parseInt(
-      headers.get("x-pagination-page-count") ?? `${page}`,
-      10,
-    );
-    if (!Number.isFinite(pageCount) || page >= pageCount) break;
+    // The previous fallback was `?? \`${page}\`` — when Trakt omitted the
+    // header the loop exited after a single page, silently truncating
+    // history/watchlist pulls at 100 items. Treat a missing/unparseable
+    // header as "I don't know how many pages" and rely on the `data.length`
+    // check above (we'll exit when the next page comes back empty).
+    const headerValue = headers.get("x-pagination-page-count");
+    if (headerValue) {
+      const pageCount = Number.parseInt(headerValue, 10);
+      if (Number.isFinite(pageCount) && page >= pageCount) break;
+    } else if (data.length < 100) {
+      // Less than a full page → there's no next page.
+      break;
+    }
     page += 1;
   }
 
@@ -666,9 +674,15 @@ export async function listTraktFavorites(
 export async function listTraktHistory(
   accessToken: string,
   profileId = "me",
+  /** ISO timestamp — Trakt returns only events with `watched_at >= startAt`.
+   *  Used as the incremental checkpoint by the coordinator so each pull only
+   *  walks the delta since the last successful sync. Omit on the very first
+   *  pull to fetch the full history. */
+  startAt?: string,
 ): Promise<Array<TraktMediaRef & { remoteHistoryId: number }>> {
+  const params = startAt ? `?start_at=${encodeURIComponent(startAt)}` : "";
   const rows = await traktPaginatedRequest<TraktHistoryItemResponse>(
-    `/users/${encodeURIComponent(profileId)}/history`,
+    `/users/${encodeURIComponent(profileId)}/history${params}`,
     accessToken,
   );
   return rows
@@ -678,6 +692,158 @@ export async function listTraktHistory(
       return { ...mapped, remoteHistoryId: row.id };
     })
     .filter((v): v is TraktMediaRef & { remoteHistoryId: number } => !!v);
+}
+
+/* -------------------------------------------------------------------------- */
+/*  /sync/last_activities — single probe used by the coordinator              */
+/* -------------------------------------------------------------------------- */
+
+export interface TraktLastActivities {
+  /** Latest movie watch — drives /sync/watched/movies. */
+  moviesWatchedAt: string | null;
+  /** Latest episode watch — drives /sync/watched/shows. */
+  episodesWatchedAt: string | null;
+  /** Either side moving means there's new history. */
+  historyAt: string | null;
+  watchlistAt: string | null;
+  /** Max across movies/shows/seasons/episodes ratings. */
+  ratingsAt: string | null;
+  favoritesAt: string | null;
+  listsAt: string | null;
+  /** Max paused_at across movies/episodes. */
+  playbackAt: string | null;
+}
+
+interface TraktLastActivitiesResponse {
+  movies?: { watched_at?: string; rated_at?: string; paused_at?: string };
+  episodes?: { watched_at?: string; rated_at?: string; paused_at?: string };
+  shows?: { rated_at?: string };
+  seasons?: { rated_at?: string };
+  watchlist?: { updated_at?: string };
+  favorites?: { updated_at?: string };
+  lists?: { updated_at?: string };
+}
+
+function maxIso(...values: Array<string | undefined | null>): string | null {
+  let best: string | null = null;
+  for (const v of values) {
+    if (!v) continue;
+    if (!best || v > best) best = v;
+  }
+  return best;
+}
+
+export async function getTraktLastActivities(
+  accessToken: string,
+): Promise<TraktLastActivities> {
+  const data = await traktRequest<TraktLastActivitiesResponse>(
+    "/sync/last_activities",
+    { accessToken },
+  );
+  return {
+    moviesWatchedAt: data.movies?.watched_at ?? null,
+    episodesWatchedAt: data.episodes?.watched_at ?? null,
+    historyAt: maxIso(data.movies?.watched_at, data.episodes?.watched_at),
+    watchlistAt: data.watchlist?.updated_at ?? null,
+    ratingsAt: maxIso(
+      data.movies?.rated_at,
+      data.shows?.rated_at,
+      data.seasons?.rated_at,
+      data.episodes?.rated_at,
+    ),
+    favoritesAt: data.favorites?.updated_at ?? null,
+    listsAt: data.lists?.updated_at ?? null,
+    playbackAt: maxIso(data.movies?.paused_at, data.episodes?.paused_at),
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  /sync/watched — consolidated "what is watched" view                       */
+/*                                                                            */
+/*  Unlike /history (events), /sync/watched returns the *current* watched     */
+/*  state per item: a movie is here iff plays >= 1; a show entry contains     */
+/*  every season/episode the user has played at least once. This is what      */
+/*  drives the watched-flag in our UI (`userPlaybackProgress.isCompleted`).   */
+/* -------------------------------------------------------------------------- */
+
+export interface TraktWatchedMovie {
+  ids: TraktIds;
+  plays: number;
+  lastWatchedAt: string;
+}
+
+export interface TraktWatchedEpisode {
+  seasonNumber: number;
+  episodeNumber: number;
+  plays: number;
+  lastWatchedAt: string;
+}
+
+export interface TraktWatchedShow {
+  ids: TraktIds;
+  plays: number;
+  lastWatchedAt: string;
+  episodes: TraktWatchedEpisode[];
+}
+
+interface TraktWatchedMovieResponse {
+  plays: number;
+  last_watched_at: string;
+  movie: { ids: TraktIds };
+}
+
+interface TraktWatchedShowResponse {
+  plays: number;
+  last_watched_at: string;
+  show: { ids: TraktIds };
+  seasons?: Array<{
+    number: number;
+    episodes: Array<{
+      number: number;
+      plays: number;
+      last_watched_at: string;
+    }>;
+  }>;
+}
+
+export async function listTraktWatchedMovies(
+  accessToken: string,
+): Promise<TraktWatchedMovie[]> {
+  const rows = await traktRequest<TraktWatchedMovieResponse[]>(
+    "/sync/watched/movies",
+    { accessToken },
+  );
+  return rows
+    .filter((row) => !!row.movie?.ids)
+    .map((row) => ({
+      ids: row.movie.ids,
+      plays: row.plays,
+      lastWatchedAt: row.last_watched_at,
+    }));
+}
+
+export async function listTraktWatchedShows(
+  accessToken: string,
+): Promise<TraktWatchedShow[]> {
+  const rows = await traktRequest<TraktWatchedShowResponse[]>(
+    "/sync/watched/shows",
+    { accessToken },
+  );
+  return rows
+    .filter((row) => !!row.show?.ids)
+    .map((row) => ({
+      ids: row.show.ids,
+      plays: row.plays,
+      lastWatchedAt: row.last_watched_at,
+      episodes: (row.seasons ?? []).flatMap((s) =>
+        s.episodes.map((ep) => ({
+          seasonNumber: s.number,
+          episodeNumber: ep.number,
+          plays: ep.plays,
+          lastWatchedAt: ep.last_watched_at,
+        })),
+      ),
+    }));
 }
 
 export async function listTraktPlaybackProgress(
