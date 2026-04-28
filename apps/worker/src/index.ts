@@ -14,6 +14,7 @@ import { handleBackfillExtras } from "./jobs/backfill-extras";
 import { handleSeedManagement } from "./jobs/seed-management";
 import { handleFolderScan } from "./jobs/folder-scan";
 import { handleValidateDownloads } from "./jobs/validate-downloads";
+import { handleRepackSupersede } from "./jobs/repack-supersede";
 import { handleTraktSync, handleTraktSyncUser } from "./jobs/trakt-sync";
 import { handleTraktListDelete, handleTraktListDeleteSweep } from "./jobs/trakt-list-delete";
 import { refreshExtras } from "@canto/core/domain/content-enrichment/use-cases/refresh-extras";
@@ -61,6 +62,7 @@ const queues = {
   seedManagement: new Queue(QUEUES.seedManagement, { connection: redisConnection }),
   folderScan: new Queue(QUEUES.folderScan, { connection: redisConnection }),
   validateDownloads: new Queue(QUEUES.validateDownloads, { connection: redisConnection }),
+  repackSupersede: new Queue(QUEUES.repackSupersede, { connection: redisConnection }),
 };
 
 /* -------------------------------------------------------------------------- */
@@ -157,6 +159,14 @@ async function setupSchedules(): Promise<void> {
     { every: 6 * 60 * 60 * 1000 },
     { name: QUEUES.validateDownloads, opts: DEFAULT_JOB_OPTS },
   );
+
+  // Repack auto-supersede — every 6h. Lookback in the job is 14 days
+  // so anything older than that is skipped without indexer cost.
+  await queues.repackSupersede.upsertJobScheduler(
+    "repack-supersede-scheduler",
+    { every: 6 * 60 * 60 * 1000, startDate: jitterStart(10 * 60 * 1000) },
+    { name: QUEUES.repackSupersede, opts: DEFAULT_JOB_OPTS },
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -230,6 +240,8 @@ const workers = [
   makeWorker(QUEUES.folderScan, () => handleFolderScan()),
 
   makeWorker(QUEUES.validateDownloads, () => handleValidateDownloads()),
+
+  makeWorker(QUEUES.repackSupersede, () => handleRepackSupersede()),
 
   // ── On-demand (dispatched by other code) ──
 

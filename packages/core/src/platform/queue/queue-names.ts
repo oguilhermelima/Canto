@@ -19,6 +19,7 @@ export const QUEUES = {
   seedManagement: "seed-management",
   folderScan: "folder-scan",
   validateDownloads: "validate-downloads",
+  repackSupersede: "repack-supersede",
   refreshExtras: "refresh-extras",
   reconcileShow: "reconcile-show",
   rebuildUserRecs: "rebuild-user-recs",
