@@ -1049,7 +1049,7 @@ interface FolderData {
   priority: number;
   isDefault: boolean;
   enabled: boolean;
-  qualityProfileId: string | null;
+  downloadProfileId: string | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1575,21 +1575,21 @@ function FolderCard({
   const [dlPath, setDlPath] = useState(folder.downloadPath ?? "");
   const [libPath, setLibPath] = useState(folder.libraryPath ?? "");
   const [qbitCat, setQbitCat] = useState(folder.qbitCategory ?? "");
-  const [qualityProfileId, setQualityProfileId] = useState<string | null>(
-    folder.qualityProfileId ?? null,
+  const [downloadProfileId, setDownloadProfileId] = useState<string | null>(
+    folder.downloadProfileId ?? null,
   );
   const [rulesOpen, setRulesOpen] = useState(false);
   const [editingDlPath, setEditingDlPath] = useState(!!folder.downloadPath);
   const [editingLibPath, setEditingLibPath] = useState(!!folder.libraryPath);
 
-  const { data: qualityProfiles } = trpc.qualityProfile.list.useQuery();
+  const { data: downloadProfiles } = trpc.downloadProfile.list.useQuery();
 
   const dirty =
     name !== folder.name ||
     dlPath !== (folder.downloadPath ?? "") ||
     libPath !== (folder.libraryPath ?? "") ||
     qbitCat !== (folder.qbitCategory ?? "") ||
-    qualityProfileId !== (folder.qualityProfileId ?? null);
+    downloadProfileId !== (folder.downloadProfileId ?? null);
 
   // Sync state from server, but skip when user has unsaved edits
   const prevFolderId = useRef(folder.id);
@@ -1601,7 +1601,7 @@ function FolderCard({
       setDlPath(folder.downloadPath ?? "");
       setLibPath(folder.libraryPath ?? "");
       setQbitCat(folder.qbitCategory ?? "");
-      setQualityProfileId(folder.qualityProfileId ?? null);
+      setDownloadProfileId(folder.downloadProfileId ?? null);
       setEditingDlPath(!!folder.downloadPath);
       setEditingLibPath(!!folder.libraryPath);
     }
@@ -1627,7 +1627,7 @@ function FolderCard({
       downloadPath: dlPath || null,
       libraryPath: libPath || null,
       qbitCategory: qbitCat || null,
-      qualityProfileId,
+      downloadProfileId,
     });
   };
 
@@ -1742,12 +1742,12 @@ function FolderCard({
                 </div>
               </div>
               <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-4">
-                <label className="text-sm font-medium text-muted-foreground sm:w-28 sm:shrink-0 sm:text-right">Quality profile</label>
+                <label className="text-sm font-medium text-muted-foreground sm:w-28 sm:shrink-0 sm:text-right">Download profile</label>
                 <div className="sm:w-64">
                   <Select
-                    value={qualityProfileId ?? "__none__"}
+                    value={downloadProfileId ?? "__none__"}
                     onValueChange={(v) =>
-                      setQualityProfileId(v === "__none__" ? null : v)
+                      setDownloadProfileId(v === "__none__" ? null : v)
                     }
                   >
                     <SelectTrigger className={cardInputCn}>
@@ -1757,7 +1757,7 @@ function FolderCard({
                       <SelectItem value="__none__">
                         Use system default
                       </SelectItem>
-                      {(qualityProfiles ?? []).map((p) => (
+                      {(downloadProfiles ?? []).map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                           {p.name} · {p.flavor}
                           {p.isDefault ? " (default)" : ""}

@@ -1,10 +1,10 @@
 import { and, eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
-  qualityProfile,
-  type QualityProfileAllowedFormat,
+  downloadProfile,
+  type DownloadProfileAllowedFormat,
 } from "@canto/db/schema";
-import type { QualityProfile } from "@canto/core/domain/torrents/rules/quality-profile";
+import type { DownloadProfile } from "@canto/core/domain/torrents/rules/download-profile";
 import type {
   Quality,
   Source,
@@ -12,11 +12,11 @@ import type {
 import type { ReleaseFlavor } from "@canto/core/domain/torrents/rules/release-groups";
 
 /**
- * Decode a `quality_profile` row into the {@link QualityProfile} domain
+ * Decode a `download_profile` row into the {@link DownloadProfile} domain
  * shape. Throws-narrowing happens at the column level so unknown values
  * coming from older rows don't silently break scoring.
  */
-function decodeProfile(row: typeof qualityProfile.$inferSelect): QualityProfile {
+function decodeProfile(row: typeof downloadProfile.$inferSelect): DownloadProfile {
   return {
     id: row.id,
     name: row.name,
@@ -33,44 +33,44 @@ function decodeProfile(row: typeof qualityProfile.$inferSelect): QualityProfile 
   };
 }
 
-export async function findQualityProfileById(
+export async function findDownloadProfileById(
   db: Database,
   id: string,
-): Promise<QualityProfile | null> {
-  const row = await db.query.qualityProfile.findFirst({
-    where: eq(qualityProfile.id, id),
+): Promise<DownloadProfile | null> {
+  const row = await db.query.downloadProfile.findFirst({
+    where: eq(downloadProfile.id, id),
   });
   return row ? decodeProfile(row) : null;
 }
 
-export async function findDefaultQualityProfile(
+export async function findDefaultDownloadProfile(
   db: Database,
   flavor: ReleaseFlavor,
-): Promise<QualityProfile | null> {
-  const row = await db.query.qualityProfile.findFirst({
+): Promise<DownloadProfile | null> {
+  const row = await db.query.downloadProfile.findFirst({
     where: and(
-      eq(qualityProfile.flavor, flavor),
-      eq(qualityProfile.isDefault, true),
+      eq(downloadProfile.flavor, flavor),
+      eq(downloadProfile.isDefault, true),
     ),
   });
   return row ? decodeProfile(row) : null;
 }
 
-export async function findAllQualityProfiles(
+export async function findAllDownloadProfiles(
   db: Database,
-): Promise<QualityProfile[]> {
-  const rows = await db.query.qualityProfile.findMany({
+): Promise<DownloadProfile[]> {
+  const rows = await db.query.downloadProfile.findMany({
     orderBy: (p, { asc }) => [asc(p.flavor), asc(p.name)],
   });
   return rows.map(decodeProfile);
 }
 
-export async function findQualityProfilesByFlavor(
+export async function findDownloadProfilesByFlavor(
   db: Database,
   flavor: ReleaseFlavor,
-): Promise<QualityProfile[]> {
-  const rows = await db.query.qualityProfile.findMany({
-    where: eq(qualityProfile.flavor, flavor),
+): Promise<DownloadProfile[]> {
+  const rows = await db.query.downloadProfile.findMany({
+    where: eq(downloadProfile.flavor, flavor),
     orderBy: (p, { asc }) => [asc(p.name)],
   });
   return rows.map(decodeProfile);
@@ -81,7 +81,7 @@ export async function findQualityProfilesByFlavor(
 interface SeedProfile {
   name: string;
   flavor: ReleaseFlavor;
-  allowedFormats: QualityProfileAllowedFormat[];
+  allowedFormats: DownloadProfileAllowedFormat[];
   cutoffQuality: string | null;
   cutoffSource: string | null;
   minTotalScore: number;
@@ -138,52 +138,52 @@ const DEFAULT_PROFILES: SeedProfile[] = [
  * flavor, marked default) on first install. Skips if any profile rows
  * already exist — re-running won't overwrite a customised setup.
  */
-export async function seedDefaultQualityProfiles(db: Database) {
-  const existing = await db.query.qualityProfile.findMany();
+export async function seedDefaultDownloadProfiles(db: Database) {
+  const existing = await db.query.downloadProfile.findMany();
   if (existing.length > 0) return existing;
 
   return db
-    .insert(qualityProfile)
+    .insert(downloadProfile)
     .values(DEFAULT_PROFILES.map((p) => ({ ...p, isDefault: true })))
     .returning();
 }
 
 /**
- * Resolve the active quality profile for a media using the precedence
+ * Resolve the active download profile for a media using the precedence
  * chain:
- *   1. media.qualityProfileId (snapshot-on-add)
- *   2. folderQualityProfileId (the folder media routes into)
+ *   1. media.downloadProfileId (snapshot-on-add)
+ *   2. folderDownloadProfileId (the folder media routes into)
  *   3. system default profile for media's flavor
  *   4. null — no profile, fall back to the admin scoring rules from
  *              `download_config`
  *
- * The caller decides who supplies `folderQualityProfileId`. For new
+ * The caller decides who supplies `folderDownloadProfileId`. For new
  * downloads coming from `searchTorrents`, that's the result of running
  * the folder router against the media; for already-downloaded media it
  * could be the persisted folder linkage. Either way, this function only
  * cares about the value, not how it was obtained.
  */
-export async function findActiveQualityProfile(
+export async function findActiveDownloadProfile(
   db: Database,
   args: {
-    mediaQualityProfileId: string | null;
-    folderQualityProfileId: string | null;
+    mediaDownloadProfileId: string | null;
+    folderDownloadProfileId: string | null;
     flavor: ReleaseFlavor;
   },
-): Promise<QualityProfile | null> {
-  if (args.mediaQualityProfileId) {
-    const profile = await findQualityProfileById(
+): Promise<DownloadProfile | null> {
+  if (args.mediaDownloadProfileId) {
+    const profile = await findDownloadProfileById(
       db,
-      args.mediaQualityProfileId,
+      args.mediaDownloadProfileId,
     );
     if (profile) return profile;
   }
-  if (args.folderQualityProfileId) {
-    const profile = await findQualityProfileById(
+  if (args.folderDownloadProfileId) {
+    const profile = await findDownloadProfileById(
       db,
-      args.folderQualityProfileId,
+      args.folderDownloadProfileId,
     );
     if (profile) return profile;
   }
-  return findDefaultQualityProfile(db, args.flavor);
+  return findDefaultDownloadProfile(db, args.flavor);
 }

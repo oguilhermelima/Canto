@@ -14,4 +14,4 @@ export * from "./user-media";
 export * from "./home-section";
 export * from "./profile-section";
 export * from "./preferences";
-export * from "./quality-profile";
+export * from "./download-profile";

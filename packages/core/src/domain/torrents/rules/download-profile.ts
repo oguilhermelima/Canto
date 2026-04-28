@@ -3,29 +3,29 @@ import { QUALITY_HIERARCHY, SOURCE_HIERARCHY } from "./quality";
 import type { ScoringRules } from "../../shared/rules/scoring-rules";
 
 /**
- * One entry in {@link QualityProfile.allowedFormats}. Releases whose
+ * One entry in {@link DownloadProfile.allowedFormats}. Releases whose
  * (quality, source) combo is not in `allowedFormats` are rejected by the
  * scoring engine; releases that match earn the entry's `weight` as a base
  * score on top of the TRaSH bonuses computed from the rules.
  */
-export interface QualityProfileAllowedFormat {
+export interface DownloadProfileAllowedFormat {
   quality: Quality;
   source: Source;
   weight: number;
 }
 
 /**
- * Quality profile — the user-facing answer to "what releases am I willing
- * to download for this library?". A profile decouples the **policy** of
- * which (quality, source) combos to accept and prefer from the **bonuses**
- * that further rank them (HDR, audio codec, release group tier — those
- * stay in {@link ScoringRules}).
+ * Download profile — the user-facing answer to "what releases am I
+ * willing to download for this library?". A profile decouples the
+ * **policy** of which (quality, source) combos to accept and prefer
+ * from the **bonuses** that further rank them (HDR, audio codec,
+ * release group tier — those stay in {@link ScoringRules}).
  */
-export interface QualityProfile {
+export interface DownloadProfile {
   id: string;
   name: string;
   flavor: "movie" | "show" | "anime";
-  allowedFormats: QualityProfileAllowedFormat[];
+  allowedFormats: DownloadProfileAllowedFormat[];
   /** Releases at or above this combo don't trigger upgrade searches.
    *  Both fields null = no cutoff (always look for upgrades). */
   cutoffQuality: Quality | null;
@@ -41,10 +41,10 @@ export interface QualityProfile {
  * the combo isn't in `allowedFormats` (which means: rejected).
  */
 export function findAllowedFormat(
-  profile: QualityProfile,
+  profile: DownloadProfile,
   quality: Quality,
   source: Source,
-): QualityProfileAllowedFormat | null {
+): DownloadProfileAllowedFormat | null {
   for (const entry of profile.allowedFormats) {
     if (entry.quality === quality && entry.source === source) return entry;
   }
@@ -63,7 +63,7 @@ export function findAllowedFormat(
  * Returns `false` when the profile has no cutoff (always search).
  */
 export function meetsCutoff(
-  profile: QualityProfile,
+  profile: DownloadProfile,
   quality: Quality,
   source: Source,
 ): boolean {
@@ -94,7 +94,7 @@ export type ProfileComparisonVerdict =
 
 /**
  * Compare a candidate release against the currently-downloaded version
- * under a quality profile. Returns whether the candidate is an upgrade,
+ * under a download profile. Returns whether the candidate is an upgrade,
  * a downgrade, equivalent, or outside the profile's allowed set.
  *
  * Comparison rule: higher `weight` in `allowedFormats` wins. If both have
@@ -105,7 +105,7 @@ export type ProfileComparisonVerdict =
 export function compareToProfile(
   current: { quality: Quality; source: Source },
   candidate: { quality: Quality; source: Source },
-  profile: QualityProfile,
+  profile: DownloadProfile,
 ): ProfileComparisonVerdict {
   const candEntry = findAllowedFormat(
     profile,
@@ -133,9 +133,9 @@ export function compareToProfile(
  *
  * Pure — input is not mutated.
  */
-export function applyQualityProfile(
+export function applyDownloadProfile(
   base: ScoringRules,
-  profile: QualityProfile,
+  profile: DownloadProfile,
 ): ScoringRules {
   return {
     ...base,

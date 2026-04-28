@@ -69,7 +69,7 @@ export function calculateConfidence(
   }
 
   // Format scoring — quality + source. Two modes:
-  //  • allowedFormats whitelist (Phase 5 quality profile): the (quality,
+  //  • allowedFormats whitelist (Phase 5 download profile): the (quality,
   //    source) combo must appear in the list, otherwise reject. Earns
   //    the entry's joint weight.
   //  • per-axis fallback (no profile): independent quality + source

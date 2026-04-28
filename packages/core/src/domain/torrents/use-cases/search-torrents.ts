@@ -10,10 +10,10 @@ import {
   type ReleaseAttributes,
 } from "../rules/release-attributes";
 import {
-  applyQualityProfile,
+  applyDownloadProfile,
   meetsCutoff,
-  type QualityProfile,
-} from "../rules/quality-profile";
+  type DownloadProfile,
+} from "../rules/download-profile";
 import type {
   ReleaseFlavor,
   ReleaseGroupTierSets,
@@ -25,7 +25,7 @@ import {
   findMediaById,
   findBlocklistByMediaId,
 } from "../../../infra/repositories";
-import { findActiveQualityProfile } from "../../../infra/torrents/quality-profile-repository";
+import { findActiveDownloadProfile } from "../../../infra/torrents/download-profile-repository";
 import { findReleaseGroupLookups } from "../../../infra/torrents/download-config-repository";
 
 export interface SearchResult extends ReleaseAttributes {
@@ -74,7 +74,7 @@ interface PreparedSearch {
   ctx: SearchContext;
   queryVariants: string[];
   rules: ScoringRules;
-  profile: QualityProfile | null;
+  profile: DownloadProfile | null;
   confidenceCtx: ConfidenceContext;
   flavor: ReleaseFlavor;
   releaseGroupLookups: ReleaseGroupTierSets;
@@ -158,16 +158,16 @@ async function prepareSearch(
     genreIds: row.genreIds,
   });
 
-  // Resolve and apply the active quality profile. media.qualityProfileId
+  // Resolve and apply the active download profile. media.downloadProfileId
   // wins (snapshot-on-add); fallback to system default per flavor.
-  // Phase 5+ may layer folder.qualityProfileId between the two.
-  const profile = await findActiveQualityProfile(db, {
-    mediaQualityProfileId: row.qualityProfileId ?? null,
-    folderQualityProfileId: null,
+  // folder.downloadProfileId can layer between the two.
+  const profile = await findActiveDownloadProfile(db, {
+    mediaDownloadProfileId: row.downloadProfileId ?? null,
+    folderDownloadProfileId: null,
     flavor,
   });
   const activeRules: ScoringRules = profile
-    ? applyQualityProfile(rules, profile)
+    ? applyDownloadProfile(rules, profile)
     : rules;
 
   // Blocklist

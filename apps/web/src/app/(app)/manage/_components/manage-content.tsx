@@ -7,7 +7,7 @@ import { UsersTab } from "@/components/management/users-tab";
 import { MediaServersSection } from "./media-servers-section";
 import { DownloadsSection } from "./downloads-section";
 import { DownloadPreferencesSection } from "./download-preferences-section";
-import { QualityProfilesSection } from "./quality-profiles-section";
+import { DownloadProfilesSection } from "./download-profiles-section";
 import { SearchTabSection } from "./search-tab-section";
 import { ManualScanSection } from "./manual-scan-section";
 import { TraktSection } from "./trakt-section";
@@ -20,7 +20,7 @@ const SECTION_COMPONENTS: Record<string, React.ComponentType> = {
   "media-servers": MediaServersSection,
   trakt: TraktSection,
   downloads: DownloadsSection,
-  "quality-profiles": QualityProfilesSection,
+  "download-profiles": DownloadProfilesSection,
   "download-preferences": DownloadPreferencesSection,
   "manual-scan": ManualScanSection,
   about: AboutSection,

@@ -95,7 +95,7 @@ const formatLabel = (q: Quality, s: Source): string => {
 
 /* ─── Section ─── */
 
-export function QualityProfilesSection(): React.JSX.Element {
+export function DownloadProfilesSection(): React.JSX.Element {
   const [editorOpen, setEditorOpen] = useState(false);
   const [draft, setDraft] = useState<ProfileDraft>(EMPTY_DRAFT);
   const [confirmDelete, setConfirmDelete] = useState<{
@@ -103,14 +103,14 @@ export function QualityProfilesSection(): React.JSX.Element {
     name: string;
   } | null>(null);
 
-  const { data: profiles, isLoading } = trpc.qualityProfile.list.useQuery();
+  const { data: profiles, isLoading } = trpc.downloadProfile.list.useQuery();
   const utils = trpc.useUtils();
 
   const invalidate = (): void => {
-    void utils.qualityProfile.list.invalidate();
+    void utils.downloadProfile.list.invalidate();
   };
 
-  const setDefault = trpc.qualityProfile.setDefault.useMutation({
+  const setDefault = trpc.downloadProfile.setDefault.useMutation({
     onSuccess: () => {
       invalidate();
       toast.success("Default profile updated");
@@ -118,7 +118,7 @@ export function QualityProfilesSection(): React.JSX.Element {
     onError: (err) => toast.error(`Failed: ${err.message}`),
   });
 
-  const remove = trpc.qualityProfile.delete.useMutation({
+  const remove = trpc.downloadProfile.delete.useMutation({
     onSuccess: () => {
       invalidate();
       toast.success("Profile removed");
@@ -127,7 +127,7 @@ export function QualityProfilesSection(): React.JSX.Element {
     onError: (err) => toast.error(`Failed: ${err.message}`),
   });
 
-  const seed = trpc.qualityProfile.seed.useMutation({
+  const seed = trpc.downloadProfile.seed.useMutation({
     onSuccess: () => {
       invalidate();
       toast.success("Default profiles seeded");
@@ -175,7 +175,7 @@ export function QualityProfilesSection(): React.JSX.Element {
   return (
     <>
       <SettingsSection
-        title="Quality Profiles"
+        title="Download Profiles"
         description="Per-flavor profiles control which (quality, source) combos the search accepts and how strongly each is preferred. Folders pick a default profile; new media snapshots it on add."
       >
         {isLoading ? (
@@ -185,7 +185,7 @@ export function QualityProfilesSection(): React.JSX.Element {
         ) : typedProfiles.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border px-6 py-10 text-center">
             <p className="text-sm font-medium text-foreground">
-              No quality profiles yet
+              No download profiles yet
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Seed the TRaSH-aligned defaults (one per flavor) or create
@@ -390,14 +390,14 @@ function ProfileEditorDialog({
     if (open) setDraft(initialDraft);
   }, [open, initialDraft]);
 
-  const create = trpc.qualityProfile.create.useMutation({
+  const create = trpc.downloadProfile.create.useMutation({
     onSuccess: () => {
       toast.success("Profile created");
       onSaved();
     },
     onError: (err) => toast.error(`Failed: ${err.message}`),
   });
-  const update = trpc.qualityProfile.update.useMutation({
+  const update = trpc.downloadProfile.update.useMutation({
     onSuccess: () => {
       toast.success("Profile updated");
       onSaved();
@@ -447,7 +447,7 @@ function ProfileEditorDialog({
       <DialogContent className="max-h-[85vh] overflow-y-auto md:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {isEditing ? "Edit Quality Profile" : "New Quality Profile"}
+            {isEditing ? "Edit Download Profile" : "New Download Profile"}
           </DialogTitle>
           <DialogDescription>
             Tune which (quality, source) combos the search accepts and how

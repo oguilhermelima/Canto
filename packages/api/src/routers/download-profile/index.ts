@@ -1,30 +1,30 @@
 import { TRPCError } from "@trpc/server";
 import { and, eq, ne } from "drizzle-orm";
-import { qualityProfile } from "@canto/db/schema";
+import { downloadProfile } from "@canto/db/schema";
 import {
-  createQualityProfileInput,
-  deleteQualityProfileInput,
-  listQualityProfilesInput,
-  setDefaultQualityProfileInput,
-  updateQualityProfileInput,
+  createDownloadProfileInput,
+  deleteDownloadProfileInput,
+  listDownloadProfilesInput,
+  setDefaultDownloadProfileInput,
+  updateDownloadProfileInput,
 } from "@canto/validators";
 import {
-  findAllQualityProfiles,
-  findQualityProfileById,
-  findQualityProfilesByFlavor,
-  seedDefaultQualityProfiles,
-} from "@canto/core/infra/torrents/quality-profile-repository";
+  findAllDownloadProfiles,
+  findDownloadProfileById,
+  findDownloadProfilesByFlavor,
+  seedDefaultDownloadProfiles,
+} from "@canto/core/infra/torrents/download-profile-repository";
 
 import { createTRPCRouter, adminProcedure } from "../../trpc";
 
-export const qualityProfileRouter = createTRPCRouter({
+export const downloadProfileRouter = createTRPCRouter({
   list: adminProcedure
-    .input(listQualityProfilesInput.optional())
+    .input(listDownloadProfilesInput.optional())
     .query(({ ctx, input }) => {
       if (input?.flavor) {
-        return findQualityProfilesByFlavor(ctx.db, input.flavor);
+        return findDownloadProfilesByFlavor(ctx.db, input.flavor);
       }
-      return findAllQualityProfiles(ctx.db);
+      return findAllDownloadProfiles(ctx.db);
     }),
 
   /**
@@ -32,26 +32,26 @@ export const qualityProfileRouter = createTRPCRouter({
    * marked default). Idempotent — does nothing if any profile rows
    * already exist.
    */
-  seed: adminProcedure.mutation(({ ctx }) => seedDefaultQualityProfiles(ctx.db)),
+  seed: adminProcedure.mutation(({ ctx }) => seedDefaultDownloadProfiles(ctx.db)),
 
   get: adminProcedure
-    .input(setDefaultQualityProfileInput)
+    .input(setDefaultDownloadProfileInput)
     .query(async ({ ctx, input }) => {
-      const profile = await findQualityProfileById(ctx.db, input.id);
+      const profile = await findDownloadProfileById(ctx.db, input.id);
       if (!profile) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Quality profile not found",
+          message: "Download profile not found",
         });
       }
       return profile;
     }),
 
   create: adminProcedure
-    .input(createQualityProfileInput)
+    .input(createDownloadProfileInput)
     .mutation(async ({ ctx, input }) => {
       const [row] = await ctx.db
-        .insert(qualityProfile)
+        .insert(downloadProfile)
         .values({
           name: input.name,
           flavor: input.flavor,
@@ -65,17 +65,17 @@ export const qualityProfileRouter = createTRPCRouter({
       if (!row) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to create quality profile",
+          message: "Failed to create download profile",
         });
       }
       return row;
     }),
 
   update: adminProcedure
-    .input(updateQualityProfileInput)
+    .input(updateDownloadProfileInput)
     .mutation(async ({ ctx, input }) => {
       const [row] = await ctx.db
-        .update(qualityProfile)
+        .update(downloadProfile)
         .set({
           name: input.name,
           flavor: input.flavor,
@@ -85,28 +85,28 @@ export const qualityProfileRouter = createTRPCRouter({
           minTotalScore: input.minTotalScore,
           updatedAt: new Date(),
         })
-        .where(eq(qualityProfile.id, input.id))
+        .where(eq(downloadProfile.id, input.id))
         .returning();
       if (!row) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Quality profile not found",
+          message: "Download profile not found",
         });
       }
       return row;
     }),
 
   delete: adminProcedure
-    .input(deleteQualityProfileInput)
+    .input(deleteDownloadProfileInput)
     .mutation(async ({ ctx, input }) => {
       const result = await ctx.db
-        .delete(qualityProfile)
-        .where(eq(qualityProfile.id, input.id))
-        .returning({ id: qualityProfile.id });
+        .delete(downloadProfile)
+        .where(eq(downloadProfile.id, input.id))
+        .returning({ id: downloadProfile.id });
       if (result.length === 0) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Quality profile not found",
+          message: "Download profile not found",
         });
       }
       return { success: true };
@@ -118,30 +118,30 @@ export const qualityProfileRouter = createTRPCRouter({
    * automatically unsets any previous one.
    */
   setDefault: adminProcedure
-    .input(setDefaultQualityProfileInput)
+    .input(setDefaultDownloadProfileInput)
     .mutation(async ({ ctx, input }) => {
-      const target = await findQualityProfileById(ctx.db, input.id);
+      const target = await findDownloadProfileById(ctx.db, input.id);
       if (!target) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Quality profile not found",
+          message: "Download profile not found",
         });
       }
       await ctx.db.transaction(async (tx) => {
         // Clear any other default in the same flavor
         await tx
-          .update(qualityProfile)
+          .update(downloadProfile)
           .set({ isDefault: false, updatedAt: new Date() })
           .where(
             and(
-              eq(qualityProfile.flavor, target.flavor),
-              ne(qualityProfile.id, input.id),
+              eq(downloadProfile.flavor, target.flavor),
+              ne(downloadProfile.id, input.id),
             ),
           );
         await tx
-          .update(qualityProfile)
+          .update(downloadProfile)
           .set({ isDefault: true, updatedAt: new Date() })
-          .where(eq(qualityProfile.id, input.id));
+          .where(eq(downloadProfile.id, input.id));
       });
       return { success: true };
     }),

@@ -135,10 +135,10 @@ export const downloadFolder = pgTable("download_folder", {
   isDefault: boolean("is_default").notNull().default(false),
   /** Whether this folder accepts downloads */
   enabled: boolean("enabled").notNull().default(true),
-  /** Default quality profile applied to media that lands in this folder
-   *  via routing. Snapshotted onto media.qualityProfileId at add-time. */
-  qualityProfileId: uuid("quality_profile_id").references(
-    () => qualityProfile.id,
+  /** Default download profile applied to media that lands in this folder
+   *  via routing. Snapshotted onto media.downloadProfileId at add-time. */
+  downloadProfileId: uuid("download_profile_id").references(
+    () => downloadProfile.id,
     { onDelete: "set null" },
   ),
 
@@ -402,8 +402,8 @@ export const media = pgTable(
     // Refresh strategy
     nextAirDate: date("next_air_date"),
     extrasUpdatedAt: timestamp("extras_updated_at", { withTimezone: true }),
-    qualityProfileId: uuid("quality_profile_id").references(
-      () => qualityProfile.id,
+    downloadProfileId: uuid("download_profile_id").references(
+      () => downloadProfile.id,
       { onDelete: "set null" },
     ),
 
@@ -765,21 +765,21 @@ export const watchProviderLink = pgTable("watch_provider_link", {
   searchUrlTemplate: text("search_url_template"),
 });
 
-// ─── Quality profiles ───
+// ─── Download profiles ───
 
 /**
- * One entry in {@link qualityProfile.allowedFormats}. Each entry expresses
+ * One entry in {@link downloadProfile.allowedFormats}. Each entry expresses
  * "this (quality, source) combo is acceptable, and this is its base
  * weight in the score". Higher weight = more preferred. Entries are
  * order-independent; weight is the source of truth.
  */
-export type QualityProfileAllowedFormat = {
+export type DownloadProfileAllowedFormat = {
   quality: string;
   source: string;
   weight: number;
 };
 
-export const qualityProfile = pgTable("quality_profile", {
+export const downloadProfile = pgTable("download_profile", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 100 }).notNull(),
   /** Which media flavor this profile may be assigned to. */
@@ -788,7 +788,7 @@ export const qualityProfile = pgTable("quality_profile", {
    *  whose (quality, source) is not in this list are rejected by the
    *  scoring engine. */
   allowedFormats: jsonb("allowed_formats")
-    .$type<QualityProfileAllowedFormat[]>()
+    .$type<DownloadProfileAllowedFormat[]>()
     .notNull(),
   /** Cutoff combo. Releases at or above the cutoff don't trigger upgrade
    *  searches. Both columns are null when the profile has no cutoff. */
@@ -1558,9 +1558,9 @@ export const accountRelations = relations(account, ({ one }) => ({
 export const downloadFolderRelations = relations(downloadFolder, ({ many, one }) => ({
   media: many(media),
   mediaPaths: many(folderMediaPath),
-  qualityProfile: one(qualityProfile, {
-    fields: [downloadFolder.qualityProfileId],
-    references: [qualityProfile.id],
+  downloadProfile: one(downloadProfile, {
+    fields: [downloadFolder.downloadProfileId],
+    references: [downloadProfile.id],
   }),
 }));
 
@@ -1584,9 +1584,9 @@ export const mediaRelations = relations(media, ({ many, one }) => ({
     fields: [media.libraryId],
     references: [downloadFolder.id],
   }),
-  qualityProfile: one(qualityProfile, {
-    fields: [media.qualityProfileId],
-    references: [qualityProfile.id],
+  downloadProfile: one(downloadProfile, {
+    fields: [media.downloadProfileId],
+    references: [downloadProfile.id],
   }),
   seasons: many(season),
   files: many(mediaFile),
@@ -1712,7 +1712,7 @@ export const mediaVersionEpisodeRelations = relations(mediaVersionEpisode, ({ on
   }),
 }));
 
-export const qualityProfileRelations = relations(qualityProfile, ({ many }) => ({
+export const downloadProfileRelations = relations(downloadProfile, ({ many }) => ({
   media: many(media),
   folders: many(downloadFolder),
 }));

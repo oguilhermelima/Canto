@@ -183,6 +183,13 @@
       "when": 1777351120579,
       "tag": "0025_drop_admin_user_preferences",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1777351425611,
+      "tag": "0026_mighty_killmonger",
+      "breakpoints": true
     }
   ]
 }

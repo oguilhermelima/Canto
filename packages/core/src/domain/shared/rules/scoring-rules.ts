@@ -5,7 +5,7 @@ import type { ReleaseGroupTier } from "../../torrents/rules/release-groups";
  * Configurable scoring rules. The {@link calculateConfidence} engine is
  * a pure function of `(attrs, ctx, rules)` — every weight, threshold and
  * bonus lives in this object so it can be overridden per-user (Phase 2),
- * per-quality-profile (Phase 5), or per-test.
+ * per-download-profile (Phase 5), or per-test.
  *
  * Layered overrides (Phase 2+) are applied via {@link mergeScoringRules},
  * which does a shallow merge with per-record key-level merge for the
@@ -25,7 +25,7 @@ export interface ScoringRules {
   /** Whitelist of (quality, source) combos with their joint weight. When
    *  set, the engine ignores the per-axis lookups and rejects any release
    *  whose combo isn't on the list. Null = no whitelist (fallback to
-   *  per-axis). Phase 5 quality profiles populate this field; without a
+   *  per-axis). Phase 5 download profiles populate this field; without a
    *  profile it stays null. */
   allowedFormats:
     | Array<{ quality: Quality; source: Source; weight: number }>
@@ -84,7 +84,7 @@ export interface ScoringRules {
 
   /** Final filter on the normalised score (0–100). Releases below this
    *  threshold are returned as 0 (i.e. dropped by the search). 0 = no
-   *  threshold. Phase 5 quality profiles populate this from the profile;
+   *  threshold. Phase 5 download profiles populate this from the profile;
    *  defaults expose it for convenience but leave it disabled. */
   minTotalScore: number;
 }
@@ -141,7 +141,7 @@ export const EMPTY_ADMIN_DOWNLOAD_POLICY: AdminDownloadPolicy = {
 /**
  * Layer a user's download preferences onto a base {@link ScoringRules}.
  *
- * Bonuses live in `base.preferenceBonuses` so a quality profile could
+ * Bonuses live in `base.preferenceBonuses` so a download profile could
  * change the magnitudes without rewriting this function. Each preferred
  * language adds `perPreferredLanguage` to that language's
  * `languageBonuses` entry (additive — profile language boosts compose
@@ -230,7 +230,7 @@ export function applyAdminDownloadPolicy(
 
 /**
  * Type-safe per-key merge for the dictionary-shaped rule fields.
- * Phase 2/Phase 5 layer user prefs and quality-profile overrides on top
+ * Phase 2/Phase 5 layer user prefs and download-profile overrides on top
  * of defaults using these helpers so the override only needs to specify
  * the keys it wants to change.
  *

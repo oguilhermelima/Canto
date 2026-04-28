@@ -15,7 +15,7 @@ export const allowedFormatEntry = z.object({
   weight: z.number().int().min(0).max(100),
 });
 
-const baseQualityProfileFields = {
+const baseDownloadProfileFields = {
   name: z.string().min(1).max(100),
   flavor: releaseFlavor,
   allowedFormats: z.array(allowedFormatEntry).min(1).max(64),
@@ -24,29 +24,29 @@ const baseQualityProfileFields = {
   minTotalScore: z.number().int().min(0).max(100).default(0),
 };
 
-export const createQualityProfileInput = z.object(baseQualityProfileFields);
+export const createDownloadProfileInput = z.object(baseDownloadProfileFields);
 
-export const updateQualityProfileInput = z.object({
+export const updateDownloadProfileInput = z.object({
   id: z.string().uuid(),
-  ...baseQualityProfileFields,
+  ...baseDownloadProfileFields,
 });
 
-export const setDefaultQualityProfileInput = z.object({
-  id: z.string().uuid(),
-});
-
-export const deleteQualityProfileInput = z.object({
+export const setDefaultDownloadProfileInput = z.object({
   id: z.string().uuid(),
 });
 
-export const listQualityProfilesInput = z.object({
+export const deleteDownloadProfileInput = z.object({
+  id: z.string().uuid(),
+});
+
+export const listDownloadProfilesInput = z.object({
   flavor: releaseFlavor.optional(),
 });
 
-export type CreateQualityProfileInput = z.infer<
-  typeof createQualityProfileInput
+export type CreateDownloadProfileInput = z.infer<
+  typeof createDownloadProfileInput
 >;
-export type UpdateQualityProfileInput = z.infer<
-  typeof updateQualityProfileInput
+export type UpdateDownloadProfileInput = z.infer<
+  typeof updateDownloadProfileInput
 >;
 export type AllowedFormatEntry = z.infer<typeof allowedFormatEntry>;

@@ -36,7 +36,7 @@ export function normalizedMediaToResponse(m: NormalizedMedia, tvdbSeasons?: Norm
     addedAt: null as Date | null,
     continuousDownload: false,
     processingStatus: "ready",
-    qualityProfileId: null as string | null,
+    downloadProfileId: null as string | null,
     createdAt: new Date(),
     updatedAt: new Date(),
     metadataUpdatedAt: null as Date | null,

@@ -69,7 +69,7 @@ export const createFolderInput = z.object({
   rules: routingRules.nullable().optional(),
   priority: z.number().int().default(0),
   isDefault: z.boolean().default(false),
-  qualityProfileId: z.string().uuid().nullable().optional(),
+  downloadProfileId: z.string().uuid().nullable().optional(),
 });
 
 export const updateFolderInput = z.object({
@@ -82,7 +82,7 @@ export const updateFolderInput = z.object({
   priority: z.number().int().optional(),
   isDefault: z.boolean().optional(),
   enabled: z.boolean().optional(),
-  qualityProfileId: z.string().uuid().nullable().optional(),
+  downloadProfileId: z.string().uuid().nullable().optional(),
 });
 
 // ── Media path inputs ──
