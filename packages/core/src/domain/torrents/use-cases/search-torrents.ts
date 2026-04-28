@@ -3,10 +3,7 @@ import type { Database } from "@canto/db/client";
 import { IndexerSearchError } from "@canto/core/domain/torrents/errors";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import { calculateConfidence } from "../../shared/rules/scoring";
-import {
-  DEFAULT_SCORING_RULES,
-  type ScoringRules,
-} from "../../shared/rules/scoring-rules";
+import type { ScoringRules } from "../../shared/rules/scoring-rules";
 import { resolveMediaFlavor } from "../../shared/rules/media-flavor";
 import {
   parseReleaseAttributes,
@@ -17,7 +14,10 @@ import {
   meetsCutoff,
   type QualityProfile,
 } from "../rules/quality-profile";
-import type { ReleaseFlavor } from "../rules/release-groups";
+import type {
+  ReleaseFlavor,
+  ReleaseGroupTierSets,
+} from "../rules/release-groups";
 import type { ConfidenceContext } from "../types/common";
 import type { IndexerResult, SearchContext } from "../types/torrent";
 import type { IndexerPort } from "../ports/indexer";
@@ -26,6 +26,7 @@ import {
   findBlocklistByMediaId,
 } from "../../../infra/repositories";
 import { findActiveQualityProfile } from "../../../infra/torrents/quality-profile-repository";
+import { findReleaseGroupLookups } from "../../../infra/torrents/download-config-repository";
 
 export interface SearchResult extends ReleaseAttributes {
   guid: string;
@@ -76,6 +77,7 @@ interface PreparedSearch {
   profile: QualityProfile | null;
   confidenceCtx: ConfidenceContext;
   flavor: ReleaseFlavor;
+  releaseGroupLookups: ReleaseGroupTierSets;
   blockedTitles: Set<string>;
   page: number;
   pageSize: number;
@@ -86,6 +88,7 @@ async function prepareSearch(
   input: SearchInput,
   rules: ScoringRules,
 ): Promise<PreparedSearch> {
+  const allLookups = await findReleaseGroupLookups(db);
   const row = await findMediaById(db, input.mediaId);
   if (!row) throw new MediaNotFoundError(input.mediaId);
 
@@ -180,6 +183,7 @@ async function prepareSearch(
     profile,
     confidenceCtx,
     flavor,
+    releaseGroupLookups: allLookups[flavor],
     blockedTitles,
     page,
     pageSize,
@@ -226,6 +230,7 @@ function scoreRawResults(
       age: r.age ?? 0,
       flags: r.indexerFlags ?? [],
       flavor: prep.flavor,
+      releaseGroupLookups: prep.releaseGroupLookups,
     });
     const confidence = calculateConfidence(
       attrs,
@@ -264,10 +269,10 @@ export async function searchTorrents(
   indexers: IndexerPort[],
   /** Per-call scoring rules. Callers that have a user context (the tRPC
    *  search procedure) layer the user's download preferences on top of
-   *  the defaults via {@link applyDownloadPreferences}. Background jobs
-   *  with no user (continuous-download, rss-sync) fall through to the
-   *  defaults. */
-  rules: ScoringRules = DEFAULT_SCORING_RULES,
+   *  the admin config via {@link applyDownloadPreferences}. Background
+   *  jobs with no user (continuous-download, rss-sync) pass the admin
+   *  config rules untouched — see {@link findDownloadConfig}. */
+  rules: ScoringRules,
 ): Promise<PaginatedSearchResults> {
   const prep = await prepareSearch(db, input, rules);
 
@@ -331,7 +336,7 @@ export async function searchOnIndexer(
   db: Database,
   input: SearchOnIndexerInput,
   indexers: IndexerPort[],
-  rules: ScoringRules = DEFAULT_SCORING_RULES,
+  rules: ScoringRules,
 ): Promise<IndexerSearchResult> {
   const idx = indexers.find((i) => i.id === input.indexerId);
   if (!idx) {

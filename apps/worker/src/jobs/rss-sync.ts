@@ -14,6 +14,10 @@ import {
   findMediaByIdWithSeasons,
   findMonitoredShowsForRss,
 } from "@canto/core/infra/repositories";
+import {
+  findDownloadConfig,
+  findReleaseGroupLookups,
+} from "@canto/core/infra/torrents/download-config-repository";
 
 /**
  * RSS Sync: Poll Prowlarr RSS feeds and auto-download matching releases
@@ -55,6 +59,12 @@ export async function handleRssSync(): Promise<void> {
 
   console.log(`[rss-sync] ${rssItems.length} RSS item(s) to process`);
 
+  // Hydrate scoring config + tier lookups once for the whole batch.
+  const [config, allLookups] = await Promise.all([
+    findDownloadConfig(db),
+    findReleaseGroupLookups(db),
+  ]);
+
   // 3. Match and download
   let downloadCount = 0;
 
@@ -83,10 +93,13 @@ export async function handleRssSync(): Promise<void> {
         age: item.age ?? 0,
         flags: item.indexerFlags ?? [],
         flavor,
+        releaseGroupLookups: allLookups[flavor],
       });
-      const confidence = calculateConfidence(attrs, {
-        hasDigitalRelease: true,
-      });
+      const confidence = calculateConfidence(
+        attrs,
+        { hasDigitalRelease: true },
+        config.rules,
+      );
       if (confidence <= 0) continue;
 
       // Check blocklist

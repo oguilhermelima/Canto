@@ -7,6 +7,7 @@ import type { DownloadClientPort } from "../../shared/ports/download-client";
 import type { IndexerPort } from "../ports/indexer";
 import { searchTorrents } from "./search-torrents";
 import { downloadTorrent } from "./download-torrent";
+import { findDownloadConfig } from "../../../infra/torrents/download-config-repository";
 
 interface ContinuousDownloadMedia {
   id: string;
@@ -33,11 +34,12 @@ export async function tryContinuousDownload(
   console.log(`[continuous-download] Searching next episode S${String(importedSeasonNumber).padStart(2, "0")}E${String(nextEp).padStart(2, "0")} for "${mediaRow.title}"`);
 
   try {
+    const { rules } = await findDownloadConfig(db);
     const { results } = await searchTorrents(db, {
       mediaId: mediaRow.id,
       seasonNumber: importedSeasonNumber,
       episodeNumbers: [nextEp],
-    }, indexers);
+    }, indexers, rules);
 
     if (results.length === 0) {
       console.log(`[continuous-download] No results for next episode`);

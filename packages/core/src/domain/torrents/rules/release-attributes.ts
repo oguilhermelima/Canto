@@ -15,6 +15,7 @@ import { detectLanguages } from "./parsing-languages";
 import {
   classifyReleaseGroup,
   type ReleaseGroupTier,
+  type ReleaseGroupTierSets,
   type ReleaseFlavor,
 } from "./release-groups";
 
@@ -98,6 +99,10 @@ export interface RawReleaseSignals {
    *  release-group tier list applies (movies / shows / anime have
    *  disjoint conventions). */
   flavor: ReleaseFlavor;
+  /** Per-flavor tier sets hydrated from `download_release_group`. The
+   *  caller loads this once per search and passes the same map for every
+   *  result so classification stays an O(1) set membership check. */
+  releaseGroupLookups: ReleaseGroupTierSets;
 }
 
 /**
@@ -107,7 +112,7 @@ export interface RawReleaseSignals {
 export function parseReleaseAttributes(
   raw: RawReleaseSignals,
 ): ReleaseAttributes {
-  const { title, seeders, age, flags, flavor } = raw;
+  const { title, seeders, age, flags, flavor, releaseGroupLookups } = raw;
   const languages = detectLanguages(title);
   const releaseGroup = detectReleaseGroup(title);
 
@@ -133,7 +138,7 @@ export function parseReleaseAttributes(
     edition: detectEdition(title),
     streamingService: detectStreamingService(title),
     releaseGroup,
-    groupTier: classifyReleaseGroup(releaseGroup, flavor),
+    groupTier: classifyReleaseGroup(releaseGroup, flavor, releaseGroupLookups),
     languages,
     hasMultiAudioToken,
     distinctLanguageCount,

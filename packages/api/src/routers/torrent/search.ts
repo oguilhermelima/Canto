@@ -9,11 +9,9 @@ import {
   searchOnIndexer,
   searchTorrents,
 } from "@canto/core/domain/torrents/use-cases/search-torrents";
-import {
-  DEFAULT_SCORING_RULES,
-  applyDownloadPreferences,
-} from "@canto/core/domain/shared/rules/scoring-rules";
+import { applyDownloadPreferences } from "@canto/core/domain/shared/rules/scoring-rules";
 import { findDownloadPreferences } from "@canto/core/infra/user/preferences-repository";
+import { findDownloadConfig } from "@canto/core/infra/torrents/download-config-repository";
 
 import { createTRPCRouter, adminProcedure } from "../../trpc";
 
@@ -24,11 +22,12 @@ export const torrentSearchRouter = createTRPCRouter({
   search: adminProcedure
     .input(torrentSearchInput)
     .query(async ({ ctx, input }) => {
-      const [indexers, prefs] = await Promise.all([
+      const [indexers, prefs, config] = await Promise.all([
         buildIndexers(),
         findDownloadPreferences(ctx.db, ctx.session.user.id),
+        findDownloadConfig(ctx.db),
       ]);
-      const rules = applyDownloadPreferences(DEFAULT_SCORING_RULES, prefs);
+      const rules = applyDownloadPreferences(config.rules, prefs);
       return searchTorrents(ctx.db, input, indexers, rules);
     }),
 
@@ -45,11 +44,12 @@ export const torrentSearchRouter = createTRPCRouter({
   searchOnIndexer: adminProcedure
     .input(torrentSearchOnIndexerInput)
     .query(async ({ ctx, input }) => {
-      const [indexers, prefs] = await Promise.all([
+      const [indexers, prefs, config] = await Promise.all([
         buildIndexers(),
         findDownloadPreferences(ctx.db, ctx.session.user.id),
+        findDownloadConfig(ctx.db),
       ]);
-      const rules = applyDownloadPreferences(DEFAULT_SCORING_RULES, prefs);
+      const rules = applyDownloadPreferences(config.rules, prefs);
       return searchOnIndexer(ctx.db, input, indexers, rules);
     }),
 });

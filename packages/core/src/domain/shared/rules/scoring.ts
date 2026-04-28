@@ -1,12 +1,8 @@
 import type { ConfidenceContext } from "../../torrents/types/common";
 import type { ReleaseAttributes } from "../../torrents/rules/release-attributes";
-import {
-  DEFAULT_SCORING_RULES,
-  type ScoringRules,
-} from "./scoring-rules";
+import type { ScoringRules } from "./scoring-rules";
 
 export {
-  DEFAULT_SCORING_RULES,
   EMPTY_DOWNLOAD_PREFERENCES,
   applyDownloadPreferences,
   mergeRecord,
@@ -51,7 +47,7 @@ export type { ScoringRules, DownloadPreferences } from "./scoring-rules";
 export function calculateConfidence(
   attrs: ReleaseAttributes,
   ctx: ConfidenceContext,
-  rules: ScoringRules = DEFAULT_SCORING_RULES,
+  rules: ScoringRules,
 ): number {
   if (attrs.seeders === 0) return 0;
 

@@ -154,7 +154,8 @@ export async function seedDefaultQualityProfiles(db: Database) {
  *   1. media.qualityProfileId (snapshot-on-add)
  *   2. folderQualityProfileId (the folder media routes into)
  *   3. system default profile for media's flavor
- *   4. null — no profile, use {@link DEFAULT_SCORING_RULES}
+ *   4. null — no profile, fall back to the admin scoring rules from
+ *              `download_config`
  *
  * The caller decides who supplies `folderQualityProfileId`. For new
  * downloads coming from `searchTorrents`, that's the result of running

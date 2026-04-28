@@ -11,6 +11,7 @@ import {
   createBlocklistEntry,
   findTorrentById,
 } from "../../../infra/repositories";
+import { findDownloadConfig } from "../../../infra/torrents/download-config-repository";
 
 interface StalledTorrent {
   id: string;
@@ -53,6 +54,7 @@ export async function retryStalledTorrent(
   if (indexers.length === 0) return;
 
   try {
+    const { rules } = await findDownloadConfig(db);
     const { results } = await searchTorrents(
       db,
       {
@@ -61,6 +63,7 @@ export async function retryStalledTorrent(
         episodeNumbers: row.episodeNumbers ?? undefined,
       },
       indexers,
+      rules,
     );
 
     if (results.length === 0) {
