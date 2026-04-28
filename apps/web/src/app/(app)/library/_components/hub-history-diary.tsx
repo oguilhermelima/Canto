@@ -120,7 +120,7 @@ function DiaryCard({
     <Link
       href={href}
       className={cn(
-        "group relative flex shrink-0 overflow-hidden rounded-xl transition-[box-shadow] duration-200 hover:z-10 hover:ring-2 hover:ring-foreground/20",
+        "group relative mt-1 flex shrink-0 overflow-hidden rounded-xl transition-[box-shadow] duration-200 hover:z-10 hover:ring-2 hover:ring-foreground/20",
         CARD_WIDTH_CLASS,
       )}
     >

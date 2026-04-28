@@ -83,7 +83,7 @@ export function CollectionsSectionsView({
 
   if (isLoading || layoutQuery.isLoading) {
     return (
-      <div className="flex flex-col gap-8 md:gap-12">
+      <div className="flex flex-col gap-12">
         {Array.from({ length: 3 }).map((_, i) => (
           <MediaCarousel
             key={i}
@@ -122,7 +122,7 @@ export function CollectionsSectionsView({
   }
 
   return (
-    <div className="flex flex-col gap-8 md:gap-12">
+    <div className="flex flex-col gap-12">
       {visibleLists.map((list) => (
         <CollectionSection
           key={list.id}

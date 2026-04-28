@@ -28,7 +28,7 @@ export function HubCollectionsSection(): React.JSX.Element {
     return (
       <section className="relative">
         <SectionTitle title="Collections" icon={FolderHeart} seeMorePath="/library/collections" linkAs={Link} />
-        <div className="mt-2 flex gap-4 overflow-x-auto md:mt-4 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+        <div className="flex gap-4 overflow-x-auto pb-4 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
           {Array.from({ length: 4 }).map((_, index) => (
             <div
               key={index}
@@ -64,7 +64,7 @@ export function HubCollectionsSection(): React.JSX.Element {
     return (
       <section>
         <SectionTitle title="Collections" icon={FolderHeart} />
-        <div className="mt-2 md:mt-4 rounded-2xl px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24 border border-border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
+        <div className="rounded-2xl px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24 border border-border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
           No collections yet. Launch your first collection to organize your galaxy of titles.
         </div>
       </section>
@@ -75,7 +75,7 @@ export function HubCollectionsSection(): React.JSX.Element {
     <section className="relative">
       <SectionTitle title="Collections" icon={FolderHeart} seeMorePath="/library/collections" linkAs={Link} />
 
-      <div className="mt-2 flex gap-4 overflow-x-auto md:mt-4 overflow-y-visible pt-1 pb-2 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+      <div className="flex gap-4 overflow-x-auto overflow-y-visible pb-4 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
         {visibleLists.map((list) => (
           <CollectionCard key={list.id} list={list} />
         ))}

@@ -31,7 +31,7 @@ export interface LibraryCarouselProps<T> {
 }
 
 const SCROLL_CONTAINER_CLASSES =
-  "flex gap-4 overflow-x-auto overflow-y-visible pt-1 pb-2 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24";
+  "flex gap-4 overflow-x-auto overflow-y-visible pb-4 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24";
 const END_SPACER_CLASSES = "w-4 shrink-0 md:w-8 lg:w-12 xl:w-16 2xl:w-24";
 
 export const LibraryCarousel = <T,>({
@@ -76,7 +76,7 @@ export const LibraryCarousel = <T,>({
     return (
       <section className="relative">
         <SectionTitle title={title} icon={icon} seeMorePath={seeAllHref} linkAs={Link} />
-        <div className={cn("mt-2 md:mt-4", SCROLL_CONTAINER_CLASSES)}>
+        <div className={SCROLL_CONTAINER_CLASSES}>
           {Array.from({ length: skeletonCount }).map((_, index) => (
             <div key={index} className={skeletonClasses} />
           ))}
@@ -90,7 +90,7 @@ export const LibraryCarousel = <T,>({
     return (
       <section className="relative">
         <SectionTitle title={title} icon={icon} seeMorePath={seeAllHref} linkAs={Link} />
-        <div className="mt-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+        <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
           <StateMessage preset="error" onRetry={onRetry} minHeight="200px" />
         </div>
       </section>
@@ -101,7 +101,7 @@ export const LibraryCarousel = <T,>({
     return (
       <section className="relative">
         <SectionTitle title={title} icon={icon} seeMorePath={seeAllHref} linkAs={Link} />
-        <div className="mt-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+        <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
           <StateMessage preset={emptyPreset} minHeight="200px" />
         </div>
       </section>
@@ -112,7 +112,7 @@ export const LibraryCarousel = <T,>({
     <section className="relative">
       <SectionTitle title={title} icon={icon} seeMorePath={seeAllHref} linkAs={Link} />
 
-      <div className="group/carousel relative mt-4">
+      <div className="group/carousel relative">
         {canScrollLeft && (
           <button
             aria-label="Scroll left"
