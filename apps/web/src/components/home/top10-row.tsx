@@ -98,7 +98,7 @@ export function Top10Row({
           {isLoading && items.length === 0
             ? Array.from({ length: 10 }).map((_, i) => (
                 <div key={i} className="flex shrink-0 items-end gap-1 md:gap-2">
-                  <div className="h-[260px] w-[100px] sm:h-[300px] sm:w-[120px] lg:h-[330px] lg:w-[140px] 2xl:h-[360px] 2xl:w-[160px]" />
+                  <RankNumeral rank={i + 1} />
                   <MediaCardSkeleton className="w-[180px] shrink-0 animate-pulse sm:w-[200px] lg:w-[220px] 2xl:w-[240px]" />
                 </div>
               ))
