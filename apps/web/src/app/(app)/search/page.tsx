@@ -31,6 +31,11 @@ export default function SearchPage(): React.JSX.Element {
     searchTypeRef.current = searchType;
   });
 
+  // The debounce only refreshes the fetch trigger (`query`) and the URL — it
+  // never writes to `inputValue`. The user's typed string is sacred: only
+  // `handleInputChange` may touch it. This is load-bearing — if anything else
+  // ever calls `setInputValue`, a URL roundtrip that normalizes whitespace
+  // will silently strip a trailing space the user is mid-typing.
   const debouncedUpdateSearch = useDebounceCallback((value: string) => {
     setQuery(value);
     const params = new URLSearchParams(searchParams.toString());
@@ -47,15 +52,12 @@ export default function SearchPage(): React.JSX.Element {
     [debouncedUpdateSearch],
   );
 
-  // Sync query state with URL search params (topbar updates the URL)
+  // Sync the fetch trigger (`query`) with URL search params for external nav
+  // (back/forward, topbar deep-link). Never touches `inputValue` — see comment
+  // on `debouncedUpdateSearch`.
   useEffect(() => {
     const q = searchParams.get("q") ?? "";
-    if (q !== query) {
-      setQuery(q);
-      setInputValue(q);
-    }
-    // Only react to external URL changes — excluding `query` from deps
-    // prevents the reset-then-restore flash when our own debounce fires
+    if (q !== query) setQuery(q);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
