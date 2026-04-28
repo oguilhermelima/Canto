@@ -146,6 +146,12 @@ export const removeListItemsInput = z.object({
 });
 export type RemoveListItemsInput = z.infer<typeof removeListItemsInput>;
 
+export const restoreListItemsInput = z.object({
+  listId: z.string().uuid(),
+  mediaIds: z.array(z.string().uuid()).min(1).max(500),
+});
+export type RestoreListItemsInput = z.infer<typeof restoreListItemsInput>;
+
 export const moveListItemsInput = z.object({
   fromListId: z.string().uuid(),
   toListId: z.string().uuid(),

@@ -5,6 +5,7 @@ import {
   moveListItemsInput,
   removeListItemInput,
   removeListItemsInput,
+  restoreListItemsInput,
 } from "@canto/validators";
 import { findMediaInLists } from "@canto/core/infra/lists/list-repository";
 import {
@@ -12,6 +13,7 @@ import {
   moveItemsBetweenLists,
   removeItemFromList,
   removeItemsFromList,
+  restoreItemsToList,
 } from "@canto/core/domain/lists/use-cases/manage-list-items";
 import { addMediaToServerLibrary } from "@canto/core/domain/lists/use-cases/add-to-server-library";
 import { viewAllCollectionItems } from "@canto/core/domain/lists/use-cases/view-all-collection-items";
@@ -50,6 +52,17 @@ export const listItemsRouter = createTRPCRouter({
     .input(moveListItemsInput)
     .mutation(({ ctx, input }) =>
       moveItemsBetweenLists(
+        ctx.db,
+        input,
+        ctx.session.user.id,
+        ctx.session.user.role,
+      ),
+    ),
+
+  restoreItems: protectedProcedure
+    .input(restoreListItemsInput)
+    .mutation(({ ctx, input }) =>
+      restoreItemsToList(
         ctx.db,
         input,
         ctx.session.user.id,
