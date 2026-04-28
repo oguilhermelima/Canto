@@ -282,6 +282,8 @@ export interface UserListMediaCandidateRow {
   releaseDate: string | null;
   externalId: number;
   provider: string;
+  airsTime: string | null;
+  originCountry: string[] | null;
 }
 
 export async function findUserListMediaCandidates(
@@ -317,6 +319,8 @@ export async function findUserListMediaCandidates(
       releaseDate: media.releaseDate,
       externalId: media.externalId,
       provider: media.provider,
+      airsTime: media.airsTime,
+      originCountry: media.originCountry,
     })
     .from(listItem)
     .innerJoin(list, eq(listItem.listId, list.id))

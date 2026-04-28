@@ -34,6 +34,8 @@ interface ListCandidate {
   provider: string;
   addedAt: Date;
   listNames: Set<string>;
+  airsTime: string | null;
+  originCountry: string[] | null;
 }
 
 export interface UpcomingItem {
@@ -50,6 +52,9 @@ export interface UpcomingItem {
   provider: string;
   fromLists: string[];
   releaseAt: Date;
+  /** True when releaseAt was synthesized from a real airsTime + TZ; false when
+   *  it's just midnight UTC and the consumer should hide the time portion. */
+  hasAirTime: boolean;
   episode: {
     id: string;
     seasonNumber: number;
@@ -158,6 +163,8 @@ function buildListCandidateMap(
         provider: row.provider,
         addedAt: row.addedAt,
         listNames: new Set([row.listName]),
+        airsTime: row.airsTime,
+        originCountry: row.originCountry,
       });
       continue;
     }
@@ -165,6 +172,93 @@ function buildListCandidateMap(
     if (row.addedAt > existing.addedAt) existing.addedAt = row.addedAt;
   }
   return map;
+}
+
+/**
+ * Map ISO 3166-1 alpha-2 country codes to representative IANA timezones for
+ * prime-time TV. Used as a best-effort fallback when episodes ship only a
+ * date and the show's network airs in a specific country. We keep the map
+ * narrow on purpose — anything outside it just falls back to "no time".
+ */
+const COUNTRY_TIMEZONES: Record<string, string> = {
+  US: "America/New_York", GB: "Europe/London", JP: "Asia/Tokyo",
+  KR: "Asia/Seoul", CN: "Asia/Shanghai", TW: "Asia/Taipei",
+  CA: "America/Toronto", AU: "Australia/Sydney", NZ: "Pacific/Auckland",
+  BR: "America/Sao_Paulo", MX: "America/Mexico_City",
+  AR: "America/Argentina/Buenos_Aires", CL: "America/Santiago",
+  CO: "America/Bogota", DE: "Europe/Berlin", FR: "Europe/Paris",
+  ES: "Europe/Madrid", IT: "Europe/Rome", NL: "Europe/Amsterdam",
+  SE: "Europe/Stockholm", NO: "Europe/Oslo", DK: "Europe/Copenhagen",
+  FI: "Europe/Helsinki", PL: "Europe/Warsaw", TR: "Europe/Istanbul",
+  RU: "Europe/Moscow", IN: "Asia/Kolkata", IE: "Europe/Dublin",
+  BE: "Europe/Brussels", PT: "Europe/Lisbon", AT: "Europe/Vienna",
+  CH: "Europe/Zurich", IL: "Asia/Jerusalem", TH: "Asia/Bangkok",
+  ID: "Asia/Jakarta", PH: "Asia/Manila", MY: "Asia/Kuala_Lumpur",
+};
+
+function pickIanaTz(originCountry: string[] | null | undefined): string | null {
+  if (!originCountry || originCountry.length === 0) return null;
+  for (const code of originCountry) {
+    const tz = COUNTRY_TIMEZONES[code.toUpperCase()];
+    if (tz) return tz;
+  }
+  return null;
+}
+
+/**
+ * Combine a date string ("2026-04-30"), a time-of-day ("21:00"), and an IANA
+ * timezone into a UTC-anchored Date. We can't construct a Date directly in a
+ * non-local TZ, so we build the wall-clock as if it were UTC, ask
+ * Intl.DateTimeFormat what that instant looks like in the target TZ, and
+ * subtract the resulting offset. Handles DST automatically.
+ */
+function buildAirDateTimeUtc(
+  dateStr: string,
+  airsTime: string,
+  tz: string,
+): Date | null {
+  const dateMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const timeMatch = airsTime.match(/^(\d{1,2}):(\d{2})/);
+  if (!dateMatch || !timeMatch) return null;
+
+  const [, yyyy, mo, dd] = dateMatch;
+  const [, hh, mm] = timeMatch;
+  const wallAsUtc = Date.UTC(+yyyy!, +mo! - 1, +dd!, +hh!, +mm!);
+
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+  });
+  const parts = Object.fromEntries(
+    fmt.formatToParts(new Date(wallAsUtc)).map((p) => [p.type, p.value]),
+  ) as Record<string, string>;
+
+  const tzWallAsUtc = Date.UTC(
+    +parts.year!, +parts.month! - 1, +parts.day!,
+    +parts.hour! % 24, +parts.minute!,
+  );
+  const offsetMs = tzWallAsUtc - wallAsUtc;
+  return new Date(wallAsUtc - offsetMs);
+}
+
+function resolveReleaseAt(
+  airDate: Date,
+  airsTime: string | null,
+  originCountry: string[] | null,
+): { releaseAt: Date; hasAirTime: boolean } {
+  if (!airsTime) return { releaseAt: airDate, hasAirTime: false };
+  const tz = pickIanaTz(originCountry);
+  if (!tz) return { releaseAt: airDate, hasAirTime: false };
+
+  // airDate at this point is parseDateLike of "YYYY-MM-DD" — i.e. UTC midnight.
+  // Re-derive the wall date string in UTC so DST/offset of the user machine
+  // doesn't drift the calendar day.
+  const dateStr = airDate.toISOString().slice(0, 10);
+  const combined = buildAirDateTimeUtc(dateStr, airsTime, tz);
+  if (!combined) return { releaseAt: airDate, hasAirTime: false };
+  return { releaseAt: combined, hasAirTime: true };
 }
 
 function buildEpisodesIndex(
@@ -211,9 +305,10 @@ function buildUpcomingMovieItem(
   const hasMovieHistory = mediaHistory.some((entry) => entry.episodeId === null);
   if (hasMovieHistory) return null;
 
-  const releaseAt = parseDateLike(candidate.releaseDate);
-  if (!releaseAt || releaseAt.getTime() <= now.getTime()) return null;
+  const baseDate = parseDateLike(candidate.releaseDate);
+  if (!baseDate || baseDate.getTime() <= now.getTime()) return null;
 
+  // Movies don't have a daily airing slot — we only know the release date.
   return {
     id: `upcoming-movie:${candidate.mediaId}`,
     kind: "upcoming_movie",
@@ -227,7 +322,8 @@ function buildUpcomingMovieItem(
     externalId: candidate.externalId,
     provider: candidate.provider,
     fromLists: [...candidate.listNames],
-    releaseAt,
+    releaseAt: baseDate,
+    hasAirTime: false,
     episode: null,
   };
 }
@@ -292,6 +388,12 @@ function toUpcomingItem(
     airDate: Date;
   },
 ): UpcomingItem {
+  const { releaseAt, hasAirTime } = resolveReleaseAt(
+    episode.airDate,
+    candidate.airsTime,
+    candidate.originCountry,
+  );
+
   return {
     id: `upcoming-episode:${candidate.mediaId}:${episode.episodeId}`,
     kind: "upcoming_episode",
@@ -305,7 +407,8 @@ function toUpcomingItem(
     externalId: candidate.externalId,
     provider: candidate.provider,
     fromLists: [...candidate.listNames],
-    releaseAt: episode.airDate,
+    releaseAt,
+    hasAirTime,
     episode: {
       id: episode.episodeId,
       seasonNumber: episode.seasonNumber,
