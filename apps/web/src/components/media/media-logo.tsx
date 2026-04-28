@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import { cn } from "@canto/ui/cn";
 
 interface MediaLogoProps {
   src: string;
   alt: string;
-  /** Size preset — controls the max-h / max-w constraints. */
+  /** Size preset — controls the fixed height and (for cards) max-width. */
   size?: "hero" | "carousel" | "spotlight" | "card";
   className?: string;
 }
@@ -14,60 +13,29 @@ interface MediaLogoProps {
 const DROP_SHADOW =
   "drop-shadow(0 0 1px rgba(255,255,255,0.5)) drop-shadow(0 0 3px rgba(255,255,255,0.15)) drop-shadow(0 1px 4px rgba(0,0,0,0.6)) drop-shadow(0 0 12px rgba(0,0,0,0.3))";
 
-type Variant = "normal" | "tall" | "extreme";
-
-const SIZE_CLASSES: Record<string, Record<Variant, string>> = {
-  hero: {
-    normal: "max-h-20 sm:max-h-22 md:max-h-22 lg:max-h-24 xl:max-h-26 2xl:max-h-28",
-    tall: "max-h-32 sm:max-h-36 md:max-h-38 lg:max-h-40 xl:max-h-44 2xl:max-h-48",
-    extreme: "max-h-40 sm:max-h-44 md:max-h-48 lg:max-h-52 xl:max-h-56 2xl:max-h-60",
-  },
-  spotlight: {
-    normal: "max-h-28 sm:max-h-32 md:max-h-36 lg:max-h-40 xl:max-h-44 2xl:max-h-48",
-    tall: "max-h-44 sm:max-h-52 md:max-h-56 lg:max-h-60 xl:max-h-64 2xl:max-h-72",
-    extreme: "max-h-52 sm:max-h-60 md:max-h-64 lg:max-h-72 xl:max-h-80 2xl:max-h-88",
-  },
-  carousel: {
-    normal: "max-h-20 max-w-[260px]",
-    tall: "max-h-36 max-w-[200px]",
-    extreme: "max-h-44 max-w-[180px]",
-  },
-  card: {
-    normal: "max-h-12 max-w-[200px]",
-    tall: "max-h-24 max-w-[160px]",
-    extreme: "max-h-28 max-w-[140px]",
-  },
+// Fixed heights per size preset. Reserves vertical space before the image
+// loads so the surrounding layout doesn't shift when the logo finally arrives
+// (the previous variant-on-load adjustment caused two consecutive shifts on
+// slow connections — visible most painfully on mobile).
+const SIZE_CLASSES: Record<string, string> = {
+  hero: "h-20 sm:h-22 md:h-22 lg:h-24 xl:h-26 2xl:h-28",
+  spotlight: "h-28 sm:h-32 md:h-36 lg:h-40 xl:h-44 2xl:h-48",
+  carousel: "h-20 max-w-[260px]",
+  card: "h-12 max-w-[200px]",
 };
 
-function detectVariant(width: number, height: number): Variant {
-  const ratio = width / height;
-  if (ratio < 0.8) return "extreme";
-  if (ratio < 1.2) return "tall";
-  return "normal";
-}
-
 export function MediaLogo({ src, alt, size = "hero", className }: MediaLogoProps): React.JSX.Element {
-  const [variant, setVariant] = useState<Variant>("normal");
-
-  const classes = SIZE_CLASSES[size]!;
-
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}
       alt={alt}
       className={cn(
-        "h-auto w-auto object-contain object-left",
-        classes[variant],
+        "w-auto max-w-full object-contain object-left",
+        SIZE_CLASSES[size],
         className,
       )}
       style={{ filter: DROP_SHADOW }}
-      onLoad={(e) => {
-        const img = e.currentTarget;
-        if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-          setVariant(detectVariant(img.naturalWidth, img.naturalHeight));
-        }
-      }}
     />
   );
 }
