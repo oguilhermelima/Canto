@@ -1,9 +1,10 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { list, listItem, media } from "@canto/db/schema";
 import {
   addListItem,
   findMediaByAnyReference,
+  markListItemsPushed,
   removeListItem,
 } from "../../../infra/repositories";
 import type {
@@ -15,13 +16,37 @@ import { getTvdbProvider } from "../../../platform/http/tvdb-client";
 import { slugify } from "../../shared/rules/slugify";
 import { persistMediaUseCase } from "../../media/use-cases/persist";
 
+/**
+ * @deprecated Used only by the legacy `decidePresenceAction` path that still
+ * powers ratings/favorites sync. List membership now uses `reconcileListItem`
+ * with positive signals.
+ */
 export const CONFLICT_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * After a successful push, the remote may take a moment to surface the new
+ * item via `listTraktListItems` (Trakt is eventually consistent). When a
+ * sync immediately afterwards still sees `local && !remote`, we treat that
+ * as in-flight rather than as evidence the remote deleted the item.
+ */
+export const PUSH_GRACE_MS = 5 * 60 * 1000;
 
 export interface LocalMediaRef {
   mediaId: string;
   type: "movie" | "show";
   ids: TraktIds;
   occurredAt: Date;
+  /** Set after a successful Trakt push. Only `reconcileListItem` reads it;
+   *  legacy callers that still build `LocalMediaRef`s for ratings/favorites
+   *  sync may leave it `undefined`. */
+  lastPushedAt?: Date | null;
+}
+
+export interface LocalTombstone {
+  mediaId: string;
+  type: "movie" | "show";
+  ids: TraktIds;
+  deletedAt: Date;
 }
 
 export interface LocalRatingRef extends LocalMediaRef {
@@ -225,6 +250,12 @@ export async function resolveMediaFromTraktRef(
   return null;
 }
 
+/**
+ * @deprecated Use {@link reconcileListItem}. Retained while ratings/favorites
+ * sync still flows through `decidePresenceAction`; see the migration plan
+ * for those modules. The 10-min window is unsafe for list membership because
+ * a missed/late Trakt push silently casts the local row as "should be deleted".
+ */
 export function decidePresenceAction(
   occurredAt: Date,
   now: Date,
@@ -235,14 +266,91 @@ export function decidePresenceAction(
   return "keep-absence";
 }
 
+export type ReconcileAction =
+  | { kind: "noop" }
+  | { kind: "push-to-remote"; reason: "local-only" | "tombstone-pending" }
+  | { kind: "remove-from-remote"; reason: "local-tombstone" }
+  | { kind: "add-to-local"; reason: "remote-only" }
+  | { kind: "soft-delete-local"; reason: "remote-deleted-after-push" }
+  | { kind: "wait"; reason: "push-grace" | "ambiguous" };
+
+export interface ReconcileInputs {
+  local: LocalMediaRef | null;
+  tombstone: LocalTombstone | null;
+  remote: TraktMediaRef | null;
+  now: Date;
+  initialSync: boolean;
+}
+
+/**
+ * Decide what to do with a single (list, media) pair given positive signals
+ * on both sides. The previous implementation collapsed every "local without
+ * remote" case into a 10-minute time window — that lost data whenever a push
+ * was delayed, dropped, or eventually-consistent. This version asks instead:
+ * "do we have proof the remote ever knew about this row?"
+ *
+ * - `local` (live) AND `remote` → no-op.
+ * - `local` AND no `remote`:
+ *     - never pushed → push.
+ *     - pushed within {@link PUSH_GRACE_MS} → wait (Trakt may be lagging).
+ *     - pushed long ago → remote really removed it → soft-delete local.
+ * - no `local` AND `remote`:
+ *     - tombstone exists for the same row → user removed it locally → push remove.
+ *     - else → import (someone added on Trakt OR initial sync).
+ * - tombstone but no live local AND no remote → user-removed and Trakt agrees → no-op.
+ *
+ * `initialSync` always biases toward `add-to-local` so the first sync after
+ * connecting an account never destroys data.
+ */
+export function reconcileListItem(input: ReconcileInputs): ReconcileAction {
+  const { local, tombstone, remote, now, initialSync } = input;
+
+  if (local && remote) return { kind: "noop" };
+
+  if (local && !remote) {
+    if (!local.lastPushedAt) {
+      return { kind: "push-to-remote", reason: "local-only" };
+    }
+    const sincePush = now.getTime() - local.lastPushedAt.getTime();
+    if (sincePush < PUSH_GRACE_MS) {
+      return { kind: "wait", reason: "push-grace" };
+    }
+    return { kind: "soft-delete-local", reason: "remote-deleted-after-push" };
+  }
+
+  if (!local && remote) {
+    if (initialSync) return { kind: "add-to-local", reason: "remote-only" };
+    if (tombstone) {
+      const remoteAt = parseDateOrNow(remote.listedAt, now);
+      // The user removed *after* the Trakt entry was added → push the remove.
+      if (tombstone.deletedAt > remoteAt) {
+        return { kind: "remove-from-remote", reason: "local-tombstone" };
+      }
+      // Trakt entry is newer than the tombstone → user re-added on Trakt.
+      return { kind: "add-to-local", reason: "remote-only" };
+    }
+    return { kind: "add-to-local", reason: "remote-only" };
+  }
+
+  // Tombstone-only: nothing on the live side, nothing on Trakt — already in sync.
+  return { kind: "noop" };
+}
+
+export interface LoadLocalListRefsResult {
+  live: LocalMediaRef[];
+  tombstones: LocalTombstone[];
+}
+
 export async function loadLocalListRefs(
   db: Database,
   listId: string,
-): Promise<LocalMediaRef[]> {
+): Promise<LoadLocalListRefsResult> {
   const rows = await db
     .select({
       mediaId: listItem.mediaId,
       addedAt: listItem.addedAt,
+      lastPushedAt: listItem.lastPushedAt,
+      deletedAt: listItem.deletedAt,
       type: media.type,
       provider: media.provider,
       externalId: media.externalId,
@@ -253,16 +361,53 @@ export async function loadLocalListRefs(
     .innerJoin(media, eq(listItem.mediaId, media.id))
     .where(eq(listItem.listId, listId));
 
-  return rows.flatMap((row): LocalMediaRef[] => {
-    if (row.type !== "movie" && row.type !== "show") return [];
-    const mapped: LocalMediaRef = {
-      mediaId: row.mediaId,
-      type: row.type,
-      ids: mediaIdsFromRow(row),
-      occurredAt: row.addedAt,
-    };
-    return mediaRefKey(mapped.type, mapped.ids) ? [mapped] : [];
-  });
+  const live: LocalMediaRef[] = [];
+  const tombstones: LocalTombstone[] = [];
+
+  for (const row of rows) {
+    if (row.type !== "movie" && row.type !== "show") continue;
+    const ids = mediaIdsFromRow(row);
+    if (!mediaRefKey(row.type, ids)) continue;
+
+    if (row.deletedAt) {
+      tombstones.push({
+        mediaId: row.mediaId,
+        type: row.type,
+        ids,
+        deletedAt: row.deletedAt,
+      });
+    } else {
+      live.push({
+        mediaId: row.mediaId,
+        type: row.type,
+        ids,
+        occurredAt: row.addedAt,
+        lastPushedAt: row.lastPushedAt ?? null,
+      });
+    }
+  }
+
+  return { live, tombstones };
+}
+
+/** Structured log of a single reconciliation outcome. Lets us reconstruct
+ *  every sync-driven mutation after the fact — the missing tool that made
+ *  the recent data-loss incident impossible to forensically investigate. */
+function logSyncDecision(
+  listId: string,
+  decision: ReconcileAction,
+  ctx: { local: LocalMediaRef | null; remote: TraktMediaRef | null; now: Date },
+): void {
+  if (decision.kind === "noop" || decision.kind === "wait") return;
+  const localPart = ctx.local
+    ? `local.mediaId=${ctx.local.mediaId} local.lastPushedAt=${ctx.local.lastPushedAt?.toISOString() ?? "null"}`
+    : "local=null";
+  const remotePart = ctx.remote
+    ? `remote.listedAt=${ctx.remote.listedAt}`
+    : "remote=null";
+  console.log(
+    `[trakt-sync] list=${listId} action=${decision.kind} reason=${decision.reason} ${localPart} ${remotePart} now=${ctx.now.toISOString()}`,
+  );
 }
 
 export async function syncSingleListMembership(
@@ -276,64 +421,82 @@ export async function syncSingleListMembership(
     refs: Array<{ type: "movie" | "show"; ids: TraktIds }>,
   ) => Promise<void>,
 ): Promise<void> {
-  const localRefs = await loadLocalListRefs(ctx.db, localListId);
+  const { live, tombstones } = await loadLocalListRefs(ctx.db, localListId);
 
-  const localByKey = new Map<string, LocalMediaRef>();
-  for (const local of localRefs) {
+  const liveByKey = new Map<string, LocalMediaRef>();
+  for (const local of live) {
     const key = mediaRefKey(local.type, local.ids);
-    if (!key) continue;
-    localByKey.set(key, local);
+    if (key) liveByKey.set(key, local);
+  }
+
+  const tombstoneByKey = new Map<string, LocalTombstone>();
+  for (const tomb of tombstones) {
+    const key = mediaRefKey(tomb.type, tomb.ids);
+    // If both a live row and a tombstone exist (re-added after removal),
+    // the live row wins for reconcile — the tombstone is historical only.
+    if (key && !liveByKey.has(key)) tombstoneByKey.set(key, tomb);
   }
 
   const remoteByKey = new Map<string, TraktMediaRef>();
   for (const remote of remoteRefs) {
     const key = mediaRefKey(remote.type, remote.ids);
-    if (!key) continue;
-    remoteByKey.set(key, remote);
+    if (key) remoteByKey.set(key, remote);
   }
 
-  const keys = new Set<string>([...localByKey.keys(), ...remoteByKey.keys()]);
+  const keys = new Set<string>([
+    ...liveByKey.keys(),
+    ...tombstoneByKey.keys(),
+    ...remoteByKey.keys(),
+  ]);
 
   const addLocalMediaIds: string[] = [];
   const removeLocalMediaIds: string[] = [];
-  const addRemoteRefs: Array<{ type: "movie" | "show"; ids: TraktIds }> = [];
+  const addRemoteRefs: Array<{ type: "movie" | "show"; ids: TraktIds; mediaId: string }> = [];
   const removeRemoteRefs: Array<{ type: "movie" | "show"; ids: TraktIds }> = [];
 
   const resolveCache = new Map<string, string | null>();
 
   for (const key of keys) {
-    const local = localByKey.get(key);
-    const remote = remoteByKey.get(key);
-    if (local && remote) continue;
+    const local = liveByKey.get(key) ?? null;
+    const tombstone = tombstoneByKey.get(key) ?? null;
+    const remote = remoteByKey.get(key) ?? null;
 
-    if (local && !remote) {
-      const action = decidePresenceAction(
-        local.occurredAt,
-        ctx.now,
-        ctx.initialSync,
-      );
-      if (action === "keep-presence") {
-        addRemoteRefs.push({ type: local.type, ids: local.ids });
-      } else {
-        removeLocalMediaIds.push(local.mediaId);
-      }
-      continue;
-    }
+    const decision = reconcileListItem({
+      local,
+      tombstone,
+      remote,
+      now: ctx.now,
+      initialSync: ctx.initialSync,
+    });
 
-    if (!local && remote) {
-      const remoteAt = parseDateOrNow(remote.listedAt, ctx.now);
-      const action = decidePresenceAction(remoteAt, ctx.now, ctx.initialSync);
-      const mediaId = await resolveMediaFromTraktRef(
-        ctx.db,
-        remote,
-        resolveCache,
-      );
-      if (!mediaId) continue;
+    logSyncDecision(localListId, decision, { local, remote, now: ctx.now });
 
-      if (action === "keep-presence") {
-        addLocalMediaIds.push(mediaId);
-      } else {
-        removeRemoteRefs.push({ type: remote.type, ids: remote.ids });
+    switch (decision.kind) {
+      case "noop":
+      case "wait":
+        continue;
+      case "push-to-remote":
+        if (local) {
+          addRemoteRefs.push({ type: local.type, ids: local.ids, mediaId: local.mediaId });
+        }
+        continue;
+      case "soft-delete-local":
+        if (local) removeLocalMediaIds.push(local.mediaId);
+        continue;
+      case "remove-from-remote":
+        if (remote) {
+          removeRemoteRefs.push({ type: remote.type, ids: remote.ids });
+        }
+        continue;
+      case "add-to-local": {
+        if (!remote) continue;
+        const mediaId = await resolveMediaFromTraktRef(
+          ctx.db,
+          remote,
+          resolveCache,
+        );
+        if (mediaId) addLocalMediaIds.push(mediaId);
+        continue;
       }
     }
   }
@@ -346,14 +509,25 @@ export async function syncSingleListMembership(
   }
 
   for (const mediaId of uniqueRemoveLocal) {
-    await removeListItem(ctx.db, localListId, mediaId);
+    await removeListItem(ctx.db, localListId, mediaId, "trakt-sync");
   }
 
   const dedupedRemoteAdds = dedupeByKey(addRemoteRefs);
   const dedupedRemoteRemoves = dedupeByKey(removeRemoteRefs);
 
   if (dedupedRemoteAdds.length > 0) {
-    await pushToRemote(dedupedRemoteAdds);
+    await pushToRemote(
+      dedupedRemoteAdds.map(({ type, ids }) => ({ type, ids })),
+    );
+    // Mark `last_pushed_at` *after* the API returns 2xx — this is the positive
+    // signal `reconcileListItem` uses to distinguish "never reached Trakt"
+    // from "reached Trakt and was later removed there".
+    await markListItemsPushed(
+      ctx.db,
+      localListId,
+      dedupedRemoteAdds.map((r) => r.mediaId),
+      ctx.now,
+    );
   }
   if (dedupedRemoteRemoves.length > 0) {
     await removeFromRemote(dedupedRemoteRemoves);
