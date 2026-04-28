@@ -29,7 +29,7 @@ export function BrowseLoading({
   className,
 }: BrowseLoadingProps): React.JSX.Element {
   return (
-    <div className={cn("w-full pb-12", className)}>
+    <div className={cn("w-full md:pb-12", className)}>
       <div className="flex px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {sidebar && (
           <div className="mr-4 hidden w-[20rem] shrink-0 md:block lg:mr-8">

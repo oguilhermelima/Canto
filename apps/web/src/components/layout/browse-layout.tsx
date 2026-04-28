@@ -214,7 +214,7 @@ export function BrowseLayout({
   const skeletonCount = viewMode === "grid" ? 18 : 8;
 
   return (
-    <div className="w-full pb-12">
+    <div className="w-full md:pb-12">
       {!hideTitle && (
         <PageHeader
           title={title}
