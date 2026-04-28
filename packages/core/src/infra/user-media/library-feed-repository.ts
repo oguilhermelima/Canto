@@ -606,13 +606,22 @@ export async function findUserMediaPaginated(
     provider: media.provider,
   };
 
+  // Stable secondary sort by mediaId. The Trakt timestamp backfill landed
+  // many rows on the same `updated_at` (per-day or coarser granularity), so
+  // ORDER BY updated_at alone is non-deterministic across pages and the
+  // offset paginator silently duplicates/skips rows. Tiebreaking on
+  // `mediaId` (the row's stable PK) makes the order total.
   const itemsQuery = db
     .select(selectFields)
     .from(userMediaState)
     .innerJoin(media, eq(userMediaState.mediaId, media.id))
     .leftJoin(mediaTranslation, mi.join)
     .where(where)
-    .orderBy(sortDir(sortColumn), desc(userMediaState.updatedAt))
+    .orderBy(
+      sortDir(sortColumn),
+      desc(userMediaState.updatedAt),
+      desc(userMediaState.mediaId),
+    )
     .limit(opts.limit)
     .offset(opts.offset);
 
