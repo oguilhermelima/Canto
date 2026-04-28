@@ -22,7 +22,7 @@ export default function LibraryLoading(): React.JSX.Element {
         </div>
       </div>
 
-      <div className="flex flex-col gap-12">
+      <div className="flex flex-col gap-6 md:gap-12">
         {/* Watch Next skeleton */}
         <section className="pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
           <Skeleton className="mb-4 h-6 w-32" />

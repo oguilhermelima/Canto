@@ -50,7 +50,7 @@ export default function LibraryPage(): React.JSX.Element {
       />
 
       {activeTab === "hub" && (
-        <div className="mt-6 flex flex-col gap-12 md:mt-8">
+        <div className="mt-6 flex flex-col gap-6 md:mt-8 md:gap-12">
           <LazySection id="hub-watch-next" minHeight={260} eager={true}>
             <HubWatchNextSection />
           </LazySection>
@@ -70,7 +70,7 @@ export default function LibraryPage(): React.JSX.Element {
       )}
 
       {activeTab === "activity" && (
-        <div className="mt-6 flex flex-col gap-12 md:mt-8">
+        <div className="mt-6 flex flex-col gap-6 md:mt-8 md:gap-12">
           <LazySection id="hub-history" minHeight={340} eager={true}>
             <HubHistoryDiary />
           </LazySection>
