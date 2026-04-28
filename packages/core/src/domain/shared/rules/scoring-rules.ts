@@ -229,6 +229,22 @@ export function applyAdminDownloadPolicy(
 }
 
 /**
+ * Compose the admin-scope policy and the per-user preferences into the
+ * final {@link ScoringRules} the engine consumes. Admin layer applies
+ * first so per-user prefs sit on top — an admin's avoid list isn't
+ * undone by user taste.
+ */
+export function composeDownloadRules(
+  config: { rules: ScoringRules; policy: AdminDownloadPolicy },
+  prefs: DownloadPreferences,
+): ScoringRules {
+  return applyDownloadPreferences(
+    applyAdminDownloadPolicy(config.rules, config.policy),
+    prefs,
+  );
+}
+
+/**
  * Type-safe per-key merge for the dictionary-shaped rule fields.
  * Phase 2/Phase 5 layer user prefs and download-profile overrides on top
  * of defaults using these helpers so the override only needs to specify

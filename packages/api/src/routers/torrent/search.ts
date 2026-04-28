@@ -9,27 +9,11 @@ import {
   searchOnIndexer,
   searchTorrents,
 } from "@canto/core/domain/torrents/use-cases/search-torrents";
-import {
-  applyAdminDownloadPolicy,
-  applyDownloadPreferences,
-} from "@canto/core/domain/shared/rules/scoring-rules";
+import { composeDownloadRules } from "@canto/core/domain/shared/rules/scoring-rules";
 import { findDownloadPreferences } from "@canto/core/infra/user/preferences-repository";
 import { findDownloadConfig } from "@canto/core/infra/torrents/download-config-repository";
 
 import { createTRPCRouter, adminProcedure } from "../../trpc";
-
-/** Compose admin policy + user prefs into the final rules. Admin layer
- *  goes first so per-user prefs apply on top of the household-wide
- *  policy — and so an admin's avoid list isn't undone by user taste. */
-function composeRules(
-  config: Awaited<ReturnType<typeof findDownloadConfig>>,
-  prefs: Awaited<ReturnType<typeof findDownloadPreferences>>,
-) {
-  return applyDownloadPreferences(
-    applyAdminDownloadPolicy(config.rules, config.policy),
-    prefs,
-  );
-}
 
 export const torrentSearchRouter = createTRPCRouter({
   /** Batch search — runs every enabled indexer and waits for the slowest.
@@ -43,7 +27,7 @@ export const torrentSearchRouter = createTRPCRouter({
         findDownloadPreferences(ctx.db, ctx.session.user.id),
         findDownloadConfig(ctx.db),
       ]);
-      return searchTorrents(ctx.db, input, indexers, composeRules(config, prefs));
+      return searchTorrents(ctx.db, input, indexers, composeDownloadRules(config, prefs));
     }),
 
   /** Snapshot of every enabled indexer (id + display name). Drives the
@@ -64,6 +48,6 @@ export const torrentSearchRouter = createTRPCRouter({
         findDownloadPreferences(ctx.db, ctx.session.user.id),
         findDownloadConfig(ctx.db),
       ]);
-      return searchOnIndexer(ctx.db, input, indexers, composeRules(config, prefs));
+      return searchOnIndexer(ctx.db, input, indexers, composeDownloadRules(config, prefs));
     }),
 });
