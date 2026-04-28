@@ -150,17 +150,35 @@ export function useSearchQueries({
         : trendingShows.hasNextPage;
 
   const { results, totalResults } = useMemo(() => {
+    // Merge movie+show pages page-by-page so already-rendered items keep their
+    // position when a new page arrives. A global sort would re-thread new items
+    // into the existing list and shift the scroll under the user's cursor.
+    const mergeMultiPages = <
+      T extends { popularity?: number | null },
+    >(
+      moviePages: { results: T[]; totalResults: number }[],
+      showPages: { results: T[]; totalResults: number }[],
+    ) => {
+      const merged: T[] = [];
+      const maxPages = Math.max(moviePages.length, showPages.length);
+      for (let i = 0; i < maxPages; i++) {
+        const pageItems = [
+          ...(moviePages[i]?.results ?? []),
+          ...(showPages[i]?.results ?? []),
+        ].sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
+        merged.push(...pageItems);
+      }
+      const movieTotal = moviePages[0]?.totalResults ?? 0;
+      const showTotal = showPages[0]?.totalResults ?? 0;
+      return { results: merged, totalResults: movieTotal + showTotal };
+    };
+
     if (isSearching) {
       if (searchType === "multi") {
-        const moviePages = multiMovieQuery.data?.pages ?? [];
-        const showPages = multiShowQuery.data?.pages ?? [];
-        const merged = [
-          ...moviePages.flatMap((p) => p.results),
-          ...showPages.flatMap((p) => p.results),
-        ].sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
-        const movieTotal = moviePages[0]?.totalResults ?? 0;
-        const showTotal = showPages[0]?.totalResults ?? 0;
-        return { results: merged, totalResults: movieTotal + showTotal };
+        return mergeMultiPages(
+          multiMovieQuery.data?.pages ?? [],
+          multiShowQuery.data?.pages ?? [],
+        );
       }
       const pages = singleQuery.data?.pages ?? [];
       const flat = pages.flatMap((p) => p.results);
@@ -169,15 +187,10 @@ export function useSearchQueries({
 
     // Trending mode
     if (searchType === "multi") {
-      const moviePages = trendingMovies.data?.pages ?? [];
-      const showPages = trendingShows.data?.pages ?? [];
-      const merged = [
-        ...moviePages.flatMap((p) => p.results),
-        ...showPages.flatMap((p) => p.results),
-      ].sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
-      const movieTotal = moviePages[0]?.totalResults ?? 0;
-      const showTotal = showPages[0]?.totalResults ?? 0;
-      return { results: merged, totalResults: movieTotal + showTotal };
+      return mergeMultiPages(
+        trendingMovies.data?.pages ?? [],
+        trendingShows.data?.pages ?? [],
+      );
     }
     const sourceData = searchType === "movie" ? trendingMovies.data : trendingShows.data;
     const pages = sourceData?.pages ?? [];
@@ -185,16 +198,26 @@ export function useSearchQueries({
     return { results: flat, totalResults: pages[0]?.totalResults ?? 0 };
   }, [isSearching, searchType, singleQuery.data, multiMovieQuery.data, multiShowQuery.data, trendingMovies.data, trendingShows.data]);
 
-  const items = results.map((r) => ({
-    externalId: r.externalId,
-    provider: r.provider,
-    type: r.type as "movie" | "show",
-    title: r.title,
-    posterPath: r.posterPath ?? null,
-    year: r.year,
-    voteAverage: r.voteAverage,
-    popularity: r.popularity,
-  }));
+  // TMDB's popularity-based pagination is unstable: the same item can appear
+  // on consecutive pages. Without dedup, React sees duplicate keys and the
+  // grid renders the same poster twice.
+  const seen = new Set<string>();
+  const items: MediaItem[] = [];
+  for (const r of results) {
+    const key = `${r.provider}-${r.type}-${r.externalId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push({
+      externalId: r.externalId,
+      provider: r.provider,
+      type: r.type as "movie" | "show",
+      title: r.title,
+      posterPath: r.posterPath ?? null,
+      year: r.year,
+      voteAverage: r.voteAverage,
+      popularity: r.popularity,
+    });
+  }
 
   const refetchAll = useCallback(() => {
     if (isSearching) {

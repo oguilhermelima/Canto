@@ -57,8 +57,10 @@ export function SearchResults({
 }: SearchResultsProps): React.JSX.Element {
   const [viewMode, setViewMode] = useViewMode("canto.browse.viewMode.search");
 
+  // Include `type` in id — movie/show TMDB ids overlap, so without it React
+  // collides keys in multi mode and reuses the wrong DOM node.
   const browseItems: BrowseItem[] = items.map((r) => ({
-    id: `${r.provider}-${r.externalId}`,
+    id: `${r.provider}-${r.type}-${r.externalId}`,
     externalId: r.externalId,
     provider: r.provider,
     type: r.type,
