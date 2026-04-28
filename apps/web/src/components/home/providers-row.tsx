@@ -34,9 +34,9 @@ function ProviderChip({
       aria-label={providerName}
       title={providerName}
       className={cn(
-        "group/chip relative block shrink-0 overflow-hidden rounded-2xl ring-1 ring-white/10 shadow-md shadow-black/30 transition duration-200",
+        "group/chip relative mt-1 block shrink-0 overflow-hidden rounded-2xl ring-1 ring-white/10 shadow-md shadow-black/30 transition duration-200",
         "h-20 w-20 sm:h-24 sm:w-24 lg:h-28 lg:w-28",
-        "hover:-translate-y-0.5 hover:ring-white/25 hover:shadow-lg hover:shadow-black/50",
+        "hover:ring-white/25 hover:shadow-lg hover:shadow-black/50",
       )}
     >
       <Image
@@ -103,7 +103,7 @@ export function ProvidersRow({ title }: { title: string }): React.JSX.Element | 
             ? Array.from({ length: 8 }).map((_, i) => (
                 <Skeleton
                   key={i}
-                  className="h-20 w-20 shrink-0 rounded-2xl sm:h-24 sm:w-24 lg:h-28 lg:w-28"
+                  className="mt-1 h-20 w-20 shrink-0 rounded-2xl sm:h-24 sm:w-24 lg:h-28 lg:w-28"
                 />
               ))
             : data?.providers.map((p) => (

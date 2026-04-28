@@ -27,9 +27,9 @@ function GenreTile({
       href={`/search?genre=${id}`}
       aria-label={`${name} genre`}
       className={cn(
-        "relative flex shrink-0 items-center justify-center overflow-hidden rounded-2xl",
+        "relative mt-1 flex shrink-0 items-center justify-center overflow-hidden rounded-2xl",
         "h-[120px] w-[200px] sm:h-[150px] sm:w-[260px] lg:h-[180px] lg:w-[320px]",
-        "ring-1 ring-white/5 transition hover:scale-[1.02] hover:ring-white/20",
+        "ring-1 ring-white/5 transition hover:ring-white/20",
       )}
       style={{ backgroundColor: color }}
     >
@@ -109,7 +109,7 @@ export function GenresRow({ title }: { title: string }): React.JSX.Element | nul
             ? Array.from({ length: 8 }).map((_, i) => (
                 <Skeleton
                   key={i}
-                  className="h-[120px] w-[200px] shrink-0 rounded-2xl sm:h-[150px] sm:w-[260px] lg:h-[180px] lg:w-[320px]"
+                  className="mt-1 h-[120px] w-[200px] shrink-0 rounded-2xl sm:h-[150px] sm:w-[260px] lg:h-[180px] lg:w-[320px]"
                 />
               ))
             : data?.map((g) => (
