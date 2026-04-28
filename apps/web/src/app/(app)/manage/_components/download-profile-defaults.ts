@@ -16,6 +16,8 @@ export interface ProfileRow {
   cutoffQuality: string | null;
   cutoffSource: string | null;
   minTotalScore: number;
+  languages: string[];
+  languageStrict: boolean;
   isDefault: boolean;
 }
 
@@ -27,6 +29,8 @@ export interface ProfileDraft {
   cutoffQuality: Quality | null;
   cutoffSource: Source | null;
   minTotalScore: number;
+  languages: string[];
+  languageStrict: boolean;
 }
 
 export const FLAVORS: readonly Flavor[] = ["movie", "show", "anime"] as const;
@@ -60,6 +64,8 @@ export const EMPTY_DRAFT: ProfileDraft = {
   cutoffQuality: null,
   cutoffSource: null,
   minTotalScore: 0,
+  languages: [],
+  languageStrict: false,
 };
 
 export const DEFAULT_FORMAT_ROW: AllowedFormat = {
@@ -95,5 +101,7 @@ export function profileRowToDraft(p: ProfileRow): ProfileDraft {
     cutoffQuality: (p.cutoffQuality as Quality | null) ?? null,
     cutoffSource: (p.cutoffSource as Source | null) ?? null,
     minTotalScore: p.minTotalScore,
+    languages: p.languages,
+    languageStrict: p.languageStrict,
   };
 }

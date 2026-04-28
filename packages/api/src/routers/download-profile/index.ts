@@ -59,6 +59,8 @@ export const downloadProfileRouter = createTRPCRouter({
           cutoffQuality: input.cutoffQuality,
           cutoffSource: input.cutoffSource,
           minTotalScore: input.minTotalScore,
+          languages: input.languages,
+          languageStrict: input.languageStrict,
           isDefault: false,
         })
         .returning();
@@ -83,6 +85,8 @@ export const downloadProfileRouter = createTRPCRouter({
           cutoffQuality: input.cutoffQuality,
           cutoffSource: input.cutoffSource,
           minTotalScore: input.minTotalScore,
+          languages: input.languages,
+          languageStrict: input.languageStrict,
           updatedAt: new Date(),
         })
         .where(eq(downloadProfile.id, input.id))

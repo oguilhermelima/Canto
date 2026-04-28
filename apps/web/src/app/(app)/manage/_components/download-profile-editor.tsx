@@ -103,6 +103,8 @@ function DownloadProfileEditorBody({
       cutoffQuality: draft.cutoffQuality,
       cutoffSource: draft.cutoffSource,
       minTotalScore: draft.minTotalScore,
+      languages: draft.languages,
+      languageStrict: draft.languageStrict,
     };
     if (!payload.name) {
       toast.error("Name is required");
@@ -211,6 +213,39 @@ function DownloadProfileEditorBody({
             Releases with a normalised score below this threshold are dropped
             from results. 0 = no extra filter.
           </p>
+        </div>
+
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">
+                Preferred languages
+              </label>
+              <p className="text-[11px] text-muted-foreground">
+                ISO codes ({"e.g. en, ja, pt"}). Always boost matches; toggle on
+                to also reject releases that match none.
+              </p>
+            </div>
+            <Switch
+              checked={draft.languageStrict}
+              onCheckedChange={(checked) =>
+                setDraft({ ...draft, languageStrict: checked })
+              }
+            />
+          </div>
+          <Input
+            value={draft.languages.join(", ")}
+            onChange={(e) =>
+              setDraft({
+                ...draft,
+                languages: e.target.value
+                  .split(",")
+                  .map((s) => s.trim().toLowerCase())
+                  .filter(Boolean),
+              })
+            }
+            placeholder="en, ja"
+          />
         </div>
       </div>
 

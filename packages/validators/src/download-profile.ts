@@ -22,6 +22,10 @@ const baseDownloadProfileFields = {
   cutoffQuality: qualityType.nullable(),
   cutoffSource: sourceType.nullable(),
   minTotalScore: z.number().int().min(0).max(100).default(0),
+  /** Per-profile preferred languages (ISO codes). Boost matching
+   *  releases; with `languageStrict`, also reject non-matches. */
+  languages: z.array(z.string().min(2).max(10)).default([]),
+  languageStrict: z.boolean().default(false),
 };
 
 export const createDownloadProfileInput = z.object(baseDownloadProfileFields);
