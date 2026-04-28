@@ -1,0 +1,1 @@
+ALTER TABLE "download" ADD COLUMN "release_group" varchar(100);

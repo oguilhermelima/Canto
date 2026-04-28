@@ -2,6 +2,7 @@ import { relations, sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  check,
   date,
   index,
   integer,
@@ -643,6 +644,12 @@ export const download = pgTable("download", {
    *  a repack. Higher counts (REPACK2, PROPER3) supersede lower; the
    *  future auto-supersede job uses this to decide whether to replace. */
   repackCount: integer("repack_count").notNull().default(0),
+  /** Release-group token parsed from the title at insert time, lowercase
+   *  comparison is the caller's responsibility. Snapshotting it here
+   *  avoids re-parsing the title in the auto-supersede gate and keeps the
+   *  downstream "same group only" check stable even if `detectReleaseGroup`
+   *  evolves. NULL when the parser couldn't extract one. */
+  releaseGroup: varchar("release_group", { length: 100 }),
 
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -820,22 +827,33 @@ export const downloadProfile = pgTable("download_profile", {
  * Single-row table. Repository upserts the row by id, defaulting to a
  * fixed sentinel when no row exists yet.
  */
-export const downloadConfig = pgTable("download_config", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  /** Full {@link ScoringRules} blob from `@canto/core`. Validated on read
-   *  via Zod in the repository — typed `unknown` here to keep the schema
-   *  package free of core imports. */
-  scoringRules: jsonb("scoring_rules").$type<Record<string, unknown>>().notNull(),
-  /** Editions to boost (e.g. ["IMAX", "Extended"]). */
-  preferredEditions: jsonb("preferred_editions").$type<string[]>().notNull().default([]),
-  /** Editions to penalise (e.g. ["Theatrical"]). */
-  avoidedEditions: jsonb("avoided_editions").$type<string[]>().notNull().default([]),
-  /** "neutral" | "prefer" | "avoid" — applied to the AV1 codec entries. */
-  av1Stance: varchar("av1_stance", { length: 10 }).notNull().default("neutral"),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const downloadConfig = pgTable(
+  "download_config",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Full {@link ScoringRules} blob from `@canto/core`. Validated on read
+     *  via Zod in the repository — typed `unknown` here to keep the schema
+     *  package free of core imports. */
+    scoringRules: jsonb("scoring_rules").$type<Record<string, unknown>>().notNull(),
+    /** Editions to boost (e.g. ["IMAX", "Extended"]). */
+    preferredEditions: jsonb("preferred_editions").$type<string[]>().notNull().default([]),
+    /** Editions to penalise (e.g. ["Theatrical"]). */
+    avoidedEditions: jsonb("avoided_editions").$type<string[]>().notNull().default([]),
+    /** "neutral" | "prefer" | "avoid" — applied to the AV1 codec entries. */
+    av1Stance: varchar("av1_stance", { length: 10 }).notNull().default("neutral"),
+    /** Sentinel column. Combined with the unique index + check below, only
+     *  one row can ever live in this table — the seed writes it, every
+     *  reader takes the first row, and a stray second row is impossible. */
+    singleton: boolean("singleton").notNull().default(true),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("uq_download_config_singleton").on(table.singleton),
+    check("download_config_singleton_check", sql`${table.singleton} = true`),
+  ],
+);
 
 // ─── Curated release-group tiers (system-wide, per flavor) ───
 
