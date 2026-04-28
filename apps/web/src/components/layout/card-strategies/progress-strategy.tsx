@@ -5,7 +5,6 @@ import {
 } from "@/app/(app)/library/_components/library-playback-card";
 import type { LibraryPlaybackEntry } from "@/app/(app)/library/_components/library-playback-card";
 import { MediaCard, MediaCardSkeleton } from "@/components/media/media-card";
-import { RatingBadgeStack } from "@/components/media/rating-badge";
 import { GRID_COLS } from "@/components/layout/browse-layout.types";
 import type { CardStrategy, BrowseItem } from "@/components/layout/browse-layout.types";
 
@@ -48,14 +47,14 @@ function episodeBadgeLabel(item: BrowseItem): string | null {
   return null;
 }
 
-function buildHoverSubtitle(item: BrowseItem): string | null {
+function buildSubtitle(item: BrowseItem): string | null {
   const epLabel = episodeBadgeLabel(item);
   if (epLabel && item.episode?.title) return `${epLabel} · ${item.episode.title}`;
   if (epLabel) return epLabel;
   return null;
 }
 
-function buildHoverExtra(item: BrowseItem): string | null {
+function buildExtra(item: BrowseItem): string | null {
   if (!item.progress) return null;
   if (item.progress.unit === "seconds" && item.progress.value > 0) {
     return `${formatDuration(item.progress.value)} / ${formatDuration(item.progress.total)}`;
@@ -81,22 +80,16 @@ function GridCard({ item }: { item: BrowseItem }): React.JSX.Element {
       posterPath={item.posterPath}
       year={item.year}
       voteAverage={item.voteAverage}
+      userRating={item.userRating}
       progress={item.progress}
-      hideMetaRating
       slots={{
-        topLeft: (
-          <RatingBadgeStack
-            voteAverage={item.voteAverage}
-            userRating={item.userRating}
-          />
-        ),
         topRight: epLabel ? (
           <div className="rounded-md bg-black/70 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur-sm">
             {epLabel}
           </div>
         ) : undefined,
-        hoverSubtitle: buildHoverSubtitle(item),
-        hoverExtra: buildHoverExtra(item),
+        subtitle: buildSubtitle(item),
+        extra: buildExtra(item),
       }}
     />
   );

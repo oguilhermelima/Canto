@@ -5,12 +5,11 @@ import { FadeImage } from "@/components/ui/fade-image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
-import { EyeOff, Film, Tv } from "lucide-react";
+import { EyeOff, Film, Star, Tv } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { tmdbThumbLoader } from "@/lib/tmdb-image";
 import { mediaHref } from "@/lib/media-href";
 import { MediaLogo } from "./media-logo";
-import { RatingInline } from "./rating-badge";
 import { useLogo } from "@/hooks/use-logos";
 
 const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
@@ -20,6 +19,10 @@ function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+function formatRating(value: number): string {
+  return value % 1 === 0 ? value.toString() : value.toFixed(1);
 }
 
 export type BadgeType = "trending" | "new" | "top-rated" | "continue";
@@ -33,6 +36,7 @@ interface BackdropCardProps {
   logoPath?: string | null;
   year?: number | null;
   voteAverage?: number | null;
+  userRating?: number | null;
   badge?: BadgeType | null;
   progress?: { percent: number; value: number; total: number; unit: "seconds" | "episodes" } | null;
   onHide?: () => void;
@@ -52,13 +56,10 @@ export function BackdropCard({
   type,
   title,
   backdropPath,
-  // logoPath from props (via enriched browse):
-  //   undefined = not provided (cold start → fetch per-card)
-  //   null = no logo exists on TMDB
-  //   string = logo file path
   logoPath: logoFromProps,
   year,
   voteAverage,
+  userRating,
   badge,
   progress,
   onHide,
@@ -66,6 +67,7 @@ export function BackdropCard({
 }: BackdropCardProps): React.JSX.Element {
   const href = mediaHref(provider ?? "tmdb", externalId ?? "0", type);
   const utils = trpc.useUtils();
+  const [imageReady, setImageReady] = useState(!backdropPath);
 
   const hasLogoFromProps = logoFromProps !== undefined;
   const fetchedLogo = useLogo(provider, externalId, type, {
@@ -75,11 +77,7 @@ export function BackdropCard({
     year,
     voteAverage,
   }, { skip: hasLogoFromProps });
-
   const logoPath = hasLogoFromProps ? logoFromProps : fetchedLogo;
-  const logoResolved = logoPath !== undefined;
-  const [imageReady, setImageReady] = useState(!backdropPath);
-  const ready = imageReady && logoResolved;
 
   const handlePrefetch = useCallback(() => {
     if (externalId) {
@@ -91,16 +89,18 @@ export function BackdropCard({
     }
   }, [externalId, provider, type, utils]);
 
+  const typeLabel = type === "movie" ? "MOVIE" : "TV SHOW";
+  const hasPublicRating = voteAverage != null && voteAverage > 0;
+  const hasUserRating = userRating != null && userRating > 0;
+  const hasAnyRating = hasPublicRating || hasUserRating;
+
   return (
     <Link
       href={href}
       onMouseEnter={handlePrefetch}
-      className={cn(
-        "group relative mt-1 flex shrink-0 overflow-hidden rounded-xl transition-[box-shadow] duration-200 hover:z-10 hover:ring-2 hover:ring-foreground/20",
-        className,
-      )}
+      className={cn("group mt-1 flex shrink-0 flex-col", className)}
     >
-      <div className="relative aspect-video w-full overflow-hidden bg-muted">
+      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-muted transition-[box-shadow] duration-200 group-hover:ring-2 group-hover:ring-foreground/20">
         {backdropPath ? (
           <FadeImage
             loader={tmdbThumbLoader}
@@ -123,97 +123,113 @@ export function BackdropCard({
           </div>
         )}
 
-        {/* Skeleton shimmer on top until image + logo resolved */}
         <div
           aria-hidden
           className={cn(
             "pointer-events-none absolute inset-0 transition-opacity duration-200",
-            ready ? "opacity-0" : "opacity-100",
+            imageReady ? "opacity-0" : "opacity-100",
           )}
         >
           <div
             className={cn(
               "absolute inset-0 rounded-xl bg-muted",
-              !ready && "animate-pulse",
+              !imageReady && "animate-pulse",
             )}
           />
         </div>
 
-        {/* Overlays fade in once content ready */}
-        <div
-          className={cn(
-            "absolute inset-0 transition-opacity duration-200",
-            ready ? "opacity-100" : "pointer-events-none opacity-0",
-          )}
-        >
-          {onHide && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onHide();
-              }}
-              className="absolute left-2.5 top-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-white/70 opacity-0 backdrop-blur-sm transition-opacity hover:bg-black/80 hover:text-white group-hover:opacity-100"
-              aria-label={`Hide ${title}`}
+        {onHide && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onHide();
+            }}
+            className="absolute left-2.5 top-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-white/70 opacity-0 backdrop-blur-sm transition-opacity hover:bg-black/80 hover:text-white group-hover:opacity-100"
+            aria-label={`Hide ${title}`}
+          >
+            <EyeOff className="h-3.5 w-3.5" />
+          </button>
+        )}
+
+        {badge && (
+          <div className="absolute right-1.5 top-1.5 z-10">
+            <span
+              className={cn(
+                "rounded-md px-1.5 py-[3px] text-[10px] font-bold leading-none uppercase tracking-wider shadow-md ring-1 backdrop-blur-md",
+                BADGE_CONFIG[badge].className,
+              )}
             >
-              <EyeOff className="h-3.5 w-3.5" />
-            </button>
-          )}
+              {BADGE_CONFIG[badge].label}
+            </span>
+          </div>
+        )}
 
-          {badge && (
-            <div className="absolute right-1.5 top-1.5 z-10">
-              <span
-                className={cn(
-                  "rounded-md px-1.5 py-[3px] text-[10px] font-bold leading-none uppercase tracking-wider shadow-md ring-1 backdrop-blur-md",
-                  BADGE_CONFIG[badge].className,
-                )}
-              >
-                {BADGE_CONFIG[badge].label}
-              </span>
-            </div>
-          )}
-
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3 pb-3 pt-12">
-            {logoPath ? (
-              <MediaLogo src={`${TMDB_IMAGE_BASE}/w500${logoPath}`} alt={title} size="card" />
-            ) : (
-              <p className="line-clamp-2 text-sm font-semibold leading-tight text-white drop-shadow-lg">
-                {title}
-              </p>
+        {(logoPath || progress) && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent px-4 pb-4 pt-14">
+            {logoPath && (
+              <MediaLogo
+                src={`${TMDB_IMAGE_BASE}/w500${logoPath}`}
+                alt={title}
+                size="card"
+              />
             )}
-            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold uppercase tracking-wider text-white/85">
-              <span>{type === "movie" ? "Movie" : "TV Show"}</span>
-              {voteAverage != null && voteAverage > 0 && (
-                <>
-                  <span className="opacity-40" aria-hidden>•</span>
-                  <RatingInline variant="public" value={voteAverage} />
-                </>
-              )}
-              {year && (
-                <>
-                  <span className="opacity-40" aria-hidden>•</span>
-                  <span className="tabular-nums">{year}</span>
-                </>
-              )}
-            </div>
             {progress && (
-              <div className="mt-2 flex items-center gap-2">
-                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/20">
+              <div className={cn("flex items-center gap-2.5", logoPath && "mt-2.5")}>
+                <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/25">
                   <div
                     className="h-full rounded-full bg-white"
-                    style={{ width: `${progress.percent}%` }}
+                    style={{ width: `${Math.min(progress.percent, 100)}%` }}
                   />
                 </div>
-                <span className="shrink-0 text-xs tabular-nums text-white">
+                <span className="shrink-0 text-[11px] font-medium tabular-nums text-white/90">
                   {progress.unit === "seconds"
                     ? `${formatDuration(progress.value)} / ${formatDuration(progress.total)}`
-                    : `${progress.value}/${progress.total}`}
+                    : `${progress.value}/${progress.total} ep`}
                 </span>
               </div>
             )}
           </div>
+        )}
+      </div>
+
+      <div className="mt-2 flex flex-col gap-1.5 px-0.5">
+        <p className="line-clamp-2 text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
+          {title}
+        </p>
+        <div className="flex flex-wrap items-center gap-x-1.5 text-xs font-medium tracking-wide text-muted-foreground">
+          <span>{typeLabel}</span>
+          {year && (
+            <>
+              <span aria-hidden>·</span>
+              <span className="tabular-nums">{year}</span>
+            </>
+          )}
         </div>
+        {hasAnyRating && (
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs font-medium tracking-wide text-muted-foreground">
+            {hasPublicRating && (
+              <span
+                title="Public rating (TMDB)"
+                className="inline-flex items-center gap-1"
+              >
+                <Star size={12} className="fill-current text-yellow-400" />
+                <span className="tabular-nums">{formatRating(voteAverage!)}</span>
+              </span>
+            )}
+            {hasPublicRating && hasUserRating && <span aria-hidden>·</span>}
+            {hasUserRating && (
+              <span
+                title="Your rating"
+                className="inline-flex items-center gap-1"
+              >
+                <Star size={12} className="fill-current text-emerald-400" />
+                <span className="tabular-nums">{formatRating(userRating!)}</span>
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </Link>
   );
@@ -224,5 +240,14 @@ export function BackdropCardSkeleton({
 }: {
   className?: string;
 }): React.JSX.Element {
-  return <Skeleton className={cn("mt-1 aspect-video rounded-xl", className)} />;
+  return (
+    <div className={cn("mt-1 flex flex-col", className)}>
+      <Skeleton className="aspect-video w-full rounded-xl" />
+      <div className="mt-2 flex flex-col gap-1.5 px-0.5">
+        <Skeleton className="h-3.5 w-3/4 rounded" />
+        <Skeleton className="h-3 w-1/2 rounded" />
+        <Skeleton className="h-3 w-2/5 rounded" />
+      </div>
+    </div>
+  );
 }

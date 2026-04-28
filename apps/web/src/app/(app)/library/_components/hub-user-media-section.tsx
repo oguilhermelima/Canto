@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import type { LucideIcon } from "lucide-react";
 import type { SpaceStateKey } from "@canto/ui/presets/space-states";
 import { MediaCard } from "@/components/media/media-card";
-import { RatingBadgeStack } from "@/components/media/rating-badge";
 import { trpc } from "@/lib/trpc/client";
 import { LibraryCarousel } from "./library-carousel";
 
@@ -72,16 +71,8 @@ export function HubUserMediaSection({
           posterPath={item.posterPath}
           year={item.year}
           voteAverage={item.voteAverage}
+          userRating={showUserRating ? item.rating : null}
           className={CARD_WIDTH_CLASS}
-          hideMetaRating
-          slots={{
-            topLeft: (
-              <RatingBadgeStack
-                voteAverage={item.voteAverage}
-                userRating={showUserRating ? item.rating : null}
-              />
-            ),
-          }}
         />
       )}
       cardWidthClass={CARD_WIDTH_CLASS}

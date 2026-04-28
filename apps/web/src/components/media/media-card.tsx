@@ -5,21 +5,50 @@ import { FadeImage } from "@/components/ui/fade-image";
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
-import { Film, Tv } from "lucide-react";
+import { Film, Star, Tv } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { tmdbPosterLoader } from "@/lib/tmdb-image";
 import { mediaHref } from "@/lib/media-href";
-import { RatingInline } from "./rating-badge";
+
+function formatRating(value: number): string {
+  return value % 1 === 0 ? value.toString() : value.toFixed(1);
+}
+
+function CardRating({
+  value,
+  starClassName,
+  title,
+  count,
+}: {
+  value: number;
+  starClassName: string;
+  title: string;
+  count?: number | null;
+}): React.JSX.Element {
+  return (
+    <span
+      title={
+        count != null && count > 0
+          ? `${title} (${count} vote${count === 1 ? "" : "s"})`
+          : title
+      }
+      className="inline-flex items-center gap-1"
+    >
+      <Star size={12} className={cn("fill-current", starClassName)} />
+      <span className="tabular-nums">{formatRating(value)}</span>
+    </span>
+  );
+}
 
 export interface MediaCardSlots {
   /** Overlay rendered at top-left of the poster (e.g., rating badges). */
   topLeft?: React.ReactNode;
   /** Overlay rendered at top-right of the poster (e.g., episode tag, user rating). */
   topRight?: React.ReactNode;
-  /** Optional line shown above the title in the hover overlay. */
-  hoverSubtitle?: React.ReactNode;
-  /** Optional line shown below the type/year meta in the hover overlay. */
-  hoverExtra?: React.ReactNode;
+  /** Replaces the default meta line under the title (type · year · rating). */
+  subtitle?: React.ReactNode;
+  /** Appended after subtitle/meta with a separator. */
+  extra?: React.ReactNode;
 }
 
 interface MediaCardProps {
@@ -31,6 +60,9 @@ interface MediaCardProps {
   posterPath: string | null;
   year?: number | null;
   voteAverage?: number | null;
+  userRating?: number | null;
+  membersAvg?: number | null;
+  membersCount?: number | null;
   progress?: {
     percent: number;
     value?: number;
@@ -40,8 +72,6 @@ interface MediaCardProps {
   href?: string;
   className?: string;
   slots?: MediaCardSlots;
-  /** Suppress the inline rating in the hover overlay meta row (when caller shows its own rating badge). */
-  hideMetaRating?: boolean;
 }
 
 export function MediaCard({
@@ -53,11 +83,13 @@ export function MediaCard({
   posterPath,
   year,
   voteAverage,
+  userRating,
+  membersAvg,
+  membersCount,
   progress,
   href,
   className,
   slots,
-  hideMetaRating = false,
 }: MediaCardProps): React.JSX.Element {
   const linkHref =
     href ?? mediaHref(provider ?? "tmdb", externalId ?? id ?? "0", type);
@@ -75,16 +107,21 @@ export function MediaCard({
     }
   }, [id, externalId, provider, type, utils]);
 
+  const typeLabel = type === "movie" ? "MOVIE" : "TV SHOW";
+  const subtitle = slots?.subtitle;
+  const extra = slots?.extra;
+  const hasPublicRating = voteAverage != null && voteAverage > 0;
+  const hasUserRating = userRating != null && userRating > 0;
+  const hasMembersRating = membersAvg != null && membersAvg > 0;
+  const hasAnyRating = hasPublicRating || hasUserRating || hasMembersRating;
+
   return (
     <Link
       href={linkHref}
       onMouseEnter={handlePrefetch}
-      className={cn(
-        "group relative mt-1 flex rounded-xl transition-[box-shadow] duration-200 hover:z-10 hover:ring-2 hover:ring-foreground/20",
-        className,
-      )}
+      className={cn("group mt-1 flex flex-col", className)}
     >
-      <div className="poster-frame relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-muted">
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-muted transition-[box-shadow] duration-200 group-hover:ring-2 group-hover:ring-foreground/20">
         {posterPath ? (
           <FadeImage
             loader={tmdbPosterLoader}
@@ -129,52 +166,73 @@ export function MediaCard({
           <div className="absolute right-1.5 top-1.5 z-10">{slots.topRight}</div>
         )}
 
-        <div
-          className={cn(
-            "absolute inset-0 flex flex-col justify-end opacity-0 transition-opacity duration-300 group-hover:opacity-100",
-            !imageReady && "pointer-events-none",
-          )}
-        >
-          <div className="bg-gradient-to-t from-black/95 via-black/60 to-transparent px-3 pb-3 pt-20">
-            {slots?.hoverSubtitle && (
-              <div className="mb-1 line-clamp-1 text-xs font-medium text-white/75">
-                {slots.hoverSubtitle}
-              </div>
-            )}
-            {title && title.trim().length > 0 && (
-              <p className="line-clamp-3 text-base font-semibold leading-tight text-white">
-                {title}
-              </p>
-            )}
-            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold uppercase tracking-wider text-white/80">
-              <span>{type === "movie" ? "Movie" : "TV Show"}</span>
-              {!hideMetaRating && voteAverage != null && voteAverage > 0 && (
-                <>
-                  <span className="opacity-40" aria-hidden>•</span>
-                  <RatingInline variant="public" value={voteAverage} />
-                </>
-              )}
-              {year && (
-                <>
-                  <span className="opacity-40" aria-hidden>•</span>
-                  <span className="tabular-nums">{year}</span>
-                </>
-              )}
-            </div>
-            {slots?.hoverExtra && (
-              <div className="mt-1 line-clamp-1 text-xs text-white/70">
-                {slots.hoverExtra}
-              </div>
-            )}
-          </div>
-        </div>
-
         {progress && progress.percent > 0 && (
           <div className="absolute inset-x-0 bottom-0 h-1.5 bg-white/20">
             <div
               className="h-full bg-white"
               style={{ width: `${Math.min(progress.percent, 100)}%` }}
             />
+          </div>
+        )}
+      </div>
+
+      <div className="mt-2 flex flex-col gap-1.5 px-0.5">
+        {title && title.trim().length > 0 && (
+          <p className="line-clamp-2 text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
+            {title}
+          </p>
+        )}
+        <div className="flex flex-wrap items-center gap-x-1.5 text-xs font-medium tracking-wide text-muted-foreground">
+          {subtitle ? (
+            <span className="line-clamp-1">{subtitle}</span>
+          ) : (
+            <>
+              <span>{typeLabel}</span>
+              {year && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span className="tabular-nums">{year}</span>
+                </>
+              )}
+            </>
+          )}
+          {extra && (
+            <>
+              <span aria-hidden>·</span>
+              <span className="line-clamp-1">{extra}</span>
+            </>
+          )}
+        </div>
+        {hasAnyRating && (
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs font-medium tracking-wide text-muted-foreground">
+            {hasPublicRating && (
+              <CardRating
+                value={voteAverage!}
+                starClassName="text-yellow-400"
+                title="Public rating (TMDB)"
+              />
+            )}
+            {hasPublicRating && (hasUserRating || hasMembersRating) && (
+              <span aria-hidden>·</span>
+            )}
+            {hasUserRating && (
+              <CardRating
+                value={userRating!}
+                starClassName="text-emerald-400"
+                title="Your rating"
+              />
+            )}
+            {hasUserRating && hasMembersRating && (
+              <span aria-hidden>·</span>
+            )}
+            {hasMembersRating && (
+              <CardRating
+                value={membersAvg!}
+                starClassName="text-cyan-300"
+                title="Members rating"
+                count={membersCount}
+              />
+            )}
           </div>
         )}
       </div>
@@ -188,6 +246,13 @@ export function MediaCardSkeleton({
   className?: string;
 }): React.JSX.Element {
   return (
-    <Skeleton className={cn("mt-1 aspect-[2/3] w-full rounded-xl", className)} />
+    <div className={cn("mt-1 flex flex-col", className)}>
+      <Skeleton className="aspect-[2/3] w-full rounded-xl" />
+      <div className="mt-2 flex flex-col gap-1.5 px-0.5">
+        <Skeleton className="h-3.5 w-3/4 rounded" />
+        <Skeleton className="h-3 w-1/2 rounded" />
+        <Skeleton className="h-3 w-2/5 rounded" />
+      </div>
+    </div>
   );
 }

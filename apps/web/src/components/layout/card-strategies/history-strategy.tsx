@@ -5,7 +5,6 @@ import {
 } from "@/app/(app)/library/_components/library-playback-card";
 import type { LibraryPlaybackEntry } from "@/app/(app)/library/_components/library-playback-card";
 import { MediaCard, MediaCardSkeleton } from "@/components/media/media-card";
-import { RatingBadgeStack } from "@/components/media/rating-badge";
 import { GRID_COLS } from "@/components/layout/browse-layout.types";
 import type { CardStrategy, BrowseItem } from "@/components/layout/browse-layout.types";
 
@@ -62,16 +61,11 @@ function GridCard({ item }: { item: BrowseItem }): React.JSX.Element {
       posterPath={item.posterPath}
       year={item.year}
       voteAverage={item.voteAverage}
+      userRating={item.userRating}
       progress={item.progress}
       slots={{
-        topLeft: (
-          <RatingBadgeStack
-            voteAverage={item.voteAverage}
-            userRating={item.userRating}
-          />
-        ),
-        hoverSubtitle: epLabel,
-        hoverExtra: watchedLabel ? `Watched ${watchedLabel}` : undefined,
+        subtitle: epLabel,
+        extra: watchedLabel ? `Watched ${watchedLabel}` : undefined,
       }}
     />
   );

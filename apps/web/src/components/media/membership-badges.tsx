@@ -49,10 +49,7 @@ export function MembershipBadges({
       ? "bg-black/70 px-1.5 py-1 text-white"
       : "bg-muted px-2 py-0.5 text-foreground";
 
-  const wrapperByVariant =
-    variant === "grid"
-      ? "absolute bottom-1.5 left-1.5 z-10"
-      : "inline-flex";
+  const wrapperByVariant = "inline-flex";
 
   return (
     <TooltipProvider delayDuration={200}>

@@ -6,7 +6,6 @@ import { Loader2 } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { trpc } from "@/lib/trpc/client";
 import { MediaCard, MediaCardSkeleton } from "@/components/media/media-card";
-import { RatingBadge } from "@/components/media/rating-badge";
 import { StateMessage } from "@canto/ui/state-message";
 
 const FILTERS = [
@@ -213,12 +212,8 @@ export function LibraryTab(): React.JSX.Element {
                 title={item.title}
                 posterPath={item.posterPath}
                 year={item.year}
+                userRating={item.rating}
                 className={activeFilter === "dropped" ? "opacity-60 grayscale" : undefined}
-                slots={
-                  item.rating != null && activeFilter === "rated"
-                    ? { topLeft: <RatingBadge variant="user" value={item.rating} /> }
-                    : undefined
-                }
               />
             ))}
           </div>

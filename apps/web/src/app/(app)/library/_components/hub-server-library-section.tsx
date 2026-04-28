@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import { Server } from "lucide-react";
 import { MediaCard } from "@/components/media/media-card";
-import { RatingBadgeStack } from "@/components/media/rating-badge";
 import { trpc } from "@/lib/trpc/client";
 import { LibraryCarousel } from "./library-carousel";
 
@@ -40,16 +39,8 @@ export function HubServerLibrarySection(): React.JSX.Element {
           posterPath={item.media.posterPath}
           year={item.media.year ?? undefined}
           voteAverage={item.media.voteAverage ?? undefined}
+          userRating={item.userRating}
           className={CARD_WIDTH_CLASS}
-          hideMetaRating
-          slots={{
-            topLeft: (
-              <RatingBadgeStack
-                voteAverage={item.media.voteAverage}
-                userRating={item.userRating}
-              />
-            ),
-          }}
         />
       )}
       cardWidthClass={CARD_WIDTH_CLASS}

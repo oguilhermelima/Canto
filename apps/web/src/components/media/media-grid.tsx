@@ -2,7 +2,6 @@
 
 import { cn } from "@canto/ui/cn";
 import { MediaCard, MediaCardSkeleton } from "./media-card";
-import { RatingBadgeStack } from "./rating-badge";
 import { StateMessage } from "@canto/ui/state-message";
 
 interface MediaItem {
@@ -58,14 +57,6 @@ export function MediaGrid({
         <MediaCard
           key={item.id ?? `${item.provider}-${item.externalId}-${i}`}
           {...item}
-          slots={{
-            topLeft: (
-              <RatingBadgeStack
-                voteAverage={item.voteAverage}
-                membersAvg={item.membersAvg}
-              />
-            ),
-          }}
         />
       ))}
     </div>

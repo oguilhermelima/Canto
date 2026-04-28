@@ -69,23 +69,46 @@ function imagePath(item: WatchNextItem): string | null {
   return item.backdropPath ?? item.posterPath;
 }
 
-function itemLabel(item: WatchNextItem): string {
+function buildSubtitle(item: WatchNextItem): string {
   if (item.kind === "continue") {
-    return item.episode
-      ? `S${String(item.episode.seasonNumber ?? 0).padStart(2, "0")}E${String(item.episode.number ?? 0).padStart(2, "0")} · ${sourceLabel(item.source)}`
-      : `Movie · ${sourceLabel(item.source)}`;
+    if (item.episode) {
+      const ep = `S${String(item.episode.seasonNumber ?? 0).padStart(2, "0")}E${String(item.episode.number ?? 0).padStart(2, "0")}`;
+      return item.episode.title ? `${ep} · ${item.episode.title}` : ep;
+    }
+    return sourceLabel(item.source);
   }
 
   if (item.kind === "next_episode") {
-    return `S${String(item.episode?.seasonNumber ?? 0).padStart(2, "0")}E${String(item.episode?.number ?? 0).padStart(2, "0")}${item.episode?.title ? ` · ${item.episode.title}` : ""}`;
+    const ep = `S${String(item.episode?.seasonNumber ?? 0).padStart(2, "0")}E${String(item.episode?.number ?? 0).padStart(2, "0")}`;
+    return item.episode?.title ? `${ep} · ${item.episode.title}` : ep;
   }
 
   if (item.kind === "because_watched" && item.becauseOf) {
     return `Because you watched ${item.becauseOf.title}`;
   }
 
-  return "Movie to start";
+  return item.mediaType === "show" ? "TV SHOW" : "MOVIE";
 }
+
+function buildExtra(item: WatchNextItem): string | null {
+  if (
+    item.progressUnit === "seconds" &&
+    item.progressTotal !== null &&
+    item.progressValue !== null
+  ) {
+    return `${formatProgress(item.progressValue)} / ${formatProgress(item.progressTotal)}`;
+  }
+  if (
+    item.progressUnit === "episodes" &&
+    item.progressTotal !== null &&
+    item.progressValue !== null
+  ) {
+    return `${item.progressValue}/${item.progressTotal} ep`;
+  }
+  return null;
+}
+
+const CARD_WIDTH = "w-[280px] shrink-0 sm:w-[300px] lg:w-[340px] 2xl:w-[380px]";
 
 export function WatchNextCard({
   item,
@@ -94,21 +117,7 @@ export function WatchNextCard({
   item: WatchNextItem;
   view: WatchNextView;
 }): React.JSX.Element {
-  const progressText =
-    item.progressUnit === "seconds" &&
-    item.progressTotal !== null &&
-    item.progressValue !== null
-      ? `${formatProgress(item.progressValue)} / ${formatProgress(item.progressTotal)}`
-      : item.progressUnit === "episodes" &&
-          item.progressTotal !== null &&
-          item.progressValue !== null
-        ? `${item.progressValue}/${item.progressTotal} episodes watched`
-        : null;
-
   const cardImage = imagePath(item);
-  // Prefer the logo coming from the procedure (already localized via the
-  // mediaI18n JOIN). Fall back to the on-demand `useLogo` only when the source
-  // didn't supply one — e.g. items that haven't been enriched yet.
   const fetchedLogo = useLogo(
     item.provider,
     String(item.externalId),
@@ -122,14 +131,16 @@ export function WatchNextCard({
     { skip: !!item.logoPath },
   );
   const logoPath = item.logoPath ?? fetchedLogo;
-  const [imageReady, setImageReady] = useState(!cardImage);
   const logoResolved = !!item.logoPath || fetchedLogo !== undefined;
+  const [imageReady, setImageReady] = useState(!cardImage);
+  const subtitle = buildSubtitle(item);
+  const extra = buildExtra(item);
 
   if (!logoResolved || !imageReady) {
     return (
-      <div className="relative w-[280px] shrink-0 sm:w-[300px] lg:w-[340px] 2xl:w-[380px]">
+      <div className={cn("mt-1 flex flex-col", CARD_WIDTH)}>
         <Skeleton className="aspect-video w-full rounded-xl" />
-        {cardImage && !imageReady && (
+        {cardImage && (
           <img
             src={tmdbThumbLoader({ src: cardImage, width: 780, quality: 75 })}
             alt=""
@@ -137,6 +148,10 @@ export function WatchNextCard({
             className="invisible absolute h-0 w-0"
           />
         )}
+        <div className="mt-2 flex flex-col gap-1.5 px-0.5">
+          <Skeleton className="h-3.5 w-3/4 rounded" />
+          <Skeleton className="h-3 w-1/2 rounded" />
+        </div>
       </div>
     );
   }
@@ -144,9 +159,9 @@ export function WatchNextCard({
   return (
     <Link
       href={mediaHref(item.provider, item.externalId, item.mediaType)}
-      className="group relative mt-1 flex w-[280px] shrink-0 overflow-hidden rounded-xl transition-[box-shadow] duration-200 hover:z-10 hover:ring-2 hover:ring-foreground/20 sm:w-[300px] lg:w-[340px] 2xl:w-[380px]"
+      className={cn("group mt-1 flex flex-col", CARD_WIDTH)}
     >
-      <div className="relative aspect-video w-full overflow-hidden bg-muted">
+      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-muted transition-[box-shadow] duration-200 group-hover:ring-2 group-hover:ring-foreground/20">
         {cardImage ? (
           <Image
             loader={tmdbThumbLoader}
@@ -175,35 +190,41 @@ export function WatchNextCard({
           {view === "continue" ? "CONTINUE" : "UP NEXT"}
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3.5 pb-3 pt-14">
-          {logoPath ? (
-            <MediaLogo
-              src={`${TMDB_IMAGE_BASE}/w500${logoPath}`}
-              alt={item.title}
-              size="card"
-              className="max-w-[70%]"
-            />
-          ) : (
-            <p className="line-clamp-2 text-sm font-semibold leading-tight text-white drop-shadow-lg">
-              {item.title}
-            </p>
-          )}
-          <div className={cn("flex items-center gap-1.5", logoPath ? "mt-2" : "mt-1.5")}>
-            <span className="text-xs font-medium text-white/90">{itemLabel(item)}</span>
-          </div>
-          {item.progressPercent !== null && (
-            <div className="mt-2.5 flex items-center gap-2.5">
-              <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/20">
-                <div
-                  className="h-full rounded-full bg-white/80"
-                  style={{ width: `${item.progressPercent}%` }}
-                />
+        {(logoPath || item.progressPercent !== null) && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent px-4 pb-4 pt-14">
+            {logoPath && (
+              <MediaLogo
+                src={`${TMDB_IMAGE_BASE}/w500${logoPath}`}
+                alt={item.title}
+                size="card"
+                className="max-w-[60%]"
+              />
+            )}
+            {item.progressPercent !== null && (
+              <div className={cn("flex items-center gap-2.5", logoPath && "mt-2.5")}>
+                <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/25">
+                  <div
+                    className="h-full rounded-full bg-white"
+                    style={{ width: `${Math.min(item.progressPercent, 100)}%` }}
+                  />
+                </div>
+                {extra && (
+                  <span className="shrink-0 text-[11px] font-medium tabular-nums text-white/90">
+                    {extra}
+                  </span>
+                )}
               </div>
-              <span className="shrink-0 text-xs tabular-nums text-white/70">
-                {progressText ?? `${item.progressPercent}%`}
-              </span>
-            </div>
-          )}
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-2 flex flex-col gap-1.5 px-0.5">
+        <p className="line-clamp-2 text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
+          {item.title}
+        </p>
+        <div className="flex flex-wrap items-center gap-x-1.5 text-xs font-medium tracking-wide text-muted-foreground">
+          <span className="line-clamp-1">{subtitle}</span>
         </div>
       </div>
     </Link>
