@@ -64,8 +64,7 @@ export async function retryStalledTorrent(
         seasonNumber: row.seasonNumber ?? undefined,
         episodeNumbers: row.episodeNumbers ?? undefined,
       },
-      indexers,
-      rules,
+      { indexers, rules },
     );
 
     if (results.length === 0) {

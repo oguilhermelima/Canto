@@ -86,8 +86,7 @@ export async function runRepackSupersede(
           episodeNumbers: row.episodeNumbers ?? undefined,
           pageSize: 50,
         },
-        deps.indexers,
-        deps.rules,
+        { indexers: deps.indexers, rules: deps.rules },
       );
       results = out.results;
     } catch (err) {

@@ -288,17 +288,22 @@ function scoreRawResults(
 
 /* ─── Public use-cases ─── */
 
+export interface SearchDeps {
+  indexers: IndexerPort[];
+  /** Per-call scoring rules. Callers that have a user context (the tRPC
+   *  search procedure) layer the user's download preferences on top of
+   *  the admin config via {@link composeDownloadRules}. Background jobs
+   *  with no user (continuous-download, rss-sync) pass the admin config
+   *  rules untouched — see {@link findDownloadConfig}. */
+  rules: ScoringRules;
+}
+
 export async function searchTorrents(
   db: Database,
   input: SearchInput,
-  indexers: IndexerPort[],
-  /** Per-call scoring rules. Callers that have a user context (the tRPC
-   *  search procedure) layer the user's download preferences on top of
-   *  the admin config via {@link applyDownloadPreferences}. Background
-   *  jobs with no user (continuous-download, rss-sync) pass the admin
-   *  config rules untouched — see {@link findDownloadConfig}. */
-  rules: ScoringRules,
+  deps: SearchDeps,
 ): Promise<PaginatedSearchResults> {
+  const { indexers, rules } = deps;
   const prep = await prepareSearch(db, input, rules);
 
   if (indexers.length === 0) {
@@ -361,9 +366,9 @@ export interface IndexerSearchResult {
 export async function searchOnIndexer(
   db: Database,
   input: SearchOnIndexerInput,
-  indexers: IndexerPort[],
-  rules: ScoringRules,
+  deps: SearchDeps,
 ): Promise<IndexerSearchResult> {
+  const { indexers, rules } = deps;
   const idx = indexers.find((i) => i.id === input.indexerId);
   if (!idx) {
     return {

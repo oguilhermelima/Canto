@@ -27,7 +27,10 @@ export const torrentSearchRouter = createTRPCRouter({
         findDownloadPreferences(ctx.db, ctx.session.user.id),
         findDownloadConfig(ctx.db),
       ]);
-      return searchTorrents(ctx.db, input, indexers, composeDownloadRules(config, prefs));
+      return searchTorrents(ctx.db, input, {
+        indexers,
+        rules: composeDownloadRules(config, prefs),
+      });
     }),
 
   /** Snapshot of every enabled indexer (id + display name). Drives the
@@ -48,6 +51,9 @@ export const torrentSearchRouter = createTRPCRouter({
         findDownloadPreferences(ctx.db, ctx.session.user.id),
         findDownloadConfig(ctx.db),
       ]);
-      return searchOnIndexer(ctx.db, input, indexers, composeDownloadRules(config, prefs));
+      return searchOnIndexer(ctx.db, input, {
+        indexers,
+        rules: composeDownloadRules(config, prefs),
+      });
     }),
 });

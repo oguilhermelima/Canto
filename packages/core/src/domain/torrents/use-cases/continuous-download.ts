@@ -37,11 +37,15 @@ export async function tryContinuousDownload(
   try {
     const config = await findDownloadConfig(db);
     const rules = applyAdminDownloadPolicy(config.rules, config.policy);
-    const { results } = await searchTorrents(db, {
-      mediaId: mediaRow.id,
-      seasonNumber: importedSeasonNumber,
-      episodeNumbers: [nextEp],
-    }, indexers, rules);
+    const { results } = await searchTorrents(
+      db,
+      {
+        mediaId: mediaRow.id,
+        seasonNumber: importedSeasonNumber,
+        episodeNumbers: [nextEp],
+      },
+      { indexers, rules },
+    );
 
     if (results.length === 0) {
       console.log(`[continuous-download] No results for next episode`);
