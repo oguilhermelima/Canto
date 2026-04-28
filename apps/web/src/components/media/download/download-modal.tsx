@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -50,15 +49,15 @@ export function DownloadModal({
 }: DownloadModalProps): React.JSX.Element {
   const modal = useDownloadModal(mediaId, mediaType, open);
 
-  useEffect(() => {
-    if (!open) modal.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
   const showingResults = modal.step === 2;
 
+  const handleOpenChange = (next: boolean): void => {
+    if (!next) modal.reset();
+    onOpenChange(next);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className={`flex h-dvh max-h-dvh w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-border bg-background p-0 md:max-w-3xl md:rounded-[2rem] [&>button:last-child]:hidden ${showingResults ? "md:h-[65vh] md:max-h-[65vh]" : mediaType === "show" ? "md:h-auto md:min-h-[50vh] md:max-h-[65vh]" : "md:h-auto md:max-h-[65vh]"}`}>
         {/* Header — fixed two-row height on both screens */}
         <div className="shrink-0 border-b border-border px-5 py-4">
