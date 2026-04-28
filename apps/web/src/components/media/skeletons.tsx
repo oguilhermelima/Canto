@@ -16,7 +16,7 @@ export function SectionTitleSkeleton({
   return (
     <div
       className={cn(
-        "flex items-center justify-between pb-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24",
+        "flex items-center justify-between pb-2 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24",
         className,
       )}
     >
@@ -38,7 +38,7 @@ export function FeaturedCardSkeleton({
   return (
     <Skeleton
       className={cn(
-        "shrink-0 rounded-xl",
+        "mt-1 shrink-0 rounded-xl",
         "h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px]",
         "w-[230px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]",
         className,

@@ -32,7 +32,7 @@ export function SectionTitle({
 
   if (seeMorePath) {
     return (
-      <div className={cn(OUTER_PADDING, "pb-4", className)}>
+      <div className={cn(OUTER_PADDING, "pb-2", className)}>
         <div className="flex items-center justify-between gap-2">
           <Link
             href={seeMorePath}
@@ -53,7 +53,7 @@ export function SectionTitle({
   return (
     <div
       className={cn(
-        "flex items-center justify-between pb-4",
+        "flex items-center justify-between pb-2",
         OUTER_PADDING,
         className,
       )}
