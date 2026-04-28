@@ -44,7 +44,7 @@ function ProviderChip({
         alt={providerName}
         width={220}
         height={220}
-        className="h-full w-full object-cover"
+        className="h-full w-full object-cover transition-transform duration-300 group-hover/chip:scale-[1.05]"
         unoptimized
       />
     </Link>
