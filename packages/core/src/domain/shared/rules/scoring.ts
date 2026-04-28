@@ -3,11 +3,18 @@ import type { ReleaseAttributes } from "../../torrents/rules/release-attributes"
 import type { ScoringRules } from "./scoring-rules";
 
 export {
+  EMPTY_ADMIN_DOWNLOAD_POLICY,
   EMPTY_DOWNLOAD_PREFERENCES,
+  applyAdminDownloadPolicy,
   applyDownloadPreferences,
   mergeRecord,
 } from "./scoring-rules";
-export type { ScoringRules, DownloadPreferences } from "./scoring-rules";
+export type {
+  AdminDownloadPolicy,
+  Av1Stance,
+  DownloadPreferences,
+  ScoringRules,
+} from "./scoring-rules";
 
 /**
  * Confidence engine. Pure function over `(attrs, ctx, rules)`.

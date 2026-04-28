@@ -176,6 +176,13 @@
       "when": 1777349965796,
       "tag": "0024_black_sentinel",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1777351120579,
+      "tag": "0025_drop_admin_user_preferences",
+      "breakpoints": true
     }
   ]
 }

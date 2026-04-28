@@ -18,6 +18,7 @@ import {
   findDownloadConfig,
   findReleaseGroupLookups,
 } from "@canto/core/infra/torrents/download-config-repository";
+import { applyAdminDownloadPolicy } from "@canto/core/domain/shared/rules/scoring-rules";
 
 /**
  * RSS Sync: Poll Prowlarr RSS feeds and auto-download matching releases
@@ -59,11 +60,14 @@ export async function handleRssSync(): Promise<void> {
 
   console.log(`[rss-sync] ${rssItems.length} RSS item(s) to process`);
 
-  // Hydrate scoring config + tier lookups once for the whole batch.
+  // Hydrate scoring config + tier lookups once for the whole batch. RSS
+  // is admin-scoped (no per-user context), so apply admin policy and
+  // skip the per-user prefs layer.
   const [config, allLookups] = await Promise.all([
     findDownloadConfig(db),
     findReleaseGroupLookups(db),
   ]);
+  const rules = applyAdminDownloadPolicy(config.rules, config.policy);
 
   // 3. Match and download
   let downloadCount = 0;
@@ -98,7 +102,7 @@ export async function handleRssSync(): Promise<void> {
       const confidence = calculateConfidence(
         attrs,
         { hasDigitalRelease: true },
-        config.rules,
+        rules,
       );
       if (confidence <= 0) continue;
 

@@ -95,15 +95,35 @@ export interface ScoringRules {
 export type Av1Stance = "neutral" | "prefer" | "avoid";
 
 /**
- * Per-user download preferences expressed as flat lists. The downstream
- * scoring engine never reads these directly — {@link applyDownloadPreferences}
- * folds them into a {@link ScoringRules} as bumps to the dictionary fields.
+ * Per-user download taste, layered into the scoring rules at search
+ * time. Today this is just languages and streaming services — what to
+ * boost based on the individual viewer's reading/listening preferences.
+ *
+ * Edition policy and AV1 stance used to live here too; both moved to
+ * {@link AdminDownloadPolicy} on the server-wide download_config row.
+ * Edition is "what edition the household keeps on disk" and AV1 stance
+ * is "what codec the playback infra can decode" — both are server
+ * policy, not personal taste.
  */
 export interface DownloadPreferences {
   /** ISO codes (matches {@link detectLanguages}'s output). */
   preferredLanguages: string[];
   /** Tag codes from {@link detectStreamingService} (NF/AMZN/...). */
   preferredStreamingServices: string[];
+}
+
+export const EMPTY_DOWNLOAD_PREFERENCES: DownloadPreferences = {
+  preferredLanguages: [],
+  preferredStreamingServices: [],
+};
+
+/**
+ * Server-wide download policy applied to every search regardless of
+ * which user triggered it. Distinguished from
+ * {@link DownloadPreferences} by ownership: this is admin config that
+ * lives on the `download_config` row and applies household-wide.
+ */
+export interface AdminDownloadPolicy {
   /** Edition strings from {@link detectEdition} ("IMAX", "Director's Cut", …). */
   preferredEditions: string[];
   /** Editions that should rank below their absence. */
@@ -112,9 +132,7 @@ export interface DownloadPreferences {
   av1Stance: Av1Stance;
 }
 
-export const EMPTY_DOWNLOAD_PREFERENCES: DownloadPreferences = {
-  preferredLanguages: [],
-  preferredStreamingServices: [],
+export const EMPTY_ADMIN_DOWNLOAD_POLICY: AdminDownloadPolicy = {
   preferredEditions: [],
   avoidedEditions: [],
   av1Stance: "neutral",
@@ -123,11 +141,11 @@ export const EMPTY_DOWNLOAD_PREFERENCES: DownloadPreferences = {
 /**
  * Layer a user's download preferences onto a base {@link ScoringRules}.
  *
- * Bonuses live in `base.preferenceBonuses` so a Phase-5 quality profile
- * could change the weights without rewriting this function. Each preferred
- * language adds `perPreferredLanguage` to that language's `languageBonuses`
- * entry (additive — Phase 5 profile language boosts compose with user
- * boosts). Streaming services and editions follow the same pattern.
+ * Bonuses live in `base.preferenceBonuses` so a quality profile could
+ * change the magnitudes without rewriting this function. Each preferred
+ * language adds `perPreferredLanguage` to that language's
+ * `languageBonuses` entry (additive — profile language boosts compose
+ * with user boosts). Streaming services follow the same pattern.
  *
  * Pure — returns a new rules object; the input is not mutated.
  */
@@ -135,13 +153,8 @@ export function applyDownloadPreferences(
   base: ScoringRules,
   prefs: DownloadPreferences,
 ): ScoringRules {
-  const {
-    perPreferredLanguage,
-    perPreferredStreamingService,
-    preferredEdition,
-    avoidedEdition,
-    av1Stance: av1Bump,
-  } = base.preferenceBonuses;
+  const { perPreferredLanguage, perPreferredStreamingService } =
+    base.preferenceBonuses;
 
   const languageBonuses = { ...base.languageBonuses };
   for (const lang of prefs.preferredLanguages) {
@@ -154,20 +167,46 @@ export function applyDownloadPreferences(
       (streamingServiceBonuses[svc] ?? 0) + perPreferredStreamingService;
   }
 
+  return {
+    ...base,
+    languageBonuses,
+    streamingServiceBonuses,
+  };
+}
+
+/**
+ * Layer the server-wide admin policy (editions + AV1 stance) onto a
+ * base {@link ScoringRules}. Pure — returns a new rules object.
+ *
+ * Applied before {@link applyDownloadPreferences} so user-scoped layers
+ * compose on top of admin policy: an admin who avoids "Theatrical"
+ * cannot be overridden by a user preferring it (avoidedEditions just
+ * adds a negative bonus; per-user prefs don't subtract from it).
+ */
+export function applyAdminDownloadPolicy(
+  base: ScoringRules,
+  policy: AdminDownloadPolicy,
+): ScoringRules {
+  const {
+    preferredEdition,
+    avoidedEdition,
+    av1Stance: av1Bump,
+  } = base.preferenceBonuses;
+
   const editionBonuses = { ...base.editionBonuses };
-  for (const ed of prefs.preferredEditions) {
+  for (const ed of policy.preferredEditions) {
     editionBonuses[ed] = (editionBonuses[ed] ?? 0) + preferredEdition;
   }
-  for (const ed of prefs.avoidedEditions) {
+  for (const ed of policy.avoidedEditions) {
     editionBonuses[ed] = (editionBonuses[ed] ?? 0) + avoidedEdition;
   }
 
   // AV1 stance: nudge AV1 entries in the codec table up or down. Applied
-  // to every quality bucket so the user's stance carries over regardless
-  // of resolution.
+  // to every quality bucket so the stance carries over regardless of
+  // resolution.
   let codec = base.codec;
-  if (prefs.av1Stance !== "neutral") {
-    const delta = prefs.av1Stance === "prefer" ? av1Bump : -av1Bump;
+  if (policy.av1Stance !== "neutral") {
+    const delta = policy.av1Stance === "prefer" ? av1Bump : -av1Bump;
     const byQuality: typeof base.codec.byQuality = {
       ...base.codec.byQuality,
       default: { ...base.codec.byQuality.default },
@@ -184,8 +223,6 @@ export function applyDownloadPreferences(
 
   return {
     ...base,
-    languageBonuses,
-    streamingServiceBonuses,
     editionBonuses,
     codec,
   };

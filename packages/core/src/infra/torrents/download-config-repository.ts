@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
   DEFAULT_DOWNLOAD_SCORING_RULES,
@@ -7,6 +8,7 @@ import {
 } from "@canto/db";
 
 import type {
+  AdminDownloadPolicy,
   Av1Stance,
   ScoringRules,
 } from "@canto/core/domain/shared/rules/scoring-rules";
@@ -29,16 +31,6 @@ export type ReleaseGroupTierSets = Record<
 >;
 
 export type ReleaseGroupLookups = Record<ReleaseFlavor, ReleaseGroupTierSets>;
-
-/** Admin-level download policy that overlays onto every search regardless
- *  of the user that triggered it. Editions and AV1 stance are
- *  household-wide policy (which edition we keep on disk, what the
- *  playback infra can decode), not per-user taste. */
-export interface AdminDownloadPolicy {
-  preferredEditions: string[];
-  avoidedEditions: string[];
-  av1Stance: Av1Stance;
-}
 
 export interface DownloadConfig {
   rules: ScoringRules;
@@ -115,6 +107,33 @@ export async function findReleaseGroupLookups(
     ].add(row.nameLower);
   }
   return lookups;
+}
+
+/**
+ * Persist an admin policy update. Updates the single config row in
+ * place; throws if no row exists (the seed at boot is responsible for
+ * inserting it). Returns the updated policy so callers don't need to
+ * re-read.
+ */
+export async function upsertAdminDownloadPolicy(
+  db: Database,
+  policy: AdminDownloadPolicy,
+): Promise<AdminDownloadPolicy> {
+  const updated = await db
+    .update(downloadConfig)
+    .set({
+      preferredEditions: policy.preferredEditions,
+      avoidedEditions: policy.avoidedEditions,
+      av1Stance: policy.av1Stance,
+      updatedAt: sql`now()`,
+    })
+    .returning();
+  if (updated.length === 0) {
+    throw new Error(
+      "download_config row missing — run seedDownloadDefaults before persisting admin policy",
+    );
+  }
+  return policy;
 }
 
 /** Structural sniff for the scoring rules shape. Cheap — checks the

@@ -12,6 +12,7 @@ import {
   findTorrentById,
 } from "../../../infra/repositories";
 import { findDownloadConfig } from "../../../infra/torrents/download-config-repository";
+import { applyAdminDownloadPolicy } from "../../shared/rules/scoring-rules";
 
 interface StalledTorrent {
   id: string;
@@ -54,7 +55,8 @@ export async function retryStalledTorrent(
   if (indexers.length === 0) return;
 
   try {
-    const { rules } = await findDownloadConfig(db);
+    const config = await findDownloadConfig(db);
+    const rules = applyAdminDownloadPolicy(config.rules, config.policy);
     const { results } = await searchTorrents(
       db,
       {
