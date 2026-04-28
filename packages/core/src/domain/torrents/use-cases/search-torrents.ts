@@ -111,8 +111,11 @@ async function prepareSearch(
   input: SearchInput,
   rules: ScoringRules,
 ): Promise<PreparedSearch> {
-  const allLookups = await findReleaseGroupLookups(db);
-  const row = await findMediaById(db, input.mediaId);
+  const [allLookups, row, blockedRows] = await Promise.all([
+    findReleaseGroupLookups(db),
+    findMediaById(db, input.mediaId),
+    findBlocklistByMediaId(db, input.mediaId),
+  ]);
   if (!row) throw new MediaNotFoundError(input.mediaId);
 
   const page = input.page ?? 0;
@@ -193,8 +196,6 @@ async function prepareSearch(
     ? applyDownloadProfile(rules, profile)
     : rules;
 
-  // Blocklist
-  const blockedRows = await findBlocklistByMediaId(db, input.mediaId);
   const blockedTitles = new Set(
     blockedRows.map((b) => b.title.toLowerCase()),
   );
