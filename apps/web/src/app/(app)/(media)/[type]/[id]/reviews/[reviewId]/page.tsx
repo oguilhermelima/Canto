@@ -45,7 +45,7 @@ export default function ReviewDetailPage(): React.JSX.Element {
     return (
       <div className="min-h-screen bg-background">
         <PageHeader title="Review" onNavigate={() => router.push(backHref)} />
-        <div className="px-4 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+        <div className="px-4 md:pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
           <div className="flex items-center gap-4">
             <Skeleton className="h-14 w-14 rounded-full" />
             <div className="space-y-2">
@@ -82,7 +82,7 @@ export default function ReviewDetailPage(): React.JSX.Element {
     <div className="min-h-screen bg-background">
       <PageHeader title="Review" onNavigate={() => router.push(backHref)} />
 
-      <div className="px-4 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+      <div className="px-4 md:pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-4">

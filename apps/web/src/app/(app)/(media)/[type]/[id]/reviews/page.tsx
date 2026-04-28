@@ -133,7 +133,7 @@ export default function ReviewsPage(): React.JSX.Element {
         onNavigate={() => router.push(backHref)}
       />
 
-      <div className="px-4 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+      <div className="px-4 md:pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Scope tabs */}

@@ -117,7 +117,7 @@ export default function EpisodeDetailPage(): React.JSX.Element {
         <EpisodeInfo episode={episode} sNum={sNum} eNum={eNum} seasonNum={seasonNum} variant="body" />
       </div>
 
-      <div className="px-4 pb-12 pt-6 md:px-8 md:pt-0 lg:px-12 xl:px-16 2xl:px-24">
+      <div className="px-4 md:pb-12 pt-6 md:px-8 md:pt-0 lg:px-12 xl:px-16 2xl:px-24">
         {episode.overview && (
           <p className="max-w-3xl leading-relaxed text-muted-foreground">
             {episode.overview}

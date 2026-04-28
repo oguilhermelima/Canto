@@ -53,7 +53,7 @@ export function ProfileMediaGridSkeleton({
  */
 export function ProfilePageSkeleton(): React.JSX.Element {
   return (
-    <div className="w-full pb-12">
+    <div className="w-full md:pb-12">
       <ProfileHeaderSkeleton />
       <ProfileTabBarSkeleton />
       <div className="px-5 md:px-8 lg:px-12 xl:px-16 2xl:px-24">

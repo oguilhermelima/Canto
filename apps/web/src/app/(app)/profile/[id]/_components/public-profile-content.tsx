@@ -71,7 +71,7 @@ export function PublicProfileContent({ userId }: { userId: string }): React.JSX.
         />
       </PublicProfileHeader>
 
-      <div className="px-5 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+      <div className="px-5 md:pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {activeTab === "overview" && <PublicOverviewTab userId={userId} />}
         {activeTab === "collection" && <PublicCollectionsTab userId={userId} />}
       </div>

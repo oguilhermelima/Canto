@@ -56,7 +56,7 @@ export default function PreferencesPage(): React.JSX.Element {
         />
       )}
 
-      <div className="px-4 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+      <div className="px-4 md:pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {/* Desktop: sidebar + content grid */}
         <div className="hidden md:grid md:grid-cols-[240px_1fr] md:gap-10 lg:gap-16">
           <PreferencesSidebar activeSection={desktopSection} />

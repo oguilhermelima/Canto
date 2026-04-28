@@ -58,7 +58,7 @@ export default function ProfilePage(): React.JSX.Element {
         <TabBar tabs={tabs} value={activeTab} onChange={setActiveTab} />
       </ProfileHeader>
 
-      <div className="px-5 pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
+      <div className="px-5 md:pb-12 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         {activeTab === "overview" && <OverviewTab />}
         {activeTab === "library" && <LibraryTab />}
         {activeTab === "stats" && <StatsTab />}
