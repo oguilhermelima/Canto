@@ -82,8 +82,10 @@ export async function autoSupersedeWithRepack(
     return { replaced: false, reason: "lower-or-equal-repack" };
   }
 
-  // (2) Same release group, lookup case-insensitive.
-  const currentGroup = detectReleaseGroup(current.title);
+  // (2) Same release group, lookup case-insensitive. Prefer the
+  // snapshotted column written at insert time; fall back to parsing the
+  // title for legacy rows that pre-date the column.
+  const currentGroup = current.releaseGroup ?? detectReleaseGroup(current.title);
   const candidateGroup = candidate.releaseGroup;
   if (
     !currentGroup ||

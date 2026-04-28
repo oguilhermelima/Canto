@@ -7,7 +7,10 @@ import { logAndSwallow } from "../../../../platform/logger/log-error";
 import { resolveDownloadUrl } from "../../../../platform/http/follow-redirects";
 import { detectQuality, detectSource } from "../../rules/quality";
 import { parseSeasons, parseEpisodes } from "../../rules/parsing";
-import { detectRepackCount } from "../../rules/parsing-release";
+import {
+  detectRepackCount,
+  detectReleaseGroup,
+} from "../../rules/parsing-release";
 import { extractHashFromMagnet } from "../../rules/torrent-rules";
 import type { DownloadClientPort } from "../../../shared/ports/download-client";
 import {
@@ -180,6 +183,7 @@ export async function coreDownload(
     episodeNumbers: input.episodeNumbers ?? (parsedEpisodes.length > 0 ? parsedEpisodes : null),
     status: "downloading",
     repackCount: detectRepackCount(input.title),
+    releaseGroup: detectReleaseGroup(input.title),
   });
 
   if (!torrentRow) {
