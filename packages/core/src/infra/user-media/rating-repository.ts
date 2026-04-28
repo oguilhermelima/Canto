@@ -16,8 +16,15 @@ export async function upsertUserRating(
     rating: number;
     comment?: string | null;
     isOverride?: boolean;
+    /** Real event time (e.g. Trakt's `rated_at`). When provided, the row's
+     *  stored `updatedAt` is moved to GREATEST(stored, incoming) so an
+     *  out-of-order sync replay can never pull the timestamp backward.
+     *  Defaults to `now()`. The same value is used as `createdAt` on insert. */
+    ratedAt?: Date;
   },
 ): Promise<typeof userRating.$inferSelect> {
+  const now = new Date();
+  const stamp = data.ratedAt ?? now;
   const existing = await db.query.userRating.findFirst({
     where: and(
       eq(userRating.userId, data.userId),
@@ -38,7 +45,9 @@ export async function upsertUserRating(
         rating: data.rating,
         comment: data.comment ?? existing.comment,
         isOverride: data.isOverride ?? true,
-        updatedAt: new Date(),
+        updatedAt: data.ratedAt
+          ? sql`GREATEST(${userRating.updatedAt}, ${data.ratedAt.toISOString()}::timestamptz)`
+          : now,
       })
       .where(eq(userRating.id, existing.id))
       .returning();
@@ -55,6 +64,8 @@ export async function upsertUserRating(
       rating: data.rating,
       comment: data.comment ?? null,
       isOverride: data.isOverride ?? true,
+      createdAt: stamp,
+      updatedAt: stamp,
     })
     .returning();
   return inserted!;

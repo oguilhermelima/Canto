@@ -110,6 +110,9 @@ export async function syncFavorites(ctx: SyncContext): Promise<void> {
           userId: ctx.userId,
           mediaId,
           isFavorite: true,
+          // Real "favorited at" time from Trakt — keeps the library's sort
+          // by updatedAt and the recently-favorited feed honest.
+          updatedAt: remoteAt,
         });
       } else {
         removeRemote.push({ type: remote.type, ids: remote.ids });

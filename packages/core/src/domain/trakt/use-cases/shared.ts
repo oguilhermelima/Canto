@@ -449,7 +449,12 @@ export async function syncSingleListMembership(
     ...remoteByKey.keys(),
   ]);
 
-  const addLocalMediaIds: string[] = [];
+  // We carry `addedAt` along with each mediaId so the eventual `addListItem`
+  // call stamps the listItem row with Trakt's real `listed_at` timestamp
+  // instead of `now()`. This keeps the library "added on" sort honest after
+  // an initial Trakt backfill — without it, every imported item would be
+  // grouped on the date of the sync.
+  const addLocalEntries: Array<{ mediaId: string; addedAt: Date }> = [];
   const removeLocalMediaIds: string[] = [];
   const addRemoteRefs: Array<{ type: "movie" | "show"; ids: TraktIds; mediaId: string }> = [];
   const removeRemoteRefs: Array<{ type: "movie" | "show"; ids: TraktIds }> = [];
@@ -495,17 +500,31 @@ export async function syncSingleListMembership(
           remote,
           resolveCache,
         );
-        if (mediaId) addLocalMediaIds.push(mediaId);
+        if (mediaId) {
+          addLocalEntries.push({
+            mediaId,
+            addedAt: parseDateOrNow(remote.listedAt, ctx.now),
+          });
+        }
         continue;
       }
     }
   }
 
-  const uniqueAddLocal = [...new Set(addLocalMediaIds)];
+  // Collapse duplicate mediaIds that may surface across different remote
+  // representations — keep the earliest listedAt so the library lists the
+  // item under the original day the user added it on Trakt.
+  const earliestByMediaId = new Map<string, Date>();
+  for (const entry of addLocalEntries) {
+    const prev = earliestByMediaId.get(entry.mediaId);
+    if (!prev || entry.addedAt.getTime() < prev.getTime()) {
+      earliestByMediaId.set(entry.mediaId, entry.addedAt);
+    }
+  }
   const uniqueRemoveLocal = [...new Set(removeLocalMediaIds)];
 
-  for (const mediaId of uniqueAddLocal) {
-    await addListItem(ctx.db, { listId: localListId, mediaId });
+  for (const [mediaId, addedAt] of earliestByMediaId) {
+    await addListItem(ctx.db, { listId: localListId, mediaId, addedAt });
   }
 
   for (const mediaId of uniqueRemoveLocal) {

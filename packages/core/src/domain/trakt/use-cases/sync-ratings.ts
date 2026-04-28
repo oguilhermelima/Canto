@@ -101,6 +101,7 @@ export async function syncRatings(ctx: SyncContext): Promise<void> {
           rating: local.rating,
         });
       } else if (typeof remote.rating === "number") {
+        const ratedAt = parseDateOrNow(remote.ratedAt, ctx.now);
         await upsertUserRating(ctx.db, {
           userId: ctx.userId,
           mediaId: local.mediaId,
@@ -108,11 +109,13 @@ export async function syncRatings(ctx: SyncContext): Promise<void> {
           episodeId: null,
           rating: remote.rating,
           isOverride: true,
+          ratedAt,
         });
         await upsertUserMediaState(ctx.db, {
           userId: ctx.userId,
           mediaId: local.mediaId,
           rating: remote.rating,
+          updatedAt: ratedAt,
         });
       }
       continue;
@@ -163,11 +166,13 @@ export async function syncRatings(ctx: SyncContext): Promise<void> {
           episodeId: null,
           rating: remote.rating,
           isOverride: true,
+          ratedAt: remoteAt,
         });
         await upsertUserMediaState(ctx.db, {
           userId: ctx.userId,
           mediaId,
           rating: remote.rating,
+          updatedAt: remoteAt,
         });
       } else {
         removeRemote.push({ type: remote.type, ids: remote.ids });

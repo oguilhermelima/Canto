@@ -8,16 +8,49 @@ export async function findUserMediaState(db: Database, userId: string, mediaId: 
   });
 }
 
+/**
+ * Upsert a user_media_state row.
+ *
+ * `updatedAt` semantics: when the caller provides one (e.g. Trakt sync passing
+ * the real remote watched/listed/rated timestamp), we never let the row's
+ * stored `updatedAt` move backward — the SET uses GREATEST(stored, incoming).
+ * That way independent sync sections that touch the same row (favorited on
+ * Trakt at T1, rated at T2 > T1) always converge on the most recent real
+ * event time, regardless of which section runs first.
+ *
+ * When the caller omits `updatedAt`, we fall back to `now()` — that path is
+ * for genuine "this just happened locally" writes (manual mark-watched,
+ * UI rating). Insert path mirrors the same rule.
+ */
 export async function upsertUserMediaState(
   db: Database,
   data: typeof userMediaState.$inferInsert,
 ) {
+  const now = new Date();
+  const incomingUpdatedAt = data.updatedAt instanceof Date
+    ? data.updatedAt
+    : data.updatedAt
+      ? new Date(data.updatedAt)
+      : null;
+
+  const insertValues = {
+    ...data,
+    updatedAt: incomingUpdatedAt ?? now,
+  };
+
+  const setClause = incomingUpdatedAt
+    ? {
+        ...data,
+        updatedAt: sql`GREATEST(${userMediaState.updatedAt}, ${incomingUpdatedAt.toISOString()}::timestamptz)`,
+      }
+    : { ...data, updatedAt: now };
+
   const [upserted] = await db
     .insert(userMediaState)
-    .values(data)
+    .values(insertValues)
     .onConflictDoUpdate({
       target: [userMediaState.userId, userMediaState.mediaId],
-      set: { ...data, updatedAt: new Date() },
+      set: setClause,
     })
     .returning();
   return upserted;
