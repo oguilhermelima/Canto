@@ -4,11 +4,19 @@ Companion to `DOWNLOAD_BACKLOG.md`. The backlog enumerates the gaps; this
 document sequences them into shippable phases with concrete file paths,
 schema changes, and decision points.
 
-> **Status (2026-04-27): Phases 1–5 complete. Phase 6b (streaming UI)
-> shipped — slow indexers no longer block fast ones. Phase 6a's
-> auto-supersede scheduler is the only meaningful gap remaining;
-> repack data is already plumbed. See `DOWNLOAD_BACKLOG.md` for the
-> line-by-line snapshot.**
+> **Status (2026-04-28): Phases 1–6 shipped end to end. The follow-up
+> hardening pass (DB-driven config, admin/user policy split, repack
+> auto-supersede full implementation, score explainability, regression
+> corpus, infohash dedup, naming consolidation) is also done. The only
+> Phase 6a piece left is the user-facing notification, captured in
+> `notification.md` for the future notification subsystem to absorb.
+> See `DOWNLOAD_BACKLOG.md` for the line-by-line snapshot.**
+
+> **Naming note.** This document was written before the
+> `qualityProfile` → `downloadProfile` and `torrent` → `download`
+> renames. Phase 5's text still uses the old `qualityProfile` symbols
+> for fidelity to the design at the time it was written; the codebase
+> uses the renamed forms today.
 
 ## Phase status
 
@@ -23,7 +31,25 @@ schema changes, and decision points.
 | 6b. Per-indexer streaming UI | ✅ shipped | `f2f347e6`, `b030569a` |
 | 6c. "Complete" fan-out | ✅ shipped | `5b3eef9b` |
 | 6d. AV1 stance | ✅ shipped | `62eaa150` |
-| 6a. Repack auto-supersede (data) | 🟡 partial — column populated; scheduler+notifications deferred | `9c98d1b8` |
+| 6a. Repack auto-supersede | ✅ shipped (notifications deferred) | `9c98d1b8`, `1c856648` |
+
+## Post-Phase 6 hardening
+
+Shipped after the original roadmap closed out. None of these were on
+the Phase 1–6 plan — they came out of a review of what was still
+fragile or hardcoded once the headline features were in.
+
+| Workstream | Status | Commits |
+|------------|--------|---------|
+| `notification.md` scaffold for deferred notifications | ✅ shipped | `cb90e547` |
+| `downloadConfig` + `downloadReleaseGroup` tables (replaces hardcoded `DEFAULT_SCORING_RULES` + tier lists) | ✅ shipped | `03568054` |
+| Scoring engine reads from DB; release groups hydrated per search | ✅ shipped | `ff78ff6b` |
+| Admin policy split from per-user prefs (editions + AV1 stance now `download_config`, languages + streaming stay per-user) | ✅ shipped | `a799b323` |
+| Rename `qualityProfile` → `downloadProfile` | ✅ shipped | `8dce157c` |
+| Rename `torrent` → `download` (entity + repository; qBit-side adapter and `searchTorrents` keep their names) | ✅ shipped | `78d5c858` |
+| Cross-indexer dedup uses magnet info-hash | ✅ shipped | `a10187e4` |
+| Regression corpus snapshot test | ✅ shipped | `cba4664b` |
+| Score explainability (`explainConfidence` + UI hover breakdown) | ✅ shipped | `b76eac14` |
 
 ## TL;DR
 
@@ -63,13 +89,15 @@ feature and deserves its own design pass before code.
   `userPreference`, `downloadFolder.rules`, `media.qualityProfileId` are
   already in the schema and unused by the search flow. Any phase that needs
   configurability plugs into these tables before adding new ones.
+  *(Post-Phase 6 update: `qualityProfile` is now `downloadProfile`,
+  scoring rules + tier lists live in `download_config` /
+  `download_release_group`, and the three admin keys
+  (`preferredEditions`, `avoidedEditions`, `av1Stance`) moved off
+  `userPreference` and onto `download_config`.)*
 - **Keep the tRPC contract additive.** `torrent.search` already exposes
   `confidence`, `quality`, `source`, `releaseGroup`, `codec`. Treat that as
   the public contract for mobile + web. New scoring inputs/outputs go on
   `ConfidenceContext` and the response payload — nothing breaking.
-- **Mobile parity guardrail.** Expo consumes the same `torrent.search`
-  query. Anything that changes the request/response shape needs a check in
-  `apps/mobile/`. Each phase below lists the mobile impact.
 
 ---
 
@@ -592,25 +620,23 @@ before any code lands. Phase 6 is opportunistic.
 
 ---
 
-## Open questions before Phase 5
+## Open questions before Phase 5 — resolved
 
-1. **Score blend.** TRaSH-bonuses-only vs profile-weight-only vs
-   blended? Determines whether someone with a "1080p Preferred" profile
-   ever sees 4K results. Recommend blended with profile dominant
-   (60–70% profile weight) but configurable per-profile.
-2. **Multi-language profiles.** Does "Anime BD" need a `language: "ja"`
-   lock, and what does that do to multi-audio releases that contain
-   JA + EN? Suggest: language pref on the profile is a *boost*, never
-   a *filter*, unless the user explicitly opts in to strict.
-3. **Per-folder vs per-media profile precedence.** If
-   `media.qualityProfileId` conflicts with
-   `downloadFolder.qualityProfileId`, which wins? Suggest media wins
-   (more specific signal; UI only sets it when user picked
-   deliberately).
-4. **Migration of existing media files.** When a user adopts profiles
-   for the first time, do we backfill `media.qualityProfileId` from
-   the matching folder's default? Yes — one-shot SQL on profile
-   creation.
+1. **Score blend.** Resolved: profile is filter + rank, not blend.
+   Combos outside `allowedFormats` return 0 (rejected). Combos inside
+   earn `entry.weight + bonusSum`. Mirrors Sonarr's quality + custom-
+   format model.
+2. **Multi-language profiles.** Resolved: language preference is a
+   *boost*, never a *filter*. Strict-mode kept on the parked list
+   pending demand.
+3. **Per-folder vs per-media profile precedence.** Resolved: media
+   wins. The resolution chain in
+   `findActiveDownloadProfile` is `media.downloadProfileId` →
+   `folder.downloadProfileId` → system default per flavor → none.
+4. **Migration of existing media files.** Resolved: no backfill.
+   Existing rows stay null and fall through to the folder/system
+   default at search time. Snapshot-on-add when the user picks a
+   profile in the download modal.
 
 ---
 

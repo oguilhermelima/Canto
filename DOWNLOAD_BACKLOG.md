@@ -1,24 +1,35 @@
 # Download flow — TRaSH alignment status
 
 Snapshot of what's shipped, what's parked, and where in the codebase
-each piece lives. Refreshed after Phase 6.
+each piece lives. Refreshed after the DB-driven config + entity rename
++ Phase 6a closeout.
 
 Scoring lives in:
-- `packages/core/src/domain/shared/rules/scoring.ts` — `calculateConfidence()` engine
-- `packages/core/src/domain/shared/rules/scoring-rules.ts` — `ScoringRules` shape + `DEFAULT_SCORING_RULES`
+- `packages/core/src/domain/shared/rules/scoring.ts` — `calculateConfidence` / `explainConfidence` engine
+- `packages/core/src/domain/shared/rules/scoring-rules.ts` — `ScoringRules` + `AdminDownloadPolicy` + `DownloadPreferences` shapes and overlays
 - `packages/core/src/domain/shared/rules/media-flavor.ts` — flavor heuristic
 - `packages/core/src/domain/torrents/rules/parsing-release.ts` — detection helpers
 - `packages/core/src/domain/torrents/rules/release-attributes.ts` — parser composer
-- `packages/core/src/domain/torrents/rules/release-groups.ts` — tier list
-- `packages/core/src/domain/torrents/rules/quality-profile.ts` — profile model + cutoff helpers
+- `packages/core/src/domain/torrents/rules/release-groups.ts` — classification (lookup tables hydrated from DB)
+- `packages/core/src/domain/torrents/rules/download-profile.ts` — profile model + cutoff helpers
 - `packages/core/src/domain/torrents/use-cases/search-torrents.ts` — orchestration
-- `packages/core/src/infra/torrents/quality-profile-repository.ts` — DB layer
+- `packages/core/src/domain/torrents/use-cases/auto-supersede.ts` — strict gate around `replaceTorrent`
+- `packages/core/src/infra/torrents/download-config-repository.ts` — reads `download_config` + `download_release_group`
+- `packages/core/src/infra/torrents/download-profile-repository.ts` — reads `download_profile`
+- `packages/db/src/seed-download-defaults.ts` — canonical default rules + tier lists, idempotent boot seed
 
 UI lives in:
-- `apps/web/src/components/media/download/*` — download modal flow
-- `apps/web/src/app/(app)/manage/_components/quality-profiles-section.tsx` — profile editor
-- `apps/web/src/app/(app)/manage/_components/download-preferences-section.tsx` — per-user prefs
+- `apps/web/src/components/media/download/*` — download modal flow (confidence chip with hover breakdown)
+- `apps/web/src/app/(app)/manage/_components/download-profiles-section.tsx` — profile editor
+- `apps/web/src/app/(app)/manage/_components/download-preferences-section.tsx` — Personal preferences (per-user) + Server policy (admin-only)
 - `apps/web/src/components/settings/download-folders.tsx` — per-folder profile selector
+
+Worker:
+- `apps/worker/src/jobs/repack-supersede.ts` — every 6h, 14-day lookback, 50 downloads per run
+- `apps/worker/src/index.ts` calls `seedDownloadDefaults(db)` alongside `seedLanguages` at boot
+
+Tests:
+- `packages/core/src/domain/shared/rules/__tests__/scoring.test.ts` — frozen real-world corpus snapshot
 
 ---
 
@@ -47,24 +58,35 @@ UI lives in:
 ### Architecture
 - [x] Config-driven `ScoringRules` — every weight, threshold, and bonus is data
 - [x] Pure parser (`parseReleaseAttributes`) compositing all detectors
-- [x] Pure engine (`calculateConfidence`) consuming attrs + ctx + rules
-- [x] Layered overlays: defaults → user prefs → quality profile → engine
+- [x] Pure engine (`calculateConfidence` / `explainConfidence`) consuming attrs + ctx + rules
+- [x] Layered overlays: DB defaults → admin policy → user prefs → quality profile → engine
+- [x] Scoring rules + release-group tier list hydrated from DB at search time, no hardcoded fallback
+- [x] Idempotent boot seed (`seedDownloadDefaults`) writing canonical TRaSH defaults
+
+### DB-driven config
+- [x] `download_config` (single-row admin table): scoringRules JSONB, preferredEditions, avoidedEditions, av1Stance
+- [x] `download_release_group` (per-flavor tier rows, PK `(name_lower, flavor)`)
+- [x] tRPC `downloadConfig.{getPolicy, setPolicy}` (admin-only)
+- [x] `download_release_group` rows can be added/edited per instance — no fork needed for custom group overrides
 
 ### Per-user preferences (overlay onto rules)
 - [x] Preferred languages (boost matching releases)
 - [x] Preferred streaming services (boost tagged releases)
-- [x] Preferred / avoided editions
-- [x] AV1 codec stance (neutral / prefer / avoid)
-- [x] Settings UI under `/manage` → Storage → Download Preferences
+- [x] Settings UI under `/manage` → Storage → Download Preferences (Personal preferences section)
 
-### Quality Profile + Cutoff
-- [x] Schema: `quality_profile` (allowedFormats / cutoff / minTotalScore / flavor / isDefault) + `download_folder.quality_profile_id` FK
+### Admin download policy (server-wide, applies to every search)
+- [x] Preferred / avoided editions (lives on `download_config`)
+- [x] AV1 codec stance (lives on `download_config`)
+- [x] Settings UI under `/manage` → Storage → Download Preferences (Server policy section, admin-only)
+
+### Download Profile + Cutoff
+- [x] Schema: `download_profile` (allowedFormats / cutoff / minTotalScore / flavor / isDefault) + `download_folder.download_profile_id` FK
 - [x] Profile applied as engine overlay; combos outside `allowedFormats` are rejected
-- [x] Resolution chain: `media.qualityProfileId` → `folder.qualityProfileId` → system default per flavor → none
+- [x] Resolution chain: `media.downloadProfileId` → `folder.downloadProfileId` → system default per flavor → none
 - [x] `aboveCutoff` flag exposed on every search result + UI badge
 - [x] `compareToProfile` helper for upgrade decisions
-- [x] tRPC `qualityProfile.{list, get, create, update, delete, setDefault, seed}`
-- [x] Editor UI in `/manage` → Storage → Quality Profiles
+- [x] tRPC `downloadProfile.{list, get, create, update, delete, setDefault, seed}`
+- [x] Editor UI in `/manage` → Storage → Download Profiles
 - [x] Per-folder profile selector in the Libraries editor
 - [x] Default profiles seedable in one click (one per flavor, marked default)
 
@@ -80,61 +102,59 @@ UI lives in:
 - [x] Client `useTorrentSearchStream` hook fans out via `useQueries`
 - [x] Scanning state shows per-indexer chips (pending / success+count+ms / error)
 - [x] Results render as soon as the first indexer responds; slow indexers never block fast ones
+- [x] Cross-indexer dedup uses the magnet info-hash, not the title — same release on two trackers collapses without flicker
 
-### Data plumbing
-- [x] `torrent.repackCount` persisted at download time — sets up data for the auto-supersede job (Phase 6a full version, deferred)
+### Phase 6a — Repack auto-supersede
+- [x] `download.repackCount` persisted at download time
+- [x] `autoSupersedeWithRepack` gate: same group + same quality/source + strictly higher repackCount, with profile check that allows equivalent verdicts and blocks downgrades / out-of-profile combos
+- [x] BullMQ scheduled job (`repackSupersede`, every 6h, 14-day lookback, 50 downloads per run, log line aggregating skip reasons)
+- [x] Wired into worker boot
+
+### Score explainability
+- [x] `explainConfidence` returns per-rule contributions (label, points, optional detail) alongside the final score
+- [x] `breakdown` field on `SearchResult` carries the components through the tRPC layer
+- [x] Confidence chip in the download modal hovers a popover showing each contribution and the raw / max ratio
+
+### Test coverage
+- [x] Real-world corpus snapshot (~23 titles across movies, shows, anime, plus penalty edges) frozen via `toMatchInlineSnapshot`
+- [x] Cohort assertions for design intent (FLUX jackpot beats NTb HDR10, avoid groups always lose to T1, nuked drives score to 0, …)
+
+### Naming consolidation
+- [x] `qualityProfile` → `downloadProfile` everywhere (table, FK columns, repo, tRPC, UI). Migration `0026_mighty_killmonger.sql`.
+- [x] `torrent` → `download` (table, mediaFile FK, repository functions, types). qBit-side adapter and `searchTorrents` deliberately keep their original names. Migration `0027_superb_the_hunter.sql`.
 
 ---
 
 ## Parked / not shipped
 
-### Phase 6a — Repack auto-supersede (full)
-**What's done:** `torrent.repack_count` column populated when a download
-starts (commit `9c98d1b8`).
+### Phase 6a — Notification UX
+**What's missing:** "We just superseded X with REPACK" notifications.
+The job logs to stdout but doesn't push anything user-visible.
 
-**What's missing:**
-- BullMQ scheduled job that scans recently-downloaded media for repack
-  upgrades using the persisted `repackCount`.
-- Replace flow gating on `compareToProfile` so the auto-replace only
-  triggers when the candidate is a strict upgrade under the active
-  profile.
-- Notification UX for "We just superseded X with REPACK".
-
-**Effort:** M. Defer until repack triage by hand becomes painful.
+**Why parked:** Notification subsystem hasn't been built yet. The
+requirement is captured in `notification.md` so it gets folded in
+when the system lands.
 
 ### Anime-specific scoring tweaks
 **What:** Source preference flattening (BluRay isn't strictly > WEB-DL
 for anime), bigger `dual` audio bonus, smaller freshness factor when
 flavor is anime.
 
-**Why parked:** The anime tier list (Phase 3) already differentiates
-anime release-group preferences. The remaining tweaks are second-order
-and need real-world signal to tune sensibly.
+**Why parked:** The anime tier list already differentiates anime
+release-group preferences. The remaining tweaks are second-order and
+need real-world signal to tune sensibly.
 
 **Effort:** S each. Add when anime users report bad rankings.
 
 ### Strict language filter on profiles
-**What:** Today profile language preference is a *boost* (per-user
-languageBonuses). Some users want a *filter* — "Anime BD profile only
-accepts Japanese audio".
+**What:** Today profile language preference is a *boost*. Some users
+want a *filter* — "Anime BD profile only accepts Japanese audio".
 
 **Why parked:** Roadmap intentionally avoided strict-mode in v1 to
 avoid over-filtering. Add as an opt-in flag per profile when demand
 emerges.
 
 **Effort:** S.
-
-### Custom group overrides (per-instance)
-**What:** Currently the tier lists in `release-groups.ts` are baked
-into code. Power users with niche tastes (or non-public-tracker users
-who follow specific groups) might want to add a group to T1 or
-demote a group to avoid without forking.
-
-**Why parked:** Solvable with a `release_group_override` JSONB table
-that overlays the curated lists at classification time. Nobody has
-asked for it yet.
-
-**Effort:** M (table + repo + UI + apply at classification).
 
 ### TRaSH guides JSON import
 **What:** Sonarr/Radarr users can import TRaSH's published JSON
@@ -147,13 +167,23 @@ Sonarr-specific concepts (custom formats, indexer flags) that don't
 
 **Effort:** L.
 
+### Observability / scoring metrics
+**What:** Score distribution histograms, profile-rejection rate per
+flavor, indexer success/latency, supersede outcome counts.
+
+**Why parked:** Out of scope for the alignment work. Picked up when a
+metrics sink (Prometheus / OTel collector / log aggregation) is wired
+into the platform.
+
+**Effort:** M.
+
 ---
 
 ## Scoring decisions worth remembering
 
 - **MAX_RAW = 170**, calibrated from the achievable positive ceiling
   with all signals aligned. If a future addition breaks this, recompute
-  before shipping.
+  before shipping. The corpus snapshot will surface the drift.
 - **Profile weights cap at 100** in the validator — keeps profile-driven
   scoring in the same magnitude as the TRaSH bonuses (each capped near
   10–13) so neither axis drowns the other.
@@ -166,3 +196,10 @@ Sonarr-specific concepts (custom formats, indexer flags) that don't
 - **Anime detection is heuristic, not a column.** `originCountry` includes
   "JP" or `originalLanguage === "ja"` AND animation-genre signal. False
   negatives are cheap; false positives corrupt scoring.
+- **Admin policy applies before per-user prefs.** A user preferring an
+  edition the admin avoided still gets the avoid penalty — admin layer
+  is policy, not taste.
+- **Repack supersede is intra-slot.** Same group + same (quality,
+  source) + strictly higher repackCount. The profile check allows the
+  "equivalent" verdict because a same-slot REPACK by definition
+  doesn't change the profile match.
