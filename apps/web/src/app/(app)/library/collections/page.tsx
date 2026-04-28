@@ -54,7 +54,7 @@ export default function CollectionsPage(): React.JSX.Element {
   };
 
   return (
-    <div className="w-full pb-12">
+    <div className="w-full md:pb-12">
       <PageHeader
         title="Collections"
         subtitle="Organize your movies and shows into lists."

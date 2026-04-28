@@ -43,7 +43,7 @@ export default function LibraryPage(): React.JSX.Element {
   const tabs = TABS.map((t) => ({ value: t.value, label: t.label, icon: t.icon }));
 
   return (
-    <div className="w-full pb-12">
+    <div className="w-full md:pb-12">
       <PageHeader
         title="Library"
         tabs={<TabBar tabs={tabs} value={activeTab} onChange={setActiveTab} />}

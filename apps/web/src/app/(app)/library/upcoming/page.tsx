@@ -112,7 +112,7 @@ export default function UpcomingSchedulePage(): React.JSX.Element {
 
   if (view === "calendar") {
     return (
-      <div className="w-full pb-12">
+      <div className="w-full md:pb-12">
         <PageHeader title="Upcoming Schedule" tabs={viewToggle} />
         <div className={cn(OUTER_PADDING, "mt-6 md:mt-8")}>
           <UpcomingCalendarMonth

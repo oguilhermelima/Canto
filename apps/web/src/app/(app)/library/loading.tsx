@@ -2,7 +2,7 @@ import { Skeleton } from "@canto/ui/skeleton";
 
 export default function LibraryLoading(): React.JSX.Element {
   return (
-    <div className="w-full pb-12">
+    <div className="w-full md:pb-12">
       {/* Header */}
       <div className="px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
         <Skeleton className="mb-1 h-9 w-32" />
