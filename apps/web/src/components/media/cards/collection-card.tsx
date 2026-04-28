@@ -27,7 +27,7 @@ export function CollectionCard({
   return (
     <Link
       href={`/collection/${list.slug}`}
-      className="group relative flex w-[300px] shrink-0 overflow-hidden rounded-2xl ring-1 ring-border/40 transition-[box-shadow,transform] duration-300 hover:ring-2 hover:ring-foreground/30 sm:w-[340px] lg:w-[380px] 2xl:w-[420px]"
+      className="group relative mt-1 flex w-[300px] shrink-0 overflow-hidden rounded-2xl ring-1 ring-border/40 transition-[box-shadow,transform] duration-300 hover:ring-2 hover:ring-foreground/30 sm:w-[340px] lg:w-[380px] 2xl:w-[420px]"
     >
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-muted">
         {count > 0 ? (

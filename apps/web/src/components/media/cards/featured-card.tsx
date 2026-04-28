@@ -65,7 +65,7 @@ export function FeaturedCard({
   return (
     <div
       className={cn(
-        "group relative shrink-0 overflow-hidden rounded-xl transition-[width] duration-200 ease-out",
+        "group relative mt-1 shrink-0 overflow-hidden rounded-xl transition-[width] duration-200 ease-out",
         "h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px]",
         isOpen
           ? "border border-border w-[calc(360px*16/9)] sm:w-[calc(400px*16/9)] lg:w-[calc(440px*16/9)] 2xl:w-[calc(500px*16/9)]"

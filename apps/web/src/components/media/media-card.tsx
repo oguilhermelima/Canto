@@ -80,7 +80,7 @@ export function MediaCard({
       href={linkHref}
       onMouseEnter={handlePrefetch}
       className={cn(
-        "group relative flex rounded-xl transition-[box-shadow] duration-200 hover:z-10 hover:ring-2 hover:ring-foreground/20",
+        "group relative mt-1 flex rounded-xl transition-[box-shadow] duration-200 hover:z-10 hover:ring-2 hover:ring-foreground/20",
         className,
       )}
     >
@@ -188,6 +188,6 @@ export function MediaCardSkeleton({
   className?: string;
 }): React.JSX.Element {
   return (
-    <Skeleton className={cn("aspect-[2/3] w-full rounded-xl", className)} />
+    <Skeleton className={cn("mt-1 aspect-[2/3] w-full rounded-xl", className)} />
   );
 }

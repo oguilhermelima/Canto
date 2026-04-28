@@ -144,7 +144,7 @@ export function WatchNextCard({
   return (
     <Link
       href={mediaHref(item.provider, item.externalId, item.mediaType)}
-      className="group relative flex w-[280px] shrink-0 overflow-hidden rounded-xl transition-[box-shadow] duration-200 hover:z-10 hover:ring-2 hover:ring-foreground/20 sm:w-[300px] lg:w-[340px] 2xl:w-[380px]"
+      className="group relative mt-1 flex w-[280px] shrink-0 overflow-hidden rounded-xl transition-[box-shadow] duration-200 hover:z-10 hover:ring-2 hover:ring-foreground/20 sm:w-[300px] lg:w-[340px] 2xl:w-[380px]"
     >
       <div className="relative aspect-video w-full overflow-hidden bg-muted">
         {cardImage ? (
