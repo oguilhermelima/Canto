@@ -114,7 +114,14 @@ export async function ensureMedia(
     // TVDB episode-translation fallback for shows that TMDB didn't cover.
     // Runs sequentially inside this job so the worker doesn't dispatch a
     // second ensure-media run (avoiding cycles through the legacy dispatcher).
-    if (runTranslations && mediaRow.type === "show" && mediaRow.tvdbId) {
+    // Skip when fetchMediaMetadata already saw a 4xx on /series/:id/extended —
+    // the per-language /episodes/default endpoint will hit the same 404.
+    if (
+      runTranslations
+      && mediaRow.type === "show"
+      && mediaRow.tvdbId
+      && !fetched.tvdbFailed
+    ) {
       for (const lang of languages) {
         if (lang.startsWith("en")) continue;
         try {
