@@ -27,6 +27,7 @@ export interface UpcomingScheduleItem {
   provider: string;
   fromLists: string[];
   releaseAt: Date | string;
+  hasAirTime: boolean;
   episode:
     | {
         id: string;

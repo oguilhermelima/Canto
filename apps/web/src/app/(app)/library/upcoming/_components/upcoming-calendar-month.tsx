@@ -73,7 +73,9 @@ function ItemRow({ item }: { item: UpcomingScheduleItem }): React.JSX.Element {
     ? `S${String(item.episode.seasonNumber).padStart(2, "0")}E${String(item.episode.number).padStart(2, "0")}`
     : "Movie release";
   const epTitle = item.episode?.title ?? null;
-  const time = TIME_FORMATTER.format(new Date(item.releaseAt));
+  const time = item.hasAirTime
+    ? TIME_FORMATTER.format(new Date(item.releaseAt))
+    : null;
 
   return (
     <Link
@@ -107,9 +109,11 @@ function ItemRow({ item }: { item: UpcomingScheduleItem }): React.JSX.Element {
           {epTitle && <span> · {epTitle}</span>}
         </p>
       </div>
-      <span className="shrink-0 self-start text-[11px] font-bold uppercase tracking-[0.18em] tabular-nums text-muted-foreground">
-        {time}
-      </span>
+      {time && (
+        <span className="shrink-0 self-start text-[11px] font-bold uppercase tracking-[0.18em] tabular-nums text-muted-foreground">
+          {time}
+        </span>
+      )}
     </Link>
   );
 }

@@ -15,6 +15,10 @@ import type { UpcomingScheduleItem } from "@/components/media/cards/upcoming-sch
 const DAYS = 7;
 const WEEKDAY_FORMATTER = new Intl.DateTimeFormat(undefined, { weekday: "short" });
 const MONTH_FORMATTER = new Intl.DateTimeFormat(undefined, { month: "short" });
+const TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  hour: "2-digit",
+  minute: "2-digit",
+});
 const COLUMN_WIDTH = "w-[340px] sm:w-[360px] lg:w-[400px]";
 const SCROLL_PADDING_X =
   "pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24";
@@ -76,6 +80,9 @@ function CalendarItem({
     ? `S${String(item.episode.seasonNumber).padStart(2, "0")}E${String(item.episode.number).padStart(2, "0")}`
     : "Movie release";
   const epTitle = item.episode?.title ?? null;
+  const time = item.hasAirTime
+    ? TIME_FORMATTER.format(new Date(item.releaseAt))
+    : null;
 
   return (
     <Link
@@ -107,6 +114,11 @@ function CalendarItem({
           {epTitle ? ` · ${epTitle}` : ""}
         </p>
       </div>
+      {time && (
+        <span className="shrink-0 text-[11px] font-bold uppercase tracking-[0.16em] tabular-nums text-muted-foreground">
+          {time}
+        </span>
+      )}
     </Link>
   );
 }
