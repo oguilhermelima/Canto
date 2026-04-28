@@ -1,81 +1,11 @@
 "use client";
 
-import { cn } from "@canto/ui/cn";
 import { Button } from "@canto/ui/button";
-import { Input } from "@canto/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@canto/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@canto/ui/tooltip";
-import {
-  Download,
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
-  ChevronDown,
-  ArrowUp,
-  ArrowDown,
-  HardDrive,
-  Clock,
-  Monitor,
-  Film as FilmIcon,
-  Zap,
-  Globe,
-  SlidersHorizontal,
-  Satellite,
-  Target,
-} from "lucide-react";
-import {
-  formatBytes,
-  formatAge,
-  formatQualityLabel,
-  sourceLabel,
-} from "@/lib/torrent-utils";
-
-interface ScoreComponent {
-  label: string;
-  points: number;
-  detail?: string;
-}
-
-interface ConfidenceBreakdown {
-  score: number;
-  raw: number;
-  maxRaw: number;
-  components: ScoreComponent[];
-  rejected: boolean;
-  rejectReason?: string;
-}
-
-interface TorrentResult {
-  guid: string;
-  title: string;
-  magnetUrl: string | null;
-  downloadUrl: string | null;
-  quality: string;
-  source: string;
-  confidence: number;
-  breakdown?: ConfidenceBreakdown;
-  seeders: number;
-  leechers: number;
-  size: number;
-  age: number;
-  indexer: string;
-  indexerLanguage?: string | null;
-  languages: string[];
-  flags: string[];
-  aboveCutoff?: boolean;
-}
+import { StateMessage } from "@canto/ui/state-message";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { FilterToolbar } from "./filter-toolbar";
+import { ScanningState } from "./scanning-state";
+import { TorrentCard, type TorrentResult } from "./torrent-card";
 
 interface TorrentResultsProps {
   mediaId: string;
@@ -155,259 +85,32 @@ export function TorrentResults({
   downloadTorrent,
   setLastDownloadAttempt: _setLastDownloadAttempt,
 }: TorrentResultsProps): React.JSX.Element {
+  const resetPage = (): void => setTorrentPage(0);
+
   return (
     <div className="flex h-full flex-col">
-      {/* Filter toolbar */}
-      <div className="shrink-0 border-b border-border px-5 py-3">
-        {/* Mobile filters */}
-        <div className="overflow-hidden rounded-2xl bg-muted/40 md:hidden">
-          <div className="flex items-center">
-            <button
-              onClick={() => setMobileFiltersOpen((o: boolean) => !o)}
-              className="flex flex-1 items-center gap-2 px-4 py-3 text-xs font-medium text-muted-foreground"
-            >
-              <SlidersHorizontal size={14} />
-              Filters & Sort
-              <ChevronDown
-                size={12}
-                className={cn(
-                  "ml-auto transition-transform duration-300",
-                  mobileFiltersOpen && "rotate-180",
-                )}
-              />
-            </button>
-          </div>
-
-          {/* Expandable panel */}
-          <div
-            className={cn(
-              "grid transition-all duration-300 ease-out",
-              mobileFiltersOpen
-                ? "grid-rows-[1fr] opacity-100"
-                : "grid-rows-[0fr] opacity-0",
-            )}
-          >
-            <div className="overflow-hidden">
-              <div className="space-y-3 border-t border-border px-4 pb-4 pt-3">
-                <div className="relative">
-                  <Search
-                    size={14}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                  />
-                  <Input
-                    placeholder="Filter results..."
-                    value={torrentSearchQuery}
-                    onChange={(e) => {
-                      setTorrentSearchQuery(e.target.value);
-                      setTorrentPage(0);
-                    }}
-                    className="h-10 w-full rounded-xl border-0 bg-background pl-9 text-sm focus-visible:ring-1"
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <Select
-                    value={torrentQualityFilter}
-                    onValueChange={(value) => {
-                      setTorrentQualityFilter(value);
-                      setTorrentPage(0);
-                    }}
-                  >
-                    <SelectTrigger className="h-9 rounded-xl border-0 bg-background px-3 text-xs text-foreground">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Quality</SelectItem>
-                      <SelectItem value="uhd">4K</SelectItem>
-                      <SelectItem value="fullhd">1080p</SelectItem>
-                      <SelectItem value="hd">720p</SelectItem>
-                      <SelectItem value="sd">SD</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={torrentSourceFilter}
-                    onValueChange={(value) => {
-                      setTorrentSourceFilter(value);
-                      setTorrentPage(0);
-                    }}
-                  >
-                    <SelectTrigger className="h-9 rounded-xl border-0 bg-background px-3 text-xs text-foreground">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Source</SelectItem>
-                      <SelectItem value="remux">Remux</SelectItem>
-                      <SelectItem value="bluray">Blu-Ray</SelectItem>
-                      <SelectItem value="webdl">WEB-DL</SelectItem>
-                      <SelectItem value="webrip">WEBRip</SelectItem>
-                      <SelectItem value="hdtv">HDTV</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={torrentSizeFilter}
-                    onValueChange={(value) => {
-                      setTorrentSizeFilter(value);
-                      setTorrentPage(0);
-                    }}
-                  >
-                    <SelectTrigger className="h-9 rounded-xl border-0 bg-background px-3 text-xs text-foreground">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Size</SelectItem>
-                      <SelectItem value="small">{"< 2 GB"}</SelectItem>
-                      <SelectItem value="medium">2–10 GB</SelectItem>
-                      <SelectItem value="large">{"> 10 GB"}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="mr-0.5 text-xs text-muted-foreground">
-                    Sort
-                  </span>
-                  {(["confidence", "seeders", "size", "age"] as const).map(
-                    (col) => (
-                      <button
-                        key={col}
-                        onClick={() => toggleSort(col)}
-                        className={cn(
-                          "inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-xl text-xs transition-colors",
-                          torrentSort === col
-                            ? "bg-background font-medium text-foreground"
-                            : "text-muted-foreground",
-                        )}
-                      >
-                        {
-                          {
-                            confidence: "Score",
-                            seeders: "Seeds",
-                            size: "Size",
-                            age: "Age",
-                          }[col]
-                        }
-                        {torrentSort === col &&
-                          (torrentSortDir === "desc" ? (
-                            <ChevronDown size={10} />
-                          ) : (
-                            <ChevronUp size={10} />
-                          ))}
-                      </button>
-                    ),
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Desktop filters */}
-        <div className="hidden md:block">
-          <div className="relative">
-            <Search
-              size={16}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              placeholder="Filter results..."
-              value={torrentSearchQuery}
-              onChange={(e) => {
-                setTorrentSearchQuery(e.target.value);
-                setTorrentPage(0);
-              }}
-              className="h-10 rounded-xl border-0 bg-muted/40 pl-10 text-sm focus-visible:ring-1"
-            />
-          </div>
-          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            <Select
-              value={torrentQualityFilter}
-              onValueChange={(value) => {
-                setTorrentQualityFilter(value);
-                setTorrentPage(0);
-              }}
-            >
-              <SelectTrigger className="h-8 w-auto rounded-lg border-0 bg-muted/60 px-2.5 text-xs text-foreground">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Quality</SelectItem>
-                <SelectItem value="uhd">4K</SelectItem>
-                <SelectItem value="fullhd">1080p</SelectItem>
-                <SelectItem value="hd">720p</SelectItem>
-                <SelectItem value="sd">SD</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={torrentSourceFilter}
-              onValueChange={(value) => {
-                setTorrentSourceFilter(value);
-                setTorrentPage(0);
-              }}
-            >
-              <SelectTrigger className="h-8 w-auto rounded-lg border-0 bg-muted/60 px-2.5 text-xs text-foreground">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Source</SelectItem>
-                <SelectItem value="remux">Remux</SelectItem>
-                <SelectItem value="bluray">Blu-Ray</SelectItem>
-                <SelectItem value="webdl">WEB-DL</SelectItem>
-                <SelectItem value="webrip">WEBRip</SelectItem>
-                <SelectItem value="hdtv">HDTV</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={torrentSizeFilter}
-              onValueChange={(value) => {
-                setTorrentSizeFilter(value);
-                setTorrentPage(0);
-              }}
-            >
-              <SelectTrigger className="h-8 w-auto rounded-lg border-0 bg-muted/60 px-2.5 text-xs text-foreground">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Size</SelectItem>
-                <SelectItem value="small">{"< 2 GB"}</SelectItem>
-                <SelectItem value="medium">2–10 GB</SelectItem>
-                <SelectItem value="large">{"> 10 GB"}</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="mx-1 h-4 w-px bg-border/50" />
-            <span className="text-xs text-muted-foreground">Sort</span>
-            <div className="flex items-center gap-0.5">
-              {(["confidence", "seeders", "size", "age"] as const).map(
-                (col) => (
-                  <button
-                    key={col}
-                    onClick={() => toggleSort(col)}
-                    className={cn(
-                      "inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-xs transition-colors",
-                      torrentSort === col
-                        ? "bg-muted/60 font-medium text-foreground"
-                        : "text-muted-foreground hover:text-muted-foreground",
-                    )}
-                  >
-                    {
-                      {
-                        confidence: "Score",
-                        seeders: "Seeds",
-                        size: "Size",
-                        age: "Age",
-                      }[col]
-                    }
-                    {torrentSort === col &&
-                      (torrentSortDir === "desc" ? (
-                        <ChevronDown size={10} />
-                      ) : (
-                        <ChevronUp size={10} />
-                      ))}
-                  </button>
-                ),
-              )}
-            </div>
-          </div>
-        </div>
-
-      </div>
+      <FilterToolbar
+        search={{
+          value: torrentSearchQuery,
+          onChange: setTorrentSearchQuery,
+        }}
+        filters={{
+          quality: torrentQualityFilter,
+          setQuality: setTorrentQualityFilter,
+          source: torrentSourceFilter,
+          setSource: setTorrentSourceFilter,
+          size: torrentSizeFilter,
+          setSize: setTorrentSizeFilter,
+        }}
+        sort={{
+          column: torrentSort,
+          dir: torrentSortDir,
+          toggle: toggleSort,
+        }}
+        mobileOpen={mobileFiltersOpen}
+        onToggleMobile={() => setMobileFiltersOpen((o) => !o)}
+        onResetPage={resetPage}
+      />
 
       {/* Results */}
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -420,172 +123,31 @@ export function TorrentResults({
             indexers={torrentSearch.indexers}
           />
         ) : torrentSearch.isError ? (
-          <div className="px-5 py-12 text-center">
-            <p className="text-sm font-medium text-destructive">
-              Search failed
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {torrentSearch.errorMessage ?? "Could not reach indexer."}
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-3"
-              onClick={() => void torrentSearch.refetch()}
-            >
-              Retry
-            </Button>
-          </div>
+          <StateMessage
+            preset="errorSearch"
+            onRetry={() => void torrentSearch.refetch()}
+            minHeight="240px"
+          />
         ) : paginatedTorrents.length > 0 ? (
           <div className="flex flex-col gap-3 px-5 py-4">
-            {paginatedTorrents.map((t, i) => {
-              const url = t.magnetUrl ?? t.downloadUrl;
-              const qLabel = formatQualityLabel(t.quality);
-              const sLabel = sourceLabel(t.source);
-              const hasFreeleech = t.flags.some((f: string) =>
-                f.includes("freeleech"),
-              );
-              return (
-                <div
-                  key={`${t.guid}-${i}`}
-                  className="overflow-hidden rounded-xl bg-muted/40 transition-colors hover:bg-muted/60"
-                >
-                  {/* Header */}
-                  <div className="flex items-center justify-between px-5 py-2.5 text-xs font-medium text-muted-foreground">
-                    <span className="flex items-center gap-2">
-                      <span>
-                        {t.indexer || "Unknown"}
-                        {t.indexerLanguage && (
-                          <span className="ml-1 text-muted-foreground">
-                            ({t.indexerLanguage})
-                          </span>
-                        )}
-                      </span>
-                      {t.aboveCutoff && (
-                        <span
-                          className="inline-flex items-center gap-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
-                          title="Hits your download profile's target. Downloading this stops the search for further upgrades."
-                        >
-                          <Target size={9} />
-                          Meets target
-                        </span>
-                      )}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock size={11} />
-                      {formatAge(t.age)}
-                    </span>
-                  </div>
-
-                  {/* Body */}
-                  <div className="flex items-start gap-4 border-t border-border px-5 py-4">
-                    <ConfidenceChip
-                      score={t.confidence}
-                      breakdown={t.breakdown}
-                    />
-
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 text-[13px] font-semibold leading-snug text-foreground">
-                        {t.title}
-                      </p>
-                      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-muted-foreground">
-                        {qLabel && (
-                          <span className="flex items-center gap-1.5 font-medium text-foreground">
-                            <Monitor
-                              size={12}
-                              className="text-muted-foreground"
-                            />
-                            {qLabel}
-                          </span>
-                        )}
-                        {sLabel && (
-                          <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
-                            <FilmIcon
-                              size={12}
-                              className="text-muted-foreground"
-                            />
-                            {sLabel}
-                          </span>
-                        )}
-                        {t.size > 0 && (
-                          <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
-                            <HardDrive
-                              size={12}
-                              className="text-muted-foreground"
-                            />
-                            {formatBytes(t.size)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => url && handleDownload(url, t.title)}
-                      disabled={!url || downloadTorrent.isPending}
-                      className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-all hover:scale-110 hover:text-foreground disabled:opacity-40"
-                    >
-                      <Download size={16} />
-                    </button>
-                  </div>
-
-                  {/* Footer */}
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-border px-5 py-2.5 text-xs font-medium text-muted-foreground">
-                    <span className="flex items-center gap-1.5 text-muted-foreground">
-                      <ArrowUp size={12} className="text-muted-foreground" />
-                      {t.seeders} seeders
-                    </span>
-                    <span className="flex items-center gap-1.5 text-muted-foreground">
-                      <ArrowDown
-                        size={12}
-                        className="text-muted-foreground"
-                      />
-                      {t.leechers} peers
-                    </span>
-                    {t.languages.length > 0 && (
-                      <span className="flex items-center gap-1.5 text-muted-foreground">
-                        <Globe
-                          size={12}
-                          className="text-muted-foreground"
-                        />
-                        {t.languages
-                          .map((l: string) => l.toUpperCase())
-                          .join(", ")}
-                      </span>
-                    )}
-                    {hasFreeleech && (
-                      <span className="flex items-center gap-1.5 font-medium text-blue-400">
-                        <Zap size={12} />
-                        Freeleech
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {paginatedTorrents.map((t, i) => (
+              <TorrentCard
+                key={`${t.guid}-${i}`}
+                torrent={t}
+                onDownload={handleDownload}
+                downloadDisabled={downloadTorrent.isPending}
+              />
+            ))}
           </div>
+        ) : advancedSearch && !committedQuery ? (
+          <StateMessage
+            icon={Search}
+            title="Awaiting coordinates"
+            description="Type a query and press Enter to scan every indexer."
+            minHeight="240px"
+          />
         ) : (
-          <div className="flex min-h-[200px] items-center justify-center px-5 py-12 text-center">
-            {advancedSearch && !committedQuery ? (
-              <div>
-                <Search className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-                <p className="text-sm font-medium text-muted-foreground">
-                  Type a query and press Enter
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Search across all indexers with a custom query.
-                </p>
-              </div>
-            ) : (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  No results found
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Check your indexer configuration in Prowlarr.
-                </p>
-              </div>
-            )}
-          </div>
+          <StateMessage preset="emptySearch" minHeight="240px" />
         )}
       </div>
 
@@ -608,7 +170,7 @@ export function TorrentResults({
               size="sm"
               className="h-7 px-2 text-xs"
               disabled={torrentPage === 0}
-              onClick={() => setTorrentPage((p: number) => p - 1)}
+              onClick={() => setTorrentPage((p) => p - 1)}
             >
               <ChevronLeft size={16} />
               Prev
@@ -618,7 +180,7 @@ export function TorrentResults({
               size="sm"
               className="h-7 px-2 text-xs"
               disabled={!hasMore}
-              onClick={() => setTorrentPage((p: number) => p + 1)}
+              onClick={() => setTorrentPage((p) => p + 1)}
             >
               Next
               <ChevronRight size={16} />
@@ -627,254 +189,5 @@ export function TorrentResults({
         </div>
       )}
     </div>
-  );
-}
-
-/* ─── Scanning State (loading) ─── */
-
-function buildSearchSummary(
-  mediaTitle: string,
-  ctx: { seasonNumber?: number; episodeNumbers?: number[] } | null,
-  advancedSearch: boolean,
-  committedQuery: string,
-): string {
-  if (advancedSearch && committedQuery) return committedQuery;
-  if (ctx?.seasonNumber === undefined) return mediaTitle;
-  const ss = String(ctx.seasonNumber).padStart(2, "0");
-  const eps = ctx.episodeNumbers ?? [];
-  if (eps.length === 0) return `${mediaTitle} · S${ss}`;
-  if (eps.length === 1) {
-    return `${mediaTitle} · S${ss}E${String(eps[0]).padStart(2, "0")}`;
-  }
-  const sorted = [...eps].sort((a, b) => a - b);
-  const first = String(sorted[0]).padStart(2, "0");
-  const last = String(sorted[sorted.length - 1]).padStart(2, "0");
-  return `${mediaTitle} · S${ss}E${first}–E${last}`;
-}
-
-interface IndexerChipData {
-  id: string;
-  name: string;
-  status: "pending" | "success" | "error";
-  count: number;
-  tookMs: number | null;
-  errorMessage: string | null;
-}
-
-function ScanningState({
-  mediaTitle,
-  torrentSearchContext,
-  advancedSearch,
-  committedQuery,
-  indexers,
-}: {
-  mediaTitle: string;
-  torrentSearchContext: { seasonNumber?: number; episodeNumbers?: number[] } | null;
-  advancedSearch: boolean;
-  committedQuery: string;
-  indexers: IndexerChipData[];
-}): React.JSX.Element {
-  const summary = buildSearchSummary(
-    mediaTitle,
-    torrentSearchContext,
-    advancedSearch,
-    committedQuery,
-  );
-
-  return (
-    <div className="flex min-h-[420px] flex-col items-center justify-center gap-8 px-5 py-12">
-      {/* Radar pulse */}
-      <div className="relative flex h-44 w-44 items-center justify-center">
-        <div
-          className="absolute h-44 w-44 animate-ping rounded-full border border-primary/20"
-          style={{ animationDuration: "3s" }}
-        />
-        <div
-          className="absolute h-32 w-32 animate-ping rounded-full border border-primary/30"
-          style={{ animationDuration: "3s", animationDelay: "0.6s" }}
-        />
-        <div
-          className="absolute h-20 w-20 animate-ping rounded-full border border-primary/40"
-          style={{ animationDuration: "3s", animationDelay: "1.2s" }}
-        />
-        <div className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/30">
-          <Satellite
-            size={26}
-            className="animate-pulse text-primary"
-            style={{ animationDuration: "1.6s" }}
-          />
-        </div>
-      </div>
-
-      {/* Copy */}
-      <div className="max-w-md text-center">
-        <p className="text-base font-semibold text-foreground">
-          Pinging the cosmos
-        </p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Sweeping every connected indexer for
-        </p>
-        <p className="mt-1.5 inline-block max-w-full truncate rounded-full bg-muted/60 px-3 py-1 text-xs font-medium text-foreground">
-          {summary}
-        </p>
-      </div>
-
-      {/* Per-indexer chips */}
-      {indexers.length > 0 && (
-        <div className="flex max-w-md flex-wrap items-center justify-center gap-2">
-          {indexers.map((idx) => (
-            <IndexerChip key={idx.id} indexer={idx} />
-          ))}
-        </div>
-      )}
-
-      <p className="text-[11px] text-muted-foreground/70">
-        First contact may take a few seconds.
-      </p>
-    </div>
-  );
-}
-
-function IndexerChip({
-  indexer,
-}: {
-  indexer: IndexerChipData;
-}): React.JSX.Element {
-  const seconds =
-    indexer.tookMs !== null ? (indexer.tookMs / 1000).toFixed(1) : null;
-
-  if (indexer.status === "success") {
-    return (
-      <span
-        className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary"
-        title={
-          indexer.count === 0
-            ? `${indexer.name} returned no results`
-            : `${indexer.name} returned ${indexer.count} result${indexer.count === 1 ? "" : "s"} in ${seconds}s`
-        }
-      >
-        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-        {indexer.name}
-        <span className="text-primary/70">
-          {indexer.count} · {seconds}s
-        </span>
-      </span>
-    );
-  }
-
-  if (indexer.status === "error") {
-    return (
-      <span
-        className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-2.5 py-1 text-[11px] font-medium text-destructive"
-        title={indexer.errorMessage ?? `${indexer.name} failed`}
-      >
-        <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
-        {indexer.name}
-        <span className="text-destructive/70">failed</span>
-      </span>
-    );
-  }
-
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/40 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-muted-foreground/50" />
-      {indexer.name}
-      <span className="text-muted-foreground/70">scanning…</span>
-    </span>
-  );
-}
-
-/**
- * Confidence score chip with hover breakdown. The chip is the same
- * coloured pill as before; hovering pops the per-component table the
- * scoring engine returned. Releases scored before the breakdown shipped
- * (or returned by older deployments) gracefully fall back to a
- * non-interactive chip.
- */
-function ConfidenceChip({
-  score,
-  breakdown,
-}: {
-  score: number;
-  breakdown?: ConfidenceBreakdown;
-}): React.JSX.Element {
-  const colour = cn(
-    "mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold tabular-nums",
-    score >= 70
-      ? "bg-green-500/10 text-green-400"
-      : score >= 40
-        ? "bg-yellow-500/10 text-yellow-400"
-        : "bg-muted text-muted-foreground",
-  );
-
-  if (!breakdown) {
-    return <div className={colour}>{score}</div>;
-  }
-
-  return (
-    <TooltipProvider delayDuration={150}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button type="button" className={cn(colour, "cursor-help")}>
-            {score}
-          </button>
-        </TooltipTrigger>
-        <TooltipContent
-          side="right"
-          align="start"
-          className="max-w-xs p-0"
-        >
-          <div className="px-3 py-2.5">
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="text-xs font-semibold text-foreground">
-                Confidence breakdown
-              </span>
-              <span className="text-[11px] text-muted-foreground tabular-nums">
-                raw {breakdown.raw} / {breakdown.maxRaw}
-              </span>
-            </div>
-            <div className="mt-2 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-[11px]">
-              {breakdown.components.map((c, i) => (
-                <ScoreRow key={`${c.label}-${i}`} component={c} />
-              ))}
-              {breakdown.components.length === 0 && (
-                <span className="col-span-2 text-muted-foreground">
-                  No components scored.
-                </span>
-              )}
-            </div>
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-}
-
-function ScoreRow({
-  component,
-}: {
-  component: ScoreComponent;
-}): React.JSX.Element {
-  const tone =
-    component.points > 0
-      ? "text-green-400"
-      : component.points < 0
-        ? "text-red-400"
-        : "text-muted-foreground";
-  return (
-    <>
-      <span className="truncate text-foreground">
-        {component.label}
-        {component.detail && (
-          <span className="ml-1 text-muted-foreground">
-            · {component.detail}
-          </span>
-        )}
-      </span>
-      <span className={cn("tabular-nums font-medium", tone)}>
-        {component.points > 0 ? "+" : ""}
-        {component.points}
-      </span>
-    </>
   );
 }
