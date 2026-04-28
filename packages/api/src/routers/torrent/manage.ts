@@ -18,9 +18,9 @@ import {
 import { retryTorrent } from "@canto/core/domain/torrents/use-cases/retry-torrent";
 import { renameTorrent } from "@canto/core/domain/torrents/use-cases/rename-torrent";
 import {
-  findTorrentById,
-  updateTorrent,
-  deleteTorrent as deleteTorrentRecord,
+  findDownloadById,
+  updateDownload,
+  deleteDownload as deleteTorrentRecord,
 } from "@canto/core/infra/repositories";
 
 import { createTRPCRouter, adminProcedure } from "../../trpc";
@@ -52,31 +52,31 @@ export const torrentManageRouter = createTRPCRouter({
   pause: adminProcedure
     .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
-      const row = await findTorrentById(ctx.db, input.id);
+      const row = await findDownloadById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
       if (row.hash) { const qb = await getDownloadClient(); await qb.pauseTorrent(row.hash); }
-      return updateTorrent(ctx.db, input.id, { status: "paused" });
+      return updateDownload(ctx.db, input.id, { status: "paused" });
     }),
 
   resume: adminProcedure
     .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
-      const row = await findTorrentById(ctx.db, input.id);
+      const row = await findDownloadById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
       if (row.hash) { const qb = await getDownloadClient(); await qb.resumeTorrent(row.hash); }
-      return updateTorrent(ctx.db, input.id, { status: "downloading" });
+      return updateDownload(ctx.db, input.id, { status: "downloading" });
     }),
 
   forceResume: adminProcedure
     .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
-      const row = await findTorrentById(ctx.db, input.id);
+      const row = await findDownloadById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
       if (!row.hash) throw new TRPCError({ code: "BAD_REQUEST", message: "Torrent has no hash" });
 
       const qb = await getDownloadClient();
       await qb.forceResumeTorrent(row.hash);
-      const updated = await updateTorrent(ctx.db, input.id, { status: "downloading" });
+      const updated = await updateDownload(ctx.db, input.id, { status: "downloading" });
       if (!updated) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update torrent" });
       return updated;
     }),
@@ -84,7 +84,7 @@ export const torrentManageRouter = createTRPCRouter({
   forceRecheck: adminProcedure
     .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
-      const row = await findTorrentById(ctx.db, input.id);
+      const row = await findDownloadById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
       if (!row.hash) throw new TRPCError({ code: "BAD_REQUEST", message: "Torrent has no hash" });
 
@@ -96,7 +96,7 @@ export const torrentManageRouter = createTRPCRouter({
   forceReannounce: adminProcedure
     .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
-      const row = await findTorrentById(ctx.db, input.id);
+      const row = await findDownloadById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
       if (!row.hash) throw new TRPCError({ code: "BAD_REQUEST", message: "Torrent has no hash" });
 
@@ -108,19 +108,19 @@ export const torrentManageRouter = createTRPCRouter({
   cancel: adminProcedure
     .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
-      const row = await findTorrentById(ctx.db, input.id);
+      const row = await findDownloadById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
       if (row.hash) {
         try { const qb = await getDownloadClient(); await qb.deleteTorrent(row.hash, false); }
         catch { /* qBit may not have it */ }
       }
-      return updateTorrent(ctx.db, input.id, { status: "cancelled" });
+      return updateDownload(ctx.db, input.id, { status: "cancelled" });
     }),
 
   delete: adminProcedure
     .input(deleteTorrentInput)
     .mutation(async ({ ctx, input }) => {
-      const row = await findTorrentById(ctx.db, input.id);
+      const row = await findDownloadById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
 
       if (input.removeTorrent && row.hash) {
@@ -143,13 +143,13 @@ export const torrentManageRouter = createTRPCRouter({
   move: adminProcedure
     .input(moveTorrentInput)
     .mutation(async ({ ctx, input }) => {
-      const row = await findTorrentById(ctx.db, input.id);
+      const row = await findDownloadById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
       if (!row.hash) throw new TRPCError({ code: "BAD_REQUEST", message: "Torrent has no hash" });
 
       const qb = await getQBClient();
       await qb.setLocation(row.hash, input.newPath);
-      await updateTorrent(ctx.db, input.id, { contentPath: input.newPath });
+      await updateDownload(ctx.db, input.id, { contentPath: input.newPath });
       return { success: true };
     }),
 });

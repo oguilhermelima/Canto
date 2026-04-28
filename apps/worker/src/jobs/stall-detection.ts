@@ -4,8 +4,8 @@ import { buildIndexers } from "@canto/core/infra/indexers/indexer-factory";
 import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
 import { retryStalledTorrent } from "@canto/core/domain/torrents/use-cases/retry-stalled-torrent";
 import {
-  findAllTorrents,
-  updateTorrent,
+  findAllDownloads,
+  updateDownload,
 } from "@canto/core/infra/repositories";
 
 /** How long a torrent must be downloading with no progress before we consider it stalled (ms) */
@@ -31,7 +31,7 @@ export async function handleStallDetection(): Promise<void> {
   }
 
   const liveMap = new Map(liveTorrents.map((t) => [t.hash, t]));
-  const allTorrents = await findAllTorrents(db);
+  const allTorrents = await findAllDownloads(db);
 
   const now = Date.now();
   const stalled: typeof allTorrents = [];
@@ -61,7 +61,7 @@ export async function handleStallDetection(): Promise<void> {
   for (const row of stalled) {
     try {
       // Mark as stalled
-      await updateTorrent(db, row.id, { status: "stalled" });
+      await updateDownload(db, row.id, { status: "stalled" });
 
       // Create notification
       await createNotification(db, {

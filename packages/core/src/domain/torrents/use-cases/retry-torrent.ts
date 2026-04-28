@@ -1,8 +1,8 @@
 import type { Database } from "@canto/db/client";
 import type { DownloadClientPort } from "../../shared/ports/download-client";
 import {
-  findTorrentById,
-  updateTorrent,
+  findDownloadById,
+  updateDownload,
 } from "../../../infra/repositories";
 import { findMediaById } from "../../../infra/media/media-repository";
 import { findFolderById, findDefaultFolder } from "../../../infra/file-organization/folder-repository";
@@ -12,7 +12,7 @@ import { findFolderById, findDefaultFolder } from "../../../infra/file-organizat
  * Resolves the correct qBittorrent category and re-adds the torrent.
  */
 export async function retryTorrent(db: Database, torrentId: string, qb: DownloadClientPort) {
-  const row = await findTorrentById(db, torrentId);
+  const row = await findDownloadById(db, torrentId);
   if (!row) return null;
 
   const url = row.magnetUrl ?? row.downloadUrl;
@@ -36,5 +36,5 @@ export async function retryTorrent(db: Database, torrentId: string, qb: Download
     if (match?.[1]) newHash = match[1].toLowerCase();
   }
 
-  return updateTorrent(db, torrentId, { hash: newHash, status: "downloading", progress: 0 });
+  return updateDownload(db, torrentId, { hash: newHash, status: "downloading", progress: 0 });
 }

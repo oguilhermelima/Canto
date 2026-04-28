@@ -60,7 +60,7 @@ export async function upsertMediaFile(
     await createMediaFileNoConflict(db, {
       mediaId: mediaRow.id,
       episodeId: pf.episodeId,
-      torrentId: torrentRow.id,
+      downloadId: torrentRow.id,
       filePath: finalPath,
       quality: torrentRow.quality,
       source: torrentRow.source,
@@ -82,7 +82,7 @@ export async function upsertMediaFile(
     }
     await createMediaFileNoConflict(db, {
       mediaId: mediaRow.id,
-      torrentId: torrentRow.id,
+      downloadId: torrentRow.id,
       filePath: finalPath,
       quality: torrentRow.quality,
       source: torrentRow.source,

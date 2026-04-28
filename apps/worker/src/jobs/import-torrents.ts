@@ -9,16 +9,16 @@ import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-cl
 import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
 import { buildIndexers } from "@canto/core/infra/indexers/indexer-factory";
 import {
-  findUnimportedTorrents,
-  findTorrentById,
+  findUnimportedDownloads,
+  findDownloadById,
   findMediaById,
   findMediaFilesByMediaId,
   ensureServerLibrary,
   addListItem,
   updateRequestStatus,
-  claimTorrentForImport,
+  claimDownloadForImport,
   resetStaleImports,
-  updateTorrent,
+  updateDownload,
   updateMedia,
 } from "@canto/core/infra/repositories";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";
@@ -31,7 +31,7 @@ export async function handleImportTorrents(): Promise<void> {
   // Reset torrents stuck with importing=true for over 30 minutes (e.g., worker crash)
   await resetStaleImports(db);
 
-  const rows = await findUnimportedTorrents(db);
+  const rows = await findUnimportedDownloads(db);
 
   const toImport = rows.filter(
     (r) => r.status === "completed" && r.hash && r.mediaId,
@@ -50,7 +50,7 @@ export async function handleImportTorrents(): Promise<void> {
   for (const row of toImport) {
     try {
       // Atomically claim the torrent to prevent race conditions with merge-live-data
-      const claimed = await claimTorrentForImport(db, row.id);
+      const claimed = await claimDownloadForImport(db, row.id);
       if (!claimed) {
         console.log(`[import-torrents] Skipping "${row.title}" — already being imported`);
         continue;
@@ -60,7 +60,7 @@ export async function handleImportTorrents(): Promise<void> {
       await autoImportTorrent(db, claimed, qbClient, { fs });
 
       // Re-read row to check if import succeeded
-      const updated = await findTorrentById(db, row.id);
+      const updated = await findDownloadById(db, row.id);
 
       if (updated?.imported) {
         // Mark the torrent as imported in qBittorrent by updating its category
@@ -135,7 +135,7 @@ export async function handleImportTorrents(): Promise<void> {
         err instanceof Error ? err.message : err,
       );
       // Reset importing flag so the torrent can be retried on next cycle
-      await updateTorrent(db, row.id, { importing: false }).catch(
+      await updateDownload(db, row.id, { importing: false }).catch(
         logAndSwallow("import-torrents reset importing flag"),
       );
     }

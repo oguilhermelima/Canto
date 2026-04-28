@@ -3,11 +3,11 @@ import type { Database } from "@canto/db/client";
 import type { DownloadClientPort } from "../../../shared/ports/download-client";
 import {
   deleteMediaFile,
-  findTorrentByTitle,
+  findDownloadByTitle,
 } from "../../../../infra/repositories";
 import { coreDownload, type DownloadInput } from "./core";
 
-type TorrentRow = NonNullable<Awaited<ReturnType<typeof findTorrentByTitle>>>;
+type TorrentRow = NonNullable<Awaited<ReturnType<typeof findDownloadByTitle>>>;
 
 export interface ReplaceInput extends DownloadInput {
   replaceFileIds: string[];

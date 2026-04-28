@@ -2,12 +2,12 @@ import type { Database } from "@canto/db/client";
 import type { DownloadClientPort } from "../../shared/ports/download-client";
 import type { LiveData } from "../../torrents/types/torrent";
 import {
-  updateTorrent,
-  updateTorrentBatch,
+  updateDownload,
+  updateDownloadBatch,
 } from "../../../infra/repositories";
 import { logAndSwallow } from "../../../platform/logger/log-error";
 
-type TorrentRow = Awaited<ReturnType<Database["query"]["torrent"]["findMany"]>>[number];
+type TorrentRow = Awaited<ReturnType<Database["query"]["download"]["findMany"]>>[number];
 
 export async function mergeLiveData(
   db: Database,
@@ -58,7 +58,7 @@ export async function mergeLiveData(
         (row as { fileSize: number | null }).fileSize = live.size;
       }
       (row as { progress: number }).progress = live.progress;
-      void updateTorrent(db, row.id, updates).catch(logAndSwallow("merge-live-data updateTorrent"));
+      void updateDownload(db, row.id, updates).catch(logAndSwallow("merge-live-data updateDownload"));
     }
   }
 
@@ -98,7 +98,7 @@ export async function mergeLiveData(
     byStatus.get(status)!.push(id);
   }
   for (const [status, ids] of byStatus) {
-    void updateTorrentBatch(db, ids, { status }).catch(logAndSwallow("merge-live-data updateTorrentBatch"));
+    void updateDownloadBatch(db, ids, { status }).catch(logAndSwallow("merge-live-data updateDownloadBatch"));
   }
 
   // Update in-memory statuses

@@ -5,8 +5,8 @@ import { db } from "@canto/db/client";
 import { getSettings } from "@canto/db/settings";
 import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
 import {
-  findTorrentByHash,
-  updateTorrent,
+  findDownloadByHash,
+  updateDownload,
 } from "@canto/core/infra/repositories";
 
 /**
@@ -44,7 +44,7 @@ export async function handleSeedManagement(): Promise<void> {
     if (torrent.progress < 1) continue;
 
     // Check if this torrent is tracked, imported, and not currently being imported
-    const dbRow = await findTorrentByHash(db, torrent.hash);
+    const dbRow = await findDownloadByHash(db, torrent.hash);
     if (!dbRow || !dbRow.imported || dbRow.importing) continue;
 
     let shouldRemove = false;
@@ -84,7 +84,7 @@ export async function handleSeedManagement(): Promise<void> {
       await client.deleteTorrent(torrent.hash, false);
 
       // Update DB status
-      await updateTorrent(db, dbRow.id, { status: "completed" });
+      await updateDownload(db, dbRow.id, { status: "completed" });
 
       console.log(
         `[seed-management] Removed "${torrent.name}" (ratio: ${torrent.ratio.toFixed(2)}, seeded: ${torrent.completion_on > 0 ? Math.round((now - torrent.completion_on) / 3600) : "?"}h)`,

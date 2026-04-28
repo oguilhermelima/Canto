@@ -12,13 +12,13 @@ import { extractHashFromMagnet } from "../../rules/torrent-rules";
 import type { DownloadClientPort } from "../../../shared/ports/download-client";
 import {
   findMediaByIdWithSeasons,
-  findTorrentByTitle,
-  findTorrentByHash,
-  createTorrent,
-  updateTorrent,
-  deleteTorrent,
+  findDownloadByTitle,
+  findDownloadByHash,
+  createDownload,
+  updateDownload,
+  deleteDownload,
   createMediaFile,
-  deleteMediaFilesByTorrentId,
+  deleteMediaFilesByDownloadId,
   findBlocklistEntry,
 } from "../../../../infra/repositories";
 import { updateMedia } from "../../../../infra/media/media-repository";
@@ -26,7 +26,7 @@ import { createNotification } from "../../../notifications/use-cases/create-noti
 import { resolveDownloadConfig } from "./folder-resolution";
 import { resolveEpisodeIds, detectDuplicates } from "./duplicate-detection";
 
-type TorrentRow = NonNullable<Awaited<ReturnType<typeof findTorrentByTitle>>>;
+type TorrentRow = NonNullable<Awaited<ReturnType<typeof findDownloadByTitle>>>;
 
 export interface DownloadInput extends TorrentDownloadInput {
   magnetUrl?: string;
@@ -84,7 +84,7 @@ export async function coreDownload(
   }
 
   if (!opts.skipDedup) {
-    const existingByTitle = await findTorrentByTitle(db, input.title);
+    const existingByTitle = await findDownloadByTitle(db, input.title);
 
     if (existingByTitle) {
       if (existingByTitle.hash) {
@@ -101,7 +101,7 @@ export async function coreDownload(
 
       if (existingByTitle.status === "paused" && existingByTitle.hash) {
         await qbClient.resumeTorrent(existingByTitle.hash);
-        const updated = await updateTorrent(db, existingByTitle.id, { status: "downloading" });
+        const updated = await updateDownload(db, existingByTitle.id, { status: "downloading" });
         return updated!;
       }
 
@@ -114,7 +114,7 @@ export async function coreDownload(
           if (match?.[1]) hash = match[1].toLowerCase();
         }
 
-        const updated = await updateTorrent(db, existingByTitle.id, {
+        const updated = await updateDownload(db, existingByTitle.id, {
           hash: hash ?? existingByTitle.hash,
           status: "downloading",
           progress: 0,
@@ -154,9 +154,9 @@ export async function coreDownload(
   let extractedHash = extractHashFromMagnet(magnetOrUrl);
 
   if (!opts.skipDedup && extractedHash) {
-    const byHash = await findTorrentByHash(db, extractedHash);
+    const byHash = await findDownloadByHash(db, extractedHash);
     if (byHash) {
-      const updated = await updateTorrent(db, byHash.id, {
+      const updated = await updateDownload(db, byHash.id, {
         status: "downloading",
         progress: 0,
         mediaId: input.mediaId,
@@ -167,7 +167,7 @@ export async function coreDownload(
     }
   }
 
-  const torrentRow = await createTorrent(db, {
+  const torrentRow = await createDownload(db, {
     mediaId: input.mediaId,
     title: input.title,
     hash: extractedHash ?? null,
@@ -191,7 +191,7 @@ export async function coreDownload(
       await createMediaFile(db, {
         mediaId: input.mediaId,
         episodeId: null,
-        torrentId: torrentRow.id,
+        downloadId: torrentRow.id,
         filePath: "",
         quality,
         source,
@@ -202,7 +202,7 @@ export async function coreDownload(
         await createMediaFile(db, {
           mediaId: input.mediaId,
           episodeId: ep.id,
-          torrentId: torrentRow.id,
+          downloadId: torrentRow.id,
           filePath: "",
           quality,
           source,
@@ -211,8 +211,8 @@ export async function coreDownload(
       }
     }
   } catch {
-    await deleteMediaFilesByTorrentId(db, torrentRow.id);
-    await deleteTorrent(db, torrentRow.id);
+    await deleteMediaFilesByDownloadId(db, torrentRow.id);
+    await deleteDownload(db, torrentRow.id);
     throw new DuplicateDownloadError("Duplicate file version detected");
   }
 
@@ -232,7 +232,7 @@ export async function coreDownload(
     if (!extractedHash && resolvedUrl.startsWith("magnet:")) {
       extractedHash = extractHashFromMagnet(resolvedUrl);
       if (extractedHash) {
-        await updateTorrent(db, torrentRow.id, { hash: extractedHash });
+        await updateDownload(db, torrentRow.id, { hash: extractedHash });
       }
     }
 
@@ -253,7 +253,7 @@ export async function coreDownload(
           const newTorrent = current.find((t) => !existingHashes.has(t.hash));
           if (newTorrent) {
             extractedHash = newTorrent.hash;
-            await updateTorrent(db, torrentRow.id, { hash: extractedHash });
+            await updateDownload(db, torrentRow.id, { hash: extractedHash });
             break;
           }
         } catch {
@@ -262,12 +262,12 @@ export async function coreDownload(
       }
       if (!extractedHash) {
         console.warn(`[download] Could not detect hash for "${torrentRow.title}" after 15 attempts`);
-        await updateTorrent(db, torrentRow.id, { status: "failed" });
+        await updateDownload(db, torrentRow.id, { status: "failed" });
       }
     }
   } catch (qbErr) {
-    await deleteMediaFilesByTorrentId(db, torrentRow.id);
-    await deleteTorrent(db, torrentRow.id);
+    await deleteMediaFilesByDownloadId(db, torrentRow.id);
+    await deleteDownload(db, torrentRow.id);
 
     void createNotification(db, {
       title: "Download failed",

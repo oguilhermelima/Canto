@@ -13,9 +13,9 @@ import type { FileSystemPort } from "../../shared/ports/file-system.port";
 import {
   findMediaByIdWithSeasons,
   findMediaFilesByMediaId,
-  findTorrentsByMediaId,
+  findDownloadsByMediaId,
   updateMediaFile,
-  updateTorrent,
+  updateDownload,
 } from "../../../infra/repositories";
 
 // ── Public types ───────────────────────────────────────────────────────────
@@ -37,7 +37,7 @@ export interface ReorganizeResult {
 
 interface RenameEntry extends FileRenamePreview {
   mediaFileId: string;
-  torrentId: string | null;
+  downloadId: string | null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -105,13 +105,13 @@ async function buildRenameList(
         const newFilename = buildFileName(mediaNaming, {
           quality: mf.quality ?? undefined,
           source: mf.source ?? undefined,
-          torrentTitle: mf.torrent?.title ?? undefined,
+          torrentTitle: mf.download?.title ?? undefined,
           extension: ext,
         });
         const newPath = path.join(basePath, newDir, newFilename);
         entries.push({
           mediaFileId: mf.id,
-          torrentId: mf.torrentId,
+          downloadId: mf.downloadId,
           oldPath: mf.filePath,
           newPath,
           episodeLabel: mediaNaming.title,
@@ -120,7 +120,7 @@ async function buildRenameList(
       } else {
         entries.push({
           mediaFileId: mf.id,
-          torrentId: mf.torrentId,
+          downloadId: mf.downloadId,
           oldPath: mf.filePath,
           newPath: mf.filePath,
           episodeLabel: "Unmapped",
@@ -143,14 +143,14 @@ async function buildRenameList(
       episodeTitle: episodeTitle ?? undefined,
       quality: mf.quality ?? undefined,
       source: mf.source ?? undefined,
-      torrentTitle: mf.torrent?.title ?? undefined,
+      torrentTitle: mf.download?.title ?? undefined,
       extension: ext,
     });
     const newPath = path.join(basePath, newDir, newFilename);
 
     entries.push({
       mediaFileId: mf.id,
-      torrentId: mf.torrentId,
+      downloadId: mf.downloadId,
       oldPath: mf.filePath,
       newPath,
       episodeLabel: buildEpisodeLabel(seasonNumber, episodeNumber, episodeTitle),
@@ -185,10 +185,10 @@ export async function executeReorganizeMediaFiles(
     return { renamed: 0, skipped, failed: [] };
   }
 
-  // Security check: no torrent should be mid-import
-  const torrents = await findTorrentsByMediaId(db, mediaId);
-  if (torrents.some((t) => t.importing)) {
-    throw new Error("Cannot reorganize files while a torrent is being imported");
+  // Security check: no download should be mid-import
+  const downloads = await findDownloadsByMediaId(db, mediaId);
+  if (downloads.some((t) => t.importing)) {
+    throw new Error("Cannot reorganize files while a download is being imported");
   }
 
   const importMethod =
@@ -201,7 +201,7 @@ export async function executeReorganizeMediaFiles(
     if (!deps.client) {
       throw new Error("Download client required for remote reorganize");
     }
-    await executeRemoteRenames(toRename, torrents, deps.client, result, db);
+    await executeRemoteRenames(toRename, downloads, deps.client, result, db);
   }
 
   return result;
@@ -305,35 +305,35 @@ async function executeLocalRenames(
 
 async function executeRemoteRenames(
   toRename: RenameEntry[],
-  torrents: Awaited<ReturnType<typeof findTorrentsByMediaId>>,
+  downloads: Awaited<ReturnType<typeof findDownloadsByMediaId>>,
   client: DownloadClientPort,
   result: ReorganizeResult,
   db: Database,
 ): Promise<void> {
-  const torrentMap = new Map(
-    torrents.filter((t) => t.hash).map((t) => [t.id, t]),
+  const downloadMap = new Map(
+    downloads.filter((d) => d.hash).map((d) => [d.id, d]),
   );
 
-  // Group renames by torrent
-  const byTorrent = new Map<string, RenameEntry[]>();
+  // Group renames by download
+  const byDownload = new Map<string, RenameEntry[]>();
   for (const r of toRename) {
-    if (!r.torrentId) continue;
-    const list = byTorrent.get(r.torrentId) ?? [];
+    if (!r.downloadId) continue;
+    const list = byDownload.get(r.downloadId) ?? [];
     list.push(r);
-    byTorrent.set(r.torrentId, list);
+    byDownload.set(r.downloadId, list);
   }
 
-  for (const [torrentId, entries] of byTorrent) {
-    const torrentRow = torrentMap.get(torrentId);
-    if (!torrentRow?.hash || !torrentRow.contentPath) continue;
+  for (const [downloadId, entries] of byDownload) {
+    const downloadRow = downloadMap.get(downloadId);
+    if (!downloadRow?.hash || !downloadRow.contentPath) continue;
 
     for (const r of entries) {
       try {
-        const oldRelative = path.relative(torrentRow.contentPath, r.oldPath);
+        const oldRelative = path.relative(downloadRow.contentPath, r.oldPath);
         const newRelative = path.basename(r.newPath);
 
         if (oldRelative !== newRelative) {
-          await client.renameFile(torrentRow.hash, oldRelative, newRelative);
+          await client.renameFile(downloadRow.hash, oldRelative, newRelative);
         }
 
         await updateMediaFile(db, r.mediaFileId, { filePath: r.newPath });
@@ -346,12 +346,12 @@ async function executeRemoteRenames(
       }
     }
 
-    // Update torrent contentPath if parent dir changed
+    // Update download contentPath if parent dir changed
     const firstEntry = entries[0];
     if (firstEntry) {
       const newContentDir = path.dirname(firstEntry.newPath);
-      if (newContentDir !== torrentRow.contentPath) {
-        await updateTorrent(db, torrentRow.id, { contentPath: newContentDir });
+      if (newContentDir !== downloadRow.contentPath) {
+        await updateDownload(db, downloadRow.id, { contentPath: newContentDir });
       }
     }
   }

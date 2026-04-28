@@ -2,14 +2,14 @@ import { and, eq, isNull } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { mediaFile } from "@canto/db/schema";
 
-export async function findMediaFilesByTorrentId(db: Database, torrentId: string, status?: string) {
+export async function findMediaFilesByDownloadId(db: Database, downloadId: string, status?: string) {
   if (status) {
     return db.query.mediaFile.findMany({
-      where: and(eq(mediaFile.torrentId, torrentId), eq(mediaFile.status, status)),
+      where: and(eq(mediaFile.downloadId, downloadId), eq(mediaFile.status, status)),
     });
   }
   return db.query.mediaFile.findMany({
-    where: eq(mediaFile.torrentId, torrentId),
+    where: eq(mediaFile.downloadId, downloadId),
   });
 }
 
@@ -23,7 +23,7 @@ export async function findMediaFilesByMediaId(db: Database, mediaId: string) {
           season: { columns: { id: true, number: true } },
         },
       },
-      torrent: {
+      download: {
         columns: { id: true, quality: true, source: true, title: true },
       },
     },
@@ -87,8 +87,8 @@ export async function deleteMediaFile(db: Database, id: string) {
   await db.delete(mediaFile).where(eq(mediaFile.id, id));
 }
 
-export async function deleteMediaFilesByTorrentId(db: Database, torrentId: string) {
-  await db.delete(mediaFile).where(eq(mediaFile.torrentId, torrentId));
+export async function deleteMediaFilesByDownloadId(db: Database, downloadId: string) {
+  await db.delete(mediaFile).where(eq(mediaFile.downloadId, downloadId));
 }
 
 export async function createMediaFileNoConflict(

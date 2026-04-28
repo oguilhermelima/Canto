@@ -22,7 +22,7 @@ import {
   mediaVersion,
   mediaVideo,
   season,
-  torrent,
+  download,
   userConnection,
   userRecommendation,
 } from "@canto/db/schema";
@@ -199,11 +199,11 @@ export async function isMediaOrphaned(
   const versionWhere = excludeVersionId
     ? and(eq(mediaVersion.mediaId, mediaId), sql`${mediaVersion.id} != ${excludeVersionId}`)
     : eq(mediaVersion.mediaId, mediaId);
-  const [[otherVersions], [torrents]] = await Promise.all([
+  const [[otherVersions], [downloads]] = await Promise.all([
     db.select({ count: count() }).from(mediaVersion).where(versionWhere),
-    db.select({ count: count() }).from(torrent).where(eq(torrent.mediaId, mediaId)),
+    db.select({ count: count() }).from(download).where(eq(download.mediaId, mediaId)),
   ]);
-  return (otherVersions?.count ?? 0) === 0 && (torrents?.count ?? 0) === 0;
+  return (otherVersions?.count ?? 0) === 0 && (downloads?.count ?? 0) === 0;
 }
 
 export async function findLibraryExternalIds(db: Database) {

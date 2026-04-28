@@ -9,7 +9,7 @@ import { searchTorrents } from "./search-torrents";
 import { downloadTorrent } from "./download-torrent";
 import {
   createBlocklistEntry,
-  findTorrentById,
+  findDownloadById,
 } from "../../../infra/repositories";
 import { findDownloadConfig } from "../../../infra/torrents/download-config-repository";
 import { applyAdminDownloadPolicy } from "../../shared/rules/scoring-rules";
@@ -43,7 +43,7 @@ export async function retryStalledTorrent(
 
   // Remove stalled torrent from qBit
   try {
-    const stalledRow = await findTorrentById(db, row.id);
+    const stalledRow = await findDownloadById(db, row.id);
     if (stalledRow?.hash) {
       await qbClient.deleteTorrent(stalledRow.hash, false);
     }

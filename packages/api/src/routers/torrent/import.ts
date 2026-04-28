@@ -21,11 +21,11 @@ import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
 import { updateMedia } from "@canto/core/infra/media/media-repository";
 import {
-  findTorrentById,
-  findTorrentByHash,
-  updateTorrent,
-  createTorrent,
-  claimTorrentForImport,
+  findDownloadById,
+  findDownloadByHash,
+  updateDownload,
+  createDownload,
+  claimDownloadForImport,
 } from "@canto/core/infra/repositories";
 
 import { createTRPCRouter, adminProcedure } from "../../trpc";
@@ -66,10 +66,10 @@ export const torrentImportRouter = createTRPCRouter({
       const title = live?.name ?? fallbackTitle;
       const inferred = inferDownloadMeta(title);
       const nextStatus = live ? mapStatusFromLive(live) : "downloading";
-      const existing = await findTorrentByHash(ctx.db, hash);
+      const existing = await findDownloadByHash(ctx.db, hash);
 
       if (existing) {
-        const updated = await updateTorrent(ctx.db, existing.id, {
+        const updated = await updateDownload(ctx.db, existing.id, {
           title,
           magnetUrl,
           status: nextStatus,
@@ -86,7 +86,7 @@ export const torrentImportRouter = createTRPCRouter({
         return updated;
       }
 
-      const created = await createTorrent(ctx.db, {
+      const created = await createDownload(ctx.db, {
         hash,
         title,
         magnetUrl,
@@ -126,9 +126,9 @@ export const torrentImportRouter = createTRPCRouter({
 
       const inferred = inferDownloadMeta(live.name);
       const nextStatus = mapStatusFromLive(live);
-      const existing = await findTorrentByHash(ctx.db, live.hash);
+      const existing = await findDownloadByHash(ctx.db, live.hash);
       if (existing) {
-        const updated = await updateTorrent(ctx.db, existing.id, {
+        const updated = await updateDownload(ctx.db, existing.id, {
           title: live.name,
           status: nextStatus,
           progress: live.progress,
@@ -144,7 +144,7 @@ export const torrentImportRouter = createTRPCRouter({
         return updated;
       }
 
-      const created = await createTorrent(ctx.db, {
+      const created = await createDownload(ctx.db, {
         hash: live.hash,
         title: live.name,
         status: nextStatus,
@@ -171,7 +171,7 @@ export const torrentImportRouter = createTRPCRouter({
 
       const inferred = inferDownloadMeta(live.name);
       const currentStatus = mapStatusFromLive(live);
-      const existing = await findTorrentByHash(ctx.db, live.hash);
+      const existing = await findDownloadByHash(ctx.db, live.hash);
 
       const tmdb = await getTmdbProvider();
       const tvdb = await getTvdbProvider();
@@ -212,8 +212,8 @@ export const torrentImportRouter = createTRPCRouter({
       };
 
       const torrent = existing
-        ? await updateTorrent(ctx.db, existing.id, baseData)
-        : await createTorrent(ctx.db, {
+        ? await updateDownload(ctx.db, existing.id, baseData)
+        : await createDownload(ctx.db, {
             ...baseData,
             hash: live.hash,
             magnetUrl: null,
@@ -231,7 +231,7 @@ export const torrentImportRouter = createTRPCRouter({
   import: adminProcedure
     .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
-      const row = await findTorrentById(ctx.db, input.id);
+      const row = await findDownloadById(ctx.db, input.id);
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
       if (row.imported) return { success: true, message: "Already imported" };
       if (row.importing) return { success: true, message: "Import already in progress" };
@@ -239,7 +239,7 @@ export const torrentImportRouter = createTRPCRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Torrent must be completed and linked to a media item to import" });
       }
 
-      const claimed = await claimTorrentForImport(ctx.db, row.id);
+      const claimed = await claimDownloadForImport(ctx.db, row.id);
       if (!claimed) return { success: true, message: "Import already in progress" };
 
       try {
@@ -248,7 +248,7 @@ export const torrentImportRouter = createTRPCRouter({
         await autoImportTorrent(ctx.db, claimed, qb, { fs });
         return { success: true };
       } catch (err) {
-        await updateTorrent(ctx.db, row.id, { importing: false });
+        await updateDownload(ctx.db, row.id, { importing: false });
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: `Import failed: ${err instanceof Error ? err.message : "Unknown error"}`,

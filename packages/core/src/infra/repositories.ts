@@ -32,7 +32,7 @@ export * from "./requests/request-aggregate-repository";
 
 export * from "./shared/language-repository";
 
-export * from "./torrents/torrent-repository";
+export * from "./torrents/download-repository";
 
 export * from "./trakt/trakt-sync-repository";
 export * from "./trakt/trakt-sync-aggregate-repository";

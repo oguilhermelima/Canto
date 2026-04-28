@@ -1,7 +1,7 @@
 import path from "node:path";
 
 import type { Database } from "@canto/db/client";
-import type { torrent as torrentSchema } from "@canto/db/schema";
+import type { download as downloadSchema } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
 import type { DownloadClientPort } from "../../shared/ports/download-client";
 import type { FileSystemPort } from "../../shared/ports/file-system.port";
@@ -13,8 +13,8 @@ import {
   findMediaByIdWithSeasons,
   findFolderById,
   findDefaultFolder,
-  findMediaFilesByTorrentId,
-  updateTorrent,
+  findMediaFilesByDownloadId,
+  updateDownload,
 } from "../../../infra/repositories";
 import { parseVideoFiles } from "../../../platform/fs/filesystem";
 
@@ -34,25 +34,25 @@ type ImportMethod = "local" | "remote";
 
 export async function autoImportTorrent(
   db: Database,
-  torrentRow: typeof torrentSchema.$inferSelect,
+  torrentRow: typeof downloadSchema.$inferSelect,
   client: DownloadClientPort,
   deps: { fs: FileSystemPort },
   hooks?: ImportHooks,
 ): Promise<void> {
   if (!torrentRow.hash || !torrentRow.mediaId) {
-    await updateTorrent(db, torrentRow.id, { importing: false });
+    await updateDownload(db, torrentRow.id, { importing: false });
     return;
   }
 
   try {
     const mediaRow = await findMediaByIdWithSeasons(db, torrentRow.mediaId);
     if (!mediaRow) {
-      await updateTorrent(db, torrentRow.id, { importing: false });
+      await updateDownload(db, torrentRow.id, { importing: false });
       return;
     }
 
-    const placeholders = await findMediaFilesByTorrentId(db, torrentRow.id, "pending");
-    const alreadyImported = await findMediaFilesByTorrentId(db, torrentRow.id, "imported");
+    const placeholders = await findMediaFilesByDownloadId(db, torrentRow.id, "pending");
+    const alreadyImported = await findMediaFilesByDownloadId(db, torrentRow.id, "imported");
 
     const rawMethod = (await getSetting("download.importMethod")) ?? "local";
     const importMethod: ImportMethod = rawMethod === "remote" ? "remote" : "local";
@@ -66,7 +66,7 @@ export async function autoImportTorrent(
     const subtitleFiles = files.filter((f) => isSubtitleFile(f.name));
 
     if (videoFiles.length === 0) {
-      await updateTorrent(db, torrentRow.id, { importing: false });
+      await updateDownload(db, torrentRow.id, { importing: false });
       return;
     }
 
@@ -80,7 +80,7 @@ export async function autoImportTorrent(
         type: "movie_multi_file",
         mediaId: mediaRow.id,
       });
-      await updateTorrent(db, torrentRow.id, { importing: false });
+      await updateDownload(db, torrentRow.id, { importing: false });
       return;
     }
 
@@ -113,7 +113,7 @@ export async function autoImportTorrent(
 
     if (parsedFiles.length === 0) {
       console.warn(`[auto-import] No valid files to import for "${mediaRow.title}" — all episodes unresolvable`);
-      await updateTorrent(db, torrentRow.id, { importing: false });
+      await updateDownload(db, torrentRow.id, { importing: false });
       return;
     }
 
@@ -132,7 +132,7 @@ export async function autoImportTorrent(
           type: "import_failed",
           mediaId: mediaRow.id,
         });
-        await updateTorrent(db, torrentRow.id, { importing: false });
+        await updateDownload(db, torrentRow.id, { importing: false });
         return;
       }
       const targetDir = path.join(libraryPath, mediaDir);
@@ -141,7 +141,7 @@ export async function autoImportTorrent(
         await deps.fs.mkdir(targetDir, { recursive: true });
       } catch (err) {
         console.error(`[auto-import] Failed to create target dir "${targetDir}":`, err);
-        await updateTorrent(db, torrentRow.id, { importing: false });
+        await updateDownload(db, torrentRow.id, { importing: false });
         return;
       }
 
@@ -150,7 +150,7 @@ export async function autoImportTorrent(
         savePath = await resolveSavePath(client, torrentRow.hash);
       } catch (err) {
         console.error(`[auto-import] Failed to resolve save path for "${torrentRow.title}":`, err instanceof Error ? err.message : err);
-        await updateTorrent(db, torrentRow.id, { importing: false });
+        await updateDownload(db, torrentRow.id, { importing: false });
         return;
       }
 
@@ -174,7 +174,7 @@ export async function autoImportTorrent(
           type: "import_failed",
           mediaId: mediaRow.id,
         });
-        await updateTorrent(db, torrentRow.id, { importing: false });
+        await updateDownload(db, torrentRow.id, { importing: false });
         return;
       }
       const targetLocation = `${containerBasePath}/${mediaDir}`;
@@ -202,7 +202,7 @@ export async function autoImportTorrent(
     const allImported = importedCount >= totalExpected;
 
     if (allImported) {
-      await updateTorrent(db, torrentRow.id, {
+      await updateDownload(db, torrentRow.id, {
         imported: true,
         importing: false,
         importMethod,
@@ -219,7 +219,7 @@ export async function autoImportTorrent(
       });
     } else {
       const newAttempts = (torrentRow.importAttempts ?? 0) + 1;
-      await updateTorrent(db, torrentRow.id, {
+      await updateDownload(db, torrentRow.id, {
         importing: false,
         importMethod,
         contentPath,
@@ -248,6 +248,6 @@ export async function autoImportTorrent(
     }
   } catch (err) {
     console.error(`[auto-import] Unexpected error for "${torrentRow.title}":`, err instanceof Error ? err.message : err);
-    await updateTorrent(db, torrentRow.id, { importing: false });
+    await updateDownload(db, torrentRow.id, { importing: false });
   }
 }

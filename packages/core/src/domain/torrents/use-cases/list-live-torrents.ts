@@ -1,8 +1,8 @@
 import type { Database } from "@canto/db/client";
 import type { DownloadClientPort } from "../../shared/ports/download-client";
 import {
-  findAllTorrentsPaginated,
-  countAllTorrents,
+  findAllDownloadsPaginated,
+  countAllDownloads,
 } from "../../../infra/repositories";
 import { findMediaById } from "../../../infra/media/media-repository";
 import { mergeLiveData } from "../../media/use-cases/merge-live-data";
@@ -18,8 +18,8 @@ export async function listLiveTorrents(
   qb: DownloadClientPort,
 ) {
   const [dbRows, total] = await Promise.all([
-    findAllTorrentsPaginated(db, limit, offset),
-    countAllTorrents(db),
+    findAllDownloadsPaginated(db, limit, offset),
+    countAllDownloads(db),
   ]);
   const merged = await mergeLiveData(db, dbRows, qb);
 

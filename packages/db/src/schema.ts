@@ -617,7 +617,7 @@ export const tmdbCertification = pgTable(
   ],
 );
 
-export const torrent = pgTable("torrent", {
+export const download = pgTable("download", {
   id: uuid("id").primaryKey().defaultRandom(),
   mediaId: uuid("media_id").references(() => media.id, { onDelete: "set null" }),
   hash: varchar("hash", { length: 100 }).unique(),
@@ -662,7 +662,7 @@ export const mediaFile = pgTable(
     episodeId: uuid("episode_id").references(() => episode.id, {
       onDelete: "cascade",
     }),
-    torrentId: uuid("torrent_id").references(() => torrent.id, {
+    downloadId: uuid("download_id").references(() => download.id, {
       onDelete: "set null",
     }),
     filePath: varchar("file_path", { length: 1000 }).notNull(),
@@ -680,7 +680,7 @@ export const mediaFile = pgTable(
   },
   (table) => [
     index("idx_media_file_media").on(table.mediaId),
-    index("idx_media_file_torrent").on(table.torrentId),
+    index("idx_media_file_download").on(table.downloadId),
   ],
 );
 
@@ -1674,7 +1674,7 @@ export const episodeTranslationRelations = relations(episodeTranslation, ({ one 
   }),
 }));
 
-export const torrentRelations = relations(torrent, ({ many }) => ({
+export const downloadRelations = relations(download, ({ many }) => ({
   files: many(mediaFile),
 }));
 
@@ -1687,9 +1687,9 @@ export const mediaFileRelations = relations(mediaFile, ({ one }) => ({
     fields: [mediaFile.episodeId],
     references: [episode.id],
   }),
-  torrent: one(torrent, {
-    fields: [mediaFile.torrentId],
-    references: [torrent.id],
+  download: one(download, {
+    fields: [mediaFile.downloadId],
+    references: [download.id],
   }),
 }));
 
