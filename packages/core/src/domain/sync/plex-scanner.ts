@@ -168,42 +168,57 @@ export function mapPlexItem(
 const PAGE_SIZE = 100;
 const REQUEST_TIMEOUT_MS = 30_000;
 
+/**
+ * Plex's numeric type code for `?type=N` filters. Required alongside
+ * `updatedAt>=` on some servers — without it, the delta filter is rejected
+ * with HTTP 400. Mixed libraries can't be narrowed, so we omit the param
+ * and rely on the 400-retry path below.
+ */
+function plexTypeCode(libType: string): number | null {
+  if (libType === "movies") return 1;
+  if (libType === "shows") return 2;
+  return null;
+}
+
 async function fetchPlexPage(
   url: string,
   token: string,
-  libraryId: string,
+  lib: PlexLibraryRef,
   offset: number,
   sinceMs: number | undefined,
 ): Promise<PlexMediaContainer> {
+  const typeCode = sinceMs != null ? plexTypeCode(lib.type) : null;
+  const typeQuery = typeCode != null ? `&type=${typeCode}` : "";
   const sinceQuery =
     sinceMs != null
       ? `&updatedAt%3E%3D${Math.floor(sinceMs / 1000)}`
       : "";
   const res = await fetch(
-    `${url}/library/sections/${libraryId}/all?X-Plex-Token=${token}&includeGuids=1&X-Plex-Container-Start=${offset}&X-Plex-Container-Size=${PAGE_SIZE}${sinceQuery}`,
+    `${url}/library/sections/${lib.plexLibraryId}/all?X-Plex-Token=${token}&includeGuids=1&X-Plex-Container-Start=${offset}&X-Plex-Container-Size=${PAGE_SIZE}${typeQuery}${sinceQuery}`,
     {
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     },
   );
   if (!res.ok) {
-    const msg = `Plex API returned HTTP ${res.status} for library ${libraryId} at offset ${offset}`;
+    const msg = `Plex API returned HTTP ${res.status} for library ${lib.plexLibraryId} at offset ${offset}`;
     if (isAuthStatus(res.status)) throw new SyncAuthError(msg, res.status);
     throw new Error(msg);
   }
   return (await res.json()) as PlexMediaContainer;
 }
 
-async function scanLibrary(
+async function paginateLibrary(
   url: string,
   token: string,
   lib: PlexLibraryRef,
+  sinceMs: number | undefined,
 ): Promise<ScannedMediaItem[]> {
   const items: ScannedMediaItem[] = [];
   let offset = 0;
 
   while (true) {
-    const data = await fetchPlexPage(url, token, lib.plexLibraryId, offset, lib.sinceMs);
+    const data = await fetchPlexPage(url, token, lib, offset, sinceMs);
     const metadata = data.MediaContainer.Metadata ?? [];
 
     for (const raw of metadata) {
@@ -219,10 +234,33 @@ async function scanLibrary(
 
     offset += PAGE_SIZE;
     const totalSize = data.MediaContainer.totalSize ?? 0;
-    if (metadata.length < PAGE_SIZE || offset >= totalSize) break;
+    if (metadata.length < PAGE_SIZE || offset >= totalSize) return items;
   }
+}
 
-  return items;
+async function scanLibrary(
+  url: string,
+  token: string,
+  lib: PlexLibraryRef,
+): Promise<ScannedMediaItem[]> {
+  // When Plex rejects the delta filter with 400 (mixed libraries, certain
+  // server versions), drop the filter and re-run as a full scan rather than
+  // failing the user's whole sync cycle.
+  try {
+    return await paginateLibrary(url, token, lib, lib.sinceMs);
+  } catch (err) {
+    if (
+      lib.sinceMs != null
+      && err instanceof Error
+      && err.message.includes("HTTP 400")
+    ) {
+      console.warn(
+        `[plex-scanner] Library ${lib.plexLibraryId} rejected delta filter (HTTP 400); retrying as full scan`,
+      );
+      return paginateLibrary(url, token, lib, undefined);
+    }
+    throw err;
+  }
 }
 
 /**
