@@ -148,29 +148,34 @@ function enrichTranslationsWithImages(
     }
   }
 
-  // Match to translations: try full locale first (e.g., "pt-BR"), then 2-letter fallback ("pt")
+  // Match translations to images by exact iso_639_1 tag only. TMDB tags images
+  // with the 2-letter code regardless of region (pt-BR uploads share "pt" with
+  // pt-PT), so falling back to the short prefix would conflate regional variants
+  // and assign pt-PT visuals to pt-BR translations. Posters are disambiguated
+  // via the per-locale endpoint in `enrichTranslationsWithLocalePoster`; logos
+  // have no equivalent endpoint and fall back to the base English logo.
   for (const t of translations) {
-    const short = t.language.split("-")[0]!;
-    const poster = bestPoster.get(t.language) ?? bestPoster.get(short);
-    const logo = bestLogo.get(t.language) ?? bestLogo.get(short);
+    const poster = bestPoster.get(t.language);
+    const logo = bestLogo.get(t.language);
     if (poster) t.posterPath = poster;
     if (logo) t.logoPath = logo;
   }
 }
 
 /**
- * Disambiguate region-specific posters when multiple variants share a 2-letter prefix.
+ * Resolve region-specific posters for every supported regional locale.
  *
- * TMDB tags images by iso_639_1 (2 letters), so pt-BR and pt-PT share the same "pt"
- * poster from `enrichTranslationsWithImages`. When supported langs include both
- * variants AND path 1 already found a tagged poster for that prefix, we hit the
- * per-locale endpoint to pick the regional one.
+ * TMDB tags images by iso_639_1 only (2 letters), so `enrichTranslationsWithImages`
+ * cannot disambiguate pt-BR vs pt-PT (both share the "pt" tag). We hit the
+ * per-locale endpoint here to pick the regional poster directly — TMDB returns
+ * the correct localized `poster_path` when queried with the full locale.
  *
- * We deliberately skip the system-language case here: TMDB's `/tv/{id}?language=X`
- * falls back to the show's *original-language* poster when no localized poster
- * exists (e.g. Japanese for an anime queried with pt-BR), which is wrong — we want
- * the EN base poster as fallback. Path 1 already handles tagged-language matching
- * correctly without that bad fallback.
+ * Gated on prefixes that already have at least one tagged poster from path 1
+ * to avoid TMDB's bad fallback: `/tv/{id}?language=X` returns the show's
+ * *original-language* poster when no localized poster exists (e.g. Japanese
+ * for an anime queried with pt-BR). When path 1 found something, we know a
+ * Portuguese poster exists, so per-locale fetch returns the correct regional
+ * variant — never the original-language fallback.
  */
 async function enrichTranslationsWithLocalePoster(
   client: TmdbClient,
@@ -195,7 +200,7 @@ async function enrichTranslationsWithLocalePoster(
 
   const langsToFetch = new Set<string>();
   for (const [prefix, langs] of byPrefix) {
-    if (langs.length > 1 && prefixesWithPoster.has(prefix)) {
+    if (prefixesWithPoster.has(prefix)) {
       for (const l of langs) langsToFetch.add(l);
     }
   }

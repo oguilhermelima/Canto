@@ -5,9 +5,13 @@ import { mediaTranslation } from "@canto/db/schema";
 /**
  * Upsert language-specific logo paths into `media_translation`.
  *
- * Maps TMDB ISO 639-1 codes (e.g. "pt") to the matching supported-language
- * codes (e.g. "pt-BR"). Exact match preferred; 2-letter prefix used as
- * fallback. Unknown languages are skipped silently.
+ * Only persists logos whose TMDB language tag matches a supported language
+ * exactly. The previous behaviour mapped a bare 2-letter prefix (e.g. "pt")
+ * onto the first regional supported variant (e.g. "pt-BR"), which silently
+ * stored pt-PT-uploaded logos as pt-BR — TMDB tags images by iso_639_1 only,
+ * so "pt" conflates pt-BR and pt-PT. With the prefix mapping gone, ambiguous
+ * regional logos fall back to the base English logo at read time instead of
+ * showing the wrong region.
  *
  * Shared by `fetchLogos` (browse-time, may lack persisted media) and
  * `ensureMedia` (engine, always has a persisted media). Keeps logo-write
@@ -21,18 +25,16 @@ export async function upsertLangLogos(
 ): Promise<number> {
   if (byLangIso639_1.size === 0) return 0;
 
-  const langToFull = new Map<string, string>();
+  const supported = new Set<string>();
   for (const code of targetLanguages) {
     if (code.startsWith("en")) continue;
-    langToFull.set(code, code);
-    const prefix = code.split("-")[0];
-    if (prefix && !langToFull.has(prefix)) langToFull.set(prefix, code);
+    supported.add(code);
   }
 
   let writes = 0;
   for (const [tmdbCode, logoPath] of byLangIso639_1) {
-    const fullCode = langToFull.get(tmdbCode);
-    if (!fullCode) continue;
+    if (!supported.has(tmdbCode)) continue;
+    const fullCode = tmdbCode;
     try {
       await db
         .insert(mediaTranslation)

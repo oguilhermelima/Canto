@@ -150,10 +150,11 @@ export async function fetchLogos(
 
     // Prefer the user's language logo when available so the card immediately
     // renders the translated version instead of waiting for the next page load.
+    // Only exact-match — TMDB tags images with the 2-letter iso_639_1, so a
+    // prefix fallback would assign pt-PT logos to pt-BR users (and vice versa).
     const langLogos = langLogoMap.get(`${item.type}-${item.externalId}`);
-    const langPrefix = language?.split("-")[0];
     const langLogo = useLangJoin && langLogos
-      ? langLogos.get(language!) ?? (langPrefix ? langLogos.get(langPrefix) : undefined) ?? null
+      ? langLogos.get(language!) ?? null
       : null;
     const logo = langLogo ?? enLogo;
     result[key] = logo;
@@ -220,8 +221,7 @@ export async function enrichBrowseWithLogos<
 
   const providers = [...new Set(data.results.map((r) => r.provider))];
   const externalIds = data.results.map((r) => r.externalId);
-  const langPrefix = language?.split("-")[0];
-  const useLangJoin = langPrefix && !language?.startsWith("en");
+  const useLangJoin = !!language && !language.startsWith("en");
 
   const rows = await db
     .select({
@@ -236,10 +236,7 @@ export async function enrichBrowseWithLogos<
       useLangJoin
         ? and(
             eq(mediaTranslation.mediaId, media.id),
-            or(
-              eq(mediaTranslation.language, language!),
-              sql`LEFT(${mediaTranslation.language}, 2) = ${langPrefix}`,
-            ),
+            eq(mediaTranslation.language, language!),
           )
         : sql`FALSE`,
     )
