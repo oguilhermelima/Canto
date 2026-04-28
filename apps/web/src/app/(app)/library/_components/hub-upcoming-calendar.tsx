@@ -18,6 +18,9 @@ const MONTH_FORMATTER = new Intl.DateTimeFormat(undefined, { month: "short" });
 const COLUMN_WIDTH = "w-[340px] sm:w-[360px] lg:w-[400px]";
 const SCROLL_PADDING_X =
   "pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24";
+// Vary skeleton density across columns so the loading state looks like a real
+// calendar (some days busy, some sparse) instead of a uniform grid.
+const SKELETON_ITEM_COUNTS = [3, 1, 2, 1, 2, 0, 1];
 
 interface DayBucket {
   date: Date;
@@ -108,59 +111,88 @@ function CalendarItem({
   );
 }
 
-function DayColumn({ bucket }: { bucket: DayBucket }): React.JSX.Element {
+function DayHeader({ bucket }: { bucket: DayBucket }): React.JSX.Element {
   const dayNum = bucket.date.getDate();
   const showMonth = dayNum === 1 || bucket.isToday;
   const monthShort = showMonth ? MONTH_FORMATTER.format(bucket.date) : null;
 
   return (
-    <div className={cn("group/day flex shrink-0 flex-col", COLUMN_WIDTH)}>
-      <div
-        className={cn(
-          "mb-3 flex items-baseline justify-between gap-2 border-b pb-2.5 transition-colors",
-          bucket.isToday
-            ? "border-foreground/70"
-            : "border-border/40 group-hover/day:border-border/70",
-        )}
-      >
-        <div className="flex items-baseline gap-2">
-          <span
-            className={cn(
-              "text-[11px] font-bold uppercase tracking-[0.18em]",
-              bucket.isToday
-                ? "text-foreground"
-                : bucket.isWeekend
-                  ? "text-muted-foreground/70"
-                  : "text-muted-foreground",
-            )}
-          >
-            {bucket.isToday ? "Today" : bucket.weekdayShort}
-          </span>
-          {monthShort && (
-            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
-              {monthShort}
-            </span>
-          )}
-        </div>
+    <div
+      className={cn(
+        "mb-3 flex items-baseline justify-between gap-2 border-b pb-2.5 transition-colors",
+        bucket.isToday
+          ? "border-foreground/70"
+          : "border-border/40 group-hover/day:border-border/70",
+      )}
+    >
+      <div className="flex items-baseline gap-2">
         <span
           className={cn(
-            "text-3xl font-extrabold tabular-nums leading-none",
-            bucket.isToday ? "text-foreground" : "text-foreground/55",
+            "text-[11px] font-bold uppercase tracking-[0.18em]",
+            bucket.isToday
+              ? "text-foreground"
+              : bucket.isWeekend
+                ? "text-muted-foreground/70"
+                : "text-muted-foreground",
           )}
         >
-          {dayNum}
+          {bucket.isToday ? "Today" : bucket.weekdayShort}
         </span>
-      </div>
-      {bucket.items.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center py-6">
-          <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground/30">
-            Quiet day
+        {monthShort && (
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+            {monthShort}
           </span>
-        </div>
+        )}
+      </div>
+      <span
+        className={cn(
+          "text-3xl font-extrabold tabular-nums leading-none",
+          bucket.isToday ? "text-foreground" : "text-foreground/55",
+        )}
+      >
+        {dayNum}
+      </span>
+    </div>
+  );
+}
+
+function DayColumn({ bucket }: { bucket: DayBucket }): React.JSX.Element {
+  return (
+    <div className={cn("group/day flex shrink-0 flex-col", COLUMN_WIDTH)}>
+      <DayHeader bucket={bucket} />
+      {bucket.items.length === 0 ? (
+        <p className="px-2 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground/30">
+          Quiet day
+        </p>
       ) : (
         <div className="flex flex-col gap-1">
           {bucket.items.map((item) => (
             <CalendarItem key={item.id} item={item} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DayColumnSkeleton({ bucket, itemCount }: { bucket: DayBucket; itemCount: number }): React.JSX.Element {
+  return (
+    <div className={cn("group/day flex shrink-0 flex-col", COLUMN_WIDTH)}>
+      <DayHeader bucket={bucket} />
+      {itemCount === 0 ? (
+        <p className="px-2 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground/30">
+          Quiet day
+        </p>
+      ) : (
+        <div className="flex flex-col gap-1">
+          {Array.from({ length: itemCount }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 px-2 py-2">
+              <Skeleton className="aspect-[2/3] w-12 shrink-0 rounded-lg" />
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -188,23 +220,20 @@ export function HubUpcomingCalendar(): React.JSX.Element {
         linkAs={Link}
       />
 
-      <div className="mt-2">
+      <div>
         <div
           className={cn(
-            "flex gap-6 overflow-x-auto overflow-y-visible pb-3 scrollbar-none",
+            "flex items-start gap-6 overflow-x-auto overflow-y-visible pb-4 scrollbar-none",
             SCROLL_PADDING_X,
           )}
         >
           {isLoading
-            ? Array.from({ length: DAYS }).map((_, i) => (
-                <div
-                  key={i}
-                  className={cn("flex shrink-0 flex-col gap-3", COLUMN_WIDTH)}
-                >
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-16 w-full rounded-xl" />
-                  <Skeleton className="h-16 w-full rounded-xl" />
-                </div>
+            ? buckets.map((bucket, i) => (
+                <DayColumnSkeleton
+                  key={bucket.date.toISOString()}
+                  bucket={bucket}
+                  itemCount={SKELETON_ITEM_COUNTS[i % SKELETON_ITEM_COUNTS.length]!}
+                />
               ))
             : buckets.map((bucket) => (
                 <DayColumn key={bucket.date.toISOString()} bucket={bucket} />
