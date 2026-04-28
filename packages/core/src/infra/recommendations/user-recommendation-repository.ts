@@ -322,6 +322,7 @@ export async function findUserRecommendations(
             AND excl_l.user_id = ${userId}
             AND excl_l.deleted_at IS NULL
             AND excl_l.type != 'server'
+            AND excl_li.deleted_at IS NULL
         )`
       : sql``;
 
@@ -539,6 +540,7 @@ export async function findUserSpotlightItems(
             AND excl_l.user_id = ${userId}
             AND excl_l.deleted_at IS NULL
             AND excl_l.type != 'server'
+            AND excl_li.deleted_at IS NULL
         )`
       : sql``;
 

@@ -280,6 +280,7 @@ export async function rebuildUserRecs(
       and(
         eq(list.userId, userId),
         sql`${list.type} != 'server'`,
+        sql`${listItem.deletedAt} IS NULL`,
       ),
     )
     .orderBy(desc(listItem.addedAt));

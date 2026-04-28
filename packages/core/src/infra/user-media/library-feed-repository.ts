@@ -294,6 +294,7 @@ export async function findUserListMediaCandidates(
   const conditions = [
     eq(list.userId, userId),
     isNull(list.deletedAt),
+    isNull(listItem.deletedAt),
     or(eq(list.type, "watchlist"), eq(list.type, "custom")),
   ];
   if (mediaType) conditions.push(eq(media.type, mediaType));

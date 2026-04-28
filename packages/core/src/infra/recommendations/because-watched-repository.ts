@@ -109,6 +109,7 @@ export async function findBecauseWatchedRecs(
             AND l.user_id = ${userId}
             AND l.deleted_at IS NULL
             AND l.type != 'server'
+            AND li.deleted_at IS NULL
         )
         AND NOT EXISTS (
           SELECT 1 FROM user_media_state ums
