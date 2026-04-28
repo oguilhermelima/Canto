@@ -83,7 +83,7 @@ export function ScanningState({
         </div>
       )}
 
-      <p className="text-[11px] text-muted-foreground/70">
+      <p className="text-[11px] text-muted-foreground">
         First contact may take a few seconds.
       </p>
     </div>
@@ -130,7 +130,7 @@ function IndexerChip({
       >
         <span className="h-1.5 w-1.5 rounded-full bg-primary" />
         {indexer.name}
-        <span className="text-primary/70">
+        <span className="text-primary">
           {indexer.count} · {seconds}s
         </span>
       </span>
@@ -145,7 +145,7 @@ function IndexerChip({
       >
         <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
         {indexer.name}
-        <span className="text-destructive/70">failed</span>
+        <span className="text-destructive">failed</span>
       </span>
     );
   }
@@ -154,7 +154,7 @@ function IndexerChip({
     <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/40 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-muted-foreground/50" />
       {indexer.name}
-      <span className="text-muted-foreground/70">scanning…</span>
+      <span className="text-muted-foreground">scanning…</span>
     </span>
   );
 }
