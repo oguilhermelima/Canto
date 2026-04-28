@@ -15,7 +15,12 @@ import { handleSeedManagement } from "./jobs/seed-management";
 import { handleFolderScan } from "./jobs/folder-scan";
 import { handleValidateDownloads } from "./jobs/validate-downloads";
 import { handleRepackSupersede } from "./jobs/repack-supersede";
-import { handleTraktSync, handleTraktSyncUser } from "./jobs/trakt-sync";
+import {
+  handleTraktSync,
+  handleTraktSyncUser,
+  handleTraktSyncSection,
+} from "./jobs/trakt-sync";
+import type { RunSectionInput } from "@canto/core/domain/trakt/run-section";
 import { handleTraktListDelete, handleTraktListDeleteSweep } from "./jobs/trakt-list-delete";
 import { refreshExtras } from "@canto/core/domain/content-enrichment/use-cases/refresh-extras";
 import { replaceShowWithTvdb } from "@canto/core/domain/media/use-cases/replace-show-with-tvdb";
@@ -53,6 +58,7 @@ const queues = {
   reverseSyncUser: new Queue(QUEUES.reverseSyncUser, { connection: redisConnection }),
   traktSync: new Queue(QUEUES.traktSync, { connection: redisConnection }),
   traktSyncUser: new Queue(QUEUES.traktSyncUser, { connection: redisConnection }),
+  traktSyncSection: new Queue(QUEUES.traktSyncSection, { connection: redisConnection }),
   traktListDelete: new Queue(QUEUES.traktListDelete, { connection: redisConnection }),
   traktListDeleteSweep: new Queue(QUEUES.traktListDeleteSweep, { connection: redisConnection }),
   stallDetection: new Queue(QUEUES.stallDetection, { connection: redisConnection }),
@@ -208,6 +214,21 @@ const workers = [
       await handleTraktSyncUser(userId);
     },
     { concurrency: 2 },
+  ),
+
+  // Per-section worker. Concurrency sits at 4 so a heavy backfill (eight
+  // sections × multiple connections) doesn't bottleneck on one slot, while
+  // still leaving headroom for the rest of the worker pool.
+  makeWorker<RunSectionInput>(
+    QUEUES.traktSyncSection,
+    async (input, log) => {
+      if (!input?.connectionId || !input?.section) {
+        log.warn("missing connectionId/section, skipping");
+        return;
+      }
+      await handleTraktSyncSection(input);
+    },
+    { concurrency: 4 },
   ),
 
   makeWorker<{ localListId: string }>(

@@ -97,16 +97,63 @@ export async function findTraktSyncStateByConnection(
   });
 }
 
+export type TraktSection =
+  | "watched-movies"
+  | "watched-shows"
+  | "history"
+  | "watchlist"
+  | "ratings"
+  | "favorites"
+  | "lists"
+  | "playback";
+
+/** Map a section identifier to its watermark column name on `traktSyncState`. */
+const SECTION_TO_WATERMARK: Record<
+  TraktSection,
+  | "watchedMoviesAt"
+  | "watchedShowsAt"
+  | "historyAt"
+  | "watchlistAt"
+  | "ratingsAt"
+  | "favoritesAt"
+  | "listsAt"
+  | "playbackAt"
+> = {
+  "watched-movies": "watchedMoviesAt",
+  "watched-shows": "watchedShowsAt",
+  history: "historyAt",
+  watchlist: "watchlistAt",
+  ratings: "ratingsAt",
+  favorites: "favoritesAt",
+  lists: "listsAt",
+  playback: "playbackAt",
+};
+
+interface TraktSyncStatePatch {
+  lastPulledAt?: Date | null;
+  lastPushedAt?: Date | null;
+  lastActivityAt?: Date | null;
+  watchedMoviesAt?: Date | null;
+  watchedShowsAt?: Date | null;
+  historyAt?: Date | null;
+  watchlistAt?: Date | null;
+  ratingsAt?: Date | null;
+  favoritesAt?: Date | null;
+  listsAt?: Date | null;
+  playbackAt?: Date | null;
+}
+
 export async function upsertTraktSyncState(
   db: Database,
   userConnectionId: string,
-  patch: {
-    lastPulledAt?: Date | null;
-    lastPushedAt?: Date | null;
-    lastActivityAt?: Date | null;
-  },
+  patch: TraktSyncStatePatch,
 ) {
   const now = new Date();
+  const setClause: Record<string, unknown> = { updatedAt: now };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v !== undefined) setClause[k] = v;
+  }
+
   const [row] = await db
     .insert(traktSyncState)
     .values({
@@ -114,26 +161,39 @@ export async function upsertTraktSyncState(
       lastPulledAt: patch.lastPulledAt ?? null,
       lastPushedAt: patch.lastPushedAt ?? null,
       lastActivityAt: patch.lastActivityAt ?? now,
+      watchedMoviesAt: patch.watchedMoviesAt ?? null,
+      watchedShowsAt: patch.watchedShowsAt ?? null,
+      historyAt: patch.historyAt ?? null,
+      watchlistAt: patch.watchlistAt ?? null,
+      ratingsAt: patch.ratingsAt ?? null,
+      favoritesAt: patch.favoritesAt ?? null,
+      listsAt: patch.listsAt ?? null,
+      playbackAt: patch.playbackAt ?? null,
       updatedAt: now,
     })
     .onConflictDoUpdate({
       target: traktSyncState.userConnectionId,
-      set: {
-        ...(patch.lastPulledAt !== undefined
-          ? { lastPulledAt: patch.lastPulledAt }
-          : {}),
-        ...(patch.lastPushedAt !== undefined
-          ? { lastPushedAt: patch.lastPushedAt }
-          : {}),
-        ...(patch.lastActivityAt !== undefined
-          ? { lastActivityAt: patch.lastActivityAt }
-          : {}),
-        updatedAt: now,
-      },
+      set: setClause,
     })
     .returning();
 
   return row!;
+}
+
+/** Atomic update of a single section's watermark — called by the section
+ *  worker after a successful pull. We deliberately skip the watermark write
+ *  on failure so the next coordinator run replays the section from the same
+ *  starting point. */
+export async function setTraktSectionWatermark(
+  db: Database,
+  userConnectionId: string,
+  section: TraktSection,
+  remoteAt: Date,
+): Promise<void> {
+  const column = SECTION_TO_WATERMARK[section];
+  await upsertTraktSyncState(db, userConnectionId, {
+    [column]: remoteAt,
+  } as TraktSyncStatePatch);
 }
 
 export async function findTraktHistorySyncByRemoteId(

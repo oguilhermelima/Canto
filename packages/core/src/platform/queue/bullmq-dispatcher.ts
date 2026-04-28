@@ -2,6 +2,7 @@ import { Queue } from "bullmq";
 import { QUEUES, type QueueName } from "./queue-names";
 import { getRedisConnection } from "./redis-config";
 import type { EnsureMediaSpec } from "../../domain/media/use-cases/ensure-media.types";
+import type { TraktSection } from "../../infra/trakt/trakt-sync-repository";
 
 const REMOVE_ON_FAIL = 50;
 
@@ -21,6 +22,7 @@ const getJellyfinSyncQueue = createQueueGetter(QUEUES.jellyfinSync);
 const getPlexSyncQueue = createQueueGetter(QUEUES.plexSync);
 const getReverseSyncUserQueue = createQueueGetter(QUEUES.reverseSyncUser);
 const getTraktSyncUserQueue = createQueueGetter(QUEUES.traktSyncUser);
+const getTraktSyncSectionQueue = createQueueGetter(QUEUES.traktSyncSection);
 const getTraktListDeleteQueue = createQueueGetter(QUEUES.traktListDelete);
 const getFolderScanQueue = createQueueGetter(QUEUES.folderScan);
 const getMediaPipelineQueue = createQueueGetter(QUEUES.mediaPipeline);
@@ -105,6 +107,47 @@ export async function dispatchUserReverseSync(userId: string): Promise<boolean> 
 export async function dispatchUserTraktSync(userId: string): Promise<boolean> {
   const q = await getTraktSyncUserQueue();
   return dispatchUniqueJob(q, `trakt-sync-user-${userId}`, { userId });
+}
+
+export interface TraktSyncSectionJob {
+  connectionId: string;
+  section: TraktSection;
+  /** Remote `last_activities` timestamp at probe time. The section job sets
+   *  this as the new watermark on successful completion. `null` is allowed
+   *  for force-refresh paths where we don't have a probe to compare against. */
+  remoteAtIso: string | null;
+}
+
+/**
+ * Dispatch a single Trakt section job (pull + push for one surface).
+ *
+ * Dedupes via `jobId={connectionId}-{section}` — if the same section is
+ * already waiting/active for a connection, we collapse to one. We always
+ * preserve the latest `remoteAtIso` so the watermark advances to the most
+ * recently observed value when the job finally runs.
+ */
+export async function dispatchTraktSyncSection(
+  connectionId: string,
+  section: TraktSection,
+  remoteAtIso: string | null,
+): Promise<void> {
+  const q = await getTraktSyncSectionQueue();
+  const jobId = `trakt-sync-section-${connectionId}-${section}`;
+  const data: TraktSyncSectionJob = { connectionId, section, remoteAtIso };
+  const existing = await q.getJob(jobId);
+  if (existing) {
+    const state = await existing.getState();
+    if (state === "waiting" || state === "delayed" || state === "active") {
+      await existing.updateData(data);
+      return;
+    }
+    await existing.remove().catch(() => {});
+  }
+  await q.add(QUEUES.traktSyncSection, data, {
+    jobId,
+    removeOnComplete: true,
+    removeOnFail: REMOVE_ON_FAIL,
+  });
 }
 
 /**

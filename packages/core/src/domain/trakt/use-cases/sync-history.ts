@@ -21,8 +21,27 @@ import {
   type SyncContext,
 } from "./shared";
 
-export async function pullHistory(ctx: SyncContext): Promise<void> {
-  const remoteRows = await listTraktHistory(ctx.accessToken, ctx.profileId);
+/**
+ * Pull Trakt history events into `user_watch_history`.
+ *
+ * `startAt`, when provided, is forwarded as Trakt's `start_at` query param so
+ * we only walk events newer than the coordinator's last successful watermark.
+ * The first ever pull (or a forced backfill) passes `undefined` and gets the
+ * full history.
+ *
+ * The per-row `findTraktHistorySyncByRemoteIds` check stays in place because
+ * Trakt's `start_at` is inclusive and the watermark itself is replayed on the
+ * next run — without the dedup guard we'd double-insert events at the boundary.
+ */
+export async function pullHistory(
+  ctx: SyncContext,
+  startAt?: string,
+): Promise<void> {
+  const remoteRows = await listTraktHistory(
+    ctx.accessToken,
+    ctx.profileId,
+    startAt,
+  );
   if (remoteRows.length === 0) return;
 
   const existingSyncRows = await findTraktHistorySyncByRemoteIds(
@@ -41,59 +60,70 @@ export async function pullHistory(ctx: SyncContext): Promise<void> {
   for (const remote of remoteRows) {
     if (syncedRemoteIds.has(remote.remoteHistoryId)) continue;
 
-    const mediaId = await resolveMediaFromTraktRef(
-      ctx.db,
-      remote,
-      resolveCache,
-    );
-    if (!mediaId) continue;
-
-    let episodeId: string | null = null;
-    if (
-      remote.type === "show" &&
-      typeof remote.seasonNumber === "number" &&
-      typeof remote.episodeNumber === "number"
-    ) {
-      episodeId = await findEpisodeIdByMediaAndNumbers(
+    // Per-row try/catch keeps a single bad item — flaky TMDB persist, episode
+    // resolution miss, transient DB error — from killing the whole pull. The
+    // section job's BullMQ retry handles "everything is on fire"; this guard
+    // handles "one out of 5000 rows is bad".
+    try {
+      const mediaId = await resolveMediaFromTraktRef(
         ctx.db,
-        mediaId,
-        remote.seasonNumber,
-        remote.episodeNumber,
+        remote,
+        resolveCache,
+      );
+      if (!mediaId) continue;
+
+      let episodeId: string | null = null;
+      if (
+        remote.type === "show" &&
+        typeof remote.seasonNumber === "number" &&
+        typeof remote.episodeNumber === "number"
+      ) {
+        episodeId = await findEpisodeIdByMediaAndNumbers(
+          ctx.db,
+          mediaId,
+          remote.seasonNumber,
+          remote.episodeNumber,
+        );
+      }
+
+      const watchedAt = parseDateOrNow(remote.watchedAt, ctx.now);
+      const existingLocal = await ctx.db.query.userWatchHistory.findFirst({
+        where: and(
+          eq(userWatchHistory.userId, ctx.userId),
+          eq(userWatchHistory.mediaId, mediaId),
+          episodeId
+            ? eq(userWatchHistory.episodeId, episodeId)
+            : isNull(userWatchHistory.episodeId),
+          eq(userWatchHistory.watchedAt, watchedAt),
+          isNull(userWatchHistory.deletedAt),
+        ),
+      });
+
+      let localId = existingLocal?.id;
+      if (!localId) {
+        const inserted = await addUserWatchHistory(ctx.db, {
+          userId: ctx.userId,
+          mediaId,
+          episodeId: episodeId ?? null,
+          watchedAt,
+          source: "trakt",
+        });
+        if (!inserted?.id) continue;
+        localId = inserted.id;
+      }
+
+      await createTraktHistorySync(ctx.db, {
+        userConnectionId: ctx.connectionId,
+        localHistoryId: localId,
+        remoteHistoryId: remote.remoteHistoryId,
+        syncedDirection: "pull",
+      });
+    } catch (err) {
+      console.warn(
+        `[trakt-sync] pullHistory: skipped remote=${remote.remoteHistoryId}:`,
+        err instanceof Error ? err.message : err,
       );
     }
-
-    const watchedAt = parseDateOrNow(remote.watchedAt, ctx.now);
-    const existingLocal = await ctx.db.query.userWatchHistory.findFirst({
-      where: and(
-        eq(userWatchHistory.userId, ctx.userId),
-        eq(userWatchHistory.mediaId, mediaId),
-        episodeId
-          ? eq(userWatchHistory.episodeId, episodeId)
-          : isNull(userWatchHistory.episodeId),
-        eq(userWatchHistory.watchedAt, watchedAt),
-        isNull(userWatchHistory.deletedAt),
-      ),
-    });
-
-    let localId = existingLocal?.id;
-    if (!localId) {
-      const inserted = await addUserWatchHistory(ctx.db, {
-        userId: ctx.userId,
-        mediaId,
-        episodeId: episodeId ?? null,
-        watchedAt,
-        source: "trakt",
-      });
-      if (!inserted?.id) continue;
-      localId = inserted.id;
-    }
-
-    await createTraktHistorySync(ctx.db, {
-      userConnectionId: ctx.connectionId,
-      localHistoryId: localId,
-      remoteHistoryId: remote.remoteHistoryId,
-      syncedDirection: "pull",
-    });
   }
 }
 

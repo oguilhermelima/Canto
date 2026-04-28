@@ -6,6 +6,7 @@ import {
   dispatchTranslateEpisodes,
   dispatchRebuildUserRecs,
   dispatchRefreshAllLanguage,
+  dispatchTraktSyncSection,
 } from "./bullmq-dispatcher";
 
 export const jobDispatcher: JobDispatcherPort = {
@@ -15,4 +16,5 @@ export const jobDispatcher: JobDispatcherPort = {
   translateEpisodes: dispatchTranslateEpisodes,
   rebuildUserRecs: dispatchRebuildUserRecs,
   refreshAllLanguage: dispatchRefreshAllLanguage,
+  traktSyncSection: dispatchTraktSyncSection,
 };
