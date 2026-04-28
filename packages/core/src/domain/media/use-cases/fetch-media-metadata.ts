@@ -77,6 +77,11 @@ export async function fetchMediaMetadata(
       try {
         const tvdbData = await deps.tvdb.getMetadata(resolvedTvdbId, "show");
         tvdbSeasons = tvdbData.seasons;
+        // TMDB doesn't expose a daily airing slot — pull it from TVDB so
+        // upcoming episodes can render real times instead of midnight UTC.
+        if (tvdbData.airsTime && !media.airsTime) {
+          media.airsTime = tvdbData.airsTime;
+        }
       } catch (err) {
         tvdbFailed = true;
         console.warn(`[fetchMediaMetadata] TVDB structure failed for "${media.title}" (tvdbId=${resolvedTvdbId}):`, err instanceof Error ? err.message : err);
