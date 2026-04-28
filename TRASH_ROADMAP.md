@@ -12,8 +12,11 @@ schema changes, and decision points.
 > god-file decomposition (`torrent-results`, `download-profiles-section`,
 > `download-folders`), worker handler extraction to a core use-case,
 > `prepareSearch` parallelization, `download_config` singleton
-> constraint, and `download.releaseGroup` snapshot. The only Phase 6a
-> piece left is the user-facing notification, captured in
+> constraint, and `download.releaseGroup` snapshot. A third pass closed
+> the search-intent gap (Full show was bleeding episode releases into
+> the modal) and replaced the vestigial Prev/Next pagination with
+> infinite scroll + a sub-tracker counter in the footer. The only
+> Phase 6a piece left is the user-facing notification, captured in
 > `notification.md` for the future notification subsystem to absorb.
 > See `DOWNLOAD_BACKLOG.md` for the line-by-line snapshot.**
 
@@ -76,6 +79,20 @@ in the supersede gate). All landed in this pass.
 | Download modal `useEffect` reset replaced with `onOpenChange` handler (eslint-disable removed) | ✅ shipped | `f615bdec` |
 | `download_config` singleton sentinel + unique index + `CHECK` constraint; `download.releaseGroup` snapshotted at insert time. Migrations `0028_round_eternals.sql`, `0029_thankful_mysterio.sql`. | ✅ shipped | `5e30d33f` |
 | `autoSupersedeWithRepack` reads `download.releaseGroup` directly with parser fallback for legacy rows; `createDownload` writes the column | ✅ shipped | `f26546e8` |
+
+## Search-intent + infinite-scroll pass (2026-04-28)
+
+Bug-driven follow-up. Selecting "Full show" in the download modal was
+returning single-episode releases mixed with season packs because
+indexers don't know the user's bucket — and the per-indexer streaming
+UI inherited a Prev/Next pagination footer that was vestigial after
+streaming landed (the hook hardcoded `page: 0` so Next never fetched
+more). Both fixed in this pass.
+
+| Workstream | Status | Commit |
+|------------|--------|--------|
+| `matchesSearchIntent` rejects releases whose S/E tokens contradict the user's pick (full show / season / episodes); applied in `scoreRawResults` after parser, skipped for movies and custom queries. 17 unit tests in `parsing-episodes.test.ts`. | ✅ shipped | `c4952839` |
+| Hook fan-out widened to `(indexer × pageCount)`; `loadMore` triggered by an IntersectionObserver sentinel with 200px rootMargin; Prev/Next footer replaced by `X results · N trackers` (distinct sub-tracker count) + "Sweeping deeper…" indicator while the next page resolves. Modal header collapsed to a single centered row, `mediaTitle` now leads in both steps with a graceful fallback when empty. | ✅ shipped | `7372ab9e` |
 
 ## TL;DR
 

@@ -10,10 +10,11 @@ Scoring lives in:
 - `packages/core/src/domain/shared/rules/scoring-rules.ts` — `ScoringRules` + `AdminDownloadPolicy` + `DownloadPreferences` shapes, overlay helpers, and `composeDownloadRules` (admin policy + user prefs)
 - `packages/core/src/domain/shared/rules/media-flavor.ts` — flavor heuristic
 - `packages/core/src/domain/torrents/rules/parsing-release.ts` — detection helpers
+- `packages/core/src/domain/torrents/rules/parsing-episodes.ts` — `parseSeasons`/`parseEpisodes` + `matchesSearchIntent` (rejects releases whose S/E tokens contradict the user's pick)
 - `packages/core/src/domain/torrents/rules/release-attributes.ts` — parser composer
 - `packages/core/src/domain/torrents/rules/release-groups.ts` — classification (lookup tables hydrated from DB)
 - `packages/core/src/domain/torrents/rules/download-profile.ts` — profile model + cutoff helpers
-- `packages/core/src/domain/torrents/use-cases/search-torrents.ts` — orchestration (`prepareSearch` runs lookups/media/blocklist in parallel)
+- `packages/core/src/domain/torrents/use-cases/search-torrents.ts` — orchestration (`prepareSearch` runs lookups/media/blocklist in parallel; derives a show-shaped `intent` so `scoreRawResults` can drop wrong-bucket releases)
 - `packages/core/src/domain/torrents/use-cases/auto-supersede.ts` — strict gate around `replaceTorrent`, reads `download.releaseGroup` snapshot
 - `packages/core/src/domain/torrents/use-cases/run-repack-supersede.ts` — repack scan orchestrator (called from the worker)
 - `packages/core/src/infra/torrents/download-config-repository.ts` — reads `download_config` + `download_release_group`
@@ -22,7 +23,7 @@ Scoring lives in:
 - `packages/db/src/seed-download-defaults.ts` — canonical default rules + tier lists, idempotent boot seed
 
 UI lives in:
-- `apps/web/src/components/media/download/` — download modal shell + extracted siblings (`torrent-results.tsx` orchestrator, `torrent-card.tsx` memo'd, `filter-toolbar*` mobile/desktop variants, `scanning-state.tsx`, `confidence-chip.tsx`)
+- `apps/web/src/components/media/download/` — download modal shell + extracted siblings (`torrent-results.tsx` orchestrator with infinite-scroll sentinel, `use-torrent-search-stream.ts` fan-out hook with `pageCount`/`loadMore`, `torrent-card.tsx` memo'd, `filter-toolbar*` mobile/desktop variants, `scanning-state.tsx`, `confidence-chip.tsx`)
 - `apps/web/src/app/(app)/manage/_components/download-profiles-section.tsx` — profile list shell + extracted siblings (`download-profile-editor.tsx`, `download-profile-flavor-group.tsx` memo'd, `download-profile-row.tsx`, `download-profile-formats-field.tsx`, `download-profile-defaults.ts`)
 - `apps/web/src/app/(app)/manage/_components/download-preferences-section.tsx` — Personal preferences (per-user) + Server policy (admin-only)
 - `apps/web/src/components/settings/download-folders.tsx` — per-folder profile selector + folder routing rules editor (decomposed into `_folders/`)
@@ -33,6 +34,7 @@ Worker:
 
 Tests:
 - `packages/core/src/domain/shared/rules/__tests__/scoring.test.ts` — frozen real-world corpus snapshot
+- `packages/core/src/domain/torrents/rules/__tests__/parsing-episodes.test.ts` — `matchesSearchIntent` cohort (full show / specific season / specific episodes) with multi-episode and full-series pack edge cases
 
 ---
 
@@ -102,10 +104,19 @@ Tests:
 - [x] Indexers expose `id` + `name` for chip rendering
 - [x] Backend split: `searchTorrents` (batch), `searchOnIndexer` (single), shared `prepareSearch` + `runOneIndexer` + `scoreRawResults` helpers
 - [x] tRPC `torrent.listIndexers` + `torrent.searchOnIndexer`
-- [x] Client `useTorrentSearchStream` hook fans out via `useQueries`
+- [x] Client `useTorrentSearchStream` hook fans out `(indexer × pageCount)` via `useQueries`
 - [x] Scanning state shows per-indexer chips (pending / success+count+ms / error)
 - [x] Results render as soon as the first indexer responds; slow indexers never block fast ones
 - [x] Cross-indexer dedup uses the magnet info-hash, not the title — same release on two trackers collapses without flicker
+- [x] Infinite scroll: IntersectionObserver sentinel triggers `loadMore` when the bottom of the list approaches; prior Prev/Next pagination removed (was vestigial after streaming landed — `page` was hardcoded to 0)
+- [x] Footer shows `X results · N trackers` (distinct sub-tracker count from result rows) — local indexer count was always `1/1` since Prowlarr is the only one and meant nothing
+
+### Search intent filter
+- [x] `matchesSearchIntent` rejects releases whose season/episode tokens contradict the user's pick (Full show / specific season / specific episodes). Mirrors Sonarr's "wrong-bucket" rule. Skipped for movies and custom queries. 17 unit tests in `parsing-episodes.test.ts`.
+
+### Download modal header
+- [x] Single-row `flex h-14 items-center` header (was a 2-row title+description block whose vertical centering drifted against the icon buttons)
+- [x] Title leads with media name; falls back to plain `Download` when `mediaTitle` is empty so the dash never dangles. `DialogDescription` moved to `sr-only` for a11y.
 
 ### Phase 6a — Repack auto-supersede
 - [x] `download.repackCount` persisted at download time
