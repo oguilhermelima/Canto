@@ -1,31 +1,34 @@
 # Download flow — TRaSH alignment status
 
 Snapshot of what's shipped, what's parked, and where in the codebase
-each piece lives. Refreshed after the DB-driven config + entity rename
-+ Phase 6a closeout.
+each piece lives. Refreshed after the handbook conformance pass
+(god-file decomposition, worker handler extraction, db schema
+hardening).
 
 Scoring lives in:
 - `packages/core/src/domain/shared/rules/scoring.ts` — `calculateConfidence` / `explainConfidence` engine
-- `packages/core/src/domain/shared/rules/scoring-rules.ts` — `ScoringRules` + `AdminDownloadPolicy` + `DownloadPreferences` shapes and overlays
+- `packages/core/src/domain/shared/rules/scoring-rules.ts` — `ScoringRules` + `AdminDownloadPolicy` + `DownloadPreferences` shapes, overlay helpers, and `composeDownloadRules` (admin policy + user prefs)
 - `packages/core/src/domain/shared/rules/media-flavor.ts` — flavor heuristic
 - `packages/core/src/domain/torrents/rules/parsing-release.ts` — detection helpers
 - `packages/core/src/domain/torrents/rules/release-attributes.ts` — parser composer
 - `packages/core/src/domain/torrents/rules/release-groups.ts` — classification (lookup tables hydrated from DB)
 - `packages/core/src/domain/torrents/rules/download-profile.ts` — profile model + cutoff helpers
-- `packages/core/src/domain/torrents/use-cases/search-torrents.ts` — orchestration
-- `packages/core/src/domain/torrents/use-cases/auto-supersede.ts` — strict gate around `replaceTorrent`
+- `packages/core/src/domain/torrents/use-cases/search-torrents.ts` — orchestration (`prepareSearch` runs lookups/media/blocklist in parallel)
+- `packages/core/src/domain/torrents/use-cases/auto-supersede.ts` — strict gate around `replaceTorrent`, reads `download.releaseGroup` snapshot
+- `packages/core/src/domain/torrents/use-cases/run-repack-supersede.ts` — repack scan orchestrator (called from the worker)
 - `packages/core/src/infra/torrents/download-config-repository.ts` — reads `download_config` + `download_release_group`
 - `packages/core/src/infra/torrents/download-profile-repository.ts` — reads `download_profile`
+- `packages/core/src/infra/torrents/download-repository.ts` — bare-fn helpers including `findRecentImportedDownloads`
 - `packages/db/src/seed-download-defaults.ts` — canonical default rules + tier lists, idempotent boot seed
 
 UI lives in:
-- `apps/web/src/components/media/download/*` — download modal flow (confidence chip with hover breakdown)
-- `apps/web/src/app/(app)/manage/_components/download-profiles-section.tsx` — profile editor
+- `apps/web/src/components/media/download/` — download modal shell + extracted siblings (`torrent-results.tsx` orchestrator, `torrent-card.tsx` memo'd, `filter-toolbar*` mobile/desktop variants, `scanning-state.tsx`, `confidence-chip.tsx`)
+- `apps/web/src/app/(app)/manage/_components/download-profiles-section.tsx` — profile list shell + extracted siblings (`download-profile-editor.tsx`, `download-profile-flavor-group.tsx` memo'd, `download-profile-row.tsx`, `download-profile-formats-field.tsx`, `download-profile-defaults.ts`)
 - `apps/web/src/app/(app)/manage/_components/download-preferences-section.tsx` — Personal preferences (per-user) + Server policy (admin-only)
-- `apps/web/src/components/settings/download-folders.tsx` — per-folder profile selector
+- `apps/web/src/components/settings/download-folders.tsx` — per-folder profile selector + folder routing rules editor (decomposed into `_folders/`)
 
 Worker:
-- `apps/worker/src/jobs/repack-supersede.ts` — every 6h, 14-day lookback, 50 downloads per run
+- `apps/worker/src/jobs/repack-supersede.ts` — thin handler delegating to `runRepackSupersede`, logs via the injected `JobLogger`. Scheduled every 6h with a 14-day lookback and 50-download cap.
 - `apps/worker/src/index.ts` calls `seedDownloadDefaults(db)` alongside `seedLanguages` at boot
 
 Tests:
@@ -106,8 +109,10 @@ Tests:
 
 ### Phase 6a — Repack auto-supersede
 - [x] `download.repackCount` persisted at download time
+- [x] `download.releaseGroup` snapshotted at download time (migration `0029_thankful_mysterio.sql`); `autoSupersedeWithRepack` reads the column directly with a parser fallback for pre-migration rows
 - [x] `autoSupersedeWithRepack` gate: same group + same quality/source + strictly higher repackCount, with profile check that allows equivalent verdicts and blocks downgrades / out-of-profile combos
 - [x] BullMQ scheduled job (`repackSupersede`, every 6h, 14-day lookback, 50 downloads per run, log line aggregating skip reasons)
+- [x] Worker handler delegates to `runRepackSupersede` core use-case; logs via injected `JobLogger`, no inline DB queries
 - [x] Wired into worker boot
 
 ### Score explainability
@@ -122,6 +127,17 @@ Tests:
 ### Naming consolidation
 - [x] `qualityProfile` → `downloadProfile` everywhere (table, FK columns, repo, tRPC, UI). Migration `0026_mighty_killmonger.sql`.
 - [x] `torrent` → `download` (table, mediaFile FK, repository functions, types). qBit-side adapter and `searchTorrents` deliberately keep their original names. Migration `0027_superb_the_hunter.sql`.
+
+### Handbook conformance pass
+- [x] Worker `handleRepackSupersede` extracted to core `runRepackSupersede` (109 LoC handler → ~45 LoC wiring + JobLogger; new `findRecentImportedDownloads` repository helper)
+- [x] `composeRules` helper at the top of `torrent/search.ts` moved to core as `composeDownloadRules` in `scoring-rules.ts` (router stays pure orchestration)
+- [x] `prepareSearch` runs `findReleaseGroupLookups`, `findMediaById`, `findBlocklistByMediaId` in parallel (Promise.all) — collapses three round-trips into one
+- [x] `download_config` singleton constraint: sentinel column + unique index + `CHECK (singleton = true)` so a stray second config row is impossible. Migration `0028_round_eternals.sql`.
+- [x] `useEffect` reset on the download modal replaced with `onOpenChange` handler (eslint-disable removed)
+- [x] `apps/web/src/components/media/download/torrent-results.tsx` decomposed (881 → 193 LoC orchestrator) into `torrent-card.tsx` (memo'd), `filter-toolbar.tsx` + mobile/desktop variants, `scanning-state.tsx`, `confidence-chip.tsx`
+- [x] Empty/error states under `StateMessage` + `SPACE_STATES` (`emptySearch`, `errorSearch`)
+- [x] `apps/web/src/app/(app)/manage/_components/download-profiles-section.tsx` decomposed (740 → 185 LoC) into `download-profile-editor.tsx` (key-based reset replacing the `useEffect` state sync), `download-profile-flavor-group.tsx` (memo'd), `download-profile-row.tsx`, `download-profile-formats-field.tsx`, `download-profile-defaults.ts`
+- [x] `apps/web/src/components/settings/download-folders.tsx` decomposed (2,571 → 198 LoC) with 14 siblings under `_folders/` (DSL helpers in `folder-routing-rules-ui.ts`, condition editor, rule card, rules editor, qbit-import dialog, scan dialog, etc.). Public `DownloadFolders` API preserved.
 
 ---
 

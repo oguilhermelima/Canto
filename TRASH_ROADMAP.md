@@ -7,8 +7,13 @@ schema changes, and decision points.
 > **Status (2026-04-28): Phases 1–6 shipped end to end. The follow-up
 > hardening pass (DB-driven config, admin/user policy split, repack
 > auto-supersede full implementation, score explainability, regression
-> corpus, infohash dedup, naming consolidation) is also done. The only
-> Phase 6a piece left is the user-facing notification, captured in
+> corpus, infohash dedup, naming consolidation) is also done. A second
+> conformance pass against the project handbook landed afterward —
+> god-file decomposition (`torrent-results`, `download-profiles-section`,
+> `download-folders`), worker handler extraction to a core use-case,
+> `prepareSearch` parallelization, `download_config` singleton
+> constraint, and `download.releaseGroup` snapshot. The only Phase 6a
+> piece left is the user-facing notification, captured in
 > `notification.md` for the future notification subsystem to absorb.
 > See `DOWNLOAD_BACKLOG.md` for the line-by-line snapshot.**
 
@@ -50,6 +55,27 @@ fragile or hardcoded once the headline features were in.
 | Cross-indexer dedup uses magnet info-hash | ✅ shipped | `a10187e4` |
 | Regression corpus snapshot test | ✅ shipped | `cba4664b` |
 | Score explainability (`explainConfidence` + UI hover breakdown) | ✅ shipped | `b76eac14` |
+
+## Handbook conformance pass (2026-04-28)
+
+A separate review against `.claude/skills/handbook/{frontend,core,api,worker}.md`
+flagged a worker handler with inline DB queries, three frontend god
+files past the size budget, and a few smaller drifts (router-local
+helper, sequential DB queries, `useEffect` for non-data state, no
+singleton enforcement on `download_config`, `releaseGroup` re-parsed
+in the supersede gate). All landed in this pass.
+
+| Workstream | Status | Commit |
+|------------|--------|--------|
+| Worker `repack-supersede` handler extracted to `runRepackSupersede` core use-case (109 → 45 LoC, JobLogger injected) | ✅ shipped | `56e9b30f` |
+| `torrent-results.tsx` decomposed (881 → 193 LoC) — `torrent-card` (memo'd), `filter-toolbar` + variants, `scanning-state`, `confidence-chip`; empty/error under `StateMessage` + `SPACE_STATES` | ✅ shipped | `fe5c32a7` |
+| `download-profiles-section.tsx` decomposed (740 → 185 LoC) — editor, flavor-group (memo'd), row, formats-field, defaults; `useEffect` state sync replaced with key-based reset | ✅ shipped | `415ca270` |
+| `download-folders.tsx` decomposed (2,571 → 198 LoC) into 14 siblings under `_folders/` (DSL helpers, condition editor, rules editor, qbit-import dialog, …); public `DownloadFolders` API preserved | ✅ shipped | `ff8065d8` |
+| `composeRules` helper moved out of `torrent/search.ts` into core as `composeDownloadRules` | ✅ shipped | `2ec0db4e` |
+| `prepareSearch` parallelizes `findReleaseGroupLookups` + `findMediaById` + `findBlocklistByMediaId` via `Promise.all` | ✅ shipped | `280b0849` |
+| Download modal `useEffect` reset replaced with `onOpenChange` handler (eslint-disable removed) | ✅ shipped | `f615bdec` |
+| `download_config` singleton sentinel + unique index + `CHECK` constraint; `download.releaseGroup` snapshotted at insert time. Migrations `0028_round_eternals.sql`, `0029_thankful_mysterio.sql`. | ✅ shipped | `5e30d33f` |
+| `autoSupersedeWithRepack` reads `download.releaseGroup` directly with parser fallback for legacy rows; `createDownload` writes the column | ✅ shipped | `f26546e8` |
 
 ## TL;DR
 
