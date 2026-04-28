@@ -19,11 +19,34 @@ import {
   listTraktWatchedMovies,
   listTraktWatchedShows,
 } from "../../../infra/trakt/trakt.adapter";
+import { promoteUserMediaStateFromPlayback } from "../../user-media/use-cases/promote-user-media-state-from-playback";
 import {
   parseDateOrNow,
   resolveMediaFromTraktRef,
   type SyncContext,
 } from "./shared";
+
+/** Reverse-sync (Plex/Jellyfin) calls this after every per-item upsert; we
+ *  do the same here so the library "Completed" tab — which reads
+ *  `user_media_state.status`, not `user_playback_progress.is_completed` —
+ *  picks up Trakt-watched items. Failures are swallowed: a botched promotion
+ *  for one media must not block the rest of the pull. */
+async function promoteSafely(
+  ctx: SyncContext,
+  mediaId: string,
+): Promise<void> {
+  try {
+    await promoteUserMediaStateFromPlayback(ctx.db, {
+      userId: ctx.userId,
+      mediaId,
+    });
+  } catch (err) {
+    console.warn(
+      `[trakt-sync] promote state failed for media ${mediaId}:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
 
 export async function pullWatchedMovies(ctx: SyncContext): Promise<void> {
   const remoteRows = await listTraktWatchedMovies(ctx.accessToken);
@@ -52,6 +75,7 @@ export async function pullWatchedMovies(ctx: SyncContext): Promise<void> {
       lastWatchedAt: parseDateOrNow(remote.lastWatchedAt, ctx.now),
       source: "trakt",
     });
+    await promoteSafely(ctx, mediaId);
   }
 }
 
@@ -73,6 +97,7 @@ export async function pullWatchedShows(ctx: SyncContext): Promise<void> {
     // do NOT also write a movie-level (episodeId=null) row — that representation
     // is reserved for movies. Show-level "watched" in Canto is a roll-up of
     // its episode rows and is computed on read.
+    let touchedAny = false;
     for (const ep of remote.episodes) {
       const episodeId = await findEpisodeIdByMediaAndNumbers(
         ctx.db,
@@ -95,6 +120,11 @@ export async function pullWatchedShows(ctx: SyncContext): Promise<void> {
         lastWatchedAt: parseDateOrNow(ep.lastWatchedAt, ctx.now),
         source: "trakt",
       });
+      touchedAny = true;
     }
+
+    // Promote once per show, not per episode — the rule reads the entire
+    // playback set anyway, so per-episode promotions would do redundant work.
+    if (touchedAny) await promoteSafely(ctx, mediaId);
   }
 }
