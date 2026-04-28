@@ -4,6 +4,7 @@ import {
   moveListItems,
   removeListItem,
   removeListItems,
+  restoreListItems,
 } from "../../../infra/lists/list-repository";
 import { removeMediaFromUserRecs, deleteUserRecommendationsForSource } from "../../../infra/recommendations/user-recommendation-repository";
 import { dispatchMediaPipeline } from "../../../platform/queue/bullmq-dispatcher";
@@ -107,4 +108,23 @@ export async function moveItemsBetweenLists(
   await moveListItems(db, input.fromListId, input.toListId, input.mediaIds);
 
   return { success: true, count: input.mediaIds.length };
+}
+
+/**
+ * Un-tombstone soft-deleted rows. The user-facing escape hatch when a sync
+ * (or accidental click) wiped items they wanted. Restores `id`, `added_at`,
+ * `notes`, and `last_pushed_at`; the next sync will reconcile them with Trakt.
+ */
+export async function restoreItemsToList(
+  db: Database,
+  input: { listId: string; mediaIds: string[] },
+  userId: string,
+  userRole: string,
+) {
+  await verifyListOwnership(db, input.listId, userId, userRole, {
+    allowSystem: true,
+  });
+
+  const restored = await restoreListItems(db, input.listId, input.mediaIds);
+  return { success: true, count: restored };
 }

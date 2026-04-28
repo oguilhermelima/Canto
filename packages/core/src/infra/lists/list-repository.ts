@@ -5,6 +5,10 @@ import type { CollectionWatchStatus } from "@canto/validators";
 import type { RecsFilters } from "../../domain/recommendations/types/recs-filters";
 import { buildRecsFilterConditions, recsSortOrder } from "../recommendations/recs-filter-builder";
 
+/** Live row predicate: skip soft-deleted (tombstoned) rows. Centralised so
+ *  every read on `list_item` opts in consistently. */
+const isLiveListItem = isNull(listItem.deletedAt);
+
 /** Build a SQL condition for the multi-select collection watch-status filter.
  *  `none` → row missing or `status IS NULL`; the others map 1:1 to the DB. */
 function buildWatchStatusesCondition(
@@ -92,7 +96,7 @@ export async function findUserListsWithCounts(
       db
         .select({ listId: listItem.listId, count: count() })
         .from(listItem)
-        .where(inArray(listItem.listId, nonServerListIds))
+        .where(and(inArray(listItem.listId, nonServerListIds), isLiveListItem))
         .groupBy(listItem.listId),
       // Top-4-per-list via window function — pulls 4N rows total instead of all
       // list_item rows. The previous version fetched the full list and trimmed
@@ -110,6 +114,7 @@ export async function findUserListsWithCounts(
           LEFT JOIN media_translation mt
                  ON mt.media_id = m.id AND mt.language = ${userLang}
           WHERE li.list_id IN (${sql.join(nonServerListIds.map((id) => sql`${id}::uuid`), sql`, `)})
+            AND li.deleted_at IS NULL
         ) ranked
         WHERE rn <= 4
         ORDER BY list_id, rn
@@ -136,7 +141,7 @@ export async function findUserListsWithCounts(
         })
         .from(listItem)
         .innerJoin(userMediaLibrary, userServerJoin)
-        .where(inArray(listItem.listId, serverListIds))
+        .where(and(inArray(listItem.listId, serverListIds), isLiveListItem))
         .groupBy(listItem.listId),
       db.execute<{ list_id: string; poster_path: string | null }>(sql`
         SELECT list_id, poster_path FROM (
@@ -153,6 +158,7 @@ export async function findUserListsWithCounts(
           LEFT JOIN media_translation mt
                  ON mt.media_id = m.id AND mt.language = ${userLang}
           WHERE li.list_id IN (${sql.join(serverListIds.map((id) => sql`${id}::uuid`), sql`, `)})
+            AND li.deleted_at IS NULL
         ) ranked
         WHERE rn <= 4
         ORDER BY list_id, rn
@@ -452,6 +458,7 @@ export async function findListItems(
 
   const conditions: SQL[] = [
     eq(listItem.listId, listId),
+    isLiveListItem,
     ...buildRecsFilterConditions(filterOpts),
   ];
 
@@ -666,10 +673,26 @@ export async function addListItem(
   db: Database,
   data: typeof listItem.$inferInsert,
 ) {
+  // Resurrect a tombstoned row (same listId+mediaId) instead of creating a new
+  // one — it preserves the original `id`, `added_at`, and `notes`. This matters
+  // for users who removed-then-readded as well as for sync flows that bounce.
+  const [revived] = await db
+    .update(listItem)
+    .set({ deletedAt: null, deletedBy: null })
+    .where(
+      and(
+        eq(listItem.listId, data.listId),
+        eq(listItem.mediaId, data.mediaId),
+        sql`${listItem.deletedAt} IS NOT NULL`,
+      ),
+    )
+    .returning();
+  if (revived) return revived;
+
   const [maxRow] = await db
     .select({ maxPos: max(listItem.position) })
     .from(listItem)
-    .where(eq(listItem.listId, data.listId));
+    .where(and(eq(listItem.listId, data.listId), isLiveListItem));
   const nextPos = (maxRow?.maxPos ?? -1) + 1;
 
   const [row] = await db
@@ -700,33 +723,104 @@ export async function reorderListItems(
   });
 }
 
+export type ListItemActor = "user" | "trakt-sync" | "move";
+
+/**
+ * Soft-delete a single live row. Hard delete is forbidden — every removal
+ * must leave a tombstone so a buggy sync (or accidental click) can be undone
+ * via `restoreListItems`. Targets only `deleted_at IS NULL` so re-running the
+ * same call on an already-tombstoned row is a no-op.
+ */
 export async function removeListItem(
   db: Database,
   listId: string,
   mediaId: string,
+  actor: ListItemActor = "user",
 ) {
   await db
-    .delete(listItem)
-    .where(and(eq(listItem.listId, listId), eq(listItem.mediaId, mediaId)));
+    .update(listItem)
+    .set({ deletedAt: new Date(), deletedBy: actor })
+    .where(
+      and(
+        eq(listItem.listId, listId),
+        eq(listItem.mediaId, mediaId),
+        isNull(listItem.deletedAt),
+      ),
+    );
 }
 
 export async function removeListItems(
   db: Database,
   listId: string,
   mediaIds: string[],
+  actor: ListItemActor = "user",
 ): Promise<void> {
   if (mediaIds.length === 0) return;
   await db
-    .delete(listItem)
+    .update(listItem)
+    .set({ deletedAt: new Date(), deletedBy: actor })
     .where(
-      and(eq(listItem.listId, listId), inArray(listItem.mediaId, mediaIds)),
+      and(
+        eq(listItem.listId, listId),
+        inArray(listItem.mediaId, mediaIds),
+        isNull(listItem.deletedAt),
+      ),
     );
 }
 
 /**
- * Move items from one list to another within a single transaction.
- * Inserts into target with onConflictDoNothing (silent skip on duplicate),
- * then deletes from source. Positions append to the target list's tail.
+ * Restore tombstoned rows. Used by the user-facing undo + admin recovery.
+ * Returns the number of rows un-tombstoned. Skips rows that would collide
+ * with a live row in the same list (a re-add happened in the meantime).
+ *
+ * Only the most recent tombstone per (list, media) is revived — multiple
+ * tombstones can exist when the user removed/re-added/removed in sequence,
+ * and untombstoning all of them would violate the partial unique index.
+ */
+export async function restoreListItems(
+  db: Database,
+  listId: string,
+  mediaIds: string[],
+): Promise<number> {
+  if (mediaIds.length === 0) return 0;
+  const restored = await db.execute<{ id: string }>(sql`
+    WITH candidates AS (
+      SELECT DISTINCT ON (li.list_id, li.media_id) li.id
+      FROM ${listItem} li
+      WHERE li.list_id = ${listId}
+        AND li.media_id IN (${sql.join(mediaIds.map((id) => sql`${id}::uuid`), sql`, `)})
+        AND li.deleted_at IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM ${listItem} live
+          WHERE live.list_id = li.list_id
+            AND live.media_id = li.media_id
+            AND live.deleted_at IS NULL
+        )
+      ORDER BY li.list_id, li.media_id, li.deleted_at DESC
+    )
+    UPDATE ${listItem} target
+    SET deleted_at = NULL, deleted_by = NULL
+    FROM candidates
+    WHERE target.id = candidates.id
+    RETURNING target.id
+  `);
+  return restored.length;
+}
+
+/**
+ * Move items between lists by *re-pointing* the FK in a single UPDATE.
+ *
+ * The previous INSERT-into-target + DELETE-from-source path produced two
+ * problems: (1) the target row got a fresh `added_at = NOW()` so the row's
+ * history was lost, and (2) `onConflictDoNothing` kept the *target's* old
+ * row when the item already lived there, so the stale `added_at` could fall
+ * outside the sync's conflict window and the row would be silently deleted
+ * on the next pull.
+ *
+ * UPDATE-based move preserves `id`, `added_at`, `notes`, and `last_pushed_at`
+ * for the rows that have a clean target. The remaining source rows (those
+ * that collide with a live target row) are tombstoned with `deleted_by='move'`
+ * so the move still completes from the user's perspective.
  */
 export async function moveListItems(
   db: Database,
@@ -740,27 +834,74 @@ export async function moveListItems(
     const [maxRow] = await tx
       .select({ maxPos: max(listItem.position) })
       .from(listItem)
-      .where(eq(listItem.listId, toListId));
-    let nextPos = (maxRow?.maxPos ?? -1) + 1;
+      .where(
+        and(eq(listItem.listId, toListId), isNull(listItem.deletedAt)),
+      );
+    const nextPos = (maxRow?.maxPos ?? -1) + 1;
 
-    for (const mediaId of mediaIds) {
-      const [inserted] = await tx
-        .insert(listItem)
-        .values({ listId: toListId, mediaId, position: nextPos })
-        .onConflictDoNothing()
-        .returning({ id: listItem.id });
-      if (inserted) nextPos++;
-    }
+    // Re-point live source rows whose media has no live target row.
+    // We assign sequential positions from `nextPos` to keep the new
+    // arrivals appended to the target's tail in a deterministic order.
+    await tx.execute(sql`
+      WITH movable AS (
+        SELECT id,
+               row_number() OVER (ORDER BY position, added_at) - 1 AS offset
+        FROM ${listItem}
+        WHERE list_id = ${fromListId}
+          AND media_id IN (${sql.join(
+            mediaIds.map((id) => sql`${id}`),
+            sql`, `,
+          )})
+          AND deleted_at IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM ${listItem} live
+            WHERE live.list_id = ${toListId}
+              AND live.media_id = ${listItem}.media_id
+              AND live.deleted_at IS NULL
+          )
+      )
+      UPDATE ${listItem} li
+      SET list_id = ${toListId},
+          position = ${nextPos} + movable.offset
+      FROM movable
+      WHERE li.id = movable.id
+    `);
 
+    // The remainder either collide with a live target row (target wins —
+    // tombstone source so the user-visible "move" succeeds) or were already
+    // tombstoned (nothing to do).
     await tx
-      .delete(listItem)
+      .update(listItem)
+      .set({ deletedAt: new Date(), deletedBy: "move" })
       .where(
         and(
           eq(listItem.listId, fromListId),
           inArray(listItem.mediaId, mediaIds),
+          isNull(listItem.deletedAt),
         ),
       );
   });
+}
+
+/** Mark `last_pushed_at` after a successful Trakt push. Reconciliation uses
+ *  this as the positive signal that a row has been mirrored to the remote. */
+export async function markListItemsPushed(
+  db: Database,
+  listId: string,
+  mediaIds: string[],
+  pushedAt: Date,
+): Promise<void> {
+  if (mediaIds.length === 0) return;
+  await db
+    .update(listItem)
+    .set({ lastPushedAt: pushedAt })
+    .where(
+      and(
+        eq(listItem.listId, listId),
+        inArray(listItem.mediaId, mediaIds),
+        isNull(listItem.deletedAt),
+      ),
+    );
 }
 
 export interface MediaMembership {
@@ -798,6 +939,7 @@ export async function getMembershipForMedia(
         inArray(listItem.mediaId, mediaIds),
         eq(list.userId, userId),
         isNull(list.deletedAt),
+        isLiveListItem,
       ),
     );
 
@@ -839,6 +981,7 @@ export async function findMediaInLists(
       and(
         eq(listItem.mediaId, mediaId),
         isNull(list.deletedAt),
+        isLiveListItem,
         or(eq(list.userId, userId), eq(list.type, "server")),
       ),
     );
@@ -894,7 +1037,7 @@ export async function findUserCustomCollectionItems(
   const mediaIdRows = await db
     .selectDistinct({ mediaId: listItem.mediaId })
     .from(listItem)
-    .where(inArray(listItem.listId, scopedListIds));
+    .where(and(inArray(listItem.listId, scopedListIds), isLiveListItem));
   const mediaIds = mediaIdRows.map((r) => r.mediaId);
 
   if (mediaIds.length === 0) return { items: [], total: 0 };
