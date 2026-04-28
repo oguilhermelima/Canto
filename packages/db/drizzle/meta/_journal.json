@@ -218,6 +218,13 @@
       "when": 1777389779551,
       "tag": "0030_crazy_revanche",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1777407977155,
+      "tag": "0031_list_item_soft_delete",
+      "breakpoints": true
     }
   ]
 }

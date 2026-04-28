@@ -1127,10 +1127,23 @@ export const listItem = pgTable(
       .defaultNow(),
     position: integer("position").notNull().default(0),
     notes: text("notes"),
+    // Soft delete: tombstone replaces hard DELETE so a buggy sync can be reversed.
+    // `deletedBy` records the actor ('user', 'trakt-sync', 'move') for forensics.
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedBy: varchar("deleted_by", { length: 20 }),
+    // Positive sync signal: set after a successful Trakt push for this row.
+    // `reconcileListItem` uses it to distinguish "never synced" from "synced
+    // then remote-removed" so we don't delete locally on Trakt eventual-consistency.
+    lastPushedAt: timestamp("last_pushed_at", { withTimezone: true }),
   },
   (table) => [
-    uniqueIndex("idx_list_item_unique").on(table.listId, table.mediaId),
+    // Live row uniqueness — partial so a tombstoned row can coexist with a
+    // re-added live row of the same (list, media) pair.
+    uniqueIndex("idx_list_item_unique")
+      .on(table.listId, table.mediaId)
+      .where(sql`${table.deletedAt} IS NULL`),
     index("idx_list_item_media").on(table.mediaId),
+    index("idx_list_item_tombstone").on(table.listId, table.deletedAt),
   ],
 );
 
