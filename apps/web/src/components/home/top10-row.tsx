@@ -93,7 +93,7 @@ export function Top10Row({
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="flex gap-2 overflow-x-auto overflow-y-visible pt-2 pb-6 pl-4 [contain:paint] scrollbar-none md:gap-3 md:pt-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
+          className="flex gap-2 overflow-x-auto overflow-y-visible pb-4 pl-4 scrollbar-none md:gap-3 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
         >
           {isLoading && items.length === 0
             ? Array.from({ length: 10 }).map((_, i) => (

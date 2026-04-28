@@ -43,7 +43,7 @@ export default function AppLoading(): React.JSX.Element {
     <div className="min-h-screen">
       <SpotlightSkeleton />
 
-      <div className="mt-4 flex w-full flex-col gap-8 pb-12 md:mt-12 md:gap-12">
+      <div className="mt-4 flex w-full flex-col gap-12 pb-12 md:mt-12">
         <CarouselRowSkeleton count={8} card={<FeaturedCardSkeleton />} />
         <CarouselRowSkeleton
           count={6}

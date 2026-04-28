@@ -16,7 +16,7 @@ export function SectionTitleSkeleton({
   return (
     <div
       className={cn(
-        "flex items-center justify-between px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24",
+        "flex items-center justify-between pb-4 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24",
         className,
       )}
     >
@@ -66,7 +66,7 @@ export function CarouselRowSkeleton({
   return (
     <section className={className}>
       <SectionTitleSkeleton showSeeMore={showSeeMore} />
-      <div className="flex gap-6 overflow-hidden pt-2 pb-6 pl-4 md:pt-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+      <div className="flex gap-6 overflow-hidden pb-4 pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
         {Array.from({ length: count }).map((_, i) => (
           <div key={i} className="shrink-0">
             {card}

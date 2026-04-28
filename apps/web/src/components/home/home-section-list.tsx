@@ -77,7 +77,7 @@ export function HomeSectionList({
           {isLoading ? (
             <>
               <SpotlightSkeleton />
-              <div className="mt-4 flex flex-col gap-10 md:mt-12 md:gap-14">
+              <div className="mt-4 flex flex-col gap-12 md:mt-12">
                 <FeaturedCarouselSkeleton />
                 <BackdropCarouselSkeleton />
                 <PosterCarouselSkeleton />
@@ -92,7 +92,7 @@ export function HomeSectionList({
 
               {/* All other sections in a uniform-gap container */}
               <div className={cn(
-                "flex flex-col gap-10 md:gap-14",
+                "flex flex-col gap-12",
                 firstIsSpotlight ? "mt-4 md:mt-12" : "",
               )}>
                 {enabled.slice(firstIsSpotlight ? 1 : 0).map((section, i) => (

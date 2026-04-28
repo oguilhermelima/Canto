@@ -97,7 +97,7 @@ export function ProvidersRow({ title }: { title: string }): React.JSX.Element | 
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="flex gap-5 overflow-x-auto pt-2 pb-4 pl-4 scrollbar-none md:gap-6 md:pt-4 md:pl-8 lg:gap-7 lg:pl-12 xl:pl-16 2xl:pl-24"
+          className="flex gap-5 overflow-x-auto pb-4 pl-4 scrollbar-none md:gap-6 md:pl-8 lg:gap-7 lg:pl-12 xl:pl-16 2xl:pl-24"
         >
           {isLoading
             ? Array.from({ length: 8 }).map((_, i) => (

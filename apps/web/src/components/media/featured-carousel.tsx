@@ -111,7 +111,7 @@ export function FeaturedCarousel({
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="flex gap-6 overflow-x-auto overflow-y-visible py-2 pl-4 [contain:paint] scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
+          className="flex gap-6 overflow-x-auto overflow-y-visible pb-4 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
           onMouseLeave={handleMouseLeave}
         >
           {isLoading && visibleItems.length === 0

@@ -128,7 +128,7 @@ export function MediaCarousel({
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="flex gap-6 overflow-x-auto overflow-y-visible pt-2 pb-6 pl-4 [contain:paint] scrollbar-none md:pt-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
+          className="flex gap-6 overflow-x-auto overflow-y-visible pb-4 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
         >
           {isLoading && visibleItems.length === 0
             ? Array.from({ length: 8 }).map((_, i) => (
