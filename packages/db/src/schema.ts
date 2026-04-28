@@ -402,6 +402,8 @@ export const media = pgTable(
 
     // Refresh strategy
     nextAirDate: date("next_air_date"),
+    /** Daily airing time slot in network local time (TVDB-sourced), e.g. "21:00". */
+    airsTime: varchar("airs_time", { length: 8 }),
     extrasUpdatedAt: timestamp("extras_updated_at", { withTimezone: true }),
     downloadProfileId: uuid("download_profile_id").references(
       () => downloadProfile.id,

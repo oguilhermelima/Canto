@@ -1,0 +1,1 @@
+ALTER TABLE "media" ADD COLUMN "airs_time" varchar(8);
