@@ -1,0 +1,2 @@
+ALTER TABLE "download_profile" ADD COLUMN "languages" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "download_profile" ADD COLUMN "language_strict" boolean DEFAULT false NOT NULL;

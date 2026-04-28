@@ -804,6 +804,14 @@ export const downloadProfile = pgTable("download_profile", {
   /** Minimum total (profile + bonuses) score for a release to be kept.
    *  Defaults to 0 = no filter beyond the allowedFormats whitelist. */
   minTotalScore: integer("min_total_score").notNull().default(0),
+  /** Profile-scoped preferred languages (ISO codes from `detectLanguages`).
+   *  Always boost matching releases via the per-language bonus; with
+   *  {@link languageStrict} on, also rejects releases that don't have at
+   *  least one match. Empty array = no language preference. */
+  languages: jsonb("languages").$type<string[]>().notNull().default([]),
+  /** When true, the engine rejects (score 0) releases that don't match
+   *  any of {@link languages}. When false, languages only boost. */
+  languageStrict: boolean("language_strict").notNull().default(false),
   /** One default per flavor. Used as the fallback when neither a media
    *  nor its folder has an explicit profile. */
   isDefault: boolean("is_default").notNull().default(false),
