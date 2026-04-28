@@ -1,4 +1,4 @@
-import { and, eq, inArray, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { download } from "@canto/db/schema";
 
@@ -108,6 +108,18 @@ export async function resetStaleImports(db: Database) {
   if (result.length > 0) {
     console.log(`[import-torrents] Reset ${result.length} stale importing download(s)`);
   }
+}
+
+export async function findRecentImportedDownloads(
+  db: Database,
+  since: Date,
+  limit: number,
+) {
+  return db.query.download.findMany({
+    where: and(eq(download.imported, true), gt(download.createdAt, since)),
+    orderBy: [desc(download.createdAt)],
+    limit,
+  });
 }
 
 export async function findUnimportedDownloads(db: Database) {

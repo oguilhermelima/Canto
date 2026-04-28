@@ -241,7 +241,7 @@ const workers = [
 
   makeWorker(QUEUES.validateDownloads, () => handleValidateDownloads()),
 
-  makeWorker(QUEUES.repackSupersede, () => handleRepackSupersede()),
+  makeWorker(QUEUES.repackSupersede, (_data, log) => handleRepackSupersede(log)),
 
   // ── On-demand (dispatched by other code) ──
 
