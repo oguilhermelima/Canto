@@ -74,13 +74,36 @@ function formatTraktErrorMessage(
   return `Trakt request failed (${status}) for ${path}${compactBody ? `: ${truncateErrorText(compactBody)}` : ""}`;
 }
 
+/** When `TRAKT_DEBUG=1`, every Trakt request is logged with method, path,
+ *  body length, and final status. Body content is truncated and access tokens
+ *  are never logged. Off by default — flip on to investigate sync incidents. */
+const TRAKT_DEBUG = process.env.TRAKT_DEBUG === "1";
+
+function logTraktRequest(
+  method: string,
+  path: string,
+  body: unknown,
+  status: number,
+  durationMs: number,
+): void {
+  if (!TRAKT_DEBUG) return;
+  const bodyPreview = body
+    ? JSON.stringify(body).slice(0, 500)
+    : "";
+  console.log(
+    `[trakt-http] ${method} ${path} status=${status} duration=${durationMs}ms body=${bodyPreview}`,
+  );
+}
+
 async function traktRequest<T>(
   path: string,
   opts: TraktRequestOptions = {},
 ): Promise<T> {
   const { clientId } = await getTraktOAuthCredentials();
+  const method = opts.method ?? "GET";
+  const start = Date.now();
   const res = await fetch(`${TRAKT_API_BASE}${path}`, {
-    method: opts.method ?? "GET",
+    method,
     headers: {
       "trakt-api-version": "2",
       "trakt-api-key": clientId,
@@ -94,6 +117,7 @@ async function traktRequest<T>(
     body: opts.body ? JSON.stringify(opts.body) : undefined,
     signal: AbortSignal.timeout(20_000),
   });
+  logTraktRequest(method, path, opts.body, res.status, Date.now() - start);
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -112,8 +136,10 @@ async function traktRequestWithHeaders<T>(
   opts: TraktRequestOptions = {},
 ): Promise<{ data: T; headers: Headers }> {
   const { clientId } = await getTraktOAuthCredentials();
+  const method = opts.method ?? "GET";
+  const start = Date.now();
   const res = await fetch(`${TRAKT_API_BASE}${path}`, {
-    method: opts.method ?? "GET",
+    method,
     headers: {
       "trakt-api-version": "2",
       "trakt-api-key": clientId,
@@ -127,6 +153,7 @@ async function traktRequestWithHeaders<T>(
     body: opts.body ? JSON.stringify(opts.body) : undefined,
     signal: AbortSignal.timeout(20_000),
   });
+  logTraktRequest(method, path, opts.body, res.status, Date.now() - start);
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
