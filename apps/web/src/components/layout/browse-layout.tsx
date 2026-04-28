@@ -151,7 +151,7 @@ export function BrowseLayout({
   groupBy,
 }: BrowseLayoutProps): React.JSX.Element {
   const isMobile = useIsMobile();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
