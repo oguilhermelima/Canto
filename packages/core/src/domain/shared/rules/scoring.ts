@@ -43,12 +43,13 @@ export interface ConfidenceBreakdown {
    *  apply at all are omitted. */
   components: ScoreComponent[];
   /** True when a hard rule (allowedFormats whitelist, dead-torrent
-   *  guard, minTotalScore filter) drove the score to 0. */
+   *  guard, minTotalScore filter, language gate) drove the score to 0. */
   rejected: boolean;
   rejectReason?:
     | "no-seeders"
     | "format-not-allowed"
-    | "below-min-score";
+    | "below-min-score"
+    | "language-not-matched";
 }
 
 /**
@@ -132,6 +133,28 @@ export function explainConfidence(
   //    the entry's joint weight.
   //  • per-axis fallback (no profile): independent quality + source
   //    lookups, summed.
+  if (rules.requiredLanguages && rules.requiredLanguages.length > 0) {
+    const required = new Set(rules.requiredLanguages);
+    const matched = attrs.languages.some((l) => required.has(l));
+    if (!matched) {
+      return {
+        score: 0,
+        raw: 0,
+        maxRaw: rules.maxRaw,
+        components: [
+          ...components,
+          {
+            label: "Language",
+            points: 0,
+            detail: `none of ${rules.requiredLanguages.join(", ")} matched`,
+          },
+        ],
+        rejected: true,
+        rejectReason: "language-not-matched",
+      };
+    }
+  }
+
   if (rules.allowedFormats) {
     const entry = rules.allowedFormats.find(
       (f) => f.quality === attrs.quality && f.source === attrs.source,

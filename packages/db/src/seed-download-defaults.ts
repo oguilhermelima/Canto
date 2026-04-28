@@ -101,6 +101,7 @@ const DEFAULT_SCORING_RULES = {
   },
   maxRaw: 170,
   minTotalScore: 0,
+  requiredLanguages: null,
 };
 
 type Flavor = "movie" | "show" | "anime";

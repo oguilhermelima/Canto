@@ -33,6 +33,13 @@ export interface DownloadProfile {
   /** Minimum total score (profile weight + TRaSH bonuses). 0 = no
    *  filter beyond the allowedFormats whitelist. */
   minTotalScore: number;
+  /** Profile-scoped preferred languages (ISO codes). Boost matching
+   *  releases via language bonuses; with {@link languageStrict} also
+   *  reject releases that match none. Empty = no preference. */
+  languages: string[];
+  /** When true, releases with no overlap against {@link languages} are
+   *  rejected (score 0). When false, languages only boost. */
+  languageStrict: boolean;
   isDefault: boolean;
 }
 
@@ -137,9 +144,19 @@ export function applyDownloadProfile(
   base: ScoringRules,
   profile: DownloadProfile,
 ): ScoringRules {
+  const languageBonuses = { ...base.languageBonuses };
+  for (const lang of profile.languages) {
+    languageBonuses[lang] =
+      (languageBonuses[lang] ?? 0) + base.preferenceBonuses.perPreferredLanguage;
+  }
   return {
     ...base,
     allowedFormats: profile.allowedFormats.map((entry) => ({ ...entry })),
     minTotalScore: profile.minTotalScore,
+    languageBonuses,
+    requiredLanguages:
+      profile.languageStrict && profile.languages.length > 0
+        ? [...profile.languages]
+        : null,
   };
 }

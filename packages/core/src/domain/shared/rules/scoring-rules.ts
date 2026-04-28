@@ -87,6 +87,11 @@ export interface ScoringRules {
    *  threshold. Phase 5 download profiles populate this from the profile;
    *  defaults expose it for convenience but leave it disabled. */
   minTotalScore: number;
+
+  /** Hard language gate. When non-null, releases with no overlap against
+   *  this list are rejected (score 0). Populated by a download profile
+   *  with `languageStrict` on; null when not strict. */
+  requiredLanguages: string[] | null;
 }
 
 /** Codec stance toward AV1. Default is "neutral" — AV1 is treated like

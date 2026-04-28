@@ -29,6 +29,8 @@ function decodeProfile(row: typeof downloadProfile.$inferSelect): DownloadProfil
     cutoffQuality: (row.cutoffQuality as Quality | null) ?? null,
     cutoffSource: (row.cutoffSource as Source | null) ?? null,
     minTotalScore: row.minTotalScore,
+    languages: row.languages,
+    languageStrict: row.languageStrict,
     isDefault: row.isDefault,
   };
 }
