@@ -232,6 +232,13 @@
       "when": 1777412552801,
       "tag": "0032_overjoyed_eternals",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1777500000000,
+      "tag": "0033_trakt_section_watermarks",
+      "breakpoints": true
     }
   ]
 }

@@ -1334,6 +1334,19 @@ export const traktSyncState = pgTable(
     lastPulledAt: timestamp("last_pulled_at", { withTimezone: true }),
     lastPushedAt: timestamp("last_pushed_at", { withTimezone: true }),
     lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
+    // Per-section watermarks. Each is the remote `last_activities` timestamp
+    // at the moment the corresponding section was last pulled successfully.
+    // The coordinator compares the live remote timestamp against these to
+    // decide which sections actually need work — sections whose remote
+    // hasn't moved are skipped entirely. NULL means "never synced".
+    watchedMoviesAt: timestamp("watched_movies_at", { withTimezone: true }),
+    watchedShowsAt: timestamp("watched_shows_at", { withTimezone: true }),
+    historyAt: timestamp("history_at", { withTimezone: true }),
+    watchlistAt: timestamp("watchlist_at", { withTimezone: true }),
+    ratingsAt: timestamp("ratings_at", { withTimezone: true }),
+    favoritesAt: timestamp("favorites_at", { withTimezone: true }),
+    listsAt: timestamp("lists_at", { withTimezone: true }),
+    playbackAt: timestamp("playback_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
