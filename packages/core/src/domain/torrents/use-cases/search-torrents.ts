@@ -2,7 +2,10 @@ import type { Database } from "@canto/db/client";
 
 import { IndexerSearchError } from "@canto/core/domain/torrents/errors";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
-import { calculateConfidence } from "../../shared/rules/scoring";
+import {
+  explainConfidence,
+  type ConfidenceBreakdown,
+} from "../../shared/rules/scoring";
 import type { ScoringRules } from "../../shared/rules/scoring-rules";
 import { resolveMediaFlavor } from "../../shared/rules/media-flavor";
 import {
@@ -56,6 +59,10 @@ export interface SearchResult extends ReleaseAttributes {
   categories: Array<{ id: number; name: string }>;
   indexerLanguage: string | null;
   confidence: number;
+  /** Per-component breakdown of how `confidence` was reached. Drives
+   *  the explainability tooltip on the download modal — clicking the
+   *  chip shows which rules contributed. */
+  breakdown: ConfidenceBreakdown;
   /** True when this release meets or exceeds the active profile's cutoff.
    *  False when the profile has no cutoff or the release falls below.
    *  Drives upgrade-flow decisions and the UI cutoff badge. */
@@ -248,12 +255,12 @@ function scoreRawResults(
       flavor: prep.flavor,
       releaseGroupLookups: prep.releaseGroupLookups,
     });
-    const confidence = calculateConfidence(
+    const breakdown = explainConfidence(
       attrs,
       prep.confidenceCtx,
       prep.rules,
     );
-    if (confidence <= 0) continue;
+    if (breakdown.score <= 0) continue;
 
     out.push({
       ...attrs,
@@ -267,7 +274,8 @@ function scoreRawResults(
       leechers: r.leechers,
       categories: r.categories,
       indexerLanguage: r.indexerLanguage ?? null,
-      confidence,
+      confidence: breakdown.score,
+      breakdown,
       aboveCutoff: prep.profile
         ? meetsCutoff(prep.profile, attrs.quality, attrs.source)
         : false,

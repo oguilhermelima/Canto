@@ -17,7 +17,45 @@ export type {
 } from "./scoring-rules";
 
 /**
- * Confidence engine. Pure function over `(attrs, ctx, rules)`.
+ * One contribution to a release's confidence score. The label/detail
+ * pair is what the explainability tooltip in the UI renders, so they
+ * should read like sentences a human would write — "Quality: UHD",
+ * "Group tier: tier1", not the raw rule keys.
+ */
+export interface ScoreComponent {
+  label: string;
+  /** Signed raw points. Positive = bonus, negative = penalty. */
+  points: number;
+  /** Optional sub-label, e.g. the matched audio codec or HDR format. */
+  detail?: string;
+}
+
+export interface ConfidenceBreakdown {
+  /** Final 0–100 score after normalisation, threshold and clamping. */
+  score: number;
+  /** Sum of all component points before normalisation. */
+  raw: number;
+  /** `rules.maxRaw` at score time — useful for "raw / max" displays. */
+  maxRaw: number;
+  /** Per-rule contributions, in the order the engine applied them.
+   *  Components with `points: 0` are kept in the list when the engine
+   *  read them (e.g. "Audio channels: 2.0 (+0)"); rules that didn't
+   *  apply at all are omitted. */
+  components: ScoreComponent[];
+  /** True when a hard rule (allowedFormats whitelist, dead-torrent
+   *  guard, minTotalScore filter) drove the score to 0. */
+  rejected: boolean;
+  rejectReason?:
+    | "no-seeders"
+    | "format-not-allowed"
+    | "below-min-score";
+}
+
+/**
+ * Explainable confidence engine. Pure function over
+ * `(attrs, ctx, rules)` that returns both the final score and the
+ * per-component breakdown. {@link calculateConfidence} is a thin
+ * wrapper that drops the breakdown.
  *
  * Component hierarchy (max raw 170 with default rules):
  *
@@ -51,12 +89,31 @@ export type {
  *                 exist, otherwise `camNoDigitalPenalty`.
  *   Nuked flag:   `flags.additive.nuked`.
  */
-export function calculateConfidence(
+export function explainConfidence(
   attrs: ReleaseAttributes,
   ctx: ConfidenceContext,
   rules: ScoringRules,
-): number {
-  if (attrs.seeders === 0) return 0;
+): ConfidenceBreakdown {
+  const components: ScoreComponent[] = [];
+  const push = (
+    label: string,
+    points: number,
+    detail?: string,
+  ): void => {
+    if (points === 0 && !detail) return;
+    components.push({ label, points, ...(detail !== undefined ? { detail } : {}) });
+  };
+
+  if (attrs.seeders === 0) {
+    return {
+      score: 0,
+      raw: 0,
+      maxRaw: rules.maxRaw,
+      components: [{ label: "Health", points: 0, detail: "no seeders" }],
+      rejected: true,
+      rejectReason: "no-seeders",
+    };
+  }
 
   let score = 0;
 
@@ -64,12 +121,13 @@ export function calculateConfidence(
   for (const tier of rules.health) {
     if (attrs.seeders >= tier.threshold) {
       score += tier.bonus;
+      push("Health", tier.bonus, `${attrs.seeders} seeders`);
       break;
     }
   }
 
   // Format scoring — quality + source. Two modes:
-  //  • allowedFormats whitelist (Phase 5 download profile): the (quality,
+  //  • allowedFormats whitelist (download profile): the (quality,
   //    source) combo must appear in the list, otherwise reject. Earns
   //    the entry's joint weight.
   //  • per-axis fallback (no profile): independent quality + source
@@ -78,79 +136,148 @@ export function calculateConfidence(
     const entry = rules.allowedFormats.find(
       (f) => f.quality === attrs.quality && f.source === attrs.source,
     );
-    if (!entry) return 0;
+    if (!entry) {
+      return {
+        score: 0,
+        raw: 0,
+        maxRaw: rules.maxRaw,
+        components: [
+          ...components,
+          {
+            label: "Profile",
+            points: 0,
+            detail: `${attrs.quality} ${attrs.source} not in profile`,
+          },
+        ],
+        rejected: true,
+        rejectReason: "format-not-allowed",
+      };
+    }
     score += entry.weight;
+    push("Profile match", entry.weight, `${attrs.quality} ${attrs.source}`);
   } else {
-    score += rules.quality[attrs.quality] ?? 0;
-    score += rules.source[attrs.source] ?? 0;
+    const q = rules.quality[attrs.quality] ?? 0;
+    score += q;
+    push("Quality", q, attrs.quality);
+    const s = rules.source[attrs.source] ?? 0;
+    score += s;
+    push("Source", s, attrs.source);
   }
 
   // Codec — context-aware on quality, with `default` fallback
-  const codecTable =
-    rules.codec.byQuality[attrs.quality] ?? rules.codec.byQuality.default;
-  if (attrs.codec) score += codecTable[attrs.codec] ?? 0;
+  if (attrs.codec) {
+    const codecTable =
+      rules.codec.byQuality[attrs.quality] ?? rules.codec.byQuality.default;
+    const c = codecTable[attrs.codec] ?? 0;
+    score += c;
+    push("Codec", c, attrs.codec);
+  }
 
   // HDR
-  if (attrs.hdrFormat) score += rules.hdr[attrs.hdrFormat] ?? 0;
+  if (attrs.hdrFormat) {
+    const h = rules.hdr[attrs.hdrFormat] ?? 0;
+    score += h;
+    push("HDR", h, attrs.hdrFormat);
+  }
 
   // UHD-without-HDR penalty
   if (attrs.quality === "uhd" && !attrs.hdrFormat) {
     score += rules.uhdNoHdrPenalty;
+    push("UHD without HDR", rules.uhdNoHdrPenalty, "penalty");
   }
 
   // Audio codec
-  if (attrs.audioCodec) score += rules.audioCodec[attrs.audioCodec] ?? 0;
+  if (attrs.audioCodec) {
+    const a = rules.audioCodec[attrs.audioCodec] ?? 0;
+    score += a;
+    push("Audio codec", a, attrs.audioCodec);
+  }
 
   // Audio channels
   if (attrs.audioChannels) {
-    score += rules.audioChannels[attrs.audioChannels] ?? 0;
+    const ch = rules.audioChannels[attrs.audioChannels] ?? 0;
+    score += ch;
+    push("Audio channels", ch, attrs.audioChannels);
   }
 
   // Multi-audio: explicit token wins over the multi-language fallback so we
   // never reward the same release twice.
   if (attrs.hasMultiAudioToken) {
     score += rules.multiAudioToken;
+    push("Multi-audio", rules.multiAudioToken, "MULTi/DUAL");
   } else if (attrs.distinctLanguageCount >= 2) {
     score += rules.multipleLanguagesBonus;
+    push(
+      "Multiple languages",
+      rules.multipleLanguagesBonus,
+      `${attrs.distinctLanguageCount} languages`,
+    );
   }
 
   // Per-language bonuses (from user prefs / profile overrides)
+  let langTotal = 0;
+  const matchedLangs: string[] = [];
   for (const lang of attrs.languages) {
     const lb = rules.languageBonuses[lang];
-    if (lb) score += lb;
+    if (lb) {
+      langTotal += lb;
+      matchedLangs.push(lang);
+    }
+  }
+  if (langTotal !== 0) {
+    score += langTotal;
+    push("Preferred languages", langTotal, matchedLangs.join(", "));
   }
 
   // Streaming service
   if (attrs.streamingService) {
-    score += rules.streamingServiceBonuses[attrs.streamingService] ?? 0;
+    const ss = rules.streamingServiceBonuses[attrs.streamingService] ?? 0;
+    if (ss !== 0) {
+      score += ss;
+      push("Streaming service", ss, attrs.streamingService);
+    }
   }
 
   // Edition
   if (attrs.edition) {
-    score += rules.editionBonuses[attrs.edition] ?? 0;
+    const ed = rules.editionBonuses[attrs.edition] ?? 0;
+    if (ed !== 0) {
+      score += ed;
+      push("Edition", ed, attrs.edition);
+    }
   }
 
   // Freshness
   for (const tier of rules.freshness) {
     if (attrs.age <= tier.threshold) {
       score += tier.bonus;
+      push("Freshness", tier.bonus, `≤${tier.threshold}d`);
       break;
     }
   }
 
   // Release group tier
-  score += rules.groupTier[attrs.groupTier] ?? 0;
+  const gt = rules.groupTier[attrs.groupTier] ?? 0;
+  if (gt !== 0 || attrs.releaseGroup) {
+    score += gt;
+    push("Group tier", gt, `${attrs.groupTier}${attrs.releaseGroup ? `: ${attrs.releaseGroup}` : ""}`);
+  }
 
   // Repack / Proper
   if (attrs.repackCount > 0) {
-    score += Math.min(
+    const repack = Math.min(
       rules.repackMaxBonus,
       attrs.repackCount * rules.repackPerCount,
     );
+    score += repack;
+    push("Repack/Proper", repack, `count ${attrs.repackCount}`);
   }
 
   // Hybrid
-  if (attrs.isHybrid) score += rules.hybridBonus;
+  if (attrs.isHybrid) {
+    score += rules.hybridBonus;
+    push("Hybrid", rules.hybridBonus, "BluRay+WEB");
+  }
 
   // Combo jackpot
   if (
@@ -160,6 +287,7 @@ export function calculateConfidence(
     attrs.audioCodec === "TrueHD Atmos"
   ) {
     score += rules.comboUhdRemuxDvAtmos;
+    push("Combo jackpot", rules.comboUhdRemuxDvAtmos, "UHD Remux DV Atmos");
   }
 
   // Indexer flags — mutually-exclusive (first match) + additive
@@ -167,27 +295,62 @@ export function calculateConfidence(
   for (const exclusive of rules.flags.exclusive) {
     if (lowerFlags.has(exclusive.flag)) {
       score += exclusive.bonus;
+      push("Indexer flag", exclusive.bonus, exclusive.flag);
       break;
     }
   }
   for (const flag of lowerFlags) {
     const bonus = rules.flags.additive[flag];
-    if (bonus) score += bonus;
+    if (bonus) {
+      score += bonus;
+      push("Indexer flag", bonus, flag);
+    }
   }
 
   // CAM keyword penalty (separate from `source: cam` — we trust both)
   if (attrs.isCam) {
-    score += ctx.hasDigitalRelease
+    const camPenalty = ctx.hasDigitalRelease
       ? rules.camWithDigitalPenalty
       : rules.camNoDigitalPenalty;
+    score += camPenalty;
+    push("CAM keyword", camPenalty, ctx.hasDigitalRelease ? "digital available" : "no digital");
   }
 
   // Normalise to 0–100
   const normalized = Math.round((score / rules.maxRaw) * 100);
   const clamped = Math.max(0, Math.min(100, normalized));
 
-  // Final-cut threshold (used by Phase 5 profiles to drop sub-quality
+  // Final-cut threshold (used by download profiles to drop sub-quality
   // releases before they ever reach the UI).
-  if (clamped < rules.minTotalScore) return 0;
-  return clamped;
+  if (clamped < rules.minTotalScore) {
+    return {
+      score: 0,
+      raw: score,
+      maxRaw: rules.maxRaw,
+      components,
+      rejected: true,
+      rejectReason: "below-min-score",
+    };
+  }
+
+  return {
+    score: clamped,
+    raw: score,
+    maxRaw: rules.maxRaw,
+    components,
+    rejected: false,
+  };
+}
+
+/**
+ * Confidence engine — returns just the 0–100 score. Thin wrapper over
+ * {@link explainConfidence} so callers that don't need the breakdown
+ * (cron jobs, regression tests) stay untouched.
+ */
+export function calculateConfidence(
+  attrs: ReleaseAttributes,
+  ctx: ConfidenceContext,
+  rules: ScoringRules,
+): number {
+  return explainConfidence(attrs, ctx, rules).score;
 }
