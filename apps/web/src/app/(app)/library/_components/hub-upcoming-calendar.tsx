@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { CalendarClock, Tv } from "lucide-react";
@@ -19,7 +19,7 @@ const TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
   hour: "2-digit",
   minute: "2-digit",
 });
-const COLUMN_WIDTH = "w-full md:w-[340px] md:shrink-0 lg:w-[400px]";
+const COLUMN_WIDTH = "w-[340px] shrink-0 lg:w-[400px]";
 const SCROLL_PADDING_X =
   "px-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24";
 // Vary skeleton density across columns so the loading state looks like a real
@@ -169,19 +169,10 @@ function DayHeader({ bucket }: { bucket: DayBucket }): React.JSX.Element {
 }
 
 function DayColumn({ bucket }: { bucket: DayBucket }): React.JSX.Element {
-  const isEmpty = bucket.items.length === 0;
   return (
-    <div
-      className={cn(
-        "group/day flex-col",
-        COLUMN_WIDTH,
-        // Hide empty days on mobile to avoid an agenda full of "Quiet day"
-        // placeholders. Desktop keeps the full 7-column grid for context.
-        isEmpty ? "hidden md:flex" : "flex",
-      )}
-    >
+    <div className={cn("group/day flex flex-col", COLUMN_WIDTH)}>
       <DayHeader bucket={bucket} />
-      {isEmpty ? (
+      {bucket.items.length === 0 ? (
         <p className="px-2 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground/30">
           Quiet day
         </p>
@@ -192,6 +183,63 @@ function DayColumn({ bucket }: { bucket: DayBucket }): React.JSX.Element {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function MobileDayChip({
+  bucket,
+  active,
+  onSelect,
+}: {
+  bucket: DayBucket;
+  active: boolean;
+  onSelect: () => void;
+}): React.JSX.Element {
+  const dayNum = bucket.date.getDate();
+  const count = bucket.items.length;
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "flex shrink-0 flex-col items-center gap-1 rounded-2xl px-3.5 py-2 transition-colors",
+        active
+          ? "bg-foreground text-background"
+          : "bg-foreground/[0.06] text-muted-foreground hover:bg-foreground/[0.1]",
+      )}
+    >
+      <span className="text-[10px] font-bold uppercase tracking-[0.18em]">
+        {bucket.isToday ? "Today" : bucket.weekdayShort}
+      </span>
+      <span className="text-xl font-extrabold tabular-nums leading-none">
+        {dayNum}
+      </span>
+      <span
+        className={cn(
+          "text-[10px] font-semibold tabular-nums",
+          active ? "text-background/70" : "text-muted-foreground/70",
+        )}
+      >
+        {count === 0 ? "—" : count}
+      </span>
+    </button>
+  );
+}
+
+function MobileDayView({ bucket }: { bucket: DayBucket }): React.JSX.Element {
+  if (bucket.items.length === 0) {
+    return (
+      <p className="py-2 text-sm text-muted-foreground/60">
+        Nothing scheduled.
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      {bucket.items.map((item) => (
+        <CalendarItem key={item.id} item={item} />
+      ))}
     </div>
   );
 }
@@ -233,6 +281,14 @@ export function HubUpcomingCalendar(): React.JSX.Element {
   );
   const hasAnyItems = buckets.some((b) => b.items.length > 0);
 
+  // Mobile: pick the first day with items (today preferred), default to 0.
+  const defaultMobileDay =
+    buckets.findIndex((b) => b.items.length > 0) >= 0
+      ? buckets.findIndex((b) => b.items.length > 0)
+      : 0;
+  const [selectedDay, setSelectedDay] = useState(defaultMobileDay);
+  const activeBucket = buckets[selectedDay] ?? buckets[0]!;
+
   return (
     <section>
       <SectionTitle
@@ -242,15 +298,52 @@ export function HubUpcomingCalendar(): React.JSX.Element {
         linkAs={Link}
       />
 
-      <div>
-        {!isLoading && !hasAnyItems && (
-          <p className={cn("py-2 text-sm text-muted-foreground md:hidden", SCROLL_PADDING_X)}>
+      {/* Mobile: day chips + selected day list. Desktop: 7-col scrollable grid. */}
+      <div className="md:hidden">
+        {isLoading ? (
+          <div className={cn("pb-4", SCROLL_PADDING_X)}>
+            <div className="flex gap-2 overflow-x-auto scrollbar-none pb-3">
+              {buckets.map((b) => (
+                <Skeleton key={b.date.toISOString()} className="h-[68px] w-16 shrink-0 rounded-2xl" />
+              ))}
+            </div>
+            <div className="flex flex-col gap-1">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-2 py-2">
+                  <Skeleton className="aspect-[2/3] w-12 shrink-0 rounded-lg" />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : !hasAnyItems ? (
+          <p className={cn("py-2 text-sm text-muted-foreground", SCROLL_PADDING_X)}>
             Nothing scheduled this week.
           </p>
+        ) : (
+          <div className={cn("pb-4", SCROLL_PADDING_X)}>
+            <div className="-mx-1 flex gap-2 overflow-x-auto scrollbar-none px-1 pb-3">
+              {buckets.map((b, i) => (
+                <MobileDayChip
+                  key={b.date.toISOString()}
+                  bucket={b}
+                  active={i === selectedDay}
+                  onSelect={() => setSelectedDay(i)}
+                />
+              ))}
+            </div>
+            <MobileDayView bucket={activeBucket} />
+          </div>
         )}
+      </div>
+
+      <div className="hidden md:block">
         <div
           className={cn(
-            "flex flex-col gap-5 pb-4 md:flex-row md:items-start md:gap-6 md:overflow-x-auto md:overflow-y-visible md:scrollbar-none",
+            "flex items-start gap-6 overflow-x-auto overflow-y-visible pb-4 scrollbar-none",
             SCROLL_PADDING_X,
           )}
         >
