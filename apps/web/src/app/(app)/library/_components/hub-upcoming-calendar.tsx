@@ -19,7 +19,7 @@ const TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
   hour: "2-digit",
   minute: "2-digit",
 });
-const COLUMN_WIDTH = "w-[340px] sm:w-[360px] lg:w-[400px]";
+const COLUMN_WIDTH = "w-[280px] sm:w-[340px] lg:w-[400px]";
 const SCROLL_PADDING_X =
   "pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24";
 // Vary skeleton density across columns so the loading state looks like a real
@@ -235,7 +235,7 @@ export function HubUpcomingCalendar(): React.JSX.Element {
       <div>
         <div
           className={cn(
-            "flex items-start gap-6 overflow-x-auto overflow-y-visible pb-4 scrollbar-none",
+            "flex items-start gap-3 overflow-x-auto overflow-y-visible pb-4 scrollbar-none md:gap-6",
             SCROLL_PADDING_X,
           )}
         >

@@ -9,13 +9,10 @@ import { Skeleton } from "@canto/ui/skeleton";
 import { trpc } from "@/lib/trpc/client";
 import { mediaHref } from "@/lib/media-href";
 import { tmdbThumbLoader } from "@/lib/tmdb-image";
-import { useLogo } from "@/hooks/use-logos";
-import { MediaLogo } from "@/components/media/media-logo";
 import { LibraryCarousel } from "./library-carousel";
 
 const PAGE_SIZE = 24;
-const CARD_WIDTH_CLASS = "w-[280px] sm:w-[300px] lg:w-[340px] 2xl:w-[380px]";
-const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
+const CARD_WIDTH_CLASS = "w-[220px] sm:w-[280px] lg:w-[340px] 2xl:w-[380px]";
 
 type DiaryEntry = {
   id: string;
@@ -81,23 +78,9 @@ function DiaryCard({
   now: Date;
 }): React.JSX.Element {
   const cardImage = imagePath(entry);
-  const fetchedLogo = useLogo(
-    entry.provider,
-    String(entry.externalId),
-    entry.mediaType,
-    {
-      title: entry.title,
-      posterPath: entry.posterPath,
-      backdropPath: entry.backdropPath,
-      year: entry.year,
-    },
-    { skip: !!entry.logoPath },
-  );
-  const logoPath = entry.logoPath ?? fetchedLogo;
   const [imageReady, setImageReady] = useState(!cardImage);
-  const logoResolved = !!entry.logoPath || fetchedLogo !== undefined;
 
-  if (!logoResolved || !imageReady) {
+  if (!imageReady) {
     return (
       <div className={cn("relative shrink-0", CARD_WIDTH_CLASS)}>
         <Skeleton className="aspect-video w-full rounded-xl" />
@@ -156,19 +139,10 @@ function DiaryCard({
         )}
 
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-3.5 pb-3 pt-14">
-          {logoPath ? (
-            <MediaLogo
-              src={`${TMDB_IMAGE_BASE}/w500${logoPath}`}
-              alt={entry.title}
-              size="card"
-              className="max-w-[70%]"
-            />
-          ) : (
-            <p className="line-clamp-2 text-sm font-semibold leading-tight text-white drop-shadow-lg">
-              {entry.title}
-            </p>
-          )}
-          <div className={cn("flex items-center gap-1.5", logoPath ? "mt-2" : "mt-1.5")}>
+          <p className="line-clamp-2 text-sm font-semibold leading-tight text-white drop-shadow-lg">
+            {entry.title}
+          </p>
+          <div className="mt-1.5 flex items-center gap-1.5">
             <span className="line-clamp-1 text-xs font-medium text-white/90">
               {episodeLabel(entry)}
             </span>

@@ -28,7 +28,7 @@ export function HubCollectionsSection(): React.JSX.Element {
     return (
       <section className="relative">
         <SectionTitle title="Collections" icon={FolderHeart} seeMorePath="/library/collections" linkAs={Link} />
-        <div className="flex gap-4 overflow-x-auto pb-4 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+        <div className="flex gap-3 overflow-x-auto overflow-y-visible pb-4 pl-4 scrollbar-none md:gap-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
           {Array.from({ length: 4 }).map((_, index) => (
             <div
               key={index}

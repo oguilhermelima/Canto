@@ -16,7 +16,7 @@ export type { WatchNextItem, WatchNextView } from "@/components/media/cards/watc
 // Page size dropped from 72 → 24. The backend now applies LIMIT in SQL, so
 // asking for 72 just to render 24 above the fold was pure waste.
 const PAGE_SIZE = 24;
-const CARD_WIDTH_CLASS = "w-[280px] sm:w-[300px] lg:w-[340px] 2xl:w-[380px]";
+const CARD_WIDTH_CLASS = "w-[220px] sm:w-[280px] lg:w-[340px] 2xl:w-[380px]";
 
 export function WatchNextTab({
   view = "watch_next",

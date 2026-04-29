@@ -8,7 +8,7 @@ import { trpc } from "@/lib/trpc/client";
 import { LibraryCarousel } from "./library-carousel";
 
 const PAGE_SIZE = 24;
-const CARD_WIDTH_CLASS = "w-[180px] shrink-0 sm:w-[200px] lg:w-[220px] 2xl:w-[240px]";
+const CARD_WIDTH_CLASS = "w-[140px] shrink-0 sm:w-[180px] lg:w-[220px] 2xl:w-[240px]";
 
 type GetUserMediaInput = Parameters<
   typeof trpc.userMedia.getUserMedia.useInfiniteQuery

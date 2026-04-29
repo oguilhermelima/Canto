@@ -31,7 +31,7 @@ export interface LibraryCarouselProps<T> {
 }
 
 const SCROLL_CONTAINER_CLASSES =
-  "flex gap-4 overflow-x-auto overflow-y-visible pb-4 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24";
+  "flex gap-3 overflow-x-auto overflow-y-visible pb-4 pl-4 scrollbar-none md:gap-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24";
 const END_SPACER_CLASSES = "w-4 shrink-0 md:w-8 lg:w-12 xl:w-16 2xl:w-24";
 
 export const LibraryCarousel = <T,>({
