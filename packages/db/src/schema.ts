@@ -517,70 +517,7 @@ export const episode = pgTable(
   ],
 );
 
-// ─── Translations (multi-language support) ───
-
-export const mediaTranslation = pgTable(
-  "media_translation",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    mediaId: uuid("media_id")
-      .notNull()
-      .references(() => media.id, { onDelete: "cascade" }),
-    language: varchar("language", { length: 10 })
-      .notNull()
-      .references(() => supportedLanguage.code),
-    title: varchar("title", { length: 500 }),
-    overview: text("overview"),
-    tagline: varchar("tagline", { length: 500 }),
-    posterPath: varchar("poster_path", { length: 255 }),
-    logoPath: varchar("logo_path", { length: 255 }),
-    trailerKey: varchar("trailer_key", { length: 100 }),
-  },
-  (table) => [
-    uniqueIndex("idx_media_translation_unique").on(table.mediaId, table.language),
-    index("idx_media_translation_media").on(table.mediaId),
-  ],
-);
-
-export const seasonTranslation = pgTable(
-  "season_translation",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    seasonId: uuid("season_id")
-      .notNull()
-      .references(() => season.id, { onDelete: "cascade" }),
-    language: varchar("language", { length: 10 })
-      .notNull()
-      .references(() => supportedLanguage.code),
-    name: varchar("name", { length: 200 }),
-    overview: text("overview"),
-  },
-  (table) => [
-    uniqueIndex("idx_season_translation_unique").on(table.seasonId, table.language),
-    index("idx_season_translation_season").on(table.seasonId),
-  ],
-);
-
-export const episodeTranslation = pgTable(
-  "episode_translation",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    episodeId: uuid("episode_id")
-      .notNull()
-      .references(() => episode.id, { onDelete: "cascade" }),
-    language: varchar("language", { length: 10 })
-      .notNull()
-      .references(() => supportedLanguage.code),
-    title: varchar("title", { length: 500 }),
-    overview: text("overview"),
-  },
-  (table) => [
-    uniqueIndex("idx_episode_translation_unique").on(table.episodeId, table.language),
-    index("idx_episode_translation_episode").on(table.episodeId),
-  ],
-);
-
-// ─── Localizations (unified per-language storage; supersedes *_translation) ───
+// ─── Localizations (unified per-language storage) ───
 
 export const mediaLocalization = pgTable(
   "media_localization",
@@ -1762,7 +1699,6 @@ export const mediaRelations = relations(media, ({ many, one }) => ({
   recommendedBy: many(mediaRecommendation, { relationName: "recommendedMedia" }),
   recommendationsFor: many(mediaRecommendation, { relationName: "sourceMedia" }),
   listItems: many(listItem),
-  translations: many(mediaTranslation),
   contentRatings: many(mediaContentRating),
   userStates: many(userMediaState),
   playbackProgress: many(userPlaybackProgress),
@@ -1776,7 +1712,6 @@ export const seasonRelations = relations(season, ({ one, many }) => ({
     references: [media.id],
   }),
   episodes: many(episode),
-  translations: many(seasonTranslation),
   ratings: many(userRating),
 }));
 
@@ -1786,7 +1721,6 @@ export const episodeRelations = relations(episode, ({ one, many }) => ({
     references: [season.id],
   }),
   files: many(mediaFile),
-  translations: many(episodeTranslation),
   playbackProgress: many(userPlaybackProgress),
   watchHistory: many(userWatchHistory),
   ratings: many(userRating),
@@ -1811,31 +1745,10 @@ export const userRatingRelations = relations(userRating, ({ one }) => ({
   }),
 }));
 
-export const mediaTranslationRelations = relations(mediaTranslation, ({ one }) => ({
-  media: one(media, {
-    fields: [mediaTranslation.mediaId],
-    references: [media.id],
-  }),
-}));
-
 export const mediaContentRatingRelations = relations(mediaContentRating, ({ one }) => ({
   media: one(media, {
     fields: [mediaContentRating.mediaId],
     references: [media.id],
-  }),
-}));
-
-export const seasonTranslationRelations = relations(seasonTranslation, ({ one }) => ({
-  season: one(season, {
-    fields: [seasonTranslation.seasonId],
-    references: [season.id],
-  }),
-}));
-
-export const episodeTranslationRelations = relations(episodeTranslation, ({ one }) => ({
-  episode: one(episode, {
-    fields: [episodeTranslation.episodeId],
-    references: [episode.id],
   }),
 }));
 

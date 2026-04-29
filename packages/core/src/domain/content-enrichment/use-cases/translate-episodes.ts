@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { episode, episodeTranslation, season, seasonTranslation } from "@canto/db/schema";
+import { episode, season } from "@canto/db/schema";
 import { TvdbProvider } from "@canto/providers";
 import {
   upsertEpisodeLocalization,
@@ -67,15 +67,6 @@ export async function translateEpisodes(
       sSeen.add(key);
       return true;
     });
-    await db
-      .insert(seasonTranslation)
-      .values(dedupedSeasonTrans)
-      .onConflictDoUpdate({
-        target: [seasonTranslation.seasonId, seasonTranslation.language],
-        set: { name: sql`EXCLUDED.name`, overview: sql`EXCLUDED.overview` },
-      });
-
-    // Dual-write to season_localization (removed in Phase 1C-δ).
     for (const r of dedupedSeasonTrans) {
       await upsertSeasonLocalization(
         db,
@@ -121,18 +112,6 @@ export async function translateEpisodes(
     });
   }
 
-  // Batch upsert episode translations
-  for (let i = 0; i < epTransRows.length; i += 500) {
-    await db
-      .insert(episodeTranslation)
-      .values(epTransRows.slice(i, i + 500))
-      .onConflictDoUpdate({
-        target: [episodeTranslation.episodeId, episodeTranslation.language],
-        set: { title: sql`EXCLUDED.title`, overview: sql`EXCLUDED.overview` },
-      });
-  }
-
-  // Dual-write to episode_localization (removed in Phase 1C-δ).
   for (const r of epTransRows) {
     await upsertEpisodeLocalization(
       db,

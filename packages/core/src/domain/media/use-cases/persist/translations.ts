@@ -1,13 +1,7 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import type { NormalizedMedia } from "@canto/providers";
-import {
-  episode,
-  episodeTranslation,
-  mediaTranslation,
-  season,
-  seasonTranslation,
-} from "@canto/db/schema";
+import { episode, season } from "@canto/db/schema";
 import type { Database } from "@canto/db/client";
 
 import { getActiveUserLanguages } from "../../../shared/services/user-service";
@@ -47,25 +41,8 @@ export async function persistTranslations(
         return true;
       });
 
-    for (let i = 0; i < mediaTransRows.length; i += 500) {
-      await db
-        .insert(mediaTranslation)
-        .values(mediaTransRows.slice(i, i + 500))
-        .onConflictDoUpdate({
-          target: [mediaTranslation.mediaId, mediaTranslation.language],
-          set: {
-            title: sql`EXCLUDED.title`,
-            overview: sql`EXCLUDED.overview`,
-            tagline: sql`EXCLUDED.tagline`,
-            posterPath: sql`COALESCE(EXCLUDED.poster_path, ${mediaTranslation.posterPath})`,
-            logoPath: sql`COALESCE(EXCLUDED.logo_path, ${mediaTranslation.logoPath})`,
-          },
-        });
-    }
-
-    // Dual-write to media_localization (removed in Phase 1C-δ).
     for (const r of mediaTransRows) {
-      if (!r.title) continue; // upsertMediaLocalization requires title
+      if (!r.title) continue;
       await upsertMediaLocalization(
         db,
         r.mediaId,
@@ -115,20 +92,6 @@ export async function persistTranslations(
         return true;
       });
 
-    for (let i = 0; i < seasonTransRows.length; i += 500) {
-      await db
-        .insert(seasonTranslation)
-        .values(seasonTransRows.slice(i, i + 500))
-        .onConflictDoUpdate({
-          target: [seasonTranslation.seasonId, seasonTranslation.language],
-          set: {
-            name: sql`EXCLUDED.name`,
-            overview: sql`EXCLUDED.overview`,
-          },
-        });
-    }
-
-    // Dual-write to season_localization (removed in Phase 1C-δ).
     for (const r of seasonTransRows) {
       await upsertSeasonLocalization(
         db,
@@ -181,20 +144,6 @@ export async function persistTranslations(
       return true;
     });
 
-    for (let i = 0; i < epTransRows.length; i += 500) {
-      await db
-        .insert(episodeTranslation)
-        .values(epTransRows.slice(i, i + 500))
-        .onConflictDoUpdate({
-          target: [episodeTranslation.episodeId, episodeTranslation.language],
-          set: {
-            title: sql`EXCLUDED.title`,
-            overview: sql`EXCLUDED.overview`,
-          },
-        });
-    }
-
-    // Dual-write to episode_localization (removed in Phase 1C-δ).
     for (const r of epTransRows) {
       await upsertEpisodeLocalization(
         db,

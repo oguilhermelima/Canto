@@ -4,12 +4,10 @@ import type { NormalizedMedia, NormalizedSeason } from "@canto/providers";
 import {
   episode,
   episodeLocalization,
-  episodeTranslation,
   media,
   mediaFile,
   season,
   seasonLocalization,
-  seasonTranslation,
   userPlaybackProgress,
   userRating,
   userWatchHistory,
@@ -384,17 +382,6 @@ export async function applyTvdbSeasons(
         seasonTransSeen.add(key);
         return true;
       });
-    for (let i = 0; i < seasonTransRows.length; i += 500) {
-      await db
-        .insert(seasonTranslation)
-        .values(seasonTransRows.slice(i, i + 500))
-        .onConflictDoUpdate({
-          target: [seasonTranslation.seasonId, seasonTranslation.language],
-          set: { name: sql`EXCLUDED.name`, overview: sql`EXCLUDED.overview` },
-        });
-    }
-
-    // Dual-write to season_localization (removed in Phase 1C-δ).
     for (const r of seasonTransRows) {
       await upsertSeasonLocalization(
         db,
@@ -419,17 +406,6 @@ export async function applyTvdbSeasons(
       epTransSeen.add(dedupKey);
       epTransRows.push({ episodeId: newEpId, language: t.language, title: t.title, overview: t.overview });
     }
-    for (let i = 0; i < epTransRows.length; i += 500) {
-      await db
-        .insert(episodeTranslation)
-        .values(epTransRows.slice(i, i + 500))
-        .onConflictDoUpdate({
-          target: [episodeTranslation.episodeId, episodeTranslation.language],
-          set: { title: sql`EXCLUDED.title`, overview: sql`EXCLUDED.overview` },
-        });
-    }
-
-    // Dual-write to episode_localization (removed in Phase 1C-δ).
     for (const r of epTransRows) {
       await upsertEpisodeLocalization(
         db,
