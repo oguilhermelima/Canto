@@ -46,7 +46,7 @@ export function SpotlightProgressDots({
   }, [total, current]);
 
   return (
-    <div className="mt-4 flex items-center justify-center gap-1.5 md:absolute md:inset-x-0 md:bottom-[3.1rem] md:mt-0">
+    <div className="flex items-center justify-end gap-1.5">
       {visibleDots.map((dotIndex) => {
         const isActive = dotIndex === current;
         const isPast = dotIndex < current;

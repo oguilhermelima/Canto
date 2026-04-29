@@ -19,7 +19,7 @@ const DROP_SHADOW =
 // slow connections — visible most painfully on mobile).
 const SIZE_CLASSES: Record<string, string> = {
   hero: "h-20 sm:h-22 md:h-22 lg:h-24 xl:h-26 2xl:h-28",
-  spotlight: "h-28 sm:h-32 md:h-36 lg:h-40 xl:h-44 2xl:h-48",
+  spotlight: "h-20 sm:h-32 md:h-36 lg:h-40 xl:h-44 2xl:h-48",
   carousel: "h-20 max-w-[260px]",
   card: "h-12 max-w-[200px]",
 };

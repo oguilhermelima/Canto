@@ -14,6 +14,7 @@ interface SpotlightContentProps {
   slideDirection: 1 | -1;
   onPausedChange: (paused: boolean) => void;
   onPrefetch: (item: SpotlightItem) => void;
+  actionsTrailing?: React.ReactNode;
 }
 
 export function SpotlightContent({
@@ -21,18 +22,19 @@ export function SpotlightContent({
   slideDirection,
   onPausedChange,
   onPrefetch,
+  actionsTrailing,
 }: SpotlightContentProps): React.JSX.Element {
   const previewUrl = mediaHref(item.provider, item.externalId, item.type);
 
   return (
     <div
-      className="flex max-w-2xl flex-col gap-5 animate-[contentSlideIn_0.35s_cubic-bezier(0.16,1,0.3,1)_both]"
+      className="flex max-w-2xl flex-col gap-3 animate-[contentSlideIn_0.35s_cubic-bezier(0.16,1,0.3,1)_both] md:gap-5"
       style={{ "--slide-from": `${slideDirection * 24}px` } as React.CSSProperties}
     >
       <Link
         href={previewUrl}
         onMouseEnter={() => onPrefetch(item)}
-        className="flex flex-col gap-5"
+        className="flex flex-col gap-3 md:gap-5"
       >
         {item.logoPath ? (
           <MediaLogo
@@ -97,6 +99,7 @@ export function SpotlightContent({
           title={item.title}
           onOpenChange={onPausedChange}
         />
+        {actionsTrailing && <div className="ml-auto">{actionsTrailing}</div>}
       </div>
     </div>
   );
