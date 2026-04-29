@@ -1,12 +1,16 @@
 "use client";
 
+import { useCallback, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Film, Star, Tv } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { SectionTitle } from "@canto/ui/section-title";
-import { MediaCard, MediaCardSkeleton } from "@/components/media/media-card";
+import { Skeleton } from "@canto/ui/skeleton";
+import { FadeImage } from "@/components/ui/fade-image";
 import { useScrollCarousel } from "@/hooks/use-scroll-carousel";
 import { mediaHref } from "@/lib/media-href";
+import { tmdbPosterLoader } from "@/lib/tmdb-image";
+import { trpc } from "@/lib/trpc/client";
 
 export interface Top10Item {
   externalId: number;
@@ -34,19 +38,152 @@ const METALLIC_NUMBER_STYLE: React.CSSProperties = {
   textShadow: "0 6px 24px rgba(0,0,0,0.45)",
 };
 
+const CARD_WIDTH_CLASSES = "w-[140px] sm:w-[180px] lg:w-[220px] 2xl:w-[240px]";
+
 function RankNumeral({ rank }: { rank: number }): React.JSX.Element {
   return (
     <span
       aria-hidden
       className={cn(
-        "pointer-events-none select-none font-black leading-[0.8] tracking-tighter italic",
-        "text-[160px] sm:text-[190px] lg:text-[230px] 2xl:text-[260px]",
+        "pointer-events-none inline-block select-none font-black leading-none tracking-tighter italic",
+        "text-[120px] sm:text-[170px] lg:text-[230px] 2xl:text-[260px]",
         rank === 10 && "-ml-2 sm:-ml-3 lg:-ml-4",
       )}
       style={METALLIC_NUMBER_STYLE}
     >
       {rank}
     </span>
+  );
+}
+
+function formatRating(value: number): string {
+  return value % 1 === 0 ? value.toString() : value.toFixed(1);
+}
+
+interface Top10CardProps {
+  item: Top10Item;
+  rank: number;
+}
+
+function Top10Card({ item, rank }: Top10CardProps): React.JSX.Element {
+  const href = mediaHref(item.provider, item.externalId, item.type);
+  const utils = trpc.useUtils();
+  const [imageReady, setImageReady] = useState(!item.posterPath);
+  const typeLabel = item.type === "movie" ? "MOVIE" : "TV SHOW";
+  const hasRating = item.voteAverage != null && item.voteAverage > 0;
+
+  const handlePrefetch = useCallback(() => {
+    void utils.media.resolve.prefetch({
+      provider: item.provider,
+      externalId: item.externalId,
+      type: item.type,
+    });
+  }, [item.externalId, item.provider, item.type, utils]);
+
+  return (
+    <div
+      className="grid shrink-0 grid-cols-[auto_auto] grid-rows-[auto_auto] items-end"
+      onMouseEnter={handlePrefetch}
+    >
+      <Link
+        href={href}
+        aria-label={`${rank}. ${item.title}`}
+        className="col-start-1 row-start-1 flex items-end self-end"
+      >
+        <RankNumeral rank={rank} />
+      </Link>
+
+      <Link
+        href={href}
+        className={cn(
+          "group col-start-2 row-start-1 mt-1 ml-1 md:ml-2",
+          CARD_WIDTH_CLASSES,
+        )}
+      >
+        <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-muted transition-[box-shadow] duration-200 group-hover:ring-2 group-hover:ring-foreground/20">
+          {item.posterPath ? (
+            <FadeImage
+              loader={tmdbPosterLoader}
+              src={item.posterPath}
+              alt={item.title}
+              fill
+              className="object-cover"
+              fadeDuration={200}
+              loading="lazy"
+              sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16vw"
+              onLoad={() => setImageReady(true)}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              {item.type === "movie" ? (
+                <Film className="h-10 w-10 text-muted-foreground" />
+              ) : (
+                <Tv className="h-10 w-10 text-muted-foreground" />
+              )}
+            </div>
+          )}
+          <div
+            aria-hidden
+            className={cn(
+              "pointer-events-none absolute inset-0 transition-opacity duration-200",
+              imageReady ? "opacity-0" : "opacity-100",
+            )}
+          >
+            <div
+              className={cn(
+                "absolute inset-0 rounded-xl bg-muted",
+                !imageReady && "animate-pulse",
+              )}
+            />
+          </div>
+        </div>
+      </Link>
+
+      <Link
+        href={href}
+        className={cn(
+          "group col-start-2 row-start-2 ml-1 mt-1.5 flex flex-col gap-1 px-0.5 md:ml-2 md:mt-2 md:gap-1.5",
+          CARD_WIDTH_CLASSES,
+        )}
+      >
+        <p className="line-clamp-2 text-xs font-semibold text-foreground transition-colors group-hover:text-primary md:text-sm">
+          {item.title}
+        </p>
+        <div className="flex flex-wrap items-center gap-x-1.5 text-[10px] font-medium tracking-wide text-muted-foreground md:text-xs">
+          <span>{typeLabel}</span>
+          {item.year && (
+            <>
+              <span aria-hidden>·</span>
+              <span className="tabular-nums">{item.year}</span>
+            </>
+          )}
+        </div>
+        {hasRating && (
+          <div className="flex items-center gap-1 text-[10px] font-medium tracking-wide text-muted-foreground md:text-xs">
+            <Star size={12} className="fill-current text-yellow-400" />
+            <span className="tabular-nums">{formatRating(item.voteAverage!)}</span>
+          </div>
+        )}
+      </Link>
+    </div>
+  );
+}
+
+function Top10CardSkeleton({ rank }: { rank: number }): React.JSX.Element {
+  return (
+    <div className="grid shrink-0 grid-cols-[auto_auto] grid-rows-[auto_auto] items-end">
+      <div className="col-start-1 row-start-1 flex items-end self-end">
+        <RankNumeral rank={rank} />
+      </div>
+      <div className={cn("col-start-2 row-start-1 mt-1 ml-1 md:ml-2", CARD_WIDTH_CLASSES)}>
+        <Skeleton className="aspect-[2/3] w-full rounded-xl" />
+      </div>
+      <div className={cn("col-start-2 row-start-2 ml-1 mt-1.5 flex flex-col gap-1 px-0.5 md:ml-2 md:mt-2 md:gap-1.5", CARD_WIDTH_CLASSES)}>
+        <Skeleton className="h-3 w-3/4 rounded md:h-3.5" />
+        <Skeleton className="h-2.5 w-1/2 rounded md:h-3" />
+        <Skeleton className="h-2.5 w-2/5 rounded md:h-3" />
+      </div>
+    </div>
   );
 }
 
@@ -93,45 +230,19 @@ export function Top10Row({
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="flex gap-2 overflow-x-auto overflow-y-visible pb-4 pl-4 scrollbar-none md:gap-3 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
+          className="flex gap-1 overflow-x-auto overflow-y-visible pb-4 pl-4 scrollbar-none md:gap-3 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
         >
           {isLoading && items.length === 0
             ? Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="flex shrink-0 items-end gap-1 md:gap-2">
-                  <RankNumeral rank={i + 1} />
-                  <MediaCardSkeleton className="w-[180px] shrink-0 animate-pulse sm:w-[200px] lg:w-[220px] 2xl:w-[240px]" />
-                </div>
+                <Top10CardSkeleton key={i} rank={i + 1} />
               ))
-            : items.slice(0, 10).map((item, i) => {
-                const rank = i + 1;
-                const href = mediaHref(item.provider, item.externalId, item.type);
-                return (
-                  <div
-                    key={`${item.provider}-${item.externalId}`}
-                    className="flex shrink-0 items-end gap-1 md:gap-2"
-                  >
-                    <Link
-                      href={href}
-                      aria-label={`${rank}. ${item.title}`}
-                      className="flex items-end"
-                    >
-                      <RankNumeral rank={rank} />
-                    </Link>
-                    <div className="w-[180px] shrink-0 sm:w-[200px] lg:w-[220px] 2xl:w-[240px]">
-                      <MediaCard
-                        externalId={item.externalId}
-                        provider={item.provider}
-                        type={item.type}
-                        title={item.title}
-                        posterPath={item.posterPath ?? null}
-                        year={item.year}
-                        voteAverage={item.voteAverage}
-                        href={href}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+            : items.slice(0, 10).map((item, i) => (
+                <Top10Card
+                  key={`${item.provider}-${item.externalId}`}
+                  item={item}
+                  rank={i + 1}
+                />
+              ))}
           <div className="w-4 shrink-0 md:w-8 lg:w-12 xl:w-16 2xl:w-24" />
         </div>
       </div>
