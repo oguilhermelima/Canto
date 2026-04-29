@@ -54,11 +54,11 @@ export default function LibraryPage(): React.JSX.Element {
 
       {activeTab === "hub" && (
         <div className="mt-6 flex flex-col gap-6 md:mt-8 md:gap-12">
-          <LazySection id="hub-watch-next" minHeight={260} eager={true} rootMargin={lazyRootMargin}>
-            <HubWatchNextSection />
-          </LazySection>
-          <LazySection id="hub-upcoming" minHeight={260} eager={false} rootMargin={lazyRootMargin}>
+          <LazySection id="hub-upcoming" minHeight={260} eager={true} rootMargin={lazyRootMargin}>
             <HubUpcomingCalendar />
+          </LazySection>
+          <LazySection id="hub-watch-next" minHeight={260} eager={false} rootMargin={lazyRootMargin}>
+            <HubWatchNextSection />
           </LazySection>
           <LazySection id="hub-watchlist" minHeight={260} eager={false} rootMargin={lazyRootMargin}>
             <HubWatchlistSection />

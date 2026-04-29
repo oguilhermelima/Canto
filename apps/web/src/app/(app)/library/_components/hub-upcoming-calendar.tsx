@@ -203,26 +203,44 @@ function MobileDayChip({
       type="button"
       onClick={onSelect}
       className={cn(
-        "flex shrink-0 flex-col items-center gap-1 rounded-2xl px-3.5 py-2 transition-colors",
+        "group/chip flex shrink-0 flex-col items-stretch gap-2 border-b-2 pb-2 pt-1 transition-colors",
         active
-          ? "bg-foreground text-background"
-          : "bg-foreground/[0.06] text-muted-foreground hover:bg-foreground/[0.1]",
+          ? "border-foreground"
+          : "border-border/40 hover:border-border/70",
       )}
     >
-      <span className="text-[10px] font-bold uppercase tracking-[0.18em]">
-        {bucket.isToday ? "Today" : bucket.weekdayShort}
-      </span>
-      <span className="text-xl font-extrabold tabular-nums leading-none">
-        {dayNum}
-      </span>
-      <span
-        className={cn(
-          "text-[10px] font-semibold tabular-nums",
-          active ? "text-background/70" : "text-muted-foreground/70",
-        )}
-      >
-        {count === 0 ? "—" : count}
-      </span>
+      <div className="flex min-w-[3.25rem] items-baseline justify-between gap-2 px-1">
+        <span
+          className={cn(
+            "text-[10px] font-bold uppercase tracking-[0.18em]",
+            active
+              ? "text-foreground"
+              : bucket.isWeekend
+                ? "text-muted-foreground/70"
+                : "text-muted-foreground",
+          )}
+        >
+          {bucket.isToday ? "Today" : bucket.weekdayShort}
+        </span>
+        <span
+          className={cn(
+            "text-2xl font-extrabold tabular-nums leading-none",
+            active ? "text-foreground" : "text-foreground/55",
+          )}
+        >
+          {dayNum}
+        </span>
+      </div>
+      {count > 0 && (
+        <span
+          className={cn(
+            "px-1 text-left text-[10px] font-semibold tabular-nums",
+            active ? "text-muted-foreground" : "text-muted-foreground/55",
+          )}
+        >
+          {count} {count === 1 ? "release" : "releases"}
+        </span>
+      )}
     </button>
   );
 }
