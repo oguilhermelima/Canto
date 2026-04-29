@@ -84,7 +84,7 @@ services:
   worker:
     image: canto:latest
     pull_policy: never
-    command: pnpm --filter @canto/worker exec tsx src/index.ts
+    command: bun apps/worker/src/index.ts
     working_dir: /app
     environment:
       NODE_ENV: production

@@ -30,6 +30,10 @@ RUN pnpm run build
 FROM base AS runner
 ENV NODE_ENV=production
 
+# Bun runs the worker (native TS, no transpile cost in prod). Web still runs
+# on Node via Next standalone — both binaries live in the same image.
+COPY --from=oven/bun:1-alpine /usr/local/bin/bun /usr/local/bin/bun
+
 # Copy built artifacts
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/pnpm-workspace.yaml ./
@@ -41,8 +45,8 @@ COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
 
-# Worker source + tsconfig (executed at runtime via tsx; TS ESM would need
-# rewritten extensions, which the repo uses Bundler resolution for) plus its
+# Worker source + tsconfig (Bun executes TS directly with bundler-style
+# resolution, so we keep .ts source and skip the tsc emit step) plus its
 # pnpm workspace node_modules (symlinks into the .pnpm store).
 COPY --from=builder /app/apps/worker/src ./apps/worker/src
 COPY --from=builder /app/apps/worker/tsconfig.json ./apps/worker/
