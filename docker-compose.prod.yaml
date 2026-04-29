@@ -41,7 +41,7 @@ services:
       target: runner
     image: canto:latest
     pull_policy: build
-    command: pnpm --filter @canto/db exec drizzle-kit push --force
+    command: pnpm --filter @canto/db exec drizzle-kit migrate
     working_dir: /app
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-canto}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-canto}
