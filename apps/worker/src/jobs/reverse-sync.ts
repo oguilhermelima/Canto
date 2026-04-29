@@ -275,14 +275,23 @@ export interface ReverseSyncOptions {
    * every time one person opens the app.
    */
   userId?: string;
+  /**
+   * Restrict the run to a single provider. The per-provider cron handlers
+   * (jellyfin/plex) pass this so each scheduled run only walks its own
+   * connections — without it both crons would loop every connection on
+   * every fire, doubling the per-cycle cost.
+   */
+  provider?: ServerSource;
 }
 
 export async function runReverseSync(options: ReverseSyncOptions = {}): Promise<void> {
   const force = options.force === true;
   const allConnections = await findAllUserConnections(db);
-  const connections = options.userId
-    ? allConnections.filter((c) => c.userId === options.userId)
-    : allConnections;
+  const connections = allConnections.filter((c) => {
+    if (options.userId && c.userId !== options.userId) return false;
+    if (options.provider && c.provider !== options.provider) return false;
+    return true;
+  });
   const tmdb = await getTmdbProvider();
 
   const globallySyncedLibraries = new Set<string>();
@@ -518,11 +527,11 @@ export async function runReverseSync(options: ReverseSyncOptions = {}): Promise<
 /* -------------------------------------------------------------------------- */
 
 export async function handleJellyfinSync(): Promise<void> {
-  return runReverseSync();
+  return runReverseSync({ provider: "jellyfin" });
 }
 
 export async function handlePlexSync(): Promise<void> {
-  return runReverseSync();
+  return runReverseSync({ provider: "plex" });
 }
 
 export async function handleReverseSyncFull(): Promise<void> {
