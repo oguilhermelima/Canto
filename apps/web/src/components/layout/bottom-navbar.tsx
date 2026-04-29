@@ -13,7 +13,7 @@ import {
 } from "@canto/ui/sheet";
 import { Separator } from "@canto/ui/separator";
 import {
-  Compass,
+  Home,
   GalleryVerticalEnd,
   Search,
   Download,
@@ -26,12 +26,12 @@ import {
   Sun,
   Moon,
 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { authClient } from "@/lib/auth-client";
 
 const navItems = [
-  { label: "Discover", href: "/", icon: Compass },
+  { label: "Home", href: "/", icon: Home },
   { label: "Library", href: "/library", icon: GalleryVerticalEnd },
   { label: "Search", href: "/search", icon: Search },
 ] as const;
@@ -47,37 +47,13 @@ export function BottomNavbar(): React.JSX.Element {
   const role = (session?.user as { role?: string } | undefined)?.role;
   const isAdmin = role === "admin";
 
-  // Hide on scroll down, show on scroll up
-  const [hidden, setHidden] = useState(false);
-  const lastScrollY = useRef(0);
-
-  useEffect(() => {
-    const onScroll = (): void => {
-      const y = window.scrollY;
-      const delta = y - lastScrollY.current;
-
-      // Only react after a minimum scroll threshold to avoid jitter
-      if (Math.abs(delta) < 8) return;
-
-      setHidden(delta > 0 && y > 60);
-      lastScrollY.current = y;
-    };
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
   function isActive(href: string): boolean {
     return pathname === href || (href !== "/" && pathname.startsWith(href));
   }
 
   return (
     <nav
-      data-scroll-animate
-      className={cn(
-        "fixed bottom-0 left-0 right-0 z-40 flex items-center justify-center gap-14 border-t border-border bg-background py-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] transition-transform duration-400 ease-[cubic-bezier(0.25,1,0.5,1)] md:hidden",
-        hidden && "translate-y-full",
-      )}
+      className="fixed bottom-0 left-0 right-0 z-40 grid grid-cols-4 items-start border-t border-border bg-background pt-2 pb-[calc(0.25rem+env(safe-area-inset-bottom))] md:hidden"
     >
       {navItems.map(({ label, href, icon: Icon }) => {
         const active = isActive(href);
@@ -87,11 +63,23 @@ export function BottomNavbar(): React.JSX.Element {
             href={href}
             aria-label={label}
             className={cn(
-              "flex items-center justify-center p-2 transition-colors duration-300",
+              "flex flex-col items-center justify-center gap-1 px-1 transition-colors duration-300",
               active ? "text-foreground" : "text-muted-foreground",
             )}
           >
-            <Icon size={22} strokeWidth={active ? 2.5 : 1.5} />
+            <Icon
+              size={24}
+              strokeWidth={active ? 2 : 1.75}
+              className={active ? "fill-current" : undefined}
+            />
+            <span
+              className={cn(
+                "text-[10px] leading-none tracking-tight",
+                active ? "font-semibold" : "font-medium",
+              )}
+            >
+              {label}
+            </span>
           </Link>
         );
       })}
@@ -99,14 +87,18 @@ export function BottomNavbar(): React.JSX.Element {
       {mounted ? (
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetTrigger asChild>
-          <button aria-label="Menu" className="flex items-center justify-center p-2">
-            <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-muted">
+          <button
+            aria-label="Profile"
+            className="flex flex-col items-center justify-center gap-1 px-1 text-muted-foreground"
+          >
+            <div className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-muted">
               {session?.user.image ? (
-                <Image src={session.user.image} alt="" width={28} height={28} className="h-7 w-7 rounded-full object-cover" />
+                <Image src={session.user.image} alt="" width={24} height={24} className="h-6 w-6 rounded-full object-cover" />
               ) : (
-                <UserRound size={16} className="text-muted-foreground" />
+                <UserRound size={14} className="text-muted-foreground" />
               )}
             </div>
+            <span className="text-[10px] font-medium leading-none tracking-tight">Profile</span>
           </button>
         </SheetTrigger>
         <SheetContent side="bottom" className="px-6 pb-8">
@@ -197,8 +189,12 @@ export function BottomNavbar(): React.JSX.Element {
         </SheetContent>
       </Sheet>
       ) : (
-        <button aria-label="Menu" className="flex items-center justify-center p-2 text-muted-foreground">
-          <UserRound size={26} />
+        <button
+          aria-label="Profile"
+          className="flex flex-col items-center justify-center gap-1 px-1 text-muted-foreground"
+        >
+          <UserRound size={24} />
+          <span className="text-[10px] font-medium leading-none tracking-tight">Profile</span>
         </button>
       )}
     </nav>
