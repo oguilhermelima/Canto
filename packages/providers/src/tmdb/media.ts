@@ -128,11 +128,12 @@ function enrichTranslationsWithImages(
   const bestPoster = new Map<string, string>();
   const bestPosterScore = new Map<string, number>();
   for (const p of imagesData.posters ?? []) {
-    if (!p.iso_639_1 || p.iso_639_1 === "en") continue; // skip English (base)
-    const cur = bestPosterScore.get(p.iso_639_1) ?? -1;
+    const langCode = p.iso_639_1;
+    if (!langCode || langCode === "en") continue; // skip English (base)
+    const cur = bestPosterScore.get(langCode) ?? -1;
     if (p.vote_average > cur) {
-      bestPoster.set(p.iso_639_1, p.file_path);
-      bestPosterScore.set(p.iso_639_1, p.vote_average);
+      bestPoster.set(langCode, p.file_path);
+      bestPosterScore.set(langCode, p.vote_average);
     }
   }
 
@@ -140,11 +141,12 @@ function enrichTranslationsWithImages(
   const bestLogo = new Map<string, string>();
   const bestLogoScore = new Map<string, number>();
   for (const l of imagesData.logos ?? []) {
-    if (!l.iso_639_1 || l.iso_639_1 === "en") continue;
-    const cur = bestLogoScore.get(l.iso_639_1) ?? -1;
+    const langCode = l.iso_639_1;
+    if (!langCode || langCode === "en") continue;
+    const cur = bestLogoScore.get(langCode) ?? -1;
     if (l.vote_average > cur) {
-      bestLogo.set(l.iso_639_1, l.file_path);
-      bestLogoScore.set(l.iso_639_1, l.vote_average);
+      bestLogo.set(langCode, l.file_path);
+      bestLogoScore.set(langCode, l.vote_average);
     }
   }
 

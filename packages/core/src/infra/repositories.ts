@@ -14,6 +14,7 @@ export * from "./media/media-repository";
 export * from "./media/media-version-repository";
 export * from "./media/media-file-repository";
 export * from "./media/media-aspect-state-repository";
+export * from "./media/media-localized-repository";
 
 export * from "./media-servers/user-connection-repository";
 
