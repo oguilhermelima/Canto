@@ -30,15 +30,13 @@ export function SectionTitle({
     </h2>
   );
 
-  // Both branches share a `py-2` inner row so the section header reserves the
-  // same vertical space whether or not a "See more" link is present.
   return (
-    <div className={cn(OUTER_PADDING, "pb-2", className)}>
+    <div className={cn(OUTER_PADDING, className)}>
       <div className="flex items-center justify-between gap-2">
         {seeMorePath ? (
           <Link
             href={seeMorePath}
-            className="group/section-title -mx-3 flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl px-3 py-2 transition-colors hover:bg-muted/50"
+            className="group/section-title -mx-3 flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl px-3 py-1 transition-colors hover:bg-muted/50 md:py-2"
           >
             {titleNode}
             <div className="flex shrink-0 items-center gap-1 text-sm font-medium text-muted-foreground transition-colors group-hover/section-title:text-foreground">
@@ -47,7 +45,7 @@ export function SectionTitle({
             </div>
           </Link>
         ) : (
-          <div className="-mx-3 flex min-w-0 flex-1 items-center gap-1 px-3 py-2">
+          <div className="-mx-3 flex min-w-0 flex-1 items-center gap-1 px-3 py-1 md:py-2">
             {titleNode}
           </div>
         )}

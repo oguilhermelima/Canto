@@ -16,11 +16,11 @@ export function SectionTitleSkeleton({
   return (
     <div
       className={cn(
-        "pb-2 px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24",
+        "px-4 md:px-8 lg:px-12 xl:px-16 2xl:px-24",
         className,
       )}
     >
-      <div className="flex items-center justify-between gap-2 py-2">
+      <div className="flex items-center justify-between gap-2 py-1 md:py-2">
         <Skeleton className="h-6 w-32 md:h-7 md:w-48" />
         {showSeeMore && <Skeleton className="h-4 w-16" />}
       </div>
