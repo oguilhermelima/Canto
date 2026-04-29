@@ -19,9 +19,9 @@ const TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
   hour: "2-digit",
   minute: "2-digit",
 });
-const COLUMN_WIDTH = "w-[280px] sm:w-[340px] lg:w-[400px]";
+const COLUMN_WIDTH = "w-full md:w-[340px] md:shrink-0 lg:w-[400px]";
 const SCROLL_PADDING_X =
-  "pl-4 pr-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24";
+  "px-4 md:pl-8 md:pr-8 lg:pl-12 lg:pr-12 xl:pl-16 xl:pr-16 2xl:pl-24 2xl:pr-24";
 // Vary skeleton density across columns so the loading state looks like a real
 // calendar (some days busy, some sparse) instead of a uniform grid.
 const SKELETON_ITEM_COUNTS = [3, 1, 2, 1, 2, 0, 1];
@@ -170,7 +170,7 @@ function DayHeader({ bucket }: { bucket: DayBucket }): React.JSX.Element {
 
 function DayColumn({ bucket }: { bucket: DayBucket }): React.JSX.Element {
   return (
-    <div className={cn("group/day flex shrink-0 flex-col", COLUMN_WIDTH)}>
+    <div className={cn("group/day flex flex-col", COLUMN_WIDTH)}>
       <DayHeader bucket={bucket} />
       {bucket.items.length === 0 ? (
         <p className="px-2 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground/30">
@@ -189,7 +189,7 @@ function DayColumn({ bucket }: { bucket: DayBucket }): React.JSX.Element {
 
 function DayColumnSkeleton({ bucket, itemCount }: { bucket: DayBucket; itemCount: number }): React.JSX.Element {
   return (
-    <div className={cn("group/day flex shrink-0 flex-col", COLUMN_WIDTH)}>
+    <div className={cn("group/day flex flex-col", COLUMN_WIDTH)}>
       <DayHeader bucket={bucket} />
       {itemCount === 0 ? (
         <p className="px-2 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground/30">
@@ -235,7 +235,7 @@ export function HubUpcomingCalendar(): React.JSX.Element {
       <div>
         <div
           className={cn(
-            "flex items-start gap-3 overflow-x-auto overflow-y-visible pb-4 scrollbar-none md:gap-6",
+            "flex flex-col gap-5 pb-4 md:flex-row md:items-start md:gap-6 md:overflow-x-auto md:overflow-y-visible md:scrollbar-none",
             SCROLL_PADDING_X,
           )}
         >
