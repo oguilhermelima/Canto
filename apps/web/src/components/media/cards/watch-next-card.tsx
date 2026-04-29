@@ -7,11 +7,7 @@ import { Bookmark, Tv } from "lucide-react";
 import { Skeleton } from "@canto/ui/skeleton";
 import { cn } from "@canto/ui/cn";
 import { mediaHref } from "@/lib/media-href";
-import { useLogo } from "@/hooks/use-logos";
-import { MediaLogo } from "@/components/media/media-logo";
 import { tmdbThumbLoader } from "@/lib/tmdb-image";
-
-const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
 export type WatchNextView = "continue" | "watch_next";
 
@@ -118,25 +114,11 @@ export function WatchNextCard({
   view: WatchNextView;
 }): React.JSX.Element {
   const cardImage = imagePath(item);
-  const fetchedLogo = useLogo(
-    item.provider,
-    String(item.externalId),
-    item.mediaType,
-    {
-      title: item.title,
-      posterPath: item.posterPath,
-      backdropPath: item.backdropPath,
-      year: item.year,
-    },
-    { skip: !!item.logoPath },
-  );
-  const logoPath = item.logoPath ?? fetchedLogo;
-  const logoResolved = !!item.logoPath || fetchedLogo !== undefined;
   const [imageReady, setImageReady] = useState(!cardImage);
   const subtitle = buildSubtitle(item);
   const extra = buildExtra(item);
 
-  if (!logoResolved || !imageReady) {
+  if (!imageReady) {
     return (
       <div className={cn("mt-1 flex flex-col", CARD_WIDTH)}>
         <Skeleton className="aspect-video w-full rounded-xl" />
@@ -190,31 +172,21 @@ export function WatchNextCard({
           {view === "continue" ? "CONTINUE" : "UP NEXT"}
         </div>
 
-        {(logoPath || item.progressPercent !== null) && (
+        {item.progressPercent !== null && (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent px-4 pb-4 pt-14">
-            {logoPath && (
-              <MediaLogo
-                src={`${TMDB_IMAGE_BASE}/w500${logoPath}`}
-                alt={item.title}
-                size="card"
-                className="max-w-[60%]"
-              />
-            )}
-            {item.progressPercent !== null && (
-              <div className={cn("flex items-center gap-2.5", logoPath && "mt-2.5")}>
-                <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/25">
-                  <div
-                    className="h-full rounded-full bg-white"
-                    style={{ width: `${Math.min(item.progressPercent, 100)}%` }}
-                  />
-                </div>
-                {extra && (
-                  <span className="shrink-0 text-[11px] font-medium tabular-nums text-white/90">
-                    {extra}
-                  </span>
-                )}
+            <div className="flex items-center gap-2.5">
+              <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/25">
+                <div
+                  className="h-full rounded-full bg-white"
+                  style={{ width: `${Math.min(item.progressPercent, 100)}%` }}
+                />
               </div>
-            )}
+              {extra && (
+                <span className="shrink-0 text-[11px] font-medium tabular-nums text-white/90">
+                  {extra}
+                </span>
+              )}
+            </div>
           </div>
         )}
       </div>

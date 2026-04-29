@@ -55,7 +55,6 @@ function toBackdropItems(items: SectionItem[]) {
       type: item.type,
       title: item.title,
       backdropPath: item.backdropPath,
-      logoPath: item.logoPath,
       year: item.year ?? undefined,
       voteAverage: item.voteAverage ?? undefined,
       popularity: item.popularity,

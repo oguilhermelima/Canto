@@ -563,7 +563,7 @@ function StylePreview({ value }: { value: string }): React.JSX.Element {
     return (
       <div className="pointer-events-none">
         <BackdropCard externalId="24188" provider="tmdb" type="movie" title="Il Sorpasso"
-          backdropPath={example.backdrop} logoPath={null} year={1962} voteAverage={8.0} className="w-full" />
+          backdropPath={example.backdrop} year={1962} voteAverage={8.0} className="w-full" />
       </div>
     );
   }

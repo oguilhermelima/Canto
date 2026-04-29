@@ -9,10 +9,6 @@ import { EyeOff, Film, Star, Tv } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { tmdbThumbLoader } from "@/lib/tmdb-image";
 import { mediaHref } from "@/lib/media-href";
-import { MediaLogo } from "./media-logo";
-import { useLogo } from "@/hooks/use-logos";
-
-const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 
 function formatDuration(seconds: number): string {
   if (seconds <= 0) return "0m";
@@ -33,7 +29,6 @@ interface BackdropCardProps {
   type: "movie" | "show";
   title: string;
   backdropPath: string | null;
-  logoPath?: string | null;
   year?: number | null;
   voteAverage?: number | null;
   userRating?: number | null;
@@ -56,7 +51,6 @@ export function BackdropCard({
   type,
   title,
   backdropPath,
-  logoPath: logoFromProps,
   year,
   voteAverage,
   userRating,
@@ -68,16 +62,6 @@ export function BackdropCard({
   const href = mediaHref(provider ?? "tmdb", externalId ?? "0", type);
   const utils = trpc.useUtils();
   const [imageReady, setImageReady] = useState(!backdropPath);
-
-  const hasLogoFromProps = logoFromProps !== undefined;
-  const fetchedLogo = useLogo(provider, externalId, type, {
-    title,
-    posterPath: null,
-    backdropPath,
-    year,
-    voteAverage,
-  }, { skip: hasLogoFromProps });
-  const logoPath = hasLogoFromProps ? logoFromProps : fetchedLogo;
 
   const handlePrefetch = useCallback(() => {
     if (externalId) {
@@ -166,30 +150,21 @@ export function BackdropCard({
           </div>
         )}
 
-        {(logoPath || progress) && (
+        {progress && (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent px-4 pb-4 pt-14">
-            {logoPath && (
-              <MediaLogo
-                src={`${TMDB_IMAGE_BASE}/w500${logoPath}`}
-                alt={title}
-                size="card"
-              />
-            )}
-            {progress && (
-              <div className={cn("flex items-center gap-2.5", logoPath && "mt-2.5")}>
-                <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/25">
-                  <div
-                    className="h-full rounded-full bg-white"
-                    style={{ width: `${Math.min(progress.percent, 100)}%` }}
-                  />
-                </div>
-                <span className="shrink-0 text-[11px] font-medium tabular-nums text-white/90">
-                  {progress.unit === "seconds"
-                    ? `${formatDuration(progress.value)} / ${formatDuration(progress.total)}`
-                    : `${progress.value}/${progress.total} ep`}
-                </span>
+            <div className="flex items-center gap-2.5">
+              <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/25">
+                <div
+                  className="h-full rounded-full bg-white"
+                  style={{ width: `${Math.min(progress.percent, 100)}%` }}
+                />
               </div>
-            )}
+              <span className="shrink-0 text-[11px] font-medium tabular-nums text-white/90">
+                {progress.unit === "seconds"
+                  ? `${formatDuration(progress.value)} / ${formatDuration(progress.total)}`
+                  : `${progress.value}/${progress.total} ep`}
+              </span>
+            </div>
           </div>
         )}
       </div>
