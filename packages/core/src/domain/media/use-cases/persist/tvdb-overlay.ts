@@ -3,10 +3,12 @@ import { and, eq, sql } from "drizzle-orm";
 import type { NormalizedMedia, NormalizedSeason } from "@canto/providers";
 import {
   episode,
+  episodeLocalization,
   episodeTranslation,
   media,
   mediaFile,
   season,
+  seasonLocalization,
   seasonTranslation,
   userPlaybackProgress,
   userRating,
@@ -188,13 +190,21 @@ export async function applyTvdbSeasons(
   let savedEpTranslations: SavedEpTranslation[] = [];
 
   if (existingEpIds.length > 0) {
-    const epTrans = await db.query.episodeTranslation.findMany({
-      where: sql`${episodeTranslation.episodeId} IN (${sql.join(
-        existingEpIds.map((id) => sql`${id}`),
-        sql`, `,
-      )})`,
-    });
-    savedEpTranslations = epTrans.map((t) => {
+    const epLocs = await db
+      .select({
+        episodeId: episodeLocalization.episodeId,
+        language: episodeLocalization.language,
+        title: episodeLocalization.title,
+        overview: episodeLocalization.overview,
+      })
+      .from(episodeLocalization)
+      .where(
+        sql`${episodeLocalization.episodeId} IN (${sql.join(
+          existingEpIds.map((id) => sql`${id}`),
+          sql`, `,
+        )})`,
+      );
+    savedEpTranslations = epLocs.map((t) => {
       const info = epIdentity.get(t.episodeId);
       return {
         absoluteNumber: info?.absoluteNumber ?? null,
@@ -216,14 +226,22 @@ export async function applyTvdbSeasons(
   let savedSeasonTranslations: SavedSeasonTranslation[] = [];
 
   if (existingSeasonIds.length > 0) {
-    const sTrans = await db.query.seasonTranslation.findMany({
-      where: sql`${seasonTranslation.seasonId} IN (${sql.join(
-        existingSeasonIds.map((id) => sql`${id}`),
-        sql`, `,
-      )})`,
-    });
+    const sLocs = await db
+      .select({
+        seasonId: seasonLocalization.seasonId,
+        language: seasonLocalization.language,
+        name: seasonLocalization.name,
+        overview: seasonLocalization.overview,
+      })
+      .from(seasonLocalization)
+      .where(
+        sql`${seasonLocalization.seasonId} IN (${sql.join(
+          existingSeasonIds.map((id) => sql`${id}`),
+          sql`, `,
+        )})`,
+      );
     const seasonNumberById = new Map(existingSeasons.map((s) => [s.id, s.number]));
-    savedSeasonTranslations = sTrans.map((t) => ({
+    savedSeasonTranslations = sLocs.map((t) => ({
       seasonNumber: seasonNumberById.get(t.seasonId) ?? 0,
       language: t.language,
       name: t.name,
