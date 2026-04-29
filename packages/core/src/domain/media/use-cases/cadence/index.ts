@@ -22,3 +22,13 @@ export {
   type ForcedAspect,
   type PlanItem,
 } from "./compute-plan";
+export {
+  buildForceAspects,
+  buildMediaContext,
+  classifyError,
+  parseDateColumn,
+  scopesFor,
+  stateKey,
+  writeAspectState,
+  type CadenceMediaRow,
+} from "./aspect-state-writer";

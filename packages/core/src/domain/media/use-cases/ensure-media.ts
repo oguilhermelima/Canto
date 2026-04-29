@@ -1,30 +1,46 @@
 import type { Database } from "@canto/db/client";
-import type { ProviderName, MediaType } from "@canto/providers";
+import type { ProviderName, MediaType, TvdbProvider } from "@canto/providers";
 import { findMediaById } from "../../../infra/repositories";
+import {
+  findAspectStates,
+  type MediaAspectStateRow,
+} from "../../../infra/media/media-aspect-state-repository";
 import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import { getActiveUserLanguages } from "../../shared/services/user-service";
-import { detectGaps } from "./detect-gaps";
+import {
+  buildForceAspects,
+  buildMediaContext,
+  classifyError,
+  computePlan,
+  effectiveProvider,
+  loadCadenceKnobs,
+  scopesFor,
+  stateKey,
+  writeAspectState,
+  type CadenceSignal,
+  type Outcome,
+} from "./cadence";
 import type {
   Aspect,
   EnsureMediaResult,
   EnsureMediaSpec,
 } from "./ensure-media.types";
-import { ALL_ASPECTS } from "./ensure-media.types";
+import { fetchAndPersistLogos } from "./fetch-and-persist-logos";
 import { fetchMediaMetadata } from "./fetch-media-metadata";
 import { updateMediaFromNormalized } from "./persist";
 import { refreshExtras } from "../../content-enrichment/use-cases/refresh-extras";
-import { upsertLangLogos } from "../../content-enrichment/use-cases/upsert-lang-logos";
 import { getTmdbProvider } from "../../../platform/http/tmdb-client";
 import { getTvdbProvider } from "../../../platform/http/tvdb-client";
 import { getSetting } from "@canto/db/settings";
 import { translateEpisodes } from "../../content-enrichment/use-cases/translate-episodes";
-import type { TvdbProvider } from "@canto/providers";
 
 /**
  * Unified "make sure this media is complete" engine.
  *
- * Callers specify what they need (languages + aspects) and the engine runs
- * the minimum set of provider calls. Idempotent and safe to re-run.
+ * Callers specify what they need (languages + aspects) and the cadence
+ * planner decides which (aspect, scope) tuples are due. Idempotent and safe
+ * to re-run — every executed aspect is recorded in `media_aspect_state` so
+ * the next visit picks up where this one left off.
  *
  * Execution order: structure → metadata + translations (shared call) → logos
  * → extras. Each stage's writes become visible to later stages.
@@ -43,22 +59,47 @@ export async function ensureMedia(
     throw new Error(`ensureMedia: media ${mediaId} not found`);
   }
 
-  const languages = (spec.languages ?? [...(await getActiveUserLanguages(db))]).filter(
-    (l) => !!l,
-  );
+  const languages = (
+    spec.languages ?? [...(await getActiveUserLanguages(db))]
+  ).filter((l) => !!l);
   result.languagesProcessed = languages;
 
-  let aspectsToRun: Aspect[];
-  if (spec.force) {
-    aspectsToRun = spec.aspects ?? ALL_ASPECTS;
-  } else if (spec.aspects && spec.aspects.length > 0) {
-    aspectsToRun = spec.aspects;
-  } else {
-    const gaps = await detectGaps(db, mediaId, languages);
-    aspectsToRun = gaps.gaps;
-  }
+  // Cadence inputs — knobs once, state snapshot once. Pure functions consume
+  // the snapshot so per-aspect upserts don't trigger fresh reads.
+  const knobs = await loadCadenceKnobs(db);
+  const aspectStates = await findAspectStates(db, mediaId);
+  const stateByKey = new Map<string, MediaAspectStateRow>(
+    aspectStates.map((r) => [stateKey(r.aspect as Aspect, r.scope), r]),
+  );
+  const tvdbDefaultShows = (await getSetting("tvdb.defaultShows")) === true;
+  const provider = effectiveProvider(
+    {
+      type: mediaRow.type,
+      provider: mediaRow.provider,
+      overrideProviderFor: mediaRow.overrideProviderFor,
+    },
+    { tvdbDefaultShows },
+  );
+  const ctx = buildMediaContext(mediaRow);
+  const now = new Date();
+  const signal: CadenceSignal = spec.force ? "forced" : "visited";
 
-  if (aspectsToRun.length === 0) {
+  const plan = computePlan({
+    state: aspectStates,
+    ctx,
+    signal,
+    activeLanguages: languages,
+    effectiveProvider: provider,
+    forceAspects: buildForceAspects(spec, languages),
+    knobs,
+    now,
+  });
+
+  const aspectsToRun = new Set<Aspect>(plan.items.map((i) => i.aspect));
+  const planTranslationLangs = scopesFor(plan.items, "translations");
+  const planLogoLangs = scopesFor(plan.items, "logos");
+
+  if (aspectsToRun.size === 0) {
     result.durationMs = Date.now() - start;
     return result;
   }
@@ -68,96 +109,155 @@ export async function ensureMedia(
     tvdb: await getTvdbProvider(),
   };
 
-  // Fuse metadata + translations + contentRatings — all served by the same
-  // fetchMediaMetadata call (TMDB returns release_dates/content_ratings via
-  // append_to_response inside getMetadata).
-  const runMetadata = aspectsToRun.includes("metadata");
-  const runTranslations = aspectsToRun.includes("translations");
-  const runStructure = aspectsToRun.includes("structure");
-  const runLogos = aspectsToRun.includes("logos");
-  const runExtras = aspectsToRun.includes("extras");
-  const runContentRatings = aspectsToRun.includes("contentRatings");
+  // Closure over the cadence inputs so per-aspect call sites stay terse and
+  // every write goes through the same pure-helper path.
+  const persistOutcome = (
+    aspect: Aspect,
+    scope: string,
+    outcome: Outcome,
+  ): Promise<void> =>
+    writeAspectState({
+      db,
+      mediaId,
+      aspect,
+      scope,
+      outcome,
+      ctx,
+      knobs,
+      stateByKey,
+      now,
+      provider,
+    });
 
+  const runMetadata = aspectsToRun.has("metadata");
+  const runTranslations = aspectsToRun.has("translations");
+  const runStructure = aspectsToRun.has("structure");
+  const runLogos = aspectsToRun.has("logos");
+  const runExtras = aspectsToRun.has("extras");
+  const runContentRatings = aspectsToRun.has("contentRatings");
+
+  // Stage 1 — metadata + translations + structure + contentRatings, served by
+  // a single fetchMediaMetadata call. We classify a single outcome and apply
+  // it to every aspect in the stage so they share a coherent next-eligible.
   if (runMetadata || runTranslations || runStructure || runContentRatings) {
-    const useTVDBSeasons = mediaRow.type === "show"
-      && !!mediaRow.tvdbId
-      && (await getSetting("tvdb.defaultShows")) === true;
+    const useTVDBSeasons =
+      mediaRow.type === "show" &&
+      !!mediaRow.tvdbId &&
+      provider === "tvdb" &&
+      mediaRow.provider !== "tvdb";
 
+    const enLangs = languages.filter((l) => l.startsWith("en"));
     const langsForFetch = runTranslations
-      ? languages
-      : languages.filter((l) => l.startsWith("en"));
+      ? Array.from(new Set([...enLangs, ...planTranslationLangs]))
+      : enLangs;
 
-    const fetched = await fetchMediaMetadata(
-      mediaRow.externalId,
-      mediaRow.provider as ProviderName,
-      mediaRow.type as MediaType,
-      deps,
-      {
-        useTVDBSeasons,
-        supportedLanguages: langsForFetch,
-        reprocess: spec.force,
-      },
-    );
-    result.providerCalls.tmdb += 1;
-    if (fetched.tvdbSeasons) result.providerCalls.tvdb += 1;
+    let outcome: Outcome = "data";
+    try {
+      const fetched = await fetchMediaMetadata(
+        mediaRow.externalId,
+        mediaRow.provider as ProviderName,
+        mediaRow.type as MediaType,
+        deps,
+        {
+          useTVDBSeasons,
+          supportedLanguages: langsForFetch,
+          reprocess: spec.force,
+        },
+      );
+      result.providerCalls.tmdb += 1;
+      if (fetched.tvdbSeasons) result.providerCalls.tvdb += 1;
 
-    await updateMediaFromNormalized(db, mediaId, fetched.media);
-    result.writes.media = true;
-    if (runStructure) result.aspectsExecuted.push("structure");
-    if (runMetadata) result.aspectsExecuted.push("metadata");
-    if (runTranslations) result.aspectsExecuted.push("translations");
-    if (runContentRatings) {
-      result.aspectsExecuted.push("contentRatings");
-      result.writes.contentRatings = fetched.media.contentRatings?.length ?? 0;
-    }
+      await updateMediaFromNormalized(db, mediaId, fetched.media);
+      result.writes.media = true;
+      if (runStructure) result.aspectsExecuted.push("structure");
+      if (runMetadata) result.aspectsExecuted.push("metadata");
+      if (runTranslations) result.aspectsExecuted.push("translations");
+      if (runContentRatings) {
+        result.aspectsExecuted.push("contentRatings");
+        result.writes.contentRatings = fetched.media.contentRatings?.length ?? 0;
+      }
 
-    // TVDB episode-translation fallback for shows that TMDB didn't cover.
-    // Runs sequentially inside this job so the worker doesn't dispatch a
-    // second ensure-media run (avoiding cycles through the legacy dispatcher).
-    // Skip when fetchMediaMetadata already saw a 4xx on /series/:id/extended —
-    // the per-language /episodes/default endpoint will hit the same 404.
-    if (
-      runTranslations
-      && mediaRow.type === "show"
-      && mediaRow.tvdbId
-      && !fetched.tvdbFailed
-    ) {
-      for (const lang of languages) {
-        if (lang.startsWith("en")) continue;
-        try {
-          await translateEpisodes(
-            db,
-            mediaId,
-            mediaRow.tvdbId,
-            lang,
-            deps.tvdb as unknown as TvdbProvider,
-          );
-          result.providerCalls.tvdb += 1;
-        } catch {
-          // TVDB may not have translations for this language — non-fatal.
+      // TVDB episode-translation fallback for shows that TMDB didn't cover.
+      // Runs sequentially inside this job so the worker doesn't dispatch a
+      // second ensure-media run (avoiding cycles through the legacy
+      // dispatcher). Skip when fetchMediaMetadata already saw a 4xx on
+      // /series/:id/extended — the per-language /episodes/default endpoint
+      // will hit the same 404. Drives off plan-translation languages so we
+      // only pay for languages the cadence engine actually asked for.
+      if (
+        runTranslations &&
+        mediaRow.type === "show" &&
+        mediaRow.tvdbId &&
+        !fetched.tvdbFailed
+      ) {
+        for (const lang of planTranslationLangs.filter(
+          (l) => !l.startsWith("en"),
+        )) {
+          try {
+            await translateEpisodes(
+              db,
+              mediaId,
+              mediaRow.tvdbId,
+              lang,
+              deps.tvdb as unknown as TvdbProvider,
+            );
+            result.providerCalls.tvdb += 1;
+          } catch {
+            // TVDB may not have translations for this language — non-fatal.
+          }
         }
       }
+    } catch (err) {
+      outcome = classifyError(err);
     }
+
+    const stageWrites: Promise<void>[] = [];
+    if (runMetadata) stageWrites.push(persistOutcome("metadata", "", outcome));
+    if (runStructure) stageWrites.push(persistOutcome("structure", "", outcome));
+    if (runContentRatings)
+      stageWrites.push(persistOutcome("contentRatings", "", outcome));
+    if (runTranslations) {
+      for (const lang of planTranslationLangs) {
+        stageWrites.push(persistOutcome("translations", lang, outcome));
+      }
+    }
+    await Promise.all(stageWrites);
   }
 
   if (runLogos) {
-    const logosWritten = await fetchAndPersistLogos(
-      db,
-      mediaId,
-      mediaRow.externalId,
-      mediaRow.type as MediaType,
-      languages,
-      deps.tmdb,
+    let logosOutcome: Outcome = "data";
+    try {
+      const logosWritten = await fetchAndPersistLogos(
+        db,
+        mediaId,
+        mediaRow.externalId,
+        mediaRow.type as MediaType,
+        languages,
+        deps.tmdb,
+      );
+      result.providerCalls.tmdb += logosWritten.calls;
+      result.writes.logos = logosWritten.writes;
+      if (logosWritten.calls > 0) result.aspectsExecuted.push("logos");
+      if (logosWritten.writes === 0) logosOutcome = "empty";
+    } catch (err) {
+      logosOutcome = classifyError(err);
+    }
+    const scopes = planLogoLangs.length > 0 ? planLogoLangs : [""];
+    await Promise.all(
+      scopes.map((scope) => persistOutcome("logos", scope, logosOutcome)),
     );
-    result.providerCalls.tmdb += logosWritten.calls;
-    result.writes.logos = logosWritten.writes;
-    if (logosWritten.calls > 0) result.aspectsExecuted.push("logos");
   }
 
   if (runExtras) {
-    await refreshExtras(db, mediaId, { tmdb: deps.tmdb });
-    result.providerCalls.tmdb += 1;
-    result.aspectsExecuted.push("extras");
+    let extrasOutcome: Outcome = "data";
+    try {
+      await refreshExtras(db, mediaId, { tmdb: deps.tmdb });
+      result.providerCalls.tmdb += 1;
+      result.aspectsExecuted.push("extras");
+    } catch (err) {
+      extrasOutcome = classifyError(err);
+    }
+    await persistOutcome("extras", "", extrasOutcome);
   }
 
   result.durationMs = Date.now() - start;
@@ -184,38 +284,6 @@ function initResult(mediaId: string): EnsureMediaResult {
     skipped: {},
     durationMs: 0,
   };
-}
-
-/**
- * Fetch language-specific logos via TMDB `/{type}/{id}/images` and upsert the
- * best match per language via the shared `upsertLangLogos` helper.
- */
-async function fetchAndPersistLogos(
-  db: Database,
-  mediaId: string,
-  externalId: number,
-  type: MediaType,
-  languages: string[],
-  tmdb: MediaProviderPort,
-): Promise<{ calls: number; writes: number }> {
-  if (!tmdb.getImages) return { calls: 0, writes: 0 };
-
-  const nonEnLangs = languages.filter((l) => !l.startsWith("en"));
-  if (nonEnLangs.length === 0) return { calls: 0, writes: 0 };
-
-  const tmdbType = type === "show" ? "tv" : "movie";
-  const images = await tmdb.getImages(externalId, tmdbType);
-  const logos = images.logos ?? [];
-
-  const byLang = new Map<string, string>();
-  for (const l of logos) {
-    if (!l.iso_639_1 || l.iso_639_1 === "en") continue;
-    if (!byLang.has(l.iso_639_1)) byLang.set(l.iso_639_1, l.file_path);
-  }
-  if (byLang.size === 0) return { calls: 1, writes: 0 };
-
-  const writes = await upsertLangLogos(db, mediaId, byLang, nonEnLangs);
-  return { calls: 1, writes };
 }
 
 // Re-export the base media row helper so that callers building bulk flows

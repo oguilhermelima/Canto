@@ -5,6 +5,13 @@ import {
   bulkInsertAspectStates,
   type NewMediaAspectStateRow,
 } from "../../../infra/media/media-aspect-state-repository";
+import {
+  buildMediaContext,
+  computeNextEligible,
+  loadCadenceKnobs,
+  type CadenceKnobs,
+  type Outcome,
+} from "./cadence";
 
 export interface BackfillAspectStateResult {
   mediasProcessed: number;
@@ -20,6 +27,9 @@ interface MediaBatchRow {
   createdAt: Date;
   metadataUpdatedAt: Date | null;
   extrasUpdatedAt: Date | null;
+  releaseDate: string | null;
+  nextAirDate: string | null;
+  overrideProviderFor: string | null;
 }
 
 /**
@@ -28,8 +38,12 @@ interface MediaBatchRow {
  * extras, and (for shows) structure. Translations/logos/contentRatings are
  * left to lazy discovery.
  *
- * Idempotent: re-running over the same medias inserts nothing because of the
- * (media_id, aspect, scope) primary key + ON CONFLICT DO NOTHING.
+ * `next_eligible_at` is computed via the cadence engine using the same
+ * outcome we record (`data` when an updated-at timestamp exists, otherwise
+ * `empty`) so the orchestrator's first sweep doesn't re-fetch every healthy
+ * row at once. Idempotent: re-running over the same medias inserts nothing
+ * because of the (media_id, aspect, scope) primary key + ON CONFLICT DO
+ * NOTHING.
  */
 export async function backfillAspectState(
   db: Database,
@@ -38,6 +52,9 @@ export async function backfillAspectState(
     mediasProcessed: 0,
     rowsInserted: 0,
   };
+
+  const knobs = await loadCadenceKnobs(db);
+  const now = new Date();
 
   let cursor: string | null = null;
 
@@ -50,6 +67,9 @@ export async function backfillAspectState(
         createdAt: media.createdAt,
         metadataUpdatedAt: media.metadataUpdatedAt,
         extrasUpdatedAt: media.extrasUpdatedAt,
+        releaseDate: media.releaseDate,
+        nextAirDate: media.nextAirDate,
+        overrideProviderFor: media.overrideProviderFor,
       })
       .from(media)
       .where(cursor === null ? undefined : gt(media.id, cursor))
@@ -61,7 +81,7 @@ export async function backfillAspectState(
     const showIds = batch.filter((m) => m.type === "show").map((m) => m.id);
     const showsWithSeasons = await findShowsWithSeasons(db, showIds);
 
-    const rows = buildBatchRows(batch, showsWithSeasons);
+    const rows = buildBatchRows(batch, showsWithSeasons, knobs, now);
     const inserted = await bulkInsertAspectStates(db, rows);
 
     result.mediasProcessed += batch.length;
@@ -89,35 +109,59 @@ async function findShowsWithSeasons(
 function buildBatchRows(
   batch: MediaBatchRow[],
   showsWithSeasons: Set<string>,
+  knobs: CadenceKnobs,
+  now: Date,
 ): NewMediaAspectStateRow[] {
-  const now = new Date();
   const rows: NewMediaAspectStateRow[] = [];
 
   for (const m of batch) {
+    const ctx = buildMediaContext({
+      type: m.type,
+      provider: m.provider,
+      overrideProviderFor: m.overrideProviderFor,
+      releaseDate: m.releaseDate,
+      nextAirDate: m.nextAirDate,
+    });
+
+    const metadataOutcome: Outcome = m.metadataUpdatedAt ? "data" : "empty";
     rows.push({
       mediaId: m.id,
       aspect: "metadata",
       scope: "",
       lastAttemptAt: m.metadataUpdatedAt ?? m.createdAt,
       succeededAt: m.metadataUpdatedAt,
-      outcome: m.metadataUpdatedAt ? "data" : "empty",
-      nextEligibleAt: now,
+      outcome: metadataOutcome,
+      nextEligibleAt: computeNextEligible(
+        { aspect: "metadata", consecutive_fails: 0 },
+        metadataOutcome,
+        ctx,
+        knobs,
+        now,
+      ),
       materializedSource: null,
     });
 
+    const extrasOutcome: Outcome = m.extrasUpdatedAt ? "data" : "empty";
     rows.push({
       mediaId: m.id,
       aspect: "extras",
       scope: "",
       lastAttemptAt: m.extrasUpdatedAt ?? m.createdAt,
       succeededAt: m.extrasUpdatedAt,
-      outcome: m.extrasUpdatedAt ? "data" : "empty",
-      nextEligibleAt: now,
+      outcome: extrasOutcome,
+      nextEligibleAt: computeNextEligible(
+        { aspect: "extras", consecutive_fails: 0 },
+        extrasOutcome,
+        ctx,
+        knobs,
+        now,
+      ),
       materializedSource: null,
     });
 
     if (m.type === "show") {
       const hasSeasons = showsWithSeasons.has(m.id);
+      const structureOutcome: Outcome = hasSeasons ? "data" : "empty";
       rows.push({
         mediaId: m.id,
         aspect: "structure",
@@ -127,8 +171,14 @@ function buildBatchRows(
         // exists. The orchestrator will recalc on first real run.
         lastAttemptAt: m.createdAt,
         succeededAt: hasSeasons ? now : null,
-        outcome: hasSeasons ? "data" : "empty",
-        nextEligibleAt: now,
+        outcome: structureOutcome,
+        nextEligibleAt: computeNextEligible(
+          { aspect: "structure", consecutive_fails: 0 },
+          structureOutcome,
+          ctx,
+          knobs,
+          now,
+        ),
         materializedSource: m.provider === "tvdb" ? "tvdb" : "tmdb",
       });
     }
