@@ -580,6 +580,117 @@ export const episodeTranslation = pgTable(
   ],
 );
 
+// ─── Localizations (unified per-language storage; supersedes *_translation) ───
+
+export const mediaLocalization = pgTable(
+  "media_localization",
+  {
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    language: varchar("language", { length: 10 })
+      .notNull()
+      .references(() => supportedLanguage.code),
+    title: varchar("title", { length: 500 }).notNull(),
+    overview: text("overview"),
+    tagline: varchar("tagline", { length: 500 }),
+    posterPath: varchar("poster_path", { length: 255 }),
+    logoPath: varchar("logo_path", { length: 255 }),
+    trailerKey: varchar("trailer_key", { length: 100 }),
+    source: varchar("source", { length: 20 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.mediaId, table.language] }),
+    index("idx_media_localization_lang").on(table.language),
+  ],
+);
+
+export const seasonLocalization = pgTable(
+  "season_localization",
+  {
+    seasonId: uuid("season_id")
+      .notNull()
+      .references(() => season.id, { onDelete: "cascade" }),
+    language: varchar("language", { length: 10 })
+      .notNull()
+      .references(() => supportedLanguage.code),
+    name: varchar("name", { length: 200 }),
+    overview: text("overview"),
+    source: varchar("source", { length: 20 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.seasonId, table.language] }),
+    index("idx_season_localization_lang").on(table.language),
+  ],
+);
+
+export const episodeLocalization = pgTable(
+  "episode_localization",
+  {
+    episodeId: uuid("episode_id")
+      .notNull()
+      .references(() => episode.id, { onDelete: "cascade" }),
+    language: varchar("language", { length: 10 })
+      .notNull()
+      .references(() => supportedLanguage.code),
+    title: varchar("title", { length: 500 }),
+    overview: text("overview"),
+    source: varchar("source", { length: 20 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.episodeId, table.language] }),
+    index("idx_episode_localization_lang").on(table.language),
+  ],
+);
+
+// ─── Media enrichment aspect state (drives the orchestrator cron sweep) ───
+
+export const mediaAspectState = pgTable(
+  "media_aspect_state",
+  {
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => media.id, { onDelete: "cascade" }),
+    aspect: varchar("aspect", { length: 20 }).notNull(),
+    scope: varchar("scope", { length: 20 }).notNull().default(""),
+    lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }).notNull(),
+    succeededAt: timestamp("succeeded_at", { withTimezone: true }),
+    outcome: varchar("outcome", { length: 20 }).notNull(),
+    nextEligibleAt: timestamp("next_eligible_at", { withTimezone: true }).notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    consecutiveFails: integer("consecutive_fails").notNull().default(0),
+    materializedSource: varchar("materialized_source", { length: 20 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.mediaId, table.aspect, table.scope] }),
+    index("idx_media_aspect_state_eligible").on(table.nextEligibleAt),
+  ],
+);
+
 export const mediaContentRating = pgTable(
   "media_content_rating",
   {
