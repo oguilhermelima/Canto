@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import type { LucideIcon } from "lucide-react";
 import type { SpaceStateKey } from "@canto/ui/presets/space-states";
 import { MediaCard } from "@/components/media/media-card";
+import { useResponsivePageSize } from "@/hooks/use-responsive-page-size";
 import { trpc } from "@/lib/trpc/client";
 import { LibraryCarousel } from "./library-carousel";
 
-const PAGE_SIZE = 24;
 const CARD_WIDTH_CLASS = "w-[140px] shrink-0 sm:w-[180px] lg:w-[220px] 2xl:w-[240px]";
 
 type GetUserMediaInput = Parameters<
@@ -31,8 +31,11 @@ export function HubUserMediaSection({
   queryInput,
   showUserRating = false,
 }: HubUserMediaSectionProps): React.JSX.Element {
+  const initialLimit = useResponsivePageSize({ mobile: 6, tablet: 10, desktop: 15 });
+  const lockedRef = useRef(initialLimit);
+  const limit = lockedRef.current;
   const query = trpc.userMedia.getUserMedia.useInfiniteQuery(
-    { ...queryInput, limit: PAGE_SIZE },
+    { ...queryInput, limit },
     {
       getNextPageParam: (lastPage) => lastPage.nextCursor,
       initialCursor: 0,

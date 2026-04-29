@@ -1,18 +1,21 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { Bookmark } from "lucide-react";
 import { MediaCard } from "@/components/media/media-card";
+import { useResponsivePageSize } from "@/hooks/use-responsive-page-size";
 import { trpc } from "@/lib/trpc/client";
 import { LibraryCarousel } from "./library-carousel";
 
-const PAGE_SIZE = 24;
 const CARD_WIDTH_CLASS =
   "w-[140px] shrink-0 sm:w-[180px] lg:w-[220px] 2xl:w-[240px]";
 
 export function HubWatchlistSection(): React.JSX.Element {
+  const initialLimit = useResponsivePageSize({ mobile: 8, tablet: 12, desktop: 18 });
+  const lockedRef = useRef(initialLimit);
+  const limit = lockedRef.current;
   const query = trpc.list.getBySlug.useQuery(
-    { slug: "watchlist", limit: PAGE_SIZE },
+    { slug: "watchlist", limit },
     { staleTime: 60_000 },
   );
 

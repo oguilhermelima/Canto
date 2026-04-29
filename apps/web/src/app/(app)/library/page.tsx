@@ -7,6 +7,7 @@ import { TabBar } from "@canto/ui/tab-bar";
 import { LazySection } from "@/components/home/lazy-section";
 import { PageHeader } from "@/components/page-header";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useResponsivePageSize } from "@/hooks/use-responsive-page-size";
 import { HubWatchNextSection } from "./_components/hub-watch-next-section";
 import { HubWatchlistSection } from "./_components/hub-watchlist-section";
 import { HubUpcomingCalendar } from "./_components/hub-upcoming-calendar";
@@ -41,6 +42,8 @@ export default function LibraryPage(): React.JSX.Element {
   );
 
   const tabs = TABS.map((t) => ({ value: t.value, label: t.label, icon: t.icon }));
+  const lazyRootMarginPx = useResponsivePageSize({ mobile: 800, tablet: 400, desktop: 200 });
+  const lazyRootMargin = `${lazyRootMarginPx}px 0px`;
 
   return (
     <div className="w-full md:pb-12">
@@ -51,19 +54,19 @@ export default function LibraryPage(): React.JSX.Element {
 
       {activeTab === "hub" && (
         <div className="mt-6 flex flex-col gap-6 md:mt-8 md:gap-12">
-          <LazySection id="hub-watch-next" minHeight={260} eager={true}>
+          <LazySection id="hub-watch-next" minHeight={260} eager={true} rootMargin={lazyRootMargin}>
             <HubWatchNextSection />
           </LazySection>
-          <LazySection id="hub-upcoming" minHeight={260} eager={false}>
+          <LazySection id="hub-upcoming" minHeight={260} eager={false} rootMargin={lazyRootMargin}>
             <HubUpcomingCalendar />
           </LazySection>
-          <LazySection id="hub-watchlist" minHeight={260} eager={false}>
+          <LazySection id="hub-watchlist" minHeight={260} eager={false} rootMargin={lazyRootMargin}>
             <HubWatchlistSection />
           </LazySection>
-          <LazySection id="hub-collections" minHeight={260} eager={false}>
+          <LazySection id="hub-collections" minHeight={260} eager={false} rootMargin={lazyRootMargin}>
             <HubCollectionsSection />
           </LazySection>
-          <LazySection id="hub-server-library" minHeight={260} eager={false}>
+          <LazySection id="hub-server-library" minHeight={260} eager={false} rootMargin={lazyRootMargin}>
             <HubServerLibrarySection />
           </LazySection>
         </div>
@@ -71,16 +74,16 @@ export default function LibraryPage(): React.JSX.Element {
 
       {activeTab === "activity" && (
         <div className="mt-6 flex flex-col gap-6 md:mt-8 md:gap-12">
-          <LazySection id="hub-history" minHeight={340} eager={true}>
+          <LazySection id="hub-history" minHeight={340} eager={true} rootMargin={lazyRootMargin}>
             <HubHistoryDiary />
           </LazySection>
-          <LazySection id="hub-favorites" minHeight={340} eager={false}>
+          <LazySection id="hub-favorites" minHeight={340} eager={false} rootMargin={lazyRootMargin}>
             <HubFavoritesSection />
           </LazySection>
-          <LazySection id="hub-ratings" minHeight={340} eager={false}>
+          <LazySection id="hub-ratings" minHeight={340} eager={false} rootMargin={lazyRootMargin}>
             <HubRatingsSection />
           </LazySection>
-          <LazySection id="hub-dropped" minHeight={340} eager={false}>
+          <LazySection id="hub-dropped" minHeight={340} eager={false} rootMargin={lazyRootMargin}>
             <HubDroppedSection />
           </LazySection>
         </div>

@@ -1,17 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Bookmark, History, Star, Tv } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { Skeleton } from "@canto/ui/skeleton";
+import { useResponsivePageSize } from "@/hooks/use-responsive-page-size";
 import { trpc } from "@/lib/trpc/client";
 import { mediaHref } from "@/lib/media-href";
 import { tmdbThumbLoader } from "@/lib/tmdb-image";
 import { LibraryCarousel } from "./library-carousel";
 
-const PAGE_SIZE = 24;
 const CARD_WIDTH_CLASS = "w-[220px] sm:w-[280px] lg:w-[340px] 2xl:w-[380px]";
 
 type DiaryEntry = {
@@ -154,8 +154,11 @@ function DiaryCard({
 }
 
 export function HubHistoryDiary(): React.JSX.Element {
+  const initialLimit = useResponsivePageSize({ mobile: 8, tablet: 12, desktop: 18 });
+  const lockedRef = useRef(initialLimit);
+  const limit = lockedRef.current;
   const { data, isLoading, isError, refetch } =
-    trpc.userMedia.getLibraryHistory.useQuery({ limit: PAGE_SIZE });
+    trpc.userMedia.getLibraryHistory.useQuery({ limit });
 
   const now = useMemo(() => new Date(), []);
 

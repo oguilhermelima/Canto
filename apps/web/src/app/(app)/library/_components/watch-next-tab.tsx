@@ -1,8 +1,10 @@
 "use client";
 
+import { useRef } from "react";
 import type { LucideIcon } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { useSectionInfiniteQuery } from "@/components/home/sources/use-section-query";
+import { useResponsivePageSize } from "@/hooks/use-responsive-page-size";
 import { WatchNextCard } from "@/components/media/cards/watch-next-card";
 import type {
   WatchNextItem,
@@ -13,9 +15,6 @@ import { LibraryCarousel } from "./library-carousel";
 export { WatchNextCard } from "@/components/media/cards/watch-next-card";
 export type { WatchNextItem, WatchNextView } from "@/components/media/cards/watch-next-card";
 
-// Page size dropped from 72 → 24. The backend now applies LIMIT in SQL, so
-// asking for 72 just to render 24 above the fold was pure waste.
-const PAGE_SIZE = 24;
 const CARD_WIDTH_CLASS = "w-[220px] sm:w-[280px] lg:w-[340px] 2xl:w-[380px]";
 
 export function WatchNextTab({
@@ -32,9 +31,12 @@ export function WatchNextTab({
   mediaType?: "movie" | "show";
 }): React.JSX.Element {
   const isContinue = view === "continue";
+  const initialLimit = useResponsivePageSize({ mobile: 6, tablet: 10, desktop: 15 });
+  const lockedRef = useRef(initialLimit);
+  const limit = lockedRef.current;
 
   const continueQuery = trpc.userMedia.getContinueWatching.useInfiniteQuery(
-    { limit: PAGE_SIZE, mediaType },
+    { limit, mediaType },
     {
       enabled: isContinue,
       getNextPageParam: (lp) => lp.nextCursor ?? undefined,
@@ -42,7 +44,7 @@ export function WatchNextTab({
     },
   );
   const watchNextQuery = trpc.userMedia.getWatchNext.useInfiniteQuery(
-    { limit: PAGE_SIZE, mediaType },
+    { limit, mediaType },
     {
       enabled: !isContinue,
       getNextPageParam: (lp) => lp.nextCursor ?? undefined,
