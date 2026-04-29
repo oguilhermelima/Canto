@@ -98,6 +98,11 @@ export const getUpcomingScheduleInput = libraryFilterInput.extend({
    * that need to render multiple episodes per series in a date range.
    */
   mode: z.enum(["next", "all"]).default("next"),
+  /** Inclusive lower bound on releaseAt. Used by the month-grid calendar so
+   * the server only returns items inside the visible window. */
+  from: z.coerce.date().optional(),
+  /** Exclusive upper bound on releaseAt. Pair with `from` for window filtering. */
+  to: z.coerce.date().optional(),
 });
 export type GetUpcomingScheduleInput = z.infer<typeof getUpcomingScheduleInput>;
 

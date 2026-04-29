@@ -14,6 +14,8 @@ export interface GetUpcomingScheduleInput {
   mediaType?: "movie" | "show";
   q?: string;
   mode?: "next" | "all";
+  from?: Date;
+  to?: Date;
 }
 
 type ListMediaRow = Awaited<
@@ -132,9 +134,20 @@ export async function getUpcomingSchedule(
   const sorted = scheduleItems.sort(
     (a, b) => a.releaseAt.getTime() - b.releaseAt.getTime(),
   );
-  const sliced = sorted.slice(cursor, cursor + limit);
+  const fromMs = input.from?.getTime();
+  const toMs = input.to?.getTime();
+  const windowed =
+    fromMs === undefined && toMs === undefined
+      ? sorted
+      : sorted.filter((item) => {
+          const t = item.releaseAt.getTime();
+          if (fromMs !== undefined && t < fromMs) return false;
+          if (toMs !== undefined && t >= toMs) return false;
+          return true;
+        });
+  const sliced = windowed.slice(cursor, cursor + limit);
   const nextCursor =
-    cursor + limit < sorted.length ? cursor + limit : undefined;
+    cursor + limit < windowed.length ? cursor + limit : undefined;
 
   // Translation already applied at the source queries via mediaI18n / episodeI18n joins.
   return { items: sliced, total: sorted.length, nextCursor };
