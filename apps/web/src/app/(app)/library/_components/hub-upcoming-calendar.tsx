@@ -169,10 +169,19 @@ function DayHeader({ bucket }: { bucket: DayBucket }): React.JSX.Element {
 }
 
 function DayColumn({ bucket }: { bucket: DayBucket }): React.JSX.Element {
+  const isEmpty = bucket.items.length === 0;
   return (
-    <div className={cn("group/day flex flex-col", COLUMN_WIDTH)}>
+    <div
+      className={cn(
+        "group/day flex-col",
+        COLUMN_WIDTH,
+        // Hide empty days on mobile to avoid an agenda full of "Quiet day"
+        // placeholders. Desktop keeps the full 7-column grid for context.
+        isEmpty ? "hidden md:flex" : "flex",
+      )}
+    >
       <DayHeader bucket={bucket} />
-      {bucket.items.length === 0 ? (
+      {isEmpty ? (
         <p className="px-2 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground/30">
           Quiet day
         </p>
@@ -222,6 +231,7 @@ export function HubUpcomingCalendar(): React.JSX.Element {
     () => buildBuckets((data?.items ?? []) as UpcomingScheduleItem[]),
     [data?.items],
   );
+  const hasAnyItems = buckets.some((b) => b.items.length > 0);
 
   return (
     <section>
@@ -233,6 +243,11 @@ export function HubUpcomingCalendar(): React.JSX.Element {
       />
 
       <div>
+        {!isLoading && !hasAnyItems && (
+          <p className={cn("py-2 text-sm text-muted-foreground md:hidden", SCROLL_PADDING_X)}>
+            Nothing scheduled this week.
+          </p>
+        )}
         <div
           className={cn(
             "flex flex-col gap-5 pb-4 md:flex-row md:items-start md:gap-6 md:overflow-x-auto md:overflow-y-visible md:scrollbar-none",
