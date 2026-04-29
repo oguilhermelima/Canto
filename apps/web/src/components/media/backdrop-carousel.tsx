@@ -115,13 +115,13 @@ export function BackdropCarousel({
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="flex gap-4 overflow-x-auto overflow-y-visible pb-4 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
+          className="flex gap-3 overflow-x-auto overflow-y-visible pb-4 pl-4 scrollbar-none md:gap-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
         >
           {isLoading && visibleItems.length === 0
             ? Array.from({ length: 8 }).map((_, i) => (
                 <BackdropCardSkeleton
                   key={i}
-                  className="w-[280px] shrink-0 animate-pulse sm:w-[300px] lg:w-[340px] 2xl:w-[380px]"
+                  className="w-[220px] shrink-0 animate-pulse sm:w-[280px] lg:w-[340px] 2xl:w-[380px]"
                 />
               ))
             : visibleItems.map((item, i) => (
@@ -143,14 +143,14 @@ export function BackdropCarousel({
                           })
                       : undefined
                   }
-                  className="w-[280px] shrink-0 sm:w-[300px] lg:w-[340px] 2xl:w-[380px]"
+                  className="w-[220px] shrink-0 sm:w-[280px] lg:w-[340px] 2xl:w-[380px]"
                 />
               ))}
           {isFetchingMore &&
             Array.from({ length: 4 }).map((_, i) => (
               <BackdropCardSkeleton
                 key={`loading-${i}`}
-                className="w-[280px] shrink-0 animate-pulse sm:w-[300px] lg:w-[340px] 2xl:w-[380px]"
+                className="w-[220px] shrink-0 animate-pulse sm:w-[280px] lg:w-[340px] 2xl:w-[380px]"
               />
             ))}
           {/* End spacer to match page padding */}

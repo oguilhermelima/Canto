@@ -104,7 +104,7 @@ function buildExtra(item: WatchNextItem): string | null {
   return null;
 }
 
-const CARD_WIDTH = "w-[280px] shrink-0 sm:w-[300px] lg:w-[340px] 2xl:w-[380px]";
+const CARD_WIDTH = "w-[220px] shrink-0 sm:w-[280px] lg:w-[340px] 2xl:w-[380px]";
 
 export function WatchNextCard({
   item,
@@ -130,9 +130,9 @@ export function WatchNextCard({
             className="invisible absolute h-0 w-0"
           />
         )}
-        <div className="mt-2 flex flex-col gap-1.5 px-0.5">
-          <Skeleton className="h-3.5 w-3/4 rounded" />
-          <Skeleton className="h-3 w-1/2 rounded" />
+        <div className="mt-1.5 flex flex-col gap-1 px-0.5 md:mt-2 md:gap-1.5">
+          <Skeleton className="h-3 w-3/4 rounded md:h-3.5" />
+          <Skeleton className="h-2.5 w-1/2 rounded md:h-3" />
         </div>
       </div>
     );
@@ -191,11 +191,11 @@ export function WatchNextCard({
         )}
       </div>
 
-      <div className="mt-2 flex flex-col gap-1.5 px-0.5">
-        <p className="line-clamp-2 text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
+      <div className="mt-1.5 flex flex-col gap-1 px-0.5 md:mt-2 md:gap-1.5">
+        <p className="line-clamp-2 text-xs font-semibold text-foreground transition-colors group-hover:text-primary md:text-sm">
           {item.title}
         </p>
-        <div className="flex flex-wrap items-center gap-x-1.5 text-xs font-medium tracking-wide text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-1.5 text-[10px] font-medium tracking-wide text-muted-foreground md:text-xs">
           <span className="line-clamp-1">{subtitle}</span>
         </div>
       </div>

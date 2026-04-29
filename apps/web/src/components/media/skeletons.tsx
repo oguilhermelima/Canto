@@ -41,8 +41,8 @@ export function FeaturedCardSkeleton({
     <Skeleton
       className={cn(
         "mt-1 shrink-0 rounded-xl",
-        "h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px]",
-        "w-[230px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]",
+        "h-[300px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px]",
+        "w-[180px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]",
         className,
       )}
     />
@@ -68,7 +68,7 @@ export function CarouselRowSkeleton({
   return (
     <section className={className}>
       <SectionTitleSkeleton showSeeMore={showSeeMore} />
-      <div className="flex gap-6 overflow-hidden pb-4 pl-4 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
+      <div className="flex gap-3 overflow-hidden pb-4 pl-4 md:gap-6 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24">
         {Array.from({ length: count }).map((_, i) => (
           <div key={i} className="shrink-0">
             {card}

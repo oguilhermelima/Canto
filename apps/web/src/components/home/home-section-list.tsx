@@ -152,7 +152,7 @@ function BackdropCarouselSkeleton(): React.JSX.Element {
     <CarouselRowSkeleton
       count={6}
       card={
-        <BackdropCardSkeleton className="w-[280px] sm:w-[300px] lg:w-[340px] 2xl:w-[380px]" />
+        <BackdropCardSkeleton className="w-[220px] sm:w-[280px] lg:w-[340px] 2xl:w-[380px]" />
       }
     />
   );
@@ -163,7 +163,7 @@ function PosterCarouselSkeleton(): React.JSX.Element {
     <CarouselRowSkeleton
       count={8}
       card={
-        <MediaCardSkeleton className="w-[180px] sm:w-[200px] lg:w-[220px] 2xl:w-[240px]" />
+        <MediaCardSkeleton className="w-[140px] sm:w-[180px] lg:w-[220px] 2xl:w-[240px]" />
       }
     />
   );

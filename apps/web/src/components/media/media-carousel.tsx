@@ -128,13 +128,13 @@ export function MediaCarousel({
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="flex gap-6 overflow-x-auto overflow-y-visible pb-4 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
+          className="flex gap-3 overflow-x-auto overflow-y-visible pb-4 pl-4 scrollbar-none md:gap-6 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
         >
           {isLoading && visibleItems.length === 0
             ? Array.from({ length: 8 }).map((_, i) => (
                 <MediaCardSkeleton
                   key={i}
-                  className="w-[180px] shrink-0 animate-pulse sm:w-[200px] lg:w-[220px] 2xl:w-[240px]"
+                  className="w-[140px] shrink-0 animate-pulse sm:w-[180px] lg:w-[220px] 2xl:w-[240px]"
                 />
               ))
             : visibleItems.map((item, i) => (
@@ -161,14 +161,14 @@ export function MediaCarousel({
                         }
                       : undefined
                   }
-                  className="w-[180px] shrink-0 sm:w-[200px] lg:w-[220px] 2xl:w-[240px]"
+                  className="w-[140px] shrink-0 sm:w-[180px] lg:w-[220px] 2xl:w-[240px]"
                 />
               ))}
           {isFetchingMore &&
             Array.from({ length: 4 }).map((_, i) => (
               <MediaCardSkeleton
                 key={`loading-${i}`}
-                className="w-[180px] shrink-0 animate-pulse sm:w-[200px] lg:w-[220px] 2xl:w-[240px]"
+                className="w-[140px] shrink-0 animate-pulse sm:w-[180px] lg:w-[220px] 2xl:w-[240px]"
               />
             ))}
           {/* End spacer to match page padding */}

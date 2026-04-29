@@ -11,7 +11,7 @@ export { UpcomingScheduleCard } from "@/components/media/cards/upcoming-schedule
 export type { UpcomingScheduleItem } from "@/components/media/cards/upcoming-schedule-card";
 
 const PAGE_SIZE = 72;
-const CARD_WIDTH_CLASS = "w-[280px] sm:w-[300px] lg:w-[340px] 2xl:w-[380px]";
+const CARD_WIDTH_CLASS = "w-[220px] sm:w-[280px] lg:w-[340px] 2xl:w-[380px]";
 
 export function UpcomingScheduleSection(): React.JSX.Element {
   return (

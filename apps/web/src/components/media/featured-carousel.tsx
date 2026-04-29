@@ -111,14 +111,14 @@ export function FeaturedCarousel({
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="flex gap-6 overflow-x-auto overflow-y-visible pb-4 pl-4 scrollbar-none md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
+          className="flex gap-3 overflow-x-auto overflow-y-visible pb-4 pl-4 scrollbar-none md:gap-6 md:pl-8 lg:pl-12 xl:pl-16 2xl:pl-24"
           onMouseLeave={handleMouseLeave}
         >
           {isLoading && visibleItems.length === 0
             ? Array.from({ length: 12 }).map((_, i) => (
                 <Skeleton
                   key={i}
-                  className="shrink-0 rounded-xl animate-pulse h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px] w-[230px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]"
+                  className="shrink-0 rounded-xl animate-pulse h-[300px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px] w-[180px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]"
                 />
               ))
             : visibleItems.map((item, i) => (
@@ -143,7 +143,7 @@ export function FeaturedCarousel({
             Array.from({ length: 4 }).map((_, i) => (
               <Skeleton
                 key={`loading-${i}`}
-                className="shrink-0 rounded-xl animate-pulse h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px] w-[230px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]"
+                className="shrink-0 rounded-xl animate-pulse h-[300px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px] w-[180px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]"
               />
             ))}
           <div className="w-4 shrink-0 md:w-8 lg:w-12 xl:w-16 2xl:w-24" />

@@ -176,13 +176,13 @@ export function MediaCard({
         )}
       </div>
 
-      <div className="mt-2 flex flex-col gap-1.5 px-0.5">
+      <div className="mt-1.5 flex flex-col gap-1 px-0.5 md:mt-2 md:gap-1.5">
         {title && title.trim().length > 0 && (
-          <p className="line-clamp-2 text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
+          <p className="line-clamp-2 text-xs font-semibold text-foreground transition-colors group-hover:text-primary md:text-sm">
             {title}
           </p>
         )}
-        <div className="flex flex-wrap items-center gap-x-1.5 text-xs font-medium tracking-wide text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-1.5 text-[10px] font-medium tracking-wide text-muted-foreground md:text-xs">
           {subtitle ? (
             <span className="line-clamp-1">{subtitle}</span>
           ) : (
@@ -204,7 +204,7 @@ export function MediaCard({
           )}
         </div>
         {hasAnyRating && (
-          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs font-medium tracking-wide text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] font-medium tracking-wide text-muted-foreground md:text-xs">
             {hasPublicRating && (
               <CardRating
                 value={voteAverage!}
@@ -248,10 +248,10 @@ export function MediaCardSkeleton({
   return (
     <div className={cn("mt-1 flex flex-col", className)}>
       <Skeleton className="aspect-[2/3] w-full rounded-xl" />
-      <div className="mt-2 flex flex-col gap-1.5 px-0.5">
-        <Skeleton className="h-3.5 w-3/4 rounded" />
-        <Skeleton className="h-3 w-1/2 rounded" />
-        <Skeleton className="h-3 w-2/5 rounded" />
+      <div className="mt-1.5 flex flex-col gap-1 px-0.5 md:mt-2 md:gap-1.5">
+        <Skeleton className="h-3 w-3/4 rounded md:h-3.5" />
+        <Skeleton className="h-2.5 w-1/2 rounded md:h-3" />
+        <Skeleton className="h-2.5 w-2/5 rounded md:h-3" />
       </div>
     </div>
   );

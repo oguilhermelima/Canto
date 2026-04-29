@@ -66,10 +66,10 @@ export function FeaturedCard({
     <div
       className={cn(
         "group relative mt-1 shrink-0 overflow-hidden rounded-xl transition-[width] duration-200 ease-out",
-        "h-[360px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px]",
+        "h-[300px] sm:h-[400px] lg:h-[440px] 2xl:h-[500px]",
         isOpen
-          ? "border border-border w-[calc(360px*16/9)] sm:w-[calc(400px*16/9)] lg:w-[calc(440px*16/9)] 2xl:w-[calc(500px*16/9)]"
-          : "w-[230px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]",
+          ? "border border-border w-[calc(300px*16/9)] sm:w-[calc(400px*16/9)] lg:w-[calc(440px*16/9)] 2xl:w-[calc(500px*16/9)]"
+          : "w-[180px] sm:w-[250px] lg:w-[280px] 2xl:w-[320px]",
       )}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -91,7 +91,7 @@ export function FeaturedCard({
             className="object-cover"
             fadeDuration={250}
             priority={index < 2}
-            sizes="(max-width: 640px) 230px, (max-width: 1024px) 250px, (max-width: 1536px) 280px, 320px"
+            sizes="(max-width: 640px) 180px, (max-width: 1024px) 250px, (max-width: 1536px) 280px, 320px"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-muted">
