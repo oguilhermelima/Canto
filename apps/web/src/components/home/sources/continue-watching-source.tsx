@@ -14,7 +14,7 @@ interface ContinueWatchingSourceProps {
 }
 
 export function ContinueWatchingSource({ sectionId, title, style }: ContinueWatchingSourceProps): React.JSX.Element | null {
-  const current = useResponsivePageSize({ mobile: 10, tablet: 16, desktop: 24 });
+  const current = useResponsivePageSize({ mobile: 6, tablet: 10, desktop: 15 });
   const lockedRef = useRef(current);
   const limit = lockedRef.current;
 

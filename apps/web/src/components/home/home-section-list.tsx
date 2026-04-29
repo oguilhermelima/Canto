@@ -7,6 +7,7 @@ import { Skeleton } from "@canto/ui/skeleton";
 import { HomeSectionRenderer } from "./home-section-renderer";
 import { DedupProvider } from "./dedup-context";
 import { LazySection } from "./lazy-section";
+import { useResponsivePageSize } from "@/hooks/use-responsive-page-size";
 import { BackdropCardSkeleton } from "@/components/media/backdrop-card";
 import { MediaCardSkeleton } from "@/components/media/media-card";
 import {
@@ -52,6 +53,8 @@ export function HomeSectionList({
   const firstIsSpotlight = enabled.length > 0
     ? enabled[0]?.style === "spotlight"
     : true; // assume spotlight while loading
+  const lazyRootMarginPx = useResponsivePageSize({ mobile: 800, tablet: 400, desktop: 200 });
+  const lazyRootMargin = `${lazyRootMarginPx}px 0px`;
 
   return (
     <DedupProvider>
@@ -101,6 +104,7 @@ export function HomeSectionList({
                     id={section.id}
                     minHeight={getMinHeightByStyle(section.style)}
                     eager={i === 0}
+                    rootMargin={lazyRootMargin}
                   >
                     <HomeSectionRenderer section={section} />
                   </LazySection>

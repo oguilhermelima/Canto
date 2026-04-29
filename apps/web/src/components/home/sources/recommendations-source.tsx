@@ -20,7 +20,7 @@ export function RecommendationsSource({ sectionId, title, style }: Recommendatio
   const utils = trpc.useUtils();
   const recsVersionRef = useRef<number | null>(null);
 
-  const current = useResponsivePageSize({ mobile: 10, tablet: 20, desktop: 30 });
+  const current = useResponsivePageSize({ mobile: 6, tablet: 10, desktop: 15 });
   const lockedRef = useRef(current);
   const pageSize = lockedRef.current;
 

@@ -14,7 +14,7 @@ interface RecentlyAddedSourceProps {
 }
 
 export function RecentlyAddedSource({ sectionId, title, style }: RecentlyAddedSourceProps): React.JSX.Element | null {
-  const current = useResponsivePageSize({ mobile: 12, tablet: 20, desktop: 30 });
+  const current = useResponsivePageSize({ mobile: 8, tablet: 12, desktop: 18 });
   const lockedRef = useRef(current);
   const pageSize = lockedRef.current;
 

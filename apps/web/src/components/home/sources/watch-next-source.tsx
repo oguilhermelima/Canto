@@ -14,7 +14,7 @@ interface WatchNextSourceProps {
 }
 
 export function WatchNextSource({ sectionId, title, style }: WatchNextSourceProps): React.JSX.Element | null {
-  const initialLimit = useResponsivePageSize({ mobile: 10, tablet: 16, desktop: 24 });
+  const initialLimit = useResponsivePageSize({ mobile: 6, tablet: 10, desktop: 15 });
   const [limit] = useState(initialLimit);
 
   const query = trpc.userMedia.getWatchNext.useInfiniteQuery(

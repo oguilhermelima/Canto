@@ -15,7 +15,7 @@ interface CollectionSourceProps {
 }
 
 export function CollectionSource({ sectionId, title, style, listId }: CollectionSourceProps): React.JSX.Element | null {
-  const current = useResponsivePageSize({ mobile: 10, tablet: 16, desktop: 20 });
+  const current = useResponsivePageSize({ mobile: 8, tablet: 12, desktop: 18 });
   const lockedRef = useRef(current);
   const limit = lockedRef.current;
 
