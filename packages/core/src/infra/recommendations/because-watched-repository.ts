@@ -1,7 +1,8 @@
 import { sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { mediaTranslation, mediaVideo } from "@canto/db/schema";
+import { mediaVideo } from "@canto/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
+import { findMediaLocalizedMany } from "../media/media-localized-repository";
 
 export interface BecauseWatchedRec {
   sourceMediaId: string;
@@ -152,45 +153,42 @@ export async function findBecauseWatchedRecs(
     if (!trailerByMedia.has(t.mediaId)) trailerByMedia.set(t.mediaId, t.externalKey);
   }
 
-  // Translation overlay (only when language is non-English).
-  const translationByMedia = new Map<
+  // Localization overlay — single batch query through the unified
+  // `media_localization` read path. Resolves user-language values with en-US
+  // fallback for every recommended media in one round trip.
+  const localizedByMedia = new Map<
     string,
-    { title: string | null; posterPath: string | null; logoPath: string | null }
+    {
+      title: string;
+      overview: string | null;
+      posterPath: string | null;
+      logoPath: string | null;
+    }
   >();
-  if (language && !language.startsWith("en")) {
-    const transRows = await db
-      .select({
-        mediaId: mediaTranslation.mediaId,
-        title: mediaTranslation.title,
-        posterPath: mediaTranslation.posterPath,
-        logoPath: mediaTranslation.logoPath,
-      })
-      .from(mediaTranslation)
-      .where(
-        and(
-          inArray(mediaTranslation.mediaId, recMediaIds),
-          eq(mediaTranslation.language, language),
-        ),
-      );
-    for (const t of transRows) translationByMedia.set(t.mediaId, t);
+  const localizedRows = await findMediaLocalizedMany(db, recMediaIds, language);
+  for (const loc of localizedRows) {
+    localizedByMedia.set(loc.id, {
+      title: loc.title,
+      overview: loc.overview,
+      posterPath: loc.posterPath,
+      logoPath: loc.logoPath,
+    });
   }
 
   return rows
     .filter((r) => r.type === "movie" || r.type === "show")
     .map((r) => {
-      const trans = translationByMedia.get(r.mediaId);
-      const translatedTitle =
-        trans?.title && trans.title.trim().length > 0 ? trans.title : null;
+      const loc = localizedByMedia.get(r.mediaId);
       return {
         sourceMediaId: r.sourceMediaId,
         mediaId: r.mediaId,
         externalId: r.externalId,
         provider: r.provider,
         type: r.type as "movie" | "show",
-        title: translatedTitle ?? r.title,
-        posterPath: trans?.posterPath ?? r.posterPath,
+        title: loc?.title ?? r.title,
+        posterPath: loc?.posterPath ?? r.posterPath,
         backdropPath: r.backdropPath,
-        logoPath: trans?.logoPath ?? r.logoPath,
+        logoPath: loc?.logoPath ?? r.logoPath,
         overview: r.overview,
         voteAverage: r.voteAverage,
         year: r.year,

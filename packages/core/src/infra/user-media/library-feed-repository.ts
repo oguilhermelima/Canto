@@ -2,11 +2,9 @@ import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte
 import type { Database } from "@canto/db/client";
 import {
   episode,
-  episodeTranslation,
   list,
   listItem,
   media,
-  mediaTranslation,
   season,
   userHiddenMedia,
   userMediaState,
@@ -144,9 +142,11 @@ export async function findUserPlaybackProgressFeed(
     })
     .from(userPlaybackProgress)
     .innerJoin(media, eq(userPlaybackProgress.mediaId, media.id))
-    .leftJoin(mediaTranslation, mi.join)
+    .leftJoin(mi.locUser, mi.locUserJoin)
+    .leftJoin(mi.locEn, mi.locEnJoin)
     .leftJoin(episode, eq(userPlaybackProgress.episodeId, episode.id))
-    .leftJoin(episodeTranslation, ei.join)
+    .leftJoin(ei.locUser, ei.locUserJoin)
+    .leftJoin(ei.locEn, ei.locEnJoin)
     .leftJoin(season, eq(episode.seasonId, season.id))
     .leftJoin(
       userMediaState,
@@ -251,9 +251,11 @@ export async function findUserWatchHistoryFeed(
     })
     .from(userWatchHistory)
     .innerJoin(media, eq(userWatchHistory.mediaId, media.id))
-    .leftJoin(mediaTranslation, mi.join)
+    .leftJoin(mi.locUser, mi.locUserJoin)
+    .leftJoin(mi.locEn, mi.locEnJoin)
     .leftJoin(episode, eq(userWatchHistory.episodeId, episode.id))
-    .leftJoin(episodeTranslation, ei.join)
+    .leftJoin(ei.locUser, ei.locUserJoin)
+    .leftJoin(ei.locEn, ei.locEnJoin)
     .leftJoin(season, eq(episode.seasonId, season.id))
     .leftJoin(
       userMediaState,
@@ -325,7 +327,8 @@ export async function findUserListMediaCandidates(
     .from(listItem)
     .innerJoin(list, eq(listItem.listId, list.id))
     .innerJoin(media, eq(listItem.mediaId, media.id))
-    .leftJoin(mediaTranslation, mi.join)
+    .leftJoin(mi.locUser, mi.locUserJoin)
+    .leftJoin(mi.locEn, mi.locEnJoin)
     .where(and(...conditions))
     .orderBy(desc(listItem.addedAt), desc(listItem.id));
 
@@ -495,9 +498,11 @@ export async function findContinueWatchingFeed(
     })
     .from(userPlaybackProgress)
     .innerJoin(media, eq(userPlaybackProgress.mediaId, media.id))
-    .leftJoin(mediaTranslation, mi.join)
+    .leftJoin(mi.locUser, mi.locUserJoin)
+    .leftJoin(mi.locEn, mi.locEnJoin)
     .leftJoin(episode, eq(userPlaybackProgress.episodeId, episode.id))
-    .leftJoin(episodeTranslation, ei.join)
+    .leftJoin(ei.locUser, ei.locUserJoin)
+    .leftJoin(ei.locEn, ei.locEnJoin)
     .leftJoin(season, eq(episode.seasonId, season.id))
     .where(and(...conditions))
     .orderBy(desc(userPlaybackProgress.lastWatchedAt), desc(userPlaybackProgress.id))
@@ -615,7 +620,8 @@ export async function findUserMediaPaginated(
     .select(selectFields)
     .from(userMediaState)
     .innerJoin(media, eq(userMediaState.mediaId, media.id))
-    .leftJoin(mediaTranslation, mi.join)
+    .leftJoin(mi.locUser, mi.locUserJoin)
+    .leftJoin(mi.locEn, mi.locEnJoin)
     .where(where)
     .orderBy(
       sortDir(sortColumn),

@@ -7,7 +7,7 @@ import {
   findPublicListBySlug,
   findListItems,
 } from "@canto/core/infra/lists/list-repository";
-import { translateMediaItems } from "@canto/core/domain/shared/services/translation-service";
+import { applyMediaItemsLocalizationOverlay } from "@canto/core/domain/shared/localization/localization-service";
 import { findProfileSections } from "@canto/core/infra/profile/profile-section-repository";
 import {
   findUserMediaPaginated,
@@ -105,7 +105,7 @@ export const publicProfileRouter = createTRPCRouter({
         offset: 0,
       });
       const viewerLang = ctx.session.user.language;
-      const translated = await translateMediaItems(
+      const translated = await applyMediaItemsLocalizationOverlay(
         ctx.db,
         rawItems.map((i) => i.media),
         viewerLang,

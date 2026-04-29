@@ -18,7 +18,6 @@ import {
   episode,
   media,
   mediaFile,
-  mediaTranslation,
   mediaVersion,
   mediaVideo,
   season,
@@ -397,7 +396,8 @@ export async function listLibraryMedia(
         tagline: mi.tagline,
       })
       .from(media)
-      .leftJoin(mediaTranslation, mi.join)
+      .leftJoin(mi.locUser, mi.locUserJoin)
+      .leftJoin(mi.locEn, mi.locEnJoin)
       .where(where)
       .orderBy(...orderBy)
       .limit(pageSize)

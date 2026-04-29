@@ -13,6 +13,7 @@ import type { MediaType } from "@canto/providers";
 import { findMediaById } from "../../../infra/repositories";
 import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import { mapSearchResultToMediaFields } from "../rules/pool-scoring";
+import { upsertMediaLocalization } from "../../shared/localization";
 import { dispatchMediaPipeline } from "../../../platform/queue/bullmq-dispatcher";
 import { logAndSwallow } from "../../../platform/logger/log-error";
 
@@ -165,6 +166,14 @@ export async function refreshExtras(
       mediaIdByExtKey.set(key, existing.id);
       if (!existing.logoPath && fields.logoPath) {
         await db.update(media).set({ logoPath: fields.logoPath }).where(eq(media.id, existing.id));
+        // Dual-write to media_localization en-US (removed in Phase 1C-δ).
+        await upsertMediaLocalization(
+          db,
+          existing.id,
+          "en-US",
+          { title: fields.title, logoPath: fields.logoPath },
+          "tmdb",
+        );
       }
     } else {
       const [inserted] = await db.insert(media).values({
@@ -182,6 +191,19 @@ export async function refreshExtras(
       }).onConflictDoNothing().returning();
       if (inserted) {
         mediaIdByExtKey.set(key, inserted.id);
+        // Dual-write to media_localization en-US (removed in Phase 1C-δ).
+        await upsertMediaLocalization(
+          db,
+          inserted.id,
+          "en-US",
+          {
+            title: fields.title,
+            overview: fields.overview ?? null,
+            posterPath: fields.posterPath ?? null,
+            logoPath: fields.logoPath ?? null,
+          },
+          "tmdb",
+        );
         // Stub row from TMDB's recs/similar payload — enqueue full metadata
         // fetch so the row is filled in before any user-facing query surfaces
         // it (read paths filter on `metadataUpdatedAt IS NOT NULL`).

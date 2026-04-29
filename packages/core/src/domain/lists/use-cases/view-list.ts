@@ -5,7 +5,7 @@ import {
   findListBySlug,
   findListItems,
 } from "../../../infra/lists/list-repository";
-import { translateMediaItems } from "../../shared/services/translation-service";
+import { applyMediaItemsLocalizationOverlay } from "../../shared/localization";
 
 /**
  * `userLang` is supplied by the caller (read from `ctx.session.user.language`
@@ -48,7 +48,7 @@ export async function viewListBySlug(
     showHidden: input.showHidden ?? listRow.showHidden,
   });
 
-  const translated = await translateMediaItems(
+  const translated = await applyMediaItemsLocalizationOverlay(
     db,
     rawItems.map((i) => i.media),
     userLang,

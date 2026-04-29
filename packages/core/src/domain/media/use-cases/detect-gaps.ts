@@ -1,15 +1,17 @@
-import { and, eq, isNotNull, sql } from "drizzle-orm";
+import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
   episode,
-  episodeTranslation,
+  episodeLocalization,
   media,
   mediaContentRating,
   mediaCredit,
-  mediaTranslation,
+  mediaLocalization,
   season,
-  seasonTranslation,
+  seasonLocalization,
 } from "@canto/db/schema";
+
+const EN = "en-US";
 import type { Aspect, GapReport } from "./ensure-media.types";
 import { EXTRAS_TTL_MS, METADATA_TTL_MS } from "./ensure-media.types";
 
@@ -166,67 +168,74 @@ async function countTranslationsPerLang(
     result[lang] = { media: 0, season: 0, episode: 0 };
   }
 
-  const mediaTransRows = await db
-    .select({ language: mediaTranslation.language })
-    .from(mediaTranslation)
+  // Counts from `media_localization` (and the new season/episode localization
+  // tables). The en-US row is the canonical baseline — never counted as a
+  // translation here. The `languages` filter already excludes en-US (callers
+  // pass `nonEnLangs`), but we add an explicit guard to keep the count semantics
+  // safe regardless of caller intent.
+  const mediaLocRows = await db
+    .select({ language: mediaLocalization.language })
+    .from(mediaLocalization)
     .where(
       and(
-        eq(mediaTranslation.mediaId, mediaId),
-        sql`${mediaTranslation.language} IN (${sql.join(
+        eq(mediaLocalization.mediaId, mediaId),
+        sql`${mediaLocalization.language} IN (${sql.join(
           languages.map((l) => sql`${l}`),
           sql`, `,
         )})`,
-        isNotNull(mediaTranslation.title),
+        ne(mediaLocalization.language, EN),
       ),
     );
-  for (const row of mediaTransRows) {
+  for (const row of mediaLocRows) {
     const bucket = result[row.language];
     if (bucket) bucket.media = 1;
   }
 
   if (!isShow) return result;
 
-  const seasonTransRows = await db
+  const seasonLocRows = await db
     .select({
-      language: seasonTranslation.language,
+      language: seasonLocalization.language,
       n: sql<number>`count(*)::int`,
     })
-    .from(seasonTranslation)
-    .innerJoin(season, eq(seasonTranslation.seasonId, season.id))
+    .from(seasonLocalization)
+    .innerJoin(season, eq(seasonLocalization.seasonId, season.id))
     .where(
       and(
         eq(season.mediaId, mediaId),
-        sql`${seasonTranslation.language} IN (${sql.join(
+        sql`${seasonLocalization.language} IN (${sql.join(
           languages.map((l) => sql`${l}`),
           sql`, `,
         )})`,
+        ne(seasonLocalization.language, EN),
       ),
     )
-    .groupBy(seasonTranslation.language);
-  for (const row of seasonTransRows) {
+    .groupBy(seasonLocalization.language);
+  for (const row of seasonLocRows) {
     const bucket = result[row.language];
     if (bucket) bucket.season = row.n;
   }
 
-  const episodeTransRows = await db
+  const episodeLocRows = await db
     .select({
-      language: episodeTranslation.language,
+      language: episodeLocalization.language,
       n: sql<number>`count(*)::int`,
     })
-    .from(episodeTranslation)
-    .innerJoin(episode, eq(episodeTranslation.episodeId, episode.id))
+    .from(episodeLocalization)
+    .innerJoin(episode, eq(episodeLocalization.episodeId, episode.id))
     .innerJoin(season, eq(episode.seasonId, season.id))
     .where(
       and(
         eq(season.mediaId, mediaId),
-        sql`${episodeTranslation.language} IN (${sql.join(
+        sql`${episodeLocalization.language} IN (${sql.join(
           languages.map((l) => sql`${l}`),
           sql`, `,
         )})`,
+        ne(episodeLocalization.language, EN),
       ),
     )
-    .groupBy(episodeTranslation.language);
-  for (const row of episodeTransRows) {
+    .groupBy(episodeLocalization.language);
+  for (const row of episodeLocRows) {
     const bucket = result[row.language];
     if (bucket) bucket.episode = row.n;
   }
@@ -236,12 +245,13 @@ async function countTranslationsPerLang(
 
 async function listLogoLangs(db: Database, mediaId: string): Promise<string[]> {
   const rows = await db
-    .select({ language: mediaTranslation.language })
-    .from(mediaTranslation)
+    .select({ language: mediaLocalization.language })
+    .from(mediaLocalization)
     .where(
       and(
-        eq(mediaTranslation.mediaId, mediaId),
-        isNotNull(mediaTranslation.logoPath),
+        eq(mediaLocalization.mediaId, mediaId),
+        isNotNull(mediaLocalization.logoPath),
+        ne(mediaLocalization.language, EN),
       ),
     );
   return rows.map((r) => r.language);

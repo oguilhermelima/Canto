@@ -1,6 +1,6 @@
 import { and, asc, eq, or, isNull, desc, count, sql, inArray, max, type SQL } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { list, listItem, listMember, media, mediaTranslation, user, userHiddenMedia, userMediaLibrary, userMediaState } from "@canto/db/schema";
+import { list, listItem, listMember, media, user, userHiddenMedia, userMediaLibrary, userMediaState } from "@canto/db/schema";
 import type { CollectionWatchStatus } from "@canto/validators";
 import type { RecsFilters } from "../../domain/recommendations/types/recs-filters";
 import { buildRecsFilterConditions, recsSortOrder } from "../recommendations/recs-filter-builder";
@@ -101,18 +101,21 @@ export async function findUserListsWithCounts(
       // Top-4-per-list via window function — pulls 4N rows total instead of all
       // list_item rows. The previous version fetched the full list and trimmed
       // to 4 in JS, so a 1k-item list cost 1k rows + 1k translation joins.
+      // COALESCE chain: user-lang localization → en-US fallback → base column.
       db.execute<{ list_id: string; poster_path: string | null }>(sql`
         SELECT list_id, poster_path FROM (
           SELECT li.list_id,
-                 COALESCE(mt.poster_path, m.poster_path) AS poster_path,
+                 COALESCE(ml.poster_path, ml_en.poster_path, m.poster_path) AS poster_path,
                  ROW_NUMBER() OVER (
                    PARTITION BY li.list_id
                    ORDER BY li.position ASC, li.added_at DESC
                  ) AS rn
           FROM list_item li
           INNER JOIN media m ON m.id = li.media_id
-          LEFT JOIN media_translation mt
-                 ON mt.media_id = m.id AND mt.language = ${userLang}
+          LEFT JOIN media_localization ml
+                 ON ml.media_id = m.id AND ml.language = ${userLang}
+          LEFT JOIN media_localization ml_en
+                 ON ml_en.media_id = m.id AND ml_en.language = 'en-US'
           WHERE li.list_id IN (${sql.join(nonServerListIds.map((id) => sql`${id}::uuid`), sql`, `)})
             AND li.deleted_at IS NULL
         ) ranked
@@ -146,7 +149,7 @@ export async function findUserListsWithCounts(
       db.execute<{ list_id: string; poster_path: string | null }>(sql`
         SELECT list_id, poster_path FROM (
           SELECT li.list_id,
-                 COALESCE(mt.poster_path, m.poster_path) AS poster_path,
+                 COALESCE(ml.poster_path, ml_en.poster_path, m.poster_path) AS poster_path,
                  ROW_NUMBER() OVER (
                    PARTITION BY li.list_id
                    ORDER BY li.position ASC, li.added_at DESC
@@ -155,8 +158,10 @@ export async function findUserListsWithCounts(
           INNER JOIN media m ON m.id = li.media_id
           INNER JOIN user_media_library uml
                  ON uml.media_id = li.media_id AND uml.user_id = ${userId}
-          LEFT JOIN media_translation mt
-                 ON mt.media_id = m.id AND mt.language = ${userLang}
+          LEFT JOIN media_localization ml
+                 ON ml.media_id = m.id AND ml.language = ${userLang}
+          LEFT JOIN media_localization ml_en
+                 ON ml_en.media_id = m.id AND ml_en.language = 'en-US'
           WHERE li.list_id IN (${sql.join(serverListIds.map((id) => sql`${id}::uuid`), sql`, `)})
             AND li.deleted_at IS NULL
         ) ranked

@@ -11,6 +11,12 @@ import {
 import type { Database } from "@canto/db/client";
 
 import { getActiveUserLanguages } from "../../../shared/services/user-service";
+import {
+  type LocalizationSource,
+  upsertEpisodeLocalization,
+  upsertMediaLocalization,
+  upsertSeasonLocalization,
+} from "../../../shared/localization";
 
 export async function persistTranslations(
   db: Database,
@@ -18,6 +24,8 @@ export async function persistTranslations(
   normalized: NormalizedMedia,
 ): Promise<void> {
   const supported = await getActiveUserLanguages(db);
+  const locSource: LocalizationSource =
+    normalized.provider === "tvdb" ? "tvdb" : "tmdb";
 
   if (normalized.translations && normalized.translations.length > 0) {
     const mTransSeen = new Set<string>();
@@ -53,6 +61,24 @@ export async function persistTranslations(
             logoPath: sql`COALESCE(EXCLUDED.logo_path, ${mediaTranslation.logoPath})`,
           },
         });
+    }
+
+    // Dual-write to media_localization (removed in Phase 1C-δ).
+    for (const r of mediaTransRows) {
+      if (!r.title) continue; // upsertMediaLocalization requires title
+      await upsertMediaLocalization(
+        db,
+        r.mediaId,
+        r.language,
+        {
+          title: r.title,
+          overview: r.overview,
+          tagline: r.tagline,
+          posterPath: r.posterPath,
+          logoPath: r.logoPath,
+        },
+        locSource,
+      );
     }
   }
 
@@ -100,6 +126,17 @@ export async function persistTranslations(
             overview: sql`EXCLUDED.overview`,
           },
         });
+    }
+
+    // Dual-write to season_localization (removed in Phase 1C-δ).
+    for (const r of seasonTransRows) {
+      await upsertSeasonLocalization(
+        db,
+        r.seasonId,
+        r.language,
+        { name: r.name, overview: r.overview },
+        locSource,
+      );
     }
   }
 
@@ -155,6 +192,17 @@ export async function persistTranslations(
             overview: sql`EXCLUDED.overview`,
           },
         });
+    }
+
+    // Dual-write to episode_localization (removed in Phase 1C-δ).
+    for (const r of epTransRows) {
+      await upsertEpisodeLocalization(
+        db,
+        r.episodeId,
+        r.language,
+        { title: r.title, overview: r.overview },
+        locSource,
+      );
     }
   }
 }

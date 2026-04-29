@@ -19,7 +19,10 @@ import {
 } from "../../../../platform/queue/bullmq-dispatcher";
 import { detectGaps } from "../detect-gaps";
 import { fetchMediaMetadata, type MediaMetadata } from "../fetch-media-metadata";
-import { applyMediaTranslation, applySeasonsTranslation } from "../../../shared/services/translation-service";
+import {
+  applyMediaLocalizationOverlay,
+  applySeasonsLocalizationOverlay,
+} from "../../../shared/localization";
 import { applyMediaContentRating } from "../../../shared/services/content-rating-service";
 import { getActiveUserLanguages, getUserWatchPreferences } from "../../../shared/services/user-service";
 import { loadExtrasFromDB } from "../../services/extras-service";
@@ -29,6 +32,7 @@ import { persistTranslations } from "./translations";
 import { persistContentRatings } from "./content-ratings";
 import { persistExtras } from "./extras";
 import { applyTvdbSeasons } from "./tvdb-overlay";
+import { upsertMediaLocalization } from "../../../shared/localization";
 
 /**
  * Detect gaps in cached data for the user's current language and enqueue a
@@ -140,6 +144,21 @@ export async function persistMedia(
     throw new Error("Failed to insert media — conflict without existing row");
   }
 
+  // Dual-write base media columns into media_localization en-US (removed in Phase 1C-δ).
+  await upsertMediaLocalization(
+    db,
+    inserted.id,
+    "en-US",
+    {
+      title: normalized.title,
+      overview: normalized.overview,
+      tagline: normalized.tagline,
+      posterPath: normalized.posterPath,
+      logoPath: normalized.logoPath,
+    },
+    "original",
+  );
+
   await persistSeasons(db, inserted.id, normalized);
   await persistTranslations(db, inserted.id, normalized);
   await persistContentRatings(db, inserted.id, normalized);
@@ -215,6 +234,21 @@ export async function updateMediaFromNormalized(
     .returning();
 
   if (!updated) throw new Error("Failed to update media");
+
+  // Dual-write base media columns into media_localization en-US (removed in Phase 1C-δ).
+  await upsertMediaLocalization(
+    db,
+    mediaId,
+    "en-US",
+    {
+      title: normalized.title,
+      overview: normalized.overview,
+      tagline: normalized.tagline,
+      posterPath: normalized.posterPath,
+      logoPath: normalized.logoPath,
+    },
+    "original",
+  );
 
   // Skip season upsert if TVDB-reconciled to avoid re-adding TMDB's flat structure
   // on top of TVDB's granular arcs.
@@ -496,11 +530,11 @@ export async function resolveMedia(
 
   if (existing?.metadataUpdatedAt && existing.extrasUpdatedAt) {
     const { language: lang, watchRegion } = await getUserWatchPreferences(db, userId);
-    const translated = await applyMediaTranslation(db, existing, lang);
-    const withRating = await applyMediaContentRating(db, translated, watchRegion);
-    if (withRating.seasons) {
-      await applySeasonsTranslation(db, withRating.seasons, lang);
-    }
+    const localized = await applyMediaLocalizationOverlay(db, existing, lang);
+    const withRating = await applyMediaContentRating(db, localized, watchRegion);
+    const finalMedia = withRating.seasons && withRating.seasons.length > 0
+      ? { ...withRating, seasons: await applySeasonsLocalizationOverlay(db, existing.id, withRating.seasons, lang) }
+      : withRating;
     const extras = await loadExtrasFromDB(db, existing.id, lang);
 
     // Lazy fill: if this user's language has gaps, enqueue an ensureMedia
@@ -509,7 +543,7 @@ export async function resolveMedia(
 
     return {
       source: "db" as const,
-      media: withRating,
+      media: finalMedia,
       extras,
       persisted: true,
       mediaId: existing.id,
@@ -522,16 +556,16 @@ export async function resolveMedia(
   const persisted = await findMediaByIdWithSeasons(db, mediaId);
   if (persisted) {
     const { language: lang, watchRegion } = await getUserWatchPreferences(db, userId);
-    const translated = await applyMediaTranslation(db, persisted, lang);
-    const withRating = await applyMediaContentRating(db, translated, watchRegion);
-    if (withRating.seasons) {
-      await applySeasonsTranslation(db, withRating.seasons, lang);
-    }
+    const localized = await applyMediaLocalizationOverlay(db, persisted, lang);
+    const withRating = await applyMediaContentRating(db, localized, watchRegion);
+    const finalMedia = withRating.seasons && withRating.seasons.length > 0
+      ? { ...withRating, seasons: await applySeasonsLocalizationOverlay(db, persisted.id, withRating.seasons, lang) }
+      : withRating;
     const extras = await loadExtrasFromDB(db, persisted.id, lang);
 
     return {
       source: "db" as const,
-      media: withRating,
+      media: finalMedia,
       extras,
       persisted: true,
       mediaId,

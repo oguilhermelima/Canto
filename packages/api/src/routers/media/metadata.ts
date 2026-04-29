@@ -19,7 +19,10 @@ import {
   findMediaById,
   findMediaByIdWithSeasons,
 } from "@canto/core/infra/media/media-repository";
-import { applyMediaTranslation, applySeasonsTranslation } from "@canto/core/domain/shared/services/translation-service";
+import {
+  applyMediaLocalizationOverlay,
+  applySeasonsLocalizationOverlay,
+} from "@canto/core/domain/shared/localization/localization-service";
 import { getUserLanguage, getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 import { loadExtrasFromDB } from "@canto/core/domain/media/services/extras-service";
 import { getByExternal } from "@canto/core/domain/media/use-cases/get-by-external";
@@ -44,11 +47,17 @@ export const mediaMetadataRouter = createTRPCRouter({
     if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
 
     const userLang = await getUserLanguage(ctx.db, ctx.session.user.id);
-    const translated = await applyMediaTranslation(ctx.db, row, userLang);
-    if (translated.seasons) {
-      await applySeasonsTranslation(ctx.db, translated.seasons, userLang);
+    const localized = await applyMediaLocalizationOverlay(ctx.db, row, userLang);
+    if (localized.seasons && localized.seasons.length > 0) {
+      const overlayedSeasons = await applySeasonsLocalizationOverlay(
+        ctx.db,
+        row.id,
+        localized.seasons,
+        userLang,
+      );
+      return { ...localized, seasons: overlayedSeasons };
     }
-    return translated;
+    return localized;
   }),
 
   getByExternal: protectedProcedure

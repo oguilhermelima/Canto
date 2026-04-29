@@ -1,6 +1,7 @@
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { mediaTranslation } from "@canto/db/schema";
+import { mediaLocalization, mediaTranslation } from "@canto/db/schema";
+import { upsertMediaLocalization } from "../../shared/localization";
 
 /**
  * Upsert language-specific logo paths into `media_translation`.
@@ -31,6 +32,23 @@ export async function upsertLangLogos(
     supported.add(code);
   }
 
+  // Dual-write needs a title (the new media_localization.title is required and
+  // the upsert helper enforces it). Look up the existing en-US localization row
+  // once; if absent, only the legacy mediaTranslation insert runs and the
+  // localization row will be filled in later by the translations refresh.
+  // Removed in Phase 1C-δ.
+  const enLocRow = await db
+    .select({ title: mediaLocalization.title })
+    .from(mediaLocalization)
+    .where(
+      and(
+        eq(mediaLocalization.mediaId, mediaId),
+        eq(mediaLocalization.language, "en-US"),
+      ),
+    )
+    .limit(1);
+  const enTitle = enLocRow[0]?.title ?? null;
+
   let writes = 0;
   for (const [tmdbCode, logoPath] of byLangIso639_1) {
     if (!supported.has(tmdbCode)) continue;
@@ -46,6 +64,22 @@ export async function upsertLangLogos(
           },
         });
       writes += 1;
+
+      // Dual-write to media_localization (removed in Phase 1C-δ). Skip when no
+      // en-US row exists yet; the next translations refresh will create one.
+      if (enTitle) {
+        try {
+          await upsertMediaLocalization(
+            db,
+            mediaId,
+            fullCode,
+            { title: enTitle, logoPath },
+            "tmdb",
+          );
+        } catch {
+          // Mirror the legacy try/catch behaviour for unsupported language codes.
+        }
+      }
     } catch {
       // FK to supported_language rejects unknown codes — skip silently.
     }

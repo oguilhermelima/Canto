@@ -1,12 +1,15 @@
 import { and, desc, eq, sql, count } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { Database } from "@canto/db/client";
 import {
   user,
+  mediaLocalization,
   mediaRecommendation,
-  mediaTranslation,
   mediaVideo,
   userRecommendation,
 } from "@canto/db/schema";
+
+const EN = "en-US";
 import type { RecsFilters } from "../../domain/recommendations/types/recs-filters";
 import {
   buildRecsFilterConditions,
@@ -288,9 +291,11 @@ function narrowReadRow(r: {
  * `media` and no GROUP BY/SUM, since the row is already 1-per-(user, media)
  * with the desired weight stored in place.
  *
- * Translation is overlaid via a LEFT JOIN on `media_translation` keyed on the
- * existing `mediaId` FK, so we only pay one extra index lookup per row when a
- * non-English language is set on the user.
+ * Localization is overlaid via two LEFT JOINs on `media_localization` (user
+ * language + en-US fallback) keyed on the existing `mediaId` FK. The COALESCE
+ * picks user-lang when present, then en-US, then the denormalized
+ * `user_recommendation` column as a final safety net for rows where the
+ * localization tables haven't been populated yet.
  *
  * Rows whose `title` column is null are skipped — they are pre-denormalization
  * artefacts and will self-heal on the next daily rebuild.
@@ -302,10 +307,8 @@ export async function findUserRecommendations(
   limit: number,
   offset: number,
   filters: RecsFilters = {},
-  language = "en-US",
+  language = EN,
 ): Promise<UserRecommendationReadRow[]> {
-  const useTranslations = !!language && !language.startsWith("en");
-
   // Anti-join exclusion via NOT EXISTS — scales with library size in O(1)
   // index lookups per row, instead of an O(N) chain of OR predicates.
   const excludeClause =
@@ -341,6 +344,9 @@ export async function findUserRecommendations(
 
   const customSort = recsSortOrder(filters.sortBy, USER_REC_COLUMNS);
 
+  const locUser = alias(mediaLocalization, "rec_loc_user");
+  const locEn = alias(mediaLocalization, "rec_loc_en");
+
   const baseSelect = {
     id: userRecommendation.mediaId,
     externalId: userRecommendation.externalId,
@@ -367,62 +373,33 @@ export async function findUserRecommendations(
     ${negativeClause}
     ${sql.join(filterClauses, sql` `)}`;
 
-  if (useTranslations) {
-    const rows = await db
-      .select({
-        ...baseSelect,
-        translatedTitle: mediaTranslation.title,
-        translatedOverview: mediaTranslation.overview,
-        translatedPosterPath: mediaTranslation.posterPath,
-        translatedLogoPath: mediaTranslation.logoPath,
-      })
-      .from(userRecommendation)
-      .leftJoin(
-        mediaTranslation,
-        and(
-          eq(mediaTranslation.mediaId, userRecommendation.mediaId),
-          eq(mediaTranslation.language, language),
-        ),
-      )
-      .where(where)
-      .orderBy(customSort ?? desc(userRecommendation.weight))
-      .limit(limit)
-      .offset(offset);
-
-    const out: UserRecommendationReadRow[] = [];
-    for (const r of rows) {
-      const translatedOverview =
-        r.translatedOverview && r.translatedOverview.trim().length > 0
-          ? r.translatedOverview
-          : null;
-      const narrowed = narrowReadRow({
-        id: r.id,
-        externalId: r.externalId,
-        provider: r.provider,
-        mediaType: r.mediaType,
-        title:
-          r.translatedTitle && r.translatedTitle.trim().length > 0
-            ? r.translatedTitle
-            : r.title,
-        overview: translatedOverview ?? r.overview,
-        posterPath: r.translatedPosterPath ?? r.posterPath,
-        backdropPath: r.backdropPath,
-        logoPath: r.translatedLogoPath ?? r.logoPath,
-        releaseDate: r.releaseDate,
-        voteAverage: r.voteAverage,
-        genres: r.genres,
-        genreIds: r.genreIds,
-        trailerKey: r.trailerKey,
-        relevance: r.relevance,
-      });
-      if (narrowed) out.push(narrowed);
-    }
-    return out;
-  }
-
   const rows = await db
-    .select(baseSelect)
+    .select({
+      ...baseSelect,
+      locUserTitle: locUser.title,
+      locUserOverview: locUser.overview,
+      locUserPosterPath: locUser.posterPath,
+      locUserLogoPath: locUser.logoPath,
+      locEnTitle: locEn.title,
+      locEnOverview: locEn.overview,
+      locEnPosterPath: locEn.posterPath,
+      locEnLogoPath: locEn.logoPath,
+    })
     .from(userRecommendation)
+    .leftJoin(
+      locUser,
+      and(
+        eq(locUser.mediaId, userRecommendation.mediaId),
+        eq(locUser.language, language),
+      ),
+    )
+    .leftJoin(
+      locEn,
+      and(
+        eq(locEn.mediaId, userRecommendation.mediaId),
+        eq(locEn.language, EN),
+      ),
+    )
     .where(where)
     .orderBy(customSort ?? desc(userRecommendation.weight))
     .limit(limit)
@@ -430,10 +407,54 @@ export async function findUserRecommendations(
 
   const out: UserRecommendationReadRow[] = [];
   for (const r of rows) {
-    const narrowed = narrowReadRow(r);
+    const narrowed = narrowReadRow({
+      id: r.id,
+      externalId: r.externalId,
+      provider: r.provider,
+      mediaType: r.mediaType,
+      title: pickLocalizedTitle(r.locUserTitle, r.locEnTitle, r.title),
+      overview: pickLocalizedText(
+        r.locUserOverview,
+        r.locEnOverview,
+        r.overview,
+      ),
+      posterPath: r.locUserPosterPath ?? r.locEnPosterPath ?? r.posterPath,
+      backdropPath: r.backdropPath,
+      logoPath: r.locUserLogoPath ?? r.locEnLogoPath ?? r.logoPath,
+      releaseDate: r.releaseDate,
+      voteAverage: r.voteAverage,
+      genres: r.genres,
+      genreIds: r.genreIds,
+      trailerKey: r.trailerKey,
+      relevance: r.relevance,
+    });
     if (narrowed) out.push(narrowed);
   }
   return out;
+}
+
+/** Pick the first non-blank localized title, falling back to the
+ *  denormalized en-US value stored on `user_recommendation`. */
+function pickLocalizedTitle(
+  userTitle: string | null,
+  enTitle: string | null,
+  fallback: string | null,
+): string | null {
+  if (userTitle && userTitle.trim().length > 0) return userTitle;
+  if (enTitle && enTitle.trim().length > 0) return enTitle;
+  return fallback;
+}
+
+/** Pick the first non-blank localized text (overview), preserving null when
+ *  no source has any content. */
+function pickLocalizedText(
+  userText: string | null,
+  enText: string | null,
+  fallback: string | null,
+): string | null {
+  if (userText && userText.trim().length > 0) return userText;
+  if (enText && enText.trim().length > 0) return enText;
+  return fallback;
 }
 
 /** Count active user_recommendation rows for a user (to decide fallback). */
@@ -513,17 +534,15 @@ export async function findUsersForDailyRecsCheck(
 /**
  * Per-user spotlight: top-weighted active items from user_recommendation
  * that have a backdrop. Reads denormalized columns directly — no JOIN with
- * `media`, no GROUP BY/SUM. Translation overlay matches `findUserRecommendations`.
+ * `media`, no GROUP BY/SUM. Localization overlay matches `findUserRecommendations`.
  */
 export async function findUserSpotlightItems(
   db: Database,
   userId: string,
   excludeItems: Array<{ externalId: number; provider: string }>,
   limit: number,
-  language = "en-US",
+  language = EN,
 ): Promise<UserRecommendationReadRow[]> {
-  const useTranslations = !!language && !language.startsWith("en");
-
   // Anti-join exclusion via NOT EXISTS — scales with library size in O(1)
   // index lookups per row, instead of an O(N) chain of OR predicates.
   const excludeClause =
@@ -553,6 +572,9 @@ export async function findUserSpotlightItems(
       AND (ums_neg.status = 'dropped' OR (ums_neg.rating IS NOT NULL AND ums_neg.rating <= 3))
   )`;
 
+  const locUser = alias(mediaLocalization, "spot_loc_user");
+  const locEn = alias(mediaLocalization, "spot_loc_en");
+
   const baseSelect = {
     id: userRecommendation.mediaId,
     externalId: userRecommendation.externalId,
@@ -578,67 +600,59 @@ export async function findUserSpotlightItems(
     ${excludeClause}
     ${negativeClause}`;
 
-  if (useTranslations) {
-    const rows = await db
-      .select({
-        ...baseSelect,
-        translatedTitle: mediaTranslation.title,
-        translatedOverview: mediaTranslation.overview,
-        translatedPosterPath: mediaTranslation.posterPath,
-        translatedLogoPath: mediaTranslation.logoPath,
-      })
-      .from(userRecommendation)
-      .leftJoin(
-        mediaTranslation,
-        and(
-          eq(mediaTranslation.mediaId, userRecommendation.mediaId),
-          eq(mediaTranslation.language, language),
-        ),
-      )
-      .where(where)
-      .orderBy(desc(userRecommendation.weight))
-      .limit(limit);
-
-    const out: UserRecommendationReadRow[] = [];
-    for (const r of rows) {
-      const translatedOverview =
-        r.translatedOverview && r.translatedOverview.trim().length > 0
-          ? r.translatedOverview
-          : null;
-      const narrowed = narrowReadRow({
-        id: r.id,
-        externalId: r.externalId,
-        provider: r.provider,
-        mediaType: r.mediaType,
-        title:
-          r.translatedTitle && r.translatedTitle.trim().length > 0
-            ? r.translatedTitle
-            : r.title,
-        overview: translatedOverview ?? r.overview,
-        posterPath: r.translatedPosterPath ?? r.posterPath,
-        backdropPath: r.backdropPath,
-        logoPath: r.translatedLogoPath ?? r.logoPath,
-        releaseDate: r.releaseDate,
-        voteAverage: r.voteAverage,
-        genres: r.genres,
-        genreIds: r.genreIds,
-        relevance: r.relevance,
-      });
-      if (narrowed) out.push(narrowed);
-    }
-    return out;
-  }
-
   const rows = await db
-    .select(baseSelect)
+    .select({
+      ...baseSelect,
+      locUserTitle: locUser.title,
+      locUserOverview: locUser.overview,
+      locUserPosterPath: locUser.posterPath,
+      locUserLogoPath: locUser.logoPath,
+      locEnTitle: locEn.title,
+      locEnOverview: locEn.overview,
+      locEnPosterPath: locEn.posterPath,
+      locEnLogoPath: locEn.logoPath,
+    })
     .from(userRecommendation)
+    .leftJoin(
+      locUser,
+      and(
+        eq(locUser.mediaId, userRecommendation.mediaId),
+        eq(locUser.language, language),
+      ),
+    )
+    .leftJoin(
+      locEn,
+      and(
+        eq(locEn.mediaId, userRecommendation.mediaId),
+        eq(locEn.language, EN),
+      ),
+    )
     .where(where)
     .orderBy(desc(userRecommendation.weight))
     .limit(limit);
 
   const out: UserRecommendationReadRow[] = [];
   for (const r of rows) {
-    const narrowed = narrowReadRow(r);
+    const narrowed = narrowReadRow({
+      id: r.id,
+      externalId: r.externalId,
+      provider: r.provider,
+      mediaType: r.mediaType,
+      title: pickLocalizedTitle(r.locUserTitle, r.locEnTitle, r.title),
+      overview: pickLocalizedText(
+        r.locUserOverview,
+        r.locEnOverview,
+        r.overview,
+      ),
+      posterPath: r.locUserPosterPath ?? r.locEnPosterPath ?? r.posterPath,
+      backdropPath: r.backdropPath,
+      logoPath: r.locUserLogoPath ?? r.locEnLogoPath ?? r.logoPath,
+      releaseDate: r.releaseDate,
+      voteAverage: r.voteAverage,
+      genres: r.genres,
+      genreIds: r.genreIds,
+      relevance: r.relevance,
+    });
     if (narrowed) out.push(narrowed);
   }
   return out;

@@ -2,7 +2,7 @@ import type { Database } from "@canto/db/client";
 import type { GetAllCollectionItemsInput } from "@canto/validators";
 import { findUserCustomCollectionItems } from "../../../infra/lists/list-repository";
 import { getCollectionLayout } from "./collection-layout";
-import { translateMediaItems } from "../../shared/services/translation-service";
+import { applyMediaItemsLocalizationOverlay } from "../../shared/localization";
 
 /**
  * `userLang` is supplied by the caller (read from `ctx.session.user.language`
@@ -45,7 +45,7 @@ export async function viewAllCollectionItems(
     },
   );
 
-  const translated = await translateMediaItems(
+  const translated = await applyMediaItemsLocalizationOverlay(
     db,
     rawItems.map((i) => i.media),
     userLang,

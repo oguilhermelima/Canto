@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { episode, episodeTranslation, season, userWatchHistory } from "@canto/db/schema";
+import { episode, season, userWatchHistory } from "@canto/db/schema";
 import { episodeI18n } from "../shared/media-i18n";
 
 export async function addUserWatchHistory(
@@ -135,7 +135,8 @@ export async function findEpisodesByMediaIds(
     })
     .from(episode)
     .innerJoin(season, eq(episode.seasonId, season.id))
-    .leftJoin(episodeTranslation, i18n.join)
+    .leftJoin(i18n.locUser, i18n.locUserJoin)
+    .leftJoin(i18n.locEn, i18n.locEnJoin)
     .where(inArray(season.mediaId, mediaIds))
     .orderBy(asc(season.mediaId), asc(season.number), asc(episode.number));
 }

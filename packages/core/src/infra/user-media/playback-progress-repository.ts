@@ -1,6 +1,6 @@
 import { and, desc, eq, gt, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { media, mediaTranslation, userPlaybackProgress } from "@canto/db/schema";
+import { media, userPlaybackProgress } from "@canto/db/schema";
 import { mediaI18n } from "../shared/media-i18n";
 
 export async function findUserPlaybackProgress(
@@ -224,7 +224,8 @@ export async function findUserWatchingShowsMetadata(
     })
     .from(userPlaybackProgress)
     .innerJoin(media, eq(userPlaybackProgress.mediaId, media.id))
-    .leftJoin(mediaTranslation, mi.join)
+    .leftJoin(mi.locUser, mi.locUserJoin)
+    .leftJoin(mi.locEn, mi.locEnJoin)
     .where(
       and(
         eq(userPlaybackProgress.userId, userId),

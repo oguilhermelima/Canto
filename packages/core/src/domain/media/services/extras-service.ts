@@ -5,7 +5,7 @@ import {
   findWatchProvidersByMediaId,
   findRecommendationsBySource,
 } from "../../../infra/content-enrichment/extras-repository";
-import { translateMediaItems } from "../../shared/services/translation-service";
+import { applyMediaItemsLocalizationOverlay } from "../../shared/localization";
 import { mapPoolItem } from "../../shared/mappers/media-mapper";
 
 /**
@@ -68,8 +68,8 @@ export async function loadExtrasFromDB(db: Database, mediaId: string, lang: stri
   const mappedSimilar = similar.map(mapPoolItem);
   const mappedRecs = recommendations.map(mapPoolItem);
   const [translatedSimilar, translatedRecs] = await Promise.all([
-    translateMediaItems(db, mappedSimilar, lang),
-    translateMediaItems(db, mappedRecs, lang),
+    applyMediaItemsLocalizationOverlay(db, mappedSimilar, lang),
+    applyMediaItemsLocalizationOverlay(db, mappedRecs, lang),
   ]);
 
   const langPrefix = lang.split("-")[0];

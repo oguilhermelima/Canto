@@ -3,7 +3,7 @@ import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import type { SearchResult } from "@canto/providers";
 import { getSetting, setSetting } from "@canto/db/settings";
 import { buildExclusionSet } from "./recommendation-service";
-import { translateMediaItems } from "../../shared/services/translation-service";
+import { applyMediaItemsLocalizationOverlay } from "../../shared/localization";
 import { mapPoolItem } from "../../shared/mappers/media-mapper";
 import { findRecommendedMediaWithBackdrops } from "../../../infra/content-enrichment/extras-repository";
 import { findUserSpotlightItems } from "../../../infra/recommendations/user-recommendation-repository";
@@ -49,7 +49,7 @@ export async function getSpotlight(
       seen.add(key);
       return true;
     });
-    return translateMediaItems(db, unique.slice(0, SPOTLIGHT_LIMIT).map(mapPoolItem), userLang);
+    return applyMediaItemsLocalizationOverlay(db, unique.slice(0, SPOTLIGHT_LIMIT).map(mapPoolItem), userLang);
   }
 
   // Path 3: TMDB trending fallback (fresh install)
@@ -120,5 +120,5 @@ export async function getSpotlight(
 
   await setSetting("cache.spotlight", { data: spotlightResults, updatedAt: new Date().toISOString() });
 
-  return translateMediaItems(db, spotlightResults, userLang);
+  return applyMediaItemsLocalizationOverlay(db, spotlightResults, userLang);
 }

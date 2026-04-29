@@ -1,7 +1,7 @@
 import type { Database } from "@canto/db/client";
 import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import { buildExclusionSet } from "./recommendation-service";
-import { translateMediaItems } from "../../shared/services/translation-service";
+import { applyMediaItemsLocalizationOverlay } from "../../shared/localization";
 import { mapPoolItem } from "../../shared/mappers/media-mapper";
 import { rankByMmr } from "../rules/mmr-diversity";
 import { exploreSlotPositions, mixExploreSlots } from "../rules/explore-mix";
@@ -133,7 +133,7 @@ export async function getRecommendations(
         ).map((entry) => entry.item)
       : unique.slice(0, pageSize);
     const items = ranked.map(mapPoolItem);
-    const translatedPoolItems = await translateMediaItems(db, items, userLang);
+    const translatedPoolItems = await applyMediaItemsLocalizationOverlay(db, items, userLang);
     return { items: translatedPoolItems, nextCursor: hasMore ? page + 1 : null, version: recsVersion };
   }
 
@@ -180,7 +180,7 @@ export async function getRecommendations(
   const sorted = results.sort((a, b) => (b.voteAverage ?? 0) - (a.voteAverage ?? 0));
   const pageItems = sorted.slice(0, pageSize);
   const hasMore = sorted.length > pageSize || allLibrary.length > (page + 1) * 3;
-  const translatedFallback = await translateMediaItems(db, pageItems, userLang);
+  const translatedFallback = await applyMediaItemsLocalizationOverlay(db, pageItems, userLang);
   return { items: translatedFallback, nextCursor: hasMore ? page + 1 : null, version: recsVersion };
 }
 
@@ -230,6 +230,6 @@ async function mixWithExploreSlot(
     if (explore.length >= slots.length) break;
   }
 
-  const translatedExplore = await translateMediaItems(db, explore, userLang);
+  const translatedExplore = await applyMediaItemsLocalizationOverlay(db, explore, userLang);
   return mixExploreSlots(personalized, translatedExplore);
 }

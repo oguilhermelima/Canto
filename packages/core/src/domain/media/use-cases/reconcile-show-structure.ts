@@ -17,6 +17,7 @@ import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import { logAndSwallow } from "../../../platform/logger/log-error";
 import type { JobDispatcherPort } from "../../shared/ports/job-dispatcher.port";
 import { getEffectiveProvider } from "../../shared/rules/effective-provider";
+import { upsertMediaLocalization } from "../../shared/localization";
 
 /**
  * Reconcile season/episode structure from TVDB without touching TMDB metadata.
@@ -106,6 +107,22 @@ export async function reconcileShowStructure(
         ...(tmdbMeta.backdropPath ? { backdropPath: tmdbMeta.backdropPath } : {}),
         ...(tmdbMeta.logoPath ? { logoPath: tmdbMeta.logoPath } : {}),
       });
+
+      // Dual-write the localized image fields into media_localization en-US
+      // (removed in Phase 1C-δ). backdropPath stays only on the base media row.
+      if (tmdbMeta.posterPath || tmdbMeta.logoPath) {
+        await upsertMediaLocalization(
+          db,
+          mediaId,
+          "en-US",
+          {
+            title: row.title,
+            ...(tmdbMeta.posterPath ? { posterPath: tmdbMeta.posterPath } : {}),
+            ...(tmdbMeta.logoPath ? { logoPath: tmdbMeta.logoPath } : {}),
+          },
+          "tmdb",
+        );
+      }
 
       // Persist TMDB media-level translations (title, overview, posters, logos)
       if (tmdbMeta.translations) {

@@ -10,7 +10,10 @@ import {
   findMediaByIdWithSeasons,
 } from "../../../infra/repositories";
 import { dispatchRefreshExtras, dispatchReconcileShow } from "../../../platform/queue/bullmq-dispatcher";
-import { applyMediaTranslation, applySeasonsTranslation } from "../../shared/services/translation-service";
+import {
+  applyMediaLocalizationOverlay,
+  applySeasonsLocalizationOverlay,
+} from "../../shared/localization";
 import { getUserLanguage } from "../../shared/services/user-service";
 
 interface GetByExternalInput {
@@ -43,11 +46,12 @@ export async function getByExternal(
     const isStale = !existing.extrasUpdatedAt || Date.now() - existing.extrasUpdatedAt.getTime() > STALE_MS;
     if (isStale) void dispatchRefreshExtras(existing.id).catch(logAndSwallow("media:getByExternal dispatchRefreshExtras"));
     const lang = await getUserLang();
-    const translated = await applyMediaTranslation(db, existing, lang);
-    if (translated.seasons) {
-      await applySeasonsTranslation(db, translated.seasons as any, lang);
+    const localized = await applyMediaLocalizationOverlay(db, existing, lang);
+    if (localized.seasons && localized.seasons.length > 0) {
+      const overlayed = await applySeasonsLocalizationOverlay(db, existing.id, localized.seasons as any, lang);
+      return { ...localized, seasons: overlayed };
     }
-    return translated;
+    return localized;
   }
 
   const provider = await providerFactory(input.provider);
@@ -61,11 +65,12 @@ export async function getByExternal(
     );
     if (crossRef) {
       const lang = await getUserLang();
-      const translated = await applyMediaTranslation(db, crossRef, lang);
-      if (translated.seasons) {
-        await applySeasonsTranslation(db, translated.seasons as any, lang);
+      const localized = await applyMediaLocalizationOverlay(db, crossRef, lang);
+      if (localized.seasons && localized.seasons.length > 0) {
+        const overlayed = await applySeasonsLocalizationOverlay(db, crossRef.id, localized.seasons as any, lang);
+        return { ...localized, seasons: overlayed };
       }
-      return translated;
+      return localized;
     }
   }
 
@@ -78,9 +83,10 @@ export async function getByExternal(
   const result = await findMediaByIdWithSeasons(db, inserted.id);
   if (!result) throw new Error("Media not found after insert");
   const lang = await getUserLang();
-  const translated = await applyMediaTranslation(db, result, lang);
-  if (translated.seasons) {
-    await applySeasonsTranslation(db, translated.seasons as any, lang);
+  const localized = await applyMediaLocalizationOverlay(db, result, lang);
+  if (localized.seasons && localized.seasons.length > 0) {
+    const overlayed = await applySeasonsLocalizationOverlay(db, result.id, localized.seasons as any, lang);
+    return { ...localized, seasons: overlayed };
   }
-  return translated;
+  return localized;
 }

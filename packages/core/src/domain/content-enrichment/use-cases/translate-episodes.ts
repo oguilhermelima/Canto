@@ -2,6 +2,10 @@ import { eq, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { episode, episodeTranslation, season, seasonTranslation } from "@canto/db/schema";
 import { TvdbProvider } from "@canto/providers";
+import {
+  upsertEpisodeLocalization,
+  upsertSeasonLocalization,
+} from "../../shared/localization";
 
 /**
  * Fetch episode + season translations for a single language from TVDB.
@@ -70,6 +74,17 @@ export async function translateEpisodes(
         target: [seasonTranslation.seasonId, seasonTranslation.language],
         set: { name: sql`EXCLUDED.name`, overview: sql`EXCLUDED.overview` },
       });
+
+    // Dual-write to season_localization (removed in Phase 1C-δ).
+    for (const r of dedupedSeasonTrans) {
+      await upsertSeasonLocalization(
+        db,
+        r.seasonId,
+        r.language,
+        { name: r.name, overview: r.overview },
+        "tvdb",
+      );
+    }
   }
 
   // Build episode ID lookup: "seasonNum-epNum" → episodeId
@@ -115,6 +130,17 @@ export async function translateEpisodes(
         target: [episodeTranslation.episodeId, episodeTranslation.language],
         set: { title: sql`EXCLUDED.title`, overview: sql`EXCLUDED.overview` },
       });
+  }
+
+  // Dual-write to episode_localization (removed in Phase 1C-δ).
+  for (const r of epTransRows) {
+    await upsertEpisodeLocalization(
+      db,
+      r.episodeId,
+      r.language,
+      { title: r.title, overview: r.overview },
+      "tvdb",
+    );
   }
 
   console.log(
