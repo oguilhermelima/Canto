@@ -2,6 +2,7 @@
 # Infra (VPN, qBittorrent, Jellyfin, Prowlarr) lives in a separate stack.
 # Required env: POSTGRES_PASSWORD, REDIS_PASSWORD, BETTER_AUTH_SECRET, BETTER_AUTH_URL, MEDIA_PATH.
 # The migrate service builds canto:latest; canto and worker consume the built image.
+# Trakt OAuth credentials are configured via Settings UI (stored in DB), not env.
 services:
   postgres:
     image: postgres:18
@@ -68,8 +69,6 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
       AUTH_TRUSTED_ORIGINS: ${AUTH_TRUSTED_ORIGINS:-}
-      TRAKT_CLIENT_ID: ${TRAKT_CLIENT_ID:-}
-      TRAKT_CLIENT_SECRET: ${TRAKT_CLIENT_SECRET:-}
     volumes:
       - ${MEDIA_PATH}:/media
       - canto_uploads:/app/data/uploads
@@ -98,8 +97,6 @@ services:
       # without it here the worker can't decrypt tmdb.apiKey, jellyfin.apiKey,
       # plex.token, etc., and every pipeline/sync job fails with 401/auth errors.
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
-      TRAKT_CLIENT_ID: ${TRAKT_CLIENT_ID:-}
-      TRAKT_CLIENT_SECRET: ${TRAKT_CLIENT_SECRET:-}
     volumes:
       - ${MEDIA_PATH}:/media
     depends_on:

@@ -165,7 +165,6 @@ export const SETTINGS_REGISTRY = {
     schema: z.string().min(1),
     secret: false,
     inputType: "text",
-    envVar: "TRAKT_CLIENT_ID",
   }),
   "trakt.clientSecret": def({
     group: "services.trakt",
@@ -174,7 +173,6 @@ export const SETTINGS_REGISTRY = {
     schema: z.string().min(1),
     secret: true,
     inputType: "password",
-    envVar: "TRAKT_CLIENT_SECRET",
   }),
 
   // ── Downloads: qBittorrent ───────────────────────────────────────────────
