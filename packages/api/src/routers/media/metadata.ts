@@ -13,7 +13,7 @@ import {
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
-import { dispatchRefreshExtras } from "@canto/core/platform/queue/bullmq-dispatcher";
+import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 import {
   findMediaById,
@@ -100,7 +100,9 @@ export const mediaMetadataRouter = createTRPCRouter({
       }
 
       // New tables empty — dispatch background refresh and fetch from TMDB directly
-      void dispatchRefreshExtras(input.id).catch(logAndSwallow("media:getExtras dispatchRefreshExtras"));
+      void dispatchEnsureMedia(input.id, { aspects: ["extras"] }).catch(
+        logAndSwallow("media:getExtras dispatchEnsureMedia(extras)"),
+      );
 
       const tmdb = await getTmdbProvider();
       let tmdbExternalId = row.externalId;

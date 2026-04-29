@@ -11,7 +11,7 @@ import {
 import type { Database } from "@canto/db/client";
 
 import { logAndSwallow } from "../../../../platform/logger/log-error";
-import { dispatchMediaPipeline } from "../../../../platform/queue/bullmq-dispatcher";
+import { dispatchEnsureMedia } from "../../../../platform/queue/bullmq-dispatcher";
 
 /**
  * Persist media extras (credits, videos, watch providers, recommendations).
@@ -79,8 +79,8 @@ export async function persistExtras(
           recMediaIdByKey.set(key, inserted.id);
           // Stub row from TMDB's recs/similar payload — enqueue full metadata
           // fetch so read paths (filtered on metadataUpdatedAt) can surface it.
-          void dispatchMediaPipeline({ mediaId: inserted.id }).catch(
-            logAndSwallow("persistExtras dispatchMediaPipeline"),
+          void dispatchEnsureMedia(inserted.id).catch(
+            logAndSwallow("persistExtras dispatchEnsureMedia"),
           );
         } else {
           const existing = await db.query.media.findFirst({

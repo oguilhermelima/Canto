@@ -13,7 +13,7 @@ import { persistMedia } from "../media/use-cases/persist";
 import { getActiveUserLanguages } from "../shared/services/user-service";
 import { getSetting, getSettings, setSettingRaw } from "@canto/db/settings";
 
-import { dispatchMediaPipeline } from "../../platform/queue/bullmq-dispatcher";
+import { dispatchEnsureMedia } from "../../platform/queue/bullmq-dispatcher";
 import { logAndSwallow } from "../../platform/logger/log-error";
 import {
   findMediaByAnyReference,
@@ -218,8 +218,8 @@ async function ensureMediaAnchor(
       await updateMedia(db, existing.id, updates);
     }
     if (!existing.metadataUpdatedAt) {
-      void dispatchMediaPipeline({ mediaId: existing.id }).catch(
-        logAndSwallow("sync-pipeline dispatchMediaPipeline"),
+      void dispatchEnsureMedia(existing.id).catch(
+        logAndSwallow("sync-pipeline dispatchEnsureMedia"),
       );
     }
     const anchor: ResolvedMediaAnchor = {
@@ -246,8 +246,8 @@ async function ensureMediaAnchor(
   };
   if (scanned.libraryId) mediaUpdates.libraryId = scanned.libraryId;
   await updateMedia(db, inserted.id, mediaUpdates);
-  void dispatchMediaPipeline({ mediaId: inserted.id }).catch(
-    logAndSwallow("sync-pipeline dispatchMediaPipeline"),
+  void dispatchEnsureMedia(inserted.id).catch(
+    logAndSwallow("sync-pipeline dispatchEnsureMedia"),
   );
 
   const anchor: ResolvedMediaAnchor = {

@@ -12,7 +12,7 @@ import {
 } from "./jobs/reverse-sync";
 import { handleStallDetection } from "./jobs/stall-detection";
 import { handleRssSync } from "./jobs/rss-sync";
-import { handleBackfillExtras } from "./jobs/backfill-extras";
+import { handleMediaCadenceSweep } from "./jobs/media-cadence-sweep";
 import { handleSeedManagement } from "./jobs/seed-management";
 import { handleFolderScan } from "./jobs/folder-scan";
 import { handleValidateDownloads } from "./jobs/validate-downloads";
@@ -25,20 +25,13 @@ import {
 import type { RunSectionInput } from "@canto/core/domain/trakt/run-section";
 import { handleTraktListDelete, handleTraktListDeleteSweep } from "./jobs/trakt-list-delete";
 import { refreshExtras } from "@canto/core/domain/content-enrichment/use-cases/refresh-extras";
-import { replaceShowWithTvdb } from "@canto/core/domain/media/use-cases/replace-show-with-tvdb";
 import { rebuildUserRecs } from "@canto/core/domain/recommendations/use-cases/rebuild-user-recs";
-import { refreshAllLanguage } from "@canto/core/domain/content-enrichment/use-cases/refresh-all-language";
 import { translateEpisodes } from "@canto/core/domain/content-enrichment/use-cases/translate-episodes";
-import { runMediaPipeline } from "@canto/core/domain/media/use-cases/run-media-pipeline";
 import { enqueueDailyRecsRebuild } from "@canto/core/domain/recommendations/use-cases/enqueue-daily-recs-rebuild";
 import { ensureMedia } from "@canto/core/domain/media/use-cases/ensure-media";
-import type {
-  EnsureMediaJob,
-  MediaPipelineJob,
-} from "@canto/core/platform/queue/bullmq-dispatcher";
+import type { EnsureMediaJob } from "@canto/core/platform/queue/bullmq-dispatcher";
 import { QUEUES } from "@canto/core/platform/queue/queue-names";
 import { getRedisConnection } from "@canto/core/platform/queue/redis-config";
-import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
 import { db } from "@canto/db/client";
 import { seedDownloadDefaults, seedLanguages } from "@canto/db";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
@@ -66,7 +59,7 @@ const queues = {
   stallDetection: new Queue(QUEUES.stallDetection, { connection: redisConnection }),
   rssSync: new Queue(QUEUES.rssSync, { connection: redisConnection }),
   dailyRecsCheck: new Queue(QUEUES.dailyRecsCheck, { connection: redisConnection }),
-  backfillExtras: new Queue(QUEUES.backfillExtras, { connection: redisConnection }),
+  mediaCadenceSweep: new Queue(QUEUES.mediaCadenceSweep, { connection: redisConnection }),
   seedManagement: new Queue(QUEUES.seedManagement, { connection: redisConnection }),
   folderScan: new Queue(QUEUES.folderScan, { connection: redisConnection }),
   validateDownloads: new Queue(QUEUES.validateDownloads, { connection: redisConnection }),
@@ -144,10 +137,15 @@ async function setupSchedules(): Promise<void> {
     { name: QUEUES.dailyRecsCheck, opts: DEFAULT_JOB_OPTS },
   );
 
-  await queues.backfillExtras.upsertJobScheduler(
-    "backfill-extras-scheduler",
-    { every: 60 * 60 * 1000 },
-    { name: QUEUES.backfillExtras, opts: DEFAULT_JOB_OPTS },
+  // Daily aspect-state sweep — fans out ensureMedia for any media whose
+  // media_aspect_state row is due (next_eligible_at <= now). The cadence
+  // engine decides which aspects to refresh; this sweep just guarantees
+  // due media gets picked up regardless of user activity. Jittered like
+  // reverse-sync-full so multiple instances don't herd on midnight.
+  await queues.mediaCadenceSweep.upsertJobScheduler(
+    "media-cadence-sweep-scheduler",
+    { every: 24 * 60 * 60 * 1000, startDate: jitterStart(10 * 60 * 1000) },
+    { name: QUEUES.mediaCadenceSweep, opts: DEFAULT_JOB_OPTS },
   );
 
   await queues.seedManagement.upsertJobScheduler(
@@ -256,7 +254,7 @@ const workers = [
     if (dispatched > 0) log.info({ users: dispatched }, "recs refresh dispatched");
   }),
 
-  makeWorker(QUEUES.backfillExtras, () => handleBackfillExtras(db)),
+  makeWorker(QUEUES.mediaCadenceSweep, (_data, log) => handleMediaCadenceSweep(log)),
 
   makeWorker(QUEUES.seedManagement, () => handleSeedManagement()),
 
@@ -268,6 +266,9 @@ const workers = [
 
   // ── On-demand (dispatched by other code) ──
 
+  // Drains pre-existing in-flight `refresh-extras` jobs from older builds —
+  // new dispatches go through `ensureMedia`. Keep until those jobs are gone
+  // (Phase 1C-δ retires the queue + use-case together).
   makeWorker<{ mediaId: string }>(
     QUEUES.refreshExtras,
     async ({ mediaId }) => {
@@ -277,25 +278,14 @@ const workers = [
     { concurrency: 2 },
   ),
 
-  makeWorker<{ mediaId: string }>(
-    QUEUES.reconcileShow,
-    async ({ mediaId }) => {
-      const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
-      await replaceShowWithTvdb(db, mediaId, { tmdb, tvdb, dispatcher: jobDispatcher });
-    },
-  ),
-
   makeWorker<{ userId: string }>(
     QUEUES.rebuildUserRecs,
     ({ userId }) => rebuildUserRecs(db, userId),
     { concurrency: 2 },
   ),
 
-  makeWorker(QUEUES.refreshAllLanguage, async () => {
-    const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
-    await refreshAllLanguage(db, { tmdb, tvdb });
-  }),
-
+  // Drains pre-existing `translate-episodes` jobs from older builds — new
+  // dispatches go through `ensureMedia`'s `translations` strategy.
   makeWorker<{ mediaId: string; tvdbId: number; language: string }>(
     QUEUES.translateEpisodes,
     async ({ mediaId, tvdbId, language }) => {
@@ -305,19 +295,7 @@ const workers = [
     { concurrency: 3 },
   ),
 
-  // ── Unified media pipeline ──
-
-  makeWorker<MediaPipelineJob>(
-    QUEUES.mediaPipeline,
-    async (data) => {
-      const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
-      await runMediaPipeline(db, data, { tmdb, tvdb });
-    },
-    { concurrency: 5 },
-  ),
-
-  // ── Unified ensureMedia engine (replaces refreshExtras/translateEpisodes/
-  //    reconcileShow/refreshAllLanguage over time) ──
+  // ── Unified ensureMedia engine ──
 
   makeWorker<EnsureMediaJob>(
     QUEUES.ensureMedia,

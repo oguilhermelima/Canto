@@ -19,11 +19,9 @@ import {
   media,
   mediaFile,
   mediaVersion,
-  mediaVideo,
   season,
   download,
   userConnection,
-  userRecommendation,
 } from "@canto/db/schema";
 import type { ListInput } from "@canto/validators";
 import { mediaI18n } from "../shared/media-i18n";
@@ -462,25 +460,3 @@ export async function findImportedFilesForMedia(
     .where(and(eq(mediaFile.mediaId, mediaId), eq(mediaFile.status, "imported")));
 }
 
-/**
- * Media present in an active user recommendation that is missing a logo or
- * video extras and hasn't had extras refreshed in the last `staleDays` days.
- * Drives the `backfill-extras` scheduled job.
- */
-export async function findMediaNeedingExtrasBackfill(
-  db: Database,
-  opts: { staleDays: number },
-): Promise<Array<{ id: string; title: string }>> {
-  return db
-    .selectDistinctOn([media.id], { id: media.id, title: media.title })
-    .from(userRecommendation)
-    .innerJoin(media, sql`${media.id} = ${userRecommendation.mediaId}`)
-    .where(
-      sql`${userRecommendation.active} = true
-        AND (${media.extrasUpdatedAt} IS NULL OR ${media.extrasUpdatedAt} < now() - interval '1 day' * ${opts.staleDays})
-        AND (
-          ${media.logoPath} IS NULL
-          OR NOT EXISTS (SELECT 1 FROM ${mediaVideo} WHERE ${mediaVideo.mediaId} = ${media.id})
-        )`,
-    );
-}

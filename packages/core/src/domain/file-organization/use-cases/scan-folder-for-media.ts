@@ -16,7 +16,7 @@ import {
   ensureServerLibrary,
   addListItem,
 } from "../../../infra/lists/list-repository";
-import { dispatchMediaPipeline } from "../../../platform/queue/bullmq-dispatcher";
+import { dispatchEnsureMedia } from "../../../platform/queue/bullmq-dispatcher";
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                    */
@@ -190,7 +190,7 @@ export async function scanFolderForMedia(
         }
 
         if (!existing.metadataUpdatedAt) {
-          void dispatchMediaPipeline({ mediaId: existing.id }).catch(() => {});
+          void dispatchEnsureMedia(existing.id).catch(() => {});
         }
       } else {
         // 3. New media — fetch from TMDB, persist, mark as downloaded
@@ -203,7 +203,7 @@ export async function scanFolderForMedia(
           libraryPath: dirPath,
           addedAt: new Date(),
         });
-        void dispatchMediaPipeline({ mediaId: inserted.id }).catch(() => {});
+        void dispatchEnsureMedia(inserted.id).catch(() => {});
 
         try {
           const serverLib = await ensureServerLibrary(db);

@@ -26,8 +26,8 @@ import { upsertMediaLocalization } from "../../shared/localization";
 export async function reconcileShowStructure(
   db: Database,
   mediaId: string,
-  deps: { tmdb: MediaProviderPort; tvdb: MediaProviderPort; dispatcher: JobDispatcherPort },
-  options?: { force?: boolean },
+  deps: { tmdb: MediaProviderPort; tvdb: MediaProviderPort; dispatcher?: JobDispatcherPort },
+  options?: { force?: boolean; dispatchTranslations?: boolean },
 ): Promise<void> {
   const row = await findMediaById(db, mediaId);
   if (!row || row.type !== "show") return;
@@ -137,10 +137,19 @@ export async function reconcileShowStructure(
     }
   }
 
-  // Dispatch per-language episode translation jobs in background
+  // Dispatch per-language episode translation jobs in background. Skipped
+  // when called from the enrichment orchestrator because the `translations`
+  // strategy will run in the same `ensureMedia` pass and handles those
+  // languages directly — avoiding duplicate jobs in the queue.
   const nonEnLangs = supportedLangs.filter((l) => !l.startsWith("en"));
-  for (const lang of nonEnLangs) {
-    void deps.dispatcher.translateEpisodes(mediaId, tvdbId, lang).catch(logAndSwallow("reconcile dispatchTranslateEpisodes"));
+  const dispatchTranslations = options?.dispatchTranslations !== false;
+  const dispatcher = deps.dispatcher;
+  if (dispatchTranslations && dispatcher) {
+    for (const lang of nonEnLangs) {
+      void dispatcher
+        .enrichMedia(mediaId, { aspects: ["translations"], languages: [lang] })
+        .catch(logAndSwallow("reconcile enrichMedia translations"));
+    }
   }
 
   const tvdbSeasonCount = tvdbData.seasons.filter((s) => s.number > 0).length;

@@ -17,7 +17,6 @@ function createQueueGetter(name: QueueName): () => Promise<Queue> {
 }
 
 const getRebuildUserRecsQueue = createQueueGetter(QUEUES.rebuildUserRecs);
-const getRefreshAllLangQueue = createQueueGetter(QUEUES.refreshAllLanguage);
 const getJellyfinSyncQueue = createQueueGetter(QUEUES.jellyfinSync);
 const getPlexSyncQueue = createQueueGetter(QUEUES.plexSync);
 const getReverseSyncUserQueue = createQueueGetter(QUEUES.reverseSyncUser);
@@ -25,34 +24,7 @@ const getTraktSyncUserQueue = createQueueGetter(QUEUES.traktSyncUser);
 const getTraktSyncSectionQueue = createQueueGetter(QUEUES.traktSyncSection);
 const getTraktListDeleteQueue = createQueueGetter(QUEUES.traktListDelete);
 const getFolderScanQueue = createQueueGetter(QUEUES.folderScan);
-const getMediaPipelineQueue = createQueueGetter(QUEUES.mediaPipeline);
 const getEnsureMediaQueue = createQueueGetter(QUEUES.ensureMedia);
-
-/**
- * Legacy shell — redirects to the unified ensureMedia engine.
- * The standalone `refresh-extras` queue is kept defined so any in-flight
- * jobs from older builds still drain; new dispatches go through ensureMedia.
- */
-export async function dispatchRefreshExtras(mediaId: string): Promise<void> {
-  await dispatchEnsureMedia(mediaId, { aspects: ["extras"] });
-}
-
-/**
- * Legacy shell — redirects to the unified ensureMedia engine.
- */
-export async function dispatchReconcileShow(mediaId: string): Promise<void> {
-  await dispatchEnsureMedia(mediaId, { aspects: ["structure"], force: true });
-}
-
-export async function dispatchRefreshAllLanguage(): Promise<void> {
-  const q = await getRefreshAllLangQueue();
-  await q.clean(0, 0, "failed").catch(() => {});
-  await q.add(QUEUES.refreshAllLanguage, {}, {
-    jobId: "refresh-all-language",
-    removeOnComplete: true,
-    removeOnFail: REMOVE_ON_FAIL,
-  });
-}
 
 export async function dispatchRebuildUserRecs(userId: string): Promise<void> {
   const q = await getRebuildUserRecsQueue();
@@ -60,22 +32,6 @@ export async function dispatchRebuildUserRecs(userId: string): Promise<void> {
     jobId: `rebuild-user-recs-${userId}`,
     removeOnComplete: true,
     removeOnFail: REMOVE_ON_FAIL,
-  });
-}
-
-/**
- * Legacy shell — redirects to the unified ensureMedia engine, which now
- * handles TVDB episode-translation fallback as part of the `translations`
- * aspect.
- */
-export async function dispatchTranslateEpisodes(
-  mediaId: string,
-  _tvdbId: number,
-  language: string,
-): Promise<void> {
-  await dispatchEnsureMedia(mediaId, {
-    aspects: ["translations"],
-    languages: [language],
   });
 }
 
@@ -169,26 +125,6 @@ export async function dispatchFolderScan(): Promise<boolean> {
   return dispatchUniqueJob(q, "folder-scan-run");
 }
 
-export interface MediaPipelineJob {
-  externalId?: number;
-  provider?: string;
-  type?: string;
-  mediaId?: string;
-  useTVDBSeasons?: boolean;
-}
-
-export async function dispatchMediaPipeline(data: MediaPipelineJob): Promise<void> {
-  const q = await getMediaPipelineQueue();
-  const jobId = data.mediaId
-    ? `media-pipeline-${data.mediaId}`
-    : `media-pipeline-${data.provider}-${data.externalId}`;
-  await q.add(QUEUES.mediaPipeline, data, {
-    jobId,
-    removeOnComplete: true,
-    removeOnFail: REMOVE_ON_FAIL,
-  });
-}
-
 export interface EnsureMediaJob {
   mediaId: string;
   spec: EnsureMediaSpec;
@@ -198,6 +134,11 @@ export interface EnsureMediaJob {
  * Enqueue an `ensureMedia` run. If a job for the same mediaId is already
  * waiting or active, merge the spec (union of languages + aspects, OR of
  * `force`) rather than creating a duplicate.
+ *
+ * Single entry point for every kind of media enrichment — replaces the
+ * legacy `dispatchRefreshExtras` / `dispatchReconcileShow` /
+ * `dispatchTranslateEpisodes` / `dispatchRefreshAllLanguage` /
+ * `dispatchMediaPipeline` shells.
  */
 export async function dispatchEnsureMedia(
   mediaId: string,

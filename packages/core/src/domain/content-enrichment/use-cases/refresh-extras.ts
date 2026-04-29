@@ -14,7 +14,7 @@ import { findMediaById } from "../../../infra/repositories";
 import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import { mapSearchResultToMediaFields } from "../rules/pool-scoring";
 import { upsertMediaLocalization } from "../../shared/localization";
-import { dispatchMediaPipeline } from "../../../platform/queue/bullmq-dispatcher";
+import { dispatchEnsureMedia } from "../../../platform/queue/bullmq-dispatcher";
 import { logAndSwallow } from "../../../platform/logger/log-error";
 
 export async function refreshExtras(
@@ -207,8 +207,8 @@ export async function refreshExtras(
         // Stub row from TMDB's recs/similar payload — enqueue full metadata
         // fetch so the row is filled in before any user-facing query surfaces
         // it (read paths filter on `metadataUpdatedAt IS NOT NULL`).
-        void dispatchMediaPipeline({ mediaId: inserted.id }).catch(
-          logAndSwallow("refresh-extras dispatchMediaPipeline"),
+        void dispatchEnsureMedia(inserted.id).catch(
+          logAndSwallow("refresh-extras dispatchEnsureMedia"),
         );
       } else {
         const conflict = await db.query.media.findFirst({

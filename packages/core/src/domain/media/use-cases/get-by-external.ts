@@ -9,7 +9,7 @@ import {
   findMediaByAnyReference,
   findMediaByIdWithSeasons,
 } from "../../../infra/repositories";
-import { dispatchRefreshExtras, dispatchReconcileShow } from "../../../platform/queue/bullmq-dispatcher";
+import { dispatchEnsureMedia } from "../../../platform/queue/bullmq-dispatcher";
 import {
   applyMediaLocalizationOverlay,
   applySeasonsLocalizationOverlay,
@@ -44,7 +44,10 @@ export async function getByExternal(
   if (existing) {
     const STALE_MS = 30 * 24 * 60 * 60 * 1000;
     const isStale = !existing.extrasUpdatedAt || Date.now() - existing.extrasUpdatedAt.getTime() > STALE_MS;
-    if (isStale) void dispatchRefreshExtras(existing.id).catch(logAndSwallow("media:getByExternal dispatchRefreshExtras"));
+    if (isStale)
+      void dispatchEnsureMedia(existing.id, { aspects: ["extras"] }).catch(
+        logAndSwallow("media:getByExternal dispatchEnsureMedia(extras)"),
+      );
     const lang = await getUserLang();
     const localized = await applyMediaLocalizationOverlay(db, existing, lang);
     if (localized.seasons && localized.seasons.length > 0) {
@@ -77,7 +80,10 @@ export async function getByExternal(
   const inserted = await persistMedia(db, normalized, { crossRefLookup: tvdbEnabled });
 
   if (tvdbEnabled && normalized.type === "show" && normalized.provider === "tmdb") {
-    void dispatchReconcileShow(inserted.id).catch(logAndSwallow("media:getByExternal dispatchReconcileShow"));
+    void dispatchEnsureMedia(inserted.id, {
+      aspects: ["structure"],
+      force: true,
+    }).catch(logAndSwallow("media:getByExternal dispatchEnsureMedia(structure)"));
   }
 
   const result = await findMediaByIdWithSeasons(db, inserted.id);

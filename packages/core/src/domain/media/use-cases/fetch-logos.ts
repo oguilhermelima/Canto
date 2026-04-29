@@ -10,7 +10,7 @@ import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import type { SearchResult } from "@canto/providers";
 import { upsertLangLogos } from "../../content-enrichment/use-cases/upsert-lang-logos";
 import { upsertMediaLocalization } from "../../shared/localization";
-import { dispatchMediaPipeline } from "../../../platform/queue/bullmq-dispatcher";
+import { dispatchEnsureMedia } from "../../../platform/queue/bullmq-dispatcher";
 import { logAndSwallow } from "../../../platform/logger/log-error";
 
 /** Deduplicates concurrent getImages calls for the same externalId */
@@ -226,8 +226,8 @@ export async function fetchLogos(
           );
           // Browse-time stub — enqueue metadata fetch so filtered reads pick it
           // up once enriched.
-          void dispatchMediaPipeline({ mediaId }).catch(
-            logAndSwallow("fetch-logos dispatchMediaPipeline"),
+          void dispatchEnsureMedia(mediaId).catch(
+            logAndSwallow("fetch-logos dispatchEnsureMedia"),
           );
         }
       } catch (err) {

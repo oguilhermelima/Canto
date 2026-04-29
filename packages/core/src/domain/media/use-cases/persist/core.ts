@@ -13,10 +13,7 @@ import {
   findMediaByAnyReference,
   findMediaByIdWithSeasons,
 } from "../../../../infra/repositories";
-import {
-  dispatchEnsureMedia,
-  dispatchTranslateEpisodes,
-} from "../../../../platform/queue/bullmq-dispatcher";
+import { dispatchEnsureMedia } from "../../../../platform/queue/bullmq-dispatcher";
 import { detectGaps } from "../detect-gaps";
 import { fetchMediaMetadata, type MediaMetadata } from "../fetch-media-metadata";
 import {
@@ -479,9 +476,10 @@ async function fetchPersistAndDispatch(
   if (result.tvdbId && result.tvdbSeasons?.length) {
     const nonEnLangs = supportedLangs.filter((l) => !l.startsWith("en"));
     for (const lang of nonEnLangs) {
-      void dispatchTranslateEpisodes(mediaId, result.tvdbId, lang).catch(
-        logAndSwallow(`${tag} dispatchTranslateEpisodes`),
-      );
+      void dispatchEnsureMedia(mediaId, {
+        aspects: ["translations"],
+        languages: [lang],
+      }).catch(logAndSwallow(`${tag} dispatchEnsureMedia(translations)`));
     }
   }
 

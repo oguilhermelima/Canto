@@ -16,17 +16,14 @@ export const QUEUES = {
   stallDetection: "stall-detection",
   rssSync: "rss-sync",
   dailyRecsCheck: "daily-recs-check",
-  backfillExtras: "backfill-extras",
+  mediaCadenceSweep: "media-cadence-sweep",
   seedManagement: "seed-management",
   folderScan: "folder-scan",
   validateDownloads: "validate-downloads",
   repackSupersede: "repack-supersede",
   refreshExtras: "refresh-extras",
-  reconcileShow: "reconcile-show",
   rebuildUserRecs: "rebuild-user-recs",
-  refreshAllLanguage: "refresh-all-language",
   translateEpisodes: "translate-episodes",
-  mediaPipeline: "media-pipeline",
   ensureMedia: "ensure-media",
 } as const;
 

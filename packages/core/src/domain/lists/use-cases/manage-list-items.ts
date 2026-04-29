@@ -7,7 +7,7 @@ import {
   restoreListItems,
 } from "../../../infra/lists/list-repository";
 import { removeMediaFromUserRecs, deleteUserRecommendationsForSource } from "../../../infra/recommendations/user-recommendation-repository";
-import { dispatchMediaPipeline } from "../../../platform/queue/bullmq-dispatcher";
+import { dispatchEnsureMedia } from "../../../platform/queue/bullmq-dispatcher";
 import { addMediaToUserRecs } from "../../recommendations/use-cases/rebuild-user-recs";
 import { logAndSwallow } from "../../../platform/logger/log-error";
 import { verifyListOwnership } from "../rules/list-rules";
@@ -35,8 +35,8 @@ export async function addItemToList(
   // Side effects (fire-and-forget)
   void removeMediaFromUserRecs(db, userId, input.mediaId)
     .catch(logAndSwallow("list:addItem removeMediaFromUserRecs"));
-  void dispatchMediaPipeline({ mediaId: input.mediaId })
-    .catch(logAndSwallow("list:addItem dispatchMediaPipeline"));
+  void dispatchEnsureMedia(input.mediaId)
+    .catch(logAndSwallow("list:addItem dispatchEnsureMedia"));
   void addMediaToUserRecs(db, userId, input.mediaId)
     .catch(logAndSwallow("list:addItem addMediaToUserRecs"));
 
