@@ -249,7 +249,7 @@ export function BrowseLayout({
             <TabBar
               tabs={visibleTabs}
               value={mediaType}
-              onChange={(v) => onMediaTypeChange!(v as "movie" | "show" | "all")}
+              onChange={(v) => onMediaTypeChange(v as "movie" | "show" | "all")}
               onFilter={filterPreset ? handleFilterToggle : undefined}
               filterActive={sidebarOpen && !isMobile}
               leading={toolbar}

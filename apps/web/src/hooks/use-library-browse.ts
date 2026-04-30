@@ -186,7 +186,7 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
         year: entry.year ?? null,
         voteAverage: "voteAverage" in entry ? (entry as { voteAverage?: number | null }).voteAverage ?? null : null,
         userRating: "userRating" in entry ? (entry as { userRating?: number | null }).userRating ?? null : null,
-        entryType: entry.entryType as "history" | "playback",
+        entryType: entry.entryType,
         watchedAt: entry.watchedAt,
         source: entry.source,
         episode: entry.episode,
@@ -195,7 +195,7 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
               percent: entry.progressPercent,
               value: entry.progressValue ?? 0,
               total: entry.progressTotal ?? 0,
-              unit: (entry.progressUnit ?? "seconds") as "seconds" | "episodes",
+              unit: (entry.progressUnit ?? "seconds"),
             }
           : null,
         isCompleted: entry.isCompleted ?? null,
@@ -260,7 +260,7 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
             percent: item.progressPercent,
             value: item.progressValue ?? 0,
             total: item.progressTotal ?? 0,
-            unit: (item.progressUnit ?? "seconds") as "seconds" | "episodes",
+            unit: (item.progressUnit ?? "seconds"),
           }
         : null,
       isCompleted: false,

@@ -23,14 +23,15 @@ import { Slider } from "@canto/ui/slider";
 import { Switch } from "@canto/ui/switch";
 import { trpc } from "@/lib/trpc/client";
 import {
-  type AllowedFormat,
-  type Flavor,
-  type ProfileDraft,
-  type Quality,
-  type Source,
+  
+  
+  
+  
+  
   QUALITY_OPTIONS,
-  SOURCE_OPTIONS,
+  SOURCE_OPTIONS
 } from "./download-profile-defaults";
+import type {AllowedFormat, Flavor, ProfileDraft, Quality, Source} from "./download-profile-defaults";
 import { DownloadProfileFormatsField } from "./download-profile-formats-field";
 
 interface DownloadProfileEditorProps {

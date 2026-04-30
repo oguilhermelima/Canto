@@ -108,7 +108,7 @@ function ConditionValueInput({
         <ChipSelect
           value={
             Array.isArray(condition.value)
-              ? (condition.value as string[])
+              ? (condition.value)
               : []
           }
           onChange={setValue}
@@ -121,7 +121,7 @@ function ConditionValueInput({
         <ChipSelect
           value={
             Array.isArray(condition.value)
-              ? (condition.value as string[])
+              ? (condition.value)
               : []
           }
           onChange={setValue}

@@ -7,9 +7,10 @@ import {
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import { updateMedia } from "@canto/core/infra/media/media-repository";
 import {
-  resolveFolder,
-  type RoutableMedia,
+  resolveFolder
+  
 } from "@canto/core/domain/torrents/rules/folder-routing";
+import type {RoutableMedia} from "@canto/core/domain/torrents/rules/folder-routing";
 
 export interface RoutableMediaRow {
   id: string;

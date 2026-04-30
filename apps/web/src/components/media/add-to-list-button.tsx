@@ -97,7 +97,7 @@ export function AddToListButton({
     {
       externalId: Number(externalId),
       provider: (provider ?? "tmdb") as "tmdb" | "tvdb",
-      type: (type ?? "movie") as "movie" | "show",
+      type: (type ?? "movie"),
     },
     { enabled: false }, // manual trigger only
   );

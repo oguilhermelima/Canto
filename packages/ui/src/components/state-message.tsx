@@ -3,7 +3,8 @@
 import { cn } from "../lib/utils";
 import { Button } from "./button";
 import { Telescope } from "lucide-react";
-import { SPACE_STATES, type SpaceStateKey } from "../presets/space-states";
+import { SPACE_STATES  } from "../presets/space-states";
+import type {SpaceStateKey} from "../presets/space-states";
 
 interface StateMessageProps {
   /** Use a preset by key, or provide custom icon/title/description */

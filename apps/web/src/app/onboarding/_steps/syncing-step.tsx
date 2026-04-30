@@ -5,7 +5,8 @@ import { Tv, Film, Sparkles, FolderSync, ArrowRight } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import type { ConfigureFooter } from "../_components/onboarding-footer";
 import type { Settings } from "../_components/constants";
-import { MagicSetup, type MagicTask, type MagicTaskStatus } from "@/components/onboarding/magic-setup";
+import { MagicSetup   } from "@/components/onboarding/magic-setup";
+import type {MagicTask, MagicTaskStatus} from "@/components/onboarding/magic-setup";
 
 export function SyncingStep({
   onNext,

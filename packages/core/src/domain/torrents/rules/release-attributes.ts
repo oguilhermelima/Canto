@@ -16,11 +16,12 @@ import {
 } from "@canto/core/domain/torrents/rules/parsing-release";
 import { detectLanguages } from "@canto/core/domain/torrents/rules/parsing-languages";
 import {
-  classifyReleaseGroup,
-  type ReleaseGroupTier,
-  type ReleaseGroupTierSets,
-  type ReleaseFlavor,
+  classifyReleaseGroup
+  
+  
+  
 } from "@canto/core/domain/torrents/rules/release-groups";
+import type {ReleaseGroupTier, ReleaseGroupTierSets, ReleaseFlavor} from "@canto/core/domain/torrents/rules/release-groups";
 
 /**
  * CAM / Telesync keywords that survive in indexer titles even when the

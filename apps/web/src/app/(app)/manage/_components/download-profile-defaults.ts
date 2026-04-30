@@ -94,8 +94,8 @@ export function profileRowToDraft(p: ProfileRow): ProfileDraft {
     name: p.name,
     flavor: p.flavor as Flavor,
     allowedFormats: p.allowedFormats.map((f) => ({
-      quality: f.quality as Quality,
-      source: f.source as Source,
+      quality: f.quality,
+      source: f.source,
       weight: f.weight,
     })),
     cutoffQuality: (p.cutoffQuality as Quality | null) ?? null,

@@ -1,7 +1,7 @@
 import type { Database } from "@canto/db/client";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";
-import { findMediaByIdWithSeasons } from "@canto/core/infra/repositories";
+import { findMediaByIdWithSeasons } from "@canto/core/infra/media/media-repository";
 import {
   EpisodeNotFoundError,
   InvalidWatchInputError,
@@ -14,14 +14,16 @@ import {
   isReleasedOnOrBefore,
   parseDateLike,
   resolveWatchedAt,
-  sourceForMode,
-  type MediaType,
-  type WatchedAtMode,
+  sourceForMode
+  
+  
 } from "@canto/core/domain/user-media/rules/user-media-rules";
+import type {MediaType, WatchedAtMode} from "@canto/core/domain/user-media/rules/user-media-rules";
 import {
-  getUserMediaState,
-  type UserMediaStateResponse,
+  getUserMediaState
+  
 } from "@canto/core/domain/user-media/use-cases/get-user-media-state";
+import type {UserMediaStateResponse} from "@canto/core/domain/user-media/use-cases/get-user-media-state";
 import { pushWatchStateToServers } from "@canto/core/domain/user-media/use-cases/push-watch-state";
 
 export interface LogWatchedDeps {
@@ -82,7 +84,7 @@ export async function logWatched(
   const releasedEpisodeIds = new Set(releasedEpisodes.map((e) => e.id));
   const history = await deps.repo.findHistoryByMedia(userId, input.mediaId);
   const computedStatus = computeTrackingStatus({
-    mediaType: media.type as MediaType,
+    mediaType: media.type,
     history,
     releasedEpisodeIds,
     markDropped: input.markDropped,

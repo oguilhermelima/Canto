@@ -7,9 +7,10 @@ import { EP_PATTERN } from "@canto/core/domain/torrents/rules/parsing";
 import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
 import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
 import {
-  type ParsedFile,
-  buildSubtitleName,
+  
+  buildSubtitleName
 } from "@canto/core/platform/fs/filesystem";
+import type {ParsedFile} from "@canto/core/platform/fs/filesystem";
 import { upsertMediaFile } from "@canto/core/domain/torrents/use-cases/import-torrent/shared";
 
 interface MediaNaming {

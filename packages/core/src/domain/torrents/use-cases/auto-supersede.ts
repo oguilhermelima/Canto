@@ -115,7 +115,7 @@ export async function autoSupersedeWithRepack(
   });
   if (profile) {
     const verdict = compareToProfile(
-      { quality: current.quality as Quality, source: current.source as Source },
+      { quality: current.quality, source: current.source },
       { quality: candidate.quality, source: candidate.source },
       profile,
     );

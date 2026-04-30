@@ -112,7 +112,7 @@ export function RequestSection({
       </div>
       <Button
         className="w-[120px] rounded-xl"
-        onClick={() => requestDownload.mutate({ mediaId: mediaId! })}
+        onClick={() => requestDownload.mutate({ mediaId: mediaId })}
         disabled={requestDownload.isPending}
       >
         {requestDownload.isPending ? (

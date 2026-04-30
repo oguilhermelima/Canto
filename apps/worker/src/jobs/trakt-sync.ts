@@ -3,10 +3,11 @@ import { eq } from "drizzle-orm";
 import { userConnection } from "@canto/db/schema";
 import { coordinateTraktSync } from "@canto/core/domain/trakt/coordinator";
 import {
-  runTraktSection,
-  type RunSectionInput,
-  type RunTraktSectionDeps,
+  runTraktSection
+  
+  
 } from "@canto/core/domain/trakt/run-section";
+import type {RunSectionInput, RunTraktSectionDeps} from "@canto/core/domain/trakt/run-section";
 import { makeListsRepository } from "@canto/core/infra/lists/lists-repository.adapter";
 import { makeUserConnectionRepository } from "@canto/core/infra/media-servers/user-connection-repository.adapter";
 import { makeTraktApi } from "@canto/core/infra/trakt/trakt-api.adapter-bindings";

@@ -17,9 +17,10 @@ import {
 } from "@canto/core/domain/media/use-cases/cadence/aspect-state-writer";
 import { detectGaps } from "@canto/core/domain/media/use-cases/detect-gaps";
 import {
-  fetchMediaMetadata,
-  type MediaMetadata,
+  fetchMediaMetadata
+  
 } from "@canto/core/domain/media/use-cases/fetch-media-metadata";
+import type {MediaMetadata} from "@canto/core/domain/media/use-cases/fetch-media-metadata";
 import { persistContentRatings } from "@canto/core/domain/media/use-cases/persist/content-ratings";
 import { persistExtras } from "@canto/core/domain/media/use-cases/persist/extras";
 import { persistTranslations } from "@canto/core/domain/media/use-cases/persist/translations";
@@ -37,12 +38,12 @@ import { makeMediaContentRatingRepository } from "@canto/core/infra/media/media-
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { findAspectSucceededAt } from "@canto/core/infra/media/media-aspect-state-repository";
 import {
-  findAspectSucceededAt,
   findMediaByAnyReference,
   findMediaByExternalId,
   findMediaByIdWithSeasons,
-} from "@canto/core/infra/repositories";
+} from "@canto/core/infra/media/media-repository";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
 import {
@@ -521,7 +522,7 @@ async function seedMetadataAndExtrasAspects(
     nextAirDate: normalized.nextAirDate ?? null,
   });
   const now = new Date();
-  const provider = normalized.provider as ProviderName;
+  const provider = normalized.provider;
   const stateByKey = new Map();
   await writeAspectState({
     aspectState: deps.aspectState,

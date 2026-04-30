@@ -129,12 +129,12 @@ export function RatingBadgeStack({
 
   return (
     <div className={cn("flex flex-col items-start gap-1", className)}>
-      {hasPublic && <RatingBadge variant="public" value={voteAverage!} />}
-      {hasUser && <RatingBadge variant="user" value={userRating!} />}
+      {hasPublic && <RatingBadge variant="public" value={voteAverage} />}
+      {hasUser && <RatingBadge variant="user" value={userRating} />}
       {hasMembers && (
         <RatingBadge
           variant="members"
-          value={membersAvg!}
+          value={membersAvg}
           count={membersCount ?? undefined}
         />
       )}

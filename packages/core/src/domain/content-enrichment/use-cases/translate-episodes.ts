@@ -173,7 +173,7 @@ async function fetchAllEpisodes(
   const all: EpRow[] = [];
   let page = 0;
 
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+   
   while (true) {
     const data: { episodes: EpRow[] } = await tvdb.request(
       `/series/${seriesId}/episodes/default/${lang}?page=${page}`,

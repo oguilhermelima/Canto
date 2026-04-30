@@ -1,11 +1,12 @@
 import type { Database } from "@canto/db/client";
 import {
-  findContinueWatchingFeed,
-  findTrailerKeysForMediaIds,
-  type ContinueWatchingFeedRow,
-  type ContinueWatchingKeysetCursor,
-  type LibraryFeedFilterOptions,
-} from "@canto/core/infra/repositories";
+  findContinueWatchingFeed
+  
+  
+  
+} from "@canto/core/infra/user-media/library-feed-repository";
+import type {ContinueWatchingFeedRow, ContinueWatchingKeysetCursor, LibraryFeedFilterOptions} from "@canto/core/infra/user-media/library-feed-repository";
+import { findTrailerKeysForMediaIds } from "@canto/core/infra/content-enrichment/extras-repository";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
 import {
   toDurationSeconds,

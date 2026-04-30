@@ -2,9 +2,10 @@ import type { Database } from "@canto/db/client";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 import {
-  getUserMediaState,
-  type UserMediaStateResponse,
+  getUserMediaState
+  
 } from "@canto/core/domain/user-media/use-cases/get-user-media-state";
+import type {UserMediaStateResponse} from "@canto/core/domain/user-media/use-cases/get-user-media-state";
 import { pushWatchStateToServers } from "@canto/core/domain/user-media/use-cases/push-watch-state";
 
 export interface ClearTrackingDeps {

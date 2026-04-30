@@ -9,11 +9,12 @@
 
 import {
   SyncAuthError,
-  isAuthStatus,
-  type ExternalIds,
-  type MediaKind,
-  type ScannedMediaItem,
+  isAuthStatus
+  
+  
+  
 } from "@canto/core/domain/sync/types";
+import type {ExternalIds, MediaKind, ScannedMediaItem} from "@canto/core/domain/sync/types";
 
 export interface PlexLibraryRef {
   /** Plex library section id (the number in `/library/sections/:id`). */

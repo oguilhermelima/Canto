@@ -1,12 +1,13 @@
 import type { Database } from "@canto/db/client";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
-import { findMediaByIdWithSeasons } from "@canto/core/infra/repositories";
+import { findMediaByIdWithSeasons } from "@canto/core/infra/media/media-repository";
 import {
   isMediaType,
-  isReleasedOnOrBefore,
-  type MediaType,
-  type TrackingStatus,
+  isReleasedOnOrBefore
+  
+  
 } from "@canto/core/domain/user-media/rules/user-media-rules";
+import type {MediaType, TrackingStatus} from "@canto/core/domain/user-media/rules/user-media-rules";
 
 export interface PromoteUserMediaStateFromPlaybackDeps {
   repo: UserMediaRepositoryPort;

@@ -25,7 +25,7 @@ export function toDomain(row: ListRow): List {
     visibility: row.visibility as ListVisibility,
     isSystem: row.isSystem,
     position: row.position,
-    defaultSortBy: row.defaultSortBy as CollectionDefaultSort,
+    defaultSortBy: row.defaultSortBy,
     groupByStatus: row.groupByStatus,
     hideCompleted: row.hideCompleted,
     hideDropped: row.hideDropped,

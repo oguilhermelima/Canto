@@ -10,11 +10,9 @@
 
 import { getSetting } from "@canto/db/settings";
 import type { Database } from "@canto/db/client";
-import {
-  findMediaById,
-  findMediaVersionsByMediaId,
-  findUserConnectionsByUserId,
-} from "@canto/core/infra/repositories";
+import { findMediaById } from "@canto/core/infra/media/media-repository";
+import { findMediaVersionsByMediaId } from "@canto/core/infra/media/media-version-repository";
+import { findUserConnectionsByUserId } from "@canto/core/infra/media-servers/user-connection-repository";
 import { findMediaLocalized } from "@canto/core/infra/media/media-localized-repository";
 import {
   findJellyfinItemIdByProviderForUser,
@@ -112,7 +110,7 @@ async function pushJellyfin(
       conn.externalUserId,
       mediaRow.title,
       mediaRow.externalId,
-      mediaRow.provider as "tmdb" | "tvdb",
+      mediaRow.provider,
     );
   }
   if (!itemId) {
@@ -171,7 +169,7 @@ async function pushPlex(
       conn.token,
       mediaRow.title,
       mediaRow.externalId,
-      mediaRow.provider as "tmdb" | "tvdb",
+      mediaRow.provider,
       plexType,
     );
   }

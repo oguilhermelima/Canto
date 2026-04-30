@@ -1,16 +1,18 @@
 import {
   fetchPlexItemWithMedia,
-  fetchPlexShowLeavesWithMedia,
-  type PlexStreamEntry,
-  type PlexStreamMedia,
-  type PlexStreamMetadataItem,
+  fetchPlexShowLeavesWithMedia
+  
+  
+  
 } from "@canto/core/infra/media-servers/plex.adapter";
+import type {PlexStreamEntry, PlexStreamMedia, PlexStreamMetadataItem} from "@canto/core/infra/media-servers/plex.adapter";
 import {
   dedupeLangs,
   normalizeLang,
-  normalizeResolution,
-  type MediaFileInfo,
+  normalizeResolution
+  
 } from "@canto/core/domain/media-servers/use-cases/fetch-info/shared";
+import type {MediaFileInfo} from "@canto/core/domain/media-servers/use-cases/fetch-info/shared";
 
 export function extractPlexFileInfo(item: PlexStreamMetadataItem): MediaFileInfo {
   const m = item.Media?.[0];

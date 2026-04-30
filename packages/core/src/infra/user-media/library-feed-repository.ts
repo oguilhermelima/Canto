@@ -1,4 +1,5 @@
-import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql  } from "drizzle-orm";
+import type {SQL} from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
   episode,
@@ -727,8 +728,8 @@ export async function findLibraryGenres(
   // Aggregate genres across all media, deduplicate by id
   const genreMap = new Map<number, string>();
   for (const row of rows) {
-    const ids = row.genreIds as number[] | null;
-    const names = row.genres as string[] | null;
+    const ids = row.genreIds;
+    const names = row.genres;
     if (!ids || !names) continue;
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i];

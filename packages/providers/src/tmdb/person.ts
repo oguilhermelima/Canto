@@ -1,5 +1,6 @@
 import type { PersonCredit, PersonDetail } from "../types";
-import { TmdbClient, yearFromDate } from "./client";
+import type { TmdbClient} from "./client";
+import { yearFromDate } from "./client";
 
 export async function getPerson(
   client: TmdbClient,

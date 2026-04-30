@@ -6,10 +6,11 @@ import type {
 } from "@canto/core/domain/media/types/media-aspect-state";
 import { DEFAULT_KNOBS } from "@canto/core/domain/media/use-cases/cadence/cadence-knobs";
 import {
-  computePlan,
-  type CadenceSignal,
-  type ComputePlanInput,
+  computePlan
+  
+  
 } from "@canto/core/domain/media/use-cases/cadence/compute-plan";
+import type {CadenceSignal, ComputePlanInput} from "@canto/core/domain/media/use-cases/cadence/compute-plan";
 import type { MediaContext } from "@canto/core/domain/media/use-cases/cadence/compute-next-eligible";
 
 const NOW = new Date("2026-04-01T00:00:00.000Z");

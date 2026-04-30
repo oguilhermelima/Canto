@@ -508,7 +508,7 @@ export class TvdbProvider implements MetadataProvider {
     const allEpisodes: TvdbEpisode[] = [];
     let page = 0;
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+     
     while (true) {
       const data = await this.request<{ episodes: TvdbEpisode[] }>(
         `/series/${seriesId}/episodes/default/${lang}?page=${page}`,

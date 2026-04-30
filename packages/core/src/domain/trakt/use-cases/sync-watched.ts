@@ -18,10 +18,11 @@ import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/port
 import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/user-media/use-cases/promote-user-media-state-from-playback";
 import {
   parseDateOrNow,
-  resolveMediaFromTraktRef,
-  type ResolveMediaDeps,
-  type SyncContext,
+  resolveMediaFromTraktRef
+  
+  
 } from "@canto/core/domain/trakt/use-cases/shared";
+import type {ResolveMediaDeps, SyncContext} from "@canto/core/domain/trakt/use-cases/shared";
 
 export interface SyncWatchedDeps extends ResolveMediaDeps {
   traktApi: TraktApiPort;

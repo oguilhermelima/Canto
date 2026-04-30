@@ -3,10 +3,11 @@ import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/port
 import type { TraktPlaybackProgressRef } from "@canto/core/domain/trakt/types/trakt-api";
 import {
   parseDateOrNow,
-  resolveMediaFromTraktRef,
-  type ResolveMediaDeps,
-  type SyncContext,
+  resolveMediaFromTraktRef
+  
+  
 } from "@canto/core/domain/trakt/use-cases/shared";
+import type {ResolveMediaDeps, SyncContext} from "@canto/core/domain/trakt/use-cases/shared";
 
 export interface SyncInProgressDeps extends ResolveMediaDeps {
   traktApi: TraktApiPort;

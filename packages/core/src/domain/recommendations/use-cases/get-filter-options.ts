@@ -1,9 +1,10 @@
 import { cached } from "@canto/core/platform/cache/redis";
 import { fetchFromTmdb } from "@canto/core/platform/http/tmdb-raw";
 import {
-  groupByBrand,
-  type BrandedProvider,
+  groupByBrand
+  
 } from "@canto/core/domain/recommendations/rules/canonical-brand";
+import type {BrandedProvider} from "@canto/core/domain/recommendations/rules/canonical-brand";
 import type { FilterOptionsInput } from "@canto/validators";
 
 export type RegionOption = {

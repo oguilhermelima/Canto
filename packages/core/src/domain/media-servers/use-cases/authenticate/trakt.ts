@@ -5,9 +5,10 @@ import {
   getTraktUserSettings,
   pingTraktClientId,
   TraktHttpError,
-  validateTraktClientCredentials,
-  type TraktDeviceCodeResponse,
+  validateTraktClientCredentials
+  
 } from "@canto/core/infra/trakt/trakt-shim";
+import type {TraktDeviceCodeResponse} from "@canto/core/infra/trakt/trakt-shim";
 
 export interface TraktAuthResult {
   success: boolean;

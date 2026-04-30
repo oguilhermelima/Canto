@@ -1,10 +1,10 @@
 import type { Database } from "@canto/db/client";
 import {
   findEpisodesByMediaIds,
-  findUserListMediaCandidates,
-  findUserMediaStatesByMediaIds,
   findUserWatchHistoryByMediaIds,
-} from "@canto/core/infra/repositories";
+} from "@canto/core/infra/user-media/watch-history-repository";
+import { findUserListMediaCandidates } from "@canto/core/infra/user-media/library-feed-repository";
+import { findUserMediaStatesByMediaIds } from "@canto/core/infra/user-media/state-repository";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
 import { parseDateLike } from "@canto/core/domain/user-media/rules/user-media-rules";
 

@@ -9,11 +9,11 @@ import {
 } from "@canto/validators";
 import {
   findLibraryGenres,
-  findTrailerKeysForMediaIds,
-  findUserLibraryStats,
   findUserMediaCounts,
   findUserMediaPaginated,
-} from "@canto/core/infra/repositories";
+} from "@canto/core/infra/user-media/library-feed-repository";
+import { findTrailerKeysForMediaIds } from "@canto/core/infra/content-enrichment/extras-repository";
+import { findUserLibraryStats } from "@canto/core/infra/user-media/stats-repository";
 import { getContinueWatching } from "@canto/core/domain/user-media/use-cases/get-continue-watching";
 import { getLibraryWatchNext } from "@canto/core/domain/user-media/use-cases/get-library-watch-next";
 import { getUpcomingSchedule } from "@canto/core/domain/user-media/use-cases/get-upcoming-schedule";

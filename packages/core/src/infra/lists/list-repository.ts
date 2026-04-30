@@ -1,10 +1,12 @@
-import { and, asc, eq, getTableColumns, or, isNull, desc, count, sql, inArray, max, type SQL } from "drizzle-orm";
+import { and, asc, eq, getTableColumns, or, isNull, desc, count, sql, inArray, max  } from "drizzle-orm";
+import type {SQL} from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { list, listItem, listMember, media, user, userHiddenMedia, userMediaLibrary, userMediaState } from "@canto/db/schema";
 import type { CollectionWatchStatus } from "@canto/validators";
 import type { RecsFilters } from "../../domain/recommendations/types/recs-filters";
 import { buildRecsFilterConditions, recsSortOrder } from "../recommendations/recs-filter-builder";
-import { mediaI18n, type MediaI18n } from "../shared/media-i18n";
+import { mediaI18n  } from "../shared/media-i18n";
+import type {MediaI18n} from "../shared/media-i18n";
 
 /** Build the column-set rec-filter conditions and sort use against the
  *  `media + mediaI18n` join shape in this repo. */
@@ -554,7 +556,7 @@ export async function findListItems(
   const whereClause = and(...conditions);
 
   const userStateJoin = joinCurrentUserState
-    ? and(eq(userMediaState.mediaId, media.id), eq(userMediaState.userId, userId!))
+    ? and(eq(userMediaState.mediaId, media.id), eq(userMediaState.userId, userId))
     : null;
 
   // Four query shapes — picked to keep Drizzle's chained query builder happy
@@ -718,7 +720,7 @@ export async function findListItems(
               avgRating: Number(row.memberAvgRating ?? 0),
             }
           : null,
-      userRating: userRating as number | null,
+      userRating: userRating,
       userStatus: row.userStatus ?? null,
       membership: membership.get(row.media.id) ?? {
         inWatchlist: false,

@@ -25,9 +25,10 @@ import {
 } from "@canto/core/platform/queue/bullmq-dispatcher";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 import {
-  resolveFolder,
-  type RoutableMedia,
+  resolveFolder
+  
 } from "@canto/core/domain/torrents/rules/folder-routing";
+import type {RoutableMedia} from "@canto/core/domain/torrents/rules/folder-routing";
 
 import { protectedProcedure } from "../../trpc";
 

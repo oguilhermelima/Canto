@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { planSchema, type CodemodPlan } from "./schema.ts";
+import { planSchema  } from "./schema.ts";
+import type {CodemodPlan} from "./schema.ts";
 
 export function loadPlan(planPath: string): CodemodPlan {
   const absolutePath = resolve(planPath);

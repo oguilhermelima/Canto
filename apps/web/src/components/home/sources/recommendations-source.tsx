@@ -58,7 +58,7 @@ export function RecommendationsSource({ sectionId, title, style }: Recommendatio
     (r): SectionItem => ({
       externalId: r.externalId,
       provider: r.provider,
-      type: r.type as "movie" | "show",
+      type: r.type,
       title: r.title,
       posterPath: r.posterPath ?? null,
       backdropPath: r.backdropPath ?? null,

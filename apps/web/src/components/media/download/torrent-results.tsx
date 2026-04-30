@@ -5,7 +5,8 @@ import { StateMessage } from "@canto/ui/state-message";
 import { Loader2, Search } from "lucide-react";
 import { FilterToolbar } from "./filter-toolbar";
 import { ScanningState } from "./scanning-state";
-import { TorrentCard, type TorrentResult } from "./torrent-card";
+import { TorrentCard  } from "./torrent-card";
+import type {TorrentResult} from "./torrent-card";
 
 interface TorrentResultsProps {
   mediaId: string;

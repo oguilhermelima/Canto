@@ -207,7 +207,7 @@ export function MediaCard({
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] font-medium tracking-wide text-muted-foreground md:text-xs">
             {hasPublicRating && (
               <CardRating
-                value={voteAverage!}
+                value={voteAverage}
                 starClassName="text-yellow-400"
                 title="Public rating (TMDB)"
               />
@@ -217,7 +217,7 @@ export function MediaCard({
             )}
             {hasUserRating && (
               <CardRating
-                value={userRating!}
+                value={userRating}
                 starClassName="text-emerald-400"
                 title="Your rating"
               />
@@ -227,7 +227,7 @@ export function MediaCard({
             )}
             {hasMembersRating && (
               <CardRating
-                value={membersAvg!}
+                value={membersAvg}
                 starClassName="text-cyan-300"
                 title="Members rating"
                 count={membersCount}

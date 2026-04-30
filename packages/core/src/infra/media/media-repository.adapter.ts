@@ -1,4 +1,5 @@
-import { and, eq, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, sql  } from "drizzle-orm";
+import type {SQL} from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { episode, media, mediaFile, season } from "@canto/db/schema";
 import type { MediaType } from "@canto/core/domain/media/types/media";

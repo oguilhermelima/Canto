@@ -6,10 +6,11 @@ import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-r
 import {
   findOrCreateUniqueListSlug,
   syncSingleListMembership,
-  toTraktListBody,
-  type SyncContext,
-  type SyncListMembershipDeps,
+  toTraktListBody
+  
+  
 } from "@canto/core/domain/trakt/use-cases/shared";
+import type {SyncContext, SyncListMembershipDeps} from "@canto/core/domain/trakt/use-cases/shared";
 
 export interface SyncCustomListsDeps extends SyncListMembershipDeps {
   traktApi: TraktApiPort;

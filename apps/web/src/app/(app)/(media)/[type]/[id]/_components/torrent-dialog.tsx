@@ -193,12 +193,12 @@ export function TorrentDialog({
                 <span className="text-muted-foreground">
                   {" "}
                   — S
-                  {String(torrentSearchContext!.seasonNumber).padStart(2, "0")}
-                  {torrentSearchContext!.episodeNumbers &&
-                    torrentSearchContext!.episodeNumbers.length > 0 && (
+                  {String(torrentSearchContext.seasonNumber).padStart(2, "0")}
+                  {torrentSearchContext.episodeNumbers &&
+                    torrentSearchContext.episodeNumbers.length > 0 && (
                       <span>
                         E
-                        {torrentSearchContext!.episodeNumbers
+                        {torrentSearchContext.episodeNumbers
                           .map((n) => String(n).padStart(2, "0"))
                           .join(", E")}
                       </span>

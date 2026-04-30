@@ -43,7 +43,7 @@ export function toRow(input: NewFolder): Insert {
     downloadPath: input.downloadPath ?? null,
     libraryPath: input.libraryPath ?? null,
     qbitCategory: input.qbitCategory ?? null,
-    rules: (input.rules ?? null) as PersistedFolderRules | null,
+    rules: (input.rules ?? null),
     ...(input.priority !== undefined && { priority: input.priority }),
     ...(input.isDefault !== undefined && { isDefault: input.isDefault }),
     ...(input.enabled !== undefined && { enabled: input.enabled }),
@@ -57,7 +57,7 @@ export function toUpdateRow(input: UpdateFolderInput): Partial<Insert> {
   if (input.downloadPath !== undefined) out.downloadPath = input.downloadPath;
   if (input.libraryPath !== undefined) out.libraryPath = input.libraryPath;
   if (input.qbitCategory !== undefined) out.qbitCategory = input.qbitCategory;
-  if (input.rules !== undefined) out.rules = input.rules as PersistedFolderRules | null;
+  if (input.rules !== undefined) out.rules = input.rules;
   if (input.priority !== undefined) out.priority = input.priority;
   if (input.isDefault !== undefined) out.isDefault = input.isDefault;
   if (input.enabled !== undefined) out.enabled = input.enabled;

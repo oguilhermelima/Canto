@@ -1,9 +1,10 @@
 import { and, eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
-  downloadProfile,
-  type DownloadProfileAllowedFormat,
+  downloadProfile
+  
 } from "@canto/db/schema";
+import type {DownloadProfileAllowedFormat} from "@canto/db/schema";
 import type { DownloadProfile } from "@canto/core/domain/torrents/rules/download-profile";
 import type {
   Quality,

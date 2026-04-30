@@ -1,4 +1,5 @@
-import { and, desc, eq, gt, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, or, sql  } from "drizzle-orm";
+import type {SQL} from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { media, userPlaybackProgress } from "@canto/db/schema";
 import { mediaI18n } from "@canto/core/infra/shared/media-i18n";

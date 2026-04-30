@@ -9,14 +9,15 @@ import { StateMessage } from "@canto/ui/state-message";
 import { trpc } from "@/lib/trpc/client";
 import { SettingsSection } from "@/components/settings/shared";
 import {
-  type Flavor,
-  type ProfileDraft,
-  type ProfileRow,
+  
+  
+  
   EMPTY_DRAFT,
   FLAVORS,
   createEmptyDraft,
-  profileRowToDraft,
+  profileRowToDraft
 } from "./download-profile-defaults";
+import type {Flavor, ProfileDraft, ProfileRow} from "./download-profile-defaults";
 import { DownloadProfileEditor } from "./download-profile-editor";
 import { DownloadProfileFlavorGroup } from "./download-profile-flavor-group";
 

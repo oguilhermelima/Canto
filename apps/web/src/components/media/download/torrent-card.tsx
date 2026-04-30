@@ -19,7 +19,8 @@ import {
   formatQualityLabel,
   sourceLabel,
 } from "@/lib/torrent-utils";
-import { ConfidenceChip, type ConfidenceBreakdown } from "./confidence-chip";
+import { ConfidenceChip  } from "./confidence-chip";
+import type {ConfidenceBreakdown} from "./confidence-chip";
 
 export interface TorrentResult {
   guid: string;

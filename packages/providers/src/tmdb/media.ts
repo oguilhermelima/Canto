@@ -16,15 +16,16 @@ import type {
 import {
   normalizeWatchProviders,
   TmdbClient,
-  yearFromDate,
-  type TmdbCollection,
-  type TmdbContentRating,
-  type TmdbGenre,
-  type TmdbImage,
-  type TmdbNetwork,
-  type TmdbProductionCompany,
-  type TmdbReleaseDate,
+  yearFromDate
+  
+  
+  
+  
+  
+  
+  
 } from "./client";
+import type {TmdbCollection, TmdbContentRating, TmdbGenre, TmdbImage, TmdbNetwork, TmdbProductionCompany, TmdbReleaseDate} from "./client";
 import { normalizeSeason } from "./season";
 
 /* -------------------------------------------------------------------------- */
@@ -737,11 +738,11 @@ export async function getExtras(
   });
 
   const similarRaw = ((data.similar as { results?: unknown[] })?.results ??
-    []) as unknown[];
+    []);
   const recommendationsRaw = ((data.recommendations as { results?: unknown[] })
-    ?.results ?? []) as unknown[];
+    ?.results ?? []);
   const videosRaw = ((data.videos as { results?: unknown[] })?.results ??
-    []) as unknown[];
+    []);
 
   const similar: SearchResult[] = similarRaw.map((r) =>
     normalizeSearchResult(r, type),

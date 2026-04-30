@@ -87,7 +87,7 @@ export async function reconcileShowStructure(
       if (tmdbData.seasons) tmdbNormalized.seasons = tmdbData.seasons;
     } catch { /* keep TVDB seasons if TMDB fails */ }
 
-    await applyTvdbSeasons(db, mediaId, tvdbData.seasons!, tmdbNormalized);
+    await applyTvdbSeasons(db, mediaId, tvdbData.seasons, tmdbNormalized);
   }
 
   const supportedLangs = [...(await getActiveUserLanguages(db))];

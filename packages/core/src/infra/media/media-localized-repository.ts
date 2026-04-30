@@ -1,4 +1,5 @@
-import { and, eq, inArray, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, or, sql  } from "drizzle-orm";
+import type {SQL} from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Database } from "@canto/db/client";
 import { media, mediaLocalization } from "@canto/db/schema";

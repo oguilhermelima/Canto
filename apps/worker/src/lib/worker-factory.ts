@@ -1,7 +1,9 @@
-import { Worker, type WorkerOptions } from "bullmq";
+import { Worker  } from "bullmq";
+import type {WorkerOptions} from "bullmq";
 import { getRedisConnection } from "@canto/core/platform/queue/redis-config";
 
-import { createJobLogger, type JobLogger } from "./job-logger";
+import { createJobLogger  } from "./job-logger";
+import type {JobLogger} from "./job-logger";
 
 export type JobHandler<TData> = (data: TData, log: JobLogger) => Promise<void>;
 

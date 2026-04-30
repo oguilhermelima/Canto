@@ -15,7 +15,7 @@ export function recommendationToDomain(row: RecommendationRow): MediaRecommendat
     id: row.id as MediaRecommendationId,
     mediaId: row.mediaId as MediaId,
     sourceMediaId: row.sourceMediaId as MediaId,
-    sourceType: row.sourceType as RecommendationSourceType,
+    sourceType: row.sourceType,
     createdAt: row.createdAt,
   };
 }

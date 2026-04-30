@@ -190,7 +190,7 @@ export function BackdropCard({
                 className="inline-flex items-center gap-1"
               >
                 <Star size={12} className="fill-current text-yellow-400" />
-                <span className="tabular-nums">{formatRating(voteAverage!)}</span>
+                <span className="tabular-nums">{formatRating(voteAverage)}</span>
               </span>
             )}
             {hasPublicRating && hasUserRating && <span aria-hidden>·</span>}
@@ -200,7 +200,7 @@ export function BackdropCard({
                 className="inline-flex items-center gap-1"
               >
                 <Star size={12} className="fill-current text-emerald-400" />
-                <span className="tabular-nums">{formatRating(userRating!)}</span>
+                <span className="tabular-nums">{formatRating(userRating)}</span>
               </span>
             )}
           </div>

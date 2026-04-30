@@ -3,10 +3,11 @@ import type { Database } from "@canto/db/client";
 import {
   downloadFolder,
   folderServerLink,
-  folderMediaPath,
-  type PersistedFolderRules,
-  type RoutingRules,
+  folderMediaPath
+  
+  
 } from "@canto/db/schema";
+import type {PersistedFolderRules, RoutingRules} from "@canto/db/schema";
 import { normalizeFolderRules } from "@canto/core/domain/torrents/rules/folder-routing";
 
 /** Converts legacy-shape `rules` into the canonical `RoutingRules` shape on read. */

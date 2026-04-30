@@ -5,7 +5,7 @@ import {
   addListItem,
   markListItemsPushed,
   removeListItem,
-} from "@canto/core/infra/repositories";
+} from "@canto/core/infra/lists/list-repository";
 import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
 import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
 import type { UserConnectionRepositoryPort } from "@canto/core/domain/media-servers/ports/user-connection-repository.port";

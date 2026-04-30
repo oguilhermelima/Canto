@@ -63,7 +63,7 @@ export async function fetchLogos(
       provider: i.provider,
       type: i.type,
     })),
-    useLangJoin ? language! : "en-US",
+    useLangJoin ? language : "en-US",
   );
 
   const existingByKey = new Map(existingRows.map((r) => [`${r.type}-${r.externalId}`, r]));
@@ -269,7 +269,7 @@ export async function enrichBrowseWithLogos<
   }));
   const rows = await localization.findLogoOverlayByExternalRefs(
     refs,
-    useLangJoin ? language! : "en-US",
+    useLangJoin ? language : "en-US",
   );
 
   const logoMap = new Map<string, string>();

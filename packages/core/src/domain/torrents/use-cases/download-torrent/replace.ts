@@ -2,11 +2,12 @@ import type { Database } from "@canto/db/client";
 
 import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
 import { deleteMediaFile } from "@canto/core/infra/media/media-file-repository";
-import { findDownloadByTitle } from "@canto/core/infra/torrents/download-repository";
+import type { findDownloadByTitle } from "@canto/core/infra/torrents/download-repository";
 import {
-  coreDownload,
-  type DownloadInput,
+  coreDownload
+  
 } from "@canto/core/domain/torrents/use-cases/download-torrent/core";
+import type {DownloadInput} from "@canto/core/domain/torrents/use-cases/download-torrent/core";
 
 type TorrentRow = NonNullable<Awaited<ReturnType<typeof findDownloadByTitle>>>;
 

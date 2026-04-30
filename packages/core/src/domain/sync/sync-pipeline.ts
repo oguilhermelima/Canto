@@ -18,15 +18,20 @@ import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 import {
   findMediaByAnyReference,
   updateMedia,
+} from "@canto/core/infra/media/media-repository";
+import {
   createMediaVersionEpisodes,
   deleteMediaVersionEpisodesByVersionId,
+  upsertMediaVersion
+  
+} from "@canto/core/infra/media/media-version-repository";
+import type {MediaVersionInsert} from "@canto/core/infra/media/media-version-repository";
+import {
   addListItem,
-  addToUserMediaLibrary,
   ensureServerLibrary,
-  upsertMediaVersion,
-  findAspectSucceededAt,
-  type MediaVersionInsert,
-} from "@canto/core/infra/repositories";
+} from "@canto/core/infra/lists/list-repository";
+import { addToUserMediaLibrary } from "@canto/core/infra/user-media/library-repository";
+import { findAspectSucceededAt } from "@canto/core/infra/media/media-aspect-state-repository";
 import { reconcileServerLibrary } from "@canto/core/infra/lists/list-repository";
 
 import {
@@ -35,9 +40,10 @@ import {
 } from "@canto/core/domain/media/use-cases/resolve-external-id";
 import {
   fetchJellyfinMediaInfo,
-  fetchPlexMediaInfo,
-  type MediaFileInfo,
+  fetchPlexMediaInfo
+  
 } from "@canto/core/domain/media-servers/use-cases/fetch-info";
+import type {MediaFileInfo} from "@canto/core/domain/media-servers/use-cases/fetch-info";
 
 import type {
   ScannedMediaItem,
@@ -46,10 +52,11 @@ import type {
 } from "@canto/core/domain/sync/types";
 import { emptySummary } from "@canto/core/domain/sync/types";
 import {
-  createMediaAnchorCache,
-  type MediaAnchorCache,
-  type ResolvedMediaAnchor,
+  createMediaAnchorCache
+  
+  
 } from "@canto/core/domain/sync/media-resolution-cache";
+import type {MediaAnchorCache, ResolvedMediaAnchor} from "@canto/core/domain/sync/media-resolution-cache";
 
 /* -------------------------------------------------------------------------- */
 /*  Constants                                                                  */

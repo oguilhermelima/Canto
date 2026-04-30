@@ -8,10 +8,11 @@ import type {
 import type { EnsureMediaSpec } from "@canto/core/domain/media/use-cases/ensure-media.types";
 import type { CadenceKnobs } from "@canto/core/domain/media/use-cases/cadence/cadence-knobs";
 import {
-  computeNextEligible,
-  type MediaContext,
-  type Outcome,
+  computeNextEligible
+  
+  
 } from "@canto/core/domain/media/use-cases/cadence/compute-next-eligible";
+import type {MediaContext, Outcome} from "@canto/core/domain/media/use-cases/cadence/compute-next-eligible";
 import type {
   ForcedAspect,
   PlanItem,

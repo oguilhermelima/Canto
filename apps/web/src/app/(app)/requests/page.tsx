@@ -137,7 +137,7 @@ export default function RequestsPage(): React.JSX.Element {
           tabs={STATUS_TABS.map(({ value, label }) => ({
             value,
             label,
-            count: counts[value as keyof typeof counts],
+            count: counts[value],
           }))}
           value={statusFilter}
           onChange={setStatusFilter}

@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   mapPlexItem,
   parsePlexGuids,
-  resolvePlexMediaKind,
-  type PlexLibraryRef,
+  resolvePlexMediaKind
+  
 } from "../plex-scanner";
+import type {PlexLibraryRef} from "../plex-scanner";
 
 const movieLib: PlexLibraryRef = {
   plexLibraryId: "1",

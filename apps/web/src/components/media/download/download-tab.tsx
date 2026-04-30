@@ -16,9 +16,10 @@ import {
   ListTree,
   Sparkles,
   FolderOpen,
-  Check,
-  type LucideIcon,
+  Check
+  
 } from "lucide-react";
+import type {LucideIcon} from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { SeasonSelect } from "./season-select";
 

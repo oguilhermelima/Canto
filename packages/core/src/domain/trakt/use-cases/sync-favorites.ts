@@ -13,11 +13,12 @@ import {
   mediaRefKey,
   parseDateOrNow,
   resolveMediaFromTraktRef,
-  toTraktFavoritesBody,
-  type LocalMediaRef,
-  type ResolveMediaDeps,
-  type SyncContext,
+  toTraktFavoritesBody
+  
+  
+  
 } from "@canto/core/domain/trakt/use-cases/shared";
+import type {LocalMediaRef, ResolveMediaDeps, SyncContext} from "@canto/core/domain/trakt/use-cases/shared";
 
 export interface SyncFavoritesDeps extends ResolveMediaDeps {
   traktApi: TraktApiPort;

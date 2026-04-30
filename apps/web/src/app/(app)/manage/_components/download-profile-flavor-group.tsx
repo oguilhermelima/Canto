@@ -4,10 +4,11 @@ import { memo } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@canto/ui/button";
 import {
-  type Flavor,
-  type ProfileRow,
-  FLAVOR_LABELS,
+  
+  
+  FLAVOR_LABELS
 } from "./download-profile-defaults";
+import type {Flavor, ProfileRow} from "./download-profile-defaults";
 import { DownloadProfileRow } from "./download-profile-row";
 
 interface DownloadProfileFlavorGroupProps {

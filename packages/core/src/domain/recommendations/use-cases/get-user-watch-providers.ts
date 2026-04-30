@@ -2,10 +2,11 @@ import type { Database } from "@canto/db/client";
 import { cached } from "@canto/core/platform/cache/redis";
 import { fetchFromTmdb } from "@canto/core/platform/http/tmdb-raw";
 import {
-  groupByBrand,
-  type BrandedProvider,
-  type WatchProvider,
+  groupByBrand
+  
+  
 } from "@canto/core/domain/recommendations/rules/canonical-brand";
+import type {BrandedProvider, WatchProvider} from "@canto/core/domain/recommendations/rules/canonical-brand";
 import { getUserWatchPreferences } from "@canto/core/domain/shared/services/user-service";
 
 export type UserWatchProvidersResult = {

@@ -8,9 +8,10 @@ import {
   gte,
   inArray,
   lte,
-  sql,
-  type SQL,
+  sql
+  
 } from "drizzle-orm";
+import type {SQL} from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
   folderServerLink,
@@ -23,7 +24,8 @@ import {
   userConnection,
 } from "@canto/db/schema";
 import type { ListInput } from "@canto/validators";
-import { mediaI18n, type MediaI18n } from "../shared/media-i18n";
+import { mediaI18n  } from "../shared/media-i18n";
+import type {MediaI18n} from "../shared/media-i18n";
 import { findMediaLocalized } from "./media-localized-repository";
 
 type MediaRow = typeof media.$inferSelect;

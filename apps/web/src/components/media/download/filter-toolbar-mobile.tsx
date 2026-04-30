@@ -17,10 +17,11 @@ import {
 } from "lucide-react";
 import {
   SORT_COLUMNS,
-  SORT_LABELS,
-  type SortColumn,
-  type SortDir,
+  SORT_LABELS
+  
+  
 } from "./filter-toolbar-shared";
+import type {SortColumn, SortDir} from "./filter-toolbar-shared";
 
 interface FilterToolbarMobileProps {
   searchValue: string;

@@ -11,13 +11,14 @@ import {
   SelectValue,
 } from "@canto/ui/select";
 import {
-  type AllowedFormat,
-  type Quality,
-  type Source,
+  
+  
+  
   DEFAULT_FORMAT_ROW,
   QUALITY_OPTIONS,
-  SOURCE_OPTIONS,
+  SOURCE_OPTIONS
 } from "./download-profile-defaults";
+import type {AllowedFormat, Quality, Source} from "./download-profile-defaults";
 
 interface DownloadProfileFormatsFieldProps {
   value: AllowedFormat[];

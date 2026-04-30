@@ -14,9 +14,10 @@ import { loadCadenceKnobs } from "@canto/core/domain/media/use-cases/cadence/cad
 import { effectiveProvider } from "@canto/core/domain/media/use-cases/cadence/effective-provider";
 import type { Outcome } from "@canto/core/domain/media/use-cases/cadence/compute-next-eligible";
 import {
-  computePlan,
-  type CadenceSignal,
+  computePlan
+  
 } from "@canto/core/domain/media/use-cases/cadence/compute-plan";
+import type {CadenceSignal} from "@canto/core/domain/media/use-cases/cadence/compute-plan";
 import {
   buildForceAspects,
   buildMediaContext,
@@ -38,7 +39,7 @@ import { fireSharedCapabilities } from "@canto/core/domain/media/enrichment/fire
 import { topoSortPlanItems } from "@canto/core/domain/media/enrichment/topo-sort";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
-import { findMediaById } from "@canto/core/infra/repositories";
+import { findMediaById } from "@canto/core/infra/media/media-repository";
 import { makeMediaAspectStateRepository } from "@canto/core/infra/media/media-aspect-state-repository.adapter";
 import { makeMediaContentRatingRepository } from "@canto/core/infra/media/media-content-rating-repository.adapter";
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";

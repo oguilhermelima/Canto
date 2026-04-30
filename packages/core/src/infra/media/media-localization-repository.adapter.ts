@@ -91,7 +91,7 @@ export function makeMediaLocalizationRepository(
             flLocEn,
             and(eq(flLocEn.mediaId, media.id), eq(flLocEn.language, EN)),
           )
-          .where(or(...conditions)!);
+          .where(or(...conditions));
       }
 
       const flLocUser = alias(mediaLocalization, "fl_loc_user");
@@ -117,7 +117,7 @@ export function makeMediaLocalizationRepository(
           flLocEn,
           and(eq(flLocEn.mediaId, media.id), eq(flLocEn.language, EN)),
         )
-        .where(or(...conditions)!);
+        .where(or(...conditions));
     },
 
     // ─── Reads (season / episode localization) ───

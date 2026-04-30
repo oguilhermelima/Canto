@@ -15,6 +15,7 @@
     "format:fix": "turbo run format --continue -- --write --cache --cache-location .cache/.prettiercache",
     "lint": "turbo run lint --continue -- --cache --cache-location .cache/.eslintcache",
     "lint:fix": "turbo run lint --continue -- --fix --cache --cache-location .cache/.eslintcache",
+    "lint:strict": "turbo run lint -- --max-warnings=0",
     "typecheck": "turbo run typecheck",
     "db:push": "turbo run push --filter=@canto/db",
     "db:generate": "turbo run generate --filter=@canto/db",

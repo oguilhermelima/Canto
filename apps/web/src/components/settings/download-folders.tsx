@@ -42,7 +42,7 @@ export function DownloadFolders({
   );
   const effectiveMethod =
     importMethodProp ??
-    (dlSettings?.importMethod as "local" | "remote" | undefined) ??
+    (dlSettings?.importMethod) ??
     "local";
   const utils = trpc.useUtils();
 

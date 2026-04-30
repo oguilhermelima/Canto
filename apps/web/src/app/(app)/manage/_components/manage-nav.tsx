@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { ChevronRight } from "lucide-react";
-import { MANAGE_SECTIONS, type ManageSectionGroup } from "./manage-config";
+import { MANAGE_SECTIONS  } from "./manage-config";
+import type {ManageSectionGroup} from "./manage-config";
 
 /* ─── Desktop Sidebar ─── */
 

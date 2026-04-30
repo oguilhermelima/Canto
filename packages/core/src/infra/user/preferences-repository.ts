@@ -3,9 +3,10 @@ import { and, eq, like } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { userPreference } from "@canto/db/schema";
 import {
-  EMPTY_DOWNLOAD_PREFERENCES,
-  type DownloadPreferences,
+  EMPTY_DOWNLOAD_PREFERENCES
+  
 } from "@canto/core/domain/shared/rules/scoring-rules";
+import type {DownloadPreferences} from "@canto/core/domain/shared/rules/scoring-rules";
 
 /**
  * Strongly-typed userPreference keys for the per-user download flow.

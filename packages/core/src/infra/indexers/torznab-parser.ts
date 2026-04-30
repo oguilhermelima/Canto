@@ -123,7 +123,7 @@ function extractTorznabAttrs(
   if (!attrs) return result;
   const list = Array.isArray(attrs) ? attrs : [attrs];
   for (const a of list) {
-    const rec = a as Record<string, unknown>;
+    const rec = a;
     const name = text(rec["@_name"]);
     const value = text(rec["@_value"]);
     if (name && value) {

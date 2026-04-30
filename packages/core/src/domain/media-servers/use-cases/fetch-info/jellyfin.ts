@@ -1,15 +1,17 @@
 import {
   fetchJellyfinItemWithStreams,
-  fetchJellyfinShowEpisodesWithStreams,
-  type JellyfinStreamItem,
-  type JellyfinStreamMediaStream,
+  fetchJellyfinShowEpisodesWithStreams
+  
+  
 } from "@canto/core/infra/media-servers/jellyfin.adapter";
+import type {JellyfinStreamItem, JellyfinStreamMediaStream} from "@canto/core/infra/media-servers/jellyfin.adapter";
 import {
   dedupeLangs,
   normalizeLang,
-  normalizeResolution,
-  type MediaFileInfo,
+  normalizeResolution
+  
 } from "@canto/core/domain/media-servers/use-cases/fetch-info/shared";
+import type {MediaFileInfo} from "@canto/core/domain/media-servers/use-cases/fetch-info/shared";
 
 export function extractJellyfinFileInfo(item: JellyfinStreamItem): MediaFileInfo {
   const src = item.MediaSources?.[0];

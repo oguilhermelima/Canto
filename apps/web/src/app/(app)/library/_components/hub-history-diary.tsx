@@ -183,7 +183,7 @@ export function HubHistoryDiary(): React.JSX.Element {
         externalId: r.externalId,
         provider: r.provider,
         watchedAt: new Date(r.watchedAt),
-        source: ("source" in r ? r.source : null) as string | null,
+        source: ("source" in r ? r.source : null),
         episode: r.episode ?? null,
       };
     });

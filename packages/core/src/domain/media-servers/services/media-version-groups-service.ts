@@ -11,10 +11,11 @@ import type { Database } from "@canto/db/client";
 
 import type { ServerSource } from "../../sync/types";
 import {
-  fetchMediaVersionsWithMedia,
-  type MediaSummary,
-  type MediaVersionRow,
+  fetchMediaVersionsWithMedia
+  
+  
 } from "../../../infra/media/media-version-repository";
+import type {MediaSummary, MediaVersionRow} from "../../../infra/media/media-version-repository";
 
 export type MediaVersionGroupsTab =
   | "all"

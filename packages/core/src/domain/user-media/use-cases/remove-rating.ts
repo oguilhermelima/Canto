@@ -1,6 +1,6 @@
 import type { Database } from "@canto/db/client";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
-import { findMediaByIdWithSeasons } from "@canto/core/infra/repositories";
+import { findMediaByIdWithSeasons } from "@canto/core/infra/media/media-repository";
 
 export interface RemoveRatingDeps {
   repo: UserMediaRepositoryPort;

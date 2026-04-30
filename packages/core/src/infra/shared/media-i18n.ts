@@ -1,4 +1,5 @@
-import { and, eq, sql, type SQL } from "drizzle-orm";
+import { and, eq, sql  } from "drizzle-orm";
+import type {SQL} from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import {
   episode,

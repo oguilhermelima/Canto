@@ -6,9 +6,10 @@ import {
 } from "@canto/core/domain/recommendations/rules/recommendation-filters";
 import {
   engagementMultiplier,
-  isNegativeSignal,
-  type EngagementSignal,
+  isNegativeSignal
+  
 } from "@canto/core/domain/recommendations/rules/engagement-signals";
+import type {EngagementSignal} from "@canto/core/domain/recommendations/rules/engagement-signals";
 import type { UserRecommendationRow } from "@canto/core/domain/recommendations/types/user-recommendation";
 
 import type { Database } from "@canto/db/client";

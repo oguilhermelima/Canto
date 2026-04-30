@@ -43,12 +43,13 @@ import {
   batchResolveMediaVersionsByServerItemIds,
   batchResolveEpisodesByMediaAndNumbers,
   findMediaInRefs,
-  findEpisodeIdInMap,
-  type JellyfinLibraryRef,
-  type PlexLibraryRef,
-  type ScannedMediaItem,
-  type ServerSource,
+  findEpisodeIdInMap
+  
+  
+  
+  
 } from "@canto/core/domain/sync";
+import type {JellyfinLibraryRef, PlexLibraryRef, ScannedMediaItem, ServerSource} from "@canto/core/domain/sync";
 
 const SKIP_RECENTLY_SYNCED_MS = 6 * 60 * 60 * 1000; // 6 hours
 

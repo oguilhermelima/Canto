@@ -13,7 +13,8 @@ import type {
 import { TmdbClient } from "./client";
 import { discover, getTrending, getTrendingFiltered } from "./discover";
 import { findByImdbId, findByTvdbId } from "./find";
-import { getCertifications, type CertificationEntry } from "./certifications";
+import { getCertifications  } from "./certifications";
+import type {CertificationEntry} from "./certifications";
 import { getGenres } from "./genres";
 import {
   getExtras,

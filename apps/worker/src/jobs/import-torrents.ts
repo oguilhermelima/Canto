@@ -1,14 +1,16 @@
 import { db } from "@canto/db/client";
 import {
-  autoImportTorrent,
-  type AutoImportMediaRow,
-  type AutoImportMediaFiles,
+  autoImportTorrent
+  
+  
 } from "@canto/core/domain/torrents/use-cases/import-torrent";
+import type {AutoImportMediaRow, AutoImportMediaFiles} from "@canto/core/domain/torrents/use-cases/import-torrent";
 import { tryContinuousDownload } from "@canto/core/domain/torrents/use-cases/continuous-download";
 import {
-  triggerMediaServerScans,
-  type ImportedMedia,
+  triggerMediaServerScans
+  
 } from "@canto/core/domain/media-servers/use-cases/trigger-scans";
+import type {ImportedMedia} from "@canto/core/domain/media-servers/use-cases/trigger-scans";
 import { makeJellyfinAdapter } from "@canto/core/infra/media-servers/jellyfin.adapter-bindings";
 import { makePlexAdapter } from "@canto/core/infra/media-servers/plex.adapter-bindings";
 import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";

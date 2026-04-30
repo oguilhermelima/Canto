@@ -356,7 +356,7 @@ export async function applyMediaLocalizationOverlay<T extends OverlayableMedia>(
         posterPath: row.posterPath ?? null,
         logoPath: row.logoPath ?? null,
       };
-  return { ...row, ...overlay } as T & typeof overlay;
+  return { ...row, ...overlay };
 }
 
 export interface OverlayableMediaItem {

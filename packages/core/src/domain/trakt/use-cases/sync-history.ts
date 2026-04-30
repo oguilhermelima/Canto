@@ -8,10 +8,11 @@ import {
   mediaIdsFromRow,
   mediaRefKey,
   parseDateOrNow,
-  resolveMediaFromTraktRef,
-  type ResolveMediaDeps,
-  type SyncContext,
+  resolveMediaFromTraktRef
+  
+  
 } from "@canto/core/domain/trakt/use-cases/shared";
+import type {ResolveMediaDeps, SyncContext} from "@canto/core/domain/trakt/use-cases/shared";
 
 export interface SyncHistoryDeps extends ResolveMediaDeps {
   traktApi: TraktApiPort;

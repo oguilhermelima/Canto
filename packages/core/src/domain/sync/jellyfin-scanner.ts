@@ -9,12 +9,13 @@
 
 import {
   SyncAuthError,
-  isAuthStatus,
-  type ExternalIds,
-  type MediaKind,
-  type ScannedMediaItem,
-  type ScannedPlayback,
+  isAuthStatus
+  
+  
+  
+  
 } from "@canto/core/domain/sync/types";
+import type {ExternalIds, MediaKind, ScannedMediaItem, ScannedPlayback} from "@canto/core/domain/sync/types";
 
 export interface JellyfinLibraryRef {
   /** Jellyfin library (ParentId) */

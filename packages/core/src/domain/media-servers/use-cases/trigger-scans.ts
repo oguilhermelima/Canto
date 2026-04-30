@@ -88,8 +88,8 @@ export async function triggerMediaServerScans(
     if (link.serverType === "jellyfin" && jellyfinUrl && jellyfinKey) {
       try {
         await deps.jellyfin.triggerScan(
-          jellyfinUrl as string,
-          jellyfinKey as string,
+          jellyfinUrl,
+          jellyfinKey,
           link.serverLibraryId ?? undefined,
         );
         console.log(
@@ -105,8 +105,8 @@ export async function triggerMediaServerScans(
     if (link.serverType === "plex" && plexUrl && plexToken) {
       try {
         await deps.plex.scanLibrary(
-          plexUrl as string,
-          plexToken as string,
+          plexUrl,
+          plexToken,
           link.serverLibraryId ? [link.serverLibraryId] : undefined,
         );
         console.log(`[import-torrents] Triggered Plex scan for section ${link.serverLibraryId}`);
@@ -127,8 +127,8 @@ export async function triggerMediaServerScans(
       for (const media of candidates) {
         await tryJellyfinAutoMergeForMedia(
           deps.jellyfin,
-          jellyfinUrl as string,
-          jellyfinKey as string,
+          jellyfinUrl,
+          jellyfinKey,
           media,
         ).catch((err) =>
           console.warn(

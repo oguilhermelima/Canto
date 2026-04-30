@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
-import { QUEUES, type QueueName } from "./queue-names";
+import { QUEUES  } from "./queue-names";
+import type {QueueName} from "./queue-names";
 import { getRedisConnection } from "./redis-config";
 import type { EnsureMediaSpec } from "../../domain/media/use-cases/ensure-media.types";
 import type { TraktSection } from "../../infra/trakt/trakt-sync-repository";

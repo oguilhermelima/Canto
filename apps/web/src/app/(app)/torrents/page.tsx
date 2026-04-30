@@ -91,7 +91,7 @@ export default function DownloadsPage(): React.JSX.Element {
         />
 
         <TorrentList
-          torrents={filtered as Parameters<typeof TorrentList>[0]["torrents"]}
+          torrents={filtered}
           isLoading={query.isLoading}
           isError={query.isError}
           onRetry={() => void utils.torrent.listLive.invalidate()}

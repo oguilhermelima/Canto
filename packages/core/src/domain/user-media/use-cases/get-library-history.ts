@@ -1,11 +1,14 @@
 import type { Database } from "@canto/db/client";
 import {
   findEpisodesByMediaIds,
-  findUserPlaybackProgressFeed,
   findUserWatchHistoryByMediaIds,
-  findUserWatchHistoryFeed,
-  type LibraryFeedFilterOptions,
-} from "@canto/core/infra/repositories";
+} from "@canto/core/infra/user-media/watch-history-repository";
+import {
+  findUserPlaybackProgressFeed,
+  findUserWatchHistoryFeed
+  
+} from "@canto/core/infra/user-media/library-feed-repository";
+import type {LibraryFeedFilterOptions} from "@canto/core/infra/user-media/library-feed-repository";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
 import {
   isReleasedOnOrBefore,

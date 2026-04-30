@@ -1,5 +1,5 @@
 import type { Database } from "@canto/db/client";
-import type { LibraryFeedFilterOptions } from "@canto/core/infra/repositories";
+import type { LibraryFeedFilterOptions } from "@canto/core/infra/user-media/library-feed-repository";
 import { getContinueWatching } from "@canto/core/domain/user-media/use-cases/get-continue-watching";
 import { getWatchNext } from "@canto/core/domain/user-media/use-cases/get-watch-next";
 

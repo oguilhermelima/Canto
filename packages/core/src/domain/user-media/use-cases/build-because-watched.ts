@@ -1,8 +1,6 @@
 import type { Database } from "@canto/db/client";
-import {
-  findBecauseWatchedRecs,
-  findRecentlyCompletedMedia,
-} from "@canto/core/infra/repositories";
+import { findBecauseWatchedRecs } from "@canto/core/infra/recommendations/because-watched-repository";
+import { findRecentlyCompletedMedia } from "@canto/core/infra/user-media/state-repository";
 import type { WatchNextItem } from "@canto/core/domain/user-media/types/watch-next";
 
 const MAX_COMPLETED_SOURCES = 5;

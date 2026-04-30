@@ -3,20 +3,23 @@ import type { Database } from "@canto/db/client";
 import { IndexerSearchError } from "@canto/core/domain/torrents/errors";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import {
-  explainConfidence,
-  type ConfidenceBreakdown,
+  explainConfidence
+  
 } from "@canto/core/domain/shared/rules/scoring";
+import type {ConfidenceBreakdown} from "@canto/core/domain/shared/rules/scoring";
 import type { ScoringRules } from "@canto/core/domain/shared/rules/scoring-rules";
 import { resolveMediaFlavor } from "@canto/core/domain/shared/rules/media-flavor";
 import {
-  parseReleaseAttributes,
-  type ReleaseAttributes,
+  parseReleaseAttributes
+  
 } from "@canto/core/domain/torrents/rules/release-attributes";
+import type {ReleaseAttributes} from "@canto/core/domain/torrents/rules/release-attributes";
 import {
   applyDownloadProfile,
-  meetsCutoff,
-  type DownloadProfile,
+  meetsCutoff
+  
 } from "@canto/core/domain/torrents/rules/download-profile";
+import type {DownloadProfile} from "@canto/core/domain/torrents/rules/download-profile";
 import type {
   ReleaseFlavor,
   ReleaseGroupTierSets,
@@ -34,9 +37,10 @@ import { findActiveDownloadProfile } from "@canto/core/infra/torrents/download-p
 import { findReleaseGroupLookups } from "@canto/core/infra/torrents/download-config-repository";
 import { extractHashFromMagnet } from "@canto/core/domain/torrents/rules/torrent-rules";
 import {
-  matchesSearchIntent,
-  type SearchIntent,
+  matchesSearchIntent
+  
 } from "@canto/core/domain/torrents/rules/parsing-episodes";
+import type {SearchIntent} from "@canto/core/domain/torrents/rules/parsing-episodes";
 
 /**
  * Stable dedupe key. Prefers the magnet info-hash so the same release

@@ -5,9 +5,10 @@ import { getSetting } from "@canto/db/settings";
 import { getEffectiveProvider } from "@canto/core/domain/shared/rules/effective-provider";
 import {
   buildFileName,
-  buildMediaDir,
-  type MediaNamingInfo,
+  buildMediaDir
+  
 } from "@canto/core/domain/shared/rules/naming";
+import type {MediaNamingInfo} from "@canto/core/domain/shared/rules/naming";
 import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
 import type { FileSystemPort } from "@canto/core/domain/shared/ports/file-system.port";
 import { findMediaByIdWithSeasons } from "@canto/core/infra/media/media-repository";

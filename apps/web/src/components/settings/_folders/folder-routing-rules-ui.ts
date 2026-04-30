@@ -203,7 +203,7 @@ export function describeCondition(c: RuleCondition): string {
           : c.op === "not_contains_any"
             ? "excludes"
             : "includes"
-      } ${(c.value as string[]).join(", ")}`;
+      } ${(c.value).join(", ")}`;
     case "genreId":
       return `genre ID ${
         c.op === "contains_all"
@@ -211,16 +211,16 @@ export function describeCondition(c: RuleCondition): string {
           : c.op === "not_contains_any"
             ? "excludes"
             : "includes"
-      } ${(c.value as number[]).join(", ")}`;
+      } ${(c.value).join(", ")}`;
     case "originCountry":
       return `country ${
         c.op === "not_contains_any" ? "excludes" : "includes"
-      } ${(c.value as string[]).join(", ")}`;
+      } ${(c.value).join(", ")}`;
     case "originalLanguage":
-      return `language ${c.op === "neq" ? "is not" : "is"} ${c.value as string}`;
+      return `language ${c.op === "neq" ? "is not" : "is"} ${c.value}`;
     case "contentRating":
       return `rating ${c.op === "in" ? "is one of" : "is"} ${
-        Array.isArray(c.value) ? (c.value as string[]).join(", ") : c.value
+        Array.isArray(c.value) ? (c.value).join(", ") : c.value
       }`;
     case "year":
       return `year ${
@@ -232,7 +232,7 @@ export function describeCondition(c: RuleCondition): string {
       return `rating ${c.op === "gte" ? "≥" : "≤"} ${c.value}`;
     case "status":
       return `status ${c.op === "in" ? "is one of" : "is"} ${
-        Array.isArray(c.value) ? (c.value as string[]).join(", ") : c.value
+        Array.isArray(c.value) ? (c.value).join(", ") : c.value
       }`;
     case "watchProvider": {
       const action = c.op === "not_contains_any" ? "not on" : "on";

@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { cn } from "@canto/ui/cn";
 import { ChevronRight } from "lucide-react";
-import { PREFERENCES_SECTIONS, type PreferencesSectionGroup } from "./preferences-config";
+import { PREFERENCES_SECTIONS  } from "./preferences-config";
+import type {PreferencesSectionGroup} from "./preferences-config";
 
 /* ─── Desktop Sidebar ─── */
 

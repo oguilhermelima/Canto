@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { ALL_ASPECTS, type Aspect } from "../../use-cases/ensure-media.types";
+import { ALL_ASPECTS  } from "../../use-cases/ensure-media.types";
+import type {Aspect} from "../../use-cases/ensure-media.types";
 import { enrichmentRegistry } from "../registry";
 import type { MediaEnrichmentStrategy } from "../types";
 

@@ -8,9 +8,10 @@ import { FieldInput } from "@/components/settings/_primitives";
 import { SectionCard, SettingsSection } from "@/components/settings/shared";
 import { trpc } from "@/lib/trpc/client";
 import {
-  SETTINGS_REGISTRY,
-  type SettingKey,
+  SETTINGS_REGISTRY
+  
 } from "@canto/db/settings-registry";
+import type {SettingKey} from "@canto/db/settings-registry";
 
 const TRAKT_KEYS = [
   "trakt.clientId",

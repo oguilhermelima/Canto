@@ -25,7 +25,7 @@ export async function handleBackfillUserRecDenorm(db: Database): Promise<void> {
   //  2. `overview IS NULL AND genres IS NULL` — rows from a deploy that
   //     ran between the title denorm and the overview/genres denorm.
   // Both heal idempotently in one pass.
-  // eslint-disable-next-line no-constant-condition
+   
   while (true) {
     const result = await db.execute(
       sql`

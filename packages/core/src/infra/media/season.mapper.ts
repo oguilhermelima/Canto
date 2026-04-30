@@ -42,7 +42,7 @@ export function toDomainWithEpisodes(
 ): SeasonWithEpisodes {
   return {
     ...toDomain(row),
-    episodes: row.episodes.map(episodeToDomain) as Episode[],
+    episodes: row.episodes.map(episodeToDomain),
   };
 }
 

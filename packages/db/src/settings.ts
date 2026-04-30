@@ -1,14 +1,15 @@
 import { createCipheriv, createDecipheriv, pbkdf2Sync, randomBytes } from "crypto";
 import { eq, inArray } from "drizzle-orm";
-import { z } from "zod";
+import type { z } from "zod";
 
 import {
   allSettingKeys,
   isSettingKey,
-  SETTINGS_REGISTRY,
-  type SettingKey,
-  type SettingValue,
+  SETTINGS_REGISTRY
+  
+  
 } from "./settings-registry";
+import type {SettingKey, SettingValue} from "./settings-registry";
 
 // Re-export the registry surface so consumers can treat `@canto/db/settings`
 // as the single entry point for everything settings-related. This keeps the
@@ -469,7 +470,7 @@ export async function listAllSettings(): Promise<SettingSnapshot[]> {
       value: def.secret ? null : value,
       hasValue: value !== null,
       secret: def.secret,
-      def: def as (typeof SETTINGS_REGISTRY)[SettingKey],
+      def: def,
     });
   }
   return snapshots;

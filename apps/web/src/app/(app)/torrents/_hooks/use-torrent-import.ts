@@ -5,9 +5,10 @@ import { useDebounceValue } from "usehooks-ts";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
 import {
-  inferImportModeFromName,
-  type ImportMatchMode,
+  inferImportModeFromName
+  
 } from "../_lib/infer-import-mode";
+import type {ImportMatchMode} from "../_lib/infer-import-mode";
 import { sanitizeTorrentTitleForSearch } from "../_lib/sanitize-torrent-title";
 import { resolveImportInput } from "../_lib/resolve-import-input";
 import type {

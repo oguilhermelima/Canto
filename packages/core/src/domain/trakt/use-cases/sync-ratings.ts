@@ -15,11 +15,12 @@ import {
   resolveMediaFromTraktRef,
   toTraktFavoritesBody,
   toTraktRatingsBody,
-  withinConflictWindow,
-  type LocalRatingRef,
-  type ResolveMediaDeps,
-  type SyncContext,
+  withinConflictWindow
+  
+  
+  
 } from "@canto/core/domain/trakt/use-cases/shared";
+import type {LocalRatingRef, ResolveMediaDeps, SyncContext} from "@canto/core/domain/trakt/use-cases/shared";
 
 export interface SyncRatingsDeps extends ResolveMediaDeps {
   traktApi: TraktApiPort;

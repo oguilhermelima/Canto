@@ -3,9 +3,10 @@ import { getCookieCache } from "better-auth/cookies";
 import { auth } from "@canto/auth";
 import {
   getMaxBytes,
-  processAndStoreImage,
-  type ImageVariant,
+  processAndStoreImage
+  
 } from "@/lib/uploads";
+import type {ImageVariant} from "@/lib/uploads";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

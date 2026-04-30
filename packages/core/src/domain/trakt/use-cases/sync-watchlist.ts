@@ -2,10 +2,11 @@ import { and, eq } from "drizzle-orm";
 import { list } from "@canto/db/schema";
 import {
   syncSingleListMembership,
-  toTraktListBody,
-  type SyncContext,
-  type SyncListMembershipDeps,
+  toTraktListBody
+  
+  
 } from "@canto/core/domain/trakt/use-cases/shared";
+import type {SyncContext, SyncListMembershipDeps} from "@canto/core/domain/trakt/use-cases/shared";
 import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
 
 export interface SyncWatchlistDeps extends SyncListMembershipDeps {

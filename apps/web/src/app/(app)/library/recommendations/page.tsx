@@ -59,7 +59,7 @@ export default function RecommendationsPage(): React.JSX.Element {
         id: `${r.provider}-${r.externalId}`,
         externalId: r.externalId,
         provider: r.provider,
-        type: r.type as "movie" | "show",
+        type: r.type,
         title: r.title,
         posterPath: r.posterPath ?? null,
         year: r.year ?? undefined,

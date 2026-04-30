@@ -6,13 +6,15 @@ import type { IndexerPort } from "@canto/core/domain/torrents/ports/indexer";
 import { findRecentImportedDownloads } from "@canto/core/infra/torrents/download-repository";
 import { runWithConcurrency } from "@canto/core/platform/concurrency/run-with-concurrency";
 import {
-  autoSupersedeWithRepack,
-  type AutoSupersedeOutcome,
+  autoSupersedeWithRepack
+  
 } from "@canto/core/domain/torrents/use-cases/auto-supersede";
+import type {AutoSupersedeOutcome} from "@canto/core/domain/torrents/use-cases/auto-supersede";
 import {
-  searchTorrents,
-  type SearchResult,
+  searchTorrents
+  
 } from "@canto/core/domain/torrents/use-cases/search-torrents";
+import type {SearchResult} from "@canto/core/domain/torrents/use-cases/search-torrents";
 
 export interface RunRepackSupersedeOpts {
   /** How far back to scan for imported downloads. */

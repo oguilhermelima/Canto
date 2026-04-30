@@ -1,14 +1,16 @@
 import type { Database } from "@canto/db/client";
 import {
   findEpisodesByMediaIds,
-  findTrailerKeysForMediaIds,
+  findUserWatchHistoryByMediaIds,
+} from "@canto/core/infra/user-media/watch-history-repository";
+import { findTrailerKeysForMediaIds } from "@canto/core/infra/content-enrichment/extras-repository";
+import {
   findUserCompletedPlaybackByMediaIds,
   findUserContinueWatchingMediaIds,
-  findUserListMediaCandidates,
-  findUserMediaStatesByMediaIds,
-  findUserWatchHistoryByMediaIds,
   findUserWatchingShowsMetadata,
-} from "@canto/core/infra/repositories";
+} from "@canto/core/infra/user-media/playback-progress-repository";
+import { findUserListMediaCandidates } from "@canto/core/infra/user-media/library-feed-repository";
+import { findUserMediaStatesByMediaIds } from "@canto/core/infra/user-media/state-repository";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
 import {
   hasConfirmedPastAirDate,

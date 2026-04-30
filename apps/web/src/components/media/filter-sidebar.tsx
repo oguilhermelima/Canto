@@ -359,8 +359,8 @@ export function FilterSidebar({
       f.watchRegion = watchRegion;
     }
     // Library-specific fields
-    if (source) f.source = source as "jellyfin" | "plex" | "manual";
-    if (watchStatus) f.watchStatus = watchStatus as "in_progress" | "completed" | "not_started";
+    if (source) f.source = source;
+    if (watchStatus) f.watchStatus = watchStatus;
     // Collection-specific fields
     if (membersRatingMin > 0) f.membersRatingMin = membersRatingMin;
     if (watchStatuses.size > 0) f.watchStatuses = [...watchStatuses];

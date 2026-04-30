@@ -4,11 +4,12 @@ import { Pencil, Star, Trash2 } from "lucide-react";
 import { Badge } from "@canto/ui/badge";
 import { Button } from "@canto/ui/button";
 import {
-  type ProfileRow,
-  type Quality,
-  type Source,
-  formatLabel,
+  
+  
+  
+  formatLabel
 } from "./download-profile-defaults";
+import type {ProfileRow, Quality, Source} from "./download-profile-defaults";
 
 interface DownloadProfileRowProps {
   profile: ProfileRow;
