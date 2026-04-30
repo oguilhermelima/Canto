@@ -21,6 +21,8 @@ import {
   findDownloadById,
   updateDownload,
   deleteDownload as deleteTorrentRecord,
+  deleteMediaFilesByDownloadId,
+  deletePendingMediaFilesByDownloadId,
 } from "@canto/core/infra/repositories";
 
 import { createTRPCRouter, adminProcedure } from "../../trpc";
@@ -114,6 +116,9 @@ export const torrentManageRouter = createTRPCRouter({
         try { const qb = await getDownloadClient(); await qb.deleteTorrent(row.hash, false); }
         catch { /* qBit may not have it */ }
       }
+      // Drop placeholder media_file rows so a retry isn't blocked by the
+      // dedup check. Already-imported rows (rare on cancel) are kept.
+      await deletePendingMediaFilesByDownloadId(ctx.db, input.id);
       return updateDownload(ctx.db, input.id, { status: "cancelled" });
     }),
 
@@ -128,6 +133,10 @@ export const torrentManageRouter = createTRPCRouter({
         catch { /* qBit may not have it */ }
       }
 
+      // Drop every media_file row linked to this download. Otherwise the
+      // FK's `set null` rule leaves orphans behind that re-trigger the
+      // dedup check on retry.
+      await deleteMediaFilesByDownloadId(ctx.db, input.id);
       await deleteTorrentRecord(ctx.db, input.id);
       return { success: true };
     }),
