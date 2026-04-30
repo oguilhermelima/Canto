@@ -1,9 +1,9 @@
-import type { Database } from "@canto/db/client";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
-import { findMediaByIdWithSeasons } from "@canto/core/infra/media/media-repository";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 
 export interface RemoveRatingDeps {
   repo: UserMediaRepositoryPort;
+  mediaRepo: MediaRepositoryPort;
 }
 
 export interface RemoveRatingInput {
@@ -13,7 +13,6 @@ export interface RemoveRatingInput {
 }
 
 export async function removeRating(
-  db: Database,
   deps: RemoveRatingDeps,
   userId: string,
   input: RemoveRatingInput,
@@ -26,7 +25,7 @@ export async function removeRating(
   );
 
   if (input.episodeId) {
-    const media = await findMediaByIdWithSeasons(db, input.mediaId);
+    const media = await deps.mediaRepo.findByIdWithSeasons(input.mediaId);
     const season = media?.seasons.find((s) =>
       s.episodes.some((e) => e.id === input.episodeId),
     );

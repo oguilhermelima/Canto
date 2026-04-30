@@ -13,6 +13,11 @@ import {
   userWatchHistory,
 } from "@canto/db/schema";
 import { episodeI18n, mediaI18n } from "@canto/core/infra/shared/media-i18n";
+import type {
+  ContinueWatchingFeedRow,
+  ContinueWatchingKeysetCursor,
+  LibraryFeedFilterOptions,
+} from "@canto/core/domain/user-media/types/library-feed";
 
 export interface UserPlaybackProgressFeedRow {
   id: string;
@@ -42,23 +47,11 @@ export interface UserPlaybackProgressFeedRow {
   episodeRuntime: number | null;
 }
 
-export interface LibraryFeedFilterOptions {
-  q?: string;
-  source?: "jellyfin" | "plex" | "trakt" | "manual";
-  yearMin?: number;
-  yearMax?: number;
-  genreIds?: number[];
-  sortBy?: "recently_watched" | "name_asc" | "name_desc" | "year_desc" | "year_asc";
-  scoreMin?: number;
-  scoreMax?: number;
-  runtimeMin?: number;
-  runtimeMax?: number;
-  language?: string;
-  certification?: string;
-  tvStatus?: string;
-  watchedFrom?: string;
-  watchedTo?: string;
-}
+export type {
+  LibraryFeedFilterOptions,
+  ContinueWatchingFeedRow,
+  ContinueWatchingKeysetCursor,
+} from "@canto/core/domain/user-media/types/library-feed";
 
 function buildTitleIlikeCondition(
   q: string | undefined,
@@ -352,38 +345,6 @@ export async function findUserListMediaCandidates(
 // them via `findTrailerKeysForMediaIds` after the main query, mirroring the
 // pattern used by recommendations. This keeps the planner away from the
 // per-row correlated subquery in `mediaI18n.trailerKey`.
-
-export interface ContinueWatchingFeedRow {
-  id: string;
-  mediaId: string;
-  episodeId: string | null;
-  positionSeconds: number;
-  isCompleted: boolean;
-  lastWatchedAt: Date;
-  source: "jellyfin" | "plex" | "trakt";
-  mediaType: string;
-  title: string;
-  posterPath: string | null;
-  backdropPath: string | null;
-  logoPath: string | null;
-  overview: string | null;
-  voteAverage: number | null;
-  genres: unknown;
-  genreIds: unknown;
-  year: number | null;
-  mediaRuntime: number | null;
-  externalId: number;
-  provider: string;
-  episodeNumber: number | null;
-  episodeTitle: string | null;
-  seasonNumber: number | null;
-  episodeRuntime: number | null;
-}
-
-export interface ContinueWatchingKeysetCursor {
-  lastWatchedAt: Date;
-  id: string;
-}
 
 const CONTINUE_WATCHING_SOURCES = ["jellyfin", "plex", "trakt"] as const;
 

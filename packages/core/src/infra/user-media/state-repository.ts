@@ -206,6 +206,27 @@ export async function findRecentlyCompletedMedia(
 }
 
 /**
+ * `(externalId, provider)` pairs for media the user has explicitly
+ * disliked: status='dropped' or rating ≤ 3. Used by the recommendations
+ * exclusion set so these items never resurface.
+ */
+export async function findUserNegativeSignalExternalIds(
+  db: Database,
+  userId: string,
+): Promise<Array<{ externalId: number; provider: string }>> {
+  return db
+    .select({ externalId: media.externalId, provider: media.provider })
+    .from(userMediaState)
+    .innerJoin(media, eq(media.id, userMediaState.mediaId))
+    .where(
+      and(
+        eq(userMediaState.userId, userId),
+        sql`(${userMediaState.status} = 'dropped' OR (${userMediaState.rating} IS NOT NULL AND ${userMediaState.rating} <= 3))`,
+      ),
+    );
+}
+
+/**
  * All non-neutral states for a user: anything with a status, rating, or
  * favorite flag set. Used by the recs rebuild to weight seeds by engagement
  * and to exclude dropped/disliked items from the output.

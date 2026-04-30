@@ -1,7 +1,7 @@
 import type { Database } from "@canto/db/client";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";
-import { findMediaByIdWithSeasons } from "@canto/core/infra/media/media-repository";
 import {
   EpisodeNotFoundError,
   InvalidWatchInputError,
@@ -28,6 +28,7 @@ import { pushWatchStateToServers } from "@canto/core/domain/user-media/use-cases
 
 export interface LogWatchedDeps {
   repo: UserMediaRepositoryPort;
+  mediaRepo: MediaRepositoryPort;
 }
 
 export interface LogWatchedInput {
@@ -50,7 +51,7 @@ export interface LogWatchedResult {
 }
 
 type MediaWithSeasons = NonNullable<
-  Awaited<ReturnType<typeof findMediaByIdWithSeasons>>
+  Awaited<ReturnType<MediaRepositoryPort["findByIdWithSeasons"]>>
 >;
 
 export async function logWatched(
@@ -61,7 +62,7 @@ export async function logWatched(
 ): Promise<LogWatchedResult> {
   validateLogWatchedShape(input);
 
-  const media = await findMediaByIdWithSeasons(db, input.mediaId);
+  const media = await deps.mediaRepo.findByIdWithSeasons(input.mediaId);
   if (!media) throw new MediaNotFoundError(input.mediaId);
   if (!isMediaType(media.type)) {
     throw new InvalidWatchInputError(`Unsupported media type: ${media.type}`);

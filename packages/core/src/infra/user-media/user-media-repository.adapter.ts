@@ -38,6 +38,7 @@ import {
   findUserEngagementStates,
   findUserMediaState,
   findUserMediaStatesByMediaIds,
+  findUserNegativeSignalExternalIds,
   upsertUserMediaState,
 } from "@canto/core/infra/user-media/state-repository";
 import {
@@ -84,6 +85,8 @@ export function makeUserMediaRepository(db: Database): UserMediaRepositoryPort {
     findStatesByMediaIds: (userId, mediaIds) =>
       findUserMediaStatesByMediaIds(db, userId, mediaIds),
     findEngagementStates: (userId) => findUserEngagementStates(db, userId),
+    findNegativeSignalExternalIds: (userId) =>
+      findUserNegativeSignalExternalIds(db, userId),
     findRecentlyCompletedMedia: (userId, language, mediaType, limit) =>
       findRecentlyCompletedMedia(db, userId, language, mediaType, limit),
 

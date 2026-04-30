@@ -1,9 +1,10 @@
-import type { Database } from "@canto/db/client";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/user-media/use-cases/promote-user-media-state-from-playback";
 
 export interface ReconcileStatesFromPlaybackDeps {
   repo: UserMediaRepositoryPort;
+  mediaRepo: MediaRepositoryPort;
 }
 
 export interface ReconcileStatesFromPlaybackResult {
@@ -13,7 +14,6 @@ export interface ReconcileStatesFromPlaybackResult {
 }
 
 export async function reconcileStatesFromPlayback(
-  db: Database,
   deps: ReconcileStatesFromPlaybackDeps,
   userId: string,
 ): Promise<ReconcileStatesFromPlaybackResult> {
@@ -23,7 +23,7 @@ export async function reconcileStatesFromPlayback(
   const errors: string[] = [];
   for (const pair of pairs) {
     try {
-      const result = await promoteUserMediaStateFromPlayback(db, deps, {
+      const result = await promoteUserMediaStateFromPlayback(deps, {
         userId: pair.userId,
         mediaId: pair.mediaId,
       });

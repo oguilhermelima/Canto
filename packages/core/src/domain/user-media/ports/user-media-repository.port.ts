@@ -57,6 +57,14 @@ export interface UserMediaRepositoryPort {
     mediaIds: string[],
   ): Promise<UserMediaStateByMediaRow[]>;
   findEngagementStates(userId: string): Promise<UserEngagementStateRow[]>;
+  /**
+   * `(externalId, provider)` pairs for media the user has explicitly
+   * disliked (status='dropped' or rating ≤ 3). Used by the recommendations
+   * exclusion set builder to ensure negative-signal items never resurface.
+   */
+  findNegativeSignalExternalIds(
+    userId: string,
+  ): Promise<Array<{ externalId: number; provider: string }>>;
   findRecentlyCompletedMedia(
     userId: string,
     language: string,

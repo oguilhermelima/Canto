@@ -1,7 +1,11 @@
-import type { Database } from "@canto/db/client";
-import { findBecauseWatchedRecs } from "@canto/core/infra/recommendations/because-watched-repository";
-import { findRecentlyCompletedMedia } from "@canto/core/infra/user-media/state-repository";
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import type { RecommendationsRepositoryPort } from "@canto/core/domain/recommendations/ports/recommendations-repository.port";
 import type { WatchNextItem } from "@canto/core/domain/user-media/types/watch-next";
+
+export interface BuildBecauseWatchedDeps {
+  userMedia: UserMediaRepositoryPort;
+  recs: RecommendationsRepositoryPort;
+}
 
 const MAX_COMPLETED_SOURCES = 5;
 const RECS_PER_SOURCE = 3;
@@ -24,13 +28,12 @@ const RECS_PER_SOURCE = 3;
  * caller — this builder doesn't know about that other source.
  */
 export async function buildBecauseWatched(
-  db: Database,
+  deps: BuildBecauseWatchedDeps,
   userId: string,
   mediaType: "movie" | "show" | undefined,
   language: string,
 ): Promise<WatchNextItem[]> {
-  const completed = await findRecentlyCompletedMedia(
-    db,
+  const completed = await deps.userMedia.findRecentlyCompletedMedia(
     userId,
     language,
     undefined, // both signal-source types — filter the rec output, not the seed
@@ -41,8 +44,7 @@ export async function buildBecauseWatched(
   const sourceIds = completed.map((c) => c.mediaId);
   const sourceById = new Map(completed.map((c) => [c.mediaId, c] as const));
 
-  const recs = await findBecauseWatchedRecs(
-    db,
+  const recs = await deps.recs.findBecauseWatchedRecs(
     userId,
     sourceIds,
     mediaType,

@@ -1,7 +1,8 @@
 import type { Database } from "@canto/db/client";
-import type { LibraryFeedFilterOptions } from "@canto/core/infra/user-media/library-feed-repository";
+import type { LibraryFeedFilterOptions } from "@canto/core/domain/user-media/types/library-feed";
 import { getContinueWatching } from "@canto/core/domain/user-media/use-cases/get-continue-watching";
 import { getWatchNext } from "@canto/core/domain/user-media/use-cases/get-watch-next";
+import type { GetWatchNextDeps } from "@canto/core/domain/user-media/use-cases/get-watch-next";
 
 type View = "all" | "continue" | "watch_next";
 type WatchStatus = "in_progress" | "completed" | "not_started";
@@ -102,6 +103,7 @@ function toFilterPayload(input: GetLibraryWatchNextInput) {
 
 export async function getLibraryWatchNext(
   db: Database,
+  deps: GetWatchNextDeps,
   userId: string,
   input: GetLibraryWatchNextInput,
 ) {
@@ -119,7 +121,7 @@ export async function getLibraryWatchNext(
   }
 
   if (input.view === "watch_next") {
-    const result = await getWatchNext(db, userId, {
+    const result = await getWatchNext(db, deps, userId, {
       limit: input.limit,
       cursor: input.cursor ?? 0,
       ...toFilterPayload(input),
@@ -142,7 +144,7 @@ export async function getLibraryWatchNext(
       cursor: null,
       ...toFilterPayload(input),
     }),
-    getWatchNext(db, userId, {
+    getWatchNext(db, deps, userId, {
       limit: input.limit,
       cursor: 0,
       ...toFilterPayload(input),

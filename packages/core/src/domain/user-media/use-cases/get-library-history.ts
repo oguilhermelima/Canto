@@ -8,7 +8,7 @@ import {
   findUserWatchHistoryFeed
   
 } from "@canto/core/infra/user-media/library-feed-repository";
-import type {LibraryFeedFilterOptions} from "@canto/core/infra/user-media/library-feed-repository";
+import type { LibraryFeedFilterOptions } from "@canto/core/domain/user-media/types/library-feed";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
 import {
   isReleasedOnOrBefore,

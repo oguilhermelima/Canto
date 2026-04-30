@@ -1,7 +1,7 @@
 import type { Database } from "@canto/db/client";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";
-import { findMediaByIdWithSeasons } from "@canto/core/infra/media/media-repository";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import {
   computeTrackingStatus,
@@ -19,6 +19,7 @@ import { pushWatchStateToServers } from "@canto/core/domain/user-media/use-cases
 
 export interface RemoveHistoryEntriesDeps {
   repo: UserMediaRepositoryPort;
+  mediaRepo: MediaRepositoryPort;
 }
 
 export interface RemoveHistoryEntriesInput {
@@ -38,7 +39,7 @@ export async function removeHistoryEntries(
   userId: string,
   input: RemoveHistoryEntriesInput,
 ): Promise<RemoveHistoryEntriesResult> {
-  const media = await findMediaByIdWithSeasons(db, input.mediaId);
+  const media = await deps.mediaRepo.findByIdWithSeasons(input.mediaId);
   if (!media) throw new MediaNotFoundError(input.mediaId);
 
   const { count: removedItems, episodeIds: removedEpisodeIds } =

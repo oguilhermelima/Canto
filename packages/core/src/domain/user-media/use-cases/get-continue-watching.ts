@@ -5,7 +5,7 @@ import {
   
   
 } from "@canto/core/infra/user-media/library-feed-repository";
-import type {ContinueWatchingFeedRow, ContinueWatchingKeysetCursor, LibraryFeedFilterOptions} from "@canto/core/infra/user-media/library-feed-repository";
+import type { ContinueWatchingFeedRow, ContinueWatchingKeysetCursor, LibraryFeedFilterOptions } from "@canto/core/domain/user-media/types/library-feed";
 import { findTrailerKeysForMediaIds } from "@canto/core/infra/content-enrichment/extras-repository";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
 import {

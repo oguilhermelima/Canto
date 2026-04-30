@@ -1,4 +1,6 @@
 import type { Database } from "@canto/db/client";
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import type { RecommendationsRepositoryPort } from "@canto/core/domain/recommendations/ports/recommendations-repository.port";
 import {
   findEpisodesByMediaIds,
   findUserWatchHistoryByMediaIds,
@@ -22,6 +24,11 @@ import type {
   GetWatchNextResult,
   WatchNextItem,
 } from "@canto/core/domain/user-media/types/watch-next";
+
+export interface GetWatchNextDeps {
+  userMedia: UserMediaRepositoryPort;
+  recs: RecommendationsRepositoryPort;
+}
 
 export type {
   GetWatchNextInput,
@@ -88,6 +95,7 @@ type StateRow = Awaited<
  */
 export async function getWatchNext(
   db: Database,
+  deps: GetWatchNextDeps,
   userId: string,
   input: GetWatchNextInput,
 ): Promise<GetWatchNextResult> {
@@ -104,7 +112,7 @@ export async function getWatchNext(
     input.mediaType === "movie"
       ? Promise.resolve<WatchNextItem[]>([])
       : buildShowNextEpisodeItems(db, userId, userLang, input, cursor, limit),
-    buildBecauseWatched(db, userId, input.mediaType, userLang),
+    buildBecauseWatched(deps, userId, input.mediaType, userLang),
   ]);
 
   const nextEpisodeMediaIds = new Set(
