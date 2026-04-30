@@ -6,6 +6,7 @@ import {
   updateMediaStatusInput,
 } from "@canto/validators";
 import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { getUserMediaState } from "@canto/core/domain/user-media/use-cases/get-user-media-state";
 import { clearTracking } from "@canto/core/domain/user-media/use-cases/clear-tracking";
 import { reconcileStatesFromPlayback } from "@canto/core/domain/user-media/use-cases/reconcile-states-from-playback";
@@ -64,6 +65,7 @@ export const stateRouter = createTRPCRouter({
 
   reconcileStatesFromPlayback: protectedProcedure.mutation(({ ctx }) => {
     const repo = makeUserMediaRepository(ctx.db);
-    return reconcileStatesFromPlayback(ctx.db, { repo }, ctx.session.user.id);
+    const mediaRepo = makeMediaRepository(ctx.db);
+    return reconcileStatesFromPlayback({ repo, mediaRepo }, ctx.session.user.id);
   }),
 });

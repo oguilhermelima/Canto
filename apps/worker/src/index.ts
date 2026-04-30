@@ -25,6 +25,8 @@ import { handleTraktListDelete, handleTraktListDeleteSweep } from "./jobs/trakt-
 import { rebuildUserRecs } from "@canto/core/domain/recommendations/use-cases/rebuild-user-recs";
 import { enqueueDailyRecsRebuild } from "@canto/core/domain/recommendations/use-cases/enqueue-daily-recs-rebuild";
 import { makeRecommendationsRepository } from "@canto/core/infra/recommendations/recommendations-repository.adapter";
+import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
+import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
 import { ensureMedia } from "@canto/core/domain/media/use-cases/ensure-media";
 import type { EnsureMediaJob } from "@canto/core/platform/queue/bullmq-dispatcher";
 import { QUEUES } from "@canto/core/platform/queue/queue-names";
@@ -257,6 +259,7 @@ const workers = [
   makeWorker(QUEUES.dailyRecsCheck, async (_data, log) => {
     const dispatched = await enqueueDailyRecsRebuild({
       repo: makeRecommendationsRepository(db),
+      jobs: jobDispatcher,
     });
     if (dispatched > 0) log.info({ users: dispatched }, "recs refresh dispatched");
   }),
@@ -275,7 +278,11 @@ const workers = [
 
   makeWorker<{ userId: string }>(
     QUEUES.rebuildUserRecs,
-    ({ userId }) => rebuildUserRecs(db, userId),
+    ({ userId }) =>
+      rebuildUserRecs(
+        { recs: makeRecommendationsRepository(db), userMedia: makeUserMediaRepository(db) },
+        userId,
+      ),
     { concurrency: 2 },
   ),
 

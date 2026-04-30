@@ -14,6 +14,8 @@ import {
 } from "@canto/core/infra/user-media/library-feed-repository";
 import { findTrailerKeysForMediaIds } from "@canto/core/infra/content-enrichment/extras-repository";
 import { findUserLibraryStats } from "@canto/core/infra/user-media/stats-repository";
+import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
+import { makeRecommendationsRepository } from "@canto/core/infra/recommendations/recommendations-repository.adapter";
 import { getContinueWatching } from "@canto/core/domain/user-media/use-cases/get-continue-watching";
 import { getLibraryWatchNext } from "@canto/core/domain/user-media/use-cases/get-library-watch-next";
 import { getUpcomingSchedule } from "@canto/core/domain/user-media/use-cases/get-upcoming-schedule";
@@ -72,9 +74,11 @@ export const feedRouter = createTRPCRouter({
    */
   getLibraryWatchNext: protectedProcedure
     .input(getLibraryWatchNextInput)
-    .query(({ ctx, input }) =>
-      getLibraryWatchNext(ctx.db, ctx.session.user.id, input),
-    ),
+    .query(({ ctx, input }) => {
+      const userMedia = makeUserMediaRepository(ctx.db);
+      const recs = makeRecommendationsRepository(ctx.db);
+      return getLibraryWatchNext(ctx.db, { userMedia, recs }, ctx.session.user.id, input);
+    }),
 
   getContinueWatching: protectedProcedure
     .input(getContinueWatchingInput)
@@ -84,9 +88,11 @@ export const feedRouter = createTRPCRouter({
 
   getWatchNext: protectedProcedure
     .input(getWatchNextInput)
-    .query(({ ctx, input }) =>
-      getWatchNext(ctx.db, ctx.session.user.id, input),
-    ),
+    .query(({ ctx, input }) => {
+      const userMedia = makeUserMediaRepository(ctx.db);
+      const recs = makeRecommendationsRepository(ctx.db);
+      return getWatchNext(ctx.db, { userMedia, recs }, ctx.session.user.id, input);
+    }),
 
   getUpcomingSchedule: protectedProcedure
     .input(getUpcomingScheduleInput)

@@ -8,6 +8,8 @@ import {
   restoreListItemsInput,
 } from "@canto/validators";
 import { makeListsRepository } from "@canto/core/infra/lists/lists-repository.adapter";
+import { makeRecommendationsRepository } from "@canto/core/infra/recommendations/recommendations-repository.adapter";
+import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
 import { addMediaToServerLibrary } from "@canto/core/domain/lists/use-cases/add-to-server-library";
 import {
   addItemToList,
@@ -27,40 +29,34 @@ export const listItemsRouter = createTRPCRouter({
   addItem: protectedProcedure
     .input(addListItemInput)
     .mutation(({ ctx, input }) => {
-      const repo = makeListsRepository(ctx.db);
-      return addItemToList(
-        { repo },
-        ctx.db,
-        input,
-        ctx.session.user.id,
-        ctx.session.user.role,
-      );
+      const deps = {
+        repo: makeListsRepository(ctx.db),
+        recs: makeRecommendationsRepository(ctx.db),
+        userMedia: makeUserMediaRepository(ctx.db),
+      };
+      return addItemToList(deps, input, ctx.session.user.id, ctx.session.user.role);
     }),
 
   removeItem: protectedProcedure
     .input(removeListItemInput)
     .mutation(({ ctx, input }) => {
-      const repo = makeListsRepository(ctx.db);
-      return removeItemFromList(
-        { repo },
-        ctx.db,
-        input,
-        ctx.session.user.id,
-        ctx.session.user.role,
-      );
+      const deps = {
+        repo: makeListsRepository(ctx.db),
+        recs: makeRecommendationsRepository(ctx.db),
+        userMedia: makeUserMediaRepository(ctx.db),
+      };
+      return removeItemFromList(deps, input, ctx.session.user.id, ctx.session.user.role);
     }),
 
   removeItems: protectedProcedure
     .input(removeListItemsInput)
     .mutation(({ ctx, input }) => {
-      const repo = makeListsRepository(ctx.db);
-      return removeItemsFromList(
-        { repo },
-        ctx.db,
-        input,
-        ctx.session.user.id,
-        ctx.session.user.role,
-      );
+      const deps = {
+        repo: makeListsRepository(ctx.db),
+        recs: makeRecommendationsRepository(ctx.db),
+        userMedia: makeUserMediaRepository(ctx.db),
+      };
+      return removeItemsFromList(deps, input, ctx.session.user.id, ctx.session.user.role);
     }),
 
   moveItems: protectedProcedure

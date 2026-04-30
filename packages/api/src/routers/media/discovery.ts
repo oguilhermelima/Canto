@@ -18,6 +18,12 @@ import { fetchLogos, enrichBrowseWithLogos } from "@canto/core/domain/media/use-
 import { getRecommendations } from "@canto/core/domain/recommendations/use-cases/get-recommendations";
 import type { RecsFilters } from "@canto/core/infra/recommendations/user-recommendation-repository";
 import { db as appDb } from "@canto/db/client";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { makeListsRepository } from "@canto/core/infra/lists/lists-repository.adapter";
+import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
+import { makeRecommendationsRepository } from "@canto/core/infra/recommendations/recommendations-repository.adapter";
+import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 
 async function getProviderWithKey(name: "tmdb" | "tvdb") {
   if (name === "tmdb") return getTmdbProvider();
@@ -182,7 +188,17 @@ export const mediaDiscoveryRouter = createTRPCRouter({
       });
 
       const tmdb = await getTmdbProvider();
-      return getRecommendations(ctx.db, {
+      const mediaRepo = makeMediaRepository(ctx.db);
+      const recsDeps = {
+        media: mediaRepo,
+        lists: makeListsRepository(ctx.db),
+        userMedia: makeUserMediaRepository(ctx.db),
+        recs: makeRecommendationsRepository(ctx.db),
+        mediaRepo,
+        extras: makeMediaExtrasRepository(ctx.db),
+        localization: makeMediaLocalizationRepository(ctx.db),
+      };
+      return getRecommendations(recsDeps, {
         userId, page, pageSize, filters: recsFilters,
         userLang: ctx.session.user.language,
         recsVersion: userRow?.recsVersion ?? 0,

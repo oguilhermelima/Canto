@@ -5,6 +5,7 @@ import {
   removeHistoryEntriesInput,
 } from "@canto/validators";
 import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { logWatched } from "@canto/core/domain/user-media/use-cases/log-watched";
 import { markDropped } from "@canto/core/domain/user-media/use-cases/mark-dropped";
 import { removeHistoryEntries } from "@canto/core/domain/user-media/use-cases/remove-history-entries";
@@ -14,7 +15,8 @@ export const historyRouter = createTRPCRouter({
     .input(logWatchedInput)
     .mutation(({ ctx, input }) => {
       const repo = makeUserMediaRepository(ctx.db);
-      return logWatched(ctx.db, { repo }, ctx.session.user.id, input);
+      const mediaRepo = makeMediaRepository(ctx.db);
+      return logWatched(ctx.db, { repo, mediaRepo }, ctx.session.user.id, input);
     }),
 
   getHistory: protectedProcedure
@@ -37,7 +39,8 @@ export const historyRouter = createTRPCRouter({
     .input(removeHistoryEntriesInput)
     .mutation(({ ctx, input }) => {
       const repo = makeUserMediaRepository(ctx.db);
-      return removeHistoryEntries(ctx.db, { repo }, ctx.session.user.id, input);
+      const mediaRepo = makeMediaRepository(ctx.db);
+      return removeHistoryEntries(ctx.db, { repo, mediaRepo }, ctx.session.user.id, input);
     }),
 
   markDropped: protectedProcedure

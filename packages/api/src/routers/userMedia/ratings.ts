@@ -8,6 +8,7 @@ import {
   removeRatingInput,
 } from "@canto/validators";
 import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { rateMedia } from "@canto/core/domain/user-media/use-cases/rate-media";
 import { removeRating } from "@canto/core/domain/user-media/use-cases/remove-rating";
 
@@ -23,7 +24,8 @@ export const ratingsRouter = createTRPCRouter({
     .input(removeRatingInput)
     .mutation(({ ctx, input }) => {
       const repo = makeUserMediaRepository(ctx.db);
-      return removeRating(ctx.db, { repo }, ctx.session.user.id, input);
+      const mediaRepo = makeMediaRepository(ctx.db);
+      return removeRating({ repo, mediaRepo }, ctx.session.user.id, input);
     }),
 
   getRatings: protectedProcedure

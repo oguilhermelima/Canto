@@ -41,8 +41,7 @@ async function promoteSafely(
 ): Promise<void> {
   try {
     await promoteUserMediaStateFromPlayback(
-      ctx.db,
-      { repo: deps.userMedia },
+      { repo: deps.userMedia, mediaRepo: deps.media },
       {
         userId: ctx.userId,
         mediaId,
