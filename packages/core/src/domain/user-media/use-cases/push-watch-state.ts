@@ -14,18 +14,18 @@ import {
   findMediaById,
   findMediaVersionsByMediaId,
   findUserConnectionsByUserId,
-} from "../../../infra/repositories";
-import { findMediaLocalized } from "../../../infra/media/media-localized-repository";
+} from "@canto/core/infra/repositories";
+import { findMediaLocalized } from "@canto/core/infra/media/media-localized-repository";
 import {
   findJellyfinItemIdByProviderForUser,
   markJellyfinItemPlayed,
   markJellyfinItemUnplayed,
-} from "../../../infra/media-servers/jellyfin.adapter";
+} from "@canto/core/infra/media-servers/jellyfin.adapter";
 import {
   findPlexItemIdByProviderId,
   markPlexItemUnwatched,
   markPlexItemWatched,
-} from "../../../infra/media-servers/plex.adapter";
+} from "@canto/core/infra/media-servers/plex.adapter";
 
 function logError(scope: string, userId: string, err: unknown): void {
   console.error(

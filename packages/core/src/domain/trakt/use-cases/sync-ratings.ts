@@ -1,17 +1,11 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { media, userRating } from "@canto/db/schema";
-import {
-  deleteUserRating,
-  upsertUserMediaState,
-  upsertUserRating,
-} from "@canto/core/infra/repositories";
-import {
-  addTraktRatings,
-  listTraktRatings,
-  removeTraktRatings,
-  type TraktIds,
-  type TraktMediaRef,
-} from "@canto/core/infra/trakt/trakt.adapter";
+import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import type {
+  TraktIds,
+  TraktMediaRef,
+} from "@canto/core/domain/trakt/types/trakt-api";
 import {
   decidePresenceAction,
   dedupeByKey,
@@ -23,10 +17,19 @@ import {
   toTraktRatingsBody,
   withinConflictWindow,
   type LocalRatingRef,
+  type ResolveMediaDeps,
   type SyncContext,
 } from "@canto/core/domain/trakt/use-cases/shared";
 
-export async function syncRatings(ctx: SyncContext): Promise<void> {
+export interface SyncRatingsDeps extends ResolveMediaDeps {
+  traktApi: TraktApiPort;
+  userMedia: UserMediaRepositoryPort;
+}
+
+export async function syncRatings(
+  ctx: SyncContext,
+  deps: SyncRatingsDeps,
+): Promise<void> {
   const localRows = await ctx.db
     .select({
       mediaId: userRating.mediaId,
@@ -49,7 +52,10 @@ export async function syncRatings(ctx: SyncContext): Promise<void> {
       ),
     );
 
-  const remoteRows = await listTraktRatings(ctx.accessToken, ctx.profileId);
+  const remoteRows = await deps.traktApi.listRatings(
+    ctx.accessToken,
+    ctx.profileId,
+  );
 
   const localByKey = new Map<string, LocalRatingRef>();
   for (const local of localRows) {
@@ -102,7 +108,7 @@ export async function syncRatings(ctx: SyncContext): Promise<void> {
         });
       } else if (typeof remote.rating === "number") {
         const ratedAt = parseDateOrNow(remote.ratedAt, ctx.now);
-        await upsertUserRating(ctx.db, {
+        await deps.userMedia.upsertRating({
           userId: ctx.userId,
           mediaId: local.mediaId,
           seasonId: null,
@@ -111,7 +117,7 @@ export async function syncRatings(ctx: SyncContext): Promise<void> {
           isOverride: true,
           ratedAt,
         });
-        await upsertUserMediaState(ctx.db, {
+        await deps.userMedia.upsertState({
           userId: ctx.userId,
           mediaId: local.mediaId,
           rating: remote.rating,
@@ -134,8 +140,8 @@ export async function syncRatings(ctx: SyncContext): Promise<void> {
           rating: local.rating,
         });
       } else {
-        await deleteUserRating(ctx.db, ctx.userId, local.mediaId, null, null);
-        await upsertUserMediaState(ctx.db, {
+        await deps.userMedia.deleteRating(ctx.userId, local.mediaId, null, null);
+        await deps.userMedia.upsertState({
           userId: ctx.userId,
           mediaId: local.mediaId,
           rating: null,
@@ -153,13 +159,14 @@ export async function syncRatings(ctx: SyncContext): Promise<void> {
       );
       const mediaId = await resolveMediaFromTraktRef(
         ctx.db,
+        deps,
         remote,
         resolveCache,
       );
       if (!mediaId) continue;
 
       if (keepPresence === "keep-presence") {
-        await upsertUserRating(ctx.db, {
+        await deps.userMedia.upsertRating({
           userId: ctx.userId,
           mediaId,
           seasonId: null,
@@ -168,7 +175,7 @@ export async function syncRatings(ctx: SyncContext): Promise<void> {
           isOverride: true,
           ratedAt: remoteAt,
         });
-        await upsertUserMediaState(ctx.db, {
+        await deps.userMedia.upsertState({
           userId: ctx.userId,
           mediaId,
           rating: remote.rating,
@@ -182,12 +189,15 @@ export async function syncRatings(ctx: SyncContext): Promise<void> {
 
   const dedupedAdds = dedupeByKey(addRemote);
   if (dedupedAdds.length > 0) {
-    await addTraktRatings(ctx.accessToken, toTraktRatingsBody(dedupedAdds));
+    await deps.traktApi.addRatings(
+      ctx.accessToken,
+      toTraktRatingsBody(dedupedAdds),
+    );
   }
 
   const dedupedRemovals = dedupeByKey(removeRemote);
   if (dedupedRemovals.length > 0) {
-    await removeTraktRatings(
+    await deps.traktApi.removeRatings(
       ctx.accessToken,
       toTraktFavoritesBody(dedupedRemovals),
     );

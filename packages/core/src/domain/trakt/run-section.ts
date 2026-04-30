@@ -14,10 +14,14 @@
 import { and, eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { userConnection } from "@canto/db/schema";
-import { updateUserConnection } from "@canto/core/infra/media-servers/user-connection-repository";
-import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
-import type { TraktSection } from "@canto/core/domain/trakt/types/trakt-section";
 import { refreshTraktAccessTokenIfNeeded } from "@canto/core/infra/trakt/trakt.adapter";
+import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
+import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
+import type { UserConnectionRepositoryPort } from "@canto/core/domain/media-servers/ports/user-connection-repository.port";
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import type { TraktSection } from "@canto/core/domain/trakt/types/trakt-section";
 import type { SyncContext } from "@canto/core/domain/trakt/use-cases/shared";
 import { syncWatchlist } from "@canto/core/domain/trakt/use-cases/sync-watchlist";
 import { syncCustomLists } from "@canto/core/domain/trakt/use-cases/sync-custom-lists";
@@ -35,7 +39,12 @@ import {
 } from "@canto/core/domain/trakt/use-cases/sync-watched";
 
 export interface RunTraktSectionDeps {
+  traktApi: TraktApiPort;
   trakt: TraktRepositoryPort;
+  userConnection: UserConnectionRepositoryPort;
+  userMedia: UserMediaRepositoryPort;
+  lists: ListsRepositoryPort;
+  providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort };
 }
 
 async function executeSection(
@@ -46,10 +55,10 @@ async function executeSection(
 ): Promise<void> {
   switch (section) {
     case "watched-movies":
-      await pullWatchedMovies(ctx);
+      await pullWatchedMovies(ctx, deps);
       return;
     case "watched-shows":
-      await pullWatchedShows(ctx);
+      await pullWatchedShows(ctx, deps);
       return;
     case "history":
       // Pull is incremental; push always runs (it scans local-only rows).
@@ -60,19 +69,19 @@ async function executeSection(
       await linkPulledHistoryBackfill(ctx, deps);
       return;
     case "watchlist":
-      await syncWatchlist(ctx);
+      await syncWatchlist(ctx, deps);
       return;
     case "ratings":
-      await syncRatings(ctx);
+      await syncRatings(ctx, deps);
       return;
     case "favorites":
-      await syncFavorites(ctx);
+      await syncFavorites(ctx, deps);
       return;
     case "lists":
       await syncCustomLists(ctx, deps);
       return;
     case "playback":
-      await pullInProgress(ctx);
+      await pullInProgress(ctx, deps);
       return;
   }
 }
@@ -98,7 +107,7 @@ export async function runTraktSection(
   if (!conn?.token || !conn.userId) return;
 
   const { accessToken } = await refreshTraktAccessTokenIfNeeded(conn, (patch) =>
-    updateUserConnection(db, conn.id, patch).then(() => undefined),
+    deps.userConnection.update(conn.id, patch).then(() => undefined),
   );
 
   // `initialSync` biases reconcile decisions toward "import remote" — used

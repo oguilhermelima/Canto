@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { episode, season, userWatchHistory } from "@canto/db/schema";
-import { episodeI18n } from "../shared/media-i18n";
+import { episodeI18n } from "@canto/core/infra/shared/media-i18n";
 
 export async function addUserWatchHistory(
   db: Database,

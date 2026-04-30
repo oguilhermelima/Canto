@@ -1,16 +1,18 @@
-import {
-  findEpisodeIdByMediaAndNumbers,
-  upsertUserPlaybackProgress,
-} from "@canto/core/infra/repositories";
-import {
-  listTraktPlaybackProgress,
-  type TraktPlaybackProgressRef,
-} from "@canto/core/infra/trakt/trakt.adapter";
+import { findEpisodeIdByMediaAndNumbers } from "@canto/core/infra/repositories";
+import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import type { TraktPlaybackProgressRef } from "@canto/core/domain/trakt/types/trakt-api";
 import {
   parseDateOrNow,
   resolveMediaFromTraktRef,
+  type ResolveMediaDeps,
   type SyncContext,
 } from "@canto/core/domain/trakt/use-cases/shared";
+
+export interface SyncInProgressDeps extends ResolveMediaDeps {
+  traktApi: TraktApiPort;
+  userMedia: UserMediaRepositoryPort;
+}
 
 const COMPLETION_THRESHOLD = 95;
 
@@ -23,8 +25,11 @@ function computePositionSeconds(
   return Math.round((clamped / 100) * runtimeMinutes * 60);
 }
 
-export async function pullInProgress(ctx: SyncContext): Promise<void> {
-  const remoteRows = await listTraktPlaybackProgress(ctx.accessToken);
+export async function pullInProgress(
+  ctx: SyncContext,
+  deps: SyncInProgressDeps,
+): Promise<void> {
+  const remoteRows = await deps.traktApi.listPlaybackProgress(ctx.accessToken);
   if (remoteRows.length === 0) return;
 
   const resolveCache = new Map<string, string | null>();
@@ -33,6 +38,7 @@ export async function pullInProgress(ctx: SyncContext): Promise<void> {
     const ref: TraktPlaybackProgressRef = remote;
     const mediaId = await resolveMediaFromTraktRef(
       ctx.db,
+      deps,
       {
         type: ref.type,
         ids: ref.ids,
@@ -65,7 +71,7 @@ export async function pullInProgress(ctx: SyncContext): Promise<void> {
     );
     const isCompleted = ref.progressPercent >= COMPLETION_THRESHOLD;
 
-    await upsertUserPlaybackProgress(ctx.db, {
+    await deps.userMedia.upsertPlayback({
       userId: ctx.userId,
       mediaId,
       episodeId,

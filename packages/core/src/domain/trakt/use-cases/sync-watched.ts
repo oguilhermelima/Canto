@@ -13,21 +13,21 @@
 /*  per-(media, episode) playback rows with isCompleted=true.                  */
 /* -------------------------------------------------------------------------- */
 
-import {
-  findEpisodeIdByMediaAndNumbers,
-  upsertUserPlaybackProgress,
-} from "@canto/core/infra/repositories";
-import {
-  listTraktWatchedMovies,
-  listTraktWatchedShows,
-} from "@canto/core/infra/trakt/trakt.adapter";
-import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
+import { findEpisodeIdByMediaAndNumbers } from "@canto/core/infra/repositories";
+import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
 import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/user-media/use-cases/promote-user-media-state-from-playback";
 import {
   parseDateOrNow,
   resolveMediaFromTraktRef,
+  type ResolveMediaDeps,
   type SyncContext,
 } from "@canto/core/domain/trakt/use-cases/shared";
+
+export interface SyncWatchedDeps extends ResolveMediaDeps {
+  traktApi: TraktApiPort;
+  userMedia: UserMediaRepositoryPort;
+}
 
 /** Reverse-sync (Plex/Jellyfin) calls this after every per-item upsert; we
  *  do the same here so the library "Completed" tab — which reads
@@ -36,14 +36,18 @@ import {
  *  for one media must not block the rest of the pull. */
 async function promoteSafely(
   ctx: SyncContext,
+  deps: SyncWatchedDeps,
   mediaId: string,
 ): Promise<void> {
   try {
-    const repo = makeUserMediaRepository(ctx.db);
-    await promoteUserMediaStateFromPlayback(ctx.db, { repo }, {
-      userId: ctx.userId,
-      mediaId,
-    });
+    await promoteUserMediaStateFromPlayback(
+      ctx.db,
+      { repo: deps.userMedia },
+      {
+        userId: ctx.userId,
+        mediaId,
+      },
+    );
   } catch (err) {
     console.warn(
       `[trakt-sync] promote state failed for media ${mediaId}:`,
@@ -52,8 +56,11 @@ async function promoteSafely(
   }
 }
 
-export async function pullWatchedMovies(ctx: SyncContext): Promise<void> {
-  const remoteRows = await listTraktWatchedMovies(ctx.accessToken);
+export async function pullWatchedMovies(
+  ctx: SyncContext,
+  deps: SyncWatchedDeps,
+): Promise<void> {
+  const remoteRows = await deps.traktApi.listWatchedMovies(ctx.accessToken);
   if (remoteRows.length === 0) return;
 
   const resolveCache = new Map<string, string | null>();
@@ -61,12 +68,13 @@ export async function pullWatchedMovies(ctx: SyncContext): Promise<void> {
   for (const remote of remoteRows) {
     const mediaId = await resolveMediaFromTraktRef(
       ctx.db,
+      deps,
       { type: "movie", ids: remote.ids },
       resolveCache,
     );
     if (!mediaId) continue;
 
-    await upsertUserPlaybackProgress(ctx.db, {
+    await deps.userMedia.upsertPlayback({
       userId: ctx.userId,
       mediaId,
       episodeId: null,
@@ -79,12 +87,15 @@ export async function pullWatchedMovies(ctx: SyncContext): Promise<void> {
       lastWatchedAt: parseDateOrNow(remote.lastWatchedAt, ctx.now),
       source: "trakt",
     });
-    await promoteSafely(ctx, mediaId);
+    await promoteSafely(ctx, deps, mediaId);
   }
 }
 
-export async function pullWatchedShows(ctx: SyncContext): Promise<void> {
-  const remoteRows = await listTraktWatchedShows(ctx.accessToken);
+export async function pullWatchedShows(
+  ctx: SyncContext,
+  deps: SyncWatchedDeps,
+): Promise<void> {
+  const remoteRows = await deps.traktApi.listWatchedShows(ctx.accessToken);
   if (remoteRows.length === 0) return;
 
   const resolveCache = new Map<string, string | null>();
@@ -92,6 +103,7 @@ export async function pullWatchedShows(ctx: SyncContext): Promise<void> {
   for (const remote of remoteRows) {
     const mediaId = await resolveMediaFromTraktRef(
       ctx.db,
+      deps,
       { type: "show", ids: remote.ids },
       resolveCache,
     );
@@ -115,7 +127,7 @@ export async function pullWatchedShows(ctx: SyncContext): Promise<void> {
       // and the next sync will pick up new episodes once persisted.
       if (!episodeId) continue;
 
-      await upsertUserPlaybackProgress(ctx.db, {
+      await deps.userMedia.upsertPlayback({
         userId: ctx.userId,
         mediaId,
         episodeId,
@@ -129,6 +141,6 @@ export async function pullWatchedShows(ctx: SyncContext): Promise<void> {
 
     // Promote once per show, not per episode — the rule reads the entire
     // playback set anyway, so per-episode promotions would do redundant work.
-    if (touchedAny) await promoteSafely(ctx, mediaId);
+    if (touchedAny) await promoteSafely(ctx, deps, mediaId);
   }
 }

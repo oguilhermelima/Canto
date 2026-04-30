@@ -1,13 +1,10 @@
 import { db } from "@canto/db/client";
 import { sql } from "drizzle-orm";
 import { makeListsRepository } from "@canto/core/infra/lists/lists-repository.adapter";
+import { makeTraktApi } from "@canto/core/infra/trakt/trakt-api.adapter-bindings";
 import { makeTraktRepository } from "@canto/core/infra/trakt/trakt-repository.adapter";
+import { makeUserConnectionRepository } from "@canto/core/infra/media-servers/user-connection-repository.adapter";
 import {
-  findUserConnectionById,
-  updateUserConnection,
-} from "@canto/core/infra/media-servers/user-connection-repository";
-import {
-  deleteTraktList,
   refreshTraktAccessTokenIfNeeded,
   TraktHttpError,
 } from "@canto/core/infra/trakt/trakt.adapter";
@@ -41,7 +38,8 @@ export async function handleTraktListDelete(localListId: string): Promise<void> 
     return;
   }
 
-  const conn = await findUserConnectionById(db, link.userConnectionId);
+  const userConnections = makeUserConnectionRepository(db);
+  const conn = await userConnections.findById(link.userConnectionId);
   if (!conn || !conn.token || !conn.userId) {
     // Connection vanished — drop the local row; remote becomes orphaned but
     // there is no way to act on it without credentials. Better than blocking.
@@ -50,11 +48,12 @@ export async function handleTraktListDelete(localListId: string): Promise<void> 
   }
 
   const { accessToken } = await refreshTraktAccessTokenIfNeeded(conn, (patch) =>
-    updateUserConnection(db, conn.id, patch).then(() => undefined),
+    userConnections.update(conn.id, patch).then(() => undefined),
   );
 
+  const traktApi = makeTraktApi();
   try {
-    await deleteTraktList(accessToken, link.traktListId);
+    await traktApi.deleteList(accessToken, link.traktListId);
   } catch (err) {
     // 404 means Trakt no longer has the list — treat as success.
     if (err instanceof TraktHttpError && err.status === 404) {

@@ -7,12 +7,16 @@ import {
   markListItemsPushed,
   removeListItem,
 } from "@canto/core/infra/repositories";
+import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
+import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
+import type { UserConnectionRepositoryPort } from "@canto/core/domain/media-servers/ports/user-connection-repository.port";
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import type {
   TraktIds,
   TraktMediaRef,
-} from "@canto/core/infra/trakt/trakt.adapter";
-import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
-import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
+} from "@canto/core/domain/trakt/types/trakt-api";
 import { slugify } from "@canto/core/domain/shared/rules/slugify";
 import { persistMediaUseCase } from "@canto/core/domain/media/use-cases/persist";
 
@@ -51,6 +55,24 @@ export interface LocalTombstone {
 
 export interface LocalRatingRef extends LocalMediaRef {
   rating: number;
+}
+
+/**
+ * Bundle of every port the trakt sync use-cases consume. Each use-case
+ * declares its own `Deps` view onto a subset of these so the call sites stay
+ * honest about what they touch.
+ *
+ * `findMediaByAnyReference` and `findEpisodeIdByMediaAndNumbers` still resolve
+ * via the media-context infra repos directly — those tables are not yet
+ * wrapped by a port and a media-wave will land in a future iteration.
+ */
+export interface SyncDeps {
+  traktApi: TraktApiPort;
+  trakt: TraktRepositoryPort;
+  userMedia: UserMediaRepositoryPort;
+  userConnection: UserConnectionRepositoryPort;
+  lists: ListsRepositoryPort;
+  providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort };
 }
 
 export interface SyncContext {
@@ -169,8 +191,13 @@ export function toTraktRatingsBody(
   };
 }
 
+export interface ResolveMediaDeps {
+  providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort };
+}
+
 export async function resolveMediaFromTraktRef(
   db: Database,
+  deps: ResolveMediaDeps,
   ref: TraktMediaRef,
   cache: Map<string, string | null>,
 ): Promise<string | null> {
@@ -194,10 +221,6 @@ export async function resolveMediaFromTraktRef(
 
   if (typeof ref.ids.tmdb === "number") {
     try {
-      const [tmdb, tvdb] = await Promise.all([
-        getTmdbProvider(),
-        getTvdbProvider(),
-      ]);
       const persisted = await persistMediaUseCase(
         db,
         {
@@ -205,7 +228,7 @@ export async function resolveMediaFromTraktRef(
           provider: "tmdb",
           type: ref.type,
         },
-        { tmdb, tvdb },
+        deps.providers,
       );
       if (persisted?.id) {
         cache.set(key, persisted.id);
@@ -221,10 +244,6 @@ export async function resolveMediaFromTraktRef(
 
   if (typeof ref.ids.tvdb === "number") {
     try {
-      const [tmdb, tvdb] = await Promise.all([
-        getTmdbProvider(),
-        getTvdbProvider(),
-      ]);
       const persisted = await persistMediaUseCase(
         db,
         {
@@ -232,7 +251,7 @@ export async function resolveMediaFromTraktRef(
           provider: "tvdb",
           type: ref.type,
         },
-        { tmdb, tvdb },
+        deps.providers,
       );
       if (persisted?.id) {
         cache.set(key, persisted.id);
@@ -410,8 +429,11 @@ function logSyncDecision(
   );
 }
 
+export type SyncListMembershipDeps = ResolveMediaDeps;
+
 export async function syncSingleListMembership(
   ctx: SyncContext,
+  deps: SyncListMembershipDeps,
   localListId: string,
   remoteRefs: TraktMediaRef[],
   pushToRemote: (
@@ -497,6 +519,7 @@ export async function syncSingleListMembership(
         if (!remote) continue;
         const mediaId = await resolveMediaFromTraktRef(
           ctx.db,
+          deps,
           remote,
           resolveCache,
         );
@@ -524,6 +547,9 @@ export async function syncSingleListMembership(
   const uniqueRemoveLocal = [...new Set(removeLocalMediaIds)];
 
   for (const [mediaId, addedAt] of earliestByMediaId) {
+    // `addListItem` accepts an `addedAt` in the row insert payload; the
+    // domain `lists` port doesn't surface that field today (TODO: extend
+    // `NewListItem` so this can flow through `deps.lists.addItem`).
     await addListItem(ctx.db, { listId: localListId, mediaId, addedAt });
   }
 
@@ -540,7 +566,9 @@ export async function syncSingleListMembership(
     );
     // Mark `last_pushed_at` *after* the API returns 2xx — this is the positive
     // signal `reconcileListItem` uses to distinguish "never reached Trakt"
-    // from "reached Trakt and was later removed there".
+    // from "reached Trakt and was later removed there". `markListItemsPushed`
+    // is not in the lists port yet (lacks an `actor`-scoped write), tracked
+    // for a future lists-wave extension.
     await markListItemsPushed(
       ctx.db,
       localListId,

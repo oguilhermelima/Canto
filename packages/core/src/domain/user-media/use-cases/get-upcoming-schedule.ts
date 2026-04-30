@@ -4,9 +4,9 @@ import {
   findUserListMediaCandidates,
   findUserMediaStatesByMediaIds,
   findUserWatchHistoryByMediaIds,
-} from "../../../infra/repositories";
-import { getUserLanguage } from "../../shared/services/user-service";
-import { parseDateLike } from "../rules/user-media-rules";
+} from "@canto/core/infra/repositories";
+import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
+import { parseDateLike } from "@canto/core/domain/user-media/rules/user-media-rules";
 
 export interface GetUpcomingScheduleInput {
   limit: number;

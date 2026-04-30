@@ -1,7 +1,7 @@
 import { and, asc, count, desc, eq, gt, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { media, userMediaState } from "@canto/db/schema";
-import { mediaI18n } from "../shared/media-i18n";
+import { mediaI18n } from "@canto/core/infra/shared/media-i18n";
 
 export async function findUserRatingDistribution(
   db: Database,

@@ -8,21 +8,24 @@ import {
   findUserMediaStatesByMediaIds,
   findUserWatchHistoryByMediaIds,
   findUserWatchingShowsMetadata,
-} from "../../../infra/repositories";
-import { getUserLanguage } from "../../shared/services/user-service";
-import { hasConfirmedPastAirDate, toProgressPercent } from "../rules/user-media-rules";
-import { buildBecauseWatched } from "./build-because-watched";
+} from "@canto/core/infra/repositories";
+import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
+import {
+  hasConfirmedPastAirDate,
+  toProgressPercent,
+} from "@canto/core/domain/user-media/rules/user-media-rules";
+import { buildBecauseWatched } from "@canto/core/domain/user-media/use-cases/build-because-watched";
 import type {
   GetWatchNextInput,
   GetWatchNextResult,
   WatchNextItem,
-} from "../types/watch-next";
+} from "@canto/core/domain/user-media/types/watch-next";
 
 export type {
   GetWatchNextInput,
   GetWatchNextResult,
   WatchNextItem,
-} from "../types/watch-next";
+} from "@canto/core/domain/user-media/types/watch-next";
 
 // JS-side ranking budget. We pull at most CANDIDATE_MULTIPLIER * limit list
 // rows + watching shows, sort, and slice. If the user genuinely has more

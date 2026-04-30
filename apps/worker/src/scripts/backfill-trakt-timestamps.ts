@@ -22,22 +22,21 @@ import {
   userRating,
 } from "@canto/db/schema";
 import { findMediaByAnyReference } from "@canto/core/infra/repositories";
+import { makeTraktApi } from "@canto/core/infra/trakt/trakt-api.adapter-bindings";
 import { makeTraktRepository } from "@canto/core/infra/trakt/trakt-repository.adapter";
-import { updateUserConnection } from "@canto/core/infra/media-servers/user-connection-repository";
-import {
-  listTraktFavorites,
-  listTraktListItems,
-  listTraktRatings,
-  listTraktWatchlist,
-  refreshTraktAccessTokenIfNeeded,
-  type TraktIds,
-  type TraktMediaRef,
-} from "@canto/core/infra/trakt/trakt.adapter";
+import { makeUserConnectionRepository } from "@canto/core/infra/media-servers/user-connection-repository.adapter";
+import { refreshTraktAccessTokenIfNeeded } from "@canto/core/infra/trakt/trakt.adapter";
+import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
+import type {
+  TraktIds,
+  TraktMediaRef,
+} from "@canto/core/domain/trakt/types/trakt-api";
 
 interface ConnContext {
   connectionId: string;
   accessToken: string;
   profileId: string;
+  api: TraktApiPort;
 }
 
 async function resolveLocalMedia(
@@ -86,7 +85,7 @@ async function backfillFavorites(
   ctx: ConnContext,
   userId: string,
 ): Promise<{ scanned: number; updated: number }> {
-  const refs = await listTraktFavorites(ctx.accessToken, ctx.profileId);
+  const refs = await ctx.api.listFavorites(ctx.accessToken, ctx.profileId);
   let updated = 0;
   for (const ref of refs) {
     if (!ref.listedAt) continue;
@@ -115,7 +114,7 @@ async function backfillRatings(
   ctx: ConnContext,
   userId: string,
 ): Promise<{ scanned: number; ratingUpdated: number; stateUpdated: number }> {
-  const refs = await listTraktRatings(ctx.accessToken, ctx.profileId);
+  const refs = await ctx.api.listRatings(ctx.accessToken, ctx.profileId);
   let ratingUpdated = 0;
   let stateUpdated = 0;
   for (const ref of refs) {
@@ -165,7 +164,7 @@ async function backfillWatchlist(
     where: and(eq(list.userId, userId), eq(list.type, "watchlist")),
   });
   if (!watchlistList) return { scanned: 0, updated: 0 };
-  const refs = await listTraktWatchlist(ctx.accessToken, ctx.profileId);
+  const refs = await ctx.api.listWatchlist(ctx.accessToken, ctx.profileId);
   return backfillListItemAddedAt(refs, watchlistList.id);
 }
 
@@ -177,7 +176,7 @@ async function backfillCustomLists(
   let scanned = 0;
   let updated = 0;
   for (const link of links) {
-    const refs = await listTraktListItems(
+    const refs = await ctx.api.listListItems(
       ctx.accessToken,
       link.traktListId,
       ctx.profileId,
@@ -209,16 +208,20 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  const userConnections = makeUserConnectionRepository(db);
+  const api = makeTraktApi();
+
   for (const conn of conns) {
     if (!conn.token) continue;
     const { accessToken } = await refreshTraktAccessTokenIfNeeded(
       conn,
-      (patch) => updateUserConnection(db, conn.id, patch).then(() => undefined),
+      (patch) => userConnections.update(conn.id, patch).then(() => undefined),
     );
     const ctx: ConnContext = {
       connectionId: conn.id,
       accessToken,
       profileId: conn.externalUserId ?? "me",
+      api,
     };
 
     console.log(`\n=== connection ${conn.id} ===`);

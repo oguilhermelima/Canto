@@ -1,25 +1,23 @@
 import { and, desc, eq, isNull, ne } from "drizzle-orm";
 import { episode, media, season, userWatchHistory } from "@canto/db/schema";
-import {
-  addUserWatchHistory,
-  findEpisodeIdByMediaAndNumbers,
-} from "@canto/core/infra/repositories";
+import { findEpisodeIdByMediaAndNumbers } from "@canto/core/infra/repositories";
+import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
 import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
-import {
-  addTraktHistory,
-  listTraktHistory,
-  type TraktIds,
-} from "@canto/core/infra/trakt/trakt.adapter";
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import type { TraktIds } from "@canto/core/domain/trakt/types/trakt-api";
 import {
   mediaIdsFromRow,
   mediaRefKey,
   parseDateOrNow,
   resolveMediaFromTraktRef,
+  type ResolveMediaDeps,
   type SyncContext,
 } from "@canto/core/domain/trakt/use-cases/shared";
 
-export interface SyncHistoryDeps {
+export interface SyncHistoryDeps extends ResolveMediaDeps {
+  traktApi: TraktApiPort;
   trakt: TraktRepositoryPort;
+  userMedia: UserMediaRepositoryPort;
 }
 
 /**
@@ -39,7 +37,7 @@ export async function pullHistory(
   deps: SyncHistoryDeps,
   startAt?: string,
 ): Promise<void> {
-  const remoteRows = await listTraktHistory(
+  const remoteRows = await deps.traktApi.listHistory(
     ctx.accessToken,
     ctx.profileId,
     startAt,
@@ -68,6 +66,7 @@ export async function pullHistory(
     try {
       const mediaId = await resolveMediaFromTraktRef(
         ctx.db,
+        deps,
         remote,
         resolveCache,
       );
@@ -102,14 +101,14 @@ export async function pullHistory(
 
       let localId = existingLocal?.id;
       if (!localId) {
-        const inserted = await addUserWatchHistory(ctx.db, {
+        const inserted = await deps.userMedia.addHistoryEntry({
           userId: ctx.userId,
           mediaId,
           episodeId: episodeId ?? null,
           watchedAt,
           source: "trakt",
         });
-        if (!inserted?.id) continue;
+        if (!inserted.id) continue;
         localId = inserted.id;
       }
 
@@ -237,7 +236,7 @@ export async function pushHistory(
 
   if (!("movies" in body) && !("shows" in body)) return;
 
-  await addTraktHistory(ctx.accessToken, body);
+  await deps.traktApi.addHistory(ctx.accessToken, body);
 
   for (const row of unsynced) {
     await deps.trakt.createHistorySync({
@@ -252,7 +251,10 @@ export async function linkPulledHistoryBackfill(
   ctx: SyncContext,
   deps: SyncHistoryDeps,
 ): Promise<void> {
-  const remoteRows = await listTraktHistory(ctx.accessToken, ctx.profileId);
+  const remoteRows = await deps.traktApi.listHistory(
+    ctx.accessToken,
+    ctx.profileId,
+  );
   if (remoteRows.length === 0) return;
 
   const existingSyncRows = await deps.trakt.findHistorySyncByRemoteIds(
@@ -271,6 +273,7 @@ export async function linkPulledHistoryBackfill(
     if (syncedRemoteIds.has(remote.remoteHistoryId)) continue;
     const mediaId = await resolveMediaFromTraktRef(
       ctx.db,
+      deps,
       remote,
       resolveCache,
     );

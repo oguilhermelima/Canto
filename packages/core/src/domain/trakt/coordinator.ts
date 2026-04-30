@@ -26,13 +26,11 @@
 import { and, eq, isNotNull } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { userConnection } from "@canto/db/schema";
-import { updateUserConnection } from "@canto/core/infra/media-servers/user-connection-repository";
-import {
-  getTraktLastActivities,
-  refreshTraktAccessTokenIfNeeded,
-  type TraktLastActivities,
-} from "@canto/core/infra/trakt/trakt.adapter";
+import { refreshTraktAccessTokenIfNeeded } from "@canto/core/infra/trakt/trakt.adapter";
+import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
 import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
+import type { UserConnectionRepositoryPort } from "@canto/core/domain/media-servers/ports/user-connection-repository.port";
+import type { TraktLastActivities } from "@canto/core/domain/trakt/types/trakt-api";
 import type { TraktSection } from "@canto/core/domain/trakt/types/trakt-section";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 
@@ -163,7 +161,9 @@ interface CoordinateOptions {
 }
 
 export interface CoordinateTraktSyncDeps {
+  traktApi: TraktApiPort;
   trakt: TraktRepositoryPort;
+  userConnection: UserConnectionRepositoryPort;
 }
 
 export async function coordinateTraktSync(
@@ -200,9 +200,10 @@ export async function coordinateTraktSync(
     try {
       const { accessToken } = await refreshTraktAccessTokenIfNeeded(
         conn,
-        (patch) => updateUserConnection(db, conn.id, patch).then(() => undefined),
+        (patch) =>
+          deps.userConnection.update(conn.id, patch).then(() => undefined),
       );
-      activities = await getTraktLastActivities(accessToken);
+      activities = await deps.traktApi.getLastActivities(accessToken);
     } catch (err) {
       console.warn(
         `[trakt-sync] coordinator: probe failed for connection ${conn.id}:`,

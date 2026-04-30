@@ -1,7 +1,7 @@
 import { and, desc, eq, gt, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { media, userPlaybackProgress } from "@canto/db/schema";
-import { mediaI18n } from "../shared/media-i18n";
+import { mediaI18n } from "@canto/core/infra/shared/media-i18n";
 
 export async function findUserPlaybackProgress(
   db: Database,

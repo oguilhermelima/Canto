@@ -22,10 +22,10 @@ import {
   findMediaById,
   findMediaVersionsWithEpisodes,
   findUserConnectionsByUserId,
-} from "../../../infra/repositories";
-import { setJellyfinPlaybackPosition } from "../../../infra/media-servers/jellyfin.adapter";
-import { setPlexPlaybackPosition } from "../../../infra/media-servers/plex.adapter";
-import type { ServerSource } from "../../sync/types";
+} from "@canto/core/infra/repositories";
+import { setJellyfinPlaybackPosition } from "@canto/core/infra/media-servers/jellyfin.adapter";
+import { setPlexPlaybackPosition } from "@canto/core/infra/media-servers/plex.adapter";
+import type { ServerSource } from "@canto/core/domain/sync/types";
 
 type Conn = Awaited<ReturnType<typeof findUserConnectionsByUserId>>[number];
 type VersionWithEpisodes = Awaited<

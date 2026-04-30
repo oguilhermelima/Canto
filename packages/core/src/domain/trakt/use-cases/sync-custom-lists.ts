@@ -1,31 +1,27 @@
 import { and, asc, eq, isNull, isNotNull } from "drizzle-orm";
 import { list } from "@canto/db/schema";
-import { createList } from "@canto/core/infra/repositories";
+import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
 import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
-import {
-  addItemsToTraktList,
-  createTraktList,
-  deleteTraktList,
-  listTraktListItems,
-  listTraktPersonalLists,
-  removeItemsFromTraktList,
-} from "@canto/core/infra/trakt/trakt.adapter";
+import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
 import {
   findOrCreateUniqueListSlug,
   syncSingleListMembership,
   toTraktListBody,
   type SyncContext,
+  type SyncListMembershipDeps,
 } from "@canto/core/domain/trakt/use-cases/shared";
 
-export interface SyncCustomListsDeps {
+export interface SyncCustomListsDeps extends SyncListMembershipDeps {
+  traktApi: TraktApiPort;
   trakt: TraktRepositoryPort;
+  lists: ListsRepositoryPort;
 }
 
 export async function syncCustomLists(
   ctx: SyncContext,
   deps: SyncCustomListsDeps,
 ): Promise<void> {
-  const remoteLists = await listTraktPersonalLists(
+  const remoteLists = await deps.traktApi.listPersonalLists(
     ctx.accessToken,
     ctx.profileId,
   );
@@ -75,7 +71,7 @@ export async function syncCustomLists(
       // delete (and may already be retrying). Skip to avoid double-deletion.
       if (tombstonedIds.has(link.localListId)) continue;
       try {
-        await deleteTraktList(ctx.accessToken, link.traktListId);
+        await deps.traktApi.deleteList(ctx.accessToken, link.traktListId);
       } catch (err) {
         console.warn(
           `[trakt-sync] Failed to delete remote Trakt list ${link.traktListId}:`,
@@ -105,7 +101,7 @@ export async function syncCustomLists(
         ctx.userId,
         remote.ids.slug,
       );
-      const created = await createList(ctx.db, {
+      const created = await deps.lists.create({
         userId: ctx.userId,
         name: remote.name,
         slug,
@@ -136,7 +132,7 @@ export async function syncCustomLists(
   for (const localCustom of localCustomLists) {
     if (refreshedByLocalId.has(localCustom.id)) continue;
 
-    const remoteCreated = await createTraktList(ctx.accessToken, {
+    const remoteCreated = await deps.traktApi.createList(ctx.accessToken, {
       name: localCustom.name,
       description: localCustom.description,
       privacy: localCustom.visibility === "public" ? "public" : "private",
@@ -156,7 +152,7 @@ export async function syncCustomLists(
   );
   for (const linkRow of finalLinks) {
     if (tombstonedIds.has(linkRow.localListId)) continue;
-    const remoteItems = await listTraktListItems(
+    const remoteItems = await deps.traktApi.listListItems(
       ctx.accessToken,
       linkRow.traktListId,
       ctx.profileId,
@@ -164,16 +160,17 @@ export async function syncCustomLists(
 
     await syncSingleListMembership(
       ctx,
+      deps,
       linkRow.localListId,
       remoteItems,
       (refs) =>
-        addItemsToTraktList(
+        deps.traktApi.addItemsToList(
           ctx.accessToken,
           linkRow.traktListId,
           toTraktListBody(refs),
         ),
       (refs) =>
-        removeItemsFromTraktList(
+        deps.traktApi.removeItemsFromList(
           ctx.accessToken,
           linkRow.traktListId,
           toTraktListBody(refs),

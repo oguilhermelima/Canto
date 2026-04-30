@@ -1,4 +1,4 @@
-import { DomainError } from "../shared/errors";
+import { DomainError } from "@canto/core/domain/shared/errors";
 
 export class SeasonNotFoundError extends DomainError {
   readonly code = "NOT_FOUND" as const;

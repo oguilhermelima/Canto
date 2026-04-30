@@ -1,4 +1,48 @@
 import { getSetting } from "@canto/db/settings";
+import type {
+  TraktConnectionCredentials,
+  TraktDeviceCodeResponse,
+  TraktFavoritesRequestBody,
+  TraktIds,
+  TraktLastActivities,
+  TraktListRequestBody,
+  TraktListSummary,
+  TraktMediaRef,
+  TraktOAuthCredentials,
+  TraktPingResult,
+  TraktPlaybackProgressRef,
+  TraktRatingsRemoveRequestBody,
+  TraktRatingsRequestBody,
+  TraktRefreshPersistPatch,
+  TraktTokenResponse,
+  TraktUserSettingsResponse,
+  TraktWatchedEpisode,
+  TraktWatchedMovie,
+  TraktWatchedShow,
+} from "@canto/core/domain/trakt/types/trakt-api";
+
+// Re-export domain types so existing infra-side imports keep working.
+export type {
+  TraktConnectionCredentials,
+  TraktDeviceCodeResponse,
+  TraktFavoritesRequestBody,
+  TraktIds,
+  TraktLastActivities,
+  TraktListRequestBody,
+  TraktListSummary,
+  TraktMediaRef,
+  TraktOAuthCredentials,
+  TraktPingResult,
+  TraktPlaybackProgressRef,
+  TraktRatingsRemoveRequestBody,
+  TraktRatingsRequestBody,
+  TraktRefreshPersistPatch,
+  TraktTokenResponse,
+  TraktUserSettingsResponse,
+  TraktWatchedEpisode,
+  TraktWatchedMovie,
+  TraktWatchedShow,
+};
 
 const TRAKT_API_BASE = "https://api.trakt.tv";
 
@@ -17,11 +61,6 @@ export class TraktHttpError extends Error {
     super(message);
     this.name = "TraktHttpError";
   }
-}
-
-export interface TraktOAuthCredentials {
-  clientId: string;
-  clientSecret: string;
 }
 
 export async function getTraktOAuthCredentials(): Promise<TraktOAuthCredentials> {
@@ -204,63 +243,6 @@ async function traktPaginatedRequest<T>(
   return out;
 }
 
-export interface TraktDeviceCodeResponse {
-  device_code: string;
-  user_code: string;
-  verification_url: string;
-  expires_in: number;
-  interval: number;
-}
-
-export interface TraktTokenResponse {
-  access_token: string;
-  token_type: string;
-  expires_in: number;
-  refresh_token: string;
-  scope: string;
-  created_at: number;
-}
-
-export interface TraktUserSettingsResponse {
-  user: {
-    username: string;
-    ids: {
-      slug: string;
-      trakt: number | null;
-      uuid: string;
-    };
-  };
-}
-
-export interface TraktIds {
-  trakt?: number;
-  slug?: string;
-  imdb?: string;
-  tmdb?: number;
-  tvdb?: number;
-}
-
-export interface TraktMediaRef {
-  type: "movie" | "show";
-  ids: TraktIds;
-  listedAt?: string;
-  ratedAt?: string;
-  watchedAt?: string;
-  rating?: number;
-  seasonNumber?: number;
-  episodeNumber?: number;
-}
-
-export interface TraktListSummary {
-  name: string;
-  description?: string | null;
-  updated_at: string;
-  ids: {
-    trakt: number;
-    slug: string;
-  };
-}
-
 interface TraktListItemResponse {
   listed_at: string;
   type: "movie" | "show";
@@ -304,43 +286,6 @@ interface TraktPlaybackItemResponse {
   episode?: { season: number; number: number; runtime?: number | null };
 }
 
-export interface TraktPlaybackProgressRef {
-  type: "movie" | "show";
-  ids: TraktIds;
-  pausedAt: string;
-  progressPercent: number;
-  runtimeMinutes: number | null;
-  seasonNumber?: number;
-  episodeNumber?: number;
-  remotePlaybackId: number;
-}
-
-type TraktListRequestBody = {
-  movies?: Array<{ ids: TraktIds; watched_at?: string }>;
-  shows?: Array<{
-    ids: TraktIds;
-    watched_at?: string;
-    seasons?: Array<{
-      number: number;
-      watched_at?: string;
-      episodes: Array<{ number: number; watched_at?: string }>;
-    }>;
-  }>;
-  seasons?: Array<{ ids: TraktIds; watched_at?: string }>;
-  episodes?: Array<{ ids: TraktIds; watched_at?: string }>;
-};
-
-type TraktRatingsRequestBody = {
-  movies?: Array<{ ids: TraktIds; rating: number }>;
-  shows?: Array<{ ids: TraktIds; rating: number }>;
-  seasons?: Array<{ ids: TraktIds; rating: number }>;
-  episodes?: Array<{ ids: TraktIds; rating: number }>;
-};
-
-type TraktFavoritesRequestBody = {
-  movies?: Array<{ ids: TraktIds }>;
-  shows?: Array<{ ids: TraktIds }>;
-};
 
 /**
  * Validate a Trakt client id by hitting a cheap public endpoint with it as the
@@ -349,7 +294,7 @@ type TraktFavoritesRequestBody = {
  */
 export async function pingTraktClientId(
   clientId: string,
-): Promise<{ ok: true } | { ok: false; status: number; reason: string }> {
+): Promise<TraktPingResult> {
   try {
     const res = await fetch(`${TRAKT_API_BASE}/genres/movies`, {
       headers: {
@@ -390,7 +335,7 @@ export async function pingTraktClientId(
 export async function validateTraktClientCredentials(
   clientId: string,
   clientSecret: string,
-): Promise<{ ok: true } | { ok: false; status: number; reason: string }> {
+): Promise<TraktPingResult> {
   try {
     const res = await fetch(`${TRAKT_API_BASE}/oauth/device/token`, {
       method: "POST",
@@ -486,20 +431,6 @@ export async function refreshTraktToken(
       client_secret: clientSecret,
     },
   });
-}
-
-export interface TraktConnectionCredentials {
-  id: string;
-  token: string | null;
-  refreshToken: string | null;
-  tokenExpiresAt: Date | null;
-}
-
-export interface TraktRefreshPersistPatch {
-  token: string;
-  refreshToken: string;
-  tokenExpiresAt: Date;
-  staleReason: null;
 }
 
 export async function refreshTraktAccessTokenIfNeeded(
@@ -698,22 +629,6 @@ export async function listTraktHistory(
 /*  /sync/last_activities — single probe used by the coordinator              */
 /* -------------------------------------------------------------------------- */
 
-export interface TraktLastActivities {
-  /** Latest movie watch — drives /sync/watched/movies. */
-  moviesWatchedAt: string | null;
-  /** Latest episode watch — drives /sync/watched/shows. */
-  episodesWatchedAt: string | null;
-  /** Either side moving means there's new history. */
-  historyAt: string | null;
-  watchlistAt: string | null;
-  /** Max across movies/shows/seasons/episodes ratings. */
-  ratingsAt: string | null;
-  favoritesAt: string | null;
-  listsAt: string | null;
-  /** Max paused_at across movies/episodes. */
-  playbackAt: string | null;
-}
-
 interface TraktLastActivitiesResponse {
   movies?: { watched_at?: string; rated_at?: string; paused_at?: string };
   episodes?: { watched_at?: string; rated_at?: string; paused_at?: string };
@@ -765,26 +680,6 @@ export async function getTraktLastActivities(
 /*  every season/episode the user has played at least once. This is what      */
 /*  drives the watched-flag in our UI (`userPlaybackProgress.isCompleted`).   */
 /* -------------------------------------------------------------------------- */
-
-export interface TraktWatchedMovie {
-  ids: TraktIds;
-  plays: number;
-  lastWatchedAt: string;
-}
-
-export interface TraktWatchedEpisode {
-  seasonNumber: number;
-  episodeNumber: number;
-  plays: number;
-  lastWatchedAt: string;
-}
-
-export interface TraktWatchedShow {
-  ids: TraktIds;
-  plays: number;
-  lastWatchedAt: string;
-  episodes: TraktWatchedEpisode[];
-}
 
 interface TraktWatchedMovieResponse {
   plays: number;

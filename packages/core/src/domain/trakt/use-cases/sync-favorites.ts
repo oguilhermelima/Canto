@@ -1,13 +1,11 @@
 import { and, eq } from "drizzle-orm";
 import { media, userMediaState } from "@canto/db/schema";
-import { upsertUserMediaState } from "@canto/core/infra/repositories";
-import {
-  addTraktFavorites,
-  listTraktFavorites,
-  removeTraktFavorites,
-  type TraktIds,
-  type TraktMediaRef,
-} from "@canto/core/infra/trakt/trakt.adapter";
+import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import type {
+  TraktIds,
+  TraktMediaRef,
+} from "@canto/core/domain/trakt/types/trakt-api";
 import {
   decidePresenceAction,
   dedupeByKey,
@@ -17,10 +15,19 @@ import {
   resolveMediaFromTraktRef,
   toTraktFavoritesBody,
   type LocalMediaRef,
+  type ResolveMediaDeps,
   type SyncContext,
 } from "@canto/core/domain/trakt/use-cases/shared";
 
-export async function syncFavorites(ctx: SyncContext): Promise<void> {
+export interface SyncFavoritesDeps extends ResolveMediaDeps {
+  traktApi: TraktApiPort;
+  userMedia: UserMediaRepositoryPort;
+}
+
+export async function syncFavorites(
+  ctx: SyncContext,
+  deps: SyncFavoritesDeps,
+): Promise<void> {
   const localRows = await ctx.db
     .select({
       mediaId: userMediaState.mediaId,
@@ -40,7 +47,10 @@ export async function syncFavorites(ctx: SyncContext): Promise<void> {
       ),
     );
 
-  const remoteRows = await listTraktFavorites(ctx.accessToken, ctx.profileId);
+  const remoteRows = await deps.traktApi.listFavorites(
+    ctx.accessToken,
+    ctx.profileId,
+  );
 
   const localByKey = new Map<string, LocalMediaRef>();
   for (const local of localRows) {
@@ -82,7 +92,7 @@ export async function syncFavorites(ctx: SyncContext): Promise<void> {
       if (keepPresence === "keep-presence") {
         addRemote.push({ type: local.type, ids: local.ids });
       } else {
-        await upsertUserMediaState(ctx.db, {
+        await deps.userMedia.upsertState({
           userId: ctx.userId,
           mediaId: local.mediaId,
           isFavorite: false,
@@ -100,13 +110,14 @@ export async function syncFavorites(ctx: SyncContext): Promise<void> {
       );
       const mediaId = await resolveMediaFromTraktRef(
         ctx.db,
+        deps,
         remote,
         resolveCache,
       );
       if (!mediaId) continue;
 
       if (keepPresence === "keep-presence") {
-        await upsertUserMediaState(ctx.db, {
+        await deps.userMedia.upsertState({
           userId: ctx.userId,
           mediaId,
           isFavorite: true,
@@ -122,12 +133,15 @@ export async function syncFavorites(ctx: SyncContext): Promise<void> {
 
   const dedupedAdds = dedupeByKey(addRemote);
   if (dedupedAdds.length > 0) {
-    await addTraktFavorites(ctx.accessToken, toTraktFavoritesBody(dedupedAdds));
+    await deps.traktApi.addFavorites(
+      ctx.accessToken,
+      toTraktFavoritesBody(dedupedAdds),
+    );
   }
 
   const dedupedRemovals = dedupeByKey(removeRemote);
   if (dedupedRemovals.length > 0) {
-    await removeTraktFavorites(
+    await deps.traktApi.removeFavorites(
       ctx.accessToken,
       toTraktFavoritesBody(dedupedRemovals),
     );

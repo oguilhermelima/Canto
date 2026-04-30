@@ -1,4 +1,4 @@
-import type { LibraryFeedFilterOptions } from "../../../infra/repositories";
+import type { LibraryFeedFilterOptions } from "@canto/core/infra/repositories";
 
 export interface GetWatchNextInput {
   limit: number;

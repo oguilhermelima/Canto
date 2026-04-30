@@ -11,7 +11,7 @@ import {
   userPlaybackProgress,
   userWatchHistory,
 } from "@canto/db/schema";
-import { episodeI18n, mediaI18n } from "../shared/media-i18n";
+import { episodeI18n, mediaI18n } from "@canto/core/infra/shared/media-i18n";
 
 export interface UserPlaybackProgressFeedRow {
   id: string;
