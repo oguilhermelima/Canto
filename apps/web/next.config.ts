@@ -19,6 +19,11 @@ const config: NextConfig = {
       { protocol: "https", hostname: "artworks.thetvdb.com" },
       { protocol: "https", hostname: "img.youtube.com" },
     ],
+    // TMDB / TVDB image URLs are immutable by path — once a poster path
+    // resolves, the bytes never change. Cap optimized output at 1 year so
+    // the browser + Next image cache hold them for the full TTL instead of
+    // re-validating on the default 60s minimum.
+    minimumCacheTTL: 31_536_000,
   },
 };
 
