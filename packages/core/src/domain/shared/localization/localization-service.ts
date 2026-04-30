@@ -11,6 +11,7 @@ import {
 import {
   findMediaLocalized,
   findMediaLocalizedByExternal,
+  findMediaLocalizedByExternalMany,
   findMediaLocalizedMany,
 } from "../../../infra/media/media-localized-repository";
 import type {
@@ -49,6 +50,20 @@ export async function resolveLocalizedMediaMany(
   language: string,
 ): Promise<LocalizedMedia[]> {
   return findMediaLocalizedMany(db, mediaIds, language);
+}
+
+/**
+ * Batch resolve localized rows by `(externalId, provider, type)`. Used when
+ * callers carry the external identifier instead of the internal media UUID
+ * (e.g. spotlight TMDB-trending fallback items built directly off provider
+ * responses).
+ */
+export async function resolveLocalizedMediaByExternalMany(
+  db: Database,
+  refs: Array<{ externalId: number; provider: string; type: string }>,
+  language: string,
+): Promise<LocalizedMedia[]> {
+  return findMediaLocalizedByExternalMany(db, refs, language);
 }
 
 export async function resolveLocalizedSeasons(
@@ -335,6 +350,15 @@ export async function applyMediaLocalizationOverlay<T extends OverlayableMedia>(
 
 export interface OverlayableMediaItem {
   id?: string | null;
+  /**
+   * External identifier triple — used as a fallback lookup key when `id` is
+   * missing. The spotlight TMDB-trending fallback (and any other path that
+   * builds items straight off provider responses without first persisting
+   * them) carries these instead of the internal UUID.
+   */
+  externalId?: number | null;
+  provider?: string | null;
+  type?: string | null;
   title?: string | null;
   overview?: string | null;
   posterPath?: string | null;
@@ -344,23 +368,65 @@ export interface OverlayableMediaItem {
 /**
  * Overlay localized fields onto a flat list of media items, reading from
  * `media_localization` with en-US fallback in a single batch query. Items
- * lacking an `id` (e.g., live TMDB stubs that haven't been persisted yet)
- * pass through unchanged. Drop-in replacement for the legacy
- * `translateMediaItems` helper for already-persisted items.
+ * are looked up by `id` when present; items lacking `id` but carrying
+ * `(externalId, provider, type)` are looked up via the external-key index.
+ * Items with neither pass through unchanged (TMDB-only items not in our
+ * DB). Drop-in replacement for the legacy `translateMediaItems` helper.
  */
 export async function applyMediaItemsLocalizationOverlay<
   T extends OverlayableMediaItem,
 >(db: Database, items: T[], language: string): Promise<T[]> {
   if (items.length === 0) return items;
+
   const ids = items
     .map((i) => i.id)
     .filter((id): id is string => typeof id === "string" && id.length > 0);
-  const localized = ids.length > 0
-    ? await findMediaLocalizedMany(db, ids, language)
-    : [];
-  const locById = new Map(localized.map((l) => [l.id, l]));
+
+  const externalRefs = items
+    .filter(
+      (i) =>
+        (typeof i.id !== "string" || i.id.length === 0) &&
+        typeof i.externalId === "number" &&
+        typeof i.provider === "string" &&
+        typeof i.type === "string",
+    )
+    .map((i) => ({
+      externalId: i.externalId as number,
+      provider: i.provider as string,
+      type: i.type as string,
+    }));
+
+  const [byId, byExternal] = await Promise.all([
+    ids.length > 0 ? findMediaLocalizedMany(db, ids, language) : Promise.resolve([]),
+    externalRefs.length > 0
+      ? findMediaLocalizedByExternalMany(db, externalRefs, language)
+      : Promise.resolve([]),
+  ]);
+
+  const locById = new Map(byId.map((l) => [l.id, l]));
+  // External key follows the same `${provider}-${type}-${externalId}` shape
+  // used elsewhere (fetch-logos, spotlight-source) so the lookup composes
+  // cleanly with existing call sites.
+  const locByExternalKey = new Map(
+    byExternal.map((l) => [
+      `${l.provider}-${l.type}-${l.externalId}`,
+      l,
+    ]),
+  );
+
   return items.map((item) => {
-    const loc = item.id ? locById.get(item.id) : undefined;
+    let loc: LocalizedMedia | undefined;
+    if (item.id) {
+      loc = locById.get(item.id);
+    } else if (
+      typeof item.externalId === "number" &&
+      typeof item.provider === "string" &&
+      typeof item.type === "string"
+    ) {
+      loc = locByExternalKey.get(
+        `${item.provider}-${item.type}-${item.externalId}`,
+      );
+    }
     if (!loc) {
       return {
         ...item,

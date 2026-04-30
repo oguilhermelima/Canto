@@ -57,11 +57,19 @@ export async function getSpotlight(
 
   const cachedData = await getSetting("cache.spotlight");
   if (cachedData && Date.now() - new Date(cachedData.updatedAt).getTime() < ONE_HOUR_MS) {
-    return cachedData.data as Array<{
+    // The cache stores the raw English TMDB shape (it's a global setting,
+    // shared across users). Apply the per-language overlay on read so the
+    // user sees localized text/posters/logos for any items already
+    // persisted in our DB (e.g. recently visited or in-library items
+    // that happen to be trending). Items not in our DB pass through with
+    // the cached English copy — there's no localized data to surface.
+    const cached = cachedData.data as Array<{
       externalId: number; provider: string; type: "movie" | "show";
       title: string; overview: string; year: number | undefined;
       voteAverage: number; backdropPath: string; logoPath: string | null;
+      posterPath?: string | null;
     }>;
+    return applyMediaItemsLocalizationOverlay(db, cached, userLang);
   }
 
   const [moviesData, showsData] = await Promise.all([

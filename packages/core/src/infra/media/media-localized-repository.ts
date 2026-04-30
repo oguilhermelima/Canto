@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Database } from "@canto/db/client";
 import { media, mediaLocalization } from "@canto/db/schema";
@@ -123,4 +123,34 @@ export async function findMediaLocalizedMany(
 ): Promise<LocalizedMedia[]> {
   if (mediaIds.length === 0) return [];
   return runQuery(db, language, inArray(media.id, mediaIds));
+}
+
+/**
+ * Batch sibling of `findMediaLocalizedByExternal`. Resolves a list of
+ * `(externalId, provider, type)` triples in a single query, returning the
+ * usual user-lang + en-US COALESCE'd rows.
+ *
+ * Used by callers that don't carry an internal media UUID but do know the
+ * external identifier — e.g. the spotlight TMDB-trending fallback, which
+ * builds items straight off `tmdb.getMetadata` without first looking the
+ * row up in our DB. Without this helper, those items would silently miss
+ * localization (overlay helpers key on `media.id`).
+ */
+export async function findMediaLocalizedByExternalMany(
+  db: Database,
+  refs: Array<{ externalId: number; provider: string; type: string }>,
+  language: string,
+): Promise<LocalizedMedia[]> {
+  if (refs.length === 0) return [];
+  const conditions = refs
+    .map((r) =>
+      and(
+        eq(media.externalId, r.externalId),
+        eq(media.provider, r.provider),
+        eq(media.type, r.type),
+      ),
+    )
+    .filter((c): c is NonNullable<typeof c> => c !== undefined);
+  if (conditions.length === 0) return [];
+  return runQuery(db, language, or(...conditions)!);
 }
