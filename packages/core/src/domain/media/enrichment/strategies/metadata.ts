@@ -1,9 +1,9 @@
-import { updateMediaFromNormalized } from "../../use-cases/persist";
 import type {
   ApplyArgs,
   MediaEnrichmentStrategy,
   SharedMetadataResponse,
-} from "../types";
+} from "@canto/core/domain/media/enrichment/types";
+import { updateMediaFromNormalized } from "@canto/core/domain/media/use-cases/persist/core";
 
 /**
  * Base media-row metadata. Writes the canonical English fields (title,
@@ -27,7 +27,9 @@ export const metadataStrategy: MediaEnrichmentStrategy<
     const { db, mediaId, ctx, response } = args;
     if (!response) return "error_5xx";
 
-    await updateMediaFromNormalized(db, mediaId, response.media);
+    await updateMediaFromNormalized(db, mediaId, response.media, {
+      deps: ctx.deps,
+    });
     ctx.result.writes.media = true;
     ctx.result.aspectsExecuted.push("metadata");
     return "data";

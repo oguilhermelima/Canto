@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { effectiveProvider } from "../effective-provider";
+import { effectiveProvider } from "@canto/core/domain/media/use-cases/cadence/effective-provider";
 
 describe("effectiveProvider", () => {
   it("uses the per-media override when set, regardless of type or settings", () => {

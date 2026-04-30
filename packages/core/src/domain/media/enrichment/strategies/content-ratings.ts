@@ -2,7 +2,7 @@ import type {
   ApplyArgs,
   MediaEnrichmentStrategy,
   SharedMetadataResponse,
-} from "../types";
+} from "@canto/core/domain/media/enrichment/types";
 
 /**
  * Per-region content rating rows. The shared `tmdb.metadata` response carries

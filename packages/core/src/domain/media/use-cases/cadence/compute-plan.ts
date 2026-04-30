@@ -1,8 +1,11 @@
 import type { ProviderName } from "@canto/providers";
-import type { MediaAspectStateRow } from "../../../../infra/media/media-aspect-state-repository";
-import type { Aspect } from "../ensure-media.types";
-import type { CadenceKnobs } from "./cadence-knobs";
-import type { MediaContext } from "./compute-next-eligible";
+
+import type {
+  Aspect,
+  MediaAspectState,
+} from "@canto/core/domain/media/types/media-aspect-state";
+import type { CadenceKnobs } from "@canto/core/domain/media/use-cases/cadence/cadence-knobs";
+import type { MediaContext } from "@canto/core/domain/media/use-cases/cadence/compute-next-eligible";
 
 /**
  * One enrichment task to run. `force: true` bypasses freshness checks so the
@@ -32,7 +35,7 @@ export interface ForcedAspect {
 }
 
 export interface ComputePlanInput {
-  state: MediaAspectStateRow[];
+  state: MediaAspectState[];
   ctx: MediaContext;
   signal: CadenceSignal;
   activeLanguages: string[];
@@ -170,7 +173,7 @@ export function computePlan(input: ComputePlanInput): EnrichmentPlan {
 }
 
 function detectSourceMigration(
-  state: MediaAspectStateRow[],
+  state: MediaAspectState[],
   effective: ProviderName,
 ): { scope: string } | null {
   const structure = state.find((r) => r.aspect === STRUCTURE_ASPECT);

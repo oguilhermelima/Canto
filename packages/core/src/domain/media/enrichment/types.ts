@@ -1,16 +1,19 @@
 import type { Database } from "@canto/db/client";
 import type { ProviderName } from "@canto/providers";
-import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
+
+import type { MediaAspectStateRepositoryPort } from "@canto/core/domain/media/ports/media-aspect-state-repository.port";
+import type { MediaContentRatingRepositoryPort } from "@canto/core/domain/media/ports/media-content-rating-repository.port";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type {
   Aspect,
   EnsureMediaResult,
   EnsureMediaSpec,
-} from "../use-cases/ensure-media.types";
-import type {
-  CadenceMediaRow,
-  Outcome,
-} from "../use-cases/cadence";
-import type { MediaMetadata } from "../use-cases/fetch-media-metadata";
+} from "@canto/core/domain/media/use-cases/ensure-media.types";
+import type { CadenceMediaRow } from "@canto/core/domain/media/use-cases/cadence/aspect-state-writer";
+import type { Outcome } from "@canto/core/domain/media/use-cases/cadence/compute-next-eligible";
+import type { MediaMetadata } from "@canto/core/domain/media/use-cases/fetch-media-metadata";
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 
 /**
  * Provider-shaped capability tags. The orchestrator coalesces strategies by
@@ -45,6 +48,21 @@ export interface EnrichmentMediaRow extends CadenceMediaRow {
 }
 
 /**
+ * Repository ports + provider clients made available to every strategy.
+ * Threaded through `EnrichmentCtx.deps` so strategies don't need to call
+ * `makeXxxRepository(db)` themselves — the orchestrator builds the deps
+ * once at the top of `ensureMedia` and shares the same instances.
+ */
+export interface EnrichmentDeps {
+  media: MediaRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
+  aspectState: MediaAspectStateRepositoryPort;
+  contentRating: MediaContentRatingRepositoryPort;
+  tmdb: MediaProviderPort;
+  tvdb: MediaProviderPort;
+}
+
+/**
  * Per-run context handed to every strategy. Includes the resolved effective
  * provider, the language fan-out the orchestrator decided to honour, and a
  * mutable result accumulator so strategies can record provider-call counts +
@@ -67,6 +85,8 @@ export interface EnrichmentCtx {
    * outcome between sibling-scope invocations.
    */
   scratch: Record<string, unknown>;
+  /** Repository ports + providers shared across the run. */
+  deps: EnrichmentDeps;
 }
 
 export interface ApplyArgs<TResponse = unknown> {

@@ -9,14 +9,13 @@
  * set of TMDB/TVDB calls.
  */
 
-/** The different categories of data that can be ensured. */
-export type Aspect =
-  | "metadata"        // base fields on media/season/episode (EN canonical)
-  | "structure"       // seasons + episodes scaffolding (usually TVDB-driven)
-  | "translations"    // media/season/episode_translation rows (title/overview/tagline/posterPath)
-  | "logos"           // per-lang logoPath via TMDB /images
-  | "extras"          // credits, videos, recommendations, watch providers
-  | "contentRatings"; // per-region content ratings (media_content_rating)
+/**
+ * The different categories of data that can be ensured. Canonical home is
+ * `domain/media/types/media-aspect-state` — this file re-exports for the
+ * historical import path the orchestrator uses.
+ */
+export type { Aspect } from "@canto/core/domain/media/types/media-aspect-state";
+import type { Aspect } from "@canto/core/domain/media/types/media-aspect-state";
 
 export const ALL_ASPECTS: Aspect[] = [
   "metadata",

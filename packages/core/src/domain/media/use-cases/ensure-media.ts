@@ -1,39 +1,67 @@
 import type { Database } from "@canto/db/client";
-import { findMediaById } from "../../../infra/repositories";
+import { getSetting } from "@canto/db/settings";
+
+import type { MediaAspectStateRepositoryPort } from "@canto/core/domain/media/ports/media-aspect-state-repository.port";
+import type { MediaContentRatingRepositoryPort } from "@canto/core/domain/media/ports/media-content-rating-repository.port";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type {
+  Aspect,
+  MediaAspectState,
+} from "@canto/core/domain/media/types/media-aspect-state";
+import { loadCadenceKnobs } from "@canto/core/domain/media/use-cases/cadence/cadence-knobs";
+import { effectiveProvider } from "@canto/core/domain/media/use-cases/cadence/effective-provider";
+import type { Outcome } from "@canto/core/domain/media/use-cases/cadence/compute-next-eligible";
 import {
-  findAspectStates,
-  type MediaAspectStateRow,
-} from "../../../infra/media/media-aspect-state-repository";
-import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
-import { getActiveUserLanguages } from "../../shared/services/user-service";
+  computePlan,
+  type CadenceSignal,
+} from "@canto/core/domain/media/use-cases/cadence/compute-plan";
 import {
   buildForceAspects,
   buildMediaContext,
   classifyError,
-  computePlan,
-  effectiveProvider,
-  loadCadenceKnobs,
   scopesFor,
   stateKey,
   writeAspectState,
-  type CadenceSignal,
-  type Outcome,
-} from "./cadence";
+} from "@canto/core/domain/media/use-cases/cadence/aspect-state-writer";
 import type {
-  Aspect,
   EnsureMediaResult,
   EnsureMediaSpec,
-} from "./ensure-media.types";
-import { getTmdbProvider } from "../../../platform/http/tmdb-client";
-import { getTvdbProvider } from "../../../platform/http/tvdb-client";
-import { getSetting } from "@canto/db/settings";
-import {
-  enrichmentRegistry,
-  fireSharedCapabilities,
-  topoSortPlanItems,
-  type EnrichmentCtx,
-  type EnrichmentMediaRow,
-} from "../enrichment";
+} from "@canto/core/domain/media/use-cases/ensure-media.types";
+import type {
+  EnrichmentCtx,
+  EnrichmentMediaRow,
+} from "@canto/core/domain/media/enrichment/types";
+import { enrichmentRegistry } from "@canto/core/domain/media/enrichment/registry";
+import { fireSharedCapabilities } from "@canto/core/domain/media/enrichment/fire-call";
+import { topoSortPlanItems } from "@canto/core/domain/media/enrichment/topo-sort";
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
+import { findMediaById } from "@canto/core/infra/repositories";
+import { makeMediaAspectStateRepository } from "@canto/core/infra/media/media-aspect-state-repository.adapter";
+import { makeMediaContentRatingRepository } from "@canto/core/infra/media/media-content-rating-repository.adapter";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
+import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
+
+/**
+ * Repository ports the orchestrator needs. Callers (HTTP routers, worker
+ * jobs, scripts) build these once at the entry-edge and pass them in so
+ * `ensureMedia` never reaches back to the DB through ad-hoc helpers.
+ *
+ * `media`, `localization`, `aspectState`, and `contentRating` are the four
+ * write-heavy ports the persist orchestration uses; extras lives behind its
+ * own port surfaced in Wave 9C.
+ */
+export interface EnsureMediaDeps {
+  media: MediaRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
+  aspectState: MediaAspectStateRepositoryPort;
+  contentRating: MediaContentRatingRepositoryPort;
+  tmdb: MediaProviderPort;
+  tvdb: MediaProviderPort;
+}
 
 /**
  * Unified "make sure this media is complete" engine.
@@ -52,10 +80,12 @@ export async function ensureMedia(
   db: Database,
   mediaId: string,
   spec: EnsureMediaSpec = {},
-  providers?: { tmdb: MediaProviderPort; tvdb: MediaProviderPort },
+  deps?: Partial<EnsureMediaDeps>,
 ): Promise<EnsureMediaResult> {
   const start = Date.now();
   const result: EnsureMediaResult = initResult(mediaId);
+
+  const resolvedDeps = await resolveDeps(db, deps);
 
   const mediaRow = await findMediaById(db, mediaId);
   if (!mediaRow) {
@@ -68,8 +98,8 @@ export async function ensureMedia(
   result.languagesProcessed = languages;
 
   const knobs = await loadCadenceKnobs(db);
-  const aspectStates = await findAspectStates(db, mediaId);
-  const stateByKey = new Map<string, MediaAspectStateRow>(
+  const aspectStates = await resolvedDeps.aspectState.findAllForMedia(mediaId);
+  const stateByKey = new Map<string, MediaAspectState>(
     aspectStates.map((r) => [stateKey(r.aspect as Aspect, r.scope), r]),
   );
   const tvdbDefaultShows = (await getSetting("tvdb.defaultShows")) === true;
@@ -101,11 +131,6 @@ export async function ensureMedia(
     return result;
   }
 
-  const deps = providers ?? {
-    tmdb: await getTmdbProvider(),
-    tvdb: await getTvdbProvider(),
-  };
-
   const ctx: EnrichmentCtx = {
     mediaRow: mediaRow as EnrichmentMediaRow,
     effectiveProvider: provider,
@@ -115,11 +140,15 @@ export async function ensureMedia(
     spec,
     result,
     scratch: {},
+    deps: resolvedDeps,
   };
 
   // 1. Fire shared capabilities once each. Self-fetched capabilities
   //    (logos / extras / per-scope translations) come back undefined.
-  const responses = await fireSharedCapabilities(plan.items, ctx, deps);
+  const responses = await fireSharedCapabilities(plan.items, ctx, {
+    tmdb: resolvedDeps.tmdb,
+    tvdb: resolvedDeps.tvdb,
+  });
 
   // 2. Topologically sort plan items so e.g. metadata writes commit before
   //    structure / translations / contentRatings strategies read the row.
@@ -135,14 +164,14 @@ export async function ensureMedia(
         scope: item.scope,
         ctx,
         response: responses.get(strategy.needs),
-        deps,
+        deps: { tmdb: resolvedDeps.tmdb, tvdb: resolvedDeps.tvdb },
       });
     } catch (err) {
       outcome = classifyError(err);
     }
 
     await writeAspectState({
-      db,
+      aspectState: resolvedDeps.aspectState,
       mediaId,
       aspect: item.aspect,
       scope: item.scope,
@@ -157,6 +186,23 @@ export async function ensureMedia(
 
   result.durationMs = Date.now() - start;
   return result;
+}
+
+async function resolveDeps(
+  db: Database,
+  partial: Partial<EnsureMediaDeps> | undefined,
+): Promise<EnsureMediaDeps> {
+  return {
+    media: partial?.media ?? makeMediaRepository(db),
+    localization:
+      partial?.localization ?? makeMediaLocalizationRepository(db),
+    aspectState:
+      partial?.aspectState ?? makeMediaAspectStateRepository(db),
+    contentRating:
+      partial?.contentRating ?? makeMediaContentRatingRepository(db),
+    tmdb: partial?.tmdb ?? (await getTmdbProvider()),
+    tvdb: partial?.tvdb ?? (await getTvdbProvider()),
+  };
 }
 
 function initResult(mediaId: string): EnsureMediaResult {

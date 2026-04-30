@@ -1,6 +1,6 @@
-import type { Aspect } from "../use-cases/ensure-media.types";
-import type { PlanItem } from "../use-cases/cadence";
-import type { MediaEnrichmentStrategy } from "./types";
+import type { Aspect } from "@canto/core/domain/media/types/media-aspect-state";
+import type { MediaEnrichmentStrategy } from "@canto/core/domain/media/enrichment/types";
+import type { PlanItem } from "@canto/core/domain/media/use-cases/cadence/compute-plan";
 
 /**
  * Topologically sort plan items by their strategy's `dependsOn` so that

@@ -1,7 +1,11 @@
 import type { MediaType } from "@canto/providers";
-import { fetchAndPersistLogos } from "../../use-cases/fetch-and-persist-logos";
-import type { Outcome } from "../../use-cases/cadence";
-import type { ApplyArgs, MediaEnrichmentStrategy } from "../types";
+
+import type {
+  ApplyArgs,
+  MediaEnrichmentStrategy,
+} from "@canto/core/domain/media/enrichment/types";
+import type { Outcome } from "@canto/core/domain/media/use-cases/cadence/compute-next-eligible";
+import { fetchAndPersistLogos } from "@canto/core/domain/media/use-cases/fetch-and-persist-logos";
 
 /**
  * Per-language `media_translation.logo_path`. `fetchAndPersistLogos` covers

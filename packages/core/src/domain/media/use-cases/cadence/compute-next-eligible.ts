@@ -1,5 +1,5 @@
-import type { Aspect } from "../ensure-media.types";
-import type { CadenceKnobs } from "./cadence-knobs";
+import type { Aspect } from "@canto/core/domain/media/types/media-aspect-state";
+import type { CadenceKnobs } from "@canto/core/domain/media/use-cases/cadence/cadence-knobs";
 
 /**
  * Outcomes recorded against a `media_aspect_state` row. Mirrors the

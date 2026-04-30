@@ -1,22 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import type { MediaAspectStateRow } from "../../../../../infra/media/media-aspect-state-repository";
-import type { Aspect } from "../../ensure-media.types";
-import { DEFAULT_KNOBS } from "../cadence-knobs";
+import type {
+  Aspect,
+  MediaAspectState,
+} from "@canto/core/domain/media/types/media-aspect-state";
+import { DEFAULT_KNOBS } from "@canto/core/domain/media/use-cases/cadence/cadence-knobs";
 import {
   computePlan,
   type CadenceSignal,
   type ComputePlanInput,
-} from "../compute-plan";
-import type { MediaContext } from "../compute-next-eligible";
+} from "@canto/core/domain/media/use-cases/cadence/compute-plan";
+import type { MediaContext } from "@canto/core/domain/media/use-cases/cadence/compute-next-eligible";
 
 const NOW = new Date("2026-04-01T00:00:00.000Z");
 const PAST = new Date("2026-03-01T00:00:00.000Z");
 const FUTURE = new Date("2026-12-01T00:00:00.000Z");
 
 function makeRow(
-  overrides: Partial<MediaAspectStateRow> & { aspect: Aspect },
-): MediaAspectStateRow {
+  overrides: Partial<MediaAspectState> & { aspect: Aspect },
+): MediaAspectState {
   const created = new Date("2026-01-01T00:00:00.000Z");
   return {
     mediaId: "media-1",
@@ -35,7 +37,7 @@ function makeRow(
 }
 
 function input(
-  overrides: Partial<ComputePlanInput> & { state: MediaAspectStateRow[] },
+  overrides: Partial<ComputePlanInput> & { state: MediaAspectState[] },
 ): ComputePlanInput {
   const ctx: MediaContext = overrides.ctx ?? {
     type: "show",

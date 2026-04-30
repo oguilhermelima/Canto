@@ -1,22 +1,33 @@
 import { eq, inArray } from "drizzle-orm";
 
-import type { NormalizedMedia } from "@canto/providers";
-import { episode, season } from "@canto/db/schema";
 import type { Database } from "@canto/db/client";
+import { episode, season } from "@canto/db/schema";
+import type { NormalizedMedia } from "@canto/providers";
 
-import { getActiveUserLanguages } from "../../../shared/services/user-service";
-import {
-  type LocalizationSource,
-  upsertEpisodeLocalization,
-  upsertMediaLocalization,
-  upsertSeasonLocalization,
-} from "../../../shared/localization";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { LocalizationSource } from "@canto/core/domain/media/types/media-localization";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
+import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 
+interface PersistTranslationsDeps {
+  localization: MediaLocalizationRepositoryPort;
+}
+
+/**
+ * Persist non-English translations for a media (and its seasons/episodes when
+ * present) into `media_localization` / `season_localization` /
+ * `episode_localization`. Calls flow through the localization port so the
+ * write semantics stay aligned with `localization-service`'s overlay reads.
+ */
 export async function persistTranslations(
   db: Database,
   mediaId: string,
   normalized: NormalizedMedia,
+  opts?: { deps?: Partial<PersistTranslationsDeps> },
 ): Promise<void> {
+  const localization =
+    opts?.deps?.localization ?? makeMediaLocalizationRepository(db);
+
   const supported = await getActiveUserLanguages(db);
   const locSource: LocalizationSource =
     normalized.provider === "tvdb" ? "tvdb" : "tmdb";
@@ -43,8 +54,7 @@ export async function persistTranslations(
 
     for (const r of mediaTransRows) {
       if (!r.title) continue;
-      await upsertMediaLocalization(
-        db,
+      await localization.upsertMediaLocalization(
         r.mediaId,
         r.language,
         {
@@ -93,8 +103,7 @@ export async function persistTranslations(
       });
 
     for (const r of seasonTransRows) {
-      await upsertSeasonLocalization(
-        db,
+      await localization.upsertSeasonLocalization(
         r.seasonId,
         r.language,
         { name: r.name, overview: r.overview },
@@ -145,8 +154,7 @@ export async function persistTranslations(
     });
 
     for (const r of epTransRows) {
-      await upsertEpisodeLocalization(
-        db,
+      await localization.upsertEpisodeLocalization(
         r.episodeId,
         r.language,
         { title: r.title, overview: r.overview },

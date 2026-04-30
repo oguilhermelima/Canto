@@ -1,17 +1,21 @@
-import type { Database } from "@canto/db/client";
 import type { ProviderName } from "@canto/providers";
-import {
-  upsertAspectState,
-  type MediaAspectStateRow,
-} from "../../../../infra/media/media-aspect-state-repository";
-import type { Aspect, EnsureMediaSpec } from "../ensure-media.types";
-import type { CadenceKnobs } from "./cadence-knobs";
+
+import type { MediaAspectStateRepositoryPort } from "@canto/core/domain/media/ports/media-aspect-state-repository.port";
+import type {
+  Aspect,
+  MediaAspectState,
+} from "@canto/core/domain/media/types/media-aspect-state";
+import type { EnsureMediaSpec } from "@canto/core/domain/media/use-cases/ensure-media.types";
+import type { CadenceKnobs } from "@canto/core/domain/media/use-cases/cadence/cadence-knobs";
 import {
   computeNextEligible,
   type MediaContext,
   type Outcome,
-} from "./compute-next-eligible";
-import type { ForcedAspect, PlanItem } from "./compute-plan";
+} from "@canto/core/domain/media/use-cases/cadence/compute-next-eligible";
+import type {
+  ForcedAspect,
+  PlanItem,
+} from "@canto/core/domain/media/use-cases/cadence/compute-plan";
 
 /** Shape of a media row that the cadence integration cares about. */
 export interface CadenceMediaRow {
@@ -62,29 +66,30 @@ export function scopesFor(items: PlanItem[], aspect: Aspect): string[] {
 }
 
 /**
- * Persist the post-execution outcome of an aspect run. Computes the next
- * eligibility window via `computeNextEligible`, increments the attempt and
- * consecutive-fail counters, and pins `materialized_source` on `structure`
- * rows so the planner can detect provider migrations on the next pass.
+ * Persist the post-execution outcome of an aspect run via the repository
+ * port. Computes the next eligibility window via `computeNextEligible`,
+ * increments the attempt and consecutive-fail counters, and pins
+ * `materialized_source` on `structure` rows so the planner can detect
+ * provider migrations on the next pass.
  *
- * `stateByKey` is the snapshot read at the start of `ensureMedia`; passing it
- * in (rather than re-querying) keeps each upsert pure-ish and avoids a second
- * round-trip per aspect.
+ * `stateByKey` is the snapshot read at the start of `ensureMedia`; passing
+ * it in (rather than re-querying) keeps each upsert pure-ish and avoids a
+ * second round-trip per aspect.
  */
 export async function writeAspectState(opts: {
-  db: Database;
+  aspectState: MediaAspectStateRepositoryPort;
   mediaId: string;
   aspect: Aspect;
   scope: string;
   outcome: Outcome;
   ctx: MediaContext;
   knobs: CadenceKnobs;
-  stateByKey: Map<string, MediaAspectStateRow>;
+  stateByKey: Map<string, MediaAspectState>;
   now: Date;
   provider: ProviderName;
 }): Promise<void> {
   const {
-    db,
+    aspectState,
     mediaId,
     aspect,
     scope,
@@ -106,7 +111,7 @@ export async function writeAspectState(opts: {
     knobs,
     now,
   );
-  await upsertAspectState(db, {
+  await aspectState.upsert({
     mediaId,
     aspect,
     scope,

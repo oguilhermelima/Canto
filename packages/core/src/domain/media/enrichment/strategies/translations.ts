@@ -1,10 +1,11 @@
 import type { TvdbProvider } from "@canto/providers";
-import { translateEpisodes } from "../../../content-enrichment/use-cases/translate-episodes";
+
 import type {
   ApplyArgs,
   MediaEnrichmentStrategy,
   SharedMetadataResponse,
-} from "../types";
+} from "@canto/core/domain/media/enrichment/types";
+import { translateEpisodes } from "@canto/core/domain/content-enrichment/use-cases/translate-episodes";
 
 /**
  * Per-language overlays. Media-level translations (title, overview, tagline,

@@ -1,41 +1,82 @@
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 
-import type { NormalizedMedia, MediaType, ProviderName } from "@canto/providers";
-import { episode, media, season } from "@canto/db/schema";
 import type { Database } from "@canto/db/client";
+import { episode, media, season } from "@canto/db/schema";
+import type { MediaType, NormalizedMedia, ProviderName } from "@canto/providers";
 import { getSetting } from "@canto/db/settings";
 
-import type { MediaProviderPort } from "../../../shared/ports/media-provider.port";
-import { logAndSwallow } from "../../../../platform/logger/log-error";
-import { getEffectiveProviderSync } from "../../../shared/rules/effective-provider";
-import {
-  findMediaByExternalId,
-  findMediaByAnyReference,
-  findMediaByIdWithSeasons,
-  findAspectSucceededAt,
-} from "../../../../infra/repositories";
-import { dispatchEnsureMedia } from "../../../../platform/queue/bullmq-dispatcher";
-import { detectGaps } from "../detect-gaps";
+import type { MediaAspectStateRepositoryPort } from "@canto/core/domain/media/ports/media-aspect-state-repository.port";
+import type { MediaContentRatingRepositoryPort } from "@canto/core/domain/media/ports/media-content-rating-repository.port";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import { loadCadenceKnobs } from "@canto/core/domain/media/use-cases/cadence/cadence-knobs";
 import {
   buildMediaContext,
-  loadCadenceKnobs,
   writeAspectState,
-} from "../cadence";
-import { fetchMediaMetadata, type MediaMetadata } from "../fetch-media-metadata";
+} from "@canto/core/domain/media/use-cases/cadence/aspect-state-writer";
+import { detectGaps } from "@canto/core/domain/media/use-cases/detect-gaps";
+import {
+  fetchMediaMetadata,
+  type MediaMetadata,
+} from "@canto/core/domain/media/use-cases/fetch-media-metadata";
+import { persistContentRatings } from "@canto/core/domain/media/use-cases/persist/content-ratings";
+import { persistExtras } from "@canto/core/domain/media/use-cases/persist/extras";
+import { persistTranslations } from "@canto/core/domain/media/use-cases/persist/translations";
+import { applyTvdbSeasons } from "@canto/core/domain/media/use-cases/persist/tvdb-overlay";
+import { loadExtrasFromDB } from "@canto/core/domain/media/services/extras-service";
+import { applyMediaContentRating } from "@canto/core/domain/shared/services/content-rating-service";
+import {
+  getActiveUserLanguages,
+  getUserWatchPreferences,
+} from "@canto/core/domain/shared/services/user-service";
+import { normalizedMediaToResponse } from "@canto/core/domain/shared/mappers/media-mapper";
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import { makeMediaAspectStateRepository } from "@canto/core/infra/media/media-aspect-state-repository.adapter";
+import { makeMediaContentRatingRepository } from "@canto/core/infra/media/media-content-rating-repository.adapter";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import {
+  findAspectSucceededAt,
+  findMediaByAnyReference,
+  findMediaByExternalId,
+  findMediaByIdWithSeasons,
+} from "@canto/core/infra/repositories";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
 import {
   applyMediaLocalizationOverlay,
   applySeasonsLocalizationOverlay,
-} from "../../../shared/localization";
-import { applyMediaContentRating } from "../../../shared/services/content-rating-service";
-import { getActiveUserLanguages, getUserWatchPreferences } from "../../../shared/services/user-service";
-import { loadExtrasFromDB } from "../../services/extras-service";
-import { normalizedMediaToResponse } from "../../../shared/mappers/media-mapper";
+} from "@canto/core/domain/shared/localization/localization-service";
+import { getEffectiveProviderSync } from "@canto/core/domain/shared/rules/effective-provider";
 
-import { persistTranslations } from "./translations";
-import { persistContentRatings } from "./content-ratings";
-import { persistExtras } from "./extras";
-import { applyTvdbSeasons } from "./tvdb-overlay";
-import { upsertMediaLocalization } from "../../../shared/localization";
+/**
+ * Repository ports the persist orchestration depends on. Wave 9B threads
+ * these through every persist entry-point so the heavy localization +
+ * cadence + content-rating writes flow through a single port set instead
+ * of ad-hoc helpers. Callers (HTTP routers, worker jobs) build them once
+ * at the entry edge and pass them down.
+ */
+export interface PersistDeps {
+  media: MediaRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
+  aspectState: MediaAspectStateRepositoryPort;
+  contentRating: MediaContentRatingRepositoryPort;
+}
+
+function withFallback(
+  db: Database,
+  partial: Partial<PersistDeps> | undefined,
+): PersistDeps {
+  return {
+    media: partial?.media ?? makeMediaRepository(db),
+    localization:
+      partial?.localization ?? makeMediaLocalizationRepository(db),
+    aspectState:
+      partial?.aspectState ?? makeMediaAspectStateRepository(db),
+    contentRating:
+      partial?.contentRating ?? makeMediaContentRatingRepository(db),
+  };
+}
 
 /**
  * Detect gaps in cached data for the user's current language and enqueue a
@@ -64,8 +105,10 @@ async function detectAndEnqueueLazyFill(
 export async function persistMedia(
   db: Database,
   normalized: NormalizedMedia,
-  opts?: { crossRefLookup?: boolean },
+  opts?: { crossRefLookup?: boolean; deps?: Partial<PersistDeps> },
 ): Promise<typeof media.$inferSelect> {
+  const deps = withFallback(db, opts?.deps);
+
   const conditions = [
     and(eq(media.externalId, normalized.externalId), eq(media.provider, normalized.provider), eq(media.type, normalized.type)),
   ];
@@ -87,7 +130,7 @@ export async function persistMedia(
       }
       return existing;
     }
-    return updateMediaFromNormalized(db, existing.id, normalized);
+    return updateMediaFromNormalized(db, existing.id, normalized, { deps });
   }
 
   const [inserted] = await db
@@ -137,15 +180,14 @@ export async function persistMedia(
         eq(media.type, normalized.type),
       ),
     });
-    if (conflict) return updateMediaFromNormalized(db, conflict.id, normalized);
+    if (conflict) return updateMediaFromNormalized(db, conflict.id, normalized, { deps });
     throw new Error("Failed to insert media — conflict without existing row");
   }
 
   // Persist en-US localization. After Phase 1C-δ this is the only home for
   // per-language title/overview/tagline/posterPath/logoPath — base media row
   // no longer has these columns.
-  await upsertMediaLocalization(
-    db,
+  await deps.localization.upsertMediaLocalization(
     inserted.id,
     "en-US",
     {
@@ -159,8 +201,8 @@ export async function persistMedia(
   );
 
   await persistSeasons(db, inserted.id, normalized);
-  await persistTranslations(db, inserted.id, normalized);
-  await persistContentRatings(db, inserted.id, normalized);
+  await persistTranslations(db, inserted.id, normalized, { deps });
+  await persistContentRatings(inserted.id, normalized, { deps });
   return inserted;
 }
 
@@ -172,7 +214,10 @@ export async function updateMediaFromNormalized(
   db: Database,
   mediaId: string,
   normalized: NormalizedMedia,
+  opts?: { deps?: Partial<PersistDeps> },
 ): Promise<typeof media.$inferSelect> {
+  const deps = withFallback(db, opts?.deps);
+
   // TVDB seasons can have seasonType "official" or "default" depending on the show.
   // When present, preserve numberOfSeasons/numberOfEpisodes (managed by applyTvdbSeasons).
   const hasTvdbSeasons = normalized.type === "show"
@@ -231,8 +276,7 @@ export async function updateMediaFromNormalized(
   // Persist en-US localization. After Phase 1C-δ this is the only home for
   // per-language title/overview/tagline/posterPath/logoPath — base media row
   // no longer has these columns.
-  await upsertMediaLocalization(
-    db,
+  await deps.localization.upsertMediaLocalization(
     mediaId,
     "en-US",
     {
@@ -251,8 +295,8 @@ export async function updateMediaFromNormalized(
     await upsertSeasons(db, mediaId, normalized);
   }
 
-  await persistTranslations(db, mediaId, normalized);
-  await persistContentRatings(db, mediaId, normalized);
+  await persistTranslations(db, mediaId, normalized, { deps });
+  await persistContentRatings(mediaId, normalized, { deps });
 
   return updated;
 }
@@ -400,20 +444,25 @@ export async function persistFullMedia(
   db: Database,
   metadata: MediaMetadata,
   existingMediaId?: string,
+  opts?: { deps?: Partial<PersistDeps> },
 ): Promise<string> {
+  const deps = withFallback(db, opts?.deps);
   const { media: normalized, extras, tvdbSeasons, tvdbId } = metadata;
 
   let mediaId: string;
   if (existingMediaId) {
-    await updateMediaFromNormalized(db, existingMediaId, normalized);
+    await updateMediaFromNormalized(db, existingMediaId, normalized, { deps });
     mediaId = existingMediaId;
   } else {
-    const inserted = await persistMedia(db, normalized, { crossRefLookup: !!tvdbId });
+    const inserted = await persistMedia(db, normalized, {
+      crossRefLookup: !!tvdbId,
+      deps,
+    });
     mediaId = inserted.id;
   }
 
   if (tvdbSeasons && tvdbSeasons.length > 0) {
-    await applyTvdbSeasons(db, mediaId, tvdbSeasons, normalized);
+    await applyTvdbSeasons(db, mediaId, tvdbSeasons, normalized, { deps });
     if (tvdbId) {
       await db
         .update(media)
@@ -436,7 +485,7 @@ export async function persistFullMedia(
   // Replaces the legacy `metadata_updated_at` / `extras_updated_at` markers.
   // The cadence engine recomputes `next_eligible_at` on the next ensureMedia
   // pass; here we use a stub context to anchor the success timestamps.
-  await seedMetadataAndExtrasAspects(db, mediaId, normalized);
+  await seedMetadataAndExtrasAspects(db, mediaId, normalized, deps);
 
   return mediaId;
 }
@@ -454,6 +503,7 @@ async function seedMetadataAndExtrasAspects(
   db: Database,
   mediaId: string,
   normalized: NormalizedMedia,
+  deps: PersistDeps,
 ): Promise<void> {
   const knobs = await loadCadenceKnobs(db);
   const ctx = buildMediaContext({
@@ -467,7 +517,7 @@ async function seedMetadataAndExtrasAspects(
   const provider = normalized.provider as ProviderName;
   const stateByKey = new Map();
   await writeAspectState({
-    db,
+    aspectState: deps.aspectState,
     mediaId,
     aspect: "metadata",
     scope: "",
@@ -479,7 +529,7 @@ async function seedMetadataAndExtrasAspects(
     provider,
   });
   await writeAspectState({
-    db,
+    aspectState: deps.aspectState,
     mediaId,
     aspect: "extras",
     scope: "",
@@ -510,6 +560,7 @@ async function fetchPersistAndDispatch(
   providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort },
   existing: MediaRow | null | undefined,
   tag: string,
+  deps: PersistDeps,
 ): Promise<{ mediaId: string; result: MediaMetadata }> {
   const globalTvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
   const useTVDBSeasons = existing
@@ -524,7 +575,7 @@ async function fetchPersistAndDispatch(
     { useTVDBSeasons, supportedLanguages: supportedLangs },
   );
 
-  const mediaId = await persistFullMedia(db, result, existing?.id);
+  const mediaId = await persistFullMedia(db, result, existing?.id, { deps });
 
   if (result.tvdbId && result.tvdbSeasons?.length) {
     const nonEnLangs = supportedLangs.filter((l) => !l.startsWith("en"));
@@ -547,7 +598,9 @@ export async function persistMediaUseCase(
   db: Database,
   input: PersistMediaInput,
   providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort },
+  opts?: { deps?: Partial<PersistDeps> },
 ) {
+  const deps = withFallback(db, opts?.deps);
   const globalTvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
 
   const existing = globalTvdbEnabled
@@ -559,7 +612,14 @@ export async function persistMediaUseCase(
     if (metadataSucceededAt) return existing;
   }
 
-  const { mediaId } = await fetchPersistAndDispatch(db, input, providers, existing, "media:persist");
+  const { mediaId } = await fetchPersistAndDispatch(
+    db,
+    input,
+    providers,
+    existing,
+    "media:persist",
+    deps,
+  );
   return findMediaByIdWithSeasons(db, mediaId);
 }
 
@@ -579,7 +639,9 @@ export async function resolveMedia(
   input: PersistMediaInput,
   userId: string,
   providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort },
+  opts?: { deps?: Partial<PersistDeps> },
 ) {
+  const deps = withFallback(db, opts?.deps);
   const existing = await findMediaByExternalId(db, input.externalId, input.provider, input.type);
 
   const [metadataSucceededAt, extrasSucceededAt] = existing
@@ -613,7 +675,14 @@ export async function resolveMedia(
     };
   }
 
-  const { mediaId, result } = await fetchPersistAndDispatch(db, input, providers, existing, "resolveMedia");
+  const { mediaId, result } = await fetchPersistAndDispatch(
+    db,
+    input,
+    providers,
+    existing,
+    "resolveMedia",
+    deps,
+  );
   const persisted = await findMediaByIdWithSeasons(db, mediaId);
   if (persisted) {
     const { language: lang, watchRegion } = await getUserWatchPreferences(db, userId);

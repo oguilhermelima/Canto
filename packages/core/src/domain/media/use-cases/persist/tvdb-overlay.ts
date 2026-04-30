@@ -1,6 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 
-import type { NormalizedMedia, NormalizedSeason } from "@canto/providers";
+import type { Database } from "@canto/db/client";
 import {
   episode,
   episodeLocalization,
@@ -12,13 +12,15 @@ import {
   userRating,
   userWatchHistory,
 } from "@canto/db/schema";
-import type { Database } from "@canto/db/client";
+import type { NormalizedMedia, NormalizedSeason } from "@canto/providers";
 
-import { persistSeasons } from "./core";
-import {
-  upsertEpisodeLocalization,
-  upsertSeasonLocalization,
-} from "../../../shared/localization";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import { persistSeasons } from "@canto/core/domain/media/use-cases/persist/core";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
+
+interface TvdbOverlayDeps {
+  localization: MediaLocalizationRepositoryPort;
+}
 
 interface TmdbEpisodeData {
   stillPath?: string;
@@ -147,14 +149,19 @@ export async function overlayTmdbSeasonData(
  * re-attached using absoluteNumber (preferred) or seasonNumber+episodeNumber.
  *
  * Translations (episode_translation, season_translation) don't have a nullable
- * FK — they're saved in memory and re-inserted after the rebuild.
+ * FK — they're saved in memory and re-inserted after the rebuild via the
+ * localization port.
  */
 export async function applyTvdbSeasons(
   db: Database,
   mediaId: string,
   tvdbSeasons: NormalizedSeason[],
   normalized: NormalizedMedia,
+  opts?: { deps?: Partial<TvdbOverlayDeps> },
 ): Promise<void> {
+  const localization =
+    opts?.deps?.localization ?? makeMediaLocalizationRepository(db);
+
   const existingSeasons = await db.query.season.findMany({
     where: eq(season.mediaId, mediaId),
     with: {
@@ -383,8 +390,7 @@ export async function applyTvdbSeasons(
         return true;
       });
     for (const r of seasonTransRows) {
-      await upsertSeasonLocalization(
-        db,
+      await localization.upsertSeasonLocalization(
         r.seasonId,
         r.language,
         { name: r.name, overview: r.overview },
@@ -407,8 +413,7 @@ export async function applyTvdbSeasons(
       epTransRows.push({ episodeId: newEpId, language: t.language, title: t.title, overview: t.overview });
     }
     for (const r of epTransRows) {
-      await upsertEpisodeLocalization(
-        db,
+      await localization.upsertEpisodeLocalization(
         r.episodeId,
         r.language,
         { title: r.title, overview: r.overview },

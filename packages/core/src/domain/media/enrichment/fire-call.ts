@@ -1,9 +1,13 @@
-import type { ProviderName, MediaType } from "@canto/providers";
-import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
-import { fetchMediaMetadata } from "../use-cases/fetch-media-metadata";
-import type { PlanItem } from "../use-cases/cadence";
-import { enrichmentRegistry } from "./registry";
-import type { ApiCapability, EnrichmentCtx } from "./types";
+import type { MediaType, ProviderName } from "@canto/providers";
+
+import { enrichmentRegistry } from "@canto/core/domain/media/enrichment/registry";
+import type {
+  ApiCapability,
+  EnrichmentCtx,
+} from "@canto/core/domain/media/enrichment/types";
+import type { PlanItem } from "@canto/core/domain/media/use-cases/cadence/compute-plan";
+import { fetchMediaMetadata } from "@canto/core/domain/media/use-cases/fetch-media-metadata";
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 
 interface FireCallDeps {
   tmdb: MediaProviderPort;

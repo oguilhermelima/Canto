@@ -1,11 +1,11 @@
-import type { Aspect } from "../use-cases/ensure-media.types";
-import type { MediaEnrichmentStrategy } from "./types";
-import { metadataStrategy } from "./strategies/metadata";
-import { structureStrategy } from "./strategies/structure";
-import { translationsStrategy } from "./strategies/translations";
-import { logosStrategy } from "./strategies/logos";
-import { extrasStrategy } from "./strategies/extras";
-import { contentRatingsStrategy } from "./strategies/content-ratings";
+import type { Aspect } from "@canto/core/domain/media/types/media-aspect-state";
+import type { MediaEnrichmentStrategy } from "@canto/core/domain/media/enrichment/types";
+import { contentRatingsStrategy } from "@canto/core/domain/media/enrichment/strategies/content-ratings";
+import { extrasStrategy } from "@canto/core/domain/media/enrichment/strategies/extras";
+import { logosStrategy } from "@canto/core/domain/media/enrichment/strategies/logos";
+import { metadataStrategy } from "@canto/core/domain/media/enrichment/strategies/metadata";
+import { structureStrategy } from "@canto/core/domain/media/enrichment/strategies/structure";
+import { translationsStrategy } from "@canto/core/domain/media/enrichment/strategies/translations";
 
 /**
  * Compile-time exhaustive `Aspect → strategy` map. The `Record<Aspect, …>`
