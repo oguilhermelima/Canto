@@ -201,3 +201,51 @@ describe("computePlan — missing translations", () => {
     ).toHaveLength(0);
   });
 });
+
+describe("computePlan — missing logos", () => {
+  it("adds a forced logos item for a non-en active language with no state row", () => {
+    const plan = computePlan(
+      input({
+        state: [
+          makeRow({
+            aspect: "translations",
+            scope: "pt-BR",
+            nextEligibleAt: FUTURE,
+          }),
+        ],
+        activeLanguages: ["en-US", "pt-BR"],
+      }),
+    );
+    expect(plan.items).toContainEqual({
+      aspect: "logos",
+      scope: "pt-BR",
+      force: true,
+    });
+    // en-US is not a logo scope (logos are non-en only).
+    expect(
+      plan.items.filter(
+        (i) => i.aspect === "logos" && i.scope === "en-US",
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("does not bootstrap logos when a state row already exists", () => {
+    const plan = computePlan(
+      input({
+        state: [
+          makeRow({
+            aspect: "logos",
+            scope: "pt-BR",
+            nextEligibleAt: FUTURE,
+          }),
+        ],
+        activeLanguages: ["en-US", "pt-BR"],
+      }),
+    );
+    expect(
+      plan.items.filter(
+        (i) => i.aspect === "logos" && i.scope === "pt-BR",
+      ),
+    ).toHaveLength(0);
+  });
+});

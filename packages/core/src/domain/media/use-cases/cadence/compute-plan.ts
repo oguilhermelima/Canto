@@ -44,6 +44,7 @@ export interface ComputePlanInput {
 
 const TRANSLATION_ASPECT: Aspect = "translations";
 const STRUCTURE_ASPECT: Aspect = "structure";
+const LOGOS_ASPECT: Aspect = "logos";
 
 /**
  * Decide which (aspect, scope) tuples need work for a single media row.
@@ -124,6 +125,32 @@ export function computePlan(input: ComputePlanInput): EnrichmentPlan {
       seen.add(k);
       items.push({
         aspect: TRANSLATION_ASPECT,
+        scope: lang,
+        force: true,
+      });
+    }
+  }
+
+  // 5. Missing logo rows for active languages — same bootstrap as
+  //    translations. Without this, a user who adds a new language after a
+  //    media was persisted never gets a `(logos, lang)` plan item from the
+  //    cadence sweep (it only sees existing state rows), so localized logos
+  //    stay un-fetched until the user explicitly visits the media. This
+  //    parity with translations keeps the cadence sweep self-healing for
+  //    new languages.
+  const logosScopes = new Set(
+    input.state
+      .filter((r) => r.aspect === LOGOS_ASPECT)
+      .map((r) => r.scope),
+  );
+  for (const lang of input.activeLanguages) {
+    if (lang.startsWith("en")) continue;
+    const k = key(LOGOS_ASPECT, lang);
+    if (seen.has(k)) continue;
+    if (!logosScopes.has(lang)) {
+      seen.add(k);
+      items.push({
+        aspect: LOGOS_ASPECT,
         scope: lang,
         force: true,
       });

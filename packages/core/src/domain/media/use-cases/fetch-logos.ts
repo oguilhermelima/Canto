@@ -8,7 +8,10 @@ const EN = "en-US";
 import { getActiveUserLanguages } from "../../shared/services/user-service";
 import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import type { SearchResult } from "@canto/providers";
-import { upsertLangLogos } from "../../content-enrichment/use-cases/upsert-lang-logos";
+import {
+  resolveSupportedLocale,
+  upsertLangLogos,
+} from "../../content-enrichment/use-cases/upsert-lang-logos";
 import { upsertMediaLocalization } from "../../shared/localization";
 import { dispatchEnsureMedia } from "../../../platform/queue/bullmq-dispatcher";
 import { logAndSwallow } from "../../../platform/logger/log-error";
@@ -113,6 +116,15 @@ export async function fetchLogos(
 
   if (needsFetch.length === 0) return result;
 
+  // Active locales drive both (a) which TMDB-tagged logo we surface for the
+  // user's language right now and (b) what `upsertLangLogos` persists for
+  // future requests. Cached for 5 minutes by `getActiveUserLanguages`, so
+  // hoisting the fetch here keeps the per-item loop synchronous while
+  // sharing the same set across response and write paths.
+  const supported = useLangJoin
+    ? await getActiveUserLanguages(db)
+    : null;
+
   // 3. Batch fetch logos from TMDB (groups of 10)
   const logoMap = new Map<string, string>();
   const langLogoMap = new Map<string, Map<string, string>>();
@@ -169,13 +181,22 @@ export async function fetchLogos(
     const enLogo = logoMap.get(`${item.type}-${item.externalId}`) ?? null;
 
     // Prefer the user's language logo when available so the card immediately
-    // renders the translated version instead of waiting for the next page load.
-    // Only exact-match — TMDB tags images with the 2-letter iso_639_1, so a
-    // prefix fallback would assign pt-PT logos to pt-BR users (and vice versa).
+    // renders the translated version instead of waiting for the next page
+    // load. TMDB tags images with iso_639_1 only ("pt"), so we resolve each
+    // tag onto the supported regional locale via `resolveSupportedLocale` —
+    // matches `upsertLangLogos`. When the prefix is ambiguous (e.g. both
+    // `pt-BR` and `pt-PT` are supported), the resolver returns null and we
+    // fall through to the English logo at read time.
     const langLogos = langLogoMap.get(`${item.type}-${item.externalId}`);
-    const langLogo = useLangJoin && langLogos
-      ? langLogos.get(language!) ?? null
-      : null;
+    let langLogo: string | null = null;
+    if (useLangJoin && langLogos && supported) {
+      for (const [tmdbCode, path] of langLogos) {
+        if (resolveSupportedLocale(tmdbCode, supported) === language) {
+          langLogo = path;
+          break;
+        }
+      }
+    }
     const logo = langLogo ?? enLogo;
     result[key] = logo;
 
@@ -245,10 +266,13 @@ export async function fetchLogos(
     }
 
     // Language-specific logos go through the shared helper so ensureMedia
-    // and this browse-time path use identical write semantics.
+    // and this browse-time path use identical write semantics. Reuses the
+    // hoisted `supported` set above; falls back to an explicit fetch when
+    // we got here without `useLangJoin` (e.g. an `en-US` caller still wants
+    // future pt-BR readers to find logos persisted from this browse).
     if (mediaId && langLogos && langLogos.size > 0) {
-      const supported = await getActiveUserLanguages(db);
-      await upsertLangLogos(db, mediaId, langLogos, supported);
+      const supportedForWrite = supported ?? (await getActiveUserLanguages(db));
+      await upsertLangLogos(db, mediaId, langLogos, supportedForWrite);
     }
   }
 
