@@ -2,7 +2,7 @@ import type {
   NewNotification,
   Notification,
   NotificationType,
-} from "../types/notification";
+} from "@canto/core/domain/notifications/types/notification";
 
 export interface NotificationsRepositoryPort {
   insert(input: NewNotification): Promise<void>;

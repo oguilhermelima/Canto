@@ -1,5 +1,5 @@
-import type { NotificationsRepositoryPort } from "../ports/notifications-repository.port";
-import type { NewNotification } from "../types/notification";
+import type { NotificationsRepositoryPort } from "@canto/core/domain/notifications/ports/notifications-repository.port";
+import type { NewNotification } from "@canto/core/domain/notifications/types/notification";
 
 export interface CreateNotificationDeps {
   repo: NotificationsRepositoryPort;

@@ -35,13 +35,13 @@ export async function setUserPreferences(
   db: Database,
   userId: string,
   input: {
-    watchRegion?: string;
+    watchRegion?: string | null;
     directSearchEnabled?: boolean;
     isPublic?: boolean;
   },
 ) {
   const updates: Partial<{
-    watchRegion: string;
+    watchRegion: string | null;
     directSearchEnabled: boolean;
     isPublic: boolean;
   }> = {};

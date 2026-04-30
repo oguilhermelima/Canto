@@ -126,12 +126,13 @@ Per-context layout ainda usa taxonomia DDD (`rules/`, `services/`, `mappers/`, `
 
 ### Convenção de paths de imports (decidida 2026-04-30, em adoção desde Wave 1)
 
-**Regra única**: todo import não-sibling usa o nome do package (`@canto/<pkg>/...`).
+**Regra única**: TODO import usa o nome do package (`@canto/<pkg>/<full-path>`). Zero `./` ou `../`.
 
-- **Sibling** (mesmo folder): `./x`
-- **Qualquer outro lugar dentro do mesmo package**: `@canto/<pkg>/<full-path>`
-  - Ex: dentro de `packages/core/src/infra/notifications/...`, importar de `domain/notifications/types/notification` vira `@canto/core/domain/notifications/types/notification`.
-- **Cross-package**: `@canto/<other-pkg>/<full-path>` (ex: `@canto/db/client`).
+- Importar de outro arquivo no mesmo folder: `@canto/<pkg>/<full-path>`
+- Importar de outro folder no mesmo package: `@canto/<pkg>/<full-path>`
+- Importar cross-package: `@canto/<other-pkg>/<full-path>`
+
+**Por quê uniformidade**: clareza > brevidade. `import { x } from "./helpers"` exige saber em qual folder o arquivo está; `@canto/core/domain/notifications/_helpers` é absoluto e move-safe (importer pode mover de pasta sem quebrar). Codebase fica consistente — apps/web já segue esse padrão (`@/components/...` em todo lugar).
 
 **Por quê não `@/...`**: o tsconfig de cada package tem `"@/*": ["./src/*"]`, mas TypeScript respeita o tsconfig do **arquivo de entrada** quando faz resolution. Quando `apps/worker` typechecka e segue source-files de `@canto/core`, o `@/` resolve pra `apps/worker/src/*`, quebrando builds. Self-reference via `@canto/core/...` resolve via pnpm workspace symlink → consistente em todo lugar.
 

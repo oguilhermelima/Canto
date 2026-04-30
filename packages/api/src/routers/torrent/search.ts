@@ -10,7 +10,8 @@ import {
   searchTorrents,
 } from "@canto/core/domain/torrents/use-cases/search-torrents";
 import { composeDownloadRules } from "@canto/core/domain/shared/rules/scoring-rules";
-import { findDownloadPreferences } from "@canto/core/infra/user/preferences-repository";
+import type { UserId } from "@canto/core/domain/user/types/user";
+import { makeUserRepository } from "@canto/core/infra/user/user-repository.adapter";
 import { findDownloadConfig } from "@canto/core/infra/torrents/download-config-repository";
 
 import { createTRPCRouter, adminProcedure } from "../../trpc";
@@ -22,9 +23,10 @@ export const torrentSearchRouter = createTRPCRouter({
   search: adminProcedure
     .input(torrentSearchInput)
     .query(async ({ ctx, input }) => {
+      const userRepo = makeUserRepository(ctx.db);
       const [indexers, prefs, config] = await Promise.all([
         buildIndexers(),
-        findDownloadPreferences(ctx.db, ctx.session.user.id),
+        userRepo.findDownloadPreferences(ctx.session.user.id as UserId),
         findDownloadConfig(ctx.db),
       ]);
       return searchTorrents(ctx.db, input, {
@@ -46,9 +48,10 @@ export const torrentSearchRouter = createTRPCRouter({
   searchOnIndexer: adminProcedure
     .input(torrentSearchOnIndexerInput)
     .query(async ({ ctx, input }) => {
+      const userRepo = makeUserRepository(ctx.db);
       const [indexers, prefs, config] = await Promise.all([
         buildIndexers(),
-        findDownloadPreferences(ctx.db, ctx.session.user.id),
+        userRepo.findDownloadPreferences(ctx.session.user.id as UserId),
         findDownloadConfig(ctx.db),
       ]);
       return searchOnIndexer(ctx.db, input, {

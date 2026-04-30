@@ -3,8 +3,8 @@ import type { NotificationsRepositoryPort } from "@canto/core/domain/notificatio
 import {
   findNotificationByTypeAndMedia,
   insertNotification,
-} from "./notification-repository";
-import { toDomain, toRow } from "./notification.mapper";
+} from "@canto/core/infra/notifications/notification-repository";
+import { toDomain, toRow } from "@canto/core/infra/notifications/notification.mapper";
 
 export function makeNotificationsRepository(
   db: Database,

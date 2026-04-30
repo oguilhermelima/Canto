@@ -1,7 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
-import { findPublicUserProfile } from "@canto/core/infra/user/user-repository";
+import type { Database } from "@canto/db/client";
+import type { UserId } from "@canto/core/domain/user/types/user";
+import { makeUserRepository } from "@canto/core/infra/user/user-repository.adapter";
 import {
   findUserListsWithCounts,
   findPublicListBySlug,
@@ -32,11 +34,12 @@ const slugInput = z.object({
  * so that a self-lookup via /profile/[ownId] still works.
  */
 async function requireVisibleUser(
-  db: Parameters<typeof findPublicUserProfile>[0],
+  db: Database,
   targetUserId: string,
   viewerUserId: string,
 ) {
-  const profile = await findPublicUserProfile(db, targetUserId);
+  const userRepo = makeUserRepository(db);
+  const profile = await userRepo.findPublicProfile(targetUserId as UserId);
   if (!profile) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Profile not found" });
   }
