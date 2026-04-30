@@ -1,12 +1,9 @@
 import type { Database } from "@canto/db/client";
+import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
 import {
   findMediaById,
   updateMedia,
-} from "../../../infra/media/media-repository";
-import {
-  ensureServerLibrary,
-  addListItem,
-} from "../../../infra/lists/list-repository";
+} from "@canto/core/infra/media/media-repository";
 
 interface LibraryStatusUpdate {
   inLibrary: boolean;
@@ -14,10 +11,20 @@ interface LibraryStatusUpdate {
 }
 
 /**
+ * Cross-context use case (media + lists). Media reads/writes still live on
+ * `db` until the media wave lands; the server-library list manipulation goes
+ * through `ListsRepositoryPort`.
+ */
+export interface ManageLibraryStatusDeps {
+  repo: ListsRepositoryPort;
+}
+
+/**
  * Shared helper for addToLibrary and markDownloaded.
  * Sets library/download flags and adds to server library list.
  */
 export async function setLibraryStatus(
+  deps: ManageLibraryStatusDeps,
   db: Database,
   mediaId: string,
   status: LibraryStatusUpdate,
@@ -26,7 +33,11 @@ export async function setLibraryStatus(
   if (!existing) return null;
 
   // Already in the desired state
-  if (existing.inLibrary && status.inLibrary && (!status.downloaded || existing.downloaded)) {
+  if (
+    existing.inLibrary &&
+    status.inLibrary &&
+    (!status.downloaded || existing.downloaded)
+  ) {
     return existing;
   }
 
@@ -39,8 +50,8 @@ export async function setLibraryStatus(
   if (!updated) return null;
 
   // Add to server library list
-  const serverLib = await ensureServerLibrary(db);
-  await addListItem(db, { listId: serverLib.id, mediaId });
+  const serverLib = await deps.repo.ensureServerLibrary();
+  await deps.repo.addItem({ listId: serverLib.id, mediaId });
 
   return updated;
 }

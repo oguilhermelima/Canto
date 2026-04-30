@@ -1,7 +1,10 @@
-import type { Database } from "@canto/db/client";
-import { ListNotFoundError, ListPermissionError, SystemListModificationError } from "@canto/core/domain/lists/errors";
-import { findListById } from "../../../infra/lists/list-repository";
-import { findListMember } from "../../../infra/lists/member-repository";
+import {
+  ListNotFoundError,
+  ListPermissionError,
+  SystemListModificationError,
+} from "@canto/core/domain/lists/errors";
+import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
+import type { List } from "@canto/core/domain/lists/types/list";
 
 // ── Ownership ──
 
@@ -14,13 +17,13 @@ const ROLE_PERMISSIONS: Record<string, PermissionLevel[]> = {
 };
 
 export async function verifyListOwnership(
-  db: Database,
+  repo: ListsRepositoryPort,
   listId: string,
   userId: string,
   userRole: string,
   opts?: { allowSystem?: boolean; requiredPermission?: PermissionLevel },
-) {
-  const listRow = await findListById(db, listId);
+): Promise<List> {
+  const listRow = await repo.findById(listId);
   if (!listRow) throw new ListNotFoundError(listId);
 
   const requiredPerm = opts?.requiredPermission ?? "edit";
@@ -37,7 +40,7 @@ export async function verifyListOwnership(
   }
 
   if (listRow.type !== "server") {
-    const membership = await findListMember(db, listId, userId);
+    const membership = await repo.findMember(listId, userId);
     if (membership) {
       const permissions = ROLE_PERMISSIONS[membership.role] ?? [];
       if (permissions.includes(requiredPerm)) {

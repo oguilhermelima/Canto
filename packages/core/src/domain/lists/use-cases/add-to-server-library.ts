@@ -1,10 +1,13 @@
-import type { Database } from "@canto/db/client";
-import {
-  addListItem,
-  ensureServerLibrary,
-} from "../../../infra/lists/list-repository";
+import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
 
-export async function addMediaToServerLibrary(db: Database, mediaId: string) {
-  const serverLib = await ensureServerLibrary(db);
-  return addListItem(db, { listId: serverLib.id, mediaId });
+export interface AddToServerLibraryDeps {
+  repo: ListsRepositoryPort;
+}
+
+export async function addMediaToServerLibrary(
+  deps: AddToServerLibraryDeps,
+  mediaId: string,
+) {
+  const serverLib = await deps.repo.ensureServerLibrary();
+  return deps.repo.addItem({ listId: serverLib.id, mediaId });
 }

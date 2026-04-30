@@ -9,14 +9,15 @@ import {
 } from "@canto/core/infra/media/media-repository";
 import { findMediaFilesByMediaId } from "@canto/core/infra/media/media-file-repository";
 import { setLibraryStatus } from "@canto/core/domain/lists/use-cases/manage-library-status";
-import { findServerLibrary, removeListItem } from "@canto/core/infra/lists/list-repository";
+import { makeListsRepository } from "@canto/core/infra/lists/lists-repository.adapter";
 import { revertRequestStatus } from "@canto/core/infra/repositories";
 
 export const mediaLibraryRouter = createTRPCRouter({
   addToLibrary: adminProcedure
     .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
-      const updated = await setLibraryStatus(ctx.db, input.id, { inLibrary: true });
+      const repo = makeListsRepository(ctx.db);
+      const updated = await setLibraryStatus({ repo }, ctx.db, input.id, { inLibrary: true });
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
       return updated;
     }),
@@ -24,7 +25,8 @@ export const mediaLibraryRouter = createTRPCRouter({
   markDownloaded: adminProcedure
     .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
-      const updated = await setLibraryStatus(ctx.db, input.id, { inLibrary: true, downloaded: true });
+      const repo = makeListsRepository(ctx.db);
+      const updated = await setLibraryStatus({ repo }, ctx.db, input.id, { inLibrary: true, downloaded: true });
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
       return updated;
     }),
@@ -34,8 +36,9 @@ export const mediaLibraryRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const updated = await updateMedia(ctx.db, input.id, { inLibrary: false, downloaded: false });
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
-      const serverLib = await findServerLibrary(ctx.db);
-      if (serverLib) await removeListItem(ctx.db, serverLib.id, input.id);
+      const repo = makeListsRepository(ctx.db);
+      const serverLib = await repo.findServerLibrary();
+      if (serverLib) await repo.removeItem(serverLib.id, input.id);
       await revertRequestStatus(ctx.db, input.id, "downloaded", "approved");
       return updated;
     }),

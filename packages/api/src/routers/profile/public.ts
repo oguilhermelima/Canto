@@ -4,9 +4,9 @@ import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import type { Database } from "@canto/db/client";
 import type { UserId } from "@canto/core/domain/user/types/user";
 import { makeUserRepository } from "@canto/core/infra/user/user-repository.adapter";
+import { makeListsRepository } from "@canto/core/infra/lists/lists-repository.adapter";
 import {
   findUserListsWithCounts,
-  findPublicListBySlug,
   findListItems,
 } from "@canto/core/infra/lists/list-repository";
 import { findProfileSections } from "@canto/core/infra/profile/profile-section-repository";
@@ -97,7 +97,8 @@ export const publicProfileRouter = createTRPCRouter({
     .input(slugInput)
     .query(async ({ ctx, input }) => {
       await requireVisibleUser(ctx.db, input.userId, ctx.session.user.id);
-      const listRow = await findPublicListBySlug(ctx.db, input.slug, input.userId);
+      const listsRepo = makeListsRepository(ctx.db);
+      const listRow = await listsRepo.findPublicBySlug(input.slug, input.userId);
       if (!listRow) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Collection not found" });
       }

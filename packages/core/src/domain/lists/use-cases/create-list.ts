@@ -1,16 +1,19 @@
-import type { Database } from "@canto/db/client";
 import type { CreateListInput } from "@canto/validators";
-import { InvalidListNameError, ListNameConflictError } from "@canto/core/domain/lists/errors";
 import {
-  createList,
-  findUserDefaultVisibility,
-} from "../../../infra/lists/list-repository";
-import { slugify } from "../../shared/rules/slugify";
+  InvalidListNameError,
+  ListNameConflictError,
+} from "@canto/core/domain/lists/errors";
+import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
+import { slugify } from "@canto/core/domain/shared/rules/slugify";
 
 const RESERVED_SLUGS = new Set(["server-library", "watchlist"]);
 
+export interface CreateListDeps {
+  repo: ListsRepositoryPort;
+}
+
 export async function createListForUser(
-  db: Database,
+  deps: CreateListDeps,
   userId: string,
   input: CreateListInput,
 ) {
@@ -25,10 +28,10 @@ export async function createListForUser(
   }
 
   const visibility =
-    input.visibility ?? (await findUserDefaultVisibility(db, userId));
+    input.visibility ?? (await deps.repo.findUserDefaultVisibility(userId));
 
   try {
-    return await createList(db, {
+    return await deps.repo.create({
       userId,
       name: input.name,
       slug,

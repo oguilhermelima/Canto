@@ -1,9 +1,12 @@
-import type { Database } from "@canto/db/client";
-import { verifyListOwnership } from "../rules/list-rules";
-import { removeListMember } from "../../../infra/lists/member-repository";
+import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
+import { verifyListOwnership } from "@canto/core/domain/lists/rules/list-rules";
+
+export interface RemoveMemberDeps {
+  repo: ListsRepositoryPort;
+}
 
 export async function removeMemberFromList(
-  db: Database,
+  deps: RemoveMemberDeps,
   listId: string,
   targetUserId: string,
   actingUserId: string,
@@ -11,15 +14,15 @@ export async function removeMemberFromList(
 ) {
   const isSelf = targetUserId === actingUserId;
   if (!isSelf) {
-    await verifyListOwnership(db, listId, actingUserId, actingUserRole, {
+    await verifyListOwnership(deps.repo, listId, actingUserId, actingUserRole, {
       requiredPermission: "admin",
     });
   } else {
     // Still ensure the list exists; use "view" so non-admins removing themselves don't trip the admin check.
-    await verifyListOwnership(db, listId, actingUserId, actingUserRole, {
+    await verifyListOwnership(deps.repo, listId, actingUserId, actingUserRole, {
       requiredPermission: "view",
     });
   }
-  await removeListMember(db, listId, targetUserId);
+  await deps.repo.removeMember(listId, targetUserId);
   return { success: true };
 }

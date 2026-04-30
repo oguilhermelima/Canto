@@ -8,13 +8,8 @@ import {
   getListBySlugInput,
 } from "@canto/validators";
 import { verifyListOwnership } from "@canto/core/domain/lists/rules/list-rules";
-import {
-  deleteList,
-  findUserListsWithCounts,
-  reorderLists,
-  reorderListItems,
-  softDeleteList,
-} from "@canto/core/infra/lists/list-repository";
+import { makeListsRepository } from "@canto/core/infra/lists/lists-repository.adapter";
+import { findUserListsWithCounts } from "@canto/core/infra/lists/list-repository";
 import { findTraktListLinkByLocalListId } from "@canto/core/infra/trakt/trakt-sync-aggregate-repository";
 import { dispatchTraktListDelete } from "@canto/core/platform/queue/bullmq-dispatcher";
 import { createListForUser } from "@canto/core/domain/lists/use-cases/create-list";
@@ -31,63 +26,88 @@ export const listManageRouter = createTRPCRouter({
     findUserListsWithCounts(ctx.db, ctx.session.user.id, ctx.session.user.language),
   ),
 
-  getCollectionLayout: protectedProcedure.query(({ ctx }) =>
-    getCollectionLayout(ctx.db, ctx.session.user.id, ctx.session.user.language),
-  ),
+  getCollectionLayout: protectedProcedure.query(({ ctx }) => {
+    const repo = makeListsRepository(ctx.db);
+    return getCollectionLayout(
+      { repo },
+      ctx.db,
+      ctx.session.user.id,
+      ctx.session.user.language,
+    );
+  }),
 
   updateCollectionLayout: protectedProcedure
     .input(updateCollectionLayoutInput)
-    .mutation(({ ctx, input }) =>
-      updateCollectionLayout(ctx.db, ctx.session.user.id, ctx.session.user.language, input),
-    ),
+    .mutation(({ ctx, input }) => {
+      const repo = makeListsRepository(ctx.db);
+      return updateCollectionLayout(
+        { repo },
+        ctx.db,
+        ctx.session.user.id,
+        ctx.session.user.language,
+        input,
+      );
+    }),
 
   reorderCollections: protectedProcedure
     .input(reorderCollectionsInput)
-    .mutation(({ ctx, input }) =>
-      reorderLists(ctx.db, ctx.session.user.id, input.orderedIds),
-    ),
+    .mutation(({ ctx, input }) => {
+      const repo = makeListsRepository(ctx.db);
+      return repo.reorder(ctx.session.user.id, input.orderedIds);
+    }),
 
   reorderItems: protectedProcedure
     .input(reorderListItemsInput)
     .mutation(async ({ ctx, input }) => {
+      const repo = makeListsRepository(ctx.db);
       await verifyListOwnership(
-        ctx.db,
+        repo,
         input.listId,
         ctx.session.user.id,
         ctx.session.user.role,
         { requiredPermission: "edit" },
       );
-      await reorderListItems(ctx.db, input.listId, input.orderedItemIds);
+      await repo.reorderItems(input.listId, input.orderedItemIds);
     }),
 
   getBySlug: protectedProcedure
     .input(getListBySlugInput)
-    .query(({ ctx, input }) =>
-      viewListBySlug(ctx.db, ctx.session.user.id, ctx.session.user.language, input),
-    ),
+    .query(({ ctx, input }) => {
+      const repo = makeListsRepository(ctx.db);
+      return viewListBySlug(
+        { repo },
+        ctx.db,
+        ctx.session.user.id,
+        ctx.session.user.language,
+        input,
+      );
+    }),
 
   create: protectedProcedure
     .input(createListInput)
-    .mutation(({ ctx, input }) =>
-      createListForUser(ctx.db, ctx.session.user.id, input),
-    ),
+    .mutation(({ ctx, input }) => {
+      const repo = makeListsRepository(ctx.db);
+      return createListForUser({ repo }, ctx.session.user.id, input);
+    }),
 
   update: protectedProcedure
     .input(updateListInput)
-    .mutation(({ ctx, input }) =>
-      updateListForUser(
-        ctx.db,
+    .mutation(({ ctx, input }) => {
+      const repo = makeListsRepository(ctx.db);
+      return updateListForUser(
+        { repo },
         ctx.session.user.id,
         ctx.session.user.role,
         input,
-      ),
-    ),
+      );
+    }),
 
   delete: protectedProcedure
     .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
+      const repo = makeListsRepository(ctx.db);
       await verifyListOwnership(
-        ctx.db,
+        repo,
         input.id,
         ctx.session.user.id,
         ctx.session.user.role,
@@ -99,10 +119,10 @@ export const listManageRouter = createTRPCRouter({
       // an empty list. Worker hard-deletes once Trakt confirms removal.
       const traktLink = await findTraktListLinkByLocalListId(ctx.db, input.id);
       if (traktLink) {
-        await softDeleteList(ctx.db, input.id);
+        await repo.softDelete(input.id);
         void dispatchTraktListDelete(input.id);
       } else {
-        await deleteList(ctx.db, input.id);
+        await repo.hardDelete(input.id);
       }
       return { success: true };
     }),

@@ -1,12 +1,11 @@
 import { db } from "@canto/db/client";
 import { sql } from "drizzle-orm";
-import {
-  findListByIdIncludingDeleted,
-  findTombstonedTraktLists,
-  hardDeleteList,
-} from "@canto/core/infra/lists/list-repository";
+import { makeListsRepository } from "@canto/core/infra/lists/lists-repository.adapter";
 import { findTraktListLinkByLocalListId } from "@canto/core/infra/trakt/trakt-sync-repository";
-import { findUserConnectionById, updateUserConnection } from "@canto/core/infra/media-servers/user-connection-repository";
+import {
+  findUserConnectionById,
+  updateUserConnection,
+} from "@canto/core/infra/media-servers/user-connection-repository";
 import {
   deleteTraktList,
   refreshTraktAccessTokenIfNeeded,
@@ -22,7 +21,8 @@ const SWEEP_GRACE_MS = 60_000;
  * tombstone stays so the sweeper can re-dispatch later.
  */
 export async function handleTraktListDelete(localListId: string): Promise<void> {
-  const list = await findListByIdIncludingDeleted(db, localListId);
+  const repo = makeListsRepository(db);
+  const list = await repo.findByIdIncludingDeleted(localListId);
   if (!list) {
     // Already hard-deleted (concurrent run won the race) — nothing to do.
     return;
@@ -36,7 +36,7 @@ export async function handleTraktListDelete(localListId: string): Promise<void> 
   const link = await findTraktListLinkByLocalListId(db, localListId);
   if (!link) {
     // No remote mirror — safe to hard-delete locally.
-    await hardDeleteList(db, localListId);
+    await repo.hardDelete(localListId);
     return;
   }
 
@@ -44,7 +44,7 @@ export async function handleTraktListDelete(localListId: string): Promise<void> 
   if (!conn || !conn.token || !conn.userId) {
     // Connection vanished — drop the local row; remote becomes orphaned but
     // there is no way to act on it without credentials. Better than blocking.
-    await hardDeleteList(db, localListId);
+    await repo.hardDelete(localListId);
     return;
   }
 
@@ -63,7 +63,7 @@ export async function handleTraktListDelete(localListId: string): Promise<void> 
     }
   }
 
-  await hardDeleteList(db, localListId);
+  await repo.hardDelete(localListId);
 }
 
 /**
@@ -72,8 +72,9 @@ export async function handleTraktListDelete(localListId: string): Promise<void> 
  * orphaned by an exhausted retry chain or a worker restart mid-flight.
  */
 export async function handleTraktListDeleteSweep(): Promise<void> {
+  const repo = makeListsRepository(db);
   const cutoff = Date.now() - SWEEP_GRACE_MS;
-  const rows = await findTombstonedTraktLists(db);
+  const rows = await repo.findTombstonedTraktLists();
   let dispatched = 0;
   for (const row of rows) {
     if (!row.deletedAt) continue;
