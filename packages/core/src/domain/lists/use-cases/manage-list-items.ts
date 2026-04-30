@@ -1,22 +1,22 @@
 import type { Database } from "@canto/db/client";
 import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
+import type { RecommendationsRepositoryPort } from "@canto/core/domain/recommendations/ports/recommendations-repository.port";
+import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import { verifyListOwnership } from "@canto/core/domain/lists/rules/list-rules";
-import {
-  deleteUserRecommendationsForSource,
-  removeMediaFromUserRecs,
-} from "@canto/core/infra/recommendations/user-recommendation-repository";
 import { addMediaToUserRecs } from "@canto/core/domain/recommendations/use-cases/rebuild-user-recs";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";
-import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
 
 /**
  * Cross-context use case. The lists side (verify-ownership, item CRUD) is
- * fully ported to `ListsRepositoryPort`; the recommendations cleanup +
- * background dispatch keep `db` as a parameter until those contexts get their
- * own ports in later waves.
+ * fully ported to `ListsRepositoryPort`; the recommendations cleanup uses
+ * `RecommendationsRepositoryPort` and background dispatch uses
+ * `JobDispatcherPort`.
  */
 export interface ManageListItemsDeps {
   repo: ListsRepositoryPort;
+  // FIXME(wave-10): make required once callers in packages/api wire these ports
+  recs?: RecommendationsRepositoryPort;
+  dispatcher?: JobDispatcherPort;
 }
 
 /**
@@ -43,10 +43,10 @@ export async function addItemToList(
   });
 
   // Side effects (fire-and-forget)
-  void removeMediaFromUserRecs(db, userId, input.mediaId).catch(
+  void deps.recs?.removeMediaFromUserRecs(userId, input.mediaId).catch(
     logAndSwallow("list:addItem removeMediaFromUserRecs"),
   );
-  void dispatchEnsureMedia(input.mediaId).catch(
+  void deps.dispatcher?.enrichMedia(input.mediaId).catch(
     logAndSwallow("list:addItem dispatchEnsureMedia"),
   );
   void addMediaToUserRecs(db, userId, input.mediaId).catch(
@@ -72,7 +72,7 @@ export async function removeItemFromList(
 
   await deps.repo.removeItem(input.listId, input.mediaId);
 
-  void deleteUserRecommendationsForSource(db, userId, input.mediaId).catch(
+  void deps.recs?.deleteUserRecommendationsForSource(userId, input.mediaId).catch(
     logAndSwallow("list:removeItem deleteUserRecommendationsForSource"),
   );
 
@@ -97,7 +97,7 @@ export async function removeItemsFromList(
   await deps.repo.removeItems(input.listId, input.mediaIds);
 
   for (const mediaId of input.mediaIds) {
-    void deleteUserRecommendationsForSource(db, userId, mediaId).catch(
+    void deps.recs?.deleteUserRecommendationsForSource(userId, mediaId).catch(
       logAndSwallow("list:removeItems deleteUserRecommendationsForSource"),
     );
   }

@@ -1,13 +1,17 @@
+import type { CollectionWatchStatus } from "@canto/validators";
 import type {
   List,
   ListOwnerSummary,
   ListTombstone,
+  ListWithCounts,
   NewList,
   UpdateListInput,
 } from "@canto/core/domain/lists/types/list";
 import type {
+  CollectionItemDetail,
   ListItem,
   ListItemActor,
+  ListItemDetail,
   MediaInListSummary,
   NewListItem,
 } from "@canto/core/domain/lists/types/list-item";
@@ -22,16 +26,34 @@ import type {
   NewListInvitation,
   PendingInvitation,
 } from "@canto/core/domain/lists/types/list-invitation";
+import type { RecsFilters } from "@canto/core/domain/recommendations/types/recs-filters";
+
+/** Options accepted by {@link ListsRepositoryPort.findListItems}. */
+export interface FindListItemsOpts extends RecsFilters {
+  userId?: string;
+  limit?: number;
+  offset?: number;
+  watchStatuses?: CollectionWatchStatus[];
+  hideCompleted?: boolean;
+  hideDropped?: boolean;
+  showHidden?: boolean;
+}
+
+/** Options accepted by {@link ListsRepositoryPort.findUserCustomCollectionItems}. */
+export interface FindCollectionItemsOpts extends RecsFilters {
+  limit?: number;
+  offset?: number;
+  watchStatuses?: CollectionWatchStatus[];
+  hideCompleted?: boolean;
+  hideDropped?: boolean;
+  showHidden?: boolean;
+}
 
 /**
  * The `ListsRepositoryPort` covers CRUD on `list`, `list_item`, `list_member`,
  * and `list_invitation` — the four tables that compose the lists context.
- *
- * Heavy aggregating reads (`findListItems` joining media + user-media-state,
- * `findUserListsWithCounts`, `findUserCustomCollectionItems`) intentionally
- * live in `infra/lists/list-repository` for now: they cross context boundaries
- * (media, user-media) and need a separate design pass before being lifted into
- * the port.
+ * Also exposes heavy aggregating reads and user-preference helpers that were
+ * previously accessed via direct infra imports in list use-cases (Wave 10).
  */
 export interface ListsRepositoryPort {
   // ── Lists ──
@@ -96,4 +118,48 @@ export interface ListsRepositoryPort {
   findInvitationByToken(token: string): Promise<ListInvitation | null>;
   acceptInvitation(token: string): Promise<ListInvitation | undefined>;
   findPendingInvitations(listId: string): Promise<PendingInvitation[]>;
+
+  // ── Aggregating reads (cross-context, previously direct infra calls) ──
+
+  /** All lists visible to a user (owned + member + server), with item counts
+   *  and up-to-4 preview posters. Used by the collection-layout sidebar and
+   *  the library overview. */
+  findUserListsWithCounts(
+    userId: string,
+    userLang: string,
+  ): Promise<ListWithCounts[]>;
+
+  /** Paginated list-item fetch with full media localization overlay, optional
+   *  member-vote aggregation, per-user state, and multi-collection membership
+   *  hint. Used by `viewListBySlug`. */
+  findListItems(
+    listId: string,
+    userLang: string,
+    opts: FindListItemsOpts,
+  ): Promise<{ items: ListItemDetail[]; total: number }>;
+
+  /** Combined "all my custom-collection items" view — deduplicates across
+   *  lists, respects the collection-layout hidden-list filter, supports the
+   *  same filter/sort surface as `findListItems`. */
+  findUserCustomCollectionItems(
+    userId: string,
+    userLang: string,
+    hiddenListIds: string[],
+    opts: FindCollectionItemsOpts,
+  ): Promise<{ items: CollectionItemDetail[]; total: number }>;
+
+  // ── User preferences (file-organization context, via library-repository) ──
+
+  /** All stored key/value preferences for a user. Returns a plain record with
+   *  a `defaultQuality` sentinel so callers don't need to handle the empty
+   *  case. */
+  findUserPreferences(userId: string): Promise<Record<string, unknown>>;
+
+  /** Upsert a single user preference key. Conflicts on `(userId, key)` update
+   *  the stored value. */
+  upsertUserPreference(
+    userId: string,
+    key: string,
+    value: unknown,
+  ): Promise<void>;
 }

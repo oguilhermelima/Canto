@@ -2,25 +2,16 @@ import type { Database } from "@canto/db/client";
 import type { GetListBySlugInput } from "@canto/validators";
 import { ListNotFoundError } from "@canto/core/domain/lists/errors";
 import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
-import { findListItems } from "@canto/core/infra/lists/list-repository";
 
-/**
- * Partial port (Wave 3): the slug-resolution side goes through
- * `ListsRepositoryPort`; the heavy `findListItems` aggregation (joins media +
- * user_media_state + member-vote subquery) stays as a direct infra call until
- * a follow-up wave lifts it into the port.
- *
- * `userLang` is supplied by the caller (read from `ctx.session.user.language`
- * in tRPC procedures) — the previous shape did a `SELECT language FROM user`
- * per list-page render even though every caller already had the value.
- */
+/** `userLang` is supplied by the caller (read from `ctx.session.user.language`
+ *  in tRPC procedures) — avoids a `SELECT language FROM user` per page load. */
 export interface ViewListDeps {
   repo: ListsRepositoryPort;
 }
 
 export async function viewListBySlug(
   deps: ViewListDeps,
-  db: Database,
+  _db: Database,
   userId: string,
   userLang: string,
   input: GetListBySlugInput,
@@ -28,7 +19,7 @@ export async function viewListBySlug(
   const listRow = await deps.repo.findBySlug(input.slug, userId);
   if (!listRow) throw new ListNotFoundError();
 
-  const { items, total } = await findListItems(db, listRow.id, userLang, {
+  const { items, total } = await deps.repo.findListItems(listRow.id, userLang, {
     userId,
     limit: input.limit,
     offset: input.cursor ?? input.offset,

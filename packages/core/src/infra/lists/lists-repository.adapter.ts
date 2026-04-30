@@ -1,5 +1,14 @@
 import type { Database } from "@canto/db/client";
+import type {
+  CollectionItemDetail,
+  ListItemDetail,
+} from "@canto/core/domain/lists/types/list-item";
+import type { ListWithCounts } from "@canto/core/domain/lists/types/list";
 import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
+
+type ListWithCountsResult = ListWithCounts[];
+type ListItemsResult = { items: ListItemDetail[]; total: number };
+type CollectionItemsResult = { items: CollectionItemDetail[]; total: number };
 import {
   addListItem,
   createList,
@@ -8,12 +17,15 @@ import {
   findListById,
   findListByIdIncludingDeleted,
   findListBySlug,
+  findListItems,
   findListOwnerSummary,
   findMediaInLists,
   findPublicListBySlug,
   findServerLibrary,
   findTombstonedTraktLists,
+  findUserCustomCollectionItems,
   findUserDefaultVisibility,
+  findUserListsWithCounts,
   hardDeleteList,
   moveListItems,
   removeListItem,
@@ -24,6 +36,10 @@ import {
   softDeleteList,
   updateList,
 } from "@canto/core/infra/lists/list-repository";
+import {
+  findUserPreferences,
+  upsertUserPreference,
+} from "@canto/core/infra/file-organization/library-repository";
 import {
   acceptInvitation,
   addListMember,
@@ -178,5 +194,33 @@ export function makeListsRepository(db: Database): ListsRepositoryPort {
       const rows = await findPendingInvitations(db, listId);
       return rows.map(toPendingInvitation);
     },
+
+    // ── Aggregating reads ──
+    // Drizzle returns plain `string` ids; the domain types use branded `ListId`
+    // and `ListItemId`. The casts via `unknown` are safe — UUIDs are identical
+    // at runtime and only differ in TypeScript's nominal brand.
+    findUserListsWithCounts: async (userId, userLang) => {
+      const rows = await findUserListsWithCounts(db, userId, userLang);
+      return rows as unknown as ListWithCountsResult;
+    },
+
+    findListItems: async (listId, userLang, opts) => {
+      const result = await findListItems(db, listId, userLang, opts);
+      return result as unknown as ListItemsResult;
+    },
+
+    findUserCustomCollectionItems: async (userId, userLang, hiddenListIds, opts) => {
+      const result = await findUserCustomCollectionItems(db, userId, userLang, hiddenListIds, opts);
+      return result as unknown as CollectionItemsResult;
+    },
+
+    // ── User preferences ──
+    findUserPreferences: async (userId) => {
+      const prefs = await findUserPreferences(db, userId);
+      return prefs as Record<string, unknown>;
+    },
+
+    upsertUserPreference: (userId, key, value) =>
+      upsertUserPreference(db, userId, key, value),
   };
 }
