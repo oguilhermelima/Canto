@@ -1,7 +1,7 @@
 import { resolve, dirname } from "node:path";
 import { mkdirSync, existsSync, writeFileSync } from "node:fs";
 
-import type { ClassDeclaration, ImportDeclaration, ImportSpecifier, SourceFile } from "ts-morph";
+import type { ClassDeclaration, SourceFile } from "ts-morph";
 
 import type { CodemodContext } from "../context.ts";
 import { createLogger } from "../helpers/logger.ts";

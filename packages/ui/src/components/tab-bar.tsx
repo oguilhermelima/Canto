@@ -139,7 +139,7 @@ export function TabBar({ tabs, value, onChange, leading, trailing, onFilter, fil
                 >
                   {Icon && <Icon className="h-4 w-4 shrink-0" />}
                   {tab.label}
-                  {tab.count != null && tab.count > 0 && (
+                  {tab.count !== undefined && tab.count > 0 && (
                     <span
                       className={cn(
                         "min-w-5 rounded-full px-1.5 py-0.5 text-center text-xs font-semibold leading-none",

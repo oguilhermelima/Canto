@@ -62,7 +62,8 @@ export function ConfirmationDialog({
     onOpenChange(nextOpen);
   };
 
-  const hasBody = body != null || (checkboxes != null && checkboxes.length > 0);
+  const hasBody =
+    body !== undefined || (checkboxes !== undefined && checkboxes.length > 0);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

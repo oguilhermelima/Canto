@@ -107,8 +107,8 @@ export async function handleRssSync(): Promise<void> {
       const attrs = parseReleaseAttributes({
         title: item.title,
         seeders: item.seeders,
-        age: item.age ?? 0,
-        flags: item.indexerFlags ?? [],
+        age: item.age,
+        flags: item.indexerFlags,
         flavor,
         releaseGroupLookups: allLookups[flavor],
       });
@@ -123,7 +123,8 @@ export async function handleRssSync(): Promise<void> {
       const blockedTitles = await getBlocklistTitles(matchedShow.id);
       if (blockedTitles.has(item.title.toLowerCase())) continue;
 
-      const seasonNum = seasons[0]!;
+      const seasonNum = seasons[0];
+      if (seasonNum === undefined) continue;
       const targetEpisodes = episodes.length > 0
         ? episodes
         : []; // Will be resolved in detectMissingEpisodes

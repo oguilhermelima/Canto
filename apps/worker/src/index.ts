@@ -221,11 +221,17 @@ const workers = [
   makeWorker<RunSectionInput>(
     QUEUES.traktSyncSection,
     async (input, log) => {
-      if (!input?.connectionId || !input?.section) {
+      // BullMQ payloads aren't type-checked, so guard before unpacking.
+      const payload = input as Partial<RunSectionInput>;
+      if (!payload.connectionId || !payload.section) {
         log.warn("missing connectionId/section, skipping");
         return;
       }
-      await handleTraktSyncSection(input);
+      await handleTraktSyncSection({
+        connectionId: payload.connectionId,
+        section: payload.section,
+        remoteAtIso: payload.remoteAtIso ?? null,
+      });
     },
     { concurrency: 4 },
   ),
@@ -294,17 +300,21 @@ const workers = [
 /* -------------------------------------------------------------------------- */
 
 async function shutdown(): Promise<void> {
-  console.log("Shutting down...");
+  console.warn("Shutting down...");
   await Promise.all([
     ...workers.map((w) => w.close()),
     ...Object.values(queues).map((q) => q.close()),
   ]);
-  console.log("All workers shut down.");
+  console.warn("All workers shut down.");
   process.exit(0);
 }
 
-process.on("SIGTERM", shutdown);
-process.on("SIGINT", shutdown);
+process.on("SIGTERM", () => {
+  void shutdown();
+});
+process.on("SIGINT", () => {
+  void shutdown();
+});
 
 /* -------------------------------------------------------------------------- */
 /*  Startup                                                                   */
@@ -322,11 +332,13 @@ process.on("SIGINT", shutdown);
  */
 async function probeRedis(): Promise<void> {
   const client = await queues.importTorrents.client;
-  const pong = await client.ping();
+  const pong: string = await client.ping();
   if (pong !== "PONG") {
     throw new Error(`unexpected PING response: ${pong}`);
   }
-  console.log(`[worker] Redis reachable at ${redisConnection.host}:${redisConnection.port}`);
+  console.warn(
+    `[worker] Redis reachable at ${redisConnection.host}:${redisConnection.port}`,
+  );
 }
 
 async function main(): Promise<void> {

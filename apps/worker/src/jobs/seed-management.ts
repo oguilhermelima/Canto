@@ -31,7 +31,7 @@ export async function handleSeedManagement(): Promise<void> {
   ]);
 
   // No limits configured — nothing to do
-  if (ratioLimit == null && timeLimitHours == null) return;
+  if (ratioLimit === null && timeLimitHours === null) return;
 
   let client;
   try {
@@ -52,7 +52,9 @@ export async function handleSeedManagement(): Promise<void> {
     completed.map((t) => t.hash),
   );
   const dbByHash = new Map(
-    dbRows.filter((r) => r.hash != null).map((r) => [r.hash as string, r]),
+    dbRows
+      .filter((r): r is typeof r & { hash: string } => r.hash !== null)
+      .map((r) => [r.hash, r]),
   );
 
   type Removal = {
@@ -67,11 +69,11 @@ export async function handleSeedManagement(): Promise<void> {
 
     let shouldRemove = false;
 
-    if (ratioLimit != null && torrent.ratio >= ratioLimit) {
+    if (ratioLimit !== null && torrent.ratio >= ratioLimit) {
       shouldRemove = true;
     }
 
-    if (timeLimitHours != null && torrent.completion_on > 0) {
+    if (timeLimitHours !== null && torrent.completion_on > 0) {
       const seededSeconds = now - torrent.completion_on;
       if (seededSeconds >= timeLimitHours * 3600) {
         shouldRemove = true;

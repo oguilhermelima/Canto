@@ -25,7 +25,8 @@ export async function runMoveUseCases(ctx: CodemodContext): Promise<void> {
 
   for (const m of ctx.plan.useCaseContextMoves) {
     const fromDirAbs = resolve(corePackageRoot, "src", m.from);
-    const toDirAbs = resolve(corePackageRoot, "src", m.to);
+    // toDirAbs reserved for future move logic; not needed in this loop.
+    void m.to;
     if (!existsSync(fromDirAbs)) {
       logger.log({ op: "skip", reason: "source-dir-missing", target: m.from });
       continue;

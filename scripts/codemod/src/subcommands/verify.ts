@@ -39,24 +39,26 @@ export function runVerify(ctx: CodemodContext, options: { planOnly?: boolean } =
   //   pre-restructure: sources should exist at `from` paths.
   //   post-restructure: sources were moved; `to` paths exist.
   const srcPrefix = "src/";
-  let preMatches = 0;
-  let postMatches = 0;
+  let _preMatches = 0;
+  let _postMatches = 0;
   const missingBoth: string[] = [];
   for (const e of plan.domainClassification) {
     const fromAbs = resolve(corePackageRoot, `${srcPrefix}${e.from}`);
     let toRel: string | undefined;
     if (isDomainMove(e)) toRel = e.to;
     else if ("action" in e && e.action === "rename-sibling") toRel = e.to;
-    const toAbs = toRel ? resolve(corePackageRoot, `${srcPrefix}${toRel}`) : undefined;
-    if (existsSync(fromAbs)) preMatches++;
-    else if (toAbs && existsSync(toAbs)) postMatches++;
+    const toAbs = toRel
+      ? resolve(corePackageRoot, `${srcPrefix}${toRel}`)
+      : undefined;
+    if (existsSync(fromAbs)) _preMatches++;
+    else if (toAbs && existsSync(toAbs)) _postMatches++;
     else missingBoth.push(`${e.from}${toRel ? ` -> ${toRel}` : ""}`);
   }
   for (const m of plan.infraMoves) {
     const fromAbs = resolve(corePackageRoot, `${srcPrefix}${m.from}`);
     const toAbs = resolve(corePackageRoot, `${srcPrefix}${m.to}`);
-    if (existsSync(fromAbs)) preMatches++;
-    else if (existsSync(toAbs)) postMatches++;
+    if (existsSync(fromAbs)) _preMatches++;
+    else if (existsSync(toAbs)) _postMatches++;
     else missingBoth.push(`${m.from} -> ${m.to}`);
   }
   if (missingBoth.length) findings.push({ severity: "error", check: "missing-both-from-and-to", detail: missingBoth.slice(0, 10).join(" | ") });

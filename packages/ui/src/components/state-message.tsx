@@ -77,7 +77,7 @@ export function StateMessage({
             {description}
           </p>
         )}
-        {(action || onRetry) && (
+        {(action ?? onRetry) && (
           <div className="mt-4 flex items-center justify-center gap-2">
             {onRetry && (
               <Button

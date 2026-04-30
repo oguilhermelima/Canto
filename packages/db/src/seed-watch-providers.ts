@@ -132,8 +132,8 @@ async function seed(): Promise<void> {
         },
       });
   }
-  console.log(`Seeded ${PROVIDERS.length} watch provider links`);
+  console.warn(`Seeded ${PROVIDERS.length} watch provider links`);
   process.exit(0);
 }
 
-seed();
+void seed();

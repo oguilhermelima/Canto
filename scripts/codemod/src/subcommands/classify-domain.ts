@@ -1,4 +1,4 @@
-import { resolve, dirname } from "node:path";
+import { resolve } from "node:path";
 import { existsSync, unlinkSync } from "node:fs";
 
 import type { CodemodContext } from "../context.ts";
@@ -86,10 +86,8 @@ export async function runClassifyDomain(ctx: CodemodContext): Promise<void> {
       continue;
     }
 
-    if (entry.action === "split-errors") {
-      logger.log({ op: "skip", reason: "handled by split-errors subcommand", target: fromRel });
-      continue;
-    }
+    // entry.action === "split-errors" is handled by the split-errors
+    // subcommand; the loop body falls through to the next entry.
   }
 
   if (ctx.apply) await project.save();

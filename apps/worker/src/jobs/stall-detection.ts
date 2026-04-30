@@ -48,7 +48,7 @@ export async function handleStallDetection(): Promise<void> {
 
     if (live.state !== "stalledDL") continue;
 
-    const createdAt = row.createdAt ? new Date(row.createdAt).getTime() : 0;
+    const createdAt = new Date(row.createdAt).getTime();
     if (now - createdAt < STALL_THRESHOLD_MS) continue;
 
     stalled.push(row);

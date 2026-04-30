@@ -80,13 +80,21 @@ export async function handleImportTorrents(): Promise<void> {
 
         // Mark the torrent as imported in qBittorrent by updating its category
         try {
-          const [torrentInfo] = await qbClient.listTorrents({ hashes: [row.hash!] });
+          if (!row.hash) {
+            console.warn(
+              `[import-torrents] download row ${row.id} has no hash; skipping qBit category update`,
+            );
+            return;
+          }
+          const [torrentInfo] = await qbClient.listTorrents({
+            hashes: [row.hash],
+          });
           if (torrentInfo) {
             const importedCategory = torrentInfo.category
               ? `${torrentInfo.category}-imported`
               : "imported";
             await qbClient.ensureCategory(importedCategory);
-            await qbClient.setCategory(row.hash!, importedCategory);
+            await qbClient.setCategory(row.hash, importedCategory);
             console.log(`[import-torrents] Set qBit category to "${importedCategory}" for "${row.title}"`);
           }
         } catch (err) {

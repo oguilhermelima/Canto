@@ -319,7 +319,6 @@ function filterItemsNeedingGlobalSync(
     const existing = versionMap.get(item.serverItemId);
     if (
       existing?.mediaId &&
-      existing.syncedAt &&
       new Date(existing.syncedAt) > skipCutoff &&
       (existing.result === "imported" || existing.result === "skipped")
     ) {
@@ -402,12 +401,12 @@ export async function runReverseSync(options: ReverseSyncOptions = {}): Promise<
     // A link is "full-scanned" this cycle when it has no checkpoint filter.
     // Only these links' rows are safe to touch with prune logic below.
     const fullScanLinkIds = new Set(
-      libs.filter((l) => l.sinceMs == null).map((l) => l.linkId),
+      libs.filter((l) => l.sinceMs === undefined).map((l) => l.linkId),
     );
     const allLinksFullScan = fullScanLinkIds.size === libs.length;
     const deltaLinkCount = libs.length - fullScanLinkIds.size;
     if (deltaLinkCount > 0) {
-      console.log(
+      console.warn(
         `[reverse-sync] ${provider} user ${conn.userId}: ${deltaLinkCount}/${libs.length} link(s) using delta checkpoint`,
       );
     }

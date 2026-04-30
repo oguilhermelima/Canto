@@ -57,18 +57,23 @@ function getDerivedKey(version: number): Buffer {
   if (!secret) {
     throw new Error("BETTER_AUTH_SECRET is required for settings encryption");
   }
+  // `version` is a runtime number; the keyof narrowing means TS treats the
+  // lookup as always defined, but at runtime an unknown version reaches here
+  // (e.g. corrupt DB row). Look up via Object.hasOwn so the runtime guard
+  // and the type both see the possibility of undefined.
+  if (!Object.hasOwn(KEY_VERSIONS, version)) {
+    throw new Error(`Unknown key version: ${version}`);
+  }
   const config = KEY_VERSIONS[version as keyof typeof KEY_VERSIONS];
-  if (!config) throw new Error(`Unknown key version: ${version}`);
   return pbkdf2Sync(secret, SALT, config.iterations, 32, config.digest);
 }
 
 const keyCache = new Map<number, Buffer>();
 function getKey(version: number = CURRENT_KEY_VERSION): Buffer {
-  let key = keyCache.get(version);
-  if (!key) {
-    key = getDerivedKey(version);
-    keyCache.set(version, key);
-  }
+  const cached = keyCache.get(version);
+  if (cached) return cached;
+  const key = getDerivedKey(version);
+  keyCache.set(version, key);
   return key;
 }
 
@@ -90,8 +95,11 @@ function decrypt(encoded: string): string {
   // Detect version: check if first byte is a known version prefix; otherwise assume v1 (legacy, no prefix)
   let version: number;
   let offset: number;
-  if (buf[0] !== undefined && buf[0] in PREFIX_TO_VERSION) {
-    version = PREFIX_TO_VERSION[buf[0]]!;
+  const firstByte = buf[0];
+  const prefixed =
+    firstByte !== undefined ? PREFIX_TO_VERSION[firstByte] : undefined;
+  if (prefixed !== undefined) {
+    version = prefixed;
     offset = KEY_VERSION_LENGTH;
   } else {
     version = 1;
@@ -282,8 +290,8 @@ const CONNECTION_ERROR_CODES = new Set([
 ]);
 
 function isConnectionError(err: unknown): boolean {
-  const cause = (err as { cause?: unknown })?.cause;
-  const code = (cause as { code?: unknown })?.code;
+  const cause = (err as { cause?: unknown }).cause;
+  const code = (cause as { code?: unknown } | undefined)?.code;
   return typeof code === "string" && CONNECTION_ERROR_CODES.has(code);
 }
 

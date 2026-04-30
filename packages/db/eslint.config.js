@@ -10,6 +10,7 @@ export default [
       "node_modules/**",
       "eslint.config.js",
       "drizzle.config.ts",
+      "migrate-folders.ts",
     ],
   },
   ...baseConfig,
