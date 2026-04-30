@@ -285,7 +285,7 @@ export async function refreshPlexItem(
   ratingKey: string,
 ): Promise<void> {
   try {
-    await fetch(
+    const res = await fetch(
       `${url}/library/metadata/${ratingKey}/refresh?X-Plex-Token=${token}`,
       {
         method: "PUT",
@@ -293,6 +293,11 @@ export async function refreshPlexItem(
         signal: AbortSignal.timeout(10_000),
       },
     );
+    if (!res.ok) {
+      console.warn(
+        `[plex] Refresh of item ${ratingKey} returned HTTP ${res.status}`,
+      );
+    }
   } catch (err) {
     console.warn(
       `[plex] Failed to refresh item ${ratingKey}:`,
@@ -429,13 +434,47 @@ export async function markPlexItemUnwatched(
 }
 
 /**
+ * Stable identifier sent on every Plex API call. Plex Media Server rejects
+ * many endpoints (including `/:/timeline`) with HTTP 400 when this header is
+ * missing on recent server versions. The value is arbitrary as long as it's
+ * a stable UUID per client instance.
+ */
+const CANTO_PLEX_CLIENT_ID = "canto-server-9b6f4c0a-2d8e-4a1f-b5e3-7c8a2f1d3e4b";
+
+/**
+ * Fetch the duration (ms) of a Plex item by ratingKey. Returns null when the
+ * item is missing or the server doesn't expose duration.
+ */
+async function fetchPlexItemDuration(
+  url: string,
+  token: string,
+  ratingKey: string,
+): Promise<number | null> {
+  const params = new URLSearchParams({ "X-Plex-Token": token });
+  const res = await fetch(
+    `${url}/library/metadata/${ratingKey}?${params.toString()}`,
+    {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
+    },
+  );
+  if (!res.ok) return null;
+  const data = (await res.json()) as {
+    MediaContainer?: { Metadata?: Array<{ duration?: number }> };
+  };
+  const duration = data.MediaContainer?.Metadata?.[0]?.duration;
+  return typeof duration === "number" && duration > 0 ? duration : null;
+}
+
+/**
  * Update a Plex item's resume position via the `/:/timeline` endpoint.
  *
- * Plex expects position in milliseconds. For a completed state we fall back
- * to the scrobble endpoint so we don't need the item's duration — `state=stopped`
- * with `time≈duration` on /:/timeline is the web-UI equivalent, but scrobble
- * is a simpler one-shot that doesn't need a duration value we don't always
- * have on hand.
+ * Plex's `/:/timeline` requires `duration` and `X-Plex-Client-Identifier` on
+ * recent server versions — without them the server returns HTTP 400. We look
+ * up duration via the metadata endpoint to keep the call self-contained.
+ *
+ * For a completed state we still fall back to scrobble because it's a simpler
+ * one-shot that doesn't need duration.
  */
 export async function setPlexPlaybackPosition(
   url: string,
@@ -448,13 +487,24 @@ export async function setPlexPlaybackPosition(
     await markPlexItemWatched(url, token, ratingKey);
     return;
   }
-  const timeMs = Math.max(0, Math.round(positionSeconds * 1000));
+  const durationMs = await fetchPlexItemDuration(url, token, ratingKey);
+  if (durationMs == null) {
+    throw new Error(
+      `Plex timeline update aborted: could not resolve duration for ratingKey=${ratingKey}`,
+    );
+  }
+  const timeMs = Math.min(
+    durationMs,
+    Math.max(0, Math.round(positionSeconds * 1000)),
+  );
   const params = new URLSearchParams({
     ratingKey,
     key: `/library/metadata/${ratingKey}`,
     identifier: "com.plexapp.plugins.library",
     state: "stopped",
     time: String(timeMs),
+    duration: String(durationMs),
+    "X-Plex-Client-Identifier": CANTO_PLEX_CLIENT_ID,
     "X-Plex-Token": token,
   });
   const res = await fetch(`${url}/:/timeline?${params.toString()}`, {
