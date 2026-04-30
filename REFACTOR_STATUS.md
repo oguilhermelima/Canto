@@ -140,12 +140,26 @@ Quando corrigir lint, **NÃO criar código pior**. Cada fix deve respeitar SOLID
     - ❌ `import { eq } from "drizzle-orm"; ... db.query.foo.findMany({ where: eq(...) })`
     - ✅ `await deps.repo.findFoo(filter)` — repo abstrai SQL.
 
-14. **Comments explicando WHAT em vez de WHY**
-    - ❌ `// loop over items\nfor (...)` — código já diz isso
-    - ✅ `// Items already deduplicated by ID upstream — skip Set overhead` (only se non-óbvio)
-    - Default: SEM COMENTÁRIOS. Só se removê-lo deixaria future-reader confuso.
+14. **Inline comments verbosos — código com cara de AI**
+    O codebase acumulou muitos comments inline (`// fazendo X agora porque Y`, `// pré-computa Z pra evitar W`) que parecem AI documentando-se pra outra sessão de AI. Isso polui o código e dá smell de "gerado por LLM".
+    - ❌ `// Single deferred update — every early-return / success / partial / catch path mutates this and the finally block writes it once. Was 11 separate updateDownload calls per attempt before this refactor.` (comments contando história do refactor)
+    - ❌ `// Pre-compute alt-season directories so multi-season torrents call mkdir once per unique season instead of once per file.` (comment narrando otimização)
+    - ❌ `// Match each parsed file against the PRE-MOVE torrent file list...` (comment explicando o algoritmo linha-a-linha)
+    - ❌ `// loop over items\nfor (...)` — redundante
+    - ✅ Default: **SEM COMENTÁRIOS INLINE**. Código bem nomeado já diz o que faz.
+    - ✅ Documentação concentrada em **docstring (JSDoc)** acima de função/classe pública, com no máximo:
+      1. Uma frase descrevendo o que a função faz.
+      2. UMA particularidade não-óbvia se necessário (constraint hidden, side effect surpreendente, edge case).
+    - ✅ Comment inline raríssimo — só quando o leitor futuro vai parar e perguntar "por quê?": invariante hidden, workaround pra bug específico (com link), constraint de framework.
+    - ❌ `// TODO:` deixados pelo refactor (que viraram dívida)  →  ✅ se for TODO real, registrar em issue/lista; se não, deletar.
 
-15. **DRY agressivo demais — abstração prematura**
+    **Princípio**: o leitor humano não precisa de você narrando o código. Se removê-lo deixar ambíguo, melhore o nome ou a estrutura, não adicione comment.
+
+15. **`// removed:` / `// was:` / "// agora isso vira X" comments**
+    - ❌ Comments comemorativos do refactor (`// was: 11 updateDownload calls; now: 1`) viram ruído permanente.
+    - ✅ A história do refactor mora em git log + commit message + PR description, NÃO no código.
+
+16. **DRY agressivo demais — abstração prematura**
     - ❌ Extrair helper compartilhado de 3 use cases que coincidem em 5 linhas mas têm semânticas diferentes
     - ✅ Esperar 4-5 sites com mesma semântica antes de DRYficar.
 
@@ -168,12 +182,26 @@ Antes de mergear Wave 11, pair-review (ou self-review estrito) das mudanças:
 - Cada `!` → checar se há guard clause melhor.
 - Cada use case modificado → confirmar que não cresceu nem assumiu mais responsabilidades.
 
-### Wave 12 — Build clean + lockdown final (~30-60 min)
+### Wave 12 — Build clean + lockdown final (~60-90 min)
 
 - `pnpm -F @canto/web build` zero warnings (Next/Turbopack residuais — geralmente 5-15 itens).
 - CI workflow troca step `Lint` → `pnpm lint:strict` (max-warnings=0).
 - `scripts/codemod/package.json` ganha stub `"test": "exit 0"` (ou turbo filter no CI) pra `pnpm exec turbo run test` não falhar.
-- REFACTOR_STATUS.md final marca tudo ✅.
+- **Comment cleanup pass** (passada manual ou semi-automática):
+  - Procurar comments inline verbosos e removê-los onde código bem-nomeado é suficiente.
+  - Consolidar restantes em docstrings (JSDoc) seguindo a regra: 1 frase do que faz + 1 particularidade não-óbvia.
+  - Comentários "// was: X" / "// removed Y" / narrativas de refactor → deletar.
+  - Hot spots conhecidos: `domain/torrents/use-cases/import-torrent*.ts`, `domain/media/use-cases/persist/*.ts`, `domain/media/use-cases/cadence/*.ts` (rica em comments do refactor anterior).
+- **Atualizar `.claude/skills/handbook`** (skill do projeto) com tudo que vem das waves:
+  - Convenção de imports `@canto/<pkg>/...`.
+  - Port-first / deps-injection padrão.
+  - Anti-bad-smells (lista completa do Wave 11c).
+  - SOLID checklist.
+  - Onde mora cada port (mapa por contexto).
+- **Atualizar `CLAUDE.md`** (raiz do projeto):
+  - Substituir descrição genérica de "Code Style" por linkagem à handbook + regras críticas (sem comments inline verbosos, port-first, etc).
+  - Adicionar seção "Architecture" com mapa de contextos + ports.
+- REFACTOR_STATUS.md final marca tudo ✅. Pode mover este doc pra `.claude/handbook/refactor-history.md` (artefato histórico) ao invés de manter na raiz.
 - Verificar Phase 5.5 folder consolidation (codemod move folders pro `user-actions/`, `media-servers/scans/`, etc) — opcional, vertical-slice waves tornaram desnecessário pra funcionalidade. Se for fazer, vira Wave 13.
 
 ### Total restante
