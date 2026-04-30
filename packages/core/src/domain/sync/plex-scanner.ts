@@ -239,24 +239,37 @@ async function paginateLibrary(
   }
 }
 
+/**
+ * Per-process memo of `(serverUrl, libraryId)` pairs whose `updatedAt>=` delta
+ * filter has been rejected with HTTP 400. Once a library lands here we skip
+ * the delta param up-front on subsequent scans, sparing the wasted round-trip
+ * and the recurring warn log every reverse-sync cycle. Cleared on restart.
+ */
+const deltaRejectedLibraries = new Set<string>();
+
+const deltaRejectedKey = (url: string, libraryId: string): string =>
+  `${url}::${libraryId}`;
+
 async function scanLibrary(
   url: string,
   token: string,
   lib: PlexLibraryRef,
 ): Promise<ScannedMediaItem[]> {
-  // When Plex rejects the delta filter with 400 (mixed libraries, certain
-  // server versions), drop the filter and re-run as a full scan rather than
-  // failing the user's whole sync cycle.
+  const memoKey = deltaRejectedKey(url, lib.plexLibraryId);
+  const skipDelta = deltaRejectedLibraries.has(memoKey);
+  const sinceMs = skipDelta ? undefined : lib.sinceMs;
+
   try {
-    return await paginateLibrary(url, token, lib, lib.sinceMs);
+    return await paginateLibrary(url, token, lib, sinceMs);
   } catch (err) {
     if (
-      lib.sinceMs != null
+      sinceMs != null
       && err instanceof Error
       && err.message.includes("HTTP 400")
     ) {
+      deltaRejectedLibraries.add(memoKey);
       console.warn(
-        `[plex-scanner] Library ${lib.plexLibraryId} rejected delta filter (HTTP 400); retrying as full scan`,
+        `[plex-scanner] Library ${lib.plexLibraryId} rejected delta filter (HTTP 400); falling back to full scan and skipping delta on future cycles`,
       );
       return paginateLibrary(url, token, lib, undefined);
     }
