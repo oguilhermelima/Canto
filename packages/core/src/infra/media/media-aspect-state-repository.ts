@@ -1,4 +1,4 @@
-import { eq, lte, min, sql } from "drizzle-orm";
+import { and, eq, lte, min, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { mediaAspectState } from "@canto/db/schema";
 
@@ -13,6 +13,32 @@ export async function findAspectStates(
     .select()
     .from(mediaAspectState)
     .where(eq(mediaAspectState.mediaId, mediaId));
+}
+
+/**
+ * Lookup `succeededAt` for a single (media_id, aspect, scope) row. Returns
+ * `null` when the row is missing or has never recorded a successful outcome.
+ * Replaces the legacy `media.metadata_updated_at` / `media.extras_updated_at`
+ * staleness probes with an aspect-keyed read.
+ */
+export async function findAspectSucceededAt(
+  db: Database,
+  mediaId: string,
+  aspect: string,
+  scope = "",
+): Promise<Date | null> {
+  const [row] = await db
+    .select({ succeededAt: mediaAspectState.succeededAt })
+    .from(mediaAspectState)
+    .where(
+      and(
+        eq(mediaAspectState.mediaId, mediaId),
+        eq(mediaAspectState.aspect, aspect),
+        eq(mediaAspectState.scope, scope),
+      ),
+    )
+    .limit(1);
+  return row?.succeededAt ?? null;
 }
 
 /**

@@ -1,6 +1,5 @@
 import { Queue } from "bullmq";
 
-import { handleBackfillAspectState } from "./jobs/backfill-aspect-state";
 import { handleBackfillUserRecDenorm } from "./jobs/backfill-user-rec-denorm";
 import { handleImportTorrents } from "./jobs/import-torrents";
 import {
@@ -332,10 +331,6 @@ async function main(): Promise<void> {
   // whose recs were rebuilt before a denorm column was added.
   handleBackfillUserRecDenorm(db).catch((err) => {
     console.error("[worker] backfill-user-rec-denorm failed at boot:", err);
-  });
-
-  handleBackfillAspectState().catch((err) => {
-    console.error("[worker] backfill-aspect-state failed at boot:", err);
   });
 
   console.log("Workers started. Waiting for jobs...");

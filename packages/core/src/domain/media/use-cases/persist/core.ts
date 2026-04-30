@@ -12,9 +12,15 @@ import {
   findMediaByExternalId,
   findMediaByAnyReference,
   findMediaByIdWithSeasons,
+  findAspectSucceededAt,
 } from "../../../../infra/repositories";
 import { dispatchEnsureMedia } from "../../../../platform/queue/bullmq-dispatcher";
 import { detectGaps } from "../detect-gaps";
+import {
+  buildMediaContext,
+  loadCadenceKnobs,
+  writeAspectState,
+} from "../cadence";
 import { fetchMediaMetadata, type MediaMetadata } from "../fetch-media-metadata";
 import {
   applyMediaLocalizationOverlay,
@@ -124,7 +130,6 @@ export async function persistMedia(
       collection: normalized.collection,
       productionCompanies: normalized.productionCompanies,
       productionCountries: normalized.productionCountries,
-      metadataUpdatedAt: new Date(),
     })
     .onConflictDoNothing()
     .returning();
@@ -224,7 +229,6 @@ export async function updateMediaFromNormalized(
       collection: normalized.collection,
       productionCompanies: normalized.productionCompanies,
       productionCountries: normalized.productionCountries,
-      metadataUpdatedAt: new Date(),
       updatedAt: new Date(),
     })
     .where(eq(media.id, mediaId))
@@ -430,13 +434,68 @@ export async function persistFullMedia(
     .update(media)
     .set({
       processingStatus: "ready",
-      metadataUpdatedAt: new Date(),
-      extrasUpdatedAt: new Date(),
       updatedAt: new Date(),
     })
     .where(eq(media.id, mediaId));
 
+  // Seed media_aspect_state so subsequent fast-path reads short-circuit.
+  // Replaces the legacy `metadata_updated_at` / `extras_updated_at` markers.
+  // The cadence engine recomputes `next_eligible_at` on the next ensureMedia
+  // pass; here we use a stub context to anchor the success timestamps.
+  await seedMetadataAndExtrasAspects(db, mediaId, normalized);
+
   return mediaId;
+}
+
+/**
+ * Mark `metadata` and `extras` aspects as successfully fetched. Used by the
+ * direct persistence paths (persistFullMedia / persistMediaUseCase /
+ * resolveMedia) so the fast-path reads on subsequent visits don't re-fetch.
+ *
+ * The cadence engine still rules everything else: next_eligible_at is
+ * computed via the standard `writeAspectState` helper using the freshly
+ * inserted media row's release/airing context.
+ */
+async function seedMetadataAndExtrasAspects(
+  db: Database,
+  mediaId: string,
+  normalized: NormalizedMedia,
+): Promise<void> {
+  const knobs = await loadCadenceKnobs(db);
+  const ctx = buildMediaContext({
+    type: normalized.type,
+    provider: normalized.provider,
+    overrideProviderFor: null,
+    releaseDate: normalized.releaseDate ?? null,
+    nextAirDate: normalized.nextAirDate ?? null,
+  });
+  const now = new Date();
+  const provider = normalized.provider as ProviderName;
+  const stateByKey = new Map();
+  await writeAspectState({
+    db,
+    mediaId,
+    aspect: "metadata",
+    scope: "",
+    outcome: "data",
+    ctx,
+    knobs,
+    stateByKey,
+    now,
+    provider,
+  });
+  await writeAspectState({
+    db,
+    mediaId,
+    aspect: "extras",
+    scope: "",
+    outcome: "data",
+    ctx,
+    knobs,
+    stateByKey,
+    now,
+    provider,
+  });
 }
 
 interface PersistMediaInput {
@@ -501,7 +560,10 @@ export async function persistMediaUseCase(
     ? await findMediaByAnyReference(db, input.externalId, input.provider, undefined, undefined, input.type)
     : await findMediaByExternalId(db, input.externalId, input.provider, input.type);
 
-  if (existing?.metadataUpdatedAt) return existing;
+  if (existing) {
+    const metadataSucceededAt = await findAspectSucceededAt(db, existing.id, "metadata");
+    if (metadataSucceededAt) return existing;
+  }
 
   const { mediaId } = await fetchPersistAndDispatch(db, input, providers, existing, "media:persist");
   return findMediaByIdWithSeasons(db, mediaId);
@@ -526,7 +588,14 @@ export async function resolveMedia(
 ) {
   const existing = await findMediaByExternalId(db, input.externalId, input.provider, input.type);
 
-  if (existing?.metadataUpdatedAt && existing.extrasUpdatedAt) {
+  const [metadataSucceededAt, extrasSucceededAt] = existing
+    ? await Promise.all([
+        findAspectSucceededAt(db, existing.id, "metadata"),
+        findAspectSucceededAt(db, existing.id, "extras"),
+      ])
+    : [null, null];
+
+  if (existing && metadataSucceededAt && extrasSucceededAt) {
     const { language: lang, watchRegion } = await getUserWatchPreferences(db, userId);
     const localized = await applyMediaLocalizationOverlay(db, existing, lang);
     const withRating = await applyMediaContentRating(db, localized, watchRegion);

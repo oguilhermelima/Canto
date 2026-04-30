@@ -8,6 +8,7 @@ import {
   findMediaByExternalId,
   findMediaByAnyReference,
   findMediaByIdWithSeasons,
+  findAspectSucceededAt,
 } from "../../../infra/repositories";
 import { dispatchEnsureMedia } from "../../../platform/queue/bullmq-dispatcher";
 import {
@@ -43,7 +44,8 @@ export async function getByExternal(
 
   if (existing) {
     const STALE_MS = 30 * 24 * 60 * 60 * 1000;
-    const isStale = !existing.extrasUpdatedAt || Date.now() - existing.extrasUpdatedAt.getTime() > STALE_MS;
+    const extrasSucceededAt = await findAspectSucceededAt(db, existing.id, "extras");
+    const isStale = !extrasSucceededAt || Date.now() - extrasSucceededAt.getTime() > STALE_MS;
     if (isStale)
       void dispatchEnsureMedia(existing.id, { aspects: ["extras"] }).catch(
         logAndSwallow("media:getByExternal dispatchEnsureMedia(extras)"),

@@ -4,12 +4,28 @@ import type { Database } from "@canto/db/client";
 import {
   blocklist,
   media,
+  mediaAspectState,
   mediaCredit,
   mediaRecommendation,
   mediaVideo,
   mediaWatchProvider,
   watchProviderLink,
 } from "@canto/db/schema";
+
+/**
+ * SQL fragment that filters to media whose `metadata` aspect has been
+ * successfully fetched at least once. Replaces the legacy
+ * `media.metadata_updated_at IS NOT NULL` filter — stub rows (created from
+ * recommendation/similar payloads with no full metadata fetch) lack a
+ * `media_aspect_state` row for `aspect='metadata'`, so this excludes them.
+ */
+const metadataFetchedExists = sql`EXISTS (
+  SELECT 1 FROM ${mediaAspectState}
+  WHERE ${mediaAspectState.mediaId} = ${media.id}
+    AND ${mediaAspectState.aspect} = 'metadata'
+    AND ${mediaAspectState.scope} = ''
+    AND ${mediaAspectState.succeededAt} IS NOT NULL
+)`;
 import type { RecsFilters } from "../../domain/recommendations/types/recs-filters";
 import { buildRecsFilterConditions, recsSortOrder } from "../recommendations/recs-filter-builder";
 
@@ -71,7 +87,7 @@ export async function findRecommendedMediaWithBackdrops(db: Database, limit: num
   return db.query.media.findMany({
     where: and(
       sql`${media.id} IN (SELECT media_id FROM media_recommendation)`,
-      isNotNull(media.metadataUpdatedAt),
+      metadataFetchedExists,
       isNotNull(media.backdropPath),
       sql`(${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL)`,
       ...getQualityFilters(),
@@ -103,7 +119,7 @@ export async function findGlobalRecommendations(
 
   const where = and(
     sql`${media.id} IN (SELECT media_id FROM media_recommendation)`,
-    isNotNull(media.metadataUpdatedAt),
+    metadataFetchedExists,
     released,
     ...getQualityFilters(),
     ...(excludeConditions.length > 0

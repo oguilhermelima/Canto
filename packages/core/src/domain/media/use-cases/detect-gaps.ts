@@ -10,6 +10,7 @@ import {
   season,
   seasonLocalization,
 } from "@canto/db/schema";
+import { findAspectSucceededAt } from "../../../infra/media/media-aspect-state-repository";
 
 const EN = "en-US";
 import type { Aspect, GapReport } from "./ensure-media.types";
@@ -33,8 +34,6 @@ export async function detectGaps(
     columns: {
       id: true,
       type: true,
-      metadataUpdatedAt: true,
-      extrasUpdatedAt: true,
     },
   });
 
@@ -64,6 +63,8 @@ export async function detectGaps(
     logoLangs,
     extrasRows,
     contentRatingCount,
+    metadataSucceededAt,
+    extrasSucceededAt,
   ] = await Promise.all([
     isShow ? countSeasons(db, mediaId) : Promise.resolve(0),
     isShow ? countEpisodes(db, mediaId) : Promise.resolve(0),
@@ -75,12 +76,14 @@ export async function detectGaps(
       : Promise.resolve<string[]>([]),
     countExtrasQuick(db, mediaId),
     countContentRatings(db, mediaId),
+    findAspectSucceededAt(db, mediaId, "metadata"),
+    findAspectSucceededAt(db, mediaId, "extras"),
   ]);
 
   const now = Date.now();
   const metadataStale =
-    !mediaRow.metadataUpdatedAt ||
-    now - mediaRow.metadataUpdatedAt.getTime() > METADATA_TTL_MS;
+    !metadataSucceededAt ||
+    now - metadataSucceededAt.getTime() > METADATA_TTL_MS;
 
   const structureMissing = isShow && seasonCount === 0;
 
@@ -107,8 +110,8 @@ export async function detectGaps(
   const logosMissingByLang = nonEnLangs.filter((l) => !logoLangSet.has(l));
 
   const extrasStale =
-    !mediaRow.extrasUpdatedAt ||
-    now - mediaRow.extrasUpdatedAt.getTime() > EXTRAS_TTL_MS ||
+    !extrasSucceededAt ||
+    now - extrasSucceededAt.getTime() > EXTRAS_TTL_MS ||
     extrasRows === 0;
 
   const contentRatingsMissing = contentRatingCount === 0;

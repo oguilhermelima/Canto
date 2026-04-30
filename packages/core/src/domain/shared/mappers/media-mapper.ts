@@ -39,8 +39,6 @@ export function normalizedMediaToResponse(m: NormalizedMedia, tvdbSeasons?: Norm
     downloadProfileId: null as string | null,
     createdAt: new Date(),
     updatedAt: new Date(),
-    metadataUpdatedAt: null as Date | null,
-    extrasUpdatedAt: null as Date | null,
     nextAirDate: m.nextAirDate ?? null,
     seasons: (tvdbSeasons ?? m.seasons)?.map((s, i) => ({
       id: `temp-season-${i}`,

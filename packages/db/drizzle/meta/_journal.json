@@ -253,6 +253,13 @@
       "when": 1777700000000,
       "tag": "0035_amused_plazm",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1777507010738,
+      "tag": "0036_icy_revanche",
+      "breakpoints": true
     }
   ]
 }

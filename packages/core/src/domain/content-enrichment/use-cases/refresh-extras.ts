@@ -206,7 +206,7 @@ export async function refreshExtras(
         );
         // Stub row from TMDB's recs/similar payload — enqueue full metadata
         // fetch so the row is filled in before any user-facing query surfaces
-        // it (read paths filter on `metadataUpdatedAt IS NOT NULL`).
+        // it (read paths filter on the metadata aspect having succeeded).
         void dispatchEnsureMedia(inserted.id).catch(
           logAndSwallow("refresh-extras dispatchEnsureMedia"),
         );
@@ -362,11 +362,5 @@ export async function refreshExtras(
         })
         .onConflictDoNothing();
     }
-
-    // Update extrasUpdatedAt
-    await tx
-      .update(media)
-      .set({ extrasUpdatedAt: new Date() })
-      .where(eq(media.id, mediaId));
   });
 }

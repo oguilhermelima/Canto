@@ -24,7 +24,8 @@ export async function persistExtras(
   extras: MediaExtras,
 ): Promise<void> {
   // Each similar/recommendation needs a media row to link to via the junction
-  // table. Stub rows (no metadataUpdatedAt) trigger a full fetch on visit.
+  // table. Stub rows (no media_aspect_state row for `metadata`) trigger a
+  // full fetch on visit.
 
   const allRecItems = [
     ...extras.similar.map((r) => ({ result: r, sourceType: "similar" as const })),
@@ -78,7 +79,8 @@ export async function persistExtras(
         if (inserted) {
           recMediaIdByKey.set(key, inserted.id);
           // Stub row from TMDB's recs/similar payload — enqueue full metadata
-          // fetch so read paths (filtered on metadataUpdatedAt) can surface it.
+          // fetch so read paths (filtered on the metadata aspect having
+          // succeeded) can surface it.
           void dispatchEnsureMedia(inserted.id).catch(
             logAndSwallow("persistExtras dispatchEnsureMedia"),
           );
@@ -187,10 +189,5 @@ export async function persistExtras(
         })
         .onConflictDoNothing();
     }
-
-    await tx
-      .update(media)
-      .set({ extrasUpdatedAt: new Date() })
-      .where(eq(media.id, mediaId));
   });
 }

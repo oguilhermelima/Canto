@@ -24,6 +24,7 @@ import {
   addToUserMediaLibrary,
   ensureServerLibrary,
   upsertMediaVersion,
+  findAspectSucceededAt,
   type MediaVersionInsert,
 } from "../../infra/repositories";
 import { reconcileServerLibrary } from "../../infra/lists/list-repository";
@@ -217,7 +218,12 @@ async function ensureMediaAnchor(
     if (Object.keys(updates).length > 0) {
       await updateMedia(db, existing.id, updates);
     }
-    if (!existing.metadataUpdatedAt) {
+    const metadataSucceededAt = await findAspectSucceededAt(
+      db,
+      existing.id,
+      "metadata",
+    );
+    if (!metadataSucceededAt) {
       void dispatchEnsureMedia(existing.id).catch(
         logAndSwallow("sync-pipeline dispatchEnsureMedia"),
       );

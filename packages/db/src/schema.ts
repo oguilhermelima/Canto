@@ -404,7 +404,6 @@ export const media = pgTable(
     nextAirDate: date("next_air_date"),
     /** Daily airing time slot in network local time (TVDB-sourced), e.g. "21:00". */
     airsTime: varchar("airs_time", { length: 8 }),
-    extrasUpdatedAt: timestamp("extras_updated_at", { withTimezone: true }),
     downloadProfileId: uuid("download_profile_id").references(
       () => downloadProfile.id,
       { onDelete: "set null" },
@@ -414,9 +413,6 @@ export const media = pgTable(
     processingStatus: varchar("processing_status", { length: 20 }).notNull().default("ready"),
 
     // Timestamps
-    metadataUpdatedAt: timestamp("metadata_updated_at", {
-      withTimezone: true,
-    }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -435,11 +431,14 @@ export const media = pgTable(
     index("idx_media_downloaded").on(table.id).where(sql`${table.downloaded} = true`),
     index("idx_media_provider").on(table.provider, table.externalId),
     // Partial index for the spotlight pool (`findRecommendedMediaWithBackdrops`).
-    // The filter trims the seq scan from ~60k to ~38k, and release_date DESC
-    // lets the query finish with an index-only scan.
+    // Filters to rows that already have a backdrop image — stub rows from
+    // recommendation/similar payloads usually do, so the metadata-fetched
+    // refinement happens at query time via an EXISTS subquery against
+    // `media_aspect_state` (which can't be expressed in a partial index
+    // because it crosses tables).
     index("idx_media_rec_enriched")
       .on(sql`${table.releaseDate} DESC`)
-      .where(sql`${table.metadataUpdatedAt} IS NOT NULL AND ${table.backdropPath} IS NOT NULL`),
+      .where(sql`${table.backdropPath} IS NOT NULL`),
     // Functional index that matches the Bayesian weighted-score ORDER BY in
     // `findGlobalRecommendations`. Without this the sort forces a full seq
     // scan + in-memory sort (~2.4s); with it, Postgres does an index scan
@@ -449,7 +448,7 @@ export const media = pgTable(
         sql`((${table.voteCount}::numeric * ${table.voteAverage}::numeric + 650.0) / (${table.voteCount}::numeric + 100)) DESC`,
       )
       .where(
-        sql`${table.metadataUpdatedAt} IS NOT NULL AND ${table.posterPath} IS NOT NULL AND ${table.voteCount} >= 50`,
+        sql`${table.posterPath} IS NOT NULL AND ${table.voteCount} >= 50`,
       ),
   ],
 );

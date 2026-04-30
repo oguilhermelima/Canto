@@ -12,6 +12,7 @@ import {
   findMediaByAnyReference,
   updateMedia,
 } from "../../../infra/media/media-repository";
+import { findAspectSucceededAt } from "../../../infra/media/media-aspect-state-repository";
 import {
   ensureServerLibrary,
   addListItem,
@@ -189,7 +190,12 @@ export async function scanFolderForMedia(
           imported++;
         }
 
-        if (!existing.metadataUpdatedAt) {
+        const metadataSucceededAt = await findAspectSucceededAt(
+          db,
+          existing.id,
+          "metadata",
+        );
+        if (!metadataSucceededAt) {
           void dispatchEnsureMedia(existing.id).catch(() => {});
         }
       } else {
