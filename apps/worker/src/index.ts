@@ -23,9 +23,7 @@ import {
 } from "./jobs/trakt-sync";
 import type { RunSectionInput } from "@canto/core/domain/trakt/run-section";
 import { handleTraktListDelete, handleTraktListDeleteSweep } from "./jobs/trakt-list-delete";
-import { refreshExtras } from "@canto/core/domain/content-enrichment/use-cases/refresh-extras";
 import { rebuildUserRecs } from "@canto/core/domain/recommendations/use-cases/rebuild-user-recs";
-import { translateEpisodes } from "@canto/core/domain/content-enrichment/use-cases/translate-episodes";
 import { enqueueDailyRecsRebuild } from "@canto/core/domain/recommendations/use-cases/enqueue-daily-recs-rebuild";
 import { ensureMedia } from "@canto/core/domain/media/use-cases/ensure-media";
 import type { EnsureMediaJob } from "@canto/core/platform/queue/bullmq-dispatcher";
@@ -265,33 +263,10 @@ const workers = [
 
   // ── On-demand (dispatched by other code) ──
 
-  // Drains pre-existing in-flight `refresh-extras` jobs from older builds —
-  // new dispatches go through `ensureMedia`. Keep until those jobs are gone
-  // (Phase 1C-δ retires the queue + use-case together).
-  makeWorker<{ mediaId: string }>(
-    QUEUES.refreshExtras,
-    async ({ mediaId }) => {
-      const tmdb = await getTmdbProvider();
-      await refreshExtras(db, mediaId, { tmdb });
-    },
-    { concurrency: 2 },
-  ),
-
   makeWorker<{ userId: string }>(
     QUEUES.rebuildUserRecs,
     ({ userId }) => rebuildUserRecs(db, userId),
     { concurrency: 2 },
-  ),
-
-  // Drains pre-existing `translate-episodes` jobs from older builds — new
-  // dispatches go through `ensureMedia`'s `translations` strategy.
-  makeWorker<{ mediaId: string; tvdbId: number; language: string }>(
-    QUEUES.translateEpisodes,
-    async ({ mediaId, tvdbId, language }) => {
-      const tvdb = await getTvdbProvider();
-      await translateEpisodes(db, mediaId, tvdbId, language, tvdb);
-    },
-    { concurrency: 3 },
   ),
 
   // ── Unified ensureMedia engine ──

@@ -21,9 +21,7 @@ export const QUEUES = {
   folderScan: "folder-scan",
   validateDownloads: "validate-downloads",
   repackSupersede: "repack-supersede",
-  refreshExtras: "refresh-extras",
   rebuildUserRecs: "rebuild-user-recs",
-  translateEpisodes: "translate-episodes",
   ensureMedia: "ensure-media",
 } as const;
 
