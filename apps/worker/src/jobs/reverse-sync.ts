@@ -10,20 +10,18 @@
 import { db } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
+import { runWithConcurrency } from "@canto/core/platform/concurrency/run-with-concurrency";
+import type { MediaVersionRow } from "@canto/core/infra/media/media-version-repository";
 import {
   findEnabledSyncLinks,
   findAllUserConnections,
-  findEpisodeIdByMediaAndNumbers,
-  findMediaByAnyReference,
-  findMediaVersionBySourceAndServerItemId,
-  findUserPlaybackProgress,
   upsertUserPlaybackProgress,
   addToUserMediaLibrary,
   pruneStaleUserMediaLibrary,
   pruneStaleMediaVersions,
   touchMediaVersionsSeen,
   reconcileMediaInLibrary,
-  updateServerLink,
+  updateServerLinksBatch,
   markUserConnectionStale,
   clearUserConnectionStale,
 } from "@canto/core/infra/repositories";
@@ -34,6 +32,11 @@ import {
   scanPlexLibraries,
   runSyncPipeline,
   SyncAuthError,
+  batchResolveMediaByExternalRefs,
+  batchResolveMediaVersionsByServerItemIds,
+  batchResolveEpisodesByMediaAndNumbers,
+  findMediaInRefs,
+  findEpisodeIdInMap,
   type JellyfinLibraryRef,
   type PlexLibraryRef,
   type ScannedMediaItem,
@@ -90,31 +93,92 @@ async function scanForConnection(
 /*  Per-user phase: playback progress + library membership                    */
 /* -------------------------------------------------------------------------- */
 
+interface PlaybackSyncResult {
+  /** Media rows whose playback state was upserted this cycle. */
+  touchedMediaIds: Set<string>;
+  /**
+   * Full media_version map for every scanned serverItemId. Returned so the
+   * downstream `filterItemsNeedingGlobalSync` can re-use the lookup instead
+   * of re-issuing N per-item queries.
+   */
+  versionMap: Map<string, MediaVersionRow>;
+}
+
 async function syncUserPlaybackAndLibrary(
   userId: string,
   provider: ServerSource,
   items: ScannedMediaItem[],
   syncRunStart: Date,
   allowPrune: boolean,
-): Promise<Set<string>> {
+): Promise<PlaybackSyncResult> {
   const touchedMediaIds = new Set<string>();
 
-  for (const item of items) {
-    const mediaByReference = await findMediaByAnyReference(
+  // Two batch lookups in parallel: media-by-external-refs (for anchor
+  // resolution) and media_version-by-serverItemId (covers items without
+  // external ids and feeds the recently-synced filter downstream). Each
+  // hits a different index, so they can run concurrently.
+  const [refMaps, versionMap] = await Promise.all([
+    batchResolveMediaByExternalRefs(
       db,
-      item.externalIds.tmdb ?? 0,
-      "tmdb",
-      item.externalIds.imdb,
-      item.externalIds.tvdb,
-    );
-    let mediaId: string | null = mediaByReference?.id ?? null;
+      items.map((i) => ({
+        tmdbId: i.externalIds.tmdb,
+        imdbId: i.externalIds.imdb,
+        tvdbId: i.externalIds.tvdb,
+      })),
+    ),
+    batchResolveMediaVersionsByServerItemIds(
+      db,
+      provider,
+      items.map((i) => i.serverItemId),
+    ),
+  ]);
+
+  // Resolve each item against (refs → version) in priority order, caching
+  // the result so the per-item loop and the show-mediaId aggregation below
+  // both hit memory only.
+  const refResolved = new Map<string, { id: string; type: string } | null>();
+  for (const item of items) {
+    const row = findMediaInRefs(refMaps, {
+      tmdbId: item.externalIds.tmdb,
+      imdbId: item.externalIds.imdb,
+      tvdbId: item.externalIds.tvdb,
+    });
+    if (row) {
+      refResolved.set(item.serverItemId, { id: row.id, type: row.type });
+      continue;
+    }
+    refResolved.set(item.serverItemId, null);
+  }
+
+  // Episodes: fan-in by mediaId. Episode lookup is needed only for show
+  // items with valid (season, episode) numbers. Mirrors the per-item gate
+  // below — `resolvedType` falls back to `item.type` when ref-resolution
+  // missed, so a movie item with stray season/episode numbers (rare) is
+  // excluded.
+  const showMediaIds = new Set<string>();
+  for (const item of items) {
+    if (!Number.isInteger(item.playback.seasonNumber)) continue;
+    if (!Number.isInteger(item.playback.episodeNumber)) continue;
+    if ((item.playback.seasonNumber ?? -1) < 0) continue;
+    if ((item.playback.episodeNumber ?? -1) < 0) continue;
+    const anchor = refResolved.get(item.serverItemId);
+    const resolvedType = anchor?.type ?? item.type;
+    if (resolvedType !== "show") continue;
+    const mediaId =
+      anchor?.id ?? versionMap.get(item.serverItemId)?.mediaId ?? null;
+    if (!mediaId) continue;
+    showMediaIds.add(mediaId);
+  }
+  const episodeMap = await batchResolveEpisodesByMediaAndNumbers(db, [
+    ...showMediaIds,
+  ]);
+
+  for (const item of items) {
+    const anchor = refResolved.get(item.serverItemId);
+    let mediaId: string | null = anchor?.id ?? null;
     if (!mediaId) {
-      const resolvedVersion = await findMediaVersionBySourceAndServerItemId(
-        db,
-        provider,
-        item.serverItemId,
-      );
-      if (resolvedVersion?.mediaId) mediaId = resolvedVersion.mediaId;
+      const v = versionMap.get(item.serverItemId);
+      if (v?.mediaId) mediaId = v.mediaId;
     }
 
     if (mediaId) {
@@ -131,7 +195,7 @@ async function syncUserPlaybackAndLibrary(
       (item.playback.positionSeconds ?? 0) > 0 || item.playback.played;
     if (!hasPlayback || !mediaId) continue;
 
-    const resolvedType = mediaByReference?.type ?? item.type;
+    const resolvedType = anchor?.type ?? item.type;
     let episodeId: string | undefined;
     if (
       resolvedType === "show" &&
@@ -140,8 +204,8 @@ async function syncUserPlaybackAndLibrary(
       (item.playback.seasonNumber ?? -1) >= 0 &&
       (item.playback.episodeNumber ?? -1) >= 0
     ) {
-      const found = await findEpisodeIdByMediaAndNumbers(
-        db,
+      const found = findEpisodeIdInMap(
+        episodeMap,
         mediaId,
         item.playback.seasonNumber ?? 0,
         item.playback.episodeNumber ?? 0,
@@ -157,21 +221,11 @@ async function syncUserPlaybackAndLibrary(
     // certainly a round-trip of a push we already made to this server on a
     // previous cycle. We still upsert (so lastWatchedAt/source refresh) but
     // skip the fan-out to prevent infinite ping-pong between servers.
-    const existingProgress = await findUserPlaybackProgress(
-      db,
-      userId,
-      mediaId,
-      episodeId ?? null,
-    );
-    const positionDelta = Math.abs(
-      newPosition - (existingProgress?.positionSeconds ?? 0),
-    );
-    const completionChanged =
-      (existingProgress?.isCompleted ?? false) !== newCompleted;
-    const shouldPush =
-      !existingProgress || positionDelta > 5 || completionChanged;
-
-    await upsertUserPlaybackProgress(db, {
+    //
+    // `upsertUserPlaybackProgress` already does the find-then-update internally;
+    // it now also returns the pre-update snapshot (or null for new/tombstoned
+    // rows) so the echo guard can be evaluated without a second round-trip.
+    const { previous } = await upsertUserPlaybackProgress(db, {
       userId,
       mediaId,
       episodeId,
@@ -181,6 +235,15 @@ async function syncUserPlaybackAndLibrary(
       source: provider,
     });
     touchedMediaIds.add(mediaId);
+
+    const positionDelta = previous
+      ? Math.abs(newPosition - (previous.positionSeconds ?? 0))
+      : Number.POSITIVE_INFINITY;
+    const completionChanged = previous
+      ? previous.isCompleted !== newCompleted
+      : true;
+    const shouldPush =
+      !previous || positionDelta > 5 || completionChanged;
 
     if (shouldPush) {
       // Fire-and-forget; the use case swallows per-server errors so one bad
@@ -219,18 +282,25 @@ async function syncUserPlaybackAndLibrary(
     }
   }
 
-  return touchedMediaIds;
+  return { touchedMediaIds, versionMap };
 }
 
 /* -------------------------------------------------------------------------- */
 /*  Global phase: filter items we've already imported recently                */
 /* -------------------------------------------------------------------------- */
 
-async function filterItemsNeedingGlobalSync(
+/**
+ * Memory-only filter: skip items whose library was already globally synced
+ * this run, and items whose existing media_version row was imported/skipped
+ * within the last 6 hours. The `versionMap` argument carries the pre-loaded
+ * media_version rows from `syncUserPlaybackAndLibrary` — no DB calls here.
+ */
+function filterItemsNeedingGlobalSync(
   provider: ServerSource,
   items: ScannedMediaItem[],
   alreadySynced: Set<string>,
-): Promise<ScannedMediaItem[]> {
+  versionMap: Map<string, MediaVersionRow>,
+): ScannedMediaItem[] {
   const skipCutoff = new Date(Date.now() - SKIP_RECENTLY_SYNCED_MS);
   const out: ScannedMediaItem[] = [];
 
@@ -238,11 +308,7 @@ async function filterItemsNeedingGlobalSync(
     const libKey = `${provider}:${item.serverLinkId}`;
     if (alreadySynced.has(libKey)) continue;
 
-    const existing = await findMediaVersionBySourceAndServerItemId(
-      db,
-      provider,
-      item.serverItemId,
-    );
+    const existing = versionMap.get(item.serverItemId);
     if (
       existing?.mediaId &&
       existing.syncedAt &&
@@ -388,16 +454,17 @@ export async function runReverseSync(options: ReverseSyncOptions = {}): Promise<
       // Warm delta runs legitimately return 0 items when nothing changed
       // since the checkpoint. Bump every link's checkpoint so the next run
       // starts from "now" instead of widening the delta window forever.
-      const now = new Date();
-      for (const lib of libs) {
-        try {
-          await updateServerLink(db, lib.linkId, { lastSyncedAt: now });
-        } catch (err) {
-          console.error(
-            `[reverse-sync] Failed to update lastSyncedAt for link ${lib.linkId}:`,
-            err instanceof Error ? err.message : err,
-          );
-        }
+      try {
+        await updateServerLinksBatch(
+          db,
+          libs.map((l) => l.linkId),
+          { lastSyncedAt: new Date() },
+        );
+      } catch (err) {
+        console.error(
+          `[reverse-sync] Failed to update lastSyncedAt for ${libs.length} link(s):`,
+          err instanceof Error ? err.message : err,
+        );
       }
       if (force || allLinksFullScan) {
         console.warn(
@@ -408,7 +475,7 @@ export async function runReverseSync(options: ReverseSyncOptions = {}): Promise<
     }
 
     const syncRunStart = new Date();
-    const touchedMediaIds = await syncUserPlaybackAndLibrary(
+    const { touchedMediaIds, versionMap } = await syncUserPlaybackAndLibrary(
       conn.userId,
       provider,
       items,
@@ -416,16 +483,22 @@ export async function runReverseSync(options: ReverseSyncOptions = {}): Promise<
       allLinksFullScan,
     );
 
-    for (const mediaId of touchedMediaIds) {
-      await promoteUserMediaStateFromPlayback(db, { userId: conn.userId, mediaId });
-    }
+    // Independent calls — fan out with bounded concurrency so a user with
+    // 1000 watched items doesn't issue 1000 sequential awaits.
+    await runWithConcurrency(
+      [...touchedMediaIds],
+      10,
+      (mediaId) =>
+        promoteUserMediaStateFromPlayback(db, { userId: conn.userId, mediaId }),
+    );
 
     const scannedLinkIds = [...new Set(items.map((i) => i.serverLinkId))];
 
-    const needGlobalSync = await filterItemsNeedingGlobalSync(
+    const needGlobalSync = filterItemsNeedingGlobalSync(
       provider,
       items,
       globallySyncedLibraries,
+      versionMap,
     );
 
     // Items the TMDB rate-limit filter dropped were still observed this
@@ -489,16 +562,17 @@ export async function runReverseSync(options: ReverseSyncOptions = {}): Promise<
     // Bump every attempted link's checkpoint — including ones that returned
     // zero delta items — so warm runs don't keep widening the delta window
     // indefinitely for quiet libraries.
-    const checkpointNow = new Date();
-    for (const lib of libs) {
-      try {
-        await updateServerLink(db, lib.linkId, { lastSyncedAt: checkpointNow });
-      } catch (err) {
-        console.error(
-          `[reverse-sync] Failed to update lastSyncedAt for link ${lib.linkId}:`,
-          err instanceof Error ? err.message : err,
-        );
-      }
+    try {
+      await updateServerLinksBatch(
+        db,
+        libs.map((l) => l.linkId),
+        { lastSyncedAt: new Date() },
+      );
+    } catch (err) {
+      console.error(
+        `[reverse-sync] Failed to update lastSyncedAt for ${libs.length} link(s):`,
+        err instanceof Error ? err.message : err,
+      );
     }
 
     for (const item of needGlobalSync) {

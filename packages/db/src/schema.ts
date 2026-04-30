@@ -428,6 +428,17 @@ export const media = pgTable(
     index("idx_media_in_library").on(table.id).where(sql`${table.inLibrary} = true`),
     index("idx_media_downloaded").on(table.id).where(sql`${table.downloaded} = true`),
     index("idx_media_provider").on(table.provider, table.externalId),
+    // Cross-reference partial indexes — reverse-sync's batch resolver hits
+    // imdbId/tvdbId via `inArray`, and most rows have NULL for both columns.
+    // Partial indexes keep them tiny and let Postgres plan a BitmapOr across
+    // (idx_media_external, idx_media_imdb_id, idx_media_tvdb_id) when the
+    // batch resolver issues its single OR query.
+    index("idx_media_imdb_id")
+      .on(table.imdbId)
+      .where(sql`${table.imdbId} IS NOT NULL`),
+    index("idx_media_tvdb_id")
+      .on(table.tvdbId)
+      .where(sql`${table.tvdbId} IS NOT NULL`),
     // Partial index for the spotlight pool (`findRecommendedMediaWithBackdrops`).
     // Filters to rows that already have a backdrop image — stub rows from
     // recommendation/similar payloads usually do, so the metadata-fetched

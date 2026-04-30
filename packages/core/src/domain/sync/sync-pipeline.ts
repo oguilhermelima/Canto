@@ -38,6 +38,11 @@ import {
 
 import type { ScannedMediaItem, SyncResult, SyncSummary } from "./types";
 import { emptySummary } from "./types";
+import {
+  createMediaAnchorCache,
+  type MediaAnchorCache,
+  type ResolvedMediaAnchor,
+} from "./media-resolution-cache";
 
 /* -------------------------------------------------------------------------- */
 /*  Constants                                                                  */
@@ -162,12 +167,6 @@ export function toMediaVersionInsert(
 /*  Media resolution + persistence                                             */
 /* -------------------------------------------------------------------------- */
 
-interface ResolvedMediaAnchor {
-  mediaId: string;
-  tmdbId: number;
-  isNewImport: boolean;
-}
-
 /**
  * Ensure the media row exists in the DB. Three branches:
  *   1. In-memory cache hit → return it.
@@ -181,7 +180,7 @@ async function ensureMediaAnchor(
   db: Database,
   tmdb: MediaProviderPort,
   scanned: ScannedMediaItem,
-  cache: Map<number, ResolvedMediaAnchor>,
+  cache: MediaAnchorCache,
   supportedLangs: readonly string[],
   tvdbEnabled: boolean,
 ): Promise<ResolvedMediaAnchor | null> {
@@ -400,7 +399,7 @@ export async function runSyncPipeline(
     `[${tag}] Found ${scannedItems.length} items (${deduplicated.length} unique) to process`,
   );
 
-  const mediaCache = new Map<number, ResolvedMediaAnchor>();
+  const mediaCache = createMediaAnchorCache();
 
   try {
     for (let i = 0; i < deduplicated.length; i += BATCH_SIZE) {
@@ -460,7 +459,7 @@ export async function runSyncPipeline(
 interface ProcessCtx {
   tag: string;
   config: ServerConfig;
-  mediaCache: Map<number, ResolvedMediaAnchor>;
+  mediaCache: MediaAnchorCache;
   supportedLangs: readonly string[];
   tvdbEnabled: boolean;
   syncRunStart: Date;

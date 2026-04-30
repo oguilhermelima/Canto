@@ -34,10 +34,30 @@ export async function findUserPlaybackProgressByMedia(
   });
 }
 
+/**
+ * Snapshot of the row's pre-upsert state. Callers use this to implement
+ * echo-guard logic (skip push fan-out when an observation merely round-trips
+ * a value we already pushed) without a second DB round-trip.
+ *
+ * Returns `null` when there is no live row to compare against — i.e. new
+ * insert, tombstoned-with-suppressed-write, or tombstoned-revival. This
+ * matches the legacy behavior of `findUserPlaybackProgress`, which filters
+ * out `deletedAt IS NOT NULL` rows.
+ */
+export interface PlaybackPreviousState {
+  positionSeconds: number | null;
+  isCompleted: boolean;
+}
+
+export interface UpsertPlaybackResult {
+  row: typeof userPlaybackProgress.$inferSelect | undefined;
+  previous: PlaybackPreviousState | null;
+}
+
 export async function upsertUserPlaybackProgress(
   db: Database,
   data: typeof userPlaybackProgress.$inferInsert,
-) {
+): Promise<UpsertPlaybackResult> {
   // PostgreSQL unique indexes treat NULL as distinct, so ON CONFLICT won't fire
   // for rows where episodeId IS NULL (movies). We do a find-then-update instead.
   // We include soft-deleted rows in the lookup so the tombstone logic below
@@ -63,14 +83,18 @@ export async function upsertUserPlaybackProgress(
           ? new Date(data.lastWatchedAt)
           : null;
       if (!incomingAt || incomingAt.getTime() <= existing.deletedAt.getTime()) {
-        return existing;
+        // Tombstoned row, no revive — caller sees no previous state so the
+        // echo guard treats this like a brand-new observation (matches the
+        // legacy `findUserPlaybackProgress` behavior of filtering tombstones).
+        return { row: existing, previous: null };
       }
       const [revived] = await db
         .update(userPlaybackProgress)
         .set({ ...data, deletedAt: null })
         .where(eq(userPlaybackProgress.id, existing.id))
         .returning();
-      return revived;
+      // Revival = caller's first observation post-tombstone, so previous = null.
+      return { row: revived, previous: null };
     }
 
     const [updated] = await db
@@ -78,14 +102,20 @@ export async function upsertUserPlaybackProgress(
       .set(data)
       .where(eq(userPlaybackProgress.id, existing.id))
       .returning();
-    return updated;
+    return {
+      row: updated,
+      previous: {
+        positionSeconds: existing.positionSeconds,
+        isCompleted: existing.isCompleted,
+      },
+    };
   }
 
   const [inserted] = await db
     .insert(userPlaybackProgress)
     .values(data)
     .returning();
-  return inserted;
+  return { row: inserted, previous: null };
 }
 
 /** Get all distinct (userId, mediaId) pairs that have any playback progress entries.

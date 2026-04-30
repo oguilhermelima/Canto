@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
   downloadFolder,
@@ -203,6 +203,24 @@ export async function updateServerLink(
     .where(eq(folderServerLink.id, id))
     .returning();
   return updated;
+}
+
+/**
+ * Apply the same `data` update to every link id in `ids`. Mirrors
+ * `updateDownloadBatch`; used by reverse-sync to checkpoint dozens of links
+ * at once without the per-row round-trip of calling `updateServerLink` in a
+ * loop.
+ */
+export async function updateServerLinksBatch(
+  db: Database,
+  ids: string[],
+  data: Partial<Pick<FolderServerLinkInsert, "syncEnabled" | "contentType" | "lastSyncedAt">>,
+): Promise<void> {
+  if (ids.length === 0) return;
+  await db
+    .update(folderServerLink)
+    .set(data)
+    .where(inArray(folderServerLink.id, ids));
 }
 
 export async function removeServerLink(db: Database, id: string) {

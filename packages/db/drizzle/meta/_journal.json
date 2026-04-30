@@ -267,6 +267,13 @@
       "when": 1777509263045,
       "tag": "0037_smooth_peter_parker",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1777511868617,
+      "tag": "0038_volatile_manta",
+      "breakpoints": true
     }
   ]
 }
