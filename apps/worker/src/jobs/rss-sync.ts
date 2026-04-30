@@ -72,6 +72,20 @@ export async function handleRssSync(): Promise<void> {
   // 3. Match and download
   let downloadCount = 0;
 
+  // Cache blocklists per matched show — RSS feeds typically have many items
+  // for the same show, so the per-item lookup at line below would otherwise
+  // re-query the DB for every release.
+  const blocklistCache = new Map<string, Set<string>>();
+  async function getBlocklistTitles(mediaId: string): Promise<Set<string>> {
+    let cached = blocklistCache.get(mediaId);
+    if (!cached) {
+      const rows = await findBlocklistByMediaId(db, mediaId);
+      cached = new Set(rows.map((b) => b.title.toLowerCase()));
+      blocklistCache.set(mediaId, cached);
+    }
+    return cached;
+  }
+
   for (const item of rssItems) {
     try {
       // Parse season/episode from RSS title
@@ -106,9 +120,8 @@ export async function handleRssSync(): Promise<void> {
       );
       if (confidence <= 0) continue;
 
-      // Check blocklist
-      const blocked = await findBlocklistByMediaId(db, matchedShow.id);
-      const blockedTitles = new Set(blocked.map((b) => b.title.toLowerCase()));
+      // Check blocklist (cached per show)
+      const blockedTitles = await getBlocklistTitles(matchedShow.id);
       if (blockedTitles.has(item.title.toLowerCase())) continue;
 
       const seasonNum = seasons[0]!;

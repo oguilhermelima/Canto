@@ -4,7 +4,7 @@ import { db } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
 import {
   findDownloadedLibraryMedia,
-  findImportedFilesForMedia,
+  findImportedFilesByMediaIds,
   updateMedia,
 } from "@canto/core/infra/repositories";
 import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
@@ -25,10 +25,22 @@ export async function handleValidateDownloads(): Promise<void> {
   const downloadedMedia = await findDownloadedLibraryMedia(db);
   if (downloadedMedia.length === 0) return;
 
+  // One SELECT for every imported file across the whole batch.
+  const allFiles = await findImportedFilesByMediaIds(
+    db,
+    downloadedMedia.map((m) => m.id),
+  );
+  const filesByMediaId = new Map<string, Array<{ filePath: string | null }>>();
+  for (const f of allFiles) {
+    const list = filesByMediaId.get(f.mediaId);
+    if (list) list.push({ filePath: f.filePath });
+    else filesByMediaId.set(f.mediaId, [{ filePath: f.filePath }]);
+  }
+
   let invalidated = 0;
 
   for (const row of downloadedMedia) {
-    const files = await findImportedFilesForMedia(db, row.id);
+    const files = filesByMediaId.get(row.id) ?? [];
 
     if (files.length === 0) {
       // No imported files in DB — mark as not downloaded
@@ -37,18 +49,19 @@ export async function handleValidateDownloads(): Promise<void> {
       continue;
     }
 
-    // Check at least one file exists on disk
-    let anyExists = false;
-    for (const file of files) {
-      if (!file.filePath) continue;
-      try {
-        await access(file.filePath, constants.F_OK);
-        anyExists = true;
-        break;
-      } catch {
-        // File not accessible
-      }
-    }
+    // Check at least one file exists on disk — checks run in parallel.
+    const checks = await Promise.all(
+      files.map(async (file) => {
+        if (!file.filePath) return false;
+        try {
+          await access(file.filePath, constants.F_OK);
+          return true;
+        } catch {
+          return false;
+        }
+      }),
+    );
+    const anyExists = checks.some((ok) => ok);
 
     if (!anyExists) {
       await updateMedia(db, row.id, { downloaded: false });

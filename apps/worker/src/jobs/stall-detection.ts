@@ -4,7 +4,7 @@ import { buildIndexers } from "@canto/core/infra/indexers/indexer-factory";
 import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
 import { retryStalledTorrent } from "@canto/core/domain/torrents/use-cases/retry-stalled-torrent";
 import {
-  findAllDownloads,
+  findDownloadsByStatus,
   updateDownload,
 } from "@canto/core/infra/repositories";
 
@@ -31,13 +31,15 @@ export async function handleStallDetection(): Promise<void> {
   }
 
   const liveMap = new Map(liveTorrents.map((t) => [t.hash, t]));
-  const allTorrents = await findAllDownloads(db);
+  // Filter at the DB layer using download.status — avoids loading completed/failed
+  // rows we'd discard in the next line anyway.
+  const downloadingRows = await findDownloadsByStatus(db, "downloading");
 
   const now = Date.now();
-  const stalled: typeof allTorrents = [];
+  const stalled: typeof downloadingRows = [];
 
-  for (const row of allTorrents) {
-    if (row.status !== "downloading" || !row.hash) continue;
+  for (const row of downloadingRows) {
+    if (!row.hash) continue;
 
     const live = liveMap.get(row.hash);
     if (!live) continue;

@@ -490,3 +490,24 @@ export async function findImportedFilesForMedia(
     .where(and(eq(mediaFile.mediaId, mediaId), eq(mediaFile.status, "imported")));
 }
 
+/**
+ * Imported media_file rows for many media in one query — used by the
+ * `validate-downloads` sweep so we don't issue one query per row.
+ */
+export async function findImportedFilesByMediaIds(
+  db: Database,
+  mediaIds: string[],
+): Promise<Array<{ id: string; mediaId: string; filePath: string | null }>> {
+  if (mediaIds.length === 0) return [];
+  return db
+    .select({
+      id: mediaFile.id,
+      mediaId: mediaFile.mediaId,
+      filePath: mediaFile.filePath,
+    })
+    .from(mediaFile)
+    .where(
+      and(inArray(mediaFile.mediaId, mediaIds), eq(mediaFile.status, "imported")),
+    );
+}
+
