@@ -40,14 +40,14 @@ export function normalizeSearchResult(
   const isMovie = type === "movie";
 
   const title = isMovie
-    ? ((data.title as string) ?? "")
-    : ((data.name as string) ?? "");
+    ? ((data.title as string | undefined) ?? "")
+    : ((data.name as string | undefined) ?? "");
   const originalTitle = isMovie
-    ? ((data.original_title as string) ?? undefined)
-    : ((data.original_name as string) ?? undefined);
+    ? (data.original_title as string | undefined)
+    : (data.original_name as string | undefined);
   const releaseDate = isMovie
-    ? ((data.release_date as string) ?? undefined)
-    : ((data.first_air_date as string) ?? undefined);
+    ? (data.release_date as string | undefined)
+    : (data.first_air_date as string | undefined);
 
   return {
     externalId: data.id as number,
@@ -55,16 +55,16 @@ export function normalizeSearchResult(
     type,
     title,
     originalTitle,
-    overview: (data.overview as string) ?? undefined,
-    posterPath: (data.poster_path as string | null) ?? undefined,
-    backdropPath: (data.backdrop_path as string | null) ?? undefined,
+    overview: data.overview as string | undefined,
+    posterPath: (data.poster_path as string | null | undefined) ?? undefined,
+    backdropPath: (data.backdrop_path as string | null | undefined) ?? undefined,
     releaseDate,
     year: yearFromDate(releaseDate),
-    voteAverage: (data.vote_average as number) ?? undefined,
-    voteCount: (data.vote_count as number) ?? undefined,
-    popularity: (data.popularity as number) ?? undefined,
-    genreIds: (data.genre_ids as number[]) ?? undefined,
-    originalLanguage: (data.original_language as string) ?? undefined,
+    voteAverage: data.vote_average as number | undefined,
+    voteCount: data.vote_count as number | undefined,
+    popularity: data.popularity as number | undefined,
+    genreIds: data.genre_ids as number[] | undefined,
+    originalLanguage: data.original_language as string | undefined,
   };
 }
 
@@ -309,37 +309,37 @@ function normalizeMovie(data: Record<string, unknown>): NormalizedMedia {
       }
     : null;
 
-  const releaseDate = (data.release_date as string) ?? undefined;
+  const releaseDate = data.release_date as string | undefined;
 
   return {
     externalId: data.id as number,
     provider: "tmdb",
     type: "movie",
-    title: (data.title as string) ?? "",
-    originalTitle: (data.original_title as string) ?? undefined,
-    overview: (data.overview as string) ?? undefined,
-    tagline: (data.tagline as string) ?? undefined,
+    title: (data.title as string | undefined) ?? "",
+    originalTitle: data.original_title as string | undefined,
+    overview: data.overview as string | undefined,
+    tagline: data.tagline as string | undefined,
     releaseDate,
     year: yearFromDate(releaseDate),
-    status: (data.status as string) ?? undefined,
+    status: data.status as string | undefined,
     genres,
     genreIds,
     contentRating,
     contentRatings: contentRatings.length > 0 ? contentRatings : undefined,
-    originalLanguage: (data.original_language as string) ?? undefined,
+    originalLanguage: data.original_language as string | undefined,
     spokenLanguages,
     originCountry,
-    voteAverage: (data.vote_average as number) ?? undefined,
-    voteCount: (data.vote_count as number) ?? undefined,
-    popularity: (data.popularity as number) ?? undefined,
-    runtime: (data.runtime as number) ?? undefined,
-    posterPath: (data.poster_path as string | null) ?? undefined,
-    backdropPath: (data.backdrop_path as string | null) ?? undefined,
+    voteAverage: data.vote_average as number | undefined,
+    voteCount: data.vote_count as number | undefined,
+    popularity: data.popularity as number | undefined,
+    runtime: data.runtime as number | undefined,
+    posterPath: (data.poster_path as string | null | undefined) ?? undefined,
+    backdropPath: (data.backdrop_path as string | null | undefined) ?? undefined,
     logoPath,
-    imdbId: externalIds?.imdb_id ?? (data.imdb_id as string) ?? undefined,
-    tvdbId: externalIds?.tvdb_id ?? undefined,
-    budget: (data.budget as number) ?? undefined,
-    revenue: (data.revenue as number) ?? undefined,
+    imdbId: externalIds?.imdb_id ?? (data.imdb_id as string | undefined),
+    tvdbId: externalIds?.tvdb_id,
+    budget: data.budget as number | undefined,
+    revenue: data.revenue as number | undefined,
     collection,
     productionCompanies,
     productionCountries,
@@ -418,54 +418,54 @@ function normalizeShow(data: Record<string, unknown>): NormalizedMedia {
           | number
           | undefined) ?? undefined;
 
-  const firstAirDate = (data.first_air_date as string) ?? undefined;
-  const lastAirDate = (data.last_air_date as string) ?? undefined;
+  const firstAirDate = data.first_air_date as string | undefined;
+  const lastAirDate = data.last_air_date as string | undefined;
 
   // Seasons from the show object (light — no episodes yet)
   const rawSeasons = (data.seasons ?? []) as Array<Record<string, unknown>>;
   const seasons: NormalizedSeason[] = rawSeasons.map((s) => ({
     number: s.season_number as number,
     externalId: s.id as number,
-    name: (s.name as string) ?? undefined,
-    overview: (s.overview as string) ?? undefined,
-    airDate: (s.air_date as string | null) ?? undefined,
-    posterPath: (s.poster_path as string | null) ?? undefined,
-    episodeCount: (s.episode_count as number) ?? undefined,
+    name: s.name as string | undefined,
+    overview: s.overview as string | undefined,
+    airDate: (s.air_date as string | null | undefined) ?? undefined,
+    posterPath: (s.poster_path as string | null | undefined) ?? undefined,
+    episodeCount: s.episode_count as number | undefined,
   }));
 
   return {
     externalId: data.id as number,
     provider: "tmdb",
     type: "show",
-    title: (data.name as string) ?? "",
-    originalTitle: (data.original_name as string) ?? undefined,
-    overview: (data.overview as string) ?? undefined,
-    tagline: (data.tagline as string) ?? undefined,
+    title: (data.name as string | undefined) ?? "",
+    originalTitle: data.original_name as string | undefined,
+    overview: data.overview as string | undefined,
+    tagline: data.tagline as string | undefined,
     releaseDate: firstAirDate,
     year: yearFromDate(firstAirDate),
     lastAirDate,
-    status: (data.status as string) ?? undefined,
+    status: data.status as string | undefined,
     genres,
     genreIds,
     contentRating,
     contentRatings: contentRatings.length > 0 ? contentRatings : undefined,
-    originalLanguage: (data.original_language as string) ?? undefined,
+    originalLanguage: data.original_language as string | undefined,
     spokenLanguages,
     originCountry,
-    voteAverage: (data.vote_average as number) ?? undefined,
-    voteCount: (data.vote_count as number) ?? undefined,
-    popularity: (data.popularity as number) ?? undefined,
+    voteAverage: data.vote_average as number | undefined,
+    voteCount: data.vote_count as number | undefined,
+    popularity: data.popularity as number | undefined,
     runtime,
-    posterPath: (data.poster_path as string | null) ?? undefined,
-    backdropPath: (data.backdrop_path as string | null) ?? undefined,
+    posterPath: (data.poster_path as string | null | undefined) ?? undefined,
+    backdropPath: (data.backdrop_path as string | null | undefined) ?? undefined,
     logoPath,
-    imdbId: externalIds?.imdb_id ?? undefined,
-    tvdbId: externalIds?.tvdb_id ?? undefined,
+    imdbId: externalIds?.imdb_id,
+    tvdbId: externalIds?.tvdb_id,
     seasons,
     networks,
-    numberOfSeasons: (data.number_of_seasons as number) ?? undefined,
-    numberOfEpisodes: (data.number_of_episodes as number) ?? undefined,
-    inProduction: (data.in_production as boolean) ?? undefined,
+    numberOfSeasons: data.number_of_seasons as number | undefined,
+    numberOfEpisodes: data.number_of_episodes as number | undefined,
+    inProduction: data.in_production as boolean | undefined,
     nextAirDate: (data.next_episode_to_air as Record<string, unknown> | null)
       ?.air_date as string | undefined,
     productionCompanies,
@@ -720,9 +720,9 @@ export async function getExtras(
     return {
       id: cm.id as number,
       name: cm.name as string,
-      character: (cm.character as string) ?? "",
-      profilePath: (cm.profile_path as string | null) ?? undefined,
-      order: (cm.order as number) ?? 0,
+      character: (cm.character as string | undefined) ?? "",
+      profilePath: (cm.profile_path as string | null | undefined) ?? undefined,
+      order: (cm.order as number | undefined) ?? 0,
     };
   });
 
@@ -731,18 +731,15 @@ export async function getExtras(
     return {
       id: cm.id as number,
       name: cm.name as string,
-      job: (cm.job as string) ?? "",
-      department: (cm.department as string) ?? "",
-      profilePath: (cm.profile_path as string | null) ?? undefined,
+      job: (cm.job as string | undefined) ?? "",
+      department: (cm.department as string | undefined) ?? "",
+      profilePath: (cm.profile_path as string | null | undefined) ?? undefined,
     };
   });
 
-  const similarRaw = ((data.similar as { results?: unknown[] })?.results ??
-    []);
-  const recommendationsRaw = ((data.recommendations as { results?: unknown[] })
-    ?.results ?? []);
-  const videosRaw = ((data.videos as { results?: unknown[] })?.results ??
-    []);
+  const similarRaw = (data.similar as { results?: unknown[] } | undefined)?.results ?? [];
+  const recommendationsRaw = (data.recommendations as { results?: unknown[] } | undefined)?.results ?? [];
+  const videosRaw = (data.videos as { results?: unknown[] } | undefined)?.results ?? [];
 
   const similar: SearchResult[] = similarRaw.map((r) =>
     normalizeSearchResult(r, type),
@@ -759,8 +756,8 @@ export async function getExtras(
       name: vid.name as string,
       site: vid.site as string,
       type: vid.type as string,
-      official: (vid.official as boolean) ?? false,
-      language: (vid.iso_639_1 as string) ?? undefined,
+      official: (vid.official as boolean | undefined) ?? false,
+      language: vid.iso_639_1 as string | undefined,
     };
   });
 
@@ -838,7 +835,7 @@ export async function getVideos(
       ].join(",") + ",en,null"
     : `${client.language},${client.language.split("-")[0]},en,null`;
   const data = await client.fetch<{
-    results: Array<{
+    results?: Array<{
       key: string;
       site: string;
       type: string;

@@ -26,21 +26,21 @@ export async function getPerson(
     const mediaType = c.media_type as string;
     const isMovie = mediaType === "movie";
     const title = isMovie
-      ? ((c.title as string) ?? "")
-      : ((c.name as string) ?? "");
+      ? ((c.title as string | undefined) ?? "")
+      : ((c.name as string | undefined) ?? "");
     const releaseDate = isMovie
-      ? ((c.release_date as string) ?? undefined)
-      : ((c.first_air_date as string) ?? undefined);
+      ? (c.release_date as string | undefined)
+      : (c.first_air_date as string | undefined);
 
     const credit: PersonCredit = {
       id: c.id as number,
       title,
-      character: (c.character as string) ?? undefined,
+      character: c.character as string | undefined,
       posterPath: (c.poster_path as string | null) ?? undefined,
       backdropPath: (c.backdrop_path as string | null) ?? undefined,
       releaseDate,
       year: yearFromDate(releaseDate),
-      voteAverage: (c.vote_average as number) ?? undefined,
+      voteAverage: c.vote_average as number | undefined,
       mediaType: isMovie ? "movie" : "show",
     };
 
@@ -62,21 +62,21 @@ export async function getPerson(
     (rawImages?.profiles ?? []) as Array<Record<string, unknown>>
   ).map((img) => ({
     filePath: img.file_path as string,
-    aspectRatio: (img.aspect_ratio as number) ?? 0.667,
+    aspectRatio: (img.aspect_ratio as number | undefined) ?? 0.667,
   }));
 
   return {
     id: data.id as number,
-    name: (data.name as string) ?? "",
-    biography: (data.biography as string) ?? "",
-    birthday: (data.birthday as string | null) ?? null,
-    deathday: (data.deathday as string | null) ?? null,
-    placeOfBirth: (data.place_of_birth as string | null) ?? null,
-    profilePath: (data.profile_path as string | null) ?? null,
-    knownForDepartment: (data.known_for_department as string | null) ?? null,
-    alsoKnownAs: (data.also_known_as as string[]) ?? [],
-    gender: (data.gender as number) ?? 0,
-    popularity: (data.popularity as number) ?? 0,
+    name: (data.name as string | undefined) ?? "",
+    biography: (data.biography as string | undefined) ?? "",
+    birthday: (data.birthday as string | null | undefined) ?? null,
+    deathday: (data.deathday as string | null | undefined) ?? null,
+    placeOfBirth: (data.place_of_birth as string | null | undefined) ?? null,
+    profilePath: (data.profile_path as string | null | undefined) ?? null,
+    knownForDepartment: (data.known_for_department as string | null | undefined) ?? null,
+    alsoKnownAs: (data.also_known_as as string[] | undefined) ?? [],
+    gender: (data.gender as number | undefined) ?? 0,
+    popularity: (data.popularity as number | undefined) ?? 0,
     images,
     movieCredits,
     tvCredits,

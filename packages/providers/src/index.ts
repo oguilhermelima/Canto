@@ -1,5 +1,4 @@
 import { TmdbProvider } from "./tmdb/index";
-import { TvdbProvider } from "./tvdb";
 import type { MetadataProvider, ProviderName } from "./types";
 
 const providers = new Map<ProviderName, MetadataProvider>();

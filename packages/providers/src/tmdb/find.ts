@@ -7,8 +7,8 @@ export async function findByImdbId(
   imdbId: string,
 ): Promise<SearchResult[]> {
   const data = await client.fetch<{
-    movie_results: unknown[];
-    tv_results: unknown[];
+    movie_results?: unknown[];
+    tv_results?: unknown[];
   }>(`/find/${imdbId}`, { external_source: "imdb_id" });
 
   const results: SearchResult[] = [];
@@ -26,8 +26,8 @@ export async function findByTvdbId(
   tvdbId: number,
 ): Promise<SearchResult[]> {
   const data = await client.fetch<{
-    movie_results: unknown[];
-    tv_results: unknown[];
+    movie_results?: unknown[];
+    tv_results?: unknown[];
   }>(`/find/${tvdbId}`, { external_source: "tvdb_id" });
 
   const results: SearchResult[] = [];

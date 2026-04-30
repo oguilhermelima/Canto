@@ -10,29 +10,29 @@ export function normalizeSeason(data: Record<string, unknown>): NormalizedSeason
     return {
       number: ep.episode_number as number,
       externalId: ep.id as number,
-      title: (ep.name as string) ?? undefined,
-      overview: (ep.overview as string) ?? undefined,
-      airDate: (ep.air_date as string | null) ?? undefined,
-      runtime: (ep.runtime as number | null) ?? undefined,
-      stillPath: (ep.still_path as string | null) ?? undefined,
-      voteAverage: (ep.vote_average as number) ?? undefined,
-      voteCount: (ep.vote_count as number) ?? undefined,
-      episodeType: (ep.episode_type as string) ?? undefined,
+      title: ep.name as string | undefined,
+      overview: ep.overview as string | undefined,
+      airDate: (ep.air_date as string | null | undefined) ?? undefined,
+      runtime: (ep.runtime as number | null | undefined) ?? undefined,
+      stillPath: (ep.still_path as string | null | undefined) ?? undefined,
+      voteAverage: ep.vote_average as number | undefined,
+      voteCount: ep.vote_count as number | undefined,
+      episodeType: ep.episode_type as string | undefined,
       crew:
         rawCrew.length > 0
           ? rawCrew.map((c) => ({
               name: c.name as string,
               job: c.job as string,
-              department: (c.department as string) ?? undefined,
-              profilePath: (c.profile_path as string | null) ?? undefined,
+              department: c.department as string | undefined,
+              profilePath: (c.profile_path as string | null | undefined) ?? undefined,
             }))
           : undefined,
       guestStars:
         rawGuests.length > 0
           ? rawGuests.map((g) => ({
               name: g.name as string,
-              character: (g.character as string) ?? undefined,
-              profilePath: (g.profile_path as string | null) ?? undefined,
+              character: g.character as string | undefined,
+              profilePath: (g.profile_path as string | null | undefined) ?? undefined,
             }))
           : undefined,
     };
@@ -41,12 +41,12 @@ export function normalizeSeason(data: Record<string, unknown>): NormalizedSeason
   return {
     number: data.season_number as number,
     externalId: data.id as number,
-    name: (data.name as string) ?? undefined,
-    overview: (data.overview as string) ?? undefined,
-    airDate: (data.air_date as string | null) ?? undefined,
-    posterPath: (data.poster_path as string | null) ?? undefined,
+    name: data.name as string | undefined,
+    overview: data.overview as string | undefined,
+    airDate: (data.air_date as string | null | undefined) ?? undefined,
+    posterPath: (data.poster_path as string | null | undefined) ?? undefined,
     episodeCount: episodes.length,
-    voteAverage: (data.vote_average as number) ?? undefined,
+    voteAverage: data.vote_average as number | undefined,
     episodes,
   };
 }

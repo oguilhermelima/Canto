@@ -17,7 +17,7 @@ export async function getCertifications(
 ): Promise<CertificationEntry[]> {
   const endpoint = `/certification/${type}/list`;
   const data = await client.fetch<{
-    certifications: Record<
+    certifications?: Record<
       string,
       Array<{ certification: string; meaning?: string; order?: number }>
     >;

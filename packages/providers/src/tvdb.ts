@@ -2,12 +2,15 @@ import type {
   DiscoverOpts,
   MediaExtras,
   MediaType,
+  MetadataOpts,
   MetadataProvider,
   NormalizedEpisode,
   NormalizedMedia,
   NormalizedSeason,
   SearchOpts,
   SearchResult,
+  SeasonTranslation,
+  Translation,
 } from "./types";
 
 /* -------------------------------------------------------------------------- */
@@ -276,7 +279,7 @@ export class TvdbProvider implements MetadataProvider {
     }
 
     const encoded = encodeURIComponent(query);
-    const data = await this.request<TvdbSearchResult[]>(
+    const data = await this.request<TvdbSearchResult[] | undefined>(
       `/search?query=${encoded}&type=series`,
     );
 
@@ -300,7 +303,7 @@ export class TvdbProvider implements MetadataProvider {
 
   /* ── Full metadata ─────────────────────────────────────────────────── */
 
-  async getMetadata(externalId: number, type: MediaType, opts?: import("./types").MetadataOpts): Promise<NormalizedMedia> {
+  async getMetadata(externalId: number, type: MediaType, opts?: MetadataOpts): Promise<NormalizedMedia> {
     if (type === "movie") {
       throw new Error("TVDB provider does not support movies");
     }
@@ -316,15 +319,15 @@ export class TvdbProvider implements MetadataProvider {
       const engTranslation = await this.request<{ name?: string; overview?: string }>(
         `/series/${externalId}/translations/eng`,
       );
-      engTitle = engTranslation?.name || undefined;
-      engOverview = engTranslation?.overview || undefined;
+      engTitle = engTranslation.name || undefined;
+      engOverview = engTranslation.overview || undefined;
     } catch {
       // English translation not available
     }
 
     // Fetch translations for all supported languages (in parallel)
     const supportedLangs = opts?.supportedLanguages ?? [];
-    const translations: import("./types").Translation[] = [];
+    const translations: Translation[] = [];
     const langsTofetch = supportedLangs.filter((l) => !l.startsWith("en"));
     if (langsTofetch.length > 0) {
       const results = await Promise.allSettled(
@@ -334,7 +337,7 @@ export class TvdbProvider implements MetadataProvider {
           const t = await this.request<{ name?: string; overview?: string }>(
             `/series/${externalId}/translations/${lang3}`,
           );
-          if (!t?.name && !t?.overview) return null;
+          if (!t.name && !t.overview) return null;
           // Per-language artwork
           const poster = findArtwork(series.artworks, 2, lang3);
           return {
@@ -342,7 +345,7 @@ export class TvdbProvider implements MetadataProvider {
             title: t.name || undefined,
             overview: t.overview || undefined,
             posterPath: poster ? prefixImageUrl(poster) : undefined,
-          } satisfies import("./types").Translation;
+          } satisfies Translation;
         }),
       );
       for (const r of results) {
@@ -354,7 +357,7 @@ export class TvdbProvider implements MetadataProvider {
         const t = await this.request<{ name?: string; overview?: string }>(
           `/series/${externalId}/translations/${this.language}`,
         );
-        if (t?.name || t?.overview) {
+        if (t.name || t.overview) {
           translations.push({
             language: this.locale,
             title: t.name || undefined,
@@ -410,7 +413,7 @@ export class TvdbProvider implements MetadataProvider {
       .filter((s): s is NormalizedSeason => s !== null);
 
     // Fetch English season names (base language) + translations for supported languages
-    const seasonTranslations: import("./types").SeasonTranslation[] = [];
+    const seasonTranslations: SeasonTranslation[] = [];
     await Promise.allSettled(
       seasons.map(async (s) => {
         if (!s.externalId) return;
@@ -419,8 +422,8 @@ export class TvdbProvider implements MetadataProvider {
           const engT = await this.request<{ name?: string; overview?: string }>(
             `/seasons/${s.externalId}/translations/eng`,
           );
-          if (engT?.name) s.name = engT.name;
-          if (engT?.overview) s.overview = engT.overview;
+          if (engT.name) s.name = engT.name;
+          if (engT.overview) s.overview = engT.overview;
         } catch { /* keep original */ }
 
         // Supported language translations (parallel per season)
@@ -432,8 +435,8 @@ export class TvdbProvider implements MetadataProvider {
               const t = await this.request<{ name?: string; overview?: string }>(
                 `/seasons/${s.externalId}/translations/${lang3}`,
               );
-              if (!t?.name && !t?.overview) return null;
-              return { seasonNumber: s.number, language: locale, name: t.name, overview: t.overview } satisfies import("./types").SeasonTranslation;
+              if (!t.name && !t.overview) return null;
+              return { seasonNumber: s.number, language: locale, name: t.name, overview: t.overview } satisfies SeasonTranslation;
             }),
           );
           for (const r of langResults) {
@@ -510,11 +513,11 @@ export class TvdbProvider implements MetadataProvider {
 
      
     while (true) {
-      const data = await this.request<{ episodes: TvdbEpisode[] }>(
+      const data = await this.request<{ episodes?: TvdbEpisode[] }>(
         `/series/${seriesId}/episodes/default/${lang}?page=${page}`,
       );
 
-      const episodes = data?.episodes ?? [];
+      const episodes = data.episodes ?? [];
       if (episodes.length === 0) break;
 
       allEpisodes.push(...episodes);
