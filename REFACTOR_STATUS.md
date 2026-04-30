@@ -2,26 +2,25 @@
 
 Status doc for the `packages/core` architecture overhaul. Tracks what landed on `main` and what still needs to happen.
 
-**Last updated**: 2026-04-22
-**Current `main` tip**: `17c7f6f1` (docs: consolidate refactor status at root)
+**Last updated**: 2026-04-30 (revisado após auditoria crítica)
+**Current `main` tip**: `2247e449` (fix(core): spotlight Path 3 — apply localization overlay on cache hit + by external triple)
 
 ---
 
-## What was done (Phases 1-5, on `main`)
+## What was done
 
 ### Phase 1 — Prep + baseline + branch push ✅
 
-- Branch `refactor/core-architecture` created and pushed to remote.
+- Branch `refactor/core-architecture` created and pushed.
 - `scripts/codemod/` workspace scaffolded (`@canto/codemod`, ts-morph based).
 - `.codemod/` added to `.gitignore`.
 - `test` task added to `turbo.json`.
-- Baseline recorded: 10/10 typecheck green, 59/59 core tests green.
 
 ### Phase 2 — Build classification JSON ✅
 
 - `scripts/codemod/src/plan/sample.json` committed with the full migration spec.
 - Review flags resolved: `rss-matching`, `service-keys`, `validate-path` reclassified from inventory-DEAD to live code with correct context owners. `InvalidPathError` added to error assignments.
-- `pnpm codemod verify --plan-only`: 0 structural findings; all 137 source paths verified present.
+- `pnpm codemod verify --plan-only`: 0 structural findings.
 
 ### Phase 3 — Implement codemod subcommands ✅
 
@@ -29,7 +28,7 @@ Status doc for the `packages/core` architecture overhaul. Tracks what landed on 
 
 ### Phase 4 — Execute scripted restructure ✅
 
-- **4.1 split-errors**: `domain/errors.ts` split into per-context `errors.ts` files (shared, lists, torrents, user-media, file-organization).
+- **4.1 split-errors**: `domain/errors.ts` split into per-context `errors.ts` files.
 - **4.2 classify-domain**: 41 moves from flat `domain/{rules,services,ports,types,mappers,constants}/` into per-context folders.
 - **4.3 collapse-exports**: `packages/core/package.json` exports reduced from 34 entries to `"./*": "./src/*.ts"`.
 - **4.4 restructure-infra**: 61 infra moves into `infra/<ctx>/` and `platform/<concern>/`; 16 legacy barrels deleted; transitional `infra/repositories.ts` aggregate created.
@@ -41,248 +40,320 @@ Status doc for the `packages/core` architecture overhaul. Tracks what landed on 
 
 ### Phase 5 — Verify ✅
 
-- 10/10 typecheck green.
-- 59/59 core tests green.
-- Zero `@canto/core/infrastructure` or `@canto/core/lib` specifiers anywhere.
-- Zero `from "~/"` in `apps/web/src` (was 477).
-- Exactly 1 `index.ts` in `packages/core/src` (the root).
+Baseline at landing: 10/10 typecheck green, 59/59 core tests green, 0 `@canto/core/infrastructure` or `@canto/core/lib` specifiers, 0 `from "~/"` in `apps/web/src`.
+
+### Phase 5.6 — Cadence engine + unified ensureMedia ✅ (unplanned, landed in this window)
+
+Entre 2026-04-22 e 2026-04-30, uma sprint paralela colapsou o fanout per-aspect de enrichment em uma engine única. Não fazia parte do plano original mas reshaped o contexto `media/` significativamente.
+
+- `domain/media/enrichment/` — strategy registry (`metadata`, `structure`, `translations`, `logos`, `extras`, `contentRatings`), `fire-call`, `topo-sort`, shared types.
+- `domain/media/use-cases/cadence/` — pure-function planner (`compute-plan`, `aspect-state-writer`, knob loader). Seleciona o conjunto mínimo de aspects por chamada baseado em TTLs, dirty signals e gap reports.
+- `domain/media/use-cases/ensure-media.ts` — entry point único. Substitui as legadas shells de worker `refreshExtras` / `reconcileShow` / `translateEpisodes` / `reprocessMedia`.
+- Filas de worker `refreshExtras` e `translateEpisodes` deletadas; só `ensureMedia` + `mediaCadenceSweep` no fluxo de metadata.
+- Localização migrada para single-query service (`shared/localization/localization-service.ts`); tabelas `*_translation` e colunas i18n base de media dropadas do schema.
+- Admin UI para tunar knobs do cadence engine.
+- `platform/concurrency/run-with-concurrency.ts` adicionado; perf no worker (paralelização de repack-supersede / folder-scan, batch de seed-management, exponential backoff em imports, batch resolve em reverse-sync, indexes em `download` / `downloadRequest` / `mediaFile`, partial indexes em `media.imdb_id` / `media.tvdb_id`).
+
+**Side effects no plano de refactor**:
+- `content-enrichment/` virou shim — `translate-episodes.ts`, `refresh-extras.ts`, `upsert-lang-logos.ts`, `sync-tmdb-certifications.ts` são funções biblioteca chamadas por strategies em `media/enrichment/`. Phase 5.5: merge óbvio em `media/`.
+- `domain/profile/` e `domain/requests/` removidos completamente do domínio (sem lógica que sobreviveu; consumers vão direto pra `infra/profile/` e `infra/requests/`). Plano da Phase 5.5 não precisa mais consolidar esses.
+- `media/use-cases/` cresceu (cadence/, persist/, fetch-logos.ts, detect-gaps.ts, resolve-media-version.ts, etc.) — Phase 7 surface bigger.
+
+**Side effect contábil**: as strategies em `media/enrichment/strategies/` e os arquivos em `media/use-cases/cadence/`, `media/use-cases/persist/` adicionaram seus próprios imports diretos de `infra/*` e `platform/*` — os 158+51 imports atuais incluem estes. A engine de cadence em si (`cadence/compute-plan.ts`, `cadence/aspect-state-writer.ts`) é pure-function e não viola, mas tudo que orquestra ela ainda está acoplado.
 
 ### Current shape of `packages/core/src/`
 
 ```
-domain/
-├── content-enrichment/ file-organization/ lists/ media/ media-servers/
-├── notifications/ profile/ recommendations/ requests/ sync/ torrents/
-├── trakt/ user/ user-media/
-└── shared/         # DomainError, cross-context rules/services/ports/mappers
-infra/
-├── content-enrichment/ file-organization/ indexers/ lists/ media/
-├── media-servers/ notifications/ profile/ recommendations/ requests/
-├── shared/ torrent-clients/ torrents/ trakt/ user/ user-media/
-└── repositories.ts   # transitional aggregate (Phase 6c deletes)
+domain/                                 # 12 contexts + shared
+├── content-enrichment/  file-organization/  lists/  media/
+├── media-servers/  notifications/  recommendations/  shared/
+├── sync/  torrents/  trakt/  user/  user-media/
+infra/                                  # 16 ctx folders (+ profile, requests, indexers, torrent-clients)
+├── content-enrichment/  file-organization/  indexers/  lists/  media/
+├── media-servers/  notifications/  profile/  recommendations/  requests/
+├── shared/  torrent-clients/  torrents/  trakt/  user/  user-media/
+└── repositories.ts                     # transitional aggregate (Phase 6c deletes)
 platform/
-└── cache/ fs/ http/ logger/ queue/ secrets/ testing/
+└── cache/  concurrency/  fs/  http/  logger/  queue/  secrets/  testing/
 ```
 
-14 contexts + `shared/` in `domain/`. Per-context layout uses `rules/`, `services/`, `mappers/`, `constants/`, `types/`, `ports/`, `errors.ts`, `use-cases/` — which is the DDD taxonomy we now want to simplify.
+Per-context layout ainda usa taxonomia DDD (`rules/`, `services/`, `mappers/`, `constants/`, `types/`, `ports/`, `errors.ts`, `use-cases/`) — **o ruído que Phase 5.5 limpa**. `shared/ports/` já tem 6 ports definidos, mas só `JobDispatcherPort` é consumido (2 call sites). Os outros 5 são bypass-eados.
+
+**Tests**: 144 (143 passing, 1 skipped). Era 59 no baseline da Phase 5.
 
 ---
 
 ## Phase 5.5 — Simplify structure (BLOCKS Phase 6)
 
-**Why**: After living with the layout landed in Phase 4, two problems surfaced:
+**Why**: contextos demais, ruído de subfolder DDD. Com 5.6 já colapsando o fluxo de metadata, escopo da 5.5 ficou mais apertado — `content-enrichment/` virou alvo claro de merge em vez de debate.
 
-1. **Too many contexts**. 14 is a lot for a medium-size app, and some are more sub-concerns than bounded contexts:
-   - `sync/` scans library from a media server — it's part of `media-servers`, not its own domain.
-   - `file-organization/` manages folders where downloads land — it's part of `torrents` flow.
-   - `user-media/` is the user's relationship with media (library, watch state, history) — it's user-centric.
-   - `content-enrichment/` caches extras (credits, videos) — it's part of `media`'s lifecycle.
-   - `profile/` holds user metadata (avatar, home sections) — it's part of `user`.
+### Tabela de consolidação revisada
 
-2. **DDD taxonomy is noise**. The sub-folder split (`rules/` vs `services/` vs `mappers/` vs `constants/`) doesn't pay for itself:
-   - "rules" contains pure helpers. Not rules in the DDD sense — just functions.
-   - "services" is a mixed bag; some are pure functions, some touch DB.
-   - "mappers" belong in `infra/` (they bridge row ↔ domain), not in `domain/`.
-   - "constants" can be inline or flat in `shared/`.
+| Current context | Becomes | Justificativa |
+|---|---|---|
+| `domain/content-enrichment/` | `domain/media/use-cases/` | Já é shim de strategies. Zero coesão própria. |
+| `domain/sync/` | `domain/media-servers/scans/` | Infra-shaped (5 arquivos, 1612 LOC, sem subfolder `use-cases/` próprio). `use-cases/` confunde naming. |
+| `domain/file-organization/` | `domain/torrents/` | Coupling bidirectional já existe (`file-organization/rules` importa `torrents/rules/parsing`). |
+| `domain/lists/` | `domain/user-actions/lists/` | Mantém `user-actions/`. |
+| `domain/recommendations/` | `domain/user-actions/recommendations/` | Mantém `user-actions/`. |
+| `domain/user-media/` | `domain/user-actions/user-media/` | Mantém `user-actions/`. |
+| `domain/media-servers/` | **unchanged top-level** | Sem `connections/`. |
+| `domain/trakt/` | **unchanged top-level** | Sem `connections/`. |
+| `domain/notifications/` | unchanged | Standalone (system → user). |
+| `domain/media/`, `domain/torrents/`, `domain/user/` | unchanged top level | |
+| `domain/profile/`, `domain/requests/` | — | Já gone (5.6 side effect). |
 
-   Cleaner split: `types/`, `ports/`, `errors.ts`, `use-cases/`, with co-located helpers. Nothing else.
+**Resultado**: 10 contextos top-level + 1 meta-grupo (`user-actions/`) + `shared/`.
 
-### Target layout
+**Por que não criar `connections/`** (originalmente proposto agrupando `media-servers/` + `trakt/`): zero coesão funcional. `media-servers/` faz auth/scan de Plex/Jellyfin (servidor → conteúdo). `trakt/` sincroniza watchlist/history do usuário com serviço externo (usuário → estado). Ambos têm acoplamento ZERO entre si (auditado). Pelo critério "fala com serviço externo", `indexers/` e `torrent-clients/` também entrariam — sintoma de label vago.
 
-```
-packages/core/src/domain/
-├── media/                          # media + content-enrichment
-│   ├── types.ts + types/           # entity, value types (one file per)
-│   ├── ports.ts + ports/           # interfaces (one file per)
-│   ├── errors.ts
-│   └── use-cases/
-│       ├── ensure-media.ts
-│       ├── ...
-│       └── _helpers.ts             # optional, cross-use-case helpers within this context
-├── torrents/                       # torrents + file-organization
-│   └── types/, ports/, errors.ts, use-cases/
-├── user/                           # user + profile
-│   └── types/, ports/, errors.ts, use-cases/
-├── connections/                    # GROUP (not a context; pure navigational folder)
-│   ├── media-servers/              # + sync folded in as use-cases
-│   │   └── types/, ports/, errors.ts, use-cases/
-│   └── trakt/
-│       └── types/, ports/, errors.ts, use-cases/
-├── user-actions/                   # GROUP (not a context)
-│   ├── lists/
-│   │   └── types/, ports/, errors.ts, use-cases/
-│   ├── recommendations/
-│   ├── user-media/                 # formerly user-media context
-│   └── requests/
-├── notifications/                  # standalone (system → user, different flow)
-│   └── types/, ports/, errors.ts, use-cases/
-└── shared/
-    ├── errors.ts + errors/         # DomainError + cross-context errors
-    ├── types.ts + types/
-    ├── ports.ts + ports/
-    └── <helper>.ts                 # flat files for cross-context utilities
-                                    # (no rules/services/mappers/ subfolders)
-```
+**Por que manter `user-actions/`**: existe DAG real entre os 3 children. `lists/` alimenta `recommendations/`; `recommendations/` consome state de `user-media/`. Cohesão funcional + 5273 LOC + 41 use-cases = paga o nesting. Reforçar com ESLint depois para impedir importação reversa.
 
-**9 bounded contexts** + 2 meta-groups (`connections/`, `user-actions/`) + 1 `shared/`. Meta-groups are pure folders with no own types/ports/use-cases — each child is a full context.
+### Convenção de subfolder por contexto (sem mudança)
 
-### Sub-folder convention per context
+- `types.ts` (sibling barrel) + `types/<entity>.ts` por entity. Sem god file.
+- `ports.ts` (sibling barrel) + `ports/<port>.port.ts` por interface.
+- `errors.ts` (ou folder `errors/` se crescer).
+- `use-cases/<feature>.ts` por use-case. Helpers inline ou `_helpers.ts`.
+- **Sem** `rules/`, `services/`, `mappers/`, `constants/`.
 
-- `types.ts` (sibling barrel) + `types/<entity>.ts` per entity/value-type. No god file.
-- `ports.ts` (sibling barrel) + `ports/<port>.port.ts` per interface.
-- `errors.ts` (or `errors.ts` + `errors/<error-class>.ts` folder if it grows).
-- `use-cases/<feature>.ts` per use-case. Helpers inline or `_helpers.ts`.
-- No `rules/`, `services/`, `mappers/`, `constants/`.
+### Pra onde vai o conteúdo dos folders DDD
 
-### What happens to removed folder kinds
+- `rules/*.ts`: para `<ctx>/use-cases/_helpers.ts` (cross-use-case dentro do ctx) ou `shared/<name>.ts` (cross-context).
+- `services/*.ts`: igual.
+- `mappers/*.ts`: para fora do domain. Para `infra/<ctx>/<entity>.mapper.ts` — Phase 7 owns.
+- `constants/*.ts`: inline ou `shared/<name>-constants.ts`.
 
-- `rules/*.ts`: fold into `<ctx>/use-cases/_helpers.ts` if cross-use-case within the context; move to `shared/<name>.ts` if cross-context.
-- `services/*.ts`: same treatment as rules.
-- `mappers/*.ts`: move OUT of domain entirely. Go to `infra/<ctx>/<entity>.mapper.ts`. (Phase 7 already scoped this — just confirms direction.)
-- `constants/*.ts`: inline or `shared/<name>-constants.ts`.
+### Decisões pendentes
 
-### Consolidation moves (per current → target)
+1. **`user-actions/` vs alternativas**: `user-actions/` (default) vs `user-data/` / `collections/`.
+2. **`content-enrichment` vs `media`**: merge outright (default — strategies já moram em `media/enrichment/`).
+3. **`sync` rename**: `media-servers/scans/` (default) vs `media-servers/sync/`.
 
-| Current context | Becomes |
-|---|---|
-| `domain/content-enrichment/` | `domain/media/use-cases/` (merged) |
-| `domain/sync/` | `domain/connections/media-servers/use-cases/` (merged) |
-| `domain/media-servers/` | `domain/connections/media-servers/` (moved into group) |
-| `domain/trakt/` | `domain/connections/trakt/` (moved into group) |
-| `domain/file-organization/` | `domain/torrents/` (merged) |
-| `domain/lists/` | `domain/user-actions/lists/` (moved into group) |
-| `domain/recommendations/` | `domain/user-actions/recommendations/` |
-| `domain/user-media/` | `domain/user-actions/user-media/` |
-| `domain/requests/` | `domain/user-actions/requests/` |
-| `domain/profile/` | `domain/user/use-cases/` (merged; profile features become user use-cases) |
-| `domain/notifications/` | unchanged (standalone) |
-| `domain/media/`, `domain/torrents/`, `domain/user/` | unchanged top level |
+### Plano de execução
 
-Infra side mirrors: `infra/content-enrichment/` → `infra/media/`, etc.
+1. Atualizar `sample.json` com novos targets (drop linhas de profile/requests, drop `connections/`, ajustar sync→scans).
+2. Rodar `classify-domain` (re-purposed) pra dobrar conteúdo de `rules/`/`services/` em use-cases ou `shared/`.
+3. Novo subcommand `consolidate-contexts`: bulk reparent de folders.
+4. Rodar `sibling-barrels` de novo pros novos folders `types/`, `ports/`.
+5. Rodar `verify` pra confirmar shape alvo.
+6. Typecheck + tests (10/10 + 144) tem que ficar verde.
 
-### Decisions pending before Phase 5.5 starts
+**Est (Claude session time)**: ~75-90 min em branch `refactor/simplify-structure`. ~30 tool calls. One PR.
 
-These were raised and default-picked but need explicit confirmation:
-
-1. **Meta-group naming**:
-   - `connections/` (default, user-preferred) vs `integrations/` (slightly more idiomatic for "plugged-in external services").
-   - `user-actions/` (default, user-preferred) vs `user-data/` vs `collections/`.
-2. **`requests` placement**: under `user-actions/` (default — user initiates) vs standalone.
-3. **`notifications` placement**: standalone (default — system-to-user) vs under `user-actions/`.
-4. **`content-enrichment` vs `media`**: merge outright (default) vs keep as `domain/media/enrichment/` sub-concern.
-5. **`sync` vs `media-servers`**: merge into `media-servers/use-cases/sync-*.ts` (default) vs keep as `media-servers/sync/` sub-folder.
-
-### Execution plan
-
-Mostly scriptable via the existing codemod with an updated `sample.json`. Remaining subcommands + one new one:
-
-1. Update `sample.json` with the new move targets.
-2. Run `classify-domain` (re-purposed) to move per-kind content into use-cases/_helpers.ts or shared/.
-3. New subcommand `consolidate-contexts`: bulk reparent folders per the table above.
-4. Run `sibling-barrels` again to produce sibling barrels for the new `types/`, `ports/`, etc. folders.
-5. Run `verify` to assert the target shape.
-6. Typecheck + tests must stay green.
-
-**Est (Claude executing, not human)**: ~45-60 min of session time on branch `refactor/simplify-structure`. Codemod already has helpers for bulk moves + cross-workspace rewrites + sibling barrels; the new bits (consolidate-contexts subcommand, updated plan JSON, fold rules/services into helpers) are ~25 tool calls. Verification (typecheck + tests) adds ~3-5 cycles × ~15s each. One PR, no incremental merge — intermediate state too messy to ship.
-
-**Non-goal**: any Phase 6 / 7 work. This is pure organizational reshuffle. Behavior unchanged.
+**Non-goal**: nada de Phase 6 / 7. Reshuffle organizacional puro.
 
 ---
 
 ## Phase 6 — Port-first refactor (BLOCKS Phase 8)
 
-**Prereq**: Phase 5.5 complete.
+**Prereq**: Phase 5.5 completa.
 
-**Why**: 7 composition-root files in `domain/` still import concrete adapters/repositories directly. Phase 8 ESLint requires zero `infra/*` or `platform/*` imports inside `domain/**`.
+**Estado dos ports hoje**:
 
-**Target**: every `domain/**` file imports only from `domain/**`, `@canto/db` (type-only), `@canto/providers`, `@canto/validators`, `zod`. The refactor-target files accept external functions via a `deps` argument; composition roots (`apps/worker/src/index.ts`, `packages/api/src/trpc.ts`) construct and inject.
+> Em `domain/shared/ports/`: 6 ports definidos (`cache.ts`, `download-client.ts`, `file-system.port.ts`, `job-dispatcher.port.ts`, `media-provider.port.ts`, `media-server.port.ts`). Só `JobDispatcherPort` é consumido por call sites reais (2 ocorrências em `domain/trakt/coordinator.ts` e `domain/media/use-cases/reconcile-show-structure.ts`). Os outros 5 estão definidos mas bypass-eados — código chama direto de `platform/*` e `infra/*`.
+>
+> **Implicação**: Phase 6a começa **conectando o que já existe**, não criando ports novos. LoggerPort e URLResolverPort entram, mas o ganho maior está em fazer ~25 call sites passarem a usar `MediaProviderPort`, `FileSystemPort`, `DownloadClientPort` etc.
 
-### Phase 6a — Simple shared ports
+**Estado real do acoplamento** (re-medido 2026-04-30):
 
-- `domain/shared/ports/logger.port.ts` (`LoggerPort`: info/warn/error/debug + `logAndSwallow`).
-- `domain/shared/ports/url-resolver.port.ts` (`URLResolverPort.followRedirects`).
-- Extend `domain/shared/ports/job-dispatcher.port.ts`: add `dispatchMediaPipeline`, `dispatchEnsureMedia`.
-- Adapters in `platform/{logger,http,queue}/` wrapping existing concrete functions.
-- Refactor call sites in `domain/connections/media-servers/use-cases/sync-pipeline.ts`, `domain/media/use-cases/persist/*`, `domain/torrents/use-cases/download-torrent/core.ts` to accept `{ logger, urlResolver, jobDispatcher }` via deps.
-- **Reach**: eliminates ~15 `platform/*` imports inside `domain/`.
-- **Est (Claude)**: ~20-30 min. Small, self-contained. ~15 tool calls.
+- **158 imports** de `infra/*` em `domain/**` atravessando **94 arquivos**.
+- **51 imports** de `platform/*` em `domain/**` atravessando **32 arquivos**.
+- 1 port per-context já existe: `domain/torrents/ports/indexer.ts`.
+
+**Target**: todo arquivo `domain/**` importa só de `domain/**`, `@canto/db` (type-only), `@canto/providers`, `@canto/validators`, `zod`. Composition roots (`apps/worker/src/index.ts`, `packages/api/src/trpc.ts`) constroem adapters e injetam via `deps`.
+
+### Phase 6a — Wireup ports compartilhadas + LoggerPort/URLResolverPort
+
+- Criar `domain/shared/ports/logger.port.ts` (`LoggerPort`: info/warn/error/debug + `logAndSwallow`).
+- Criar `domain/shared/ports/url-resolver.port.ts` (`URLResolverPort.followRedirects`).
+- Estender `job-dispatcher.port.ts` com novas operações conforme necessário.
+- Adapters em `platform/{logger,http,queue}/` envolvendo funções concretas atuais.
+- **Wireup das 5 ports já definidas mas bypass-eadas** — fazer use cases atuais passarem a consumir `MediaProviderPort` (em vez de `getTmdbProvider`/`getTvdbProvider`), `FileSystemPort`, `DownloadClientPort`, `MediaServerPort`, `CachePort`.
+- Refatorar ~13 call sites: `connections/media-servers/use-cases/sync-pipeline.ts`, `media/use-cases/persist/*`, `torrents/use-cases/download-torrent/core.ts`, `lists/use-cases/manage-list-items.ts`, recommendation use-cases etc.
+- **Reach**: elimina ~25 dos 51 imports `platform/*`.
+- **Est**: ~25-30 min. ~18 tool calls.
 
 ### Phase 6b — Media-server adapter ports
 
-- `domain/connections/media-servers/ports/plex-adapter.port.ts` (≈ 9 methods).
-- `domain/connections/media-servers/ports/jellyfin-adapter.port.ts` (≈ 7 methods).
-- Adapter objects in `infra/media-servers/{plex,jellyfin}.adapter-bindings.ts` assembling the interface from existing concrete functions.
-- Refactor the 6 media-server use-case files.
-- **Reach**: eliminates ~14 `infra/media-servers/*.adapter` imports in `domain/`.
-- **Est (Claude)**: ~25-35 min. Interfaces are boilerplate-heavy but mechanical. ~20 tool calls.
+- `domain/media-servers/ports/plex-adapter.port.ts` (≈ 9 métodos).
+- `domain/media-servers/ports/jellyfin-adapter.port.ts` (≈ 7 métodos).
+- Adapter objects em `infra/media-servers/{plex,jellyfin}.adapter-bindings.ts` montando a interface a partir das funções concretas.
+- Refatorar 7 use-case files (`update-metadata`, `discover-libraries`, `trigger-scans`, authenticate/{plex,jellyfin,trakt}, fetch-info/{plex,jellyfin}, sync-libraries/{plex,jellyfin}, services/user-connection-service).
+- Inclui surfacing do TMDB/TVDB provider port em `trakt/use-cases/shared.ts`.
+- **Reach**: elimina ~30 dos 158 imports `infra/*` + ~15 dos platform.
+- **Est**: ~30-40 min. ~25 tool calls.
 
 ### Phase 6c — Per-context repository ports
 
-- Create `domain/<ctx>/ports/<ctx>-repository.port.ts` per context that a domain file currently consumes.
-- Minimum set after Phase 5.5:
-  - `MediaRepositoryPort` (`domain/media/ports/`).
-  - `TorrentsRepositoryPort` (`domain/torrents/ports/`).
-  - `ListsRepositoryPort` (`domain/user-actions/lists/ports/`).
-  - `UserMediaRepositoryPort` (`domain/user-actions/user-media/ports/`).
-  - `FileOrganizationRepositoryPort` — may fold into `TorrentsRepositoryPort` since file-organization merges into torrents.
-  - `MediaServersRepositoryPort` (`domain/connections/media-servers/ports/`).
-  - `NotificationsRepositoryPort` — may not need a port; `notifications` is small and tight.
-- Adapter files as thin spreads of existing functions.
-- Refactor all refactor-target files to accept these ports via deps.
-- **Delete `packages/core/src/infra/repositories.ts`** (transitional aggregate).
-- **Reach**: `grep -r "from \"@/infra/\"" packages/core/src/domain` returns 0.
-- **Est (Claude)**: ~40-60 min. Biggest of the three sub-phases — touches 11 files and the composition roots. ~35 tool calls.
+- Criar `domain/<ctx>/ports/<ctx>-repository.port.ts` por contexto.
+- Set mínimo após 5.5:
+  - `MediaRepositoryPort` (cobre content-enrichment após merge).
+  - `TorrentsRepositoryPort` (cobre file-organization após merge).
+  - `ListsRepositoryPort`.
+  - `UserMediaRepositoryPort` (maior — 20+ métodos).
+  - `MediaServersRepositoryPort` (cobre sync após merge).
+  - `RecommendationsRepositoryPort`.
+  - `TraktRepositoryPort`.
+  - `NotificationsRepositoryPort` — pequeno; avaliar durante execução.
+  - `UserRepositoryPort`.
+- Adapter files como spreads finos das funções existentes.
+- Refatorar arquivos restantes do domain pra aceitar ports via `deps`.
+- Converter 7 imports `typeof schema.X` value para type-only via codemod (small win).
+- **Deletar `packages/core/src/infra/repositories.ts`** (aggregate transitional, 56 consumers).
+- **Reach**: drives `infra/*` count em `domain/` para 0.
+- **Est**: ~90-150 min. Maior das três sub-phases — toca ~80 arquivos + composition roots. ~50 tool calls.
+
+### Phase 6c.5 — ESLint warn gate (BLOCKS Phase 7 sangria)
+
+Após 6c terminar, antes da Phase 7 começar:
+
+- Adicionar regra `no-restricted-imports` em modo `warn` (não `error`) no `tooling/eslint/base.js` (ou em config dedicado pra `packages/core`):
+  - `domain/**` não pode importar `infra/*`, `platform/*`, `bullmq`, `ioredis`, `drizzle-orm`, `node:*`, `@trpc/server`, `next`, `react`.
+- Não bloqueia merge — apenas torna visível qualquer regressão durante Phase 7.
+- Promovido a `error` no fim da Phase 7 (parte da Phase 8).
+- **Est**: ~5-10 min.
 
 ---
 
 ## Phase 7 — Strict domain types + mappers
 
-**Prereq**: Phase 6 complete.
+**Prereq**: Phase 6 completa.
 
-**Why**: domain value-space still imports Drizzle types via `@canto/db`, including `import { ... } from "@canto/db/schema"` (value imports). Goal: zero `@canto/db` value imports inside `domain/**`.
+**Estado real**: **53** db value imports em `domain/**` (32 de `@canto/db/schema`, 21 de `@canto/db/settings` etc.), **34** imports `drizzle-orm`.
 
-### Per context (smallest first)
+**Why**: domain value-space ainda importa Drizzle row types via `@canto/db/schema`. Goal: zero `@canto/db` value imports em `domain/**`. Type-only imports OK.
 
-1. `notifications` (1 entity).
-2. `user-actions/lists` (2 entities).
-3. `connections/trakt` (1 entity).
-4. `user-actions/requests` (1 entity).
-5. `user-actions/recommendations` (1 entity).
-6. `connections/media-servers` (1 entity + server-link).
-7. `torrents` (includes file-organization entities: torrent, media-file, folder, library).
-8. `user` (includes profile entities).
-9. `user-actions/user-media` (9 methods across state, history, ratings, library, feed, stats, playback, hidden, profile-insights).
-10. `media` (includes content-enrichment extras).
+### Por contexto (calibrado contra `packages/db/src/schema.ts`)
 
-### Per context:
+| Contexto | Entidades reais | Métodos repo aprox | Bucket |
+|---|---|---|---|
+| `notifications` | 1 (`notification`) | ~4 | Pequeno |
+| `user-actions/lists` | 2 (`list`, `listMember`) | ~8 | Pequeno |
+| `user-actions/recommendations` | 2 (`userRecommendation`, `becauseWatched`) | ~6 | Pequeno |
+| `media-servers` | 1 (`userConnection`) | ~5 | Pequeno |
+| `user` | 2 (`user`, `userPreference`) | ~5 | Pequeno |
+| `trakt` | 1 dominante + ~5 tabelas de suporte | ~10 | Médio |
+| `torrents` (pós file-org merge) | 5 (`download`, `mediaFile`, `mediaVersion`, `downloadFolder`, `folderMediaPath`) | ~15 | Médio |
+| `user-actions/user-media` | 8 (`userMediaState`, `userPlaybackProgress`, `userMediaRating`, `userMediaHidden`, `userMediaLibrary`, `userMediaLibraryFeed`, `userMediaStats`, `profileInsights`) | ~20 | Grande |
+| `media` (pós content-enrichment merge) | 10+ (`media`, `season`, `episode`, `mediaLocalization`, `mediaAspectState`, `mediaContentRating`, `tmdbCertification`, `mediaFile`, `mediaVersion`, watch-providers, extras) | ~25 | Grande |
 
-- Hand-write `domain/<ctx>/types/<entity>.ts` for every entity (branded IDs, enums, Dates).
-- Hand-write `infra/<ctx>/<entity>.mapper.ts` with `toDomain(row)` and `toRow(entity)`.
-- Update `infra/<ctx>/*-repository.ts` to call mapper at boundaries; signatures flip from row types to domain types.
-- Update callers across `domain/`, `infra/`, `packages/api/`, `apps/*`.
+### Por contexto
 
-**Est (Claude) per context**:
-- Small (1-2 entities, no complex relationships): ~10-15 min. Applies to notifications, lists, trakt, requests, recommendations, media-servers.
-- Medium (2-3 entities, some cross-type references): ~20-30 min. Applies to torrents (after file-organization merge), user (after profile merge).
-- Large (many methods, dense query shapes): ~30-45 min. Applies to user-actions/user-media, media (after content-enrichment merge).
+- Hand-write `domain/<ctx>/types/<entity>.ts` para cada entity (branded IDs, enums, Dates).
+- Hand-write `infra/<ctx>/<entity>.mapper.ts` com `toDomain(row)` e `toRow(entity)`.
+- Update `infra/<ctx>/*-repository.ts` pra chamar mapper nas fronteiras; signatures viram domain types.
+- Update callers atravessando `domain/`, `infra/`, `packages/api/`, `apps/*`.
 
-Total Phase 7: **~2.5-3.5 hours of session time** if done continuously. Safer to split across 2-3 sessions — typecheck failures in one context can cascade if callers aren't updated, and long sessions hit turn limits.
+### Estimativa por bucket (recalibrado)
+
+- **Pequeno** (1-2 entidades, ~5-8 métodos): **15-20 min** cada (era 10-15). 5 contextos × 17min = ~85min.
+- **Médio** (5 entidades, ~15 métodos): **35-45 min** cada. 2 contextos × 40min = ~80min.
+- **Grande** (8-10+ entidades, 20+ métodos): **60-80 min** cada. 2 contextos × 70min = ~140min.
+
+Total Phase 7: **~4-5 horas** de session time (era 2.5-3.5h). Realisticamente split em 2-3 sessões.
 
 ---
 
 ## Phase 8 — ESLint boundaries + CI
 
-**Prereq**: Phase 6 complete. Phase 7 preferably complete.
+**Prereq**: Phase 6 completa. Phase 7 preferivelmente completa.
 
-- Add `tooling/eslint-config/core-boundaries.mjs` with `no-restricted-imports`:
-  - `domain/**` may import: `domain/**`, `@canto/db` (type-only), `@canto/providers`, `@canto/validators`, `zod`.
-  - `domain/**` may NOT import: `infra/*`, `platform/*`, `bullmq`, `ioredis`, `drizzle-orm`, `node:*`, `fetch`, `@trpc/server`, `next`, `react`.
-  - `infra/**` may import: `domain/**`, `platform/**`, `@canto/db`, externals.
-  - `platform/**` may import: externals only.
-- Synthetic violation fixture at `packages/core/src/__eslint_fixtures__/should-fail.ts`; CI expects exit 1.
-- Extend (or create) `.github/workflows/ci.yml` with `pnpm codemod verify`.
+- Promover regras da Phase 6c.5 de `warn` para `error`:
+  - `domain/**` pode importar: `domain/**`, `@canto/db` (type-only), `@canto/providers`, `@canto/validators`, `zod`.
+  - `domain/**` NÃO pode importar: `infra/*`, `platform/*`, `bullmq`, `ioredis`, `drizzle-orm`, `node:*`, `fetch`, `@trpc/server`, `next`, `react`.
+  - `infra/**` pode importar: `domain/**`, `platform/**`, `@canto/db`, externals.
+  - `platform/**` pode importar: externals only.
+- Synthetic violation fixture em `packages/core/src/__eslint_fixtures__/should-fail.ts`; CI espera exit 1.
+- Estender (ou criar) `.github/workflows/ci.yml` com `pnpm codemod verify`.
 
-**Est (Claude)**: ~20-30 min. Mostly config writing + one smoke test. ~12 tool calls.
+**Est**: ~25-30 min. ~12 tool calls.
+
+---
+
+## Phase 9 — Lint hardening + zero warnings
+
+**Prereq**: nenhum. Pode rodar em paralelo com 5.5/6/7 ou após Phase 8. **Recomendação**: rodar Phase 9b (bugs hooks) AGORA — bugs em produção não esperam.
+
+### Estado atual (auditado 2026-04-30)
+
+- **ESLint só roda em `apps/web`**. `apps/worker`, `packages/api`, `packages/core`, `packages/auth`, `packages/db`, `packages/ui`, `packages/providers`, `packages/validators`, `scripts/codemod` — NENHUM tem `eslint.config.js` nem script `lint`. Turbo task `lint --continue` cobre 1 de 9 packages.
+- **`apps/web` tem 138 problemas** (1 erro + 137 warnings) com config atual já permissiva.
+- **Build emite 144 warnings**, dos quais ~12 são bugs reais:
+  - `react-hooks/rules-of-hooks`: `useMemo` em condicional (2 ocorrências).
+  - `react-hooks/refs` "Cannot access refs during render": 10+ ocorrências.
+  - `react-hooks/exhaustive-deps`: 5+ deps que mudam todo render.
+- Override em `apps/web/eslint.config.js` rebaixa 11 regras importantes pra `warn` ou `off` com comment "soft-fail categories of pre-existing debt".
+
+### Phase 9a — Espalhar ESLint para todos os packages (~30-45 min)
+
+Adicionar `eslint.config.js` + script `"lint": "eslint ."` em:
+- `apps/worker`, `packages/api`, `packages/core`, `packages/auth`, `packages/db`, `packages/ui`, `packages/providers`, `packages/validators`, `scripts/codemod`.
+
+Cada um estende `@canto/eslint-config/base` (+ `react.js` em `packages/ui` se houver JSX). Esperar que o primeiro `pnpm lint` mostre dezenas/centenas de novas violações latentes — esse é o ponto.
+
+### Phase 9b — Fixar bugs reais de react-hooks em apps/web (~90-120 min)
+
+Bugs (não estilo). Tratar como prioridade:
+- `react-hooks/rules-of-hooks`: 2 ocorrências, `useMemo` em condicional. Refatorar para hooks no topo.
+- `react-hooks/refs` "Cannot access refs during render": 10+ ocorrências. Mover acesso a `.current` para `useEffect` ou event handlers.
+- `react-hooks/exhaustive-deps`: 5+ ocorrências de deps que mudam todo render. Wrap com `useMemo`/`useCallback`.
+
+### Phase 9c — Auto-fix + sweep dos warnings restantes (~120-180 min)
+
+1. `pnpm lint --fix` — resolve ~31 warnings auto-fixáveis (`consistent-type-specifier-style`, `consistent-type-imports`).
+2. Sweep manual:
+   - `no-unnecessary-condition`: ~30 ocorrências. Remover guards mortos.
+   - `no-unused-vars`: poucos. Prefixar com `_` ou deletar.
+   - `no-img-element`: substituir `<img>` por `<Image />` do next/image.
+   - `no-explicit-any`: substituir por `unknown` + narrowing (CLAUDE.md já proíbe `any`).
+3. Repetir build até zero warnings.
+
+### Phase 9d — Promover regras para `error` + remover exceções (~30-45 min)
+
+Editar `tooling/eslint/base.js` e `apps/web/eslint.config.js`:
+
+| Regra | Atual | Alvo |
+|---|---|---|
+| `@typescript-eslint/no-unused-vars` | error / **warn (web)** | error |
+| `@typescript-eslint/no-unnecessary-condition` | error / **warn (web)** | error |
+| `@typescript-eslint/no-misused-promises` | error / **warn (web)** | error |
+| `@typescript-eslint/no-explicit-any` | recommended (warn) | **error** |
+| `@typescript-eslint/consistent-type-imports` | warn / warn | error |
+| `import-x/consistent-type-specifier-style` | error / **warn (web)** | error |
+| `react-hooks/exhaustive-deps` | warn | error |
+| `react-hooks/rules-of-hooks` | warn | error |
+| `react-hooks/refs` | warn | error |
+| `react-hooks/immutability` | warn | error |
+| `react-hooks/preserve-manual-memoization` | warn | error |
+| `react-hooks/set-state-in-effect` | **off** | warn (deferir error) |
+| `@next/next/no-img-element` | warn | error |
+
+Adicionar regras strict novas em `tooling/eslint/base.js`:
+- `@typescript-eslint/no-floating-promises: "error"` (pega promises não-awaitadas)
+- `@typescript-eslint/await-thenable: "error"`
+- `@typescript-eslint/no-non-null-assertion: "error"` (banir `!`)
+- `@typescript-eslint/prefer-nullish-coalescing: "error"` (`??` vs `||`)
+- `@typescript-eslint/no-unnecessary-type-assertion: "error"`
+- `eqeqeq: ["error", "always"]`
+- `no-console: ["warn", { allow: ["warn", "error"] }]` (warn por enquanto)
+
+Remover comment "soft-fail categories of pre-existing debt" do `apps/web/eslint.config.js`.
+
+### Phase 9e — Adicionar lint:strict task no Turbo (~10 min)
+
+`turbo.json`:
+- Tornar `lint` task dependente de `^topo`.
+- Garantir `cache` válido + `outputs: [".cache/.eslintcache"]` em todos os packages.
+- Adicionar `lint:strict` que falha se houver qualquer warning (`--max-warnings=0`) — usar em CI.
+
+### Phase 9f — Build limpo (~30-60 min)
+
+Após 9b/c, rodar `pnpm -F @canto/web build` e fixar qualquer warning residual emitido pelo Next/Turbopack. Hoje há 144 warnings de build — alvo: zero.
+
+**Total Phase 9**: ~5-8 horas de session time. Realistic split em 2 sessões:
+- Sessão 1: 9a + 9b (espalhar lint, fixar bugs hooks). ~3h.
+- Sessão 2: 9c + 9d + 9e + 9f (sweep, hardening, build). ~4h.
 
 ---
 
@@ -290,44 +361,148 @@ Total Phase 7: **~2.5-3.5 hours of session time** if done continuously. Safer to
 
 | Debt | Cleared by |
 |---|---|
-| 14 contexts with DDD-era subfolder layout (`rules/`, `services/`, `mappers/`, `constants/`) | Phase 5.5 |
-| `domain/media/` + `content-enrichment/` separate; `sync/` vs `media-servers/`; `user-media/` standalone; `file-organization/` standalone | Phase 5.5 |
-| `packages/core/src/infra/repositories.ts` transitional aggregate barrel | Phase 6c |
-| `domain/**` files importing `@canto/core/infra/*.adapter` / `@canto/core/platform/*` directly | Phase 6a/b/c |
-| `domain/**` files with value imports from `@canto/db/schema` or `drizzle-orm` | Phase 7 |
-| No ESLint boundaries rule | Phase 8 |
-| No CI workflow file | Phase 8 or later |
+| 12 contextos com layout DDD-era (`rules/`, `services/`, `mappers/`, `constants/`) | Phase 5.5 |
+| `domain/content-enrichment/` (now thin shim) separado de `media/`; `sync/` separado de `media-servers/`; `file-organization/` separado de `torrents/` | Phase 5.5 |
+| `packages/core/src/infra/repositories.ts` aggregate barrel transitional (56 consumers) | Phase 6c |
+| 158 imports `infra/*` + 51 imports `platform/*` em `domain/**` | Phase 6a/b/c |
+| 5 de 6 ports compartilhadas definidas mas bypass-eadas | Phase 6a (wireup) |
+| 53 imports value `@canto/db` + 34 imports `drizzle-orm` em `domain/**` | Phase 7 |
+| Sem regra ESLint impedindo violações novas em `domain/**` | Phase 6c.5 (warn) + Phase 8 (error) |
+| ESLint só roda em `apps/web` (1 de 9 packages) | Phase 9a |
+| 138 lint problems + 144 build warnings em `apps/web` | Phase 9b/c/f |
+| 11 regras importantes em modo `warn` ou `off` | Phase 9d |
+| Sem `lint:strict` task no Turbo / CI | Phase 9e |
+| Sem CI workflow file | Phase 8 |
 
 ---
 
 ## Manual verification still pending
 
-Auto mode has not booted dev servers. Before relying on `main` beyond typecheck:
+Auto mode não bootou dev servers desde pré-5.6. Antes de confiar no `main` além de typecheck:
 
-- `rm -rf apps/web/.next && pnpm -F @canto/web dev` → boot on :3000; exercise `/lists`, `/media/[id]`, `/settings/services`.
-- `pnpm -F @canto/worker dev` → pick up a synthetic job end-to-end.
+- `rm -rf apps/web/.next && pnpm -F @canto/web dev` → boot em :3000; exercitar `/lists`, `/media/[id]`, `/settings/services`, página nova de admin cadence-knobs.
+- `pnpm -F @canto/worker dev` → exercitar `ensureMedia` end-to-end (cadence sweep deve planejar + dispatch corretamente; verificar `media_aspect_state` rows updated).
 - `pnpm -F @canto/web build` → Turbopack production build.
 
 ---
 
-## How to resume
+## How to execute — Plano em Waves
 
-Each phase is an independent branch. **Run in this order**:
+**Ideia central**: cada wave é **autocontida e shippable**. Slice vertical através das phases (6+7+9-do-contexto) em vez de varrer phase-por-phase. Pode parar entre waves sem deixar funcionalidade quebrada.
 
-1. **Phase 5.5** — `refactor/simplify-structure`. Confirm the 5 decisions at the top of the Phase 5.5 section. Update `sample.json`. Run codemod. Single PR. ~45-60 min session time.
+Phase numbers (5.5, 6, 7, 8, 9) ficam acima como **referência** do que cada bucket de trabalho contém. Waves são a **ordem de execução**.
 
-2. **Phase 6a** — `refactor/core-ports-shared`. LoggerPort + URLResolverPort + JobDispatcherPort extension. ~20-30 min.
+Critério de "wave fechada":
+- Typecheck verde (`pnpm typecheck` 10/10).
+- Tests verdes (`pnpm -F @canto/core test` + qualquer outro afetado).
+- Build verde se afetou apps/web.
+- ESLint sem violações novas no contexto da wave.
+- PR mergeável independente.
 
-3. **Phase 6b** — `refactor/core-ports-media-servers`. Plex + Jellyfin adapter ports. ~25-35 min.
+---
 
-4. **Phase 6c** — `refactor/core-ports-repositories`. Per-context repo ports + delete aggregate. ~40-60 min.
+### Wave 0 — Bootstrap (cross-cutting, ~3-4h)
 
-5. **Phase 7** — `refactor/core-strict-types-<ctx>`. One branch per context, smallest first. 10-45 min per context. Total ~2.5-3.5h session time continuous, or split across 2-3 sessions.
+Trabalho que tem que vir antes das waves de contexto, ou que é global e não cabe em wave de domínio.
 
-6. **Phase 8** — `chore/eslint-boundaries`. ESLint rules + CI. ~20-30 min.
+#### 0A — Lint coverage everywhere (~30 min)
+- Adicionar `eslint.config.js` + script `"lint": "eslint ."` em 9 packages: `apps/worker`, `packages/{api,core,auth,db,ui,providers,validators}`, `scripts/codemod`.
+- Cada um estende `@canto/eslint-config/base` (+ `react.js` em `packages/ui` se houver JSX).
+- Não fixa warnings ainda — só liga visibilidade. Esperar 100s de violações no primeiro run.
 
-**Total remaining work (Claude session time)**: ~5-7 hours aggregate. Realistically splits across 3-5 sessions because of turn/token limits and verify-cycle wait time (typecheck ~15s, tests ~3s per cycle; dozens of cycles accumulate).
+#### 0B — Bugs react-hooks em apps/web (~90 min) **PRIORIDADE**
+- `react-hooks/rules-of-hooks` (2x): `useMemo` em condicional → mover hooks pro topo.
+- `react-hooks/refs` "Cannot access refs during render" (10+x): mover `.current` pra `useEffect`/handlers.
+- `react-hooks/exhaustive-deps` (5+x): wrap deps com `useMemo`/`useCallback`.
+- **São bugs reais em produção**. Pode rodar antes mesmo de 0A.
 
-**Reference**: Phase 1-5 were ~160 tool calls and roughly 2-3 hours of session time across one long session. The remaining phases together are roughly 2-3x that volume.
+#### 0C — Phase 5.5 codemod (~60 min)
+- Codemod move folders: `content-enrichment→media`, `sync→media-servers/scans`, `file-organization→torrents`, `lists/recommendations/user-media→user-actions/`.
+- Drop subfolders DDD em favor de `types/`, `ports/`, `use-cases/`.
+- Após: shape novo, código velho. Próximas waves limpam código contexto-por-contexto.
 
-After each merge: `git checkout main && git pull`. Dirty / unpushed commits stop the codemod.
+#### 0D — Shared ports wireup (~25 min)
+- Cria `LoggerPort`, `URLResolverPort` em `domain/shared/ports/`.
+- Wireup das 5 ports já definidas mas bypass-eadas (`MediaProviderPort`, `FileSystemPort`, `DownloadClientPort`, `MediaServerPort`, `CachePort`) — ~13 call sites switchados pra usar a interface.
+- Composition roots (`apps/worker/src/index.ts`, `packages/api/src/trpc.ts`) constroem adapters.
+
+**Estado pós-Wave 0**: shape novo da Phase 5.5, lint everywhere, bugs hooks zero, shared ports wired. 4 PRs (um por sub-wave) ou bundle.
+
+---
+
+### Waves 1-9 — Per-context vertical slices
+
+Cada wave faz para **um contexto**:
+1. Cria `domain/<ctx>/ports/<ctx>-repository.port.ts` + adapter binding em `infra/<ctx>/`.
+2. Cria types branded em `domain/<ctx>/types/<entity>.ts`.
+3. Cria mappers em `infra/<ctx>/<entity>.mapper.ts` (`toDomain` / `toRow`).
+4. Refatora use-cases pra aceitar `deps` (repo, logger, etc).
+5. Elimina imports `infra/*` e `platform/*` dentro de `domain/<ctx>/`.
+6. Converte imports `@canto/db/schema` desse contexto pra type-only.
+7. Limpa lint warnings nos arquivos do contexto.
+8. Update consumers (API routers, worker handlers, outros contextos).
+
+**Ordem: menor primeiro, maior por último.** Permite iteração rápida + aprende o pattern em contextos pequenos antes dos densos.
+
+#### Wave 1 — `notifications` (~25-30 min)
+1 entity (`notification`), ~4 methods. Standalone (system → user). Ensaio do pattern de wave.
+
+#### Wave 2 — `user` (~25-30 min)
+2 entities (`user`, `userPreference`), ~5 methods. Pequeno, sem fan-out.
+
+#### Wave 3 — `user-actions/lists` (~30-40 min)
+2 entities (`list`, `listMember`), ~8 methods. Coupling com recommendations (próxima wave) — deixa port de recommendations pendente, lists usa adapter trivial.
+
+#### Wave 4 — `user-actions/recommendations` (~30-40 min)
+2 entities (`userRecommendation`, `becauseWatched`), ~6 methods. Consome state de user-media via port (Wave 7); até lá, adapter trivial sobre função existente.
+
+#### Wave 5 — `media-servers` + scans (~45-60 min)
+1 entity dominante (`userConnection`), ~5 methods + scanners (sync code agora dentro). Inclui Phase 6b (Plex + Jellyfin adapter ports — ~9 + 7 métodos cada). Wave mais bursty.
+
+#### Wave 6 — `trakt` (~45-60 min)
+1 entity dominante + ~5 supporting tables, ~10 methods. Fluxos de sync (history, ratings, favorites, watched, watchlist, custom-lists) — densos mas mecânicos.
+
+#### Wave 7 — `user-actions/user-media` (~75-90 min)
+8 entities (`userMediaState`, `userPlaybackProgress`, `userMediaRating`, `userMediaHidden`, `userMediaLibrary`, `userMediaLibraryFeed`, `userMediaStats`, `profileInsights`), ~20 methods. Wave grande. **Considerar split**: 7A (state + history + ratings) e 7B (library + feed + stats + playback + hidden + insights).
+
+#### Wave 8 — `torrents` + file-organization (~60-75 min)
+5 entities (`download`, `mediaFile`, `mediaVersion`, `downloadFolder`, `folderMediaPath`), ~15 methods. `IndexerPort` já existe. Coupling bidirectional com file-org agora interno ao contexto.
+
+#### Wave 9 — `media` + content-enrichment + cadence (~90-120 min)
+**Maior contexto**. 10+ entities (`media`, `season`, `episode`, `mediaLocalization`, `mediaAspectState`, `mediaContentRating`, `tmdbCertification`, `mediaFile`, `mediaVersion`, watch-providers, extras), ~25 methods. Inclui content-enrichment shims, cadence engine, strategies, persist subfolders. **Split recomendado**:
+- 9A: media core (`media`/`season`/`episode` + repos + types).
+- 9B: localization + aspect-state.
+- 9C: extras + watch-providers + content-enrichment shims.
+
+Tests da cadence engine devem cobrir bem — refatoração não pode regredir lógica de planejamento.
+
+---
+
+### Wave Final — Lockdown (~90-120 min)
+
+Após Waves 1-9 todas verdes:
+
+- **Phase 8** ESLint boundaries em modo `error` (era warn). Adicionar `no-restricted-imports`:
+  - `domain/**` não pode importar `infra/*`, `platform/*`, `bullmq`, `ioredis`, `drizzle-orm`, `node:*`, `@trpc/server`, `next`, `react`.
+  - Synthetic violation fixture em `packages/core/src/__eslint_fixtures__/should-fail.ts`.
+- **Phase 9c sweep**: warnings residuais que tightening de tipos não resolveu.
+- **Phase 9d**: promover ~13 regras de `warn` pra `error` em `tooling/eslint/base.js` + `apps/web/eslint.config.js`. Adicionar `no-floating-promises`, `await-thenable`, `no-non-null-assertion`, `prefer-nullish-coalescing`, `eqeqeq`, `no-unnecessary-type-assertion`.
+- **Phase 9e**: turbo `lint:strict --max-warnings=0`.
+- **Phase 9f**: `pnpm -F @canto/web build` com zero warnings.
+- **Delete `infra/repositories.ts`** (último consumer caiu na Wave 9).
+- **CI workflow** `.github/workflows/ci.yml` rodando typecheck + test + lint:strict.
+
+---
+
+### Total
+
+| Bloco | Estimativa |
+|---|---|
+| Wave 0 (bootstrap) | 3-4h |
+| Waves 1-9 (contextos) | 7-9h agregado |
+| Wave Final (lockdown) | 1.5-2h |
+| **Total realista** | **~12-15h** |
+
+PRs: 4 da Wave 0 + 9 das waves de contexto + 1 lockdown = **~14 PRs** mergeáveis independentemente. Pode parar a qualquer momento entre waves.
+
+**Após cada wave**: `git checkout main && git pull`. Codemod precisa tree limpa.
