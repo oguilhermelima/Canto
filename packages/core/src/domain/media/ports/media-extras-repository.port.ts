@@ -177,6 +177,30 @@ export interface MediaExtrasRepositoryPort {
   ): Promise<LocalizedRecommendationItem[]>;
 
   /**
+   * Resolve existing media rows that overlap with a set of TMDB
+   * recommendation/similar items — used by `refreshExtras` to avoid
+   * creating duplicate stubs for media already in the DB.
+   *
+   * Matches (a) rows with provider=tmdb whose externalId is in
+   * `tmdbExternalIds`, and (b) rows with provider=tvdb whose en-US title
+   * is in `tvdbTitles` and whose type matches `mediaType`.
+   */
+  findExistingMediaByExternalRefs(
+    tmdbExternalIds: number[],
+    tvdbTitles: string[],
+    mediaType: string,
+  ): Promise<
+    Array<{
+      id: string;
+      externalId: number;
+      provider: string;
+      type: string;
+      title: string | null;
+      logoPath: string | null;
+    }>
+  >;
+
+  /**
    * Read existing `media_recommendation` rows for a source — used by
    * `refreshExtras` to compute the diff before deleting/inserting.
    */

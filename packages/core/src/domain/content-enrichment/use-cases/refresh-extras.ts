@@ -1,17 +1,13 @@
-import { and, eq, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
-
 import type { Database } from "@canto/db/client";
-import { media, mediaLocalization } from "@canto/db/schema";
 import type { MediaType } from "@canto/providers";
 
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import { mapSearchResultToMediaFields } from "@canto/core/domain/content-enrichment/rules/pool-scoring";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
-import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 
 const EN = "en-US";
@@ -21,6 +17,8 @@ export interface RefreshExtrasDeps {
   extras: MediaExtrasRepositoryPort;
   localization: MediaLocalizationRepositoryPort;
   media: MediaRepositoryPort;
+  // FIXME(wave-10): make required once domain/media/enrichment/strategies/extras.ts threads dispatcher
+  dispatcher?: JobDispatcherPort;
 }
 
 export async function refreshExtras(
@@ -98,52 +96,22 @@ export async function refreshExtras(
   const existingRecs =
     await deps.extras.findRecommendationsForSource(mediaId);
 
-  // Also look up existing media rows for the recommended items' external IDs
-  // Check both tmdb provider AND tvdb-provider rows (which store tvdb_id = external_id)
-  // to avoid creating cross-provider duplicates. After Phase 1C-δ titles live
-  // on `media_localization` (en-US row is canonical), so the tvdb cross-match
-  // joins through that table.
   const recExternalIds = [...uniqueRecItems.values()].map(
     (i) => i.result.externalId,
   );
   const recTitles = [...uniqueRecItems.values()].map((i) => i.result.title);
-  const recLocEn = alias(mediaLocalization, "rec_loc_en");
-  const existingMedia =
-    recExternalIds.length > 0
-      ? await db
-          .select({
-            id: media.id,
-            externalId: media.externalId,
-            title: recLocEn.title,
-            logoPath: recLocEn.logoPath,
-            provider: media.provider,
-            type: media.type,
-          })
-          .from(media)
-          .leftJoin(
-            recLocEn,
-            and(eq(recLocEn.mediaId, media.id), eq(recLocEn.language, EN)),
-          )
-          .where(
-            sql`(
-            (${media.externalId} IN (${sql.join(
-              recExternalIds.map((id) => sql`${id}`),
-              sql`, `,
-            )}) AND ${media.provider} = 'tmdb')
-            OR (${media.provider} = 'tvdb' AND ${media.type} = ${row.type} AND ${recLocEn.title} IN (${sql.join(
-              recTitles.map((t) => sql`${t}`),
-              sql`, `,
-            )}))
-          )`,
-          )
-      : [];
+  const existingMedia = await deps.extras.findExistingMediaByExternalRefs(
+    recExternalIds,
+    recTitles,
+    row.type,
+  );
   const existingMediaByExtId = new Map(
     existingMedia.filter((m) => m.provider === "tmdb").map((m) => [m.externalId, m]),
   );
   const existingMediaByTitle = new Map(
     existingMedia
       .filter((m) => m.provider === "tvdb" && m.title !== null)
-      .map((m) => [m.title!, m]),
+      .map((m) => [m.title as string, m]),
   );
 
   const trailerMap = new Map<number, string>();
@@ -242,7 +210,7 @@ export async function refreshExtras(
         // Stub row from TMDB's recs/similar payload — enqueue full metadata
         // fetch so the row is filled in before any user-facing query surfaces
         // it (read paths filter on the metadata aspect having succeeded).
-        void dispatchEnsureMedia(inserted.id).catch(
+        void deps.dispatcher?.enrichMedia(inserted.id).catch(
           logAndSwallow("refresh-extras dispatchEnsureMedia"),
         );
       }

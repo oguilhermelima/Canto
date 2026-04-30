@@ -10,10 +10,13 @@ import {
 } from "drizzle-orm";
 
 import type { Database } from "@canto/db/client";
+import { alias } from "drizzle-orm/pg-core";
+
 import {
   media,
   mediaAspectState,
   mediaCredit,
+  mediaLocalization,
   mediaRecommendation,
   mediaVideo,
   mediaWatchProvider,
@@ -307,6 +310,53 @@ export function makeMediaExtrasRepository(
       return rows.map((row) => ({
         ...(row as unknown as LocalizedRecommendationItem),
         trailerKey: trailerByMediaId.get(row.id) ?? null,
+      }));
+    },
+
+    findExistingMediaByExternalRefs: async (tmdbExternalIds, tvdbTitles, mediaType) => {
+      if (tmdbExternalIds.length === 0 && tvdbTitles.length === 0) return [];
+      const recLocEn = alias(mediaLocalization, "rec_loc_en");
+      const conditions: Array<ReturnType<typeof and>> = [];
+      if (tmdbExternalIds.length > 0) {
+        conditions.push(
+          and(inArray(media.externalId, tmdbExternalIds), eq(media.provider, "tmdb")),
+        );
+      }
+      if (tvdbTitles.length > 0) {
+        conditions.push(
+          and(
+            eq(media.provider, "tvdb"),
+            eq(media.type, mediaType),
+            inArray(recLocEn.title, tvdbTitles),
+          ),
+        );
+      }
+      const where =
+        conditions.length === 1
+          ? conditions[0]
+          : sql`(${sql.join(conditions, sql` OR `)})`;
+      const rows = await db
+        .select({
+          id: media.id,
+          externalId: media.externalId,
+          provider: media.provider,
+          type: media.type,
+          title: recLocEn.title,
+          logoPath: recLocEn.logoPath,
+        })
+        .from(media)
+        .leftJoin(
+          recLocEn,
+          and(eq(recLocEn.mediaId, media.id), eq(recLocEn.language, "en-US")),
+        )
+        .where(where);
+      return rows.map((r) => ({
+        id: r.id,
+        externalId: r.externalId,
+        provider: r.provider,
+        type: r.type,
+        title: r.title ?? null,
+        logoPath: r.logoPath ?? null,
       }));
     },
 
