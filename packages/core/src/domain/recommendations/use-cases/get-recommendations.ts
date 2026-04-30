@@ -1,6 +1,12 @@
-import type { Database } from "@canto/db/client";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
-import { buildExclusionSet } from "@canto/core/domain/recommendations/use-cases/recommendation-service";
+import type { RecommendationsRepositoryPort } from "@canto/core/domain/recommendations/ports/recommendations-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import {
+  buildExclusionSet,
+} from "@canto/core/domain/recommendations/use-cases/recommendation-service";
+import type { BuildExclusionSetDeps } from "@canto/core/domain/recommendations/use-cases/recommendation-service";
 import { applyMediaItemsLocalizationOverlay } from "@canto/core/domain/shared/localization/localization-service";
 import { mapPoolItem } from "@canto/core/domain/shared/mappers/media-mapper";
 import { rankByMmr } from "@canto/core/domain/recommendations/rules/mmr-diversity";
@@ -9,13 +15,13 @@ import {
   mixExploreSlots,
 } from "@canto/core/domain/recommendations/rules/explore-mix";
 import type { RecsFilters } from "@canto/core/domain/recommendations/types/recs-filters";
-import {
-  countUserRecommendations,
-  findUserRecommendations,
-} from "@canto/core/infra/recommendations/user-recommendation-repository";
-import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
-import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
-import { findLibraryMediaBrief } from "@canto/core/infra/media/media-repository";
+
+export interface GetRecommendationsDeps extends BuildExclusionSetDeps {
+  recs: RecommendationsRepositoryPort;
+  mediaRepo: MediaRepositoryPort;
+  extras: MediaExtrasRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
+}
 
 interface GetRecommendationsInput {
   userId: string;
@@ -46,7 +52,7 @@ const MMR_OVERSAMPLE = 3;
  * 3. Live TMDB fetch when pool is empty
  */
 export async function getRecommendations(
-  db: Database,
+  deps: GetRecommendationsDeps,
   input: GetRecommendationsInput,
   tmdb: MediaProviderPort,
 ) {
@@ -54,9 +60,8 @@ export async function getRecommendations(
   const offset = page * pageSize;
   const useMmr = page === 0 && !filters.sortBy;
 
-  const extras = makeMediaExtrasRepository(db);
-  const localization = makeMediaLocalizationRepository(db);
-  const { excludeItems } = await buildExclusionSet(db, userId);
+  const { extras, localization } = deps;
+  const { excludeItems } = await buildExclusionSet(deps, userId);
 
   // ── Path 1: Per-user recommendations ──
   // `countUserRecommendations` counts rows regardless of media enrichment
@@ -64,14 +69,13 @@ export async function getRecommendations(
   // has recs that all point to light media, the count is positive but the
   // filtered query returns nothing — so fall through to the global pool
   // instead of returning an empty list.
-  const userRecCount = await countUserRecommendations(db, userId);
+  const userRecCount = await deps.recs.countUserRecommendations(userId);
   if (userRecCount > 0) {
     // The repo applies translation overlay inline via a LEFT JOIN on
     // `media_translation`, so we skip the post-query `translateMediaItems`
     // call — it would just re-resolve the same translation row.
     const fetchSize = useMmr ? pageSize * MMR_OVERSAMPLE + 1 : pageSize + 1;
-    const rows = await findUserRecommendations(
-      db,
+    const rows = await deps.recs.findUserRecommendations(
       userId,
       excludeItems,
       fetchSize,
@@ -98,8 +102,7 @@ export async function getRecommendations(
       const items =
         useMmr && personalizedItems.length === pageSize
           ? await mixWithExploreSlot(
-              db,
-              localization,
+              deps,
               personalizedItems,
               excludeItems,
               userLang,
@@ -153,7 +156,7 @@ export async function getRecommendations(
   // ── Path 3: Live TMDB fallback (pool completely empty) ──
   if (excludeItems.length === 0) return { items: [], nextCursor: null, version: recsVersion };
 
-  const allLibrary = await findLibraryMediaBrief(db);
+  const allLibrary = await deps.mediaRepo.findLibraryMediaBrief();
   const seedStart = (page * 3) % allLibrary.length;
   const seeds: typeof allLibrary = [];
   for (let i = 0; i < 3 && i < allLibrary.length; i++) {
@@ -210,8 +213,7 @@ type MappedPoolItem = ReturnType<typeof mapPoolItem>;
  * the personalised ones already passed through the SQL translation overlay.
  */
 async function mixWithExploreSlot(
-  db: Database,
-  localization: ReturnType<typeof makeMediaLocalizationRepository>,
+  deps: Pick<GetRecommendationsDeps, "extras" | "localization">,
   personalized: MappedPoolItem[],
   excludeItems: Array<{ externalId: number; provider: string }>,
   userLang: string,
@@ -226,9 +228,7 @@ async function mixWithExploreSlot(
   }));
   const exploreExcludes = [...excludeItems, ...personalizedExclude];
 
-  // Pull 2× the slot count so we can dedup against `personalizedExclude`
-  // even when the global pool has overlap with the personalised page.
-  const pool = await makeMediaExtrasRepository(db).findGlobalRecommendations(
+  const pool = await deps.extras.findGlobalRecommendations(
     exploreExcludes,
     slots.length * 2,
     0,
@@ -251,7 +251,7 @@ async function mixWithExploreSlot(
   const translatedExplore = await applyMediaItemsLocalizationOverlay(
     explore,
     userLang,
-    { localization },
+    { localization: deps.localization },
   );
   return mixExploreSlots(personalized, translatedExplore);
 }

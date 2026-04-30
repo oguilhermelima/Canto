@@ -1,13 +1,21 @@
-import type { Database } from "@canto/db/client";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import type { RecommendationsRepositoryPort } from "@canto/core/domain/recommendations/ports/recommendations-repository.port";
+import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { SearchResult } from "@canto/providers";
 import { getSetting, setSetting } from "@canto/db/settings";
-import { buildExclusionSet } from "@canto/core/domain/recommendations/use-cases/recommendation-service";
+import {
+  buildExclusionSet,
+} from "@canto/core/domain/recommendations/use-cases/recommendation-service";
+import type { BuildExclusionSetDeps } from "@canto/core/domain/recommendations/use-cases/recommendation-service";
 import { applyMediaItemsLocalizationOverlay } from "@canto/core/domain/shared/localization/localization-service";
 import { mapPoolItem } from "@canto/core/domain/shared/mappers/media-mapper";
-import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
-import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
-import { findUserSpotlightItems } from "@canto/core/infra/recommendations/user-recommendation-repository";
+
+export interface GetSpotlightDeps extends BuildExclusionSetDeps {
+  recs: RecommendationsRepositoryPort;
+  extras: MediaExtrasRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
+}
 
 interface TrendingFetcher {
   (type: "movie" | "show"): Promise<{ results: SearchResult[] }>;
@@ -25,24 +33,23 @@ const SPOTLIGHT_LIMIT = 20;
  * every caller already had the value on the session.
  */
 export async function getSpotlight(
-  db: Database,
+  deps: GetSpotlightDeps,
   userId: string,
   userLang: string,
   tmdb: MediaProviderPort,
   fetchTrending: TrendingFetcher,
 ) {
-  const { excludeSet, excludeItems } = await buildExclusionSet(db, userId);
+  const { excludeSet, excludeItems } = await buildExclusionSet(deps, userId);
 
   // Path 1: Per-user spotlight — repo applies translation overlay inline via
   // LEFT JOIN on `media_translation`, so we skip the post-query overlay call.
-  const userItems = await findUserSpotlightItems(db, userId, excludeItems, SPOTLIGHT_LIMIT, userLang);
+  const userItems = await deps.recs.findUserSpotlightItems(userId, excludeItems, SPOTLIGHT_LIMIT, userLang);
   if (userItems.length > 0) {
     return userItems.map(mapPoolItem);
   }
 
   // Path 2: Global pool fallback (localization joined inline)
-  const extras = makeMediaExtrasRepository(db);
-  const poolItems = await extras.findRecommendedMediaWithBackdrops(
+  const poolItems = await deps.extras.findRecommendedMediaWithBackdrops(
     userLang,
     SPOTLIGHT_LIMIT * 3,
   );
@@ -75,7 +82,7 @@ export async function getSpotlight(
       posterPath?: string | null;
     }>;
     return applyMediaItemsLocalizationOverlay(cached, userLang, {
-      localization: makeMediaLocalizationRepository(db),
+      localization: deps.localization,
     });
   }
 
@@ -136,6 +143,6 @@ export async function getSpotlight(
   await setSetting("cache.spotlight", { data: spotlightResults, updatedAt: new Date().toISOString() });
 
   return applyMediaItemsLocalizationOverlay(spotlightResults, userLang, {
-    localization: makeMediaLocalizationRepository(db),
+    localization: deps.localization,
   });
 }

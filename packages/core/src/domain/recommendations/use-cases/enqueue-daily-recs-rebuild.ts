@@ -1,8 +1,9 @@
 import type { RecommendationsRepositoryPort } from "@canto/core/domain/recommendations/ports/recommendations-repository.port";
-import { dispatchRebuildUserRecs } from "@canto/core/platform/queue/bullmq-dispatcher";
+import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 
 export interface EnqueueDailyRecsRebuildDeps {
   repo: RecommendationsRepositoryPort;
+  jobs: JobDispatcherPort;
 }
 
 /**
@@ -15,7 +16,7 @@ export async function enqueueDailyRecsRebuild(
 ): Promise<number> {
   const userIds = await deps.repo.findUsersForDailyRecsCheck();
   for (const userId of userIds) {
-    await dispatchRebuildUserRecs(userId);
+    await deps.jobs.rebuildUserRecs(userId);
   }
   return userIds.length;
 }

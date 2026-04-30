@@ -34,7 +34,7 @@ import { buildRecsFilterConditions, recsSortOrder } from "@canto/core/infra/reco
 import {
   getQualityFilters,
   getWeightedScoreOrder,
-} from "@canto/core/domain/recommendations/rules/recommendation-filters";
+} from "@canto/core/infra/recommendations/recommendation-filters";
 import {
   toDomain as creditToDomain,
   toRow as creditToRow,

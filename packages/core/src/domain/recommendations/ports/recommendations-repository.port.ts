@@ -64,6 +64,55 @@ export interface RecommendationsRepositoryPort {
   findUsersForDailyRecsCheck(): Promise<string[]>;
 
   /**
+   * Top-N quality-filtered rec candidates for a single seed media, ordered by
+   * Bayesian weighted score. Returns the denormalized columns needed to
+   * persist a `user_recommendation` row without an extra join.
+   */
+  findRecCandidatesForSeed(
+    sourceMediaId: string,
+    limit: number,
+  ): Promise<
+    Array<{
+      mediaId: string;
+      externalId: number;
+      provider: string;
+      type: string;
+      title: string | null;
+      overview: string | null;
+      posterPath: string | null;
+      backdropPath: string | null;
+      logoPath: string | null;
+      voteAverage: number | null;
+      year: number | null;
+      releaseDate: string | null;
+      genres: string[] | null;
+      genreIds: number[] | null;
+      runtime: number | null;
+      originalLanguage: string | null;
+      contentRating: string | null;
+      status: string | null;
+      popularity: number | null;
+    }>
+  >;
+
+  /**
+   * Distinct source media ids from the server library (in_library=true) that
+   * have at least one recommendation. Used as fallback seeds when the user
+   * has few personal items.
+   */
+  findServerRecSources(limit: number): Promise<Array<{ sourceMediaId: string }>>;
+
+  /**
+   * User list items with genres and list type, newest first, excluding server
+   * library items. Used by the rec-rebuild to select diverse seeds.
+   */
+  findUserListItemsForRecs(
+    userId: string,
+  ): Promise<
+    Array<{ mediaId: string; genres: string[] | null; listType: string }>
+  >;
+
+  /**
    * Top-N "because you watched X" recs per source media, ranked by weighted
    * score and overlaid with the user's localization.
    */

@@ -11,6 +11,11 @@ import {
   removeMediaFromUserRecs,
   upsertUserRecommendations,
 } from "@canto/core/infra/recommendations/user-recommendation-repository";
+import {
+  findRecCandidatesForSeed,
+  findServerRecSources,
+  findUserListItemsForRecs,
+} from "@canto/core/infra/recommendations/rebuild-recs-repository";
 
 export function makeRecommendationsRepository(
   db: Database,
@@ -49,6 +54,10 @@ export function makeRecommendationsRepository(
       const rows = await findUsersForDailyRecsCheck(db);
       return rows.map((r) => r.id);
     },
+    findRecCandidatesForSeed: (sourceMediaId, limit) =>
+      findRecCandidatesForSeed(db, sourceMediaId, limit),
+    findServerRecSources: (limit) => findServerRecSources(db, limit),
+    findUserListItemsForRecs: (userId) => findUserListItemsForRecs(db, userId),
     findBecauseWatchedRecs: async (
       userId,
       sourceMediaIds,

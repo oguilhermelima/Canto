@@ -1,21 +1,21 @@
-import type { Database } from "@canto/db/client";
 import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
 import type { RecommendationsRepositoryPort } from "@canto/core/domain/recommendations/ports/recommendations-repository.port";
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import { verifyListOwnership } from "@canto/core/domain/lists/rules/list-rules";
 import { addMediaToUserRecs } from "@canto/core/domain/recommendations/use-cases/rebuild-user-recs";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 
 /**
- * Cross-context use case. The lists side (verify-ownership, item CRUD) is
- * fully ported to `ListsRepositoryPort`; the recommendations cleanup uses
- * `RecommendationsRepositoryPort` and background dispatch uses
- * `JobDispatcherPort`.
+ * Cross-context use case. Lists CRUD via `ListsRepositoryPort`,
+ * recommendations cleanup via `RecommendationsRepositoryPort`, add-recs via
+ * `UserMediaRepositoryPort`. Background enrichment uses `JobDispatcherPort`.
  */
 export interface ManageListItemsDeps {
   repo: ListsRepositoryPort;
-  // FIXME(wave-10): make required once callers in packages/api wire these ports
-  recs?: RecommendationsRepositoryPort;
+  recs: RecommendationsRepositoryPort;
+  userMedia: UserMediaRepositoryPort;
+  // FIXME(wave-10): make required once callers in packages/api wire this port
   dispatcher?: JobDispatcherPort;
 }
 
@@ -27,7 +27,6 @@ export interface ManageListItemsDeps {
  */
 export async function addItemToList(
   deps: ManageListItemsDeps,
-  db: Database,
   input: { listId: string; mediaId: string; notes?: string },
   userId: string,
   userRole: string,
@@ -42,16 +41,17 @@ export async function addItemToList(
     notes: input.notes,
   });
 
-  // Side effects (fire-and-forget)
-  void deps.recs?.removeMediaFromUserRecs(userId, input.mediaId).catch(
+  void deps.recs.removeMediaFromUserRecs(userId, input.mediaId).catch(
     logAndSwallow("list:addItem removeMediaFromUserRecs"),
   );
   void deps.dispatcher?.enrichMedia(input.mediaId).catch(
     logAndSwallow("list:addItem dispatchEnsureMedia"),
   );
-  void addMediaToUserRecs(db, userId, input.mediaId).catch(
-    logAndSwallow("list:addItem addMediaToUserRecs"),
-  );
+  void addMediaToUserRecs(
+    { recs: deps.recs, userMedia: deps.userMedia },
+    userId,
+    input.mediaId,
+  ).catch(logAndSwallow("list:addItem addMediaToUserRecs"));
 
   return item;
 }
@@ -61,7 +61,6 @@ export async function addItemToList(
  */
 export async function removeItemFromList(
   deps: ManageListItemsDeps,
-  db: Database,
   input: { listId: string; mediaId: string },
   userId: string,
   userRole: string,
@@ -72,7 +71,7 @@ export async function removeItemFromList(
 
   await deps.repo.removeItem(input.listId, input.mediaId);
 
-  void deps.recs?.deleteUserRecommendationsForSource(userId, input.mediaId).catch(
+  void deps.recs.deleteUserRecommendationsForSource(userId, input.mediaId).catch(
     logAndSwallow("list:removeItem deleteUserRecommendationsForSource"),
   );
 
@@ -85,7 +84,6 @@ export async function removeItemFromList(
  */
 export async function removeItemsFromList(
   deps: ManageListItemsDeps,
-  db: Database,
   input: { listId: string; mediaIds: string[] },
   userId: string,
   userRole: string,
@@ -97,7 +95,7 @@ export async function removeItemsFromList(
   await deps.repo.removeItems(input.listId, input.mediaIds);
 
   for (const mediaId of input.mediaIds) {
-    void deps.recs?.deleteUserRecommendationsForSource(userId, mediaId).catch(
+    void deps.recs.deleteUserRecommendationsForSource(userId, mediaId).catch(
       logAndSwallow("list:removeItems deleteUserRecommendationsForSource"),
     );
   }

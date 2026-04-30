@@ -1,43 +1,11 @@
-import { desc, eq, and, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
-import {
-  getQualityFilters,
-  getWeightedScoreOrder,
-} from "@canto/core/domain/recommendations/rules/recommendation-filters";
+import type { RecommendationsRepositoryPort } from "@canto/core/domain/recommendations/ports/recommendations-repository.port";
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
 import {
   engagementMultiplier,
-  isNegativeSignal
-  
+  isNegativeSignal,
 } from "@canto/core/domain/recommendations/rules/engagement-signals";
-import type {EngagementSignal} from "@canto/core/domain/recommendations/rules/engagement-signals";
+import type { EngagementSignal } from "@canto/core/domain/recommendations/rules/engagement-signals";
 import type { UserRecommendationRow } from "@canto/core/domain/recommendations/types/user-recommendation";
-
-import type { Database } from "@canto/db/client";
-import {
-  list,
-  listItem,
-  media,
-  mediaLocalization,
-  mediaRecommendation,
-} from "@canto/db/schema";
-import {
-  rebuildUserRecommendations,
-  upsertUserRecommendations,
-} from "@canto/core/infra/recommendations/user-recommendation-repository";
-import { findUserEngagementStates } from "@canto/core/infra/user-media/state-repository";
-
-const EN = "en-US";
-
-/**
- * Aliased en-US `media_localization` row used by the rec-candidate selects.
- * Each query that references `recCandidateColumns` must LEFT JOIN this alias
- * on `(mediaId, language='en-US')` so the COALESCE-free columns resolve.
- */
-const recLocEn = alias(mediaLocalization, "rec_loc_en");
-const recLocEnJoin = and(
-  eq(recLocEn.mediaId, media.id),
-  eq(recLocEn.language, EN),
-)!;
 
 const MAX_SEEDS = 10;
 const MAX_SEEDS_FROM_COLLECTIONS = 5;
@@ -48,56 +16,14 @@ const SERVER_BASE_WEIGHT = 0.4;
 const COLLECTION_BASE_WEIGHT = 0.6;
 const ENGAGEMENT_BASE_WEIGHT = 0.85;
 
-/**
- * Columns we read from `media` in every seed-recommendation query so we can
- * persist them denormalized on `user_recommendation`. Centralized here so the
- * SELECT shape stays in lockstep across the watchlist / collection / server
- * paths. Per-language fields (title/overview/posterPath/logoPath) source
- * from the en-US `media_localization` row joined as `recLocEn`.
- */
-const recCandidateColumns = {
-  mediaId: mediaRecommendation.mediaId,
-  externalId: media.externalId,
-  provider: media.provider,
-  type: media.type,
-  title: recLocEn.title,
-  overview: recLocEn.overview,
-  posterPath: recLocEn.posterPath,
-  backdropPath: media.backdropPath,
-  logoPath: recLocEn.logoPath,
-  voteAverage: media.voteAverage,
-  year: media.year,
-  releaseDate: media.releaseDate,
-  genres: media.genres,
-  genreIds: media.genreIds,
-  runtime: media.runtime,
-  originalLanguage: media.originalLanguage,
-  contentRating: media.contentRating,
-  status: media.status,
-  popularity: media.popularity,
-};
+export interface RebuildUserRecsDeps {
+  recs: RecommendationsRepositoryPort;
+  userMedia: UserMediaRepositoryPort;
+}
 
-type RecCandidate = {
-  mediaId: string;
-  externalId: number;
-  provider: string;
-  type: string;
-  title: string | null;
-  overview: string | null;
-  posterPath: string | null;
-  backdropPath: string | null;
-  logoPath: string | null;
-  voteAverage: number | null;
-  year: number | null;
-  releaseDate: string | null;
-  genres: string[] | null;
-  genreIds: number[] | null;
-  runtime: number | null;
-  originalLanguage: string | null;
-  contentRating: string | null;
-  status: string | null;
-  popularity: number | null;
-};
+type RecCandidate = Awaited<
+  ReturnType<RecommendationsRepositoryPort["findRecCandidatesForSeed"]>
+>[number];
 
 function toRecRow(candidate: RecCandidate, weight: number): UserRecommendationRow {
   return {
@@ -154,7 +80,6 @@ function selectSeeds(
   items: Array<{ mediaId: string; genres: string[] | null }>,
   limit: number,
 ): string[] {
-  // Group by primary genre (first genre), preserving addedAt order (already sorted newest first)
   const byGenre = new Map<string, string[]>();
   for (const item of items) {
     const genre = item.genres?.[0] ?? "Other";
@@ -163,7 +88,6 @@ function selectSeeds(
     byGenre.set(genre, bucket);
   }
 
-  // Round-robin: pick 1 from each genre per round
   const seeds: string[] = [];
   const genreKeys = [...byGenre.keys()];
   const cursors = new Map<string, number>(genreKeys.map((g) => [g, 0]));
@@ -180,14 +104,14 @@ function selectSeeds(
         added = true;
       }
     }
-    if (!added) break; // all genres exhausted
+    if (!added) break;
   }
 
   return seeds;
 }
 
 interface ProcessSeedDeps {
-  db: Database;
+  recs: RecommendationsRepositoryPort;
   rows: UserRecommendationRow[];
   signalByMedia: Map<string, EngagementSignal>;
   negativeMedia: Set<string>;
@@ -207,17 +131,10 @@ async function processSeed(
   const seedSignal = deps.signalByMedia.get(seedMediaId);
   const seedBoost = seedSignal ? engagementMultiplier(seedSignal) : 1.0;
 
-  const recItems = await deps.db
-    .select(recCandidateColumns)
-    .from(mediaRecommendation)
-    .innerJoin(media, eq(media.id, mediaRecommendation.mediaId))
-    .leftJoin(recLocEn, recLocEnJoin)
-    .where(and(
-      eq(mediaRecommendation.sourceMediaId, seedMediaId),
-      ...getQualityFilters(),
-    ))
-    .orderBy(getWeightedScoreOrder())
-    .limit(deps.rankCap);
+  const recItems = await deps.recs.findRecCandidatesForSeed(
+    seedMediaId,
+    deps.rankCap,
+  );
 
   for (let rank = 0; rank < recItems.length; rank++) {
     const candidate = recItems[rank]!;
@@ -266,12 +183,12 @@ function selectEngagementSeeds(
  * stronger weight; recs that point to dropped/disliked media are excluded.
  */
 export async function rebuildUserRecs(
-  db: Database,
+  deps: RebuildUserRecsDeps,
   userId: string,
 ): Promise<void> {
   // 0. Engagement signals — used both to boost seeds and to exclude
   // dropped/disliked recs from the output.
-  const engagementStates = await findUserEngagementStates(db, userId);
+  const engagementStates = await deps.userMedia.findEngagementStates(userId);
   const signalByMedia = new Map<string, EngagementSignal>();
   const updatedAtByMedia = new Map<string, Date>();
   const negativeMedia = new Set<string>();
@@ -288,24 +205,7 @@ export async function rebuildUserRecs(
 
   // 1. Get all user list items with genres (newest first), excluding any
   // mediaIds the user has explicitly dropped or rated low.
-  const allUserItems = await db
-    .select({
-      mediaId: listItem.mediaId,
-      genres: media.genres,
-      listType: list.type,
-    })
-    .from(listItem)
-    .innerJoin(list, eq(listItem.listId, list.id))
-    .innerJoin(media, eq(listItem.mediaId, media.id))
-    .where(
-      and(
-        eq(list.userId, userId),
-        sql`${list.type} != 'server'`,
-        sql`${listItem.deletedAt} IS NULL`,
-      ),
-    )
-    .orderBy(desc(listItem.addedAt));
-
+  const allUserItems = await deps.recs.findUserListItemsForRecs(userId);
   const filteredItems = allUserItems.filter(
     (item) => !negativeMedia.has(item.mediaId),
   );
@@ -337,7 +237,7 @@ export async function rebuildUserRecs(
 
   const rows: UserRecommendationRow[] = [];
   const seedDeps: ProcessSeedDeps = {
-    db,
+    recs: deps.recs,
     rows,
     signalByMedia,
     negativeMedia,
@@ -370,13 +270,7 @@ export async function rebuildUserRecs(
     + collectionSeedMediaIds.length
     + engagementSeedMediaIds.length;
   if (totalOwnSeeds < MAX_SEEDS) {
-    const serverSources = await db
-      .selectDistinct({ sourceMediaId: mediaRecommendation.sourceMediaId })
-      .from(mediaRecommendation)
-      .innerJoin(media, eq(mediaRecommendation.sourceMediaId, media.id))
-      .where(eq(media.inLibrary, true))
-      .limit(MAX_SERVER_SOURCES);
-
+    const serverSources = await deps.recs.findServerRecSources(MAX_SERVER_SOURCES);
     serverSourceCount = serverSources.length;
 
     const serverDeps: ProcessSeedDeps = { ...seedDeps, rankCap: 8 };
@@ -386,7 +280,7 @@ export async function rebuildUserRecs(
   }
 
   // 8. Rebuild with granular weights (dedup keeps highest weight per mediaId)
-  await rebuildUserRecommendations(db, userId, rows);
+  await deps.recs.rebuildUserRecommendations(userId, rows);
 
   const genreBreakdown = seedMediaIds.length > 0
     ? ` (seeds from ${new Set(watchlistItems.filter((i) => seedMediaIds.includes(i.mediaId)).map((i) => i.genres?.[0] ?? "Other")).size} genres)`
@@ -403,26 +297,14 @@ export async function rebuildUserRecs(
  * Used reactively when user adds an item to a list.
  */
 export async function addMediaToUserRecs(
-  db: Database,
+  deps: RebuildUserRecsDeps,
   userId: string,
   mediaId: string,
 ): Promise<void> {
-  const recItems = await db
-    .select(recCandidateColumns)
-    .from(mediaRecommendation)
-    .innerJoin(media, eq(media.id, mediaRecommendation.mediaId))
-    .leftJoin(recLocEn, recLocEnJoin)
-    .where(and(
-      eq(mediaRecommendation.sourceMediaId, mediaId),
-      ...getQualityFilters(),
-    ))
-    .orderBy(getWeightedScoreOrder())
-    .limit(MAX_POOL_RANK);
-
+  const recItems = await deps.recs.findRecCandidatesForSeed(mediaId, MAX_POOL_RANK);
   if (recItems.length === 0) return;
 
-  // Skip recs the user has explicitly dropped or low-rated.
-  const engagementStates = await findUserEngagementStates(db, userId);
+  const engagementStates = await deps.userMedia.findEngagementStates(userId);
   const negativeMedia = new Set<string>();
   for (const state of engagementStates) {
     if (
@@ -436,8 +318,6 @@ export async function addMediaToUserRecs(
     }
   }
 
-  // New item gets top sourceWeight (position 0). Rank is preserved against
-  // the original ordering — filtering negatives mid-flight would shift it.
   const rows: UserRecommendationRow[] = [];
   for (let rank = 0; rank < recItems.length; rank++) {
     const candidate = recItems[rank]!;
@@ -445,7 +325,7 @@ export async function addMediaToUserRecs(
     rows.push(toRecRow(candidate, 1.0 * rankMultiplier(rank + 1)));
   }
 
-  await upsertUserRecommendations(db, userId, rows);
+  await deps.recs.upsertUserRecommendations(userId, rows);
 
   console.log(
     `[add-media-to-user-recs] User ${userId}: added ${rows.length} recs from media ${mediaId}`,

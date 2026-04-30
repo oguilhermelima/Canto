@@ -75,6 +75,17 @@ export interface ListsRepositoryPort {
   hardDelete(id: string): Promise<void>;
   reorder(userId: string, orderedIds: string[]): Promise<void>;
 
+  // ── Aggregating reads ──
+
+  /**
+   * `(externalId, provider)` pairs for all media in the user's lists
+   * (watchlist + custom, excluding the server library). Used by the
+   * recommendations exclusion set builder.
+   */
+  findUserListExternalIds(
+    userId: string,
+  ): Promise<Array<{ externalId: number; provider: string }>>;
+
   // ── List Items ──
 
   addItem(input: NewListItem): Promise<ListItem | undefined>;

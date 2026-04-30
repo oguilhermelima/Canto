@@ -25,6 +25,7 @@ import {
   findTombstonedTraktLists,
   findUserCustomCollectionItems,
   findUserDefaultVisibility,
+  findUserListExternalIds,
   findUserListsWithCounts,
   hardDeleteList,
   moveListItems,
@@ -155,6 +156,7 @@ export function makeListsRepository(db: Database): ListsRepositoryPort {
       const rows = await findMediaInLists(db, mediaId, userId);
       return rows.map(toMediaInListSummary);
     },
+    findUserListExternalIds: (userId) => findUserListExternalIds(db, userId),
 
     // ── Members ──
     findMembers: async (listId) => {
