@@ -680,46 +680,60 @@ export const tmdbCertification = pgTable(
   ],
 );
 
-export const download = pgTable("download", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  mediaId: uuid("media_id").references(() => media.id, { onDelete: "set null" }),
-  hash: varchar("hash", { length: 100 }).unique(),
-  title: varchar("title", { length: 500 }).notNull(),
-  /** "movie" | "season" | "episode" */
-  downloadType: varchar("download_type", { length: 20 }).notNull().default("movie"),
-  seasonNumber: integer("season_number"),
-  episodeNumbers: jsonb("episode_numbers").$type<number[]>(),
-  status: varchar("status", { length: 20 }).notNull().default("unknown"),
-  quality: varchar("quality", { length: 20 }).notNull().default("unknown"),
-  source: varchar("source", { length: 20 }).notNull().default("unknown"),
-  progress: real("progress").notNull().default(0),
-  contentPath: varchar("content_path", { length: 1000 }),
-  fileSize: bigint("file_size", { mode: "number" }),
-  magnetUrl: text("magnet_url"),
-  downloadUrl: text("download_url"),
-  imported: boolean("imported").notNull().default(false),
-  importing: boolean("importing").notNull().default(false),
-  importAttempts: integer("import_attempts").notNull().default(0),
-  importMethod: varchar("import_method", { length: 10 }),
-  usenet: boolean("usenet").notNull().default(false),
-  /** Repack/proper count parsed from the title at download time. 0 = not
-   *  a repack. Higher counts (REPACK2, PROPER3) supersede lower; the
-   *  future auto-supersede job uses this to decide whether to replace. */
-  repackCount: integer("repack_count").notNull().default(0),
-  /** Release-group token parsed from the title at insert time, lowercase
-   *  comparison is the caller's responsibility. Snapshotting it here
-   *  avoids re-parsing the title in the auto-supersede gate and keeps the
-   *  downstream "same group only" check stable even if `detectReleaseGroup`
-   *  evolves. NULL when the parser couldn't extract one. */
-  releaseGroup: varchar("release_group", { length: 100 }),
+export const download = pgTable(
+  "download",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    mediaId: uuid("media_id").references(() => media.id, { onDelete: "set null" }),
+    hash: varchar("hash", { length: 100 }).unique(),
+    title: varchar("title", { length: 500 }).notNull(),
+    /** "movie" | "season" | "episode" */
+    downloadType: varchar("download_type", { length: 20 }).notNull().default("movie"),
+    seasonNumber: integer("season_number"),
+    episodeNumbers: jsonb("episode_numbers").$type<number[]>(),
+    status: varchar("status", { length: 20 }).notNull().default("unknown"),
+    quality: varchar("quality", { length: 20 }).notNull().default("unknown"),
+    source: varchar("source", { length: 20 }).notNull().default("unknown"),
+    progress: real("progress").notNull().default(0),
+    contentPath: varchar("content_path", { length: 1000 }),
+    fileSize: bigint("file_size", { mode: "number" }),
+    magnetUrl: text("magnet_url"),
+    downloadUrl: text("download_url"),
+    imported: boolean("imported").notNull().default(false),
+    importing: boolean("importing").notNull().default(false),
+    importAttempts: integer("import_attempts").notNull().default(0),
+    importMethod: varchar("import_method", { length: 10 }),
+    usenet: boolean("usenet").notNull().default(false),
+    /** Repack/proper count parsed from the title at download time. 0 = not
+     *  a repack. Higher counts (REPACK2, PROPER3) supersede lower; the
+     *  future auto-supersede job uses this to decide whether to replace. */
+    repackCount: integer("repack_count").notNull().default(0),
+    /** Release-group token parsed from the title at insert time, lowercase
+     *  comparison is the caller's responsibility. Snapshotting it here
+     *  avoids re-parsing the title in the auto-supersede gate and keeps the
+     *  downstream "same group only" check stable even if `detectReleaseGroup`
+     *  evolves. NULL when the parser couldn't extract one. */
+    releaseGroup: varchar("release_group", { length: 100 }),
 
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_download_status").on(table.status),
+    index("idx_download_media").on(table.mediaId),
+    // Partial: most rows are imported=true; the WHERE keeps the index tiny
+    // and targeted at the import reconciliation hot path.
+    index("idx_download_imported")
+      .on(table.imported)
+      .where(sql`${table.imported} = false`),
+    // Hot ORDER BY createdAt in admin/user list queries.
+    index("idx_download_created").on(table.createdAt),
+  ],
+);
 
 export const mediaFile = pgTable(
   "media_file",
@@ -750,6 +764,11 @@ export const mediaFile = pgTable(
   (table) => [
     index("idx_media_file_media").on(table.mediaId),
     index("idx_media_file_download").on(table.downloadId),
+    // Partial: pending rows are a small subset; keeps the index tiny and
+    // targeted at import reconciliation scans.
+    index("idx_media_file_pending")
+      .on(table.status)
+      .where(sql`${table.status} = 'pending'`),
   ],
 );
 
@@ -1291,6 +1310,9 @@ export const downloadRequest = pgTable(
   (table) => [
     index("idx_request_user").on(table.userId),
     index("idx_request_status").on(table.status),
+    // Composite: admin/user list pages filter on (userId, status) together.
+    // Avoids the BitmapAnd between idx_request_user and idx_request_status.
+    index("idx_request_user_status").on(table.userId, table.status),
     uniqueIndex("idx_request_user_media").on(table.userId, table.mediaId),
   ],
 );

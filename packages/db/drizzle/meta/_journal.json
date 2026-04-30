@@ -274,6 +274,13 @@
       "when": 1777511868617,
       "tag": "0038_volatile_manta",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1777513967125,
+      "tag": "0039_tan_sabretooth",
+      "breakpoints": true
     }
   ]
 }
