@@ -1,25 +1,26 @@
 import { and, desc, eq, isNull, ne } from "drizzle-orm";
 import { episode, media, season, userWatchHistory } from "@canto/db/schema";
-import { findEpisodeIdByMediaAndNumbers } from "../../../infra/repositories";
 import {
-  attachRemoteIdToHistorySync,
-  createTraktHistorySync,
-  findTraktHistorySyncByLocalIds,
-  findTraktHistorySyncByRemoteIds,
-} from "../../../infra/trakt/trakt-sync-repository";
-import { addUserWatchHistory } from "../../../infra/repositories";
+  addUserWatchHistory,
+  findEpisodeIdByMediaAndNumbers,
+} from "@canto/core/infra/repositories";
+import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
 import {
   addTraktHistory,
   listTraktHistory,
   type TraktIds,
-} from "../../../infra/trakt/trakt.adapter";
+} from "@canto/core/infra/trakt/trakt.adapter";
 import {
   mediaIdsFromRow,
   mediaRefKey,
   parseDateOrNow,
   resolveMediaFromTraktRef,
   type SyncContext,
-} from "./shared";
+} from "@canto/core/domain/trakt/use-cases/shared";
+
+export interface SyncHistoryDeps {
+  trakt: TraktRepositoryPort;
+}
 
 /**
  * Pull Trakt history events into `user_watch_history`.
@@ -29,12 +30,13 @@ import {
  * The first ever pull (or a forced backfill) passes `undefined` and gets the
  * full history.
  *
- * The per-row `findTraktHistorySyncByRemoteIds` check stays in place because
+ * The per-row `findHistorySyncByRemoteIds` check stays in place because
  * Trakt's `start_at` is inclusive and the watermark itself is replayed on the
  * next run — without the dedup guard we'd double-insert events at the boundary.
  */
 export async function pullHistory(
   ctx: SyncContext,
+  deps: SyncHistoryDeps,
   startAt?: string,
 ): Promise<void> {
   const remoteRows = await listTraktHistory(
@@ -44,8 +46,7 @@ export async function pullHistory(
   );
   if (remoteRows.length === 0) return;
 
-  const existingSyncRows = await findTraktHistorySyncByRemoteIds(
-    ctx.db,
+  const existingSyncRows = await deps.trakt.findHistorySyncByRemoteIds(
     ctx.connectionId,
     remoteRows.map((row) => row.remoteHistoryId),
   );
@@ -112,7 +113,7 @@ export async function pullHistory(
         localId = inserted.id;
       }
 
-      await createTraktHistorySync(ctx.db, {
+      await deps.trakt.createHistorySync({
         userConnectionId: ctx.connectionId,
         localHistoryId: localId,
         remoteHistoryId: remote.remoteHistoryId,
@@ -127,7 +128,10 @@ export async function pullHistory(
   }
 }
 
-export async function pushHistory(ctx: SyncContext): Promise<void> {
+export async function pushHistory(
+  ctx: SyncContext,
+  deps: SyncHistoryDeps,
+): Promise<void> {
   const localRows = await ctx.db
     .select({
       id: userWatchHistory.id,
@@ -157,8 +161,7 @@ export async function pushHistory(ctx: SyncContext): Promise<void> {
 
   if (localRows.length === 0) return;
 
-  const syncRows = await findTraktHistorySyncByLocalIds(
-    ctx.db,
+  const syncRows = await deps.trakt.findHistorySyncByLocalIds(
     ctx.connectionId,
     localRows.map((row) => row.id),
   );
@@ -237,7 +240,7 @@ export async function pushHistory(ctx: SyncContext): Promise<void> {
   await addTraktHistory(ctx.accessToken, body);
 
   for (const row of unsynced) {
-    await createTraktHistorySync(ctx.db, {
+    await deps.trakt.createHistorySync({
       userConnectionId: ctx.connectionId,
       localHistoryId: row.id,
       syncedDirection: "push",
@@ -247,12 +250,12 @@ export async function pushHistory(ctx: SyncContext): Promise<void> {
 
 export async function linkPulledHistoryBackfill(
   ctx: SyncContext,
+  deps: SyncHistoryDeps,
 ): Promise<void> {
   const remoteRows = await listTraktHistory(ctx.accessToken, ctx.profileId);
   if (remoteRows.length === 0) return;
 
-  const existingSyncRows = await findTraktHistorySyncByRemoteIds(
-    ctx.db,
+  const existingSyncRows = await deps.trakt.findHistorySyncByRemoteIds(
     ctx.connectionId,
     remoteRows.map((row) => row.remoteHistoryId),
   );
@@ -302,8 +305,7 @@ export async function linkPulledHistoryBackfill(
     });
     if (!localMatch) continue;
 
-    await attachRemoteIdToHistorySync(
-      ctx.db,
+    await deps.trakt.attachRemoteIdToHistorySync(
       ctx.connectionId,
       localMatch.id,
       remote.remoteHistoryId,

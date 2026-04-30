@@ -1,14 +1,16 @@
-import { findEpisodeIdByMediaAndNumbers } from "../../../infra/repositories";
-import { upsertUserPlaybackProgress } from "../../../infra/repositories";
+import {
+  findEpisodeIdByMediaAndNumbers,
+  upsertUserPlaybackProgress,
+} from "@canto/core/infra/repositories";
 import {
   listTraktPlaybackProgress,
   type TraktPlaybackProgressRef,
-} from "../../../infra/trakt/trakt.adapter";
+} from "@canto/core/infra/trakt/trakt.adapter";
 import {
   parseDateOrNow,
   resolveMediaFromTraktRef,
   type SyncContext,
-} from "./shared";
+} from "@canto/core/domain/trakt/use-cases/shared";
 
 const COMPLETION_THRESHOLD = 95;
 

@@ -10,7 +10,7 @@ import {
 import { verifyListOwnership } from "@canto/core/domain/lists/rules/list-rules";
 import { makeListsRepository } from "@canto/core/infra/lists/lists-repository.adapter";
 import { findUserListsWithCounts } from "@canto/core/infra/lists/list-repository";
-import { findTraktListLinkByLocalListId } from "@canto/core/infra/trakt/trakt-sync-aggregate-repository";
+import { makeTraktRepository } from "@canto/core/infra/trakt/trakt-repository.adapter";
 import { dispatchTraktListDelete } from "@canto/core/platform/queue/bullmq-dispatcher";
 import { createListForUser } from "@canto/core/domain/lists/use-cases/create-list";
 import { updateListForUser } from "@canto/core/domain/lists/use-cases/update-list";
@@ -117,7 +117,8 @@ export const listManageRouter = createTRPCRouter({
       // Hard-deleting locally first would orphan the Trakt list (the link
       // cascade-drops with the list), and the next sync would re-import it as
       // an empty list. Worker hard-deletes once Trakt confirms removal.
-      const traktLink = await findTraktListLinkByLocalListId(ctx.db, input.id);
+      const traktRepo = makeTraktRepository(ctx.db);
+      const traktLink = await traktRepo.findListLinkByLocalListId(input.id);
       if (traktLink) {
         await repo.softDelete(input.id);
         void dispatchTraktListDelete(input.id);

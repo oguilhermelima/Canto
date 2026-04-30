@@ -1,10 +1,13 @@
 import { and, eq, inArray, isNull, notInArray } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
+import type { TraktSection } from "@canto/core/domain/trakt/types/trakt-section";
 import {
   traktHistorySync,
   traktListLink,
   traktSyncState,
 } from "@canto/db/schema";
+
+export type { TraktSection } from "@canto/core/domain/trakt/types/trakt-section";
 
 export async function findTraktListLinksByConnection(
   db: Database,
@@ -96,16 +99,6 @@ export async function findTraktSyncStateByConnection(
     where: eq(traktSyncState.userConnectionId, userConnectionId),
   });
 }
-
-export type TraktSection =
-  | "watched-movies"
-  | "watched-shows"
-  | "history"
-  | "watchlist"
-  | "ratings"
-  | "favorites"
-  | "lists"
-  | "playback";
 
 /** Map a section identifier to its watermark column name on `traktSyncState`. */
 const SECTION_TO_WATERMARK: Record<

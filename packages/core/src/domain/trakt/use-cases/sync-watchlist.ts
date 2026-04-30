@@ -4,12 +4,12 @@ import {
   addToTraktWatchlist,
   listTraktWatchlist,
   removeFromTraktWatchlist,
-} from "../../../infra/trakt/trakt.adapter";
+} from "@canto/core/infra/trakt/trakt.adapter";
 import {
   syncSingleListMembership,
   toTraktListBody,
   type SyncContext,
-} from "./shared";
+} from "@canto/core/domain/trakt/use-cases/shared";
 
 export async function syncWatchlist(ctx: SyncContext): Promise<void> {
   const watchlist = await ctx.db.query.list.findFirst({

@@ -4,14 +4,14 @@ import {
   deleteUserRating,
   upsertUserMediaState,
   upsertUserRating,
-} from "../../../infra/repositories";
+} from "@canto/core/infra/repositories";
 import {
   addTraktRatings,
   listTraktRatings,
   removeTraktRatings,
   type TraktIds,
   type TraktMediaRef,
-} from "../../../infra/trakt/trakt.adapter";
+} from "@canto/core/infra/trakt/trakt.adapter";
 import {
   decidePresenceAction,
   dedupeByKey,
@@ -24,7 +24,7 @@ import {
   withinConflictWindow,
   type LocalRatingRef,
   type SyncContext,
-} from "./shared";
+} from "@canto/core/domain/trakt/use-cases/shared";
 
 export async function syncRatings(ctx: SyncContext): Promise<void> {
   const localRows = await ctx.db

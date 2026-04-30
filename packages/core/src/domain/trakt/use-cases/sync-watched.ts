@@ -13,18 +13,20 @@
 /*  per-(media, episode) playback rows with isCompleted=true.                  */
 /* -------------------------------------------------------------------------- */
 
-import { findEpisodeIdByMediaAndNumbers } from "../../../infra/repositories";
-import { upsertUserPlaybackProgress } from "../../../infra/repositories";
+import {
+  findEpisodeIdByMediaAndNumbers,
+  upsertUserPlaybackProgress,
+} from "@canto/core/infra/repositories";
 import {
   listTraktWatchedMovies,
   listTraktWatchedShows,
-} from "../../../infra/trakt/trakt.adapter";
-import { promoteUserMediaStateFromPlayback } from "../../user-media/use-cases/promote-user-media-state-from-playback";
+} from "@canto/core/infra/trakt/trakt.adapter";
+import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/user-media/use-cases/promote-user-media-state-from-playback";
 import {
   parseDateOrNow,
   resolveMediaFromTraktRef,
   type SyncContext,
-} from "./shared";
+} from "@canto/core/domain/trakt/use-cases/shared";
 
 /** Reverse-sync (Plex/Jellyfin) calls this after every per-item upsert; we
  *  do the same here so the library "Completed" tab — which reads

@@ -1,13 +1,13 @@
 import { and, eq } from "drizzle-orm";
 import { media, userMediaState } from "@canto/db/schema";
-import { upsertUserMediaState } from "../../../infra/repositories";
+import { upsertUserMediaState } from "@canto/core/infra/repositories";
 import {
   addTraktFavorites,
   listTraktFavorites,
   removeTraktFavorites,
   type TraktIds,
   type TraktMediaRef,
-} from "../../../infra/trakt/trakt.adapter";
+} from "@canto/core/infra/trakt/trakt.adapter";
 import {
   decidePresenceAction,
   dedupeByKey,
@@ -18,7 +18,7 @@ import {
   toTraktFavoritesBody,
   type LocalMediaRef,
   type SyncContext,
-} from "./shared";
+} from "@canto/core/domain/trakt/use-cases/shared";
 
 export async function syncFavorites(ctx: SyncContext): Promise<void> {
   const localRows = await ctx.db

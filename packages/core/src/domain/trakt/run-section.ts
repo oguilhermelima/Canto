@@ -14,32 +14,33 @@
 import { and, eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { userConnection } from "@canto/db/schema";
-import { updateUserConnection } from "../../infra/media-servers/user-connection-repository";
-import { refreshTraktAccessTokenIfNeeded } from "../../infra/trakt/trakt.adapter";
-import {
-  findTraktSyncStateByConnection,
-  setTraktSectionWatermark,
-  upsertTraktSyncState,
-  type TraktSection,
-} from "../../infra/trakt/trakt-sync-repository";
-import type { SyncContext } from "./use-cases/shared";
-import { syncWatchlist } from "./use-cases/sync-watchlist";
-import { syncCustomLists } from "./use-cases/sync-custom-lists";
-import { syncRatings } from "./use-cases/sync-ratings";
-import { syncFavorites } from "./use-cases/sync-favorites";
+import { updateUserConnection } from "@canto/core/infra/media-servers/user-connection-repository";
+import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
+import type { TraktSection } from "@canto/core/domain/trakt/types/trakt-section";
+import { refreshTraktAccessTokenIfNeeded } from "@canto/core/infra/trakt/trakt.adapter";
+import type { SyncContext } from "@canto/core/domain/trakt/use-cases/shared";
+import { syncWatchlist } from "@canto/core/domain/trakt/use-cases/sync-watchlist";
+import { syncCustomLists } from "@canto/core/domain/trakt/use-cases/sync-custom-lists";
+import { syncRatings } from "@canto/core/domain/trakt/use-cases/sync-ratings";
+import { syncFavorites } from "@canto/core/domain/trakt/use-cases/sync-favorites";
 import {
   linkPulledHistoryBackfill,
   pullHistory,
   pushHistory,
-} from "./use-cases/sync-history";
-import { pullInProgress } from "./use-cases/sync-in-progress";
+} from "@canto/core/domain/trakt/use-cases/sync-history";
+import { pullInProgress } from "@canto/core/domain/trakt/use-cases/sync-in-progress";
 import {
   pullWatchedMovies,
   pullWatchedShows,
-} from "./use-cases/sync-watched";
+} from "@canto/core/domain/trakt/use-cases/sync-watched";
+
+export interface RunTraktSectionDeps {
+  trakt: TraktRepositoryPort;
+}
 
 async function executeSection(
   ctx: SyncContext,
+  deps: RunTraktSectionDeps,
   section: TraktSection,
   startAt: string | undefined,
 ): Promise<void> {
@@ -54,9 +55,9 @@ async function executeSection(
       // Pull is incremental; push always runs (it scans local-only rows).
       // linkPulledHistoryBackfill stitches up sync rows for events created
       // locally before this connection existed.
-      await pullHistory(ctx, startAt);
-      await pushHistory(ctx);
-      await linkPulledHistoryBackfill(ctx);
+      await pullHistory(ctx, deps, startAt);
+      await pushHistory(ctx, deps);
+      await linkPulledHistoryBackfill(ctx, deps);
       return;
     case "watchlist":
       await syncWatchlist(ctx);
@@ -68,7 +69,7 @@ async function executeSection(
       await syncFavorites(ctx);
       return;
     case "lists":
-      await syncCustomLists(ctx);
+      await syncCustomLists(ctx, deps);
       return;
     case "playback":
       await pullInProgress(ctx);
@@ -84,6 +85,7 @@ export interface RunSectionInput {
 
 export async function runTraktSection(
   db: Database,
+  deps: RunTraktSectionDeps,
   input: RunSectionInput,
 ): Promise<void> {
   const conn = await db.query.userConnection.findFirst({
@@ -101,7 +103,7 @@ export async function runTraktSection(
 
   // `initialSync` biases reconcile decisions toward "import remote" — used
   // only by list/watchlist/ratings/favorites flows.
-  const state = await findTraktSyncStateByConnection(db, conn.id);
+  const state = await deps.trakt.findSyncStateByConnection(conn.id);
   const initialSync = !state?.lastActivityAt;
   const now = new Date();
 
@@ -123,17 +125,16 @@ export async function runTraktSection(
     now,
   };
 
-  await executeSection(ctx, input.section, startAt);
+  await executeSection(ctx, deps, input.section, startAt);
 
   // Advance watermarks only on success. The lastActivityAt write keeps the
   // legacy "first-run" detection working until we migrate all reconcile
   // flows off `initialSync`.
-  await upsertTraktSyncState(db, conn.id, {
+  await deps.trakt.upsertSyncState(conn.id, {
     lastActivityAt: now,
   });
   if (input.remoteAtIso) {
-    await setTraktSectionWatermark(
-      db,
+    await deps.trakt.setSectionWatermark(
       conn.id,
       input.section,
       new Date(input.remoteAtIso),

@@ -1,4 +1,4 @@
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { list, listItem, media } from "@canto/db/schema";
 import {
@@ -6,15 +6,15 @@ import {
   findMediaByAnyReference,
   markListItemsPushed,
   removeListItem,
-} from "../../../infra/repositories";
+} from "@canto/core/infra/repositories";
 import type {
   TraktIds,
   TraktMediaRef,
-} from "../../../infra/trakt/trakt.adapter";
-import { getTmdbProvider } from "../../../platform/http/tmdb-client";
-import { getTvdbProvider } from "../../../platform/http/tvdb-client";
-import { slugify } from "../../shared/rules/slugify";
-import { persistMediaUseCase } from "../../media/use-cases/persist";
+} from "@canto/core/infra/trakt/trakt.adapter";
+import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
+import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
+import { slugify } from "@canto/core/domain/shared/rules/slugify";
+import { persistMediaUseCase } from "@canto/core/domain/media/use-cases/persist";
 
 /**
  * @deprecated Used only by the legacy `decidePresenceAction` path that still

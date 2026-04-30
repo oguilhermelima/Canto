@@ -1,7 +1,7 @@
 import { db } from "@canto/db/client";
 import { sql } from "drizzle-orm";
 import { makeListsRepository } from "@canto/core/infra/lists/lists-repository.adapter";
-import { findTraktListLinkByLocalListId } from "@canto/core/infra/trakt/trakt-sync-repository";
+import { makeTraktRepository } from "@canto/core/infra/trakt/trakt-repository.adapter";
 import {
   findUserConnectionById,
   updateUserConnection,
@@ -33,7 +33,8 @@ export async function handleTraktListDelete(localListId: string): Promise<void> 
     return;
   }
 
-  const link = await findTraktListLinkByLocalListId(db, localListId);
+  const traktRepo = makeTraktRepository(db);
+  const link = await traktRepo.findListLinkByLocalListId(localListId);
   if (!link) {
     // No remote mirror — safe to hard-delete locally.
     await repo.hardDelete(localListId);

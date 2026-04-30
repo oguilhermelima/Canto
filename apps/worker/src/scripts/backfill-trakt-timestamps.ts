@@ -22,7 +22,7 @@ import {
   userRating,
 } from "@canto/db/schema";
 import { findMediaByAnyReference } from "@canto/core/infra/repositories";
-import { findTraktListLinksByConnection } from "@canto/core/infra/trakt/trakt-sync-repository";
+import { makeTraktRepository } from "@canto/core/infra/trakt/trakt-repository.adapter";
 import { updateUserConnection } from "@canto/core/infra/media-servers/user-connection-repository";
 import {
   listTraktFavorites,
@@ -172,7 +172,8 @@ async function backfillWatchlist(
 async function backfillCustomLists(
   ctx: ConnContext,
 ): Promise<{ scanned: number; updated: number }> {
-  const links = await findTraktListLinksByConnection(db, ctx.connectionId);
+  const traktRepo = makeTraktRepository(db);
+  const links = await traktRepo.findListLinksByConnection(ctx.connectionId);
   let scanned = 0;
   let updated = 0;
   for (const link of links) {

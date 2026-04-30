@@ -26,17 +26,15 @@
 import { and, eq, isNotNull } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { userConnection } from "@canto/db/schema";
-import { updateUserConnection } from "../../infra/media-servers/user-connection-repository";
+import { updateUserConnection } from "@canto/core/infra/media-servers/user-connection-repository";
 import {
   getTraktLastActivities,
   refreshTraktAccessTokenIfNeeded,
   type TraktLastActivities,
-} from "../../infra/trakt/trakt.adapter";
-import {
-  findTraktSyncStateByConnection,
-  type TraktSection,
-} from "../../infra/trakt/trakt-sync-repository";
-import type { JobDispatcherPort } from "../shared/ports/job-dispatcher.port";
+} from "@canto/core/infra/trakt/trakt.adapter";
+import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
+import type { TraktSection } from "@canto/core/domain/trakt/types/trakt-section";
+import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 
 /* Sections that pull AND push. We always dispatch these so locally-pending
  * pushes don't sit forever waiting for a remote-side change. The section
@@ -164,8 +162,13 @@ interface CoordinateOptions {
   force?: boolean;
 }
 
+export interface CoordinateTraktSyncDeps {
+  trakt: TraktRepositoryPort;
+}
+
 export async function coordinateTraktSync(
   db: Database,
+  deps: CoordinateTraktSyncDeps,
   dispatcher: JobDispatcherPort,
   options: CoordinateOptions = {},
 ): Promise<CoordinateResult> {
@@ -209,7 +212,7 @@ export async function coordinateTraktSync(
       return;
     }
 
-    const state = await findTraktSyncStateByConnection(db, conn.id);
+    const state = await deps.trakt.findSyncStateByConnection(conn.id);
     const watermarks: TraktWatermarks = {
       watchedMoviesAt: state?.watchedMoviesAt ?? null,
       watchedShowsAt: state?.watchedShowsAt ?? null,

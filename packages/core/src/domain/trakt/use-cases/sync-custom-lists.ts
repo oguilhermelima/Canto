@@ -1,10 +1,7 @@
 import { and, asc, eq, isNull, isNotNull } from "drizzle-orm";
-import { list, traktListLink } from "@canto/db/schema";
-import { createList } from "../../../infra/repositories";
-import {
-  findTraktListLinksByConnection,
-  upsertTraktListLink,
-} from "../../../infra/trakt/trakt-sync-repository";
+import { list } from "@canto/db/schema";
+import { createList } from "@canto/core/infra/repositories";
+import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
 import {
   addItemsToTraktList,
   createTraktList,
@@ -12,20 +9,27 @@ import {
   listTraktListItems,
   listTraktPersonalLists,
   removeItemsFromTraktList,
-} from "../../../infra/trakt/trakt.adapter";
+} from "@canto/core/infra/trakt/trakt.adapter";
 import {
   findOrCreateUniqueListSlug,
   syncSingleListMembership,
   toTraktListBody,
   type SyncContext,
-} from "./shared";
+} from "@canto/core/domain/trakt/use-cases/shared";
 
-export async function syncCustomLists(ctx: SyncContext): Promise<void> {
+export interface SyncCustomListsDeps {
+  trakt: TraktRepositoryPort;
+}
+
+export async function syncCustomLists(
+  ctx: SyncContext,
+  deps: SyncCustomListsDeps,
+): Promise<void> {
   const remoteLists = await listTraktPersonalLists(
     ctx.accessToken,
     ctx.profileId,
   );
-  const links = await findTraktListLinksByConnection(ctx.db, ctx.connectionId);
+  const links = await deps.trakt.findListLinksByConnection(ctx.connectionId);
   const linksByRemoteId = new Map(
     links.map((link) => [link.traktListId, link]),
   );
@@ -61,9 +65,7 @@ export async function syncCustomLists(ctx: SyncContext): Promise<void> {
               ),
             );
         }
-        await ctx.db
-          .delete(traktListLink)
-          .where(eq(traktListLink.id, link.id));
+        await deps.trakt.deleteListLinkById(link.id);
       }
     }
 
@@ -80,9 +82,7 @@ export async function syncCustomLists(ctx: SyncContext): Promise<void> {
           err instanceof Error ? err.message : err,
         );
       }
-      await ctx.db
-        .delete(traktListLink)
-        .where(eq(traktListLink.id, link.id));
+      await deps.trakt.deleteListLinkById(link.id);
     }
 
     localCustomLists = await ctx.db.query.list.findMany({
@@ -116,7 +116,7 @@ export async function syncCustomLists(ctx: SyncContext): Promise<void> {
       localListId = created.id;
     }
 
-    await upsertTraktListLink(ctx.db, {
+    await deps.trakt.upsertListLink({
       userConnectionId: ctx.connectionId,
       traktListId: remote.ids.trakt,
       traktListSlug: remote.ids.slug,
@@ -126,8 +126,7 @@ export async function syncCustomLists(ctx: SyncContext): Promise<void> {
     });
   }
 
-  const refreshedLinks = await findTraktListLinksByConnection(
-    ctx.db,
+  const refreshedLinks = await deps.trakt.findListLinksByConnection(
     ctx.connectionId,
   );
   const refreshedByLocalId = new Map(
@@ -142,7 +141,7 @@ export async function syncCustomLists(ctx: SyncContext): Promise<void> {
       description: localCustom.description,
       privacy: localCustom.visibility === "public" ? "public" : "private",
     });
-    await upsertTraktListLink(ctx.db, {
+    await deps.trakt.upsertListLink({
       userConnectionId: ctx.connectionId,
       traktListId: remoteCreated.ids.trakt,
       traktListSlug: remoteCreated.ids.slug,
@@ -152,8 +151,7 @@ export async function syncCustomLists(ctx: SyncContext): Promise<void> {
     });
   }
 
-  const finalLinks = await findTraktListLinksByConnection(
-    ctx.db,
+  const finalLinks = await deps.trakt.findListLinksByConnection(
     ctx.connectionId,
   );
   for (const linkRow of finalLinks) {
@@ -182,7 +180,7 @@ export async function syncCustomLists(ctx: SyncContext): Promise<void> {
         ),
     );
 
-    await upsertTraktListLink(ctx.db, {
+    await deps.trakt.upsertListLink({
       userConnectionId: ctx.connectionId,
       traktListId: linkRow.traktListId,
       traktListSlug: linkRow.traktListSlug,

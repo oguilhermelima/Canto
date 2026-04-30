@@ -6,6 +6,7 @@ import {
   runTraktSection,
   type RunSectionInput,
 } from "@canto/core/domain/trakt/run-section";
+import { makeTraktRepository } from "@canto/core/infra/trakt/trakt-repository.adapter";
 import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
 
 /**
@@ -13,7 +14,8 @@ import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter
  * fanned out to `trakt-sync-section` jobs.
  */
 export async function handleTraktSync(): Promise<void> {
-  await coordinateTraktSync(db, jobDispatcher);
+  const trakt = makeTraktRepository(db);
+  await coordinateTraktSync(db, { trakt }, jobDispatcher);
 }
 
 /**
@@ -22,12 +24,13 @@ export async function handleTraktSync(): Promise<void> {
  * dispatches every section regardless of watermarks.
  */
 export async function handleTraktSyncUser(userId: string): Promise<void> {
+  const trakt = makeTraktRepository(db);
   const connections = await db.query.userConnection.findMany({
     where: eq(userConnection.userId, userId),
   });
   for (const conn of connections) {
     if (conn.provider !== "trakt") continue;
-    await coordinateTraktSync(db, jobDispatcher, {
+    await coordinateTraktSync(db, { trakt }, jobDispatcher, {
       connectionId: conn.id,
       force: true,
     });
@@ -38,5 +41,6 @@ export async function handleTraktSyncUser(userId: string): Promise<void> {
 export async function handleTraktSyncSection(
   input: RunSectionInput,
 ): Promise<void> {
-  await runTraktSection(db, input);
+  const trakt = makeTraktRepository(db);
+  await runTraktSection(db, { trakt }, input);
 }
