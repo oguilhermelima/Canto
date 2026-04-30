@@ -24,6 +24,14 @@ export interface MediaMetadata {
 }
 
 /**
+ * Per-process memo of TVDB IDs that returned 404. Reconciles run on a fixed
+ * cadence and re-fetch every show, so without this we'd hammer TVDB (and
+ * spam logs) for IDs that we already know are gone upstream. Cleared on
+ * worker restart, which is fine — TVDB rarely un-deletes records.
+ */
+const tvdbMissingIds = new Set<number>();
+
+/**
  * Pure function — no DB reads, no DB writes, no job dispatches.
  * Fetches complete media metadata from providers (TMDB + optionally TVDB).
  */
@@ -73,18 +81,28 @@ export async function fetchMediaMetadata(
       }
     }
 
-    if (resolvedTvdbId) {
+    if (resolvedTvdbId && tvdbMissingIds.has(resolvedTvdbId)) {
+      tvdbFailed = true;
+    } else if (resolvedTvdbId) {
       try {
         const tvdbData = await deps.tvdb.getMetadata(resolvedTvdbId, "show");
         tvdbSeasons = tvdbData.seasons;
-        // TMDB doesn't expose a daily airing slot — pull it from TVDB so
-        // upcoming episodes can render real times instead of midnight UTC.
         if (tvdbData.airsTime && !media.airsTime) {
           media.airsTime = tvdbData.airsTime;
         }
       } catch (err) {
         tvdbFailed = true;
-        console.warn(`[fetchMediaMetadata] TVDB structure failed for "${media.title}" (tvdbId=${resolvedTvdbId}):`, err instanceof Error ? err.message : err);
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes("404")) {
+          tvdbMissingIds.add(resolvedTvdbId);
+          console.warn(
+            `[fetchMediaMetadata] TVDB ${resolvedTvdbId} for "${media.title}" returned 404 — caching miss until next restart`,
+          );
+        } else {
+          console.warn(
+            `[fetchMediaMetadata] TVDB structure failed for "${media.title}" (tvdbId=${resolvedTvdbId}): ${message}`,
+          );
+        }
       }
     }
   }
