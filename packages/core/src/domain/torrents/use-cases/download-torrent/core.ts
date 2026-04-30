@@ -3,8 +3,8 @@ import type { TorrentDownloadInput } from "@canto/validators";
 
 import { BlocklistedReleaseError, DownloadClientError, DuplicateDownloadError, InvalidDownloadInputError, TorrentPersistenceError } from "@canto/core/domain/torrents/errors";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
-import { logAndSwallow } from "../../../../platform/logger/log-error";
-import { resolveDownloadUrl } from "../../../../platform/http/follow-redirects";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import { resolveDownloadUrl } from "@canto/core/platform/http/follow-redirects";
 import { detectQuality, detectSource } from "../../rules/quality";
 import { parseSeasons, parseEpisodes } from "../../rules/parsing";
 import {
@@ -12,7 +12,7 @@ import {
   detectReleaseGroup,
 } from "../../rules/parsing-release";
 import { extractHashFromMagnet } from "../../rules/torrent-rules";
-import type { DownloadClientPort } from "../../../shared/ports/download-client";
+import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
 import {
   findMediaByIdWithSeasons,
   findDownloadByTitle,
@@ -23,9 +23,10 @@ import {
   createMediaFile,
   deleteMediaFilesByDownloadId,
   findBlocklistEntry,
-} from "../../../../infra/repositories";
-import { updateMedia } from "../../../../infra/media/media-repository";
-import { createNotification } from "../../../notifications/use-cases/create-notification";
+} from "@canto/core/infra/repositories";
+import { updateMedia } from "@canto/core/infra/media/media-repository";
+import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
+import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
 import { resolveDownloadConfig } from "./folder-resolution";
 import { resolveEpisodeIds, detectDuplicates } from "./duplicate-detection";
 
@@ -273,12 +274,15 @@ export async function coreDownload(
     await deleteMediaFilesByDownloadId(db, torrentRow.id);
     await deleteDownload(db, torrentRow.id);
 
-    void createNotification(db, {
-      title: "Download failed",
-      message: `Failed to add "${input.title}" to qBittorrent: ${qbErr instanceof Error ? qbErr.message : "Unknown error"}`,
-      type: "download_failed",
-      mediaId: input.mediaId,
-    }).catch(logAndSwallow("download-torrent createNotification"));
+    void createNotification(
+      { repo: makeNotificationsRepository(db) },
+      {
+        title: "Download failed",
+        message: `Failed to add "${input.title}" to qBittorrent: ${qbErr instanceof Error ? qbErr.message : "Unknown error"}`,
+        type: "download_failed",
+        mediaId: input.mediaId,
+      },
+    ).catch(logAndSwallow("download-torrent createNotification"));
 
     throw new DownloadClientError(
       `Failed to add torrent to qBittorrent: ${qbErr instanceof Error ? qbErr.message : "Unknown error"}`,

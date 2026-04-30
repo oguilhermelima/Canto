@@ -1,15 +1,15 @@
 import path from "node:path";
 
 import type { Database } from "@canto/db/client";
-import type { FileSystemPort } from "../../../shared/ports/file-system.port";
-import { buildMediaDir } from "../../../shared/rules/naming";
+import type { FileSystemPort } from "@canto/core/domain/shared/ports/file-system.port";
+import { buildMediaDir } from "@canto/core/domain/shared/rules/naming";
 import { EP_PATTERN } from "../../rules/parsing";
-import { createNotification } from "../../../notifications/use-cases/create-notification";
-import { findNotificationByTypeAndMedia } from "../../../../infra/repositories";
+import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
+import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
 import {
   type ParsedFile,
   buildSubtitleName,
-} from "../../../../platform/fs/filesystem";
+} from "@canto/core/platform/fs/filesystem";
 import { upsertMediaFile } from "./shared";
 
 interface MediaNaming {
@@ -91,14 +91,21 @@ export async function importLocalVideoFiles(
 
         if (method === "copy" && !crossFsNotified) {
           crossFsNotified = true;
-          const existing = await findNotificationByTypeAndMedia(db, "cross_filesystem_warning", mediaRow.id);
+          const notificationsRepo = makeNotificationsRepository(db);
+          const existing = await notificationsRepo.findByTypeAndMedia(
+            "cross_filesystem_warning",
+            mediaRow.id,
+          );
           if (!existing) {
-            await createNotification(db, {
-              title: "Cross-filesystem copy",
-              message: `Files are being copied instead of hardlinked (different filesystems). This uses double disk space.`,
-              type: "cross_filesystem_warning",
-              mediaId: mediaRow.id,
-            });
+            await createNotification(
+              { repo: notificationsRepo },
+              {
+                title: "Cross-filesystem copy",
+                message: `Files are being copied instead of hardlinked (different filesystems). This uses double disk space.`,
+                type: "cross_filesystem_warning",
+                mediaId: mediaRow.id,
+              },
+            );
           }
         }
       }

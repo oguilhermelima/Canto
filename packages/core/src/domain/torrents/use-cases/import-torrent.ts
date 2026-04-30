@@ -3,12 +3,13 @@ import path from "node:path";
 import type { Database } from "@canto/db/client";
 import type { download as downloadSchema } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
-import type { DownloadClientPort } from "../../shared/ports/download-client";
-import type { FileSystemPort } from "../../shared/ports/file-system.port";
-import { isVideoFile, buildMediaDir } from "../../shared/rules/naming";
+import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
+import type { FileSystemPort } from "@canto/core/domain/shared/ports/file-system.port";
+import { isVideoFile, buildMediaDir } from "@canto/core/domain/shared/rules/naming";
 import { EP_PATTERN, isSubtitleFile } from "../rules/parsing";
-import { getEffectiveProviderSync } from "../../shared/rules/effective-provider";
-import { createNotification } from "../../notifications/use-cases/create-notification";
+import { getEffectiveProviderSync } from "@canto/core/domain/shared/rules/effective-provider";
+import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
+import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
 import {
   findMediaByIdWithSeasons,
   findFolderById,
@@ -16,9 +17,9 @@ import {
   findMediaFilesByDownloadId,
   findMediaFilesByMediaId,
   updateDownload,
-} from "../../../infra/repositories";
-import { findMediaLocalized } from "../../../infra/media/media-localized-repository";
-import { parseVideoFiles } from "../../../platform/fs/filesystem";
+} from "@canto/core/infra/repositories";
+import { findMediaLocalized } from "@canto/core/infra/media/media-localized-repository";
+import { parseVideoFiles } from "@canto/core/platform/fs/filesystem";
 
 import { resolveSavePath } from "./import-torrent/shared";
 import { importLocalVideoFiles, importLocalSubtitleFiles } from "./import-torrent/local";
@@ -82,6 +83,7 @@ export async function autoImportTorrent(
   const downloadUpdate: Partial<typeof downloadSchema.$inferInsert> = {
     importing: false,
   };
+  const notificationsRepo = makeNotificationsRepository(db);
 
   try {
     if (!torrentRow.hash || !torrentRow.mediaId) return result;
@@ -130,7 +132,7 @@ export async function autoImportTorrent(
       console.warn(
         `[auto-import] Movie "${mediaNaming.title}" has ${videoFiles.length} video files — skipping auto-import`,
       );
-      await createNotification(db, {
+      await createNotification({ repo: notificationsRepo }, {
         title: "Movie import skipped",
         message: `"${mediaNaming.title}" has ${videoFiles.length} video files — expected a single file for movies.`,
         type: "movie_multi_file",
@@ -165,7 +167,7 @@ export async function autoImportTorrent(
       const libraryPath = libRow?.libraryPath;
       if (!libraryPath) {
         console.error(`[auto-import] No library path configured for "${mediaNaming.title}" — configure paths in Settings > Downloads`);
-        await createNotification(db, {
+        await createNotification({ repo: notificationsRepo }, {
           title: "Import failed — paths not configured",
           message: `No library path set for "${mediaNaming.title}". Go to Settings > Downloads to configure your paths.`,
           type: "import_failed",
@@ -204,7 +206,7 @@ export async function autoImportTorrent(
       const libraryBasePath = libRow?.libraryPath;
       if (!libraryBasePath) {
         console.error(`[auto-import] No library path configured for "${mediaNaming.title}" — configure paths in Settings > Downloads`);
-        await createNotification(db, {
+        await createNotification({ repo: notificationsRepo }, {
           title: "Import failed — paths not configured",
           message: `No library path set for "${mediaNaming.title}". Go to Settings > Downloads to configure your paths.`,
           type: "import_failed",
@@ -281,7 +283,7 @@ export async function autoImportTorrent(
         title: mediaNaming.title,
         libraryId: mediaRow.libraryId ?? null,
       });
-      await createNotification(db, {
+      await createNotification({ repo: notificationsRepo }, {
         title: "Import complete",
         message: `Imported ${importedCount} file(s) for "${mediaNaming.title}"`,
         type: "import_success",
@@ -296,21 +298,21 @@ export async function autoImportTorrent(
       );
 
       if (newAttempts >= 5) {
-        await createNotification(db, {
+        await createNotification({ repo: notificationsRepo }, {
           title: "Import failed",
           message: `Failed to import "${mediaNaming.title}" after ${newAttempts} attempts. Check your library paths in Settings > Downloads or try importing manually.`,
           type: "import_failed",
           mediaId: mediaRow.id,
         });
       } else if (importedCount > 0) {
-        await createNotification(db, {
+        await createNotification({ repo: notificationsRepo }, {
           title: "Partial import",
           message: `Imported ${importedCount} of ${totalExpected} file(s) for "${mediaNaming.title}". Will retry remaining files.`,
           type: "import_failed",
           mediaId: mediaRow.id,
         });
       } else if (newAttempts === 1) {
-        await createNotification(db, {
+        await createNotification({ repo: notificationsRepo }, {
           title: "Import retry",
           message: `Could not import "${mediaNaming.title}" — will retry. If this persists, check your library and download paths in Settings > Downloads.`,
           type: "import_warning",

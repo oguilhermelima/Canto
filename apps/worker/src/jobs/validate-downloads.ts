@@ -8,6 +8,7 @@ import {
   updateMedia,
 } from "@canto/core/infra/repositories";
 import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
+import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
 
 /**
  * Periodic validation: checks that media marked as `downloaded` still has
@@ -37,6 +38,7 @@ export async function handleValidateDownloads(): Promise<void> {
     else filesByMediaId.set(f.mediaId, [{ filePath: f.filePath }]);
   }
 
+  const notificationsRepo = makeNotificationsRepository(db);
   let invalidated = 0;
 
   for (const row of downloadedMedia) {
@@ -65,12 +67,15 @@ export async function handleValidateDownloads(): Promise<void> {
 
     if (!anyExists) {
       await updateMedia(db, row.id, { downloaded: false });
-      await createNotification(db, {
-        title: "Files no longer found",
-        message: `Downloaded files for "${row.title}" are no longer accessible. The media remains in your library but is marked as not downloaded.`,
-        type: "import_failed",
-        mediaId: row.id,
-      });
+      await createNotification(
+        { repo: notificationsRepo },
+        {
+          title: "Files no longer found",
+          message: `Downloaded files for "${row.title}" are no longer accessible. The media remains in your library but is marked as not downloaded.`,
+          type: "import_failed",
+          mediaId: row.id,
+        },
+      );
       invalidated++;
     }
   }

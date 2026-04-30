@@ -1,29 +1,13 @@
-import type { Database } from "@canto/db/client";
-import { insertNotification } from "../../../infra/repositories";
+import type { NotificationsRepositoryPort } from "../ports/notifications-repository.port";
+import type { NewNotification } from "../types/notification";
 
-type NotificationType =
-  | "import_success"
-  | "import_failed"
-  | "import_warning"
-  | "cross_filesystem_warning"
-  | "download_failed"
-  | "download_stalled"
-  | "blocklist_added"
-  | "movie_multi_file";
+export interface CreateNotificationDeps {
+  repo: NotificationsRepositoryPort;
+}
 
 export async function createNotification(
-  db: Database,
-  input: {
-    title: string;
-    message: string;
-    type: NotificationType;
-    mediaId?: string;
-  },
+  deps: CreateNotificationDeps,
+  input: NewNotification,
 ): Promise<void> {
-  await insertNotification(db, {
-    title: input.title,
-    message: input.message,
-    type: input.type,
-    mediaId: input.mediaId ?? null,
-  });
+  await deps.repo.insert(input);
 }

@@ -2,6 +2,7 @@ import { db } from "@canto/db/client";
 import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
 import { buildIndexers } from "@canto/core/infra/indexers/indexer-factory";
 import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
+import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
 import { retryStalledTorrent } from "@canto/core/domain/torrents/use-cases/retry-stalled-torrent";
 import {
   findDownloadsByStatus,
@@ -59,6 +60,7 @@ export async function handleStallDetection(): Promise<void> {
   );
 
   const indexers = await buildIndexers();
+  const notificationsRepo = makeNotificationsRepository(db);
 
   for (const row of stalled) {
     try {
@@ -66,12 +68,15 @@ export async function handleStallDetection(): Promise<void> {
       await updateDownload(db, row.id, { status: "stalled" });
 
       // Create notification
-      await createNotification(db, {
-        title: "Download stalled",
-        message: `"${row.title}" has been stalled for over an hour.`,
-        type: "download_stalled",
-        mediaId: row.mediaId ?? undefined,
-      });
+      await createNotification(
+        { repo: notificationsRepo },
+        {
+          title: "Download stalled",
+          message: `"${row.title}" has been stalled for over an hour.`,
+          type: "download_stalled",
+          mediaId: row.mediaId,
+        },
+      );
 
       // Auto-retry: search for alternative and download
       if (row.mediaId) {

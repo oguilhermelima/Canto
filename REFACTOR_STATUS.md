@@ -124,6 +124,19 @@ Per-context layout ainda usa taxonomia DDD (`rules/`, `services/`, `mappers/`, `
 - `mappers/*.ts`: para fora do domain. Para `infra/<ctx>/<entity>.mapper.ts` — Phase 7 owns.
 - `constants/*.ts`: inline ou `shared/<name>-constants.ts`.
 
+### Convenção de paths de imports (decidida 2026-04-30, em adoção desde Wave 1)
+
+**Regra única**: todo import não-sibling usa o nome do package (`@canto/<pkg>/...`).
+
+- **Sibling** (mesmo folder): `./x`
+- **Qualquer outro lugar dentro do mesmo package**: `@canto/<pkg>/<full-path>`
+  - Ex: dentro de `packages/core/src/infra/notifications/...`, importar de `domain/notifications/types/notification` vira `@canto/core/domain/notifications/types/notification`.
+- **Cross-package**: `@canto/<other-pkg>/<full-path>` (ex: `@canto/db/client`).
+
+**Por quê não `@/...`**: o tsconfig de cada package tem `"@/*": ["./src/*"]`, mas TypeScript respeita o tsconfig do **arquivo de entrada** quando faz resolution. Quando `apps/worker` typechecka e segue source-files de `@canto/core`, o `@/` resolve pra `apps/worker/src/*`, quebrando builds. Self-reference via `@canto/core/...` resolve via pnpm workspace symlink → consistente em todo lugar.
+
+**Adoção**: cada wave converte imports dos arquivos que toca. Wave Final faz codemod sweep dos arquivos não-tocados (infra repositories, etc.).
+
 ### Decisões pendentes
 
 1. **`user-actions/` vs alternativas**: `user-actions/` (default) vs `user-data/` / `collections/`.

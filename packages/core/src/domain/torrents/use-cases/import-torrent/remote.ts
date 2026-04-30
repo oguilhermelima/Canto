@@ -1,12 +1,13 @@
 import path from "node:path";
 
 import type { Database } from "@canto/db/client";
-import type { DownloadClientPort, TorrentFileInfo } from "../../../shared/ports/download-client";
-import { createNotification } from "../../../notifications/use-cases/create-notification";
+import type { DownloadClientPort, TorrentFileInfo } from "@canto/core/domain/shared/ports/download-client";
+import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
+import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
 import {
   type ParsedFile,
   buildSubtitleName,
-} from "../../../../platform/fs/filesystem";
+} from "@canto/core/platform/fs/filesystem";
 import { upsertMediaFile } from "./shared";
 
 interface MediaNaming {
@@ -110,12 +111,15 @@ export async function importRemoteVideoFiles(
         `[auto-import] renameFile failed for "${oldPath}": ${err instanceof Error ? err.message : err} — proceeding with move using original name`,
       );
       renamedByOriginal.set(oldPath, oldPath);
-      await createNotification(db, {
-        title: "File rename failed",
-        message: `Could not rename "${oldPath.substring(oldPath.lastIndexOf("/") + 1)}" during import. The file is using its original name.`,
-        type: "import_warning",
-        mediaId: mediaRow.id,
-      });
+      await createNotification(
+        { repo: makeNotificationsRepository(db) },
+        {
+          title: "File rename failed",
+          message: `Could not rename "${oldPath.substring(oldPath.lastIndexOf("/") + 1)}" during import. The file is using its original name.`,
+          type: "import_warning",
+          mediaId: mediaRow.id,
+        },
+      );
     }
   }
 
