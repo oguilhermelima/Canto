@@ -278,9 +278,11 @@ const workers = [
       const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
       await ensureMedia(db, mediaId, spec, { tmdb, tvdb });
     },
-    // Raised from 3 to 6 — TMDB/qBit rate limits aren't the bottleneck and
-    // the daily cadence sweep (batch=500) clears in ~3h instead of ~12h.
-    { concurrency: 6 },
+    // Raised from 3 to 8 — TMDB/qBit rate limits aren't the bottleneck and
+    // backlogs of 20k+ jobs (manual reprocess + cadence sweep stacking) drain
+    // in ~1.5h instead of ~4h. 8 keeps us comfortably under TMDB's 50 req/10s
+    // soft limit while postgres connection pool and worker memory have room.
+    { concurrency: 8 },
   ),
 ];
 
