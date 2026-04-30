@@ -62,8 +62,6 @@ export function SeasonsSection({
   availability,
   mediaServers,
 }: SeasonsSectionProps): React.JSX.Element | null {
-  if (media.type !== "show") return null;
-
   const { data: userRatings } = trpc.userMedia.getRatings.useQuery(
     { mediaId: mediaId! },
     { enabled: !!mediaId },
@@ -82,6 +80,8 @@ export function SeasonsSection({
     () => media.seasons.filter((s) => seasonHasData(s)),
     [media.seasons],
   );
+
+  if (media.type !== "show") return null;
 
   if (visibleSeasons.length === 0) return null;
 

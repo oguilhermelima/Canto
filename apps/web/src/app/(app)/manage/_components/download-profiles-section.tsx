@@ -61,7 +61,10 @@ export function DownloadProfilesSection(): React.JSX.Element {
     onError: (err) => toast.error(`Failed: ${err.message}`),
   });
 
-  const typedProfiles: ProfileRow[] = (profiles ?? []) as ProfileRow[];
+  const typedProfiles = useMemo<ProfileRow[]>(
+    () => (profiles ?? []) as ProfileRow[],
+    [profiles],
+  );
 
   const grouped = useMemo(() => {
     const result: Record<Flavor, ProfileRow[]> = {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { useResponsivePageSize } from "@/hooks/use-responsive-page-size";
 import type { SectionItem } from "../section-item";
@@ -16,8 +16,7 @@ interface CollectionSourceProps {
 
 export function CollectionSource({ sectionId, title, style, listId }: CollectionSourceProps): React.JSX.Element | null {
   const current = useResponsivePageSize({ mobile: 8, tablet: 12, desktop: 18 });
-  const lockedRef = useRef(current);
-  const limit = lockedRef.current;
+  const [limit] = useState(current);
 
   const { data: lists } = trpc.list.getAll.useQuery(undefined, {
     staleTime: 5 * 60 * 1000,

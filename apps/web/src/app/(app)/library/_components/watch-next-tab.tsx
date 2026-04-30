@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { useSectionInfiniteQuery } from "@/components/home/sources/use-section-query";
@@ -32,8 +32,7 @@ export function WatchNextTab({
 }): React.JSX.Element {
   const isContinue = view === "continue";
   const initialLimit = useResponsivePageSize({ mobile: 6, tablet: 10, desktop: 15 });
-  const lockedRef = useRef(initialLimit);
-  const limit = lockedRef.current;
+  const [limit] = useState(initialLimit);
 
   const continueQuery = trpc.userMedia.getContinueWatching.useInfiniteQuery(
     { limit, mediaType },

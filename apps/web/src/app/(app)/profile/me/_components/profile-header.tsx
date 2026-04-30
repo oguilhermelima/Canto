@@ -24,6 +24,15 @@ function formatWatchDays(mins: number | null | undefined): string | null {
   return `${hours} hour${hours === 1 ? "" : "s"} watched`;
 }
 
+/** True iff the previous page was on this same origin (and document.referrer is readable). */
+function isFromSameOrigin(): boolean {
+  try {
+    return !!document.referrer && new URL(document.referrer).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Mosaic of 4 recent backdrops with horizontal cross-fade masks.
  * Used as atmospheric banner when user hasn't uploaded a custom header image.
@@ -97,17 +106,10 @@ export function ProfileHeader({ children }: ProfileHeaderProps): React.JSX.Eleme
       if (err instanceof Error && err.name === "AbortError") return;
       toast.error("Couldn't share profile link");
     }
-  }, [user?.id, user?.name]);
+  }, [user]);
 
   const handleBack = useCallback(() => {
-    const fromSameOrigin = (() => {
-      try {
-        return !!document.referrer && new URL(document.referrer).origin === window.location.origin;
-      } catch {
-        return false;
-      }
-    })();
-    if (fromSameOrigin) router.back();
+    if (isFromSameOrigin()) router.back();
     else router.push("/");
   }, [router]);
 

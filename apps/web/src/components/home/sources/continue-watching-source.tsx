@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { useResponsivePageSize } from "@/hooks/use-responsive-page-size";
 import type { SectionItem } from "../section-item";
@@ -15,8 +15,7 @@ interface ContinueWatchingSourceProps {
 
 export function ContinueWatchingSource({ sectionId, title, style }: ContinueWatchingSourceProps): React.JSX.Element | null {
   const current = useResponsivePageSize({ mobile: 6, tablet: 10, desktop: 15 });
-  const lockedRef = useRef(current);
-  const limit = lockedRef.current;
+  const [limit] = useState(current);
 
   const query = trpc.userMedia.getContinueWatching.useInfiniteQuery(
     { limit },

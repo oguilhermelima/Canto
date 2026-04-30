@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Bookmark, History, Star, Tv } from "lucide-react";
@@ -155,8 +155,7 @@ function DiaryCard({
 
 export function HubHistoryDiary(): React.JSX.Element {
   const initialLimit = useResponsivePageSize({ mobile: 8, tablet: 12, desktop: 18 });
-  const lockedRef = useRef(initialLimit);
-  const limit = lockedRef.current;
+  const [limit] = useState(initialLimit);
   const { data, isLoading, isError, refetch } =
     trpc.userMedia.getLibraryHistory.useQuery({ limit });
 

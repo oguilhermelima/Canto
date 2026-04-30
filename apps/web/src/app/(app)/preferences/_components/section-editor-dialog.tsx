@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { cn } from "@canto/ui/cn";
 import { Button } from "@canto/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@canto/ui/dialog";
@@ -627,7 +627,10 @@ export function SectionEditorDialog({
   const collections = (userLists ?? []).filter((l) => l.type === "watchlist" || l.type === "custom");
 
   // Condition management — enforce unique fields
-  const usedFields = new Set(conditions.map((c) => c.field));
+  const usedFields = useMemo(
+    () => new Set(conditions.map((c) => c.field)),
+    [conditions],
+  );
 
   const addCondition = useCallback(() => {
     const next = TMDB_FIELD_OPTIONS.find(

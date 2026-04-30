@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { cn } from "@canto/ui/cn";
@@ -433,7 +433,7 @@ export function FilterSidebar({
     });
   };
 
-  const handleReset = (): void => {
+  const handleReset = useCallback((): void => {
     setQ("");
     setSelectedGenres(new Set());
     setGenreMode("or");
@@ -455,7 +455,7 @@ export function FilterSidebar({
     setWatchStatuses(new Set());
     setMembersRatingMin(0);
     setMembersRatingDisplay(0);
-  };
+  }, [fallbackSort]);
 
   // Expose reset to parent via ref
   useEffect(() => {
@@ -481,7 +481,10 @@ export function FilterSidebar({
     { type: certType },
     { staleTime: 60 * 60 * 1000, enabled: showCertification },
   );
-  const certOptions = certByRegion?.[watchRegion] ?? certByRegion?.US ?? [];
+  const certOptions = useMemo(
+    () => certByRegion?.[watchRegion] ?? certByRegion?.US ?? [],
+    [certByRegion, watchRegion],
+  );
 
   useEffect(() => {
     if (

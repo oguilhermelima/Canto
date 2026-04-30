@@ -38,6 +38,16 @@ interface SectionQueryResult {
   onRetry: () => void;
 }
 
+/**
+ * Generic helper hook around tRPC infinite queries.
+ *
+ * NOTE: callers typically pass `getItems` and `mapItem` as inline arrow
+ * functions, so they're new on every render. They're listed as deps so the
+ * memo stays correct, but in practice the items array is recomputed on each
+ * render. That's fine — it's pure synchronous work over already-fetched data,
+ * and React Compiler handles downstream memoization. Callers that want to
+ * avoid this can stabilise the mappers with `useCallback` or hoist them.
+ */
 export function useSectionInfiniteQuery<
   TPage,
   TRaw extends { provider: string; externalId: number | string },
@@ -48,8 +58,9 @@ export function useSectionInfiniteQuery<
   mapItem: (raw: TRaw) => TItem,
   dedupWithin = false,
 ): SectionInfiniteResult<TItem> {
+  const pages = query.data?.pages;
   const items = useMemo<TItem[]>(() => {
-    const raws = (query.data?.pages ?? []).flatMap(getItems);
+    const raws = (pages ?? []).flatMap(getItems);
     if (!dedupWithin) return raws.map(mapItem);
     const seen = new Set<string>();
     const results: TItem[] = [];
@@ -60,15 +71,17 @@ export function useSectionInfiniteQuery<
       results.push(mapItem(raw));
     }
     return results;
-  }, [query.data]);
+  }, [pages, getItems, mapItem, dedupWithin]);
+
+  const { hasNextPage, fetchNextPage, refetch } = query;
 
   const onLoadMore = useCallback(() => {
-    if (query.hasNextPage) void query.fetchNextPage();
-  }, [query]);
+    if (hasNextPage) void fetchNextPage();
+  }, [hasNextPage, fetchNextPage]);
 
   const onRetry = useCallback(() => {
-    void query.refetch();
-  }, [query]);
+    void refetch();
+  }, [refetch]);
 
   return {
     items,
@@ -85,14 +98,16 @@ export function useSectionQuery<TData, TRaw>(
   getItems: (data: TData) => TRaw[],
   mapItem: (raw: TRaw) => SectionItem,
 ): SectionQueryResult {
+  const data = query.data;
   const items = useMemo<SectionItem[]>(() => {
-    if (query.data === undefined) return [];
-    return getItems(query.data).map(mapItem);
-  }, [query.data]);
+    if (data === undefined) return [];
+    return getItems(data).map(mapItem);
+  }, [data, getItems, mapItem]);
 
+  const refetch = query.refetch;
   const onRetry = useCallback(() => {
-    void query.refetch();
-  }, [query]);
+    void refetch();
+  }, [refetch]);
 
   return {
     items,

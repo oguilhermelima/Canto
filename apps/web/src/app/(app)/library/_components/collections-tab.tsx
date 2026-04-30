@@ -125,7 +125,10 @@ export function CollectionsTab({
     });
   }, [lists, filters.sortBy, filters.sortOrder, searchQuery]);
 
-  const hiddenIds = layoutQuery.data?.hiddenListIds ?? [];
+  const hiddenIds = useMemo(
+    () => layoutQuery.data?.hiddenListIds ?? [],
+    [layoutQuery.data?.hiddenListIds],
+  );
   const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
   const hiddenCount = useMemo(
     () => mergedLists.filter((list) => hiddenSet.has(list.id)).length,

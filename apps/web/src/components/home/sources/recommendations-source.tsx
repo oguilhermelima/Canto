@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { useResponsivePageSize } from "@/hooks/use-responsive-page-size";
 import type { SectionItem } from "../section-item";
@@ -21,8 +21,7 @@ export function RecommendationsSource({ sectionId, title, style }: Recommendatio
   const recsVersionRef = useRef<number | null>(null);
 
   const current = useResponsivePageSize({ mobile: 6, tablet: 10, desktop: 15 });
-  const lockedRef = useRef(current);
-  const pageSize = lockedRef.current;
+  const [pageSize] = useState(current);
 
   // Heavy infinite query: paginates the denormalized recommendations read.
   // No `refetchInterval` — invalidation is driven by the lightweight version

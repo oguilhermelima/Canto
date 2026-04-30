@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import type { SpaceStateKey } from "@canto/ui/presets/space-states";
 import { MediaCard } from "@/components/media/media-card";
@@ -32,8 +32,7 @@ export function HubUserMediaSection({
   showUserRating = false,
 }: HubUserMediaSectionProps): React.JSX.Element {
   const initialLimit = useResponsivePageSize({ mobile: 6, tablet: 10, desktop: 15 });
-  const lockedRef = useRef(initialLimit);
-  const limit = lockedRef.current;
+  const [limit] = useState(initialLimit);
   const query = trpc.userMedia.getUserMedia.useInfiniteQuery(
     { ...queryInput, limit },
     {

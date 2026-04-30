@@ -69,7 +69,10 @@ export function CollectionsSectionsView({
   const { data: lists, isLoading, isError, refetch } = trpc.list.getAll.useQuery();
   const layoutQuery = trpc.list.getCollectionLayout.useQuery();
 
-  const hiddenIds = layoutQuery.data?.hiddenListIds ?? [];
+  const hiddenIds = useMemo(
+    () => layoutQuery.data?.hiddenListIds ?? [],
+    [layoutQuery.data?.hiddenListIds],
+  );
   const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
 
   // DB returns lists in position order — show only user-created collections.

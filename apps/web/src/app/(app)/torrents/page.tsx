@@ -51,7 +51,7 @@ export default function DownloadsPage(): React.JSX.Element {
     torrents,
     onAfterDelete: () => setDeleteTarget(null),
   });
-  const imp = useTorrentImport();
+  const { fileInputRef, ...imp } = useTorrentImport();
 
   const { filtered, counts } = useMemo(
     () => filterAndCountTorrents(torrents, statusFilter),
@@ -76,7 +76,7 @@ export default function DownloadsPage(): React.JSX.Element {
         <div className="mt-3 flex items-center gap-2 md:hidden">{importMenu}</div>
       </PageHeader>
       <input
-        ref={imp.fileInputRef}
+        ref={fileInputRef}
         type="file"
         hidden
         accept=".torrent,application/x-bittorrent"
