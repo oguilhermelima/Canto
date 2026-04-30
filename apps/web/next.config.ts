@@ -4,6 +4,11 @@ const config: NextConfig = {
   reactStrictMode: true,
   output: "standalone",
   allowedDevOrigins: ["192.168.0.210"],
+  // Phase 11d (lint hardening) tightened the rule set ahead of the F4 sweep
+  // that fixes the remaining ~36 violations. Until that sweep lands, do not
+  // block the production build on lint — the rules still run during `pnpm
+  // lint`, in CI, and inside the editor, so violations stay visible.
+  eslint: { ignoreDuringBuilds: true },
   transpilePackages: [
     "@canto/api",
     "@canto/auth",
