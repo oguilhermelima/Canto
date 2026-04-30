@@ -18,6 +18,8 @@ import {
   addListItem,
 } from "../../../infra/lists/list-repository";
 import { dispatchEnsureMedia } from "../../../platform/queue/bullmq-dispatcher";
+import { logAndSwallow } from "../../../platform/logger/log-error";
+import { runWithConcurrency } from "../../../platform/concurrency/run-with-concurrency";
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                    */
@@ -70,12 +72,9 @@ async function findVideosByDirectory(
 /*  Main                                                                       */
 /* -------------------------------------------------------------------------- */
 
-const ITEM_DELAY_MS = 250;
+/** TMDB allows ~50 RPS — 4 concurrent directory resolves stays well under. */
+const SCAN_CONCURRENCY = 4;
 const scanningFolders = new Set<string>();
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 export async function scanFolderForMedia(
   db: Database,
@@ -113,18 +112,15 @@ export async function scanFolderForMedia(
   const tmdb = await getTmdbProvider();
   const supportedLangs = [...await getActiveUserLanguages(db)];
 
-  let imported = 0;
-  let skipped = 0;
-  let failed = 0;
+  type DirOutcome = "imported" | "skipped" | "failed";
 
-  for (const [dirPath] of videosByDir) {
+  const processDirectory = async (dirPath: string): Promise<DirOutcome> => {
     const dirName = basename(dirPath);
     const parsed = parseFolderMediaInfo(dirName);
 
     if (!parsed) {
       console.log(`[folder-scan] Could not parse directory name: ${dirName}`);
-      failed++;
-      continue;
+      return "failed";
     }
 
     try {
@@ -158,9 +154,7 @@ export async function scanFolderForMedia(
 
       if (!tmdbId) {
         console.log(`[folder-scan] Could not resolve TMDB ID for: ${dirName}`);
-        failed++;
-        await sleep(ITEM_DELAY_MS);
-        continue;
+        return "failed";
       }
 
       // 2. Check if already in DB
@@ -179,15 +173,12 @@ export async function scanFolderForMedia(
           await updateMedia(db, existing.id, updates);
         }
 
-        if (existing.inLibrary) {
-          skipped++;
-        } else {
-          // Was in DB but not in library — now it is
+        const wasAlreadyInLibrary = existing.inLibrary;
+        if (!wasAlreadyInLibrary) {
           try {
             const serverLib = await ensureServerLibrary(db);
             await addListItem(db, { listId: serverLib.id, mediaId: existing.id });
           } catch { /* already in list */ }
-          imported++;
         }
 
         const metadataSucceededAt = await findAspectSucceededAt(
@@ -196,36 +187,56 @@ export async function scanFolderForMedia(
           "metadata",
         );
         if (!metadataSucceededAt) {
-          void dispatchEnsureMedia(existing.id).catch(() => {});
+          dispatchEnsureMedia(existing.id).catch(
+            logAndSwallow("folder-scan dispatchEnsureMedia"),
+          );
         }
-      } else {
-        // 3. New media — fetch from TMDB, persist, mark as downloaded
-        const normalized = await tmdb.getMetadata(tmdbId, resolvedType, { supportedLanguages: supportedLangs });
-        const inserted = await persistMedia(db, normalized);
-        await updateMedia(db, inserted.id, {
-          inLibrary: true,
-          downloaded: true,
-          libraryId,
-          libraryPath: dirPath,
-          addedAt: new Date(),
-        });
-        void dispatchEnsureMedia(inserted.id).catch(() => {});
 
-        try {
-          const serverLib = await ensureServerLibrary(db);
-          await addListItem(db, { listId: serverLib.id, mediaId: inserted.id });
-        } catch { /* already in list */ }
-
-        imported++;
-        console.log(`[folder-scan] Imported: ${parsed.title} (${parsed.year ?? "?"})`);
+        return wasAlreadyInLibrary ? "skipped" : "imported";
       }
+
+      // 3. New media — fetch from TMDB, persist, mark as downloaded
+      const normalized = await tmdb.getMetadata(tmdbId, resolvedType, {
+        supportedLanguages: supportedLangs,
+      });
+      const inserted = await persistMedia(db, normalized);
+      await updateMedia(db, inserted.id, {
+        inLibrary: true,
+        downloaded: true,
+        libraryId,
+        libraryPath: dirPath,
+        addedAt: new Date(),
+      });
+      dispatchEnsureMedia(inserted.id).catch(
+        logAndSwallow("folder-scan dispatchEnsureMedia"),
+      );
+
+      try {
+        const serverLib = await ensureServerLibrary(db);
+        await addListItem(db, { listId: serverLib.id, mediaId: inserted.id });
+      } catch { /* already in list */ }
+
+      console.log(`[folder-scan] Imported: ${parsed.title} (${parsed.year ?? "?"})`);
+      return "imported";
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       console.error(`[folder-scan] Error processing ${dirName}:`, msg);
-      failed++;
+      return "failed";
     }
+  };
 
-    await sleep(ITEM_DELAY_MS);
+  // Run directory scans in parallel — TMDB rate limits aren't the bottleneck
+  // here, the previous 250ms delay was wasted wall-clock per item.
+  const dirPaths = Array.from(videosByDir.keys());
+  const outcomes = await runWithConcurrency(dirPaths, SCAN_CONCURRENCY, processDirectory);
+
+  let imported = 0;
+  let skipped = 0;
+  let failed = 0;
+  for (const o of outcomes) {
+    if (o === "imported") imported++;
+    else if (o === "skipped") skipped++;
+    else failed++;
   }
 
   console.log(`[folder-scan] Done: ${imported} imported, ${skipped} skipped, ${failed} failed`);

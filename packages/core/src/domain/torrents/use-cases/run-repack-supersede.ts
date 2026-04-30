@@ -4,6 +4,7 @@ import type { DownloadClientPort } from "../../shared/ports/download-client";
 import type { ScoringRules } from "../../shared/rules/scoring-rules";
 import type { IndexerPort } from "../ports/indexer";
 import { findRecentImportedDownloads } from "../../../infra/torrents/download-repository";
+import { runWithConcurrency } from "../../../platform/concurrency/run-with-concurrency";
 import {
   autoSupersedeWithRepack,
   type AutoSupersedeOutcome,
@@ -43,6 +44,8 @@ interface Deps {
 
 const DEFAULT_LOOKBACK_DAYS = 14;
 const DEFAULT_MAX_PER_RUN = 50;
+/** Prowlarr/Jackett rate limits make >4 concurrent searches counter-productive. */
+const SEARCH_CONCURRENCY = 4;
 
 /**
  * Scan recently-imported downloads for repack upgrades and replace each
@@ -72,46 +75,67 @@ export async function runRepackSupersede(
   };
   if (candidates.length === 0) return outcome;
 
-  for (const row of candidates) {
-    if (!row.mediaId) continue;
-    outcome.scanned++;
+  // Drop candidates that can't be scanned, so the concurrency cap doesn't
+  // get spent on no-ops.
+  const scannable = candidates.filter((row) => row.mediaId != null);
+  outcome.scanned = scannable.length;
 
-    let results: SearchResult[];
+  // Phase 1 — fan out the indexer searches (rate-limited at SEARCH_CONCURRENCY).
+  type SearchOutcome =
+    | { row: (typeof scannable)[number]; results: SearchResult[]; error: null }
+    | { row: (typeof scannable)[number]; results: null; error: string };
+
+  const searchOutcomes = await runWithConcurrency<
+    (typeof scannable)[number],
+    SearchOutcome
+  >(scannable, SEARCH_CONCURRENCY, async (row) => {
     try {
       const out = await searchTorrents(
         db,
         {
-          mediaId: row.mediaId,
+          mediaId: row.mediaId!,
           seasonNumber: row.seasonNumber ?? undefined,
           episodeNumbers: row.episodeNumbers ?? undefined,
           pageSize: 50,
         },
         { indexers: deps.indexers, rules: deps.rules },
       );
-      results = out.results;
+      return { row, results: out.results, error: null };
     } catch (err) {
-      outcome.failures.push({
-        downloadId: row.id,
-        title: row.title,
+      return {
+        row,
+        results: null,
         error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  });
+
+  // Phase 2 — apply supersedes sequentially. autoSupersedeWithRepack writes to
+  // qBit + DB; parallelizing it would risk racing on the same hash slot.
+  for (const item of searchOutcomes) {
+    if (item.error !== null) {
+      outcome.failures.push({
+        downloadId: item.row.id,
+        title: item.row.title,
+        error: item.error,
       });
       continue;
     }
 
-    const best = pickBestRepack(results, row.repackCount);
+    const best = pickBestRepack(item.results, item.row.repackCount);
     if (!best) continue;
 
     let supersede: AutoSupersedeOutcome;
     try {
       supersede = await autoSupersedeWithRepack(
         db,
-        { currentDownloadId: row.id, candidate: best },
+        { currentDownloadId: item.row.id, candidate: best },
         deps.qbClient,
       );
     } catch (err) {
       outcome.failures.push({
-        downloadId: row.id,
-        title: row.title,
+        downloadId: item.row.id,
+        title: item.row.title,
         error: err instanceof Error ? err.message : String(err),
       });
       continue;
@@ -120,8 +144,8 @@ export async function runRepackSupersede(
     if (supersede.replaced) {
       outcome.replaced++;
       outcome.replacements.push({
-        downloadId: row.id,
-        oldTitle: row.title,
+        downloadId: item.row.id,
+        oldTitle: item.row.title,
         newTitle: best.title,
         newRepackCount: best.repackCount,
       });
