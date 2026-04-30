@@ -54,6 +54,10 @@ export async function findBecauseWatchedRecs(
     sql`, `,
   );
 
+  // User-language values fall back to en-US so non-English speakers still get
+  // results when their localization rows are missing, and recs whose only
+  // localization is the user's own language aren't dropped just because en-US
+  // hasn't been backfilled yet.
   const result = await db.execute<RawRow>(sql`
     WITH ranked AS (
       SELECT
@@ -62,11 +66,11 @@ export async function findBecauseWatchedRecs(
         m.external_id AS "externalId",
         m.provider,
         m.type,
-        m.title,
-        m.poster_path AS "posterPath",
+        COALESCE(ml_user.title, ml_en.title) AS "title",
+        COALESCE(ml_user.poster_path, ml_en.poster_path) AS "posterPath",
         m.backdrop_path AS "backdropPath",
-        m.logo_path AS "logoPath",
-        m.overview,
+        COALESCE(ml_user.logo_path, ml_en.logo_path) AS "logoPath",
+        COALESCE(ml_user.overview, ml_en.overview) AS "overview",
         m.vote_average AS "voteAverage",
         m.year,
         m.release_date AS "releaseDate",
@@ -80,9 +84,13 @@ export async function findBecauseWatchedRecs(
         ) AS rn
       FROM media_recommendation mr
       INNER JOIN media m ON m.id = mr.media_id
+      LEFT JOIN media_localization ml_user
+        ON ml_user.media_id = m.id AND ml_user.language = ${language}
+      LEFT JOIN media_localization ml_en
+        ON ml_en.media_id = m.id AND ml_en.language = 'en-US'
       WHERE mr.source_media_id IN (${sourceIdValues})
         AND COALESCE(m.vote_count, 0) >= 50
-        AND m.poster_path IS NOT NULL
+        AND COALESCE(ml_user.poster_path, ml_en.poster_path) IS NOT NULL
         ${mediaTypeClause}
         AND (m.release_date <= CURRENT_DATE OR m.release_date IS NULL)
         AND m.in_library = false
