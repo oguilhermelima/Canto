@@ -54,8 +54,8 @@ export async function refreshExtras(
             searchTitle,
             row.type as "movie" | "show",
           );
-          if (search.results.length > 0)
-            extrasExternalId = search.results[0]!.externalId;
+          const first = search.results[0];
+          if (first) extrasExternalId = first.externalId;
         } catch {
           /* skip extras if we can't find TMDB equivalent */
         }
@@ -145,11 +145,11 @@ export async function refreshExtras(
           );
           if (enTrailer) trailerMap.set(item.result.externalId, enTrailer.key);
 
-          const enLogos = (images.logos ?? []).filter(
+          const enLogos = images.logos.filter(
             (l) => l.iso_639_1 === "en" || l.iso_639_1 === null,
           );
-          if (enLogos.length > 0)
-            logoMap.set(item.result.externalId, enLogos[0]!.file_path);
+          const firstLogo = enLogos[0];
+          if (firstLogo) logoMap.set(item.result.externalId, firstLogo.file_path);
         } catch {
           // Best-effort
         }
@@ -188,32 +188,30 @@ export async function refreshExtras(
         externalId: fields.externalId,
         provider: fields.provider,
         backdropPath: fields.backdropPath ?? null,
-        releaseDate: fields.releaseDate || null,
+        releaseDate: fields.releaseDate ?? null,
         voteAverage: fields.voteAverage ?? null,
         downloaded: false,
       });
-      if (inserted) {
-        mediaIdByExtKey.set(key, inserted.id);
-        // After Phase 1C-δ, title/overview/posterPath/logoPath live only on
-        // media_localization en-US.
-        await deps.localization.upsertMediaLocalization(
-          inserted.id,
-          EN,
-          {
-            title: fields.title,
-            overview: fields.overview ?? null,
-            posterPath: fields.posterPath ?? null,
-            logoPath: fields.logoPath ?? null,
-          },
-          "tmdb",
-        );
-        // Stub row from TMDB's recs/similar payload — enqueue full metadata
-        // fetch so the row is filled in before any user-facing query surfaces
-        // it (read paths filter on the metadata aspect having succeeded).
-        void deps.dispatcher?.enrichMedia(inserted.id).catch(
-          logAndSwallow("refresh-extras dispatchEnsureMedia"),
-        );
-      }
+      mediaIdByExtKey.set(key, inserted.id);
+      // After Phase 1C-δ, title/overview/posterPath/logoPath live only on
+      // media_localization en-US.
+      await deps.localization.upsertMediaLocalization(
+        inserted.id,
+        EN,
+        {
+          title: fields.title,
+          overview: fields.overview ?? null,
+          posterPath: fields.posterPath ?? null,
+          logoPath: fields.logoPath ?? null,
+        },
+        "tmdb",
+      );
+      // Stub row from TMDB's recs/similar payload — enqueue full metadata
+      // fetch so the row is filled in before any user-facing query surfaces
+      // it (read paths filter on the metadata aspect having succeeded).
+      void deps.dispatcher?.enrichMedia(inserted.id).catch(
+        logAndSwallow("refresh-extras dispatchEnsureMedia"),
+      );
     }
   }
 
@@ -230,14 +228,14 @@ export async function refreshExtras(
   // Insert credits (cast)
   if (extras.credits.cast.length > 0) {
     await deps.extras.insertCredits(
-      extras.credits.cast.map((c, i) => ({
+      extras.credits.cast.map((c) => ({
         mediaId,
         personId: c.id,
         name: c.name,
         character: c.character,
         profilePath: c.profilePath,
         type: "cast" as const,
-        order: c.order ?? i,
+        order: c.order,
       })),
     );
   }
@@ -290,7 +288,7 @@ export async function refreshExtras(
           mediaId,
           providerId: wp.providerId,
           providerName: wp.providerName,
-          logoPath: wp.logoPath ?? null,
+          logoPath: wp.logoPath,
           type: "stream",
           region,
         });
@@ -300,7 +298,7 @@ export async function refreshExtras(
           mediaId,
           providerId: wp.providerId,
           providerName: wp.providerName,
-          logoPath: wp.logoPath ?? null,
+          logoPath: wp.logoPath,
           type: "rent",
           region,
         });
@@ -310,7 +308,7 @@ export async function refreshExtras(
           mediaId,
           providerId: wp.providerId,
           providerName: wp.providerName,
-          logoPath: wp.logoPath ?? null,
+          logoPath: wp.logoPath,
           type: "buy",
           region,
         });
