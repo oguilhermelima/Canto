@@ -1,7 +1,6 @@
 **/node_modules
 **/.next
 **/dist
-**/.turbo
 **/.cache
 **/*.tsbuildinfo
 .git
@@ -9,3 +8,7 @@
 old
 data
 *.log
+# Note: `**/.turbo` intentionally NOT ignored. Turbo's cache directories are
+# kept so the builder stage can warm Turbo's cache from the host (when
+# available) and so the BuildKit cache mount on `pnpm run build` can persist
+# `.turbo/` across builds (see Dockerfile builder stage).

@@ -39,6 +39,15 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runner
+      # BuildKit local cache: layer cache (and pnpm/turbo cache mounts)
+      # survive between `compose build` invocations. Operators must
+      # `mkdir -p /var/cache/canto-docker` (and ensure docker can write
+      # to it) before the first build. Requires DOCKER_BUILDKIT=1 — the
+      # default in Docker 23+.
+      cache_from:
+        - "type=local,src=/var/cache/canto-docker"
+      cache_to:
+        - "type=local,dest=/var/cache/canto-docker,mode=max"
     image: canto:latest
     pull_policy: build
     command: pnpm --filter @canto/db exec drizzle-kit migrate

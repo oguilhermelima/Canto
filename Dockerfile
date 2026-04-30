@@ -18,13 +18,21 @@ COPY tooling/eslint/package.json ./tooling/eslint/
 COPY tooling/prettier/package.json ./tooling/prettier/
 COPY tooling/tailwind/package.json ./tooling/tailwind/
 COPY tooling/typescript/package.json ./tooling/typescript/
-RUN pnpm install --frozen-lockfile
+# BuildKit cache mount: pnpm content-addressable store survives across
+# builds, so unchanged dependencies skip the network entirely. Default
+# store on Linux for the root user is /root/.local/share/pnpm/store.
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
 
 # ── Build ──
 FROM deps AS builder
 COPY . .
 ENV SKIP_ENV_VALIDATION=true
-RUN pnpm run build
+# BuildKit cache mount on Turbo's local cache. Persists task outputs
+# (Next build, package transpiles) across builds — unchanged inputs hit
+# the cache and skip recomputation.
+RUN --mount=type=cache,id=turbo,target=/app/.turbo \
+    pnpm run build
 
 # ── Production runner ──
 FROM base AS runner
