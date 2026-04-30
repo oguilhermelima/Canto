@@ -1,0 +1,2 @@
+CREATE INDEX "idx_media_imdb_id" ON "media" USING btree ("imdb_id") WHERE "media"."imdb_id" IS NOT NULL;--> statement-breakpoint
+CREATE INDEX "idx_media_tvdb_id" ON "media" USING btree ("tvdb_id") WHERE "media"."tvdb_id" IS NOT NULL;
