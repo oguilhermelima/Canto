@@ -40,7 +40,28 @@ A regra ESLint de boundary do Wave Final ficou em modo `warn` por causa de 263 v
 
 **Tarefa nova nesta wave**: criar `LoggerPort` em `domain/shared/ports/logger.port.ts` e adapter em `platform/logger/`. Substituir 16 sites de `logAndSwallow` direto.
 
-**Critério de done**: `pnpm -F @canto/core lint` zero warnings de `no-restricted-imports` em `domain/**`. Promover regra para `error` final.
+**Tarefas adjuntas (mesma wave, contemporâneas ao boundary cleanup):**
+
+1. **Naming consistency em ports** — padronizar verbos:
+   - `find*` → retorna `T | null`, não throw.
+   - `get*` → retorna `T` ou throw.
+   - `list*` → retorna `T[]`.
+   - `count*` → retorna `number`.
+
+   Hoje há mistura de `findX` / `getX` / `loadX` / `fetchX` no mesmo port. Renomear seguindo a regra acima quando passar pelo arquivo.
+
+2. **Branded IDs: parse vs cast nas fronteiras** — hoje muito `id as MediaId` em consumers (API/worker). Criar `parseMediaId(raw: string): MediaId` em `domain/media/types/media.ts` (idem por entity branded) com validação de UUID. API boundaries chamam `parseMediaId(input.id)`; dentro do domain confia. Remove o `as` shortcut.
+
+3. **Domain errors tipadas** — vários sites ainda fazem `throw new Error("string")` cru. Migrar pra subclasses de `DomainError` (já existem em `<ctx>/errors.ts`). Cliente API mapeia error class → HTTP status.
+
+4. **Composition root `buildCoreDeps(db)`** — `apps/worker/src/index.ts` constrói ~10 adapters manualmente. Extrair `buildCoreDeps(db): CoreDeps` em `packages/core/src/composition.ts` retornando `{ media, user, lists, recommendations, mediaServers, trakt, userMedia, torrents, folders, notifications, extras, localization, aspectState, contentRating, logger }`. tRPC context usa o mesmo helper.
+
+**Critério de done**:
+- `pnpm -F @canto/core lint` zero warnings de `no-restricted-imports` em `domain/**`. Promover regra para `error` final.
+- Verbos `find/get/list/count` consistentes em todos os ports.
+- Zero `as <Brand>Id` em consumers (todos via `parse*Id`).
+- Zero `throw new Error(string)` em domain (tudo via DomainError subclasses).
+- Worker entry e tRPC context usam `buildCoreDeps`.
 
 ### Wave 11 — Lint hardening + qualidade de código (~3-4h)
 
@@ -182,6 +203,14 @@ Antes de mergear Wave 11, pair-review (ou self-review estrito) das mudanças:
 - Cada `!` → checar se há guard clause melhor.
 - Cada use case modificado → confirmar que não cresceu nem assumiu mais responsabilidades.
 
+#### 11f — Tarefas adjuntas de qualidade
+
+1. **Transaction boundaries explícitas** — alguns use cases fazem read-then-write sem txn (race-conditioneable). Auditar `download-torrent`, `import-torrent`, `manage-list-items`, `accept-invitation`, `promote-user-media-state-from-playback`. Adicionar `withTransaction(fn)` ao port shape onde necessário; use case envolve operação não-atômica.
+
+2. **Magic timeouts/TTLs em const nomeada** — `5 * 60 * 1000`, `30 * 24 * 60 * 60 * 1000`, `60 * 60 * 1000` espalhados em domain code. Mover pra `domain/<ctx>/constants.ts` com nome documentado (`STALL_THRESHOLD_MS`, `METADATA_TTL_MS` — alguns já existem em `ensure-media.types.ts`, replicar pattern). Em rules pure, `const FOO_MS = ... as const;`.
+
+3. **Input validation no API boundary** — alguns tRPC procedures aceitam input sem Zod (recebe `string` arbitrário e re-valida em domain ou nada). Padronizar: todo input passa por validator de `packages/validators` antes de chegar em use case. Use case confia no shape.
+
 ### Wave 12 — Build clean + lockdown final (~60-90 min)
 
 - `pnpm -F @canto/web build` zero warnings (Next/Turbopack residuais — geralmente 5-15 itens).
@@ -204,16 +233,30 @@ Antes de mergear Wave 11, pair-review (ou self-review estrito) das mudanças:
 - REFACTOR_STATUS.md final marca tudo ✅. Pode mover este doc pra `.claude/handbook/refactor-history.md` (artefato histórico) ao invés de manter na raiz.
 - Verificar Phase 5.5 folder consolidation (codemod move folders pro `user-actions/`, `media-servers/scans/`, etc) — opcional, vertical-slice waves tornaram desnecessário pra funcionalidade. Se for fazer, vira Wave 13.
 
+### Wave 13 — Nice-to-have (opcional, pós-refactor)
+
+Não bloqueia nada. Roda quando der tempo.
+
+1. **Use case tests via port mocks** — agora que tudo é port-first, escrever tests é trivial. Cobertura atual heavy em cadence/parsing/scoring (puros) mas baixa em use cases. Mock de port + asserts em `deps.repo.X.toHaveBeenCalledWith(...)`. Alvo: cada use case top-traffic com 1+ test happy path + 1 edge.
+
+2. **Per-context `index.ts` (public surface)** — `domain/<ctx>/index.ts` re-exporta só o que é público (use cases + types + ports + errors). API surface vira explícita. Custo: ~14 arquivos. Benefício: discoverability + lint pode bloquear imports de internals.
+
+3. **Structured logging** — depois do `LoggerPort` (Wave 10), substituir `logger.warn("[ctx] msg" + value)` por `logger.warn({ event: "ctx.event", mediaId, userId }, "msg")`. Habilita query/grep por evento, integração com observabilidade futura.
+
+4. **Composition root: factory pattern por entry point** — todos os `make<X>Repository(db)` constroem na mesma árvore de deps. `composition/{worker,api,test}.ts` por entry. Test version usa mocks. Reduz duplicação + acelera testes.
+
 ### Total restante
 
 | Bloco | Estimativa |
 |---|---|
-| Wave 10 (boundary leaks) | 6-9h |
-| Wave 11 (lint sweep + bad smells) | 3-4h |
-| Wave 12 (build + CI lockdown) | 30-60 min |
-| **Total** | **~10-14h** |
+| Wave 10 (boundary leaks + naming + parse + errors + composition) | 8-11h |
+| Wave 11 (lint sweep + bad smells + txn + constants + validators) | 4-5h |
+| Wave 12 (build + comments cleanup + handbook + CLAUDE.md) | 1-1.5h |
+| Wave 13 (nice-to-have, opcional) | 4-6h |
+| **Total core (W10-W12)** | **~13-17h** |
+| **Total com W13** | **~17-23h** |
 
-Realístico: 5-7 sub-sessões.
+Realístico: 7-10 sub-sessões pra W10-W12. W13 é tempo livre.
 
 ---
 
