@@ -1,8 +1,6 @@
 import { TRPCError } from "@trpc/server";
-import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "@canto/db/client";
-import { userConnection } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
 import { addUserConnectionInput } from "@canto/validators";
 import {
@@ -11,8 +9,9 @@ import {
   loginPlex,
 } from "@canto/core/domain/media-servers/use-cases/authenticate";
 import { discoverServerLibraries } from "@canto/core/domain/media-servers/use-cases/discover-libraries";
-import { getJellyfinCurrentUserId } from "@canto/core/infra/media-servers/jellyfin.adapter";
-import { authenticatePlexServerToken } from "@canto/core/infra/media-servers/plex.adapter";
+import { makeJellyfinAdapter } from "@canto/core/infra/media-servers/jellyfin.adapter-bindings";
+import { makePlexAdapter } from "@canto/core/infra/media-servers/plex.adapter-bindings";
+import { makeUserConnectionRepository } from "@canto/core/infra/media-servers/user-connection-repository.adapter";
 import { upsertServerLink } from "@canto/core/infra/file-organization/folder-repository";
 import {
   dispatchJellyfinSync,
@@ -33,7 +32,16 @@ export async function setupLibrariesForConnection(
   connectionId: string,
 ): Promise<void> {
   try {
-    const libraries = await discoverServerLibraries(db, provider, userId);
+    const libraries = await discoverServerLibraries(
+      db,
+      provider,
+      {
+        repo: makeUserConnectionRepository(db),
+        plex: makePlexAdapter(),
+        jellyfin: makeJellyfinAdapter(),
+      },
+      userId,
+    );
 
     for (const lib of libraries) {
       await upsertServerLink(db, {
@@ -61,6 +69,10 @@ export const setupRouter = createTRPCRouter({
   add: protectedProcedure
     .input(addUserConnectionInput)
     .mutation(async ({ ctx, input }) => {
+      const repo = makeUserConnectionRepository(ctx.db);
+      const plex = makePlexAdapter();
+      const jellyfin = makeJellyfinAdapter();
+
       let token: string | undefined;
       let externalUserId: string | undefined;
 
@@ -72,13 +84,20 @@ export const setupRouter = createTRPCRouter({
             message: "Plex URL not configured by admin",
           });
         }
-        const result = input.credentials.mode === "email"
-          ? await loginPlex({
-              url,
-              email: input.credentials.email,
-              password: input.credentials.password,
-            })
-          : await authenticatePlex({ url, token: input.credentials.token });
+        const result =
+          input.credentials.mode === "email"
+            ? await loginPlex(
+                {
+                  url,
+                  email: input.credentials.email,
+                  password: input.credentials.password,
+                },
+                { plex },
+              )
+            : await authenticatePlex(
+                { url, token: input.credentials.token },
+                { plex },
+              );
         if (!result.success) {
           throw new TRPCError({
             code: "BAD_REQUEST",
@@ -95,11 +114,14 @@ export const setupRouter = createTRPCRouter({
             message: "Jellyfin URL not configured by admin",
           });
         }
-        const result = await authenticateJellyfin({
-          url,
-          username: input.username,
-          password: input.password,
-        });
+        const result = await authenticateJellyfin(
+          {
+            url,
+            username: input.username,
+            password: input.password,
+          },
+          { jellyfin },
+        );
         if (!result.success) {
           throw new TRPCError({
             code: "BAD_REQUEST",
@@ -117,44 +139,32 @@ export const setupRouter = createTRPCRouter({
         });
       }
 
-      const [existing] = await ctx.db
-        .select()
-        .from(userConnection)
-        .where(
-          and(
-            eq(userConnection.userId, ctx.session.user.id),
-            eq(userConnection.provider, input.provider),
-          ),
-        );
+      const existing = await repo.findByProvider(
+        ctx.session.user.id,
+        input.provider,
+      );
 
       let connectionId: string;
 
       if (existing) {
-        await ctx.db
-          .update(userConnection)
-          .set({
-            token,
-            refreshToken: null,
-            tokenExpiresAt: null,
-            externalUserId,
-            staleReason: null,
-            updatedAt: new Date(),
-          })
-          .where(eq(userConnection.id, existing.id));
+        await repo.update(existing.id, {
+          token,
+          refreshToken: null,
+          tokenExpiresAt: null,
+          externalUserId,
+          staleReason: null,
+        });
         connectionId = existing.id;
       } else {
-        const [inserted] = await ctx.db
-          .insert(userConnection)
-          .values({
-            userId: ctx.session.user.id,
-            provider: input.provider,
-            token,
-            refreshToken: null,
-            tokenExpiresAt: null,
-            externalUserId,
-          })
-          .returning({ id: userConnection.id });
-        connectionId = inserted!.id;
+        const inserted = await repo.create({
+          userId: ctx.session.user.id,
+          provider: input.provider,
+          token,
+          refreshToken: null,
+          tokenExpiresAt: null,
+          externalUserId,
+        });
+        connectionId = inserted.id;
       }
 
       void setupLibrariesForConnection(ctx.db, ctx.session.user.id, input.provider, connectionId);
@@ -170,6 +180,10 @@ export const setupRouter = createTRPCRouter({
   reuseAdminCreds: protectedProcedure
     .input(z.object({ provider: z.enum(["jellyfin", "plex"]) }))
     .mutation(async ({ ctx, input }) => {
+      const repo = makeUserConnectionRepository(ctx.db);
+      const plex = makePlexAdapter();
+      const jellyfin = makeJellyfinAdapter();
+
       const url = await getSetting(input.provider === "jellyfin" ? "jellyfin.url" : "plex.url");
       if (!url) {
         throw new TRPCError({
@@ -195,7 +209,7 @@ export const setupRouter = createTRPCRouter({
         // installations (pre-adminUserId) keep working.
         let jellyfinUserId = await getSetting("jellyfin.adminUserId");
         if (!jellyfinUserId) {
-          jellyfinUserId = await getJellyfinCurrentUserId(url, apiKey);
+          jellyfinUserId = await jellyfin.getCurrentUserId(url, apiKey);
         }
         if (!jellyfinUserId) {
           throw new TRPCError({
@@ -213,7 +227,7 @@ export const setupRouter = createTRPCRouter({
             message: "Plex admin credentials are not configured",
           });
         }
-        const result = await authenticatePlexServerToken(url, plexToken);
+        const result = await plex.authenticateServerToken(url, plexToken);
         if (!result.ok || !result.userId) {
           throw new TRPCError({
             code: "BAD_REQUEST",
@@ -224,41 +238,26 @@ export const setupRouter = createTRPCRouter({
         externalUserId = result.userId;
       }
 
-      const [existing] = await ctx.db
-        .select()
-        .from(userConnection)
-        .where(
-          and(
-            eq(userConnection.userId, ctx.session.user.id),
-            eq(userConnection.provider, input.provider),
-          ),
-        );
+      const existing = await repo.findByProvider(ctx.session.user.id, input.provider);
 
       let connectionId: string;
       if (existing) {
-        await ctx.db
-          .update(userConnection)
-          .set({
-            token,
-            refreshToken: null,
-            tokenExpiresAt: null,
-            externalUserId,
-            staleReason: null,
-            updatedAt: new Date(),
-          })
-          .where(eq(userConnection.id, existing.id));
+        await repo.update(existing.id, {
+          token,
+          refreshToken: null,
+          tokenExpiresAt: null,
+          externalUserId,
+          staleReason: null,
+        });
         connectionId = existing.id;
       } else {
-        const [inserted] = await ctx.db
-          .insert(userConnection)
-          .values({
-            userId: ctx.session.user.id,
-            provider: input.provider,
-            token,
-            externalUserId,
-          })
-          .returning({ id: userConnection.id });
-        connectionId = inserted!.id;
+        const inserted = await repo.create({
+          userId: ctx.session.user.id,
+          provider: input.provider,
+          token,
+          externalUserId,
+        });
+        connectionId = inserted.id;
       }
 
       void setupLibrariesForConnection(ctx.db, ctx.session.user.id, input.provider, connectionId);

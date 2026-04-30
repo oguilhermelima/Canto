@@ -1,10 +1,10 @@
-import type { MediaServerPort } from "../../domain/shared/ports/media-server.port";
-import { fetchJellyfinMediaInfo } from "../../domain/media-servers/use-cases/fetch-info/jellyfin";
+import type { MediaServerPort } from "@canto/core/domain/shared/ports/media-server.port";
+import { fetchJellyfinMediaInfo } from "@canto/core/domain/media-servers/use-cases/fetch-info/jellyfin";
 import {
   getJellyfinLibraryFolders,
   testJellyfinConnection,
   triggerJellyfinScan,
-} from "./jellyfin.adapter";
+} from "@canto/core/infra/media-servers/jellyfin.adapter";
 
 /**
  * Jellyfin binding for `MediaServerPort`. The library list flattens Jellyfin's

@@ -4,13 +4,13 @@ import {
   type PlexStreamEntry,
   type PlexStreamMedia,
   type PlexStreamMetadataItem,
-} from "../../../../infra/media-servers/plex.adapter";
+} from "@canto/core/infra/media-servers/plex.adapter";
 import {
   dedupeLangs,
   normalizeLang,
   normalizeResolution,
   type MediaFileInfo,
-} from "./shared";
+} from "@canto/core/domain/media-servers/use-cases/fetch-info/shared";
 
 export function extractPlexFileInfo(item: PlexStreamMetadataItem): MediaFileInfo {
   const m = item.Media?.[0];

@@ -13,7 +13,7 @@ import {
   type ExternalIds,
   type MediaKind,
   type ScannedMediaItem,
-} from "./types";
+} from "@canto/core/domain/sync/types";
 
 export interface PlexLibraryRef {
   /** Plex library section id (the number in `/library/sections/:id`). */

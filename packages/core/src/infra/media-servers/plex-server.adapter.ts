@@ -1,10 +1,10 @@
-import type { MediaServerPort } from "../../domain/shared/ports/media-server.port";
-import { fetchPlexMediaInfo } from "../../domain/media-servers/use-cases/fetch-info/plex";
+import type { MediaServerPort } from "@canto/core/domain/shared/ports/media-server.port";
+import { fetchPlexMediaInfo } from "@canto/core/domain/media-servers/use-cases/fetch-info/plex";
 import {
   getPlexSections,
   scanPlexLibrary,
   testPlexConnection,
-} from "./plex.adapter";
+} from "@canto/core/infra/media-servers/plex.adapter";
 
 /**
  * Plex binding for `MediaServerPort`. Library listing maps Plex sections

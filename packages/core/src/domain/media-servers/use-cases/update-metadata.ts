@@ -4,21 +4,14 @@
 
 import type { Database } from "@canto/db/client";
 import { getSettings } from "@canto/db/settings";
-import { findMediaById } from "../../../infra/media/media-repository";
-import { findMediaLocalized } from "../../../infra/media/media-localized-repository";
+import type { JellyfinAdapterPort } from "@canto/core/domain/media-servers/ports/jellyfin-adapter.port";
+import type { PlexAdapterPort } from "@canto/core/domain/media-servers/ports/plex-adapter.port";
+import { findMediaById } from "@canto/core/infra/media/media-repository";
+import { findMediaLocalized } from "@canto/core/infra/media/media-localized-repository";
 import {
   findMediaVersionsByMediaId,
   updateMediaVersion,
-} from "../../../infra/media/media-version-repository";
-import {
-  applyJellyfinRemoteMatch,
-  getJellyfinItem,
-} from "../../../infra/media-servers/jellyfin.adapter";
-import {
-  matchPlexItem,
-  lockPlexFields,
-  getPlexItem,
-} from "../../../infra/media-servers/plex.adapter";
+} from "@canto/core/infra/media/media-version-repository";
 
 export interface ServerUpdateResult {
   jellyfin: boolean;
@@ -27,9 +20,15 @@ export interface ServerUpdateResult {
   updatedServerTitle?: string;
 }
 
+export interface UpdateMediaServerMetadataDeps {
+  plex: PlexAdapterPort;
+  jellyfin: JellyfinAdapterPort;
+}
+
 export async function updateMediaServerMetadata(
   db: Database,
   mediaId: string,
+  deps: UpdateMediaServerMetadataDeps,
 ): Promise<ServerUpdateResult> {
   const result: ServerUpdateResult = { jellyfin: false, plex: false };
 
@@ -61,13 +60,13 @@ export async function updateMediaServerMetadata(
 
   for (const version of versions) {
     // ── Jellyfin ──────────────────────────────────────────────────────────
-    // `applyJellyfinRemoteMatch` runs RemoteSearch → RemoteSearch/Apply,
-    // which is what the Jellyfin web UI does when a user picks a match in
-    // the "Identify…" dialog. No more patch-POST or ReplaceAllMetadata
-    // refresh (which used to actively undo the fix).
+    // `applyRemoteMatch` runs RemoteSearch → RemoteSearch/Apply, which is
+    // what the Jellyfin web UI does when a user picks a match in the
+    // "Identify…" dialog. No more patch-POST or ReplaceAllMetadata refresh
+    // (which used to actively undo the fix).
     if (version.source === "jellyfin" && jellyfinEnabled && jellyfinUrl && jellyfinKey) {
       try {
-        await applyJellyfinRemoteMatch(
+        await deps.jellyfin.applyRemoteMatch(
           jellyfinUrl,
           jellyfinKey,
           version.serverItemId,
@@ -75,7 +74,7 @@ export async function updateMediaServerMetadata(
           mediaRow.externalId,
         );
 
-        const updated = await getJellyfinItem(
+        const updated = await deps.jellyfin.getItem(
           jellyfinUrl,
           jellyfinKey,
           version.serverItemId,
@@ -99,7 +98,7 @@ export async function updateMediaServerMetadata(
     }
 
     // ── Plex ──────────────────────────────────────────────────────────────
-    // `matchPlexItem` hits `/library/metadata/:id/match` with the legacy
+    // `matchItem` hits `/library/metadata/:id/match` with the legacy
     // themoviedb guid (`com.plexapp.agents.themoviedb://<id>?lang=en`),
     // which modern Plex still accepts across both legacy and the new
     // tv.plex.agents.movie/show agents. Then we lock the core fields so a
@@ -108,16 +107,16 @@ export async function updateMediaServerMetadata(
       try {
         // Plex match-by-name uses the canonical en-US title.
         const enLoc = await findMediaLocalized(db, mediaRow.id, "en-US");
-        await matchPlexItem(
+        await deps.plex.matchItem(
           plexUrl,
           plexToken,
           version.serverItemId,
           mediaRow.externalId,
           { name: enLoc?.title ?? "" },
         );
-        await lockPlexFields(plexUrl, plexToken, version.serverItemId, plexType);
+        await deps.plex.lockFields(plexUrl, plexToken, version.serverItemId, plexType);
 
-        const updated = await getPlexItem(plexUrl, plexToken, version.serverItemId);
+        const updated = await deps.plex.getItem(plexUrl, plexToken, version.serverItemId);
         if (updated) {
           await updateMediaVersion(db, version.id, {
             serverItemTitle: updated.title,

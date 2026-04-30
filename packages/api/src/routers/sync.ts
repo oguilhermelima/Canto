@@ -26,6 +26,9 @@ import { discoverServerLibraries } from "@canto/core/domain/media-servers/use-ca
 import { updateMediaServerMetadata } from "@canto/core/domain/media-servers/use-cases/update-metadata";
 import { getMediaAvailability } from "@canto/core/domain/media/services/media-availability-service";
 import { listMediaVersionGroups } from "@canto/core/domain/media-servers/services/media-version-groups-service";
+import { makeJellyfinAdapter } from "@canto/core/infra/media-servers/jellyfin.adapter-bindings";
+import { makePlexAdapter } from "@canto/core/infra/media-servers/plex.adapter-bindings";
+import { makeUserConnectionRepository } from "@canto/core/infra/media-servers/user-connection-repository.adapter";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 
 /* -------------------------------------------------------------------------- */
@@ -139,7 +142,10 @@ export const syncRouter = createTRPCRouter({
 
       const mutated = result as { mediaId: string; suggestedName: string };
       if (input.updateMediaServer && mutated.mediaId) {
-        await updateMediaServerMetadata(ctx.db, mutated.mediaId).catch(
+        await updateMediaServerMetadata(ctx.db, mutated.mediaId, {
+          plex: makePlexAdapter(),
+          jellyfin: makeJellyfinAdapter(),
+        }).catch(
           logAndSwallow("sync.resolveMediaVersion:updateMediaServerMetadata"),
         );
       }
@@ -199,5 +205,16 @@ export const syncRouter = createTRPCRouter({
 
   discoverServerLibraries: protectedProcedure
     .input(discoverServerLibrariesInput)
-    .query(({ ctx, input }) => discoverServerLibraries(ctx.db, input.serverType, ctx.session.user.id)),
+    .query(({ ctx, input }) =>
+      discoverServerLibraries(
+        ctx.db,
+        input.serverType,
+        {
+          repo: makeUserConnectionRepository(ctx.db),
+          plex: makePlexAdapter(),
+          jellyfin: makeJellyfinAdapter(),
+        },
+        ctx.session.user.id,
+      ),
+    ),
 });

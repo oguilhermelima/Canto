@@ -4,13 +4,9 @@
 
 import type { Database } from "@canto/db/client";
 import { getSetting, getSettings } from "@canto/db/settings";
-import { findAllServerLinks } from "../../../infra/repositories";
-import {
-  triggerJellyfinScan,
-  findJellyfinMoviesByProviderId,
-  mergeJellyfinVersions,
-} from "../../../infra/media-servers/jellyfin.adapter";
-import { scanPlexLibrary } from "../../../infra/media-servers/plex.adapter";
+import type { JellyfinAdapterPort } from "@canto/core/domain/media-servers/ports/jellyfin-adapter.port";
+import type { PlexAdapterPort } from "@canto/core/domain/media-servers/ports/plex-adapter.port";
+import { findAllServerLinks } from "@canto/core/infra/repositories";
 
 export interface ImportedMedia {
   id: string;
@@ -20,6 +16,11 @@ export interface ImportedMedia {
   provider: string;
   /** Number of imported media_file rows Canto has for this media. */
   mediaFileCount: number;
+}
+
+export interface TriggerMediaServerScansDeps {
+  plex: PlexAdapterPort;
+  jellyfin: JellyfinAdapterPort;
 }
 
 async function isAutoMergeEnabled(): Promise<boolean> {
@@ -34,6 +35,7 @@ async function isAutoMergeEnabled(): Promise<boolean> {
  * async so we can't assume the items exist the moment we trigger the scan.
  */
 async function tryJellyfinAutoMergeForMedia(
+  jellyfin: JellyfinAdapterPort,
   url: string,
   apiKey: string,
   media: ImportedMedia,
@@ -43,14 +45,16 @@ async function tryJellyfinAutoMergeForMedia(
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     await new Promise((r) => setTimeout(r, DELAY_MS));
-    const items = await findJellyfinMoviesByProviderId(url, apiKey, media).catch(() => []);
+    const items = await jellyfin
+      .findMoviesByProviderId(url, apiKey, media)
+      .catch(() => []);
 
     if (items.length >= media.mediaFileCount) {
       if (items.length >= 2) {
         console.log(
           `[auto-merge] Merging ${items.length} Jellyfin items for "${media.title}"`,
         );
-        await mergeJellyfinVersions(url, apiKey, items.map((it) => it.id));
+        await jellyfin.mergeVersions(url, apiKey, items.map((it) => it.id));
       }
       return;
     }
@@ -62,6 +66,7 @@ async function tryJellyfinAutoMergeForMedia(
 
 export async function triggerMediaServerScans(
   db: Database,
+  deps: TriggerMediaServerScansDeps,
   importedMedias: ImportedMedia[] = [],
 ): Promise<void> {
   const links = await findAllServerLinks(db);
@@ -82,7 +87,7 @@ export async function triggerMediaServerScans(
   for (const link of links) {
     if (link.serverType === "jellyfin" && jellyfinUrl && jellyfinKey) {
       try {
-        await triggerJellyfinScan(
+        await deps.jellyfin.triggerScan(
           jellyfinUrl as string,
           jellyfinKey as string,
           link.serverLibraryId ?? undefined,
@@ -99,7 +104,7 @@ export async function triggerMediaServerScans(
 
     if (link.serverType === "plex" && plexUrl && plexToken) {
       try {
-        await scanPlexLibrary(
+        await deps.plex.scanLibrary(
           plexUrl as string,
           plexToken as string,
           link.serverLibraryId ? [link.serverLibraryId] : undefined,
@@ -121,6 +126,7 @@ export async function triggerMediaServerScans(
       );
       for (const media of candidates) {
         await tryJellyfinAutoMergeForMedia(
+          deps.jellyfin,
           jellyfinUrl as string,
           jellyfinKey as string,
           media,

@@ -3,13 +3,13 @@ import {
   fetchJellyfinShowEpisodesWithStreams,
   type JellyfinStreamItem,
   type JellyfinStreamMediaStream,
-} from "../../../../infra/media-servers/jellyfin.adapter";
+} from "@canto/core/infra/media-servers/jellyfin.adapter";
 import {
   dedupeLangs,
   normalizeLang,
   normalizeResolution,
   type MediaFileInfo,
-} from "./shared";
+} from "@canto/core/domain/media-servers/use-cases/fetch-info/shared";
 
 export function extractJellyfinFileInfo(item: JellyfinStreamItem): MediaFileInfo {
   const src = item.MediaSources?.[0];

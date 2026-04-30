@@ -14,7 +14,7 @@ import {
   type MediaKind,
   type ScannedMediaItem,
   type ScannedPlayback,
-} from "./types";
+} from "@canto/core/domain/sync/types";
 
 export interface JellyfinLibraryRef {
   /** Jellyfin library (ParentId) */

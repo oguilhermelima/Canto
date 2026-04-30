@@ -9,6 +9,8 @@ import {
   triggerMediaServerScans,
   type ImportedMedia,
 } from "@canto/core/domain/media-servers/use-cases/trigger-scans";
+import { makeJellyfinAdapter } from "@canto/core/infra/media-servers/jellyfin.adapter-bindings";
+import { makePlexAdapter } from "@canto/core/infra/media-servers/plex.adapter-bindings";
 import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
 import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
 import { buildIndexers } from "@canto/core/infra/indexers/indexer-factory";
@@ -168,6 +170,10 @@ export async function handleImportTorrents(): Promise<void> {
         mediaFileCount: importedCount,
       });
     }
-    await triggerMediaServerScans(db, importedMedias);
+    await triggerMediaServerScans(
+      db,
+      { plex: makePlexAdapter(), jellyfin: makeJellyfinAdapter() },
+      importedMedias,
+    );
   }
 }

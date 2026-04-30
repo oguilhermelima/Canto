@@ -3,8 +3,8 @@ import type { Database } from "@canto/db/client";
 import {
   findServerLink,
   upsertServerLink,
-} from "../../../../infra/repositories";
-import { autoElectDefault } from "../shared/sync-helpers";
+} from "@canto/core/infra/repositories";
+import { autoElectDefault } from "@canto/core/domain/media-servers/use-cases/shared/sync-helpers";
 
 type JellyfinFolder = { Id: string; Name: string; CollectionType: string; Locations: string[] };
 

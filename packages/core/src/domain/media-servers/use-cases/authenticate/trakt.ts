@@ -1,4 +1,4 @@
-import type { Database } from "@canto/db/client";
+import type { UserConnectionRepositoryPort } from "@canto/core/domain/media-servers/ports/user-connection-repository.port";
 import {
   createTraktDeviceCode,
   exchangeTraktDeviceCode,
@@ -7,12 +7,7 @@ import {
   TraktHttpError,
   validateTraktClientCredentials,
   type TraktDeviceCodeResponse,
-} from "../../../../infra/trakt/trakt-shim";
-import {
-  createUserConnection,
-  findUserConnectionByProvider,
-  updateUserConnection,
-} from "../../../../infra/media-servers/user-connection-repository";
+} from "@canto/core/infra/trakt/trakt-shim";
 
 export interface TraktAuthResult {
   success: boolean;
@@ -72,6 +67,7 @@ export type TraktDeviceAuthCheckResult =
   | { authenticated: false; pending: false; expired: true };
 
 export interface CompleteTraktDeviceAuthDeps {
+  repo: UserConnectionRepositoryPort;
   dispatchUserTraktSync: (userId: string) => Promise<boolean> | Promise<void>;
 }
 
@@ -82,7 +78,6 @@ export interface CompleteTraktDeviceAuthDeps {
  * transport error.
  */
 export async function completeTraktDeviceAuth(
-  db: Database,
   userId: string,
   deviceCode: string,
   deps: CompleteTraktDeviceAuthDeps,
@@ -96,9 +91,9 @@ export async function completeTraktDeviceAuth(
       (tokenData.created_at + tokenData.expires_in) * 1000,
     );
 
-    const existing = await findUserConnectionByProvider(db, userId, "trakt");
+    const existing = await deps.repo.findByProvider(userId, "trakt");
     if (existing) {
-      await updateUserConnection(db, existing.id, {
+      await deps.repo.update(existing.id, {
         token: tokenData.access_token,
         refreshToken: tokenData.refresh_token,
         tokenExpiresAt: expiresAt,
@@ -106,7 +101,7 @@ export async function completeTraktDeviceAuth(
         staleReason: null,
       });
     } else {
-      await createUserConnection(db, {
+      await deps.repo.create({
         userId,
         provider: "trakt",
         token: tokenData.access_token,

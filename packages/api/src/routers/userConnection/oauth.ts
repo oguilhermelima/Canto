@@ -1,6 +1,4 @@
 import { TRPCError } from "@trpc/server";
-import { eq, and } from "drizzle-orm";
-import { userConnection } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
 import { traktDeviceCheckInput, checkPlexPinInput } from "@canto/validators";
 import {
@@ -10,57 +8,52 @@ import {
   startTraktDeviceAuth,
 } from "@canto/core/domain/media-servers/use-cases/authenticate";
 import { TraktConfigurationError, TraktHttpError } from "@canto/core/infra/trakt/trakt-shim";
+import { makePlexAdapter } from "@canto/core/infra/media-servers/plex.adapter-bindings";
+import { makeUserConnectionRepository } from "@canto/core/infra/media-servers/user-connection-repository.adapter";
 import { dispatchUserTraktSync } from "@canto/core/platform/queue/bullmq-dispatcher";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { setupLibrariesForConnection } from "./setup";
 
 export const oauthRouter = createTRPCRouter({
-  plexPinCreate: protectedProcedure.mutation(() => createPlexPin()),
+  plexPinCreate: protectedProcedure.mutation(() =>
+    createPlexPin({ plex: makePlexAdapter() }),
+  ),
 
   plexPinCheck: protectedProcedure
     .input(checkPlexPinInput)
     .query(async ({ ctx, input }) => {
+      const repo = makeUserConnectionRepository(ctx.db);
+      const plex = makePlexAdapter();
+
       const serverUrl = input.serverUrl ?? (await getSetting("plex.url")) ?? undefined;
-      const result = await checkPlexPin({
-        pinId: input.pinId,
-        clientId: input.clientId,
-        serverUrl,
-      });
+      const result = await checkPlexPin(
+        {
+          pinId: input.pinId,
+          clientId: input.clientId,
+          serverUrl,
+        },
+        { plex },
+      );
 
       if (result.authenticated && result.token) {
-        const [existing] = await ctx.db
-          .select()
-          .from(userConnection)
-          .where(
-            and(
-              eq(userConnection.userId, ctx.session.user.id),
-              eq(userConnection.provider, "plex"),
-            ),
-          );
+        const existing = await repo.findByProvider(ctx.session.user.id, "plex");
 
         let connectionId: string;
 
         if (existing) {
-          await ctx.db
-            .update(userConnection)
-            .set({
-              token: result.token,
-              externalUserId: result.userId ?? existing.externalUserId,
-              updatedAt: new Date(),
-            })
-            .where(eq(userConnection.id, existing.id));
+          await repo.update(existing.id, {
+            token: result.token,
+            externalUserId: result.userId ?? existing.externalUserId,
+          });
           connectionId = existing.id;
         } else {
-          const [inserted] = await ctx.db
-            .insert(userConnection)
-            .values({
-              userId: ctx.session.user.id,
-              provider: "plex",
-              token: result.token,
-              externalUserId: result.userId ?? "unknown",
-            })
-            .returning({ id: userConnection.id });
-          connectionId = inserted!.id;
+          const inserted = await repo.create({
+            userId: ctx.session.user.id,
+            provider: "plex",
+            token: result.token,
+            externalUserId: result.userId ?? "unknown",
+          });
+          connectionId = inserted.id;
         }
 
         void setupLibrariesForConnection(ctx.db, ctx.session.user.id, "plex", connectionId);
@@ -87,9 +80,14 @@ export const oauthRouter = createTRPCRouter({
     .input(traktDeviceCheckInput)
     .query(async ({ ctx, input }) => {
       try {
-        return await completeTraktDeviceAuth(ctx.db, ctx.session.user.id, input.deviceCode, {
-          dispatchUserTraktSync,
-        });
+        return await completeTraktDeviceAuth(
+          ctx.session.user.id,
+          input.deviceCode,
+          {
+            repo: makeUserConnectionRepository(ctx.db),
+            dispatchUserTraktSync,
+          },
+        );
       } catch (err) {
         if (err instanceof TraktConfigurationError) {
           throw new TRPCError({ code: "BAD_REQUEST", message: err.message });

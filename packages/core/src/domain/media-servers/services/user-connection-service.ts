@@ -1,20 +1,14 @@
-import type { Database } from "@canto/db/client";
-import { getJellyfinCredentials, getPlexCredentials } from "../../../platform/secrets/server-credentials";
+import type { JellyfinAdapterPort } from "@canto/core/domain/media-servers/ports/jellyfin-adapter.port";
+import type { PlexAdapterPort } from "@canto/core/domain/media-servers/ports/plex-adapter.port";
+import type { UserConnectionRepositoryPort } from "@canto/core/domain/media-servers/ports/user-connection-repository.port";
+import type {
+  ConnectionKind,
+  UserConnection,
+} from "@canto/core/domain/media-servers/types/user-connection";
 import {
-  authenticateJellyfinByName,
-  getJellyfinCurrentUserId,
-  getJellyfinLibraryFolders,
-} from "../../../infra/media-servers/jellyfin.adapter";
-import {
-  authenticatePlexServerToken,
-  getPlexSections,
-} from "../../../infra/media-servers/plex.adapter";
-import {
-  createUserConnection,
-  findUserConnectionsByUserId,
-  findUserConnectionByProvider,
-  updateUserConnection,
-} from "../../../infra/media-servers/user-connection-repository";
+  getJellyfinCredentials,
+  getPlexCredentials,
+} from "@canto/core/platform/secrets/server-credentials";
 
 export interface UserConnectionAuthResult {
   success: boolean;
@@ -36,17 +30,20 @@ export class ServerNotConfiguredError extends Error {
  * Authenticate a per-user Plex token against the admin-configured Plex
  * server and return identity + the libraries they can see.
  */
-export async function authenticatePlexUser(token: string): Promise<UserConnectionAuthResult> {
+export async function authenticatePlexUser(
+  token: string,
+  deps: { plex: PlexAdapterPort },
+): Promise<UserConnectionAuthResult> {
   const creds = await getPlexCredentials();
   if (!creds) throw new ServerNotConfiguredError("plex");
 
   try {
-    const auth = await authenticatePlexServerToken(creds.url, token);
+    const auth = await deps.plex.authenticateServerToken(creds.url, token);
     if (!auth.ok) {
       return { success: false, error: "Invalid Plex token or cannot reach server" };
     }
 
-    const sections = await getPlexSections(creds.url, token);
+    const sections = await deps.plex.getSections(creds.url, token);
     const accessibleLibraries = sections.map((s) => s.key);
 
     return {
@@ -69,6 +66,7 @@ export async function authenticatePlexUser(token: string): Promise<UserConnectio
  */
 export async function authenticateJellyfinUser(
   input: { token: string } | { username: string; password: string },
+  deps: { jellyfin: JellyfinAdapterPort },
 ): Promise<UserConnectionAuthResult> {
   const creds = await getJellyfinCredentials();
   if (!creds) throw new ServerNotConfiguredError("jellyfin");
@@ -79,11 +77,15 @@ export async function authenticateJellyfinUser(
 
     if ("token" in input) {
       token = input.token;
-      const userId = await getJellyfinCurrentUserId(creds.url, token);
+      const userId = await deps.jellyfin.getCurrentUserId(creds.url, token);
       if (!userId) return { success: false, error: "Invalid Jellyfin token" };
       externalUserId = userId;
     } else {
-      const auth = await authenticateJellyfinByName(creds.url, input.username, input.password);
+      const auth = await deps.jellyfin.authenticateByName(
+        creds.url,
+        input.username,
+        input.password,
+      );
       if (!auth.ok) {
         if (auth.status === 401) {
           return { success: false, error: "Invalid username or password" };
@@ -94,7 +96,7 @@ export async function authenticateJellyfinUser(
       externalUserId = auth.userId;
     }
 
-    const libraries = await getJellyfinLibraryFolders(creds.url, token);
+    const libraries = await deps.jellyfin.getLibraryFolders(creds.url, token);
     const accessibleLibraries = libraries.map((l) => l.Id);
 
     return {
@@ -111,37 +113,40 @@ export async function authenticateJellyfinUser(
   }
 }
 
-export function listUserConnections(db: Database, userId: string) {
-  return findUserConnectionsByUserId(db, userId);
+export function listUserConnections(
+  userId: string,
+  deps: { repo: UserConnectionRepositoryPort },
+): Promise<UserConnection[]> {
+  return deps.repo.findByUserId(userId);
 }
 
 export async function addOrUpdateUserConnection(
-  db: Database,
   userId: string,
   authResult: UserConnectionAuthResult,
-  provider: "plex" | "jellyfin" | "trakt",
-) {
+  provider: ConnectionKind,
+  deps: { repo: UserConnectionRepositoryPort },
+): Promise<UserConnection | undefined> {
   if (!authResult.success || !authResult.token || !authResult.externalUserId) {
     throw new Error("Cannot add connection without successful authentication");
   }
 
-  const existing = await findUserConnectionByProvider(db, userId, provider);
+  const existing = await deps.repo.findByProvider(userId, provider);
 
   if (existing) {
-    return updateUserConnection(db, existing.id, {
+    return deps.repo.update(existing.id, {
       token: authResult.token,
       externalUserId: authResult.externalUserId,
-      accessibleLibraries: authResult.accessibleLibraries,
+      accessibleLibraries: authResult.accessibleLibraries ?? null,
       enabled: true,
     });
   }
 
-  return createUserConnection(db, {
+  return deps.repo.create({
     userId,
     provider,
     token: authResult.token,
     externalUserId: authResult.externalUserId,
-    accessibleLibraries: authResult.accessibleLibraries,
+    accessibleLibraries: authResult.accessibleLibraries ?? null,
     enabled: true,
   });
 }

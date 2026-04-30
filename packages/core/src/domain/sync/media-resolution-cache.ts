@@ -19,7 +19,7 @@
 import { and, eq, inArray, or } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { episode, media, mediaVersion, season } from "@canto/db/schema";
-import type { ServerSource } from "./types";
+import type { ServerSource } from "@canto/core/domain/sync/types";
 
 /* -------------------------------------------------------------------------- */
 /*  Anchor cache (used by sync-pipeline)                                       */

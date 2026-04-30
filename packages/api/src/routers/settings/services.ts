@@ -28,6 +28,8 @@ import {
   createPlexPin,
   checkPlexPin,
 } from "@canto/core/domain/media-servers/use-cases/authenticate";
+import { makeJellyfinAdapter } from "@canto/core/infra/media-servers/jellyfin.adapter-bindings";
+import { makePlexAdapter } from "@canto/core/infra/media-servers/plex.adapter-bindings";
 
 const ALL_SERVICES = serviceEnum.options;
 
@@ -124,11 +126,15 @@ export const settingsServicesRouter = createTRPCRouter({
 
   authenticateJellyfin: setupOrAdminProcedure
     .input(authenticateJellyfinInput)
-    .mutation(({ input }) => authenticateJellyfin(input)),
+    .mutation(({ input }) =>
+      authenticateJellyfin(input, { jellyfin: makeJellyfinAdapter() }),
+    ),
 
   authenticatePlex: setupOrAdminProcedure
     .input(authenticatePlexInput)
-    .mutation(({ input }) => authenticatePlex(input)),
+    .mutation(({ input }) =>
+      authenticatePlex(input, { plex: makePlexAdapter() }),
+    ),
 
   authenticateTrakt: setupOrAdminProcedure
     .input(authenticateTraktInput)
@@ -136,11 +142,13 @@ export const settingsServicesRouter = createTRPCRouter({
 
   loginPlex: setupOrAdminProcedure
     .input(loginPlexInput)
-    .mutation(({ input }) => loginPlex(input)),
+    .mutation(({ input }) => loginPlex(input, { plex: makePlexAdapter() })),
 
-  plexPinCreate: setupOrAdminProcedure.mutation(() => createPlexPin()),
+  plexPinCreate: setupOrAdminProcedure.mutation(() =>
+    createPlexPin({ plex: makePlexAdapter() }),
+  ),
 
   plexPinCheck: setupOrAdminProcedure
     .input(checkPlexPinInput)
-    .query(({ input }) => checkPlexPin(input)),
+    .query(({ input }) => checkPlexPin(input, { plex: makePlexAdapter() })),
 });

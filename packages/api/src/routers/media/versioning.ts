@@ -25,6 +25,8 @@ import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter
 import { executeReorganizeMediaFiles } from "@canto/core/domain/file-organization/use-cases/reorganize-media-files";
 import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
 import { updateMediaServerMetadata } from "@canto/core/domain/media-servers/use-cases/update-metadata";
+import { makeJellyfinAdapter } from "@canto/core/infra/media-servers/jellyfin.adapter-bindings";
+import { makePlexAdapter } from "@canto/core/infra/media-servers/plex.adapter-bindings";
 
 export const mediaVersioningRouter = createTRPCRouter({
   previewProviderOverride: adminProcedure
@@ -76,7 +78,10 @@ export const mediaVersioningRouter = createTRPCRouter({
       }
 
       if (input.updateMediaServer) {
-        await updateMediaServerMetadata(ctx.db, input.id);
+        await updateMediaServerMetadata(ctx.db, input.id, {
+          plex: makePlexAdapter(),
+          jellyfin: makeJellyfinAdapter(),
+        });
       }
 
       return findMediaById(ctx.db, input.id);

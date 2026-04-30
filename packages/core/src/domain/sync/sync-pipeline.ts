@@ -8,13 +8,13 @@
 /* -------------------------------------------------------------------------- */
 
 import type { Database } from "@canto/db/client";
-import type { MediaProviderPort } from "../shared/ports/media-provider.port";
-import { persistMedia } from "../media/use-cases/persist";
-import { getActiveUserLanguages } from "../shared/services/user-service";
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import { persistMedia } from "@canto/core/domain/media/use-cases/persist";
+import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 import { getSetting, getSettings, setSettingRaw } from "@canto/db/settings";
 
-import { dispatchEnsureMedia } from "../../platform/queue/bullmq-dispatcher";
-import { logAndSwallow } from "../../platform/logger/log-error";
+import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 import {
   findMediaByAnyReference,
   updateMedia,
@@ -26,23 +26,30 @@ import {
   upsertMediaVersion,
   findAspectSucceededAt,
   type MediaVersionInsert,
-} from "../../infra/repositories";
-import { reconcileServerLibrary } from "../../infra/lists/list-repository";
+} from "@canto/core/infra/repositories";
+import { reconcileServerLibrary } from "@canto/core/infra/lists/list-repository";
 
-import { resolveExternalId, tmdbCall } from "../media/use-cases/resolve-external-id";
+import {
+  resolveExternalId,
+  tmdbCall,
+} from "@canto/core/domain/media/use-cases/resolve-external-id";
 import {
   fetchJellyfinMediaInfo,
   fetchPlexMediaInfo,
   type MediaFileInfo,
-} from "../media-servers/use-cases/fetch-info";
+} from "@canto/core/domain/media-servers/use-cases/fetch-info";
 
-import type { ScannedMediaItem, SyncResult, SyncSummary } from "./types";
-import { emptySummary } from "./types";
+import type {
+  ScannedMediaItem,
+  SyncResult,
+  SyncSummary,
+} from "@canto/core/domain/sync/types";
+import { emptySummary } from "@canto/core/domain/sync/types";
 import {
   createMediaAnchorCache,
   type MediaAnchorCache,
   type ResolvedMediaAnchor,
-} from "./media-resolution-cache";
+} from "@canto/core/domain/sync/media-resolution-cache";
 
 /* -------------------------------------------------------------------------- */
 /*  Constants                                                                  */

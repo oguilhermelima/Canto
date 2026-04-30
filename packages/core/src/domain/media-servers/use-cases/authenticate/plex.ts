@@ -1,16 +1,8 @@
 import { randomUUID } from "crypto";
 import { getSetting, setSetting } from "@canto/db/settings";
-import { validateServiceUrl } from "../../rules/validate-service-url";
-import {
-  authenticatePlexServerToken,
-  checkPlexTvPin,
-  createPlexTvPin,
-  getPlexTvServerResource,
-  getPlexTvUser,
-  plexTvSignIn,
-  testPlexConnection,
-} from "../../../../infra/media-servers/plex.adapter";
-import { fetchError } from "./shared";
+import type { PlexAdapterPort } from "@canto/core/domain/media-servers/ports/plex-adapter.port";
+import { validateServiceUrl } from "@canto/core/domain/media-servers/rules/validate-service-url";
+import { fetchError } from "@canto/core/domain/media-servers/use-cases/authenticate/shared";
 
 async function getOrCreatePlexClientId(): Promise<string> {
   const existing = await getSetting("plex.clientId");
@@ -30,15 +22,19 @@ export interface PlexAuthResult {
   userId?: string;
 }
 
+export interface PlexAuthDeps {
+  plex: PlexAdapterPort;
+}
+
 /** Authenticate against a Plex server using an existing token. */
-export async function authenticatePlex(input: {
-  url: string;
-  token: string;
-}): Promise<PlexAuthResult> {
+export async function authenticatePlex(
+  input: { url: string; token: string },
+  deps: PlexAuthDeps,
+): Promise<PlexAuthResult> {
   const baseUrl = input.url.replace(/\/$/, "");
   try {
     validateServiceUrl(baseUrl);
-    const res = await authenticatePlexServerToken(baseUrl, input.token);
+    const res = await deps.plex.authenticateServerToken(baseUrl, input.token);
     if (!res.ok) {
       if (res.status === 401) return { success: false, error: "Invalid token" };
       return { success: false, error: `HTTP ${res.status}` };
@@ -63,16 +59,15 @@ export async function authenticatePlex(input: {
 }
 
 /** Authenticate via plex.tv with email + password, then validate the server. */
-export async function loginPlex(input: {
-  url: string;
-  email: string;
-  password: string;
-}): Promise<PlexAuthResult> {
+export async function loginPlex(
+  input: { url: string; email: string; password: string },
+  deps: PlexAuthDeps,
+): Promise<PlexAuthResult> {
   const baseUrl = input.url.replace(/\/$/, "");
   try {
     validateServiceUrl(baseUrl);
 
-    const signIn = await plexTvSignIn(input.email, input.password);
+    const signIn = await deps.plex.plexTvSignIn(input.email, input.password);
     if (!signIn.ok) {
       if (signIn.status === 401) {
         return { success: false, error: "Invalid email or password" };
@@ -80,7 +75,7 @@ export async function loginPlex(input: {
       return { success: false, error: `plex.tv returned HTTP ${signIn.status}` };
     }
 
-    const server = await authenticatePlexServerToken(baseUrl, signIn.token);
+    const server = await deps.plex.authenticateServerToken(baseUrl, signIn.token);
     if (!server.ok) {
       return {
         success: false,
@@ -109,22 +104,21 @@ export async function loginPlex(input: {
 }
 
 /** Create a PIN for the Plex OAuth flow. */
-export async function createPlexPin(): Promise<{
+export async function createPlexPin(deps: PlexAuthDeps): Promise<{
   pinId: number;
   pinCode: string;
   clientId: string;
 }> {
   const clientId = await getOrCreatePlexClientId();
-  const { id, code } = await createPlexTvPin(clientId);
+  const { id, code } = await deps.plex.createPin(clientId);
   return { pinId: id, pinCode: code, clientId };
 }
 
 /** Poll a Plex PIN and (once claimed) resolve identity + server info. */
-export async function checkPlexPin(input: {
-  pinId: number;
-  clientId: string;
-  serverUrl?: string;
-}): Promise<{
+export async function checkPlexPin(
+  input: { pinId: number; clientId: string; serverUrl?: string },
+  deps: PlexAuthDeps,
+): Promise<{
   authenticated: boolean;
   expired?: boolean;
   token?: string;
@@ -135,24 +129,27 @@ export async function checkPlexPin(input: {
 }> {
   if (input.serverUrl) validateServiceUrl(input.serverUrl);
 
-  const pin = await checkPlexTvPin(input.clientId, input.pinId);
+  const pin = await deps.plex.checkPin(input.clientId, input.pinId);
   if (!pin.authenticated) {
     return { authenticated: false, expired: pin.expired };
   }
   const token = pin.token;
 
-  const identity = await getPlexTvUser(input.clientId, token);
+  const identity = await deps.plex.getTvUser(input.clientId, token);
 
   let serverName: string | undefined;
   let machineId: string | undefined;
 
   if (input.serverUrl) {
     try {
-      const info = await testPlexConnection(input.serverUrl, token);
+      const info = await deps.plex.testConnection(input.serverUrl, token);
       serverName = info.serverName;
-      // testPlexConnection returns version, not machineId — pull machineId
-      // via the dedicated token flow.
-      const serverAuth = await authenticatePlexServerToken(input.serverUrl, token);
+      // testConnection returns version, not machineId — pull machineId via
+      // the dedicated token flow.
+      const serverAuth = await deps.plex.authenticateServerToken(
+        input.serverUrl,
+        token,
+      );
       if (serverAuth.ok) {
         machineId = serverAuth.machineId;
       }
@@ -160,7 +157,7 @@ export async function checkPlexPin(input: {
       /* Server not reachable */
     }
   } else {
-    const resource = await getPlexTvServerResource(input.clientId, token);
+    const resource = await deps.plex.getTvServerResource(input.clientId, token);
     if (resource) {
       serverName = resource.serverName;
       machineId = resource.machineId;

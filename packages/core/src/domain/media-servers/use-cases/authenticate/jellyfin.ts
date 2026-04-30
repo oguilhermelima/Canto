@@ -1,12 +1,6 @@
-import { validateServiceUrl } from "../../rules/validate-service-url";
-import {
-  authenticateJellyfinByName,
-  createJellyfinApiKey,
-  findJellyfinApiKey,
-  pingJellyfinPublic,
-  testJellyfinConnection,
-} from "../../../../infra/media-servers/jellyfin.adapter";
-import { fetchError } from "./shared";
+import type { JellyfinAdapterPort } from "@canto/core/domain/media-servers/ports/jellyfin-adapter.port";
+import { validateServiceUrl } from "@canto/core/domain/media-servers/rules/validate-service-url";
+import { fetchError } from "@canto/core/domain/media-servers/use-cases/authenticate/shared";
 
 export interface JellyfinAuthResult {
   success: boolean;
@@ -17,21 +11,24 @@ export interface JellyfinAuthResult {
   user?: string;
 }
 
+export interface JellyfinAuthDeps {
+  jellyfin: JellyfinAdapterPort;
+}
+
 /**
  * Authenticate with Jellyfin using username/password, then upgrade to a
  * persistent Canto API key when possible. Returns auth fields suitable for
  * persisting; caller handles error → HTTP mapping.
  */
-export async function authenticateJellyfin(input: {
-  url: string;
-  username: string;
-  password: string;
-}): Promise<JellyfinAuthResult> {
+export async function authenticateJellyfin(
+  input: { url: string; username: string; password: string },
+  deps: JellyfinAuthDeps,
+): Promise<JellyfinAuthResult> {
   const baseUrl = input.url.replace(/\/$/, "");
   try {
     validateServiceUrl(baseUrl);
 
-    const ping = await pingJellyfinPublic(baseUrl);
+    const ping = await deps.jellyfin.pingPublic(baseUrl);
     if (!ping.ok) {
       return {
         success: false,
@@ -42,7 +39,11 @@ export async function authenticateJellyfin(input: {
       };
     }
 
-    const auth = await authenticateJellyfinByName(baseUrl, input.username, input.password);
+    const auth = await deps.jellyfin.authenticateByName(
+      baseUrl,
+      input.username,
+      input.password,
+    );
     if (!auth.ok) {
       if (auth.status === 401) {
         return { success: false, error: "Invalid username or password" };
@@ -51,14 +52,14 @@ export async function authenticateJellyfin(input: {
     }
 
     let apiKey = auth.accessToken;
-    if (await createJellyfinApiKey(baseUrl, auth.accessToken)) {
-      const stored = await findJellyfinApiKey(baseUrl, auth.accessToken);
+    if (await deps.jellyfin.createApiKey(baseUrl, auth.accessToken)) {
+      const stored = await deps.jellyfin.findApiKey(baseUrl, auth.accessToken);
       if (stored) apiKey = stored;
     }
 
     let serverName = "";
     try {
-      const info = await testJellyfinConnection(baseUrl, apiKey);
+      const info = await deps.jellyfin.testConnection(baseUrl, apiKey);
       serverName = info.serverName;
     } catch {
       /* Non-critical: server info lookup failed, fall back to empty name */
