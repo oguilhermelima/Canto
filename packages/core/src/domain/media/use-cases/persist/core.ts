@@ -660,10 +660,20 @@ export async function resolveMedia(
 
   if (existing && metadataSucceededAt && extrasSucceededAt) {
     const { language: lang, watchRegion } = await getUserWatchPreferences(db, userId);
-    const localized = await applyMediaLocalizationOverlay(db, existing, lang);
+    const localized = await applyMediaLocalizationOverlay(existing, lang, {
+      localization: deps.localization,
+    });
     const withRating = await applyMediaContentRating(db, localized, watchRegion);
     const finalMedia = withRating.seasons && withRating.seasons.length > 0
-      ? { ...withRating, seasons: await applySeasonsLocalizationOverlay(db, existing.id, withRating.seasons, lang) }
+      ? {
+          ...withRating,
+          seasons: await applySeasonsLocalizationOverlay(
+            existing.id,
+            withRating.seasons,
+            lang,
+            { localization: deps.localization },
+          ),
+        }
       : withRating;
     const extras = await loadExtrasFromDB(db, existing.id, lang, {
       extras: deps.extras,
@@ -695,10 +705,20 @@ export async function resolveMedia(
   const persisted = await findMediaByIdWithSeasons(db, mediaId);
   if (persisted) {
     const { language: lang, watchRegion } = await getUserWatchPreferences(db, userId);
-    const localized = await applyMediaLocalizationOverlay(db, persisted, lang);
+    const localized = await applyMediaLocalizationOverlay(persisted, lang, {
+      localization: deps.localization,
+    });
     const withRating = await applyMediaContentRating(db, localized, watchRegion);
     const finalMedia = withRating.seasons && withRating.seasons.length > 0
-      ? { ...withRating, seasons: await applySeasonsLocalizationOverlay(db, persisted.id, withRating.seasons, lang) }
+      ? {
+          ...withRating,
+          seasons: await applySeasonsLocalizationOverlay(
+            persisted.id,
+            withRating.seasons,
+            lang,
+            { localization: deps.localization },
+          ),
+        }
       : withRating;
     const extras = await loadExtrasFromDB(db, persisted.id, lang, {
       extras: deps.extras,

@@ -13,7 +13,8 @@ import {
   findMediaLocalizedByExternal,
   findMediaLocalizedByExternalMany,
   findMediaLocalizedMany,
-} from "../../../infra/media/media-localized-repository";
+} from "@canto/core/infra/media/media-localized-repository";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type {
   EpisodeLocalizationPayload,
   LocalizationSource,
@@ -22,9 +23,19 @@ import type {
   LocalizedSeason,
   MediaLocalizationPayload,
   SeasonLocalizationPayload,
-} from "./types";
+} from "@canto/core/domain/shared/localization/types";
 
 const EN = "en-US";
+
+/**
+ * Deps bag every overlay helper accepts. Wave 9C2 routed the overlay reads
+ * through the localization port — callers either build it once at the entry
+ * edge via `makeMediaLocalizationRepository(db)` or thread it down through
+ * a higher-level deps interface (`PersistDeps.localization` etc).
+ */
+export interface LocalizationOverlayDeps {
+  localization: MediaLocalizationRepositoryPort;
+}
 
 export async function resolveLocalizedMedia(
   db: Database,
@@ -319,9 +330,9 @@ export interface OverlayableSeason {
  * unpersisted media), the original row is returned unchanged.
  */
 export async function applyMediaLocalizationOverlay<T extends OverlayableMedia>(
-  db: Database,
   row: T,
   language: string,
+  deps: LocalizationOverlayDeps,
 ): Promise<T & {
   title: string;
   overview: string | null;
@@ -329,7 +340,7 @@ export async function applyMediaLocalizationOverlay<T extends OverlayableMedia>(
   posterPath: string | null;
   logoPath: string | null;
 }> {
-  const loc = await findMediaLocalized(db, row.id, language);
+  const loc = await deps.localization.findLocalizedById(row.id, language);
   const overlay = loc
     ? {
         title: loc.title,
@@ -375,7 +386,7 @@ export interface OverlayableMediaItem {
  */
 export async function applyMediaItemsLocalizationOverlay<
   T extends OverlayableMediaItem,
->(db: Database, items: T[], language: string): Promise<T[]> {
+>(items: T[], language: string, deps: LocalizationOverlayDeps): Promise<T[]> {
   if (items.length === 0) return items;
 
   const ids = items
@@ -397,10 +408,12 @@ export async function applyMediaItemsLocalizationOverlay<
     }));
 
   const [byId, byExternal] = await Promise.all([
-    ids.length > 0 ? findMediaLocalizedMany(db, ids, language) : Promise.resolve([]),
+    ids.length > 0
+      ? deps.localization.findLocalizedManyByIds(ids, language)
+      : Promise.resolve([] as LocalizedMedia[]),
     externalRefs.length > 0
-      ? findMediaLocalizedByExternalMany(db, externalRefs, language)
-      : Promise.resolve([]),
+      ? deps.localization.findLocalizedManyByExternal(externalRefs, language)
+      : Promise.resolve([] as LocalizedMedia[]),
   ]);
 
   const locById = new Map(byId.map((l) => [l.id, l]));
@@ -459,17 +472,19 @@ export async function applySeasonsLocalizationOverlay<
   E extends OverlayableEpisode,
   S extends OverlayableSeason & { episodes: E[] },
 >(
-  db: Database,
   mediaId: string,
   seasons: S[],
   language: string,
+  deps: LocalizationOverlayDeps,
 ): Promise<S[]> {
   if (seasons.length === 0) return seasons;
 
   const [localizedSeasons, episodeLocsPerSeason] = await Promise.all([
-    resolveLocalizedSeasons(db, mediaId, language),
+    deps.localization.findLocalizedSeasonsByMedia(mediaId, language),
     Promise.all(
-      seasons.map((s) => resolveLocalizedEpisodes(db, s.id, language)),
+      seasons.map((s) =>
+        deps.localization.findLocalizedEpisodesBySeason(s.id, language),
+      ),
     ),
   ]);
 

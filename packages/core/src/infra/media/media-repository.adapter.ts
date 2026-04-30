@@ -1,16 +1,20 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { episode, media, mediaFile, season } from "@canto/db/schema";
+import type { MediaType } from "@canto/core/domain/media/types/media";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import {
   deleteMedia as deleteMediaInfra,
+  findDownloadedLibraryMedia as findDownloadedLibraryMediaInfra,
   findEpisodeIdByMediaAndNumbers as findEpisodeIdByMediaAndNumbersInfra,
   findEpisodeNumbersById as findEpisodeNumbersByIdInfra,
   findMediaByAnyReference as findMediaByAnyReferenceInfra,
   findMediaByExternalId as findMediaByExternalIdInfra,
   findMediaById as findMediaByIdInfra,
   findMediaByIdWithSeasons as findMediaByIdWithSeasonsInfra,
+  findMonitoredShowsForRss as findMonitoredShowsForRssInfra,
   isMediaOrphaned as isMediaOrphanedInfra,
+  listLibraryMedia as listLibraryMediaInfra,
   updateMedia as updateMediaInfra,
 } from "@canto/core/infra/media/media-repository";
 import {
@@ -155,6 +159,66 @@ export function makeMediaRepository(db: Database): MediaRepositoryPort {
         .from(media)
         .where(and(eq(media.inLibrary, true), eq(media.type, "show")));
       return rows.map((r) => r.id);
+    },
+
+    /**
+     * Wave 9C2: paginated + filtered library listing. Delegates to the
+     * existing infra helper which JOINs `media_localization` for the
+     * user-lang overlay; the port projection is shape-compatible.
+     */
+    listLibraryMedia: async (input, language, userId) => {
+      const result = await listLibraryMediaInfra(db, input, language, userId);
+      return {
+        ...result,
+        items: result.items.map((row) => ({
+          ...mediaToDomain(row),
+          title: row.title,
+          overview: row.overview,
+          posterPath: row.posterPath,
+          logoPath: row.logoPath,
+          tagline: row.tagline,
+        })),
+      };
+    },
+
+    findMonitoredShowsForRss: async () => {
+      const rows = await findMonitoredShowsForRssInfra(db);
+      return rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        externalId: r.externalId,
+        provider: r.provider,
+        type: r.type,
+        originCountry: r.originCountry,
+        originalLanguage: r.originalLanguage,
+        genres: r.genres,
+        genreIds: r.genreIds,
+      }));
+    },
+
+    findDownloadedLibraryMedia: async () => {
+      return findDownloadedLibraryMediaInfra(db);
+    },
+
+    findEligibleForEnrichment: async (filter) => {
+      const conditions: SQL[] = [];
+      if (filter.mediaIds && filter.mediaIds.length > 0) {
+        conditions.push(inArray(media.id, filter.mediaIds));
+      }
+      if (filter.type) conditions.push(eq(media.type, filter.type));
+      if (filter.hasTvdbId) conditions.push(isNotNull(media.tvdbId));
+      if (filter.onlyInLibrary) conditions.push(eq(media.inLibrary, true));
+
+      const rows = await db
+        .select({ id: media.id, type: media.type, tvdbId: media.tvdbId })
+        .from(media)
+        .where(conditions.length > 0 ? and(...conditions) : sql`TRUE`);
+
+      return rows.map((r) => ({
+        id: r.id,
+        type: r.type as MediaType,
+        tvdbId: r.tvdbId,
+      }));
     },
 
     // ─── Cross-context bridges ───

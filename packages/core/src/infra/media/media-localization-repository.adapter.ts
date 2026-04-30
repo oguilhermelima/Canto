@@ -1,10 +1,11 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import type { Database } from "@canto/db/client";
 import {
   episode,
   episodeLocalization,
+  media,
   mediaLocalization,
   season,
   seasonLocalization,
@@ -61,6 +62,63 @@ export function makeMediaLocalizationRepository(
 
     findLocalizedManyByExternal: (refs, language) =>
       findMediaLocalizedByExternalMany(db, refs, language),
+
+    // ─── Logo overlay (browse-time) ───
+    findLogoOverlayByExternalRefs: async (refs, language) => {
+      if (refs.length === 0) return [];
+      const isEn = language === EN;
+      const conditions = refs.map((r) =>
+        and(
+          eq(media.externalId, r.externalId),
+          eq(media.provider, r.provider),
+          eq(media.type, r.type),
+        ),
+      );
+
+      const flLocEn = alias(mediaLocalization, "fl_loc_en");
+
+      if (isEn) {
+        return db
+          .select({
+            id: media.id,
+            externalId: media.externalId,
+            type: media.type,
+            logoPath: flLocEn.logoPath,
+            translatedLogoPath: sql<string | null>`NULL`,
+          })
+          .from(media)
+          .leftJoin(
+            flLocEn,
+            and(eq(flLocEn.mediaId, media.id), eq(flLocEn.language, EN)),
+          )
+          .where(or(...conditions)!);
+      }
+
+      const flLocUser = alias(mediaLocalization, "fl_loc_user");
+      return db
+        .select({
+          id: media.id,
+          externalId: media.externalId,
+          type: media.type,
+          logoPath: sql<
+            string | null
+          >`COALESCE(${flLocUser.logoPath}, ${flLocEn.logoPath})`,
+          translatedLogoPath: flLocUser.logoPath,
+        })
+        .from(media)
+        .leftJoin(
+          flLocUser,
+          and(
+            eq(flLocUser.mediaId, media.id),
+            eq(flLocUser.language, language),
+          ),
+        )
+        .leftJoin(
+          flLocEn,
+          and(eq(flLocEn.mediaId, media.id), eq(flLocEn.language, EN)),
+        )
+        .where(or(...conditions)!);
+    },
 
     // ─── Reads (season / episode localization) ───
     findLocalizedSeasonsByMedia: (mediaId, language) =>

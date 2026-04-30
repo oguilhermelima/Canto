@@ -17,7 +17,6 @@ import {
   findFolderById,
   seedDefaultFolders,
 } from "@canto/core/infra/file-organization/folder-repository";
-import { listLibraryMedia } from "@canto/core/infra/media/media-repository";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 
 /* -------------------------------------------------------------------------- */
@@ -36,7 +35,11 @@ export const libraryRouter = createTRPCRouter({
    * for English-original media via COALESCE).
    */
   list: protectedProcedure.input(listInput).query(({ ctx, input }) =>
-    listLibraryMedia(ctx.db, input, ctx.session.user.language, ctx.session.user.id),
+    makeMediaRepository(ctx.db).listLibraryMedia(
+      input,
+      ctx.session.user.language,
+      ctx.session.user.id,
+    ),
   ),
 
   stats: protectedProcedure.query(({ ctx }) => makeMediaRepository(ctx.db).findLibraryStats()),

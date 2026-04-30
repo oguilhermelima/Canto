@@ -1,10 +1,14 @@
-import { and, eq, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { media } from "@canto/db/schema";
-import { detectGaps } from "./detect-gaps";
-import { getActiveUserLanguages } from "../../shared/services/user-service";
-import { dispatchEnsureMedia } from "../../../platform/queue/bullmq-dispatcher";
-import { ALL_ASPECTS, type Aspect, type EnsureMediaSpec } from "./ensure-media.types";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import { detectGaps } from "@canto/core/domain/media/use-cases/detect-gaps";
+import {
+  ALL_ASPECTS,
+  type Aspect,
+  type EnsureMediaSpec,
+} from "@canto/core/domain/media/use-cases/ensure-media.types";
+import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
 
 export interface EnsureMediaManyFilter {
   mediaIds?: string[];
@@ -25,33 +29,38 @@ export interface EnsureMediaManyResult {
   byLanguage: Record<string, number>;
 }
 
+export interface EnsureMediaManyDeps {
+  /** Optional — falls back to building from `db` when not supplied. */
+  media?: MediaRepositoryPort;
+}
+
 /**
  * Bulk orchestrator. Enumerates media per the filter, runs gap detection for
  * each, and enqueues `ensureMedia` jobs for the ones that need work.
  *
  * Caller drives scope via the filter. Nothing in this function is eager —
  * actual fetches happen asynchronously in the worker.
+ *
+ * Wave 9C2: row enumeration moved behind
+ * `MediaRepositoryPort.findEligibleForEnrichment` so this orchestrator no
+ * longer reaches into the `media` table directly.
  */
 export async function ensureMediaMany(
   db: Database,
   filter: EnsureMediaManyFilter,
   spec: EnsureMediaSpec = {},
   opts: EnsureMediaManyOptions = {},
+  deps: EnsureMediaManyDeps = {},
 ): Promise<EnsureMediaManyResult> {
   const languages = spec.languages ?? [...(await getActiveUserLanguages(db))];
+  const mediaRepo = deps.media ?? makeMediaRepository(db);
 
-  const conditions: SQL[] = [];
-  if (filter.mediaIds && filter.mediaIds.length > 0) {
-    conditions.push(inArray(media.id, filter.mediaIds));
-  }
-  if (filter.type) conditions.push(eq(media.type, filter.type));
-  if (filter.hasTvdbId) conditions.push(isNotNull(media.tvdbId));
-  if (filter.onlyInLibrary) conditions.push(eq(media.inLibrary, true));
-
-  const rows = await db
-    .select({ id: media.id, type: media.type, tvdbId: media.tvdbId })
-    .from(media)
-    .where(conditions.length > 0 ? and(...conditions) : sql`TRUE`);
+  const rows = await mediaRepo.findEligibleForEnrichment({
+    mediaIds: filter.mediaIds,
+    type: filter.type,
+    hasTvdbId: filter.hasTvdbId,
+    onlyInLibrary: filter.onlyInLibrary,
+  });
 
   const byAspect: Record<Aspect, number> = {
     metadata: 0,

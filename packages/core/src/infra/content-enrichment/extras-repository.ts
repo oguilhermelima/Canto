@@ -2,7 +2,6 @@ import { and, desc, eq, getTableColumns, inArray, isNotNull, not, sql } from "dr
 import { getQualityFilters, getWeightedScoreOrder } from "../../domain/recommendations/rules/recommendation-filters";
 import type { Database } from "@canto/db/client";
 import {
-  blocklist,
   media,
   mediaAspectState,
   mediaCredit,
@@ -230,33 +229,6 @@ export async function findTrailerKeysForMediaIds(
     if (!out.has(row.mediaId)) out.set(row.mediaId, row.externalKey);
   }
   return out;
-}
-
-// ── Blocklist ──
-
-export async function findBlocklistByMediaId(db: Database, mediaId: string) {
-  return db.query.blocklist.findMany({
-    where: eq(blocklist.mediaId, mediaId),
-    columns: { title: true },
-  });
-}
-
-export async function findBlocklistEntry(
-  db: Database,
-  mediaId: string,
-  title: string,
-) {
-  return db.query.blocklist.findFirst({
-    where: and(eq(blocklist.mediaId, mediaId), eq(blocklist.title, title)),
-  });
-}
-
-export async function createBlocklistEntry(
-  db: Database,
-  data: typeof blocklist.$inferInsert,
-) {
-  const [row] = await db.insert(blocklist).values(data).returning();
-  return row;
 }
 
 // ── Watch Provider Links ──

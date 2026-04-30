@@ -1,4 +1,5 @@
 import type { Database } from "@canto/db/client";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import type { MediaType, ProviderName } from "@canto/providers";
@@ -6,6 +7,7 @@ import { persistMedia } from "@canto/core/domain/media/use-cases/persist";
 import { getSetting } from "@canto/db/settings";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 import { findAspectSucceededAt } from "@canto/core/infra/media/media-aspect-state-repository";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
 import {
   applyMediaLocalizationOverlay,
@@ -21,6 +23,8 @@ interface GetByExternalInput {
 
 export interface GetByExternalDeps {
   media: MediaRepositoryPort;
+  /** Optional — falls back to building from `db` when not supplied. */
+  localization?: MediaLocalizationRepositoryPort;
 }
 
 /**
@@ -41,6 +45,7 @@ export async function getByExternal(
   getSupportedLangs: () => Promise<string[]>,
 ) {
   const tvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
+  const localization = deps.localization ?? makeMediaLocalizationRepository(db);
 
   const existing = tvdbEnabled
     ? await deps.media.findByAnyReference(
@@ -67,9 +72,16 @@ export async function getByExternal(
         logAndSwallow("media:getByExternal dispatchEnsureMedia(extras)"),
       );
     const lang = await getUserLang();
-    const localized = await applyMediaLocalizationOverlay(db, existing, lang);
+    const localized = await applyMediaLocalizationOverlay(existing, lang, {
+      localization,
+    });
     if (localized.seasons && localized.seasons.length > 0) {
-      const overlayed = await applySeasonsLocalizationOverlay(db, existing.id, localized.seasons as any, lang);
+      const overlayed = await applySeasonsLocalizationOverlay(
+        existing.id,
+        localized.seasons as any,
+        lang,
+        { localization },
+      );
       return { ...localized, seasons: overlayed };
     }
     return localized;
@@ -88,9 +100,16 @@ export async function getByExternal(
     );
     if (crossRef) {
       const lang = await getUserLang();
-      const localized = await applyMediaLocalizationOverlay(db, crossRef, lang);
+      const localized = await applyMediaLocalizationOverlay(crossRef, lang, {
+        localization,
+      });
       if (localized.seasons && localized.seasons.length > 0) {
-        const overlayed = await applySeasonsLocalizationOverlay(db, crossRef.id, localized.seasons as any, lang);
+        const overlayed = await applySeasonsLocalizationOverlay(
+          crossRef.id,
+          localized.seasons as any,
+          lang,
+          { localization },
+        );
         return { ...localized, seasons: overlayed };
       }
       return localized;
@@ -109,9 +128,16 @@ export async function getByExternal(
   const result = await deps.media.findByIdWithSeasons(inserted.id);
   if (!result) throw new Error("Media not found after insert");
   const lang = await getUserLang();
-  const localized = await applyMediaLocalizationOverlay(db, result, lang);
+  const localized = await applyMediaLocalizationOverlay(result, lang, {
+    localization,
+  });
   if (localized.seasons && localized.seasons.length > 0) {
-    const overlayed = await applySeasonsLocalizationOverlay(db, result.id, localized.seasons as any, lang);
+    const overlayed = await applySeasonsLocalizationOverlay(
+      result.id,
+      localized.seasons as any,
+      lang,
+      { localization },
+    );
     return { ...localized, seasons: overlayed };
   }
   return localized;

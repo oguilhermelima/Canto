@@ -1,20 +1,19 @@
-import { eq, and, sql, isNotNull, or } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
+import { eq, and } from "drizzle-orm";
 
 import type { Database } from "@canto/db/client";
-import { media, mediaLocalization } from "@canto/db/schema";
+import { media } from "@canto/db/schema";
 
-const EN = "en-US";
-import { getActiveUserLanguages } from "../../shared/services/user-service";
-import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
+import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import type { SearchResult } from "@canto/providers";
 import {
   resolveSupportedLocale,
   upsertLangLogos,
-} from "../../content-enrichment/use-cases/upsert-lang-logos";
-import { upsertMediaLocalization } from "../../shared/localization";
-import { dispatchEnsureMedia } from "../../../platform/queue/bullmq-dispatcher";
-import { logAndSwallow } from "../../../platform/logger/log-error";
+} from "@canto/core/domain/content-enrichment/use-cases/upsert-lang-logos";
+import { upsertMediaLocalization } from "@canto/core/domain/shared/localization/localization-service";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
+import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 
 /** Deduplicates concurrent getImages calls for the same externalId */
 const inflightFetches = new Map<string, Promise<string | undefined>>();
@@ -53,52 +52,19 @@ export async function fetchLogos(
   const useLangJoin = !!language && !language.startsWith("en");
 
   // 1. Query DB for existing records (match by externalId+provider+type triples).
-  // Always reads `media_localization` for the en-US baseline; when the user
-  // has a non-English language, also overlays the user-lang row so the
-  // localized logo wins via COALESCE chain (user-lang → en-US → base column).
-  const conditions = items.map((i) =>
-    and(eq(media.externalId, i.externalId), eq(media.provider, i.provider), eq(media.type, i.type)),
+  // Wave 9C2: localization overlay JOIN moved into the
+  // `MediaLocalizationRepositoryPort.findLogoOverlayByExternalRefs` helper —
+  // browse-time logo resolution flows through the port like every other
+  // localization read.
+  const localization = makeMediaLocalizationRepository(db);
+  const existingRows = await localization.findLogoOverlayByExternalRefs(
+    items.map((i) => ({
+      externalId: i.externalId,
+      provider: i.provider,
+      type: i.type,
+    })),
+    useLangJoin ? language! : "en-US",
   );
-
-  const flLocUser = alias(mediaLocalization, "fl_loc_user");
-  const flLocEn = alias(mediaLocalization, "fl_loc_en");
-
-  const existingRows = useLangJoin
-    ? await db
-        .select({
-          id: media.id,
-          externalId: media.externalId,
-          type: media.type,
-          logoPath: sql<string | null>`COALESCE(${flLocUser.logoPath}, ${flLocEn.logoPath})`,
-          translatedLogoPath: flLocUser.logoPath,
-        })
-        .from(media)
-        .leftJoin(
-          flLocUser,
-          and(
-            eq(flLocUser.mediaId, media.id),
-            eq(flLocUser.language, language!),
-          ),
-        )
-        .leftJoin(
-          flLocEn,
-          and(eq(flLocEn.mediaId, media.id), eq(flLocEn.language, EN)),
-        )
-        .where(or(...conditions)!)
-    : await db
-        .select({
-          id: media.id,
-          externalId: media.externalId,
-          type: media.type,
-          logoPath: flLocEn.logoPath,
-          translatedLogoPath: sql<string | null>`NULL`,
-        })
-        .from(media)
-        .leftJoin(
-          flLocEn,
-          and(eq(flLocEn.mediaId, media.id), eq(flLocEn.language, EN)),
-        )
-        .where(or(...conditions)!);
 
   const existingByKey = new Map(existingRows.map((r) => [`${r.type}-${r.externalId}`, r]));
 
@@ -282,80 +248,36 @@ export async function fetchLogos(
 /**
  * Enrich browse results with logos from DB.
  * Prefers translated logo for the given language, falls back to base English logo.
+ *
+ * Wave 9C2: routes the localization JOIN through
+ * `MediaLocalizationRepositoryPort.findLogoOverlayByExternalRefs` and filters
+ * to non-null logos client-side (volume per page is small enough that the
+ * SQL-side filter no longer matters).
  */
 export async function enrichBrowseWithLogos<
   T extends { results: SearchResult[]; totalPages: number; totalResults: number },
 >(db: Database, data: T, language?: string): Promise<T> {
   if (data.results.length === 0) return data;
 
-  const providers = [...new Set(data.results.map((r) => r.provider))];
-  const externalIds = data.results.map((r) => r.externalId);
   const useLangJoin = !!language && !language.startsWith("en");
+  const localization = makeMediaLocalizationRepository(db);
 
-  const enrichLocUser = alias(mediaLocalization, "enrich_loc_user");
-  const enrichLocEn = alias(mediaLocalization, "enrich_loc_en");
-
-  const rows = useLangJoin
-    ? await db
-        .select({
-          externalId: media.externalId,
-          type: media.type,
-          localizedLogoPath: sql<
-            string | null
-          >`COALESCE(${enrichLocUser.logoPath}, ${enrichLocEn.logoPath})`,
-        })
-        .from(media)
-        .leftJoin(
-          enrichLocUser,
-          and(
-            eq(enrichLocUser.mediaId, media.id),
-            eq(enrichLocUser.language, language!),
-          ),
-        )
-        .leftJoin(
-          enrichLocEn,
-          and(
-            eq(enrichLocEn.mediaId, media.id),
-            eq(enrichLocEn.language, EN),
-          ),
-        )
-        .where(
-          and(
-            sql`${media.externalId} IN (${sql.join(externalIds.map((id) => sql`${id}`), sql`, `)})`,
-            sql`${media.provider} IN (${sql.join(providers.map((p) => sql`${p}`), sql`, `)})`,
-            or(
-              isNotNull(enrichLocUser.logoPath),
-              isNotNull(enrichLocEn.logoPath),
-            ),
-          ),
-        )
-    : await db
-        .select({
-          externalId: media.externalId,
-          type: media.type,
-          localizedLogoPath: enrichLocEn.logoPath,
-        })
-        .from(media)
-        .leftJoin(
-          enrichLocEn,
-          and(
-            eq(enrichLocEn.mediaId, media.id),
-            eq(enrichLocEn.language, EN),
-          ),
-        )
-        .where(
-          and(
-            sql`${media.externalId} IN (${sql.join(externalIds.map((id) => sql`${id}`), sql`, `)})`,
-            sql`${media.provider} IN (${sql.join(providers.map((p) => sql`${p}`), sql`, `)})`,
-            isNotNull(enrichLocEn.logoPath),
-          ),
-        );
-
-  if (rows.length === 0) return data;
-
-  const logoMap = new Map(
-    rows.map((r) => [`${r.type}-${r.externalId}`, r.localizedLogoPath]),
+  const refs = data.results.map((r) => ({
+    externalId: r.externalId,
+    provider: r.provider,
+    type: r.type,
+  }));
+  const rows = await localization.findLogoOverlayByExternalRefs(
+    refs,
+    useLangJoin ? language! : "en-US",
   );
+
+  const logoMap = new Map<string, string>();
+  for (const r of rows) {
+    if (r.logoPath) logoMap.set(`${r.type}-${r.externalId}`, r.logoPath);
+  }
+
+  if (logoMap.size === 0) return data;
 
   return {
     ...data,

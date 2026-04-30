@@ -2,10 +2,7 @@ import { access, constants } from "node:fs/promises";
 
 import { db } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
-import {
-  findDownloadedLibraryMedia,
-  findImportedFilesByMediaIds,
-} from "@canto/core/infra/media/media-repository";
+import { findImportedFilesByMediaIds } from "@canto/core/infra/media/media-repository";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
 import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
@@ -23,7 +20,8 @@ export async function handleValidateDownloads(): Promise<void> {
   // Only validate local imports — remote imports can't be checked from Canto's filesystem
   if (importMethod === "remote") return;
 
-  const downloadedMedia = await findDownloadedLibraryMedia(db);
+  const media = makeMediaRepository(db);
+  const downloadedMedia = await media.findDownloadedLibraryMedia();
   if (downloadedMedia.length === 0) return;
 
   // One SELECT for every imported file across the whole batch.
@@ -39,7 +37,6 @@ export async function handleValidateDownloads(): Promise<void> {
   }
 
   const notificationsRepo = makeNotificationsRepository(db);
-  const media = makeMediaRepository(db);
   let invalidated = 0;
 
   for (const row of downloadedMedia) {

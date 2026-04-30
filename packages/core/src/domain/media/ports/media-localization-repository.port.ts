@@ -75,6 +75,32 @@ export interface MediaLocalizationRepositoryPort {
     language: LocaleCode,
   ): Promise<LocalizedMedia[]>;
 
+  // ─── Logo overlay (browse-time) ───
+
+  /**
+   * Batch logo lookup keyed off `(externalId, provider, type)` triples,
+   * with the user-language COALESCE applied. Used by the browse-time logo
+   * enrichment path (`fetch-logos`) to figure out which items already
+   * have a localized logo persisted vs. which still need a TMDB roundtrip.
+   *
+   * Returns one row per matched media; `logoPath` is the COALESCE
+   * (user-lang → en-US) result, while `translatedLogoPath` is the raw
+   * user-language column so callers can detect "we already have a
+   * localized logo" without re-querying.
+   */
+  findLogoOverlayByExternalRefs(
+    refs: ExternalMediaRef[],
+    language: LocaleCode,
+  ): Promise<
+    Array<{
+      id: string;
+      externalId: number;
+      type: string;
+      logoPath: string | null;
+      translatedLogoPath: string | null;
+    }>
+  >;
+
   // ─── Reads (season / episode localization) ───
 
   /** All seasons for a media with the user-lang COALESCE applied. */

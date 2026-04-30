@@ -28,7 +28,7 @@ import {
   createMediaFile,
   deleteMediaFilesByDownloadId,
 } from "@canto/core/infra/media/media-file-repository";
-import { findBlocklistEntry } from "@canto/core/infra/content-enrichment/extras-repository";
+import { makeTorrentsRepository } from "@canto/core/infra/torrents/torrents-repository.adapter";
 import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
 import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
 import { resolveDownloadConfig } from "@canto/core/domain/torrents/use-cases/download-torrent/folder-resolution";
@@ -88,7 +88,8 @@ export async function coreDownload(
   const { category: qbCategory, downloadPath } = await resolveDownloadConfig(db, mediaRow, input.folderId);
 
   if (!opts.skipDedup) {
-    const blocked = await findBlocklistEntry(db, input.mediaId, input.title);
+    const torrentsRepo = makeTorrentsRepository(db);
+    const blocked = await torrentsRepo.findBlocklistEntry(input.mediaId, input.title);
     if (blocked) {
       throw new BlocklistedReleaseError(blocked.reason);
     }

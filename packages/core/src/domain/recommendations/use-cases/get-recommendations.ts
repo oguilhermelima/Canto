@@ -14,6 +14,7 @@ import {
   findUserRecommendations,
 } from "@canto/core/infra/recommendations/user-recommendation-repository";
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import { findLibraryMediaBrief } from "@canto/core/infra/media/media-repository";
 
 interface GetRecommendationsInput {
@@ -54,6 +55,7 @@ export async function getRecommendations(
   const useMmr = page === 0 && !filters.sortBy;
 
   const extras = makeMediaExtrasRepository(db);
+  const localization = makeMediaLocalizationRepository(db);
   const { excludeItems } = await buildExclusionSet(db, userId);
 
   // ── Path 1: Per-user recommendations ──
@@ -97,6 +99,7 @@ export async function getRecommendations(
         useMmr && personalizedItems.length === pageSize
           ? await mixWithExploreSlot(
               db,
+              localization,
               personalizedItems,
               excludeItems,
               userLang,
@@ -139,7 +142,11 @@ export async function getRecommendations(
         ).map((entry) => entry.item)
       : unique.slice(0, pageSize);
     const items = ranked.map(mapPoolItem);
-    const translatedPoolItems = await applyMediaItemsLocalizationOverlay(db, items, userLang);
+    const translatedPoolItems = await applyMediaItemsLocalizationOverlay(
+      items,
+      userLang,
+      { localization },
+    );
     return { items: translatedPoolItems, nextCursor: hasMore ? page + 1 : null, version: recsVersion };
   }
 
@@ -186,7 +193,11 @@ export async function getRecommendations(
   const sorted = results.sort((a, b) => (b.voteAverage ?? 0) - (a.voteAverage ?? 0));
   const pageItems = sorted.slice(0, pageSize);
   const hasMore = sorted.length > pageSize || allLibrary.length > (page + 1) * 3;
-  const translatedFallback = await applyMediaItemsLocalizationOverlay(db, pageItems, userLang);
+  const translatedFallback = await applyMediaItemsLocalizationOverlay(
+    pageItems,
+    userLang,
+    { localization },
+  );
   return { items: translatedFallback, nextCursor: hasMore ? page + 1 : null, version: recsVersion };
 }
 
@@ -200,6 +211,7 @@ type MappedPoolItem = ReturnType<typeof mapPoolItem>;
  */
 async function mixWithExploreSlot(
   db: Database,
+  localization: ReturnType<typeof makeMediaLocalizationRepository>,
   personalized: MappedPoolItem[],
   excludeItems: Array<{ externalId: number; provider: string }>,
   userLang: string,
@@ -236,6 +248,10 @@ async function mixWithExploreSlot(
     if (explore.length >= slots.length) break;
   }
 
-  const translatedExplore = await applyMediaItemsLocalizationOverlay(db, explore, userLang);
+  const translatedExplore = await applyMediaItemsLocalizationOverlay(
+    explore,
+    userLang,
+    { localization },
+  );
   return mixExploreSlots(personalized, translatedExplore);
 }

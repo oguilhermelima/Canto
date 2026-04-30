@@ -216,3 +216,72 @@ export interface LibraryStats {
   shows: number;
   storageBytes: bigint;
 }
+
+/**
+ * Library listing projection used by `MediaRepositoryPort.listLibraryMedia`.
+ * Extends the base `Media` row with the user-language overlay applied
+ * inline via `media_localization`. Wave 9C2 promoted the legacy
+ * `listLibraryMedia` infra helper to a port method so consumers no
+ * longer reach into infra; the projection mirrors the legacy shape
+ * field-for-field so callers stay drop-in.
+ */
+export interface LibraryMediaItem extends Media {
+  title: string;
+  overview: string | null;
+  posterPath: string | null;
+  logoPath: string | null;
+  tagline: string | null;
+}
+
+/** Page response wrapping `LibraryMediaItem[]` with pagination metadata. */
+export interface LibraryMediaPage {
+  items: LibraryMediaItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * Tiny projection of shows monitored for continuous-download RSS — only
+ * what the matcher and scoring layer need (id/title/externalId/provider/
+ * type plus the flavor-derivation columns). Matches the legacy
+ * `findMonitoredShowsForRss` shape.
+ */
+export interface MonitoredShowForRss {
+  id: string;
+  title: string;
+  externalId: number;
+  provider: string;
+  type: string;
+  originCountry: string[] | null;
+  originalLanguage: string | null;
+  genres: string[] | null;
+  genreIds: number[] | null;
+}
+
+/** `(id, title)` projection used by the `validate-downloads` worker. */
+export interface DownloadedLibraryMedia {
+  id: string;
+  title: string;
+}
+
+/**
+ * Filter shape for `MediaRepositoryPort.findEligibleForEnrichment`. Used by
+ * the `ensureMediaMany` orchestrator to enumerate the rows the bulk
+ * gap-detection sweep should iterate over.
+ */
+export interface EnrichmentEligibilityFilter {
+  mediaIds?: string[];
+  type?: MediaType;
+  hasTvdbId?: boolean;
+  onlyInLibrary?: boolean;
+}
+
+/** Tiny `(id, type, tvdbId)` projection returned by
+ *  `findEligibleForEnrichment`. Matches the columns the orchestrator needs
+ *  to drive `detectGaps` per row. */
+export interface EnrichmentEligibility {
+  id: string;
+  type: MediaType;
+  tvdbId: number | null;
+}

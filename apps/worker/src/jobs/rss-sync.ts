@@ -9,7 +9,6 @@ import { matchRssTitle } from "@canto/core/domain/torrents/rules/rss-matching";
 import { detectMissingEpisodes } from "@canto/core/domain/media/use-cases/detect-episode-gaps";
 import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
 import { getProwlarrClient } from "@canto/core/infra/indexers/prowlarr.adapter";
-import { findMonitoredShowsForRss } from "@canto/core/infra/media/media-repository";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { makeTorrentsRepository } from "@canto/core/infra/torrents/torrents-repository.adapter";
 import {
@@ -33,9 +32,9 @@ export async function handleRssSync(): Promise<void> {
   if (!prowlarrEnabled) return;
 
   // 1. Find monitored shows
-  const monitoredShows = await findMonitoredShowsForRss(db);
   const media = makeMediaRepository(db);
   const torrents = makeTorrentsRepository(db);
+  const monitoredShows = await media.findMonitoredShowsForRss();
 
   if (monitoredShows.length === 0) return;
 

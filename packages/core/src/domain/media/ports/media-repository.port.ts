@@ -5,15 +5,21 @@ import type {
   NewEpisode,
 } from "@canto/core/domain/media/types/episode";
 import type {
+  DownloadedLibraryMedia,
+  EnrichmentEligibility,
+  EnrichmentEligibilityFilter,
   LibraryExternalIdRef,
   LibraryMediaBrief,
+  LibraryMediaPage,
   LibraryStats,
   Media,
   MediaProvider,
   MediaType,
+  MonitoredShowForRss,
   NewMedia,
   UpdateMediaInput,
 } from "@canto/core/domain/media/types/media";
+import type { ListInput } from "@canto/validators";
 import type {
   NewSeason,
   Season,
@@ -103,6 +109,45 @@ export interface MediaRepositoryPort {
   /** Show ids currently in the user library. Used by `toggle-tvdb-default`
    *  to fan out structure refreshes. */
   findShowIdsInLibrary(): Promise<string[]>;
+
+  /**
+   * Paginated + filtered library listing, with the user-language localization
+   * overlay applied inline (LEFT JOIN on `media_localization` with COALESCE
+   * en-US fallback). Mirrors the legacy `listLibraryMedia` infra helper.
+   *
+   * When `userId` is supplied, results are restricted to media that has at
+   * least one `media_version` row from a server the user has connected to.
+   * Used by the library tRPC route and the mobile library tab.
+   */
+  listLibraryMedia(
+    input: ListInput,
+    language: string,
+    userId?: string,
+  ): Promise<LibraryMediaPage>;
+
+  /**
+   * Shows marked for continuous-download RSS monitoring. Tiny projection
+   * keyed off the en-US localization (release-group titles match the
+   * canonical English title). Used by the `rss-sync` worker job.
+   */
+  findMonitoredShowsForRss(): Promise<MonitoredShowForRss[]>;
+
+  /**
+   * Library media flagged as `downloaded = true` plus their en-US titles.
+   * Drives the `validate-downloads` worker job — file-system presence
+   * checks and human-readable failure messages.
+   */
+  findDownloadedLibraryMedia(): Promise<DownloadedLibraryMedia[]>;
+
+  /**
+   * Enumerate media rows eligible for the `ensureMediaMany` orchestrator
+   * to iterate over. Returns the minimum set of columns the gap-detection
+   * loop needs (`id` / `type` / `tvdbId`) — every other column the
+   * orchestrator might want goes through `detectGaps` per-row.
+   */
+  findEligibleForEnrichment(
+    filter: EnrichmentEligibilityFilter,
+  ): Promise<EnrichmentEligibility[]>;
 
   // ─── Cross-context bridges ───
 

@@ -1,18 +1,22 @@
 import type { Database } from "@canto/db/client";
 
 import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import { applyMediaItemsLocalizationOverlay } from "@canto/core/domain/shared/localization/localization-service";
 import { mapPoolItem } from "@canto/core/domain/shared/mappers/media-mapper";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 
 export interface LoadExtrasDeps {
   extras: MediaExtrasRepositoryPort;
+  /** Optional — falls back to building from `db` when not supplied. */
+  localization?: MediaLocalizationRepositoryPort;
 }
 
 /**
  * Load extras (credits, videos, watch providers, similar, recs) from DB
  * tables for an already-persisted media item. The caller threads in the
- * extras port; localization overlay still goes through `db` because the
- * mapper helpers JOIN against the structural `media` row.
+ * extras + localization ports; both fall back to building from `db` when
+ * not supplied so router-level callers stay terse.
  */
 export async function loadExtrasFromDB(
   db: Database,
@@ -20,6 +24,7 @@ export async function loadExtrasFromDB(
   lang: string,
   deps: LoadExtrasDeps,
 ) {
+  const localization = deps.localization ?? makeMediaLocalizationRepository(db);
   const [credits, videos, watchProviders, similar, recommendations] =
     await Promise.all([
       deps.extras.findCreditsByMediaId(mediaId),
@@ -91,8 +96,8 @@ export async function loadExtrasFromDB(
   const mappedSimilar = similar.map(mapPoolItem);
   const mappedRecs = recommendations.map(mapPoolItem);
   const [translatedSimilar, translatedRecs] = await Promise.all([
-    applyMediaItemsLocalizationOverlay(db, mappedSimilar, lang),
-    applyMediaItemsLocalizationOverlay(db, mappedRecs, lang),
+    applyMediaItemsLocalizationOverlay(mappedSimilar, lang, { localization }),
+    applyMediaItemsLocalizationOverlay(mappedRecs, lang, { localization }),
   ]);
 
   const langPrefix = lang.split("-")[0];

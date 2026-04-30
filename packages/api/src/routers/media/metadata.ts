@@ -21,6 +21,7 @@ import {
 } from "@canto/core/infra/media/media-repository";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import {
   applyMediaLocalizationOverlay,
   applySeasonsLocalizationOverlay,
@@ -49,13 +50,16 @@ export const mediaMetadataRouter = createTRPCRouter({
     if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
 
     const userLang = await getUserLanguage(ctx.db, ctx.session.user.id);
-    const localized = await applyMediaLocalizationOverlay(ctx.db, row, userLang);
+    const localization = makeMediaLocalizationRepository(ctx.db);
+    const localized = await applyMediaLocalizationOverlay(row, userLang, {
+      localization,
+    });
     if (localized.seasons && localized.seasons.length > 0) {
       const overlayedSeasons = await applySeasonsLocalizationOverlay(
-        ctx.db,
         row.id,
         localized.seasons,
         userLang,
+        { localization },
       );
       return { ...localized, seasons: overlayedSeasons };
     }

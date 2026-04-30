@@ -28,7 +28,7 @@ import type {
 } from "@canto/core/domain/torrents/types/torrent";
 import type { IndexerPort } from "@canto/core/domain/torrents/ports/indexer";
 import { findMediaById } from "@canto/core/infra/media/media-repository";
-import { findBlocklistByMediaId } from "@canto/core/infra/content-enrichment/extras-repository";
+import { makeTorrentsRepository } from "@canto/core/infra/torrents/torrents-repository.adapter";
 import { findMediaLocalized } from "@canto/core/infra/media/media-localized-repository";
 import { findActiveDownloadProfile } from "@canto/core/infra/torrents/download-profile-repository";
 import { findReleaseGroupLookups } from "@canto/core/infra/torrents/download-config-repository";
@@ -121,10 +121,11 @@ async function prepareSearch(
   input: SearchInput,
   rules: ScoringRules,
 ): Promise<PreparedSearch> {
+  const torrentsRepo = makeTorrentsRepository(db);
   const [allLookups, row, blockedRows] = await Promise.all([
     findReleaseGroupLookups(db),
     findMediaById(db, input.mediaId),
-    findBlocklistByMediaId(db, input.mediaId),
+    torrentsRepo.findBlocklistByMediaId(input.mediaId),
   ]);
   if (!row) throw new MediaNotFoundError(input.mediaId);
 

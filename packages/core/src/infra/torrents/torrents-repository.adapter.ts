@@ -43,7 +43,7 @@ import {
   createBlocklistEntry,
   findBlocklistByMediaId,
   findBlocklistEntry,
-} from "@canto/core/infra/content-enrichment/extras-repository";
+} from "@canto/core/infra/torrents/blocklist-repository";
 import {
   toDomain as blocklistToDomain,
   toRow as blocklistToRow,

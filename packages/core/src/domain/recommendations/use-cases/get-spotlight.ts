@@ -6,6 +6,7 @@ import { buildExclusionSet } from "@canto/core/domain/recommendations/use-cases/
 import { applyMediaItemsLocalizationOverlay } from "@canto/core/domain/shared/localization/localization-service";
 import { mapPoolItem } from "@canto/core/domain/shared/mappers/media-mapper";
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import { findUserSpotlightItems } from "@canto/core/infra/recommendations/user-recommendation-repository";
 
 interface TrendingFetcher {
@@ -73,7 +74,9 @@ export async function getSpotlight(
       voteAverage: number; backdropPath: string; logoPath: string | null;
       posterPath?: string | null;
     }>;
-    return applyMediaItemsLocalizationOverlay(db, cached, userLang);
+    return applyMediaItemsLocalizationOverlay(cached, userLang, {
+      localization: makeMediaLocalizationRepository(db),
+    });
   }
 
   const [moviesData, showsData] = await Promise.all([
@@ -132,5 +135,7 @@ export async function getSpotlight(
 
   await setSetting("cache.spotlight", { data: spotlightResults, updatedAt: new Date().toISOString() });
 
-  return applyMediaItemsLocalizationOverlay(db, spotlightResults, userLang);
+  return applyMediaItemsLocalizationOverlay(spotlightResults, userLang, {
+    localization: makeMediaLocalizationRepository(db),
+  });
 }
