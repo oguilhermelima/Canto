@@ -21,6 +21,7 @@ import {
   deleteMedia,
   isMediaOrphaned,
 } from "../../../infra/repositories";
+import { findMediaLocalized } from "../../../infra/media/media-localized-repository";
 
 export type ResolveMediaVersionInput =
   | { versionId: string; tmdbId: number; type: "movie" | "show" }
@@ -84,7 +85,8 @@ export async function resolveMediaVersion(
 
   if (existingTarget) {
     targetMediaId = existingTarget.id;
-    targetTitle = existingTarget.title;
+    const targetLoc = await findMediaLocalized(db, existingTarget.id, "en-US");
+    targetTitle = targetLoc?.title ?? "";
     targetYear = existingTarget.year ?? null;
   } else {
     // Pull metadata upfront so dryRun can surface an accurate preview.
@@ -134,7 +136,10 @@ export async function resolveMediaVersion(
     if (!orphaned) continue;
 
     const row = await findMediaById(db, oldId);
-    if (row) orphanedMedia.push({ id: row.id, title: row.title, year: row.year ?? null });
+    if (row) {
+      const orphanLoc = await findMediaLocalized(db, row.id, "en-US");
+      orphanedMedia.push({ id: row.id, title: orphanLoc?.title ?? "", year: row.year ?? null });
+    }
   }
 
   if (dryRun) {

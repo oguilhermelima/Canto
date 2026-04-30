@@ -22,6 +22,7 @@ import type { Database } from "@canto/db/client";
 import { mediaVersion, mediaVersionEpisode, media } from "@canto/db/schema";
 
 import type { ServerSource } from "../../domain/sync/types";
+import { mediaI18n } from "../shared/media-i18n";
 
 /* -------------------------------------------------------------------------- */
 /*  Row types                                                                  */
@@ -89,8 +90,10 @@ export interface MediaVersionWithMedia {
  */
 export async function fetchMediaVersionsWithMedia(
   db: Database,
+  language: string,
   filters: { server?: ServerSource; search?: string },
 ): Promise<MediaVersionWithMedia[]> {
+  const mi = mediaI18n(language);
   const conditions = [] as ReturnType<typeof eq>[];
   if (filters.server) conditions.push(eq(mediaVersion.source, filters.server));
   if (filters.search) {
@@ -98,7 +101,7 @@ export async function fetchMediaVersionsWithMedia(
     conditions.push(
       or(
         ilike(mediaVersion.serverItemTitle, needle),
-        ilike(media.title, needle),
+        sql`${mi.title} ILIKE ${needle}`,
       )!,
     );
   }
@@ -108,16 +111,18 @@ export async function fetchMediaVersionsWithMedia(
     .select({
       version: getTableColumns(mediaVersion),
       mediaId: media.id,
-      mediaTitle: media.title,
+      mediaTitle: mi.title,
       mediaType: media.type,
       mediaYear: media.year,
-      mediaPosterPath: media.posterPath,
+      mediaPosterPath: mi.posterPath,
       mediaExternalId: media.externalId,
     })
     .from(mediaVersion)
     .leftJoin(media, eq(mediaVersion.mediaId, media.id))
+    .leftJoin(mi.locUser, mi.locUserJoin)
+    .leftJoin(mi.locEn, mi.locEnJoin)
     .where(where)
-    .orderBy(media.title, mediaVersion.serverItemTitle);
+    .orderBy(mi.title, mediaVersion.serverItemTitle);
 
   return rows.map((row) => ({
     version: row.version as MediaVersionRow,

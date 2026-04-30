@@ -6,7 +6,6 @@ import {
   eq,
   getTableColumns,
   gte,
-  ilike,
   inArray,
   lte,
   sql,
@@ -24,9 +23,22 @@ import {
   userConnection,
 } from "@canto/db/schema";
 import type { ListInput } from "@canto/validators";
-import { mediaI18n } from "../shared/media-i18n";
+import { mediaI18n, type MediaI18n } from "../shared/media-i18n";
+import { findMediaLocalized } from "./media-localized-repository";
 
 type MediaRow = typeof media.$inferSelect;
+
+/**
+ * Shape returned by listing endpoints — adds the localization overlay fields
+ * back onto the base `media` row so consumers see the pre-1C-δ shape.
+ */
+type LocalizedMediaRow = MediaRow & {
+  title: string;
+  overview: string | null;
+  posterPath: string | null;
+  logoPath: string | null;
+  tagline: string | null;
+};
 
 const withSeasonsAndEpisodes = {
   seasons: {
@@ -247,7 +259,7 @@ export async function findLibraryStats(db: Database) {
 /*  Library listing (paginated + filtered)                                    */
 /* -------------------------------------------------------------------------- */
 
-function buildLibraryFilters(input: ListInput): SQL {
+function buildLibraryFilters(input: ListInput, mi: MediaI18n): SQL {
   const conditions: SQL[] = [eq(media.inLibrary, true)];
 
   if (input.type) conditions.push(eq(media.type, input.type));
@@ -274,7 +286,9 @@ function buildLibraryFilters(input: ListInput): SQL {
   }
 
   if (input.provider) conditions.push(eq(media.provider, input.provider));
-  if (input.search) conditions.push(ilike(media.title, `%${input.search}%`));
+  if (input.search) {
+    conditions.push(sql`${mi.title} ILIKE ${`%${input.search}%`}`);
+  }
 
   if (input.downloaded !== undefined) {
     if (input.downloaded) {
@@ -291,10 +305,14 @@ function buildLibraryFilters(input: ListInput): SQL {
   return and(...conditions)!;
 }
 
-function buildOrderBy(sortBy: ListInput["sortBy"], sortOrder: ListInput["sortOrder"]) {
+function buildOrderBy(
+  sortBy: ListInput["sortBy"],
+  sortOrder: ListInput["sortOrder"],
+  mi: MediaI18n,
+) {
   const orderFn = sortOrder === "asc" ? asc : desc;
   switch (sortBy) {
-    case "title": return [orderFn(media.title)];
+    case "title": return [orderFn(mi.title)];
     case "year": return [orderFn(media.year)];
     case "voteAverage": return [orderFn(media.voteAverage)];
     case "popularity": return [orderFn(media.popularity)];
@@ -336,12 +354,13 @@ export async function listLibraryMedia(
   input: ListInput,
   language: string,
   userId?: string,
-): Promise<{ items: MediaRow[]; total: number; page: number; pageSize: number }> {
+): Promise<{ items: LocalizedMediaRow[]; total: number; page: number; pageSize: number }> {
   const page = input.cursor ?? input.page;
   const pageSize = input.pageSize;
   const offset = (page - 1) * pageSize;
 
-  let where: SQL = buildLibraryFilters(input);
+  const mi = mediaI18n(language);
+  let where: SQL = buildLibraryFilters(input, mi);
 
   if (userId) {
     // Get which providers the user has connected accounts for.
@@ -372,13 +391,11 @@ export async function listLibraryMedia(
     where = and(where, sql`${media.id} IN (${accessibleMediaIds})`)!;
   }
 
-  const orderBy = buildOrderBy(input.sortBy, input.sortOrder);
+  const orderBy = buildOrderBy(input.sortBy, input.sortOrder, mi);
 
-  // Overlay translations inline via LEFT JOIN on `media_translation`. For
-  // en-US users (or any language with no row) COALESCE returns the raw column
-  // and the join is a no-op. The previous shape did a separate
-  // `batchMediaTranslations` per page in JS, costing a second round trip.
-  const mi = mediaI18n(language);
+  // Overlay localized title/overview/poster/logo via LEFT JOIN on
+  // `media_localization` (user lang + en-US fallback). Replaces the legacy
+  // `media_translation` overlay path.
   const mediaCols = getTableColumns(media);
 
   const [rawItems, [totalRow]] = await Promise.all([
@@ -403,9 +420,9 @@ export async function listLibraryMedia(
     db.select({ total: count() }).from(media).where(where),
   ]);
 
-  // The select shape matches `MediaRow` field-for-field — drizzle infers it
-  // from `getTableColumns(media)` plus the SQL-typed overlay fields.
-  const items = rawItems as MediaRow[];
+  // The select shape matches `LocalizedMediaRow` field-for-field — drizzle
+  // infers it from `getTableColumns(media)` plus the SQL-typed overlay fields.
+  const items = rawItems as LocalizedMediaRow[];
 
   return { items, total: totalRow?.total ?? 0, page, pageSize };
 }
@@ -415,12 +432,17 @@ export async function listLibraryMedia(
  * what the RSS matcher needs (id/title/externalId/provider/type) and what
  * the scoring layer needs to derive media flavor (origin country, original
  * language, genres) for tier-aware release-group classification.
+ *
+ * RSS matching is intrinsically en-US (release group titles match the
+ * canonical English title), so the title column resolves to en-US directly
+ * via `media_localization`.
  */
 export async function findMonitoredShowsForRss(db: Database) {
+  const mi = mediaI18n("en-US");
   return db
     .select({
       id: media.id,
-      title: media.title,
+      title: mi.title,
       externalId: media.externalId,
       provider: media.provider,
       type: media.type,
@@ -430,20 +452,28 @@ export async function findMonitoredShowsForRss(db: Database) {
       genreIds: media.genreIds,
     })
     .from(media)
+    .leftJoin(mi.locUser, mi.locUserJoin)
+    .leftJoin(mi.locEn, mi.locEnJoin)
     .where(and(eq(media.type, "show"), eq(media.continuousDownload, true)));
 }
 
 /**
  * Media currently in the user library that is marked as downloaded — used by
- * the `validate-downloads` job to check file-system presence.
+ * the `validate-downloads` job to check file-system presence. Title comes
+ * from the en-US localization row (validation messages and filename hints
+ * use the canonical English title).
  */
 export async function findDownloadedLibraryMedia(
   db: Database,
 ): Promise<Array<{ id: string; title: string }>> {
-  return db.query.media.findMany({
-    where: and(eq(media.downloaded, true), eq(media.inLibrary, true)),
-    columns: { id: true, title: true },
-  });
+  const mi = mediaI18n("en-US");
+  const rows = await db
+    .select({ id: media.id, title: mi.title })
+    .from(media)
+    .leftJoin(mi.locUser, mi.locUserJoin)
+    .leftJoin(mi.locEn, mi.locEnJoin)
+    .where(and(eq(media.downloaded, true), eq(media.inLibrary, true)));
+  return rows.map((r) => ({ id: r.id, title: r.title }));
 }
 
 /**

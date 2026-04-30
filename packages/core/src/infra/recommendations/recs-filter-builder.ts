@@ -1,18 +1,19 @@
 import { asc, desc, sql } from "drizzle-orm";
 import type { AnyColumn, SQL } from "drizzle-orm";
-import { media, userRecommendation } from "@canto/db/schema";
+import { userRecommendation } from "@canto/db/schema";
 import type { RecsFilters } from "../../domain/recommendations/types/recs-filters";
 
 /**
- * Column refs the filter builder needs. Two pre-defined targets are exported
- * because the same filter shape is used against the de-normalized
- * `user_recommendation` columns and the canonical `media` columns; passing a
- * struct keeps the builder a single function while letting callers point it
- * at whichever table is in scope for their query.
+ * Column refs the filter builder needs. The same filter shape is reused against
+ * the de-normalized `user_recommendation` columns and against the canonical
+ * `media` table joined with `media_localization` (the title column there is a
+ * SQL COALESCE expression — accept it via the `title: AnyColumn | SQL` shape).
+ * Passing a struct keeps the builder a single function while letting callers
+ * point it at whichever target is in scope for their query.
  */
 export interface RecsFilterColumns {
   id: AnyColumn;
-  title: AnyColumn;
+  title: AnyColumn | SQL;
   genreIds: AnyColumn;
   originalLanguage: AnyColumn;
   voteAverage: AnyColumn;
@@ -21,19 +22,6 @@ export interface RecsFilterColumns {
   contentRating: AnyColumn;
   status: AnyColumn;
 }
-
-/** Filter conditions read from the canonical `media` table. */
-export const MEDIA_COLUMNS: RecsFilterColumns = {
-  id: media.id,
-  title: media.title,
-  genreIds: media.genreIds,
-  originalLanguage: media.originalLanguage,
-  voteAverage: media.voteAverage,
-  releaseDate: media.releaseDate,
-  runtime: media.runtime,
-  contentRating: media.contentRating,
-  status: media.status,
-};
 
 /** Filter conditions read from the de-normalized `user_recommendation` row. */
 export const USER_REC_COLUMNS: RecsFilterColumns = {
@@ -49,15 +37,17 @@ export const USER_REC_COLUMNS: RecsFilterColumns = {
 };
 
 /**
- * Build an array of Drizzle SQL conditions from RecsFilters.
- * Each condition maps to one filter property; callers combine them with `and(...)`.
+ * Build an array of Drizzle SQL conditions from RecsFilters. Each condition
+ * maps to one filter property; callers combine them with `and(...)`.
  *
- * Defaults to `MEDIA_COLUMNS` so existing callers (`findGlobalRecommendations`,
- * `findListItems`) keep working unchanged.
+ * Callers must supply column refs — there is no longer a default because the
+ * canonical media titles live on `media_localization` and need a `language`
+ * to resolve. Use `mediaI18n(language)` and pass the resolved `title`
+ * expression in via `RecsFilterColumns.title`.
  */
 export function buildRecsFilterConditions(
   filters: RecsFilters,
-  columns: RecsFilterColumns = MEDIA_COLUMNS,
+  columns: RecsFilterColumns,
 ): SQL[] {
   const {
     q,
@@ -120,7 +110,7 @@ export function buildRecsFilterConditions(
  */
 export function recsSortOrder(
   sortBy: string | undefined,
-  columns: RecsFilterColumns = MEDIA_COLUMNS,
+  columns: RecsFilterColumns,
 ) {
   switch (sortBy) {
     case "vote_average.desc":

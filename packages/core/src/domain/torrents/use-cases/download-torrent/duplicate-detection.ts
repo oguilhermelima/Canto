@@ -13,7 +13,13 @@ export interface EpisodeRef {
 
 export interface MediaRowForDuplicates {
   type: string;
-  title: string;
+  /**
+   * Display title used in duplicate-error messages. Optional because the base
+   * media row no longer carries one — callers that surface user-facing
+   * messages should populate this from the en-US localization, otherwise the
+   * detector falls back to a neutral "(${quality} ${source})" descriptor.
+   */
+  title?: string | null;
   seasons?: Array<{
     number: number;
     episodes?: Array<{ id: string; number: number }>;
@@ -69,7 +75,10 @@ export async function detectDuplicates(
 
   if (mediaRow.type === "movie") {
     const existingFile = await findDuplicateMovieFile(db, mediaId, quality, source);
-    if (existingFile) duplicates.push(`${mediaRow.title} (${quality} ${source})`);
+    if (existingFile) {
+      const label = mediaRow.title ? `${mediaRow.title} (${quality} ${source})` : `(${quality} ${source})`;
+      duplicates.push(label);
+    }
   } else {
     for (const ep of episodeIds) {
       const existingFile = await findDuplicateEpisodeFile(db, ep.id, quality, source);

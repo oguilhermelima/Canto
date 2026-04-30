@@ -7,7 +7,6 @@ import {
   findPublicListBySlug,
   findListItems,
 } from "@canto/core/infra/lists/list-repository";
-import { applyMediaItemsLocalizationOverlay } from "@canto/core/domain/shared/localization/localization-service";
 import { findProfileSections } from "@canto/core/infra/profile/profile-section-repository";
 import {
   findUserMediaPaginated,
@@ -99,18 +98,12 @@ export const publicProfileRouter = createTRPCRouter({
       if (!listRow) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Collection not found" });
       }
-      const { items: rawItems, total } = await findListItems(ctx.db, listRow.id, {
+      const viewerLang = ctx.session.user.language;
+      const { items, total } = await findListItems(ctx.db, listRow.id, viewerLang, {
         userId: ctx.session.user.id,
         limit: input.limit,
         offset: 0,
       });
-      const viewerLang = ctx.session.user.language;
-      const translated = await applyMediaItemsLocalizationOverlay(
-        ctx.db,
-        rawItems.map((i) => i.media),
-        viewerLang,
-      );
-      const items = rawItems.map((item, i) => ({ ...item, media: translated[i]! }));
       return { list: listRow, items, total };
     }),
 
@@ -135,11 +128,11 @@ export const publicProfileRouter = createTRPCRouter({
       recentCompleted,
       recentAny,
     ] = await Promise.all([
-      findUserWatchTimeStats(ctx.db, userId),
+      findUserWatchTimeStats(ctx.db, userId, viewerLang),
       findUserMediaCounts(ctx.db, userId),
       findUserTopGenres(ctx.db, userId),
-      findUserProfileInsights(ctx.db, userId),
-      findUserRecentActivity(ctx.db, userId, 8),
+      findUserProfileInsights(ctx.db, userId, viewerLang),
+      findUserRecentActivity(ctx.db, userId, viewerLang, 8),
       findUserMediaPaginated(ctx.db, userId, viewerLang, {
         status: "watching",
         limit: 12,

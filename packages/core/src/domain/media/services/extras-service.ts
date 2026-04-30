@@ -17,8 +17,8 @@ export async function loadExtrasFromDB(db: Database, mediaId: string, lang: stri
     findCreditsByMediaId(db, mediaId),
     findVideosByMediaId(db, mediaId),
     findWatchProvidersByMediaId(db, mediaId),
-    findRecommendationsBySource(db, mediaId, "similar"),
-    findRecommendationsBySource(db, mediaId, "recommendation"),
+    findRecommendationsBySource(db, mediaId, "similar", lang),
+    findRecommendationsBySource(db, mediaId, "recommendation", lang),
   ]);
 
   const cast = credits

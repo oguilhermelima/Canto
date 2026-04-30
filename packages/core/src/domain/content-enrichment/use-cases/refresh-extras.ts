@@ -1,9 +1,11 @@
 import { and, eq, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 import type { Database } from "@canto/db/client";
 import {
   media,
   mediaCredit,
+  mediaLocalization,
   mediaRecommendation,
   mediaVideo,
   mediaWatchProvider,
@@ -11,11 +13,14 @@ import {
 import { getActiveUserLanguages } from "../../shared/services/user-service";
 import type { MediaType } from "@canto/providers";
 import { findMediaById } from "../../../infra/repositories";
+import { findMediaLocalized } from "../../../infra/media/media-localized-repository";
 import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import { mapSearchResultToMediaFields } from "../rules/pool-scoring";
 import { upsertMediaLocalization } from "../../shared/localization";
 import { dispatchEnsureMedia } from "../../../platform/queue/bullmq-dispatcher";
 import { logAndSwallow } from "../../../platform/logger/log-error";
+
+const EN = "en-US";
 
 export async function refreshExtras(
   db: Database,
@@ -38,12 +43,16 @@ export async function refreshExtras(
         if (match) extrasExternalId = match.externalId;
       } catch { /* fallback to title search */ }
     }
-    // If IMDB didn't work, try title search
+    // If IMDB didn't work, try title search using the en-US localization.
     if (extrasExternalId === row.externalId) {
-      try {
-        const search = await tmdb.search(row.title, row.type as "movie" | "show");
-        if (search.results.length > 0) extrasExternalId = search.results[0]!.externalId;
-      } catch { /* skip extras if we can't find TMDB equivalent */ }
+      const enLoc = await findMediaLocalized(db, row.id, EN);
+      const searchTitle = enLoc?.title;
+      if (searchTitle) {
+        try {
+          const search = await tmdb.search(searchTitle, row.type as "movie" | "show");
+          if (search.results.length > 0) extrasExternalId = search.results[0]!.externalId;
+        } catch { /* skip extras if we can't find TMDB equivalent */ }
+      }
     }
     if (extrasExternalId === row.externalId && row.provider !== "tmdb") return; // Can't find TMDB match
   }
@@ -84,24 +93,42 @@ export async function refreshExtras(
 
   // Also look up existing media rows for the recommended items' external IDs
   // Check both tmdb provider AND tvdb-provider rows (which store tvdb_id = external_id)
-  // to avoid creating cross-provider duplicates
+  // to avoid creating cross-provider duplicates. After Phase 1C-δ titles live
+  // on `media_localization` (en-US row is canonical), so the tvdb cross-match
+  // joins through that table.
   const recExternalIds = [...uniqueRecItems.values()].map((i) => i.result.externalId);
   const recTitles = [...uniqueRecItems.values()].map((i) => i.result.title);
+  const recLocEn = alias(mediaLocalization, "rec_loc_en");
   const existingMedia = recExternalIds.length > 0
-    ? await db.query.media.findMany({
-        where: sql`(
-          (${media.externalId} IN (${sql.join(recExternalIds.map((id) => sql`${id}`), sql`, `)}) AND ${media.provider} = 'tmdb')
-          OR (${media.provider} = 'tvdb' AND ${media.type} = ${row.type} AND ${media.title} IN (${sql.join(recTitles.map((t) => sql`${t}`), sql`, `)}))
-        )`,
-        columns: { id: true, externalId: true, title: true, provider: true, type: true, logoPath: true },
-      })
+    ? await db
+        .select({
+          id: media.id,
+          externalId: media.externalId,
+          title: recLocEn.title,
+          logoPath: recLocEn.logoPath,
+          provider: media.provider,
+          type: media.type,
+        })
+        .from(media)
+        .leftJoin(
+          recLocEn,
+          and(eq(recLocEn.mediaId, media.id), eq(recLocEn.language, EN)),
+        )
+        .where(
+          sql`(
+            (${media.externalId} IN (${sql.join(recExternalIds.map((id) => sql`${id}`), sql`, `)}) AND ${media.provider} = 'tmdb')
+            OR (${media.provider} = 'tvdb' AND ${media.type} = ${row.type} AND ${recLocEn.title} IN (${sql.join(recTitles.map((t) => sql`${t}`), sql`, `)}))
+          )`,
+        )
     : [];
   // Map by TMDB external ID; for tvdb-provider rows, build a title lookup fallback
   const existingMediaByExtId = new Map(
     existingMedia.filter((m) => m.provider === "tmdb").map((m) => [m.externalId, m]),
   );
   const existingMediaByTitle = new Map(
-    existingMedia.filter((m) => m.provider === "tvdb").map((m) => [m.title, m]),
+    existingMedia
+      .filter((m) => m.provider === "tvdb" && m.title !== null)
+      .map((m) => [m.title!, m]),
   );
 
   const trailerMap = new Map<number, string>();
@@ -165,8 +192,7 @@ export async function refreshExtras(
     if (existing) {
       mediaIdByExtKey.set(key, existing.id);
       if (!existing.logoPath && fields.logoPath) {
-        await db.update(media).set({ logoPath: fields.logoPath }).where(eq(media.id, existing.id));
-        // Dual-write to media_localization en-US (removed in Phase 1C-δ).
+        // After Phase 1C-δ, logoPath is only persisted on media_localization.
         await upsertMediaLocalization(
           db,
           existing.id,
@@ -180,18 +206,15 @@ export async function refreshExtras(
         type: fields.type,
         externalId: fields.externalId,
         provider: fields.provider,
-        title: fields.title,
-        overview: fields.overview ?? null,
-        posterPath: fields.posterPath ?? null,
         backdropPath: fields.backdropPath ?? null,
-        logoPath: fields.logoPath ?? null,
         releaseDate: fields.releaseDate || null,
         voteAverage: fields.voteAverage ?? null,
         downloaded: false,
       }).onConflictDoNothing().returning();
       if (inserted) {
         mediaIdByExtKey.set(key, inserted.id);
-        // Dual-write to media_localization en-US (removed in Phase 1C-δ).
+        // After Phase 1C-δ, title/overview/posterPath/logoPath live only on
+        // media_localization en-US.
         await upsertMediaLocalization(
           db,
           inserted.id,

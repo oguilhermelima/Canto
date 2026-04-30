@@ -1,9 +1,26 @@
-import { and, asc, eq, or, isNull, desc, count, sql, inArray, max, type SQL } from "drizzle-orm";
+import { and, asc, eq, getTableColumns, or, isNull, desc, count, sql, inArray, max, type SQL } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { list, listItem, listMember, media, user, userHiddenMedia, userMediaLibrary, userMediaState } from "@canto/db/schema";
 import type { CollectionWatchStatus } from "@canto/validators";
 import type { RecsFilters } from "../../domain/recommendations/types/recs-filters";
 import { buildRecsFilterConditions, recsSortOrder } from "../recommendations/recs-filter-builder";
+import { mediaI18n, type MediaI18n } from "../shared/media-i18n";
+
+/** Build the column-set rec-filter conditions and sort use against the
+ *  `media + mediaI18n` join shape in this repo. */
+function recsFilterColumnsForMedia(mi: MediaI18n) {
+  return {
+    id: media.id,
+    title: mi.title,
+    genreIds: media.genreIds,
+    originalLanguage: media.originalLanguage,
+    voteAverage: media.voteAverage,
+    releaseDate: media.releaseDate,
+    runtime: media.runtime,
+    contentRating: media.contentRating,
+    status: media.status,
+  };
+}
 
 /** Live row predicate: skip soft-deleted (tombstoned) rows. Centralised so
  *  every read on `list_item` opts in consistently. */
@@ -395,6 +412,7 @@ export async function ensureServerLibrary(db: Database) {
 export async function findListItems(
   db: Database,
   listId: string,
+  language: string,
   opts: {
     userId?: string;
     limit?: number;
@@ -418,6 +436,18 @@ export async function findListItems(
     showHidden,
     ...filterOpts
   } = opts;
+
+  const mi = mediaI18n(language);
+  const recCols = recsFilterColumnsForMedia(mi);
+  const mediaCols = getTableColumns(media);
+  const mediaSelect = {
+    ...mediaCols,
+    title: mi.title,
+    overview: mi.overview,
+    posterPath: mi.posterPath,
+    logoPath: mi.logoPath,
+    tagline: mi.tagline,
+  };
 
   const listRow = await findListById(db, listId);
   const isServerLibrary = listRow?.type === "server";
@@ -464,7 +494,7 @@ export async function findListItems(
   const conditions: SQL[] = [
     eq(listItem.listId, listId),
     isLiveListItem,
-    ...buildRecsFilterConditions(filterOpts),
+    ...buildRecsFilterConditions(filterOpts, recCols),
   ];
 
   if (isServerLibrary && userId) {
@@ -516,7 +546,7 @@ export async function findListItems(
     }
     if (sortBy === "date_added.desc") return [desc(listItem.addedAt), tiebreaker];
     if (sortBy === "date_added.asc") return [asc(listItem.addedAt), tiebreaker];
-    const customSort = recsSortOrder(sortBy);
+    const customSort = recsSortOrder(sortBy, recCols);
     if (customSort) return [customSort, tiebreaker];
     return [asc(listItem.position), desc(listItem.addedAt), tiebreaker];
   })();
@@ -530,9 +560,19 @@ export async function findListItems(
   // Four query shapes — picked to keep Drizzle's chained query builder happy
   // (the builder loses type info when joins are added through a mutable
   // variable). Each branch owns its full SELECT/JOIN chain end-to-end.
+  // After the i18n drop, `media` is the table columns + the `mediaI18n`
+  // overlaid title/overview/posterPath/logoPath/tagline so callers see the
+  // pre-1C-δ shape.
+  type MediaWithLocalization = typeof media.$inferSelect & {
+    title: string;
+    overview: string | null;
+    posterPath: string | null;
+    logoPath: string | null;
+    tagline: string | null;
+  };
   type ItemRow = {
     listItem: typeof listItem.$inferSelect;
-    media: typeof media.$inferSelect;
+    media: MediaWithLocalization;
     memberTotalRating?: number | null;
     memberVoteCount?: number | null;
     memberAvgRating?: number | null;
@@ -545,7 +585,7 @@ export async function findListItems(
       return db
         .select({
           listItem,
-          media,
+          media: mediaSelect,
           memberTotalRating: memberVotesSubquery.totalRating,
           memberVoteCount: memberVotesSubquery.voteCount,
           memberAvgRating: memberVotesSubquery.avgRating,
@@ -554,54 +594,62 @@ export async function findListItems(
         })
         .from(listItem)
         .innerJoin(media, eq(listItem.mediaId, media.id))
+        .leftJoin(mi.locUser, mi.locUserJoin)
+        .leftJoin(mi.locEn, mi.locEnJoin)
         .leftJoin(memberVotesSubquery, eq(memberVotesSubquery.mediaId, media.id))
         .leftJoin(userMediaState, userStateJoin)
         .where(whereClause)
         .orderBy(...orderByExpr)
         .limit(lim)
-        .offset(off);
+        .offset(off) as Promise<ItemRow[]>;
     }
     if (memberVotesSubquery) {
       return db
         .select({
           listItem,
-          media,
+          media: mediaSelect,
           memberTotalRating: memberVotesSubquery.totalRating,
           memberVoteCount: memberVotesSubquery.voteCount,
           memberAvgRating: memberVotesSubquery.avgRating,
         })
         .from(listItem)
         .innerJoin(media, eq(listItem.mediaId, media.id))
+        .leftJoin(mi.locUser, mi.locUserJoin)
+        .leftJoin(mi.locEn, mi.locEnJoin)
         .leftJoin(memberVotesSubquery, eq(memberVotesSubquery.mediaId, media.id))
         .where(whereClause)
         .orderBy(...orderByExpr)
         .limit(lim)
-        .offset(off);
+        .offset(off) as Promise<ItemRow[]>;
     }
     if (userStateJoin) {
       return db
         .select({
           listItem,
-          media,
+          media: mediaSelect,
           userRating: userMediaState.rating,
           userStatus: userMediaState.status,
         })
         .from(listItem)
         .innerJoin(media, eq(listItem.mediaId, media.id))
+        .leftJoin(mi.locUser, mi.locUserJoin)
+        .leftJoin(mi.locEn, mi.locEnJoin)
         .leftJoin(userMediaState, userStateJoin)
         .where(whereClause)
         .orderBy(...orderByExpr)
         .limit(lim)
-        .offset(off);
+        .offset(off) as Promise<ItemRow[]>;
     }
     return db
-      .select({ listItem, media })
+      .select({ listItem, media: mediaSelect })
       .from(listItem)
       .innerJoin(media, eq(listItem.mediaId, media.id))
+      .leftJoin(mi.locUser, mi.locUserJoin)
+      .leftJoin(mi.locEn, mi.locEnJoin)
       .where(whereClause)
       .orderBy(...orderByExpr)
       .limit(lim)
-      .offset(off);
+      .offset(off) as Promise<ItemRow[]>;
   })();
 
   const countP: Promise<Array<{ total: number }>> = (async () => {
@@ -610,6 +658,8 @@ export async function findListItems(
         .select({ total: count() })
         .from(listItem)
         .innerJoin(media, eq(listItem.mediaId, media.id))
+        .leftJoin(mi.locUser, mi.locUserJoin)
+        .leftJoin(mi.locEn, mi.locEnJoin)
         .leftJoin(memberVotesSubquery, eq(memberVotesSubquery.mediaId, media.id))
         .leftJoin(userMediaState, userStateJoin)
         .where(whereClause);
@@ -619,6 +669,8 @@ export async function findListItems(
         .select({ total: count() })
         .from(listItem)
         .innerJoin(media, eq(listItem.mediaId, media.id))
+        .leftJoin(mi.locUser, mi.locUserJoin)
+        .leftJoin(mi.locEn, mi.locEnJoin)
         .leftJoin(memberVotesSubquery, eq(memberVotesSubquery.mediaId, media.id))
         .where(whereClause);
     }
@@ -627,6 +679,8 @@ export async function findListItems(
         .select({ total: count() })
         .from(listItem)
         .innerJoin(media, eq(listItem.mediaId, media.id))
+        .leftJoin(mi.locUser, mi.locUserJoin)
+        .leftJoin(mi.locEn, mi.locEnJoin)
         .leftJoin(userMediaState, userStateJoin)
         .where(whereClause);
     }
@@ -634,6 +688,8 @@ export async function findListItems(
       .select({ total: count() })
       .from(listItem)
       .innerJoin(media, eq(listItem.mediaId, media.id))
+      .leftJoin(mi.locUser, mi.locUserJoin)
+      .leftJoin(mi.locEn, mi.locEnJoin)
       .where(whereClause);
   })();
 
@@ -1001,6 +1057,7 @@ export async function findMediaInLists(
 export async function findUserCustomCollectionItems(
   db: Database,
   userId: string,
+  language: string,
   hiddenListIds: string[],
   opts: {
     limit?: number;
@@ -1021,6 +1078,18 @@ export async function findUserCustomCollectionItems(
     showHidden,
     ...filterOpts
   } = opts;
+
+  const mi = mediaI18n(language);
+  const recCols = recsFilterColumnsForMedia(mi);
+  const mediaCols = getTableColumns(media);
+  const mediaSelect = {
+    ...mediaCols,
+    title: mi.title,
+    overview: mi.overview,
+    posterPath: mi.posterPath,
+    logoPath: mi.logoPath,
+    tagline: mi.tagline,
+  };
 
   const userLists = await db
     .select({ id: list.id })
@@ -1049,7 +1118,7 @@ export async function findUserCustomCollectionItems(
 
   const conditions: SQL[] = [
     inArray(media.id, mediaIds),
-    ...buildRecsFilterConditions(filterOpts),
+    ...buildRecsFilterConditions(filterOpts, recCols),
   ];
 
   const wsCondition = buildWatchStatusesCondition(watchStatuses);
@@ -1074,7 +1143,7 @@ export async function findUserCustomCollectionItems(
     eq(userMediaState.userId, userId),
   );
 
-  const customSort = recsSortOrder(sortBy);
+  const customSort = recsSortOrder(sortBy, recCols);
   const orderByExpr =
     sortBy === "date_added.desc" || sortBy === "date_added.asc"
       ? sql`${media.popularity} DESC NULLS LAST`
@@ -1085,10 +1154,12 @@ export async function findUserCustomCollectionItems(
   const [rows, [countRow]] = await Promise.all([
     db
       .select({
-        media,
+        media: mediaSelect,
         userRating: userMediaState.rating,
       })
       .from(media)
+      .leftJoin(mi.locUser, mi.locUserJoin)
+      .leftJoin(mi.locEn, mi.locEnJoin)
       .leftJoin(userMediaState, userStateJoin)
       .where(whereClause)
       .orderBy(orderByExpr)
@@ -1097,6 +1168,8 @@ export async function findUserCustomCollectionItems(
     db
       .select({ total: count() })
       .from(media)
+      .leftJoin(mi.locUser, mi.locUserJoin)
+      .leftJoin(mi.locEn, mi.locEnJoin)
       .leftJoin(userMediaState, userStateJoin)
       .where(whereClause),
   ]);

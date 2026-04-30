@@ -28,6 +28,7 @@ import {
   findMediaById,
   findBlocklistByMediaId,
 } from "../../../infra/repositories";
+import { findMediaLocalized } from "../../../infra/media/media-localized-repository";
 import { findActiveDownloadProfile } from "../../../infra/torrents/download-profile-repository";
 import { findReleaseGroupLookups } from "../../../infra/torrents/download-config-repository";
 import { extractHashFromMagnet } from "../rules/torrent-rules";
@@ -135,7 +136,9 @@ async function prepareSearch(
   if (isCustomQuery) {
     query = input.query!;
   } else {
-    query = row.title;
+    // Indexer queries match against release-group naming, which is en-US.
+    const enLoc = await findMediaLocalized(db, row.id, "en-US");
+    query = enLoc?.title ?? "";
     if (input.seasonNumber !== undefined) {
       const paddedSeason = String(input.seasonNumber).padStart(2, "0");
       if (

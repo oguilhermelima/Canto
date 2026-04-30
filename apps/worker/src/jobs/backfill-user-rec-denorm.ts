@@ -43,11 +43,11 @@ export async function handleBackfillUserRecDenorm(db: Database): Promise<void> {
             external_id = m.external_id,
             provider = m.provider,
             type = m.type,
-            title = m.title,
-            overview = m.overview,
-            poster_path = m.poster_path,
+            title = COALESCE(ml.title, ''),
+            overview = ml.overview,
+            poster_path = ml.poster_path,
             backdrop_path = m.backdrop_path,
-            logo_path = m.logo_path,
+            logo_path = ml.logo_path,
             vote_average = m.vote_average,
             year = m.year,
             release_date = m.release_date,
@@ -59,6 +59,8 @@ export async function handleBackfillUserRecDenorm(db: Database): Promise<void> {
             status = m.status,
             popularity = m.popularity
           FROM media m
+          LEFT JOIN media_localization ml
+            ON ml.media_id = m.id AND ml.language = 'en-US'
           WHERE ur.id IN (SELECT id FROM batch)
             AND ur.media_id = m.id
           RETURNING ur.id

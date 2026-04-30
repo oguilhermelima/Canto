@@ -66,7 +66,7 @@ export async function fetchLogos(
           id: media.id,
           externalId: media.externalId,
           type: media.type,
-          logoPath: sql<string | null>`COALESCE(${flLocUser.logoPath}, ${flLocEn.logoPath}, ${media.logoPath})`,
+          logoPath: sql<string | null>`COALESCE(${flLocUser.logoPath}, ${flLocEn.logoPath})`,
           translatedLogoPath: flLocUser.logoPath,
         })
         .from(media)
@@ -87,7 +87,7 @@ export async function fetchLogos(
           id: media.id,
           externalId: media.externalId,
           type: media.type,
-          logoPath: sql<string | null>`COALESCE(${flLocEn.logoPath}, ${media.logoPath})`,
+          logoPath: flLocEn.logoPath,
           translatedLogoPath: sql<string | null>`NULL`,
         })
         .from(media)
@@ -185,8 +185,7 @@ export async function fetchLogos(
     if (existing) {
       mediaId = existing.id;
       if (logo && !existing.logoPath) {
-        await db.update(media).set({ logoPath: logo }).where(eq(media.id, existing.id));
-        // Dual-write to media_localization en-US (removed in Phase 1C-δ).
+        // After Phase 1C-δ, logoPath lives only on media_localization.
         await upsertMediaLocalization(
           db,
           existing.id,
@@ -201,22 +200,32 @@ export async function fetchLogos(
           type: item.type,
           externalId: item.externalId,
           provider: item.provider,
-          title: item.title,
-          posterPath: item.posterPath ?? null,
           backdropPath: item.backdropPath ?? null,
-          logoPath: logo,
           year: item.year ?? null,
           voteAverage: item.voteAverage ?? null,
           downloaded: false,
-        }).onConflictDoUpdate({
+        }).onConflictDoNothing({
           target: [media.externalId, media.provider, media.type],
-          set: {
-            logoPath: sql`CASE WHEN EXCLUDED.logo_path IS NOT NULL THEN EXCLUDED.logo_path ELSE ${media.logoPath} END`,
-          },
         }).returning({ id: media.id });
-        mediaId = row?.id;
+
+        // onConflictDoNothing returns no row when the conflict fires; look it up.
+        if (row?.id) {
+          mediaId = row.id;
+        } else {
+          const conflict = await db.query.media.findFirst({
+            where: and(
+              eq(media.externalId, item.externalId),
+              eq(media.provider, item.provider),
+              eq(media.type, item.type),
+            ),
+            columns: { id: true },
+          });
+          mediaId = conflict?.id;
+        }
+
         if (mediaId) {
-          // Dual-write to media_localization en-US (removed in Phase 1C-δ).
+          // After Phase 1C-δ, title/posterPath/logoPath live only on
+          // media_localization en-US.
           await upsertMediaLocalization(
             db,
             mediaId,
@@ -267,7 +276,6 @@ export async function enrichBrowseWithLogos<
         .select({
           externalId: media.externalId,
           type: media.type,
-          logoPath: media.logoPath,
           localizedLogoPath: sql<
             string | null
           >`COALESCE(${enrichLocUser.logoPath}, ${enrichLocEn.logoPath})`,
@@ -292,7 +300,6 @@ export async function enrichBrowseWithLogos<
             sql`${media.externalId} IN (${sql.join(externalIds.map((id) => sql`${id}`), sql`, `)})`,
             sql`${media.provider} IN (${sql.join(providers.map((p) => sql`${p}`), sql`, `)})`,
             or(
-              isNotNull(media.logoPath),
               isNotNull(enrichLocUser.logoPath),
               isNotNull(enrichLocEn.logoPath),
             ),
@@ -302,7 +309,6 @@ export async function enrichBrowseWithLogos<
         .select({
           externalId: media.externalId,
           type: media.type,
-          logoPath: media.logoPath,
           localizedLogoPath: enrichLocEn.logoPath,
         })
         .from(media)
@@ -317,14 +323,14 @@ export async function enrichBrowseWithLogos<
           and(
             sql`${media.externalId} IN (${sql.join(externalIds.map((id) => sql`${id}`), sql`, `)})`,
             sql`${media.provider} IN (${sql.join(providers.map((p) => sql`${p}`), sql`, `)})`,
-            or(isNotNull(media.logoPath), isNotNull(enrichLocEn.logoPath)),
+            isNotNull(enrichLocEn.logoPath),
           ),
         );
 
   if (rows.length === 0) return data;
 
   const logoMap = new Map(
-    rows.map((r) => [`${r.type}-${r.externalId}`, r.localizedLogoPath ?? r.logoPath]),
+    rows.map((r) => [`${r.type}-${r.externalId}`, r.localizedLogoPath]),
   );
 
   return {

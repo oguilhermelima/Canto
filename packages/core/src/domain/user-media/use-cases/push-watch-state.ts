@@ -15,6 +15,7 @@ import {
   findMediaVersionsByMediaId,
   findUserConnectionsByUserId,
 } from "../../../infra/repositories";
+import { findMediaLocalized } from "../../../infra/media/media-localized-repository";
 import {
   findJellyfinItemIdByProviderForUser,
   markJellyfinItemPlayed,
@@ -42,6 +43,15 @@ export async function pushWatchStateToServers(
   const mediaRow = await findMediaById(db, mediaId);
   if (!mediaRow) return;
 
+  // Title for the Jellyfin/Plex search fallback comes from en-US localization.
+  const enLoc = await findMediaLocalized(db, mediaRow.id, "en-US");
+  const mediaWithTitle = {
+    title: enLoc?.title ?? "",
+    provider: mediaRow.provider,
+    externalId: mediaRow.externalId,
+    type: mediaRow.type,
+  };
+
   const connections = await findUserConnectionsByUserId(db, userId);
   const enabled = connections.filter((c) => c.enabled && c.token);
   if (enabled.length === 0) return;
@@ -51,12 +61,12 @@ export async function pushWatchStateToServers(
 
   await Promise.all([
     ...jellyfinConns.map((conn) =>
-      pushJellyfin(db, mediaId, mediaRow, conn, watched).catch((err) =>
+      pushJellyfin(db, mediaId, mediaWithTitle, conn, watched).catch((err) =>
         logError(`jellyfin ${conn.id}`, userId, err),
       ),
     ),
     ...plexConns.map((conn) =>
-      pushPlex(db, mediaId, mediaRow, conn, watched).catch((err) =>
+      pushPlex(db, mediaId, mediaWithTitle, conn, watched).catch((err) =>
         logError(`plex ${conn.id}`, userId, err),
       ),
     ),

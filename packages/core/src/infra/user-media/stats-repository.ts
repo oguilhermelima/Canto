@@ -1,6 +1,7 @@
 import { and, count, desc, eq, gt, gte, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { media, userMediaState } from "@canto/db/schema";
+import { mediaI18n } from "../shared/media-i18n";
 
 export interface UserLibraryStats {
   totalWatched: number;
@@ -85,12 +86,14 @@ export interface UserWatchTimeStats {
 export async function findUserWatchTimeStats(
   db: Database,
   userId: string,
+  language: string,
 ): Promise<UserWatchTimeStats> {
   const yearStart = new Date(new Date().getFullYear(), 0, 1);
   const completedCondition = and(
     eq(userMediaState.userId, userId),
     eq(userMediaState.status, "completed"),
   );
+  const mi = mediaI18n(language);
 
   const [
     [movieRow],
@@ -129,9 +132,11 @@ export async function findUserWatchTimeStats(
       ),
     // Most recent backdrop for visual hero
     db
-      .select({ backdropPath: media.backdropPath, title: media.title })
+      .select({ backdropPath: media.backdropPath, title: mi.title })
       .from(userMediaState)
       .innerJoin(media, eq(userMediaState.mediaId, media.id))
+      .leftJoin(mi.locUser, mi.locUserJoin)
+      .leftJoin(mi.locEn, mi.locEnJoin)
       .where(and(
         eq(userMediaState.userId, userId),
         sql`${userMediaState.status} != 'none'`,

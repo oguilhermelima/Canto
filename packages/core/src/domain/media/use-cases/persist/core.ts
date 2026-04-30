@@ -96,10 +96,7 @@ export async function persistMedia(
       type: normalized.type,
       externalId: normalized.externalId,
       provider: normalized.provider,
-      title: normalized.title,
       originalTitle: normalized.originalTitle,
-      overview: normalized.overview,
-      tagline: normalized.tagline,
       releaseDate: normalized.releaseDate || null,
       year: normalized.year,
       lastAirDate: normalized.lastAirDate || null,
@@ -114,9 +111,7 @@ export async function persistMedia(
       voteCount: normalized.voteCount,
       popularity: normalized.popularity,
       runtime: normalized.runtime,
-      posterPath: normalized.posterPath,
       backdropPath: normalized.backdropPath,
-      logoPath: normalized.logoPath,
       imdbId: normalized.imdbId,
       tvdbId: normalized.tvdbId,
       numberOfSeasons: normalized.numberOfSeasons,
@@ -146,7 +141,9 @@ export async function persistMedia(
     throw new Error("Failed to insert media — conflict without existing row");
   }
 
-  // Dual-write base media columns into media_localization en-US (removed in Phase 1C-δ).
+  // Persist en-US localization. After Phase 1C-δ this is the only home for
+  // per-language title/overview/tagline/posterPath/logoPath — base media row
+  // no longer has these columns.
   await upsertMediaLocalization(
     db,
     inserted.id,
@@ -193,10 +190,7 @@ export async function updateMediaFromNormalized(
     .set({
       externalId: normalized.externalId,
       provider: normalized.provider,
-      title: normalized.title,
       originalTitle: normalized.originalTitle,
-      overview: normalized.overview,
-      tagline: normalized.tagline,
       releaseDate: normalized.releaseDate || null,
       year: normalized.year,
       lastAirDate: normalized.lastAirDate || null,
@@ -211,9 +205,7 @@ export async function updateMediaFromNormalized(
       voteCount: normalized.voteCount,
       popularity: normalized.popularity,
       runtime: normalized.runtime,
-      posterPath: normalized.posterPath,
       backdropPath: normalized.backdropPath,
-      logoPath: normalized.logoPath,
       imdbId: normalized.imdbId,
       tvdbId: normalized.tvdbId,
       ...(hasTvdbSeasons ? {} : {
@@ -236,7 +228,9 @@ export async function updateMediaFromNormalized(
 
   if (!updated) throw new Error("Failed to update media");
 
-  // Dual-write base media columns into media_localization en-US (removed in Phase 1C-δ).
+  // Persist en-US localization. After Phase 1C-δ this is the only home for
+  // per-language title/overview/tagline/posterPath/logoPath — base media row
+  // no longer has these columns.
   await upsertMediaLocalization(
     db,
     mediaId,

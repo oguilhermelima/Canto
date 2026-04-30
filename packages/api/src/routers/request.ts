@@ -40,11 +40,12 @@ export const requestRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const limit = input?.limit ?? 20;
       const offset = input?.cursor ?? 0;
+      const language = ctx.session.user.language;
 
       if (ctx.session.user.role === "admin") {
-        return findAllRequestsPaginated(ctx.db, { limit, offset });
+        return findAllRequestsPaginated(ctx.db, language, { limit, offset });
       }
-      return findRequestsByUserPaginated(ctx.db, ctx.session.user.id, {
+      return findRequestsByUserPaginated(ctx.db, ctx.session.user.id, language, {
         limit,
         offset,
       });

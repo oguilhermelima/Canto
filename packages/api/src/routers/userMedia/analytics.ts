@@ -17,14 +17,14 @@ export const analyticsRouter = createTRPCRouter({
   ),
 
   getWatchTimeStats: protectedProcedure.query(({ ctx }) =>
-    findUserWatchTimeStats(ctx.db, ctx.session.user.id),
+    findUserWatchTimeStats(ctx.db, ctx.session.user.id, ctx.session.user.language),
   ),
 
   getRecentActivity: protectedProcedure.query(({ ctx }) =>
-    findUserRecentActivity(ctx.db, ctx.session.user.id),
+    findUserRecentActivity(ctx.db, ctx.session.user.id, ctx.session.user.language),
   ),
 
   getProfileInsights: protectedProcedure.query(({ ctx }) =>
-    findUserProfileInsights(ctx.db, ctx.session.user.id),
+    findUserProfileInsights(ctx.db, ctx.session.user.id, ctx.session.user.language),
   ),
 });

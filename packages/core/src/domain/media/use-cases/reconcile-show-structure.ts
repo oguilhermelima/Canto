@@ -1,6 +1,4 @@
 import type { Database } from "@canto/db/client";
-import { eq } from "drizzle-orm";
-import { season } from "@canto/db/schema";
 import {
   persistTranslations,
   applyTvdbSeasons,
@@ -13,6 +11,7 @@ import {
   findMediaById,
   updateMedia,
 } from "../../../infra/repositories";
+import { findMediaLocalized } from "../../../infra/media/media-localized-repository";
 import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
 import { logAndSwallow } from "../../../platform/logger/log-error";
 import type { JobDispatcherPort } from "../../shared/ports/job-dispatcher.port";
@@ -40,13 +39,20 @@ export async function reconcileShowStructure(
   const isAlreadyTvdb = row.provider === "tvdb";
   const tvdb = deps.tvdb;
 
+  // Title for log messages + TVDB title-search fallback comes from en-US
+  // localization (the only post-1C-δ home for the canonical English title).
+  const enLoc = await findMediaLocalized(db, row.id, "en-US");
+  const enTitle = enLoc?.title ?? "";
+
   // Resolve TVDB ID
   let tvdbId = isAlreadyTvdb ? row.externalId : row.tvdbId;
   if (!tvdbId) {
-    try {
-      const results = await tvdb.search(row.title, "show");
-      if (results.results.length > 0) tvdbId = results.results[0]!.externalId;
-    } catch { /* not found */ }
+    if (enTitle) {
+      try {
+        const results = await tvdb.search(enTitle, "show");
+        if (results.results.length > 0) tvdbId = results.results[0]!.externalId;
+      } catch { /* not found */ }
+    }
     if (!tvdbId) return;
     if (!isAlreadyTvdb) await updateMedia(db, mediaId, { tvdbId });
   }
@@ -55,7 +61,7 @@ export async function reconcileShowStructure(
   const tvdbData = await tvdb.getMetadata(tvdbId, "show");
 
   if (!tvdbData.seasons || tvdbData.seasons.length === 0) {
-    console.log(`[reconcile] "${row.title}": TVDB has no seasons, skipping`);
+    console.log(`[reconcile] "${enTitle}": TVDB has no seasons, skipping`);
     return;
   }
 
@@ -101,22 +107,20 @@ export async function reconcileShowStructure(
         await overlayTmdbSeasonData(db, mediaId, tmdbMeta.seasons);
       }
 
-      // Update base images from TMDB
-      await updateMedia(db, mediaId, {
-        ...(tmdbMeta.posterPath ? { posterPath: tmdbMeta.posterPath } : {}),
-        ...(tmdbMeta.backdropPath ? { backdropPath: tmdbMeta.backdropPath } : {}),
-        ...(tmdbMeta.logoPath ? { logoPath: tmdbMeta.logoPath } : {}),
-      });
+      // Update base media (only language-agnostic fields after Phase 1C-δ).
+      if (tmdbMeta.backdropPath) {
+        await updateMedia(db, mediaId, { backdropPath: tmdbMeta.backdropPath });
+      }
 
-      // Dual-write the localized image fields into media_localization en-US
-      // (removed in Phase 1C-δ). backdropPath stays only on the base media row.
+      // Persist the localized image fields into media_localization en-US.
+      // backdropPath stays only on the base media row.
       if (tmdbMeta.posterPath || tmdbMeta.logoPath) {
         await upsertMediaLocalization(
           db,
           mediaId,
           "en-US",
           {
-            title: row.title,
+            title: enTitle,
             ...(tmdbMeta.posterPath ? { posterPath: tmdbMeta.posterPath } : {}),
             ...(tmdbMeta.logoPath ? { logoPath: tmdbMeta.logoPath } : {}),
           },
@@ -133,7 +137,7 @@ export async function reconcileShowStructure(
         } as typeof tmdbMeta);
       }
     } catch (err) {
-      console.warn(`[reconcile] TMDB backfill failed for "${row.title}":`, err instanceof Error ? err.message : err);
+      console.warn(`[reconcile] TMDB backfill failed for "${enTitle}":`, err instanceof Error ? err.message : err);
     }
   }
 
@@ -154,6 +158,6 @@ export async function reconcileShowStructure(
 
   const tvdbSeasonCount = tvdbData.seasons.filter((s) => s.number > 0).length;
   console.log(
-    `[reconcile] "${row.title}": TVDB structure applied (${tvdbSeasonCount} seasons, ${tvdbData.numberOfEpisodes ?? 0} eps), ${nonEnLangs.length} translation jobs dispatched`,
+    `[reconcile] "${enTitle}": TVDB structure applied (${tvdbSeasonCount} seasons, ${tvdbData.numberOfEpisodes ?? 0} eps), ${nonEnLangs.length} translation jobs dispatched`,
   );
 }

@@ -59,10 +59,13 @@ export interface LibraryFeedFilterOptions {
   watchedTo?: string;
 }
 
-function buildTitleIlikeCondition(q: string | undefined): SQL | null {
+function buildTitleIlikeCondition(
+  q: string | undefined,
+  titleExpr: SQL,
+): SQL | null {
   if (!q || q.length === 0) return null;
   const pattern = `%${q.replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
-  return sql`${media.title} ILIKE ${pattern}`;
+  return sql`${titleExpr} ILIKE ${pattern}`;
 }
 
 export async function findUserPlaybackProgressFeed(
@@ -72,12 +75,15 @@ export async function findUserPlaybackProgressFeed(
   mediaType?: "movie" | "show",
   filters?: LibraryFeedFilterOptions,
 ): Promise<UserPlaybackProgressFeedRow[]> {
+  const mi = mediaI18n(language);
+  const ei = episodeI18n(language);
+
   const conditions = [
     eq(userPlaybackProgress.userId, userId),
     isNull(userPlaybackProgress.deletedAt),
   ];
   if (mediaType) conditions.push(eq(media.type, mediaType));
-  const titleLike = buildTitleIlikeCondition(filters?.q);
+  const titleLike = buildTitleIlikeCondition(filters?.q, mi.title);
   if (titleLike) conditions.push(titleLike);
   if (filters?.source) conditions.push(eq(userPlaybackProgress.source, filters.source));
   if (filters?.yearMin !== undefined) conditions.push(gte(media.year, filters.yearMin));
@@ -99,8 +105,8 @@ export async function findUserPlaybackProgressFeed(
 
   const orderClauses = (() => {
     switch (filters?.sortBy) {
-      case "name_asc": return [asc(media.title), desc(userPlaybackProgress.id)];
-      case "name_desc": return [desc(media.title), desc(userPlaybackProgress.id)];
+      case "name_asc": return [sql`${mi.title} ASC`, desc(userPlaybackProgress.id)];
+      case "name_desc": return [sql`${mi.title} DESC`, desc(userPlaybackProgress.id)];
       case "year_asc": return [asc(media.year), desc(userPlaybackProgress.id)];
       case "year_desc": return [desc(media.year), desc(userPlaybackProgress.id)];
       case "recently_watched":
@@ -108,9 +114,6 @@ export async function findUserPlaybackProgressFeed(
         return [desc(userPlaybackProgress.lastWatchedAt), desc(userPlaybackProgress.id)];
     }
   })();
-
-  const mi = mediaI18n(language);
-  const ei = episodeI18n(language);
 
   return db
     .select({
@@ -188,12 +191,15 @@ export async function findUserWatchHistoryFeed(
   mediaType?: "movie" | "show",
   filters?: LibraryFeedFilterOptions,
 ): Promise<UserWatchHistoryFeedRow[]> {
+  const mi = mediaI18n(language);
+  const ei = episodeI18n(language);
+
   const conditions = [
     eq(userWatchHistory.userId, userId),
     isNull(userWatchHistory.deletedAt),
   ];
   if (mediaType) conditions.push(eq(media.type, mediaType));
-  const titleLike = buildTitleIlikeCondition(filters?.q);
+  const titleLike = buildTitleIlikeCondition(filters?.q, mi.title);
   if (titleLike) conditions.push(titleLike);
   if (filters?.source) conditions.push(eq(userWatchHistory.source, filters.source));
   if (filters?.yearMin !== undefined) conditions.push(gte(media.year, filters.yearMin));
@@ -215,8 +221,8 @@ export async function findUserWatchHistoryFeed(
 
   const orderClauses = (() => {
     switch (filters?.sortBy) {
-      case "name_asc": return [asc(media.title), desc(userWatchHistory.id)];
-      case "name_desc": return [desc(media.title), desc(userWatchHistory.id)];
+      case "name_asc": return [sql`${mi.title} ASC`, desc(userWatchHistory.id)];
+      case "name_desc": return [sql`${mi.title} DESC`, desc(userWatchHistory.id)];
       case "year_asc": return [asc(media.year), desc(userWatchHistory.id)];
       case "year_desc": return [desc(media.year), desc(userWatchHistory.id)];
       case "recently_watched":
@@ -224,9 +230,6 @@ export async function findUserWatchHistoryFeed(
         return [desc(userWatchHistory.watchedAt), desc(userWatchHistory.id)];
     }
   })();
-
-  const mi = mediaI18n(language);
-  const ei = episodeI18n(language);
 
   return db
     .select({
@@ -425,8 +428,11 @@ export async function findContinueWatchingFeed(
     );
   }
 
+  const mi = mediaI18n(language);
+  const ei = episodeI18n(language);
+
   if (mediaType) conditions.push(eq(media.type, mediaType));
-  const titleLike = buildTitleIlikeCondition(filters?.q);
+  const titleLike = buildTitleIlikeCondition(filters?.q, mi.title);
   if (titleLike) conditions.push(titleLike);
   if (filters?.yearMin !== undefined)
     conditions.push(gte(media.year, filters.yearMin));
@@ -465,9 +471,6 @@ export async function findContinueWatchingFeed(
       )!,
     );
   }
-
-  const mi = mediaI18n(language);
-  const ei = episodeI18n(language);
 
   const rows = await db
     .select({
@@ -579,17 +582,17 @@ export async function findUserMediaPaginated(
 
   const where = and(...conditions);
 
+  const mi = mediaI18n(language);
+
   const sortDir = opts.sortOrder === "asc" ? asc : desc;
   const sortColumn = (() => {
     switch (opts.sortBy) {
       case "rating": return userMediaState.rating;
-      case "title": return media.title;
+      case "title": return mi.title;
       case "year": return media.year;
       default: return userMediaState.updatedAt;
     }
   })();
-
-  const mi = mediaI18n(language);
 
   const selectFields = {
     mediaId: userMediaState.mediaId,

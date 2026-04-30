@@ -77,6 +77,7 @@ export const syncRouter = createTRPCRouter({
     .query(({ ctx, input }) =>
       listMediaVersionGroups(
         ctx.db,
+        ctx.session.user.language,
         { server: input.server, tab: input.tab, search: input.search },
         input.page,
         input.pageSize,

@@ -12,6 +12,7 @@ import type { Database } from "@canto/db/client";
 
 import { logAndSwallow } from "../../../../platform/logger/log-error";
 import { dispatchEnsureMedia } from "../../../../platform/queue/bullmq-dispatcher";
+import { upsertMediaLocalization } from "../../../shared/localization";
 
 /**
  * Persist media extras (credits, videos, watch providers, recommendations).
@@ -63,11 +64,7 @@ export async function persistExtras(
             type: item.result.type,
             externalId: item.result.externalId,
             provider: item.result.provider ?? "tmdb",
-            title: item.result.title,
-            overview: item.result.overview ?? null,
-            posterPath: item.result.posterPath ?? null,
             backdropPath: item.result.backdropPath ?? null,
-            logoPath: item.result.logoPath ?? null,
             releaseDate: item.result.releaseDate || null,
             year: item.result.year ?? null,
             voteAverage: item.result.voteAverage ?? null,
@@ -78,6 +75,20 @@ export async function persistExtras(
           .returning();
         if (inserted) {
           recMediaIdByKey.set(key, inserted.id);
+          // After Phase 1C-δ, title/overview/posterPath/logoPath live only on
+          // media_localization en-US. Persist the stub's i18n payload there.
+          await upsertMediaLocalization(
+            db,
+            inserted.id,
+            "en-US",
+            {
+              title: item.result.title,
+              overview: item.result.overview ?? null,
+              posterPath: item.result.posterPath ?? null,
+              logoPath: item.result.logoPath ?? null,
+            },
+            "tmdb",
+          );
           // Stub row from TMDB's recs/similar payload — enqueue full metadata
           // fetch so read paths (filtered on the metadata aspect having
           // succeeded) can surface it.

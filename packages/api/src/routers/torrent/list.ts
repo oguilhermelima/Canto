@@ -24,7 +24,7 @@ export const torrentListRouter = createTRPCRouter({
     .input(listLiveTorrentsInput)
     .query(async ({ ctx, input }) => {
       const qb = await getDownloadClient();
-      return listLiveTorrents(ctx.db, input.limit, input.cursor, qb);
+      return listLiveTorrents(ctx.db, ctx.session.user.language, input.limit, input.cursor, qb);
     }),
 
   listLiveByMedia: adminProcedure

@@ -39,8 +39,8 @@ export async function getSpotlight(
     return userItems.map(mapPoolItem);
   }
 
-  // Path 2: Global pool fallback
-  const poolItems = await findRecommendedMediaWithBackdrops(db, SPOTLIGHT_LIMIT * 3);
+  // Path 2: Global pool fallback (localization joined inline)
+  const poolItems = await findRecommendedMediaWithBackdrops(db, userLang, SPOTLIGHT_LIMIT * 3);
   if (poolItems.length > 0) {
     const seen = new Set<string>();
     const unique = poolItems.filter((item) => {
@@ -49,7 +49,7 @@ export async function getSpotlight(
       seen.add(key);
       return true;
     });
-    return applyMediaItemsLocalizationOverlay(db, unique.slice(0, SPOTLIGHT_LIMIT).map(mapPoolItem), userLang);
+    return unique.slice(0, SPOTLIGHT_LIMIT).map(mapPoolItem);
   }
 
   // Path 3: TMDB trending fallback (fresh install)

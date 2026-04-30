@@ -5,12 +5,14 @@ import {
   findListBySlug,
   findListItems,
 } from "../../../infra/lists/list-repository";
-import { applyMediaItemsLocalizationOverlay } from "../../shared/localization";
 
 /**
  * `userLang` is supplied by the caller (read from `ctx.session.user.language`
  * in tRPC procedures) — the previous shape did a `SELECT language FROM user`
  * per list-page render even though every caller already had the value.
+ *
+ * After Phase 1C-δ the repository overlays media_localization inline so no
+ * post-call overlay is required.
  */
 export async function viewListBySlug(
   db: Database,
@@ -21,7 +23,7 @@ export async function viewListBySlug(
   const listRow = await findListBySlug(db, input.slug, userId);
   if (!listRow) throw new ListNotFoundError();
 
-  const { items: rawItems, total } = await findListItems(db, listRow.id, {
+  const { items, total } = await findListItems(db, listRow.id, userLang, {
     userId,
     limit: input.limit,
     offset: input.cursor ?? input.offset,
@@ -48,11 +50,5 @@ export async function viewListBySlug(
     showHidden: input.showHidden ?? listRow.showHidden,
   });
 
-  const translated = await applyMediaItemsLocalizationOverlay(
-    db,
-    rawItems.map((i) => i.media),
-    userLang,
-  );
-  const items = rawItems.map((item, idx) => ({ ...item, media: translated[idx]! }));
   return { list: listRow, items, total };
 }

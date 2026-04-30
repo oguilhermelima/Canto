@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { media, userMediaState, userPlaybackProgress } from "@canto/db/schema";
+import { mediaI18n } from "../shared/media-i18n";
 
 export async function findUserMediaState(db: Database, userId: string, mediaId: string) {
   return db.query.userMediaState.findFirst({
@@ -117,19 +118,23 @@ export interface RecentlyCompletedMediaRow {
 export async function findRecentlyCompletedMedia(
   db: Database,
   userId: string,
+  language: string,
   mediaType: "movie" | "show" | undefined,
   limit: number,
 ): Promise<RecentlyCompletedMediaRow[]> {
+  const miExplicit = mediaI18n(language);
   const explicit = await db
     .select({
       mediaId: userMediaState.mediaId,
-      title: media.title,
-      posterPath: media.posterPath,
+      title: miExplicit.title,
+      posterPath: miExplicit.posterPath,
       type: media.type,
       completedAt: userMediaState.updatedAt,
     })
     .from(userMediaState)
     .innerJoin(media, eq(media.id, userMediaState.mediaId))
+    .leftJoin(miExplicit.locUser, miExplicit.locUserJoin)
+    .leftJoin(miExplicit.locEn, miExplicit.locEnJoin)
     .where(
       and(
         eq(userMediaState.userId, userId),
@@ -140,18 +145,21 @@ export async function findRecentlyCompletedMedia(
     .orderBy(desc(userMediaState.updatedAt))
     .limit(limit * 2);
 
+  const miImplicit = mediaI18n(language);
   const implicit =
     !mediaType || mediaType === "movie"
       ? await db
           .select({
             mediaId: userPlaybackProgress.mediaId,
-            title: media.title,
-            posterPath: media.posterPath,
+            title: miImplicit.title,
+            posterPath: miImplicit.posterPath,
             type: media.type,
             completedAt: userPlaybackProgress.lastWatchedAt,
           })
           .from(userPlaybackProgress)
           .innerJoin(media, eq(media.id, userPlaybackProgress.mediaId))
+          .leftJoin(miImplicit.locUser, miImplicit.locUserJoin)
+          .leftJoin(miImplicit.locEn, miImplicit.locEnJoin)
           .where(
             and(
               eq(userPlaybackProgress.userId, userId),

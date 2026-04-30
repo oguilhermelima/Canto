@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, not, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, inArray, isNotNull, not, sql } from "drizzle-orm";
 import { getQualityFilters, getWeightedScoreOrder } from "../../domain/recommendations/rules/recommendation-filters";
 import type { Database } from "@canto/db/client";
 import {
@@ -28,6 +28,7 @@ const metadataFetchedExists = sql`EXISTS (
 )`;
 import type { RecsFilters } from "../../domain/recommendations/types/recs-filters";
 import { buildRecsFilterConditions, recsSortOrder } from "../recommendations/recs-filter-builder";
+import { mediaI18n } from "../shared/media-i18n";
 
 // ── Credits ──
 
@@ -60,41 +61,64 @@ export async function findRecommendationsBySource(
   db: Database,
   sourceMediaId: string,
   sourceType: string,
+  language: string,
 ) {
+  const mi = mediaI18n(language);
   return db
     .select({
       id: media.id,
       externalId: media.externalId,
       provider: media.provider,
       mediaType: media.type,
-      title: media.title,
-      overview: media.overview,
-      posterPath: media.posterPath,
+      title: mi.title,
+      overview: mi.overview,
+      posterPath: mi.posterPath,
       backdropPath: media.backdropPath,
-      logoPath: media.logoPath,
+      logoPath: mi.logoPath,
       releaseDate: media.releaseDate,
       voteAverage: media.voteAverage,
     })
     .from(mediaRecommendation)
     .innerJoin(media, eq(media.id, mediaRecommendation.mediaId))
+    .leftJoin(mi.locUser, mi.locUserJoin)
+    .leftJoin(mi.locEn, mi.locEnJoin)
     .where(and(
       eq(mediaRecommendation.sourceMediaId, sourceMediaId),
       eq(mediaRecommendation.sourceType, sourceType),
     ));
 }
 
-export async function findRecommendedMediaWithBackdrops(db: Database, limit: number) {
-  return db.query.media.findMany({
-    where: and(
-      sql`${media.id} IN (SELECT media_id FROM media_recommendation)`,
-      metadataFetchedExists,
-      isNotNull(media.backdropPath),
-      sql`(${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL)`,
-      ...getQualityFilters(),
-    ),
-    orderBy: [getWeightedScoreOrder()],
-    limit,
-  });
+export async function findRecommendedMediaWithBackdrops(
+  db: Database,
+  language: string,
+  limit: number,
+) {
+  const mi = mediaI18n(language);
+  const mediaCols = getTableColumns(media);
+
+  return db
+    .select({
+      ...mediaCols,
+      title: mi.title,
+      overview: mi.overview,
+      posterPath: mi.posterPath,
+      logoPath: mi.logoPath,
+      tagline: mi.tagline,
+    })
+    .from(media)
+    .leftJoin(mi.locUser, mi.locUserJoin)
+    .leftJoin(mi.locEn, mi.locEnJoin)
+    .where(
+      and(
+        sql`${media.id} IN (SELECT media_id FROM media_recommendation)`,
+        metadataFetchedExists,
+        isNotNull(media.backdropPath),
+        sql`(${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL)`,
+        ...getQualityFilters(),
+      ),
+    )
+    .orderBy(getWeightedScoreOrder())
+    .limit(limit);
 }
 
 export async function findGlobalRecommendations(
@@ -102,6 +126,7 @@ export async function findGlobalRecommendations(
   excludeItems: Array<{ externalId: number; provider: string }>,
   limit: number,
   offset: number,
+  language: string,
   filters: RecsFilters = {},
 ) {
   const released = sql`(${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL)`;
@@ -117,6 +142,19 @@ export async function findGlobalRecommendations(
         )
       : [];
 
+  const mi = mediaI18n(language);
+  const filterConditions = buildRecsFilterConditions(filters, {
+    id: media.id,
+    title: mi.title,
+    genreIds: media.genreIds,
+    originalLanguage: media.originalLanguage,
+    voteAverage: media.voteAverage,
+    releaseDate: media.releaseDate,
+    runtime: media.runtime,
+    contentRating: media.contentRating,
+    status: media.status,
+  });
+
   const where = and(
     sql`${media.id} IN (SELECT media_id FROM media_recommendation)`,
     metadataFetchedExists,
@@ -125,18 +163,39 @@ export async function findGlobalRecommendations(
     ...(excludeConditions.length > 0
       ? [not(sql`(${sql.join(excludeConditions, sql` OR `)})`)]
       : []),
-    ...buildRecsFilterConditions(filters),
+    ...filterConditions,
   );
 
-  const customSort = recsSortOrder(filters.sortBy);
+  const customSort = recsSortOrder(filters.sortBy, {
+    id: media.id,
+    title: mi.title,
+    genreIds: media.genreIds,
+    originalLanguage: media.originalLanguage,
+    voteAverage: media.voteAverage,
+    releaseDate: media.releaseDate,
+    runtime: media.runtime,
+    contentRating: media.contentRating,
+    status: media.status,
+  });
   const orderBy = customSort ? [customSort] : [getWeightedScoreOrder()];
 
-  const rows = await db.query.media.findMany({
-    where,
-    orderBy,
-    limit,
-    offset,
-  });
+  const mediaCols = getTableColumns(media);
+  const rows = await db
+    .select({
+      ...mediaCols,
+      title: mi.title,
+      overview: mi.overview,
+      posterPath: mi.posterPath,
+      logoPath: mi.logoPath,
+      tagline: mi.tagline,
+    })
+    .from(media)
+    .leftJoin(mi.locUser, mi.locUserJoin)
+    .leftJoin(mi.locEn, mi.locEnJoin)
+    .where(where)
+    .orderBy(...orderBy)
+    .limit(limit)
+    .offset(offset);
 
   if (rows.length === 0) return rows;
 

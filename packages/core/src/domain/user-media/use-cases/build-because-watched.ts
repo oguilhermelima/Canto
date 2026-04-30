@@ -34,6 +34,7 @@ export async function buildBecauseWatched(
   const completed = await findRecentlyCompletedMedia(
     db,
     userId,
+    language,
     undefined, // both signal-source types — filter the rec output, not the seed
     MAX_COMPLETED_SOURCES,
   );

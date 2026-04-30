@@ -21,6 +21,7 @@ import {
   updateDownload,
   updateMedia,
 } from "@canto/core/infra/repositories";
+import { findMediaLocalized } from "@canto/core/infra/media/media-localized-repository";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 
 /* -------------------------------------------------------------------------- */
@@ -112,6 +113,7 @@ export async function handleImportTorrents(): Promise<void> {
 
         // Continuous download: try to grab next episode (matching quality)
         if (updated.mediaId && mediaRow) {
+          const enLoc = await findMediaLocalized(db, mediaRow.id, "en-US");
           const indexers = await buildIndexers();
           void tryContinuousDownload(
             db,
@@ -119,7 +121,7 @@ export async function handleImportTorrents(): Promise<void> {
               id: mediaRow.id,
               type: mediaRow.type,
               continuousDownload: mediaRow.continuousDownload,
-              title: mediaRow.title,
+              title: enLoc?.title ?? "",
             },
             row.seasonNumber,
             row.episodeNumbers,
@@ -149,9 +151,12 @@ export async function handleImportTorrents(): Promise<void> {
       if (!mediaRow) continue;
       const files = await findMediaFilesByMediaId(db, mediaId);
       const importedCount = files.filter((f) => f.status === "imported").length;
+      // Title now lives on media_localization; en-US is the canonical row used
+      // by media-server search (Jellyfin/Plex titles are en-US labelled).
+      const enLoc = await findMediaLocalized(db, mediaRow.id, "en-US");
       importedMedias.push({
         id: mediaRow.id,
-        title: mediaRow.title,
+        title: enLoc?.title ?? "",
         type: mediaRow.type,
         externalId: mediaRow.externalId,
         provider: mediaRow.provider,

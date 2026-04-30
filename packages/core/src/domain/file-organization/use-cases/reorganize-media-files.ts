@@ -17,6 +17,7 @@ import {
   updateMediaFile,
   updateDownload,
 } from "../../../infra/repositories";
+import { findMediaLocalized } from "../../../infra/media/media-localized-repository";
 
 // ── Public types ───────────────────────────────────────────────────────────
 
@@ -84,8 +85,10 @@ async function buildRenameList(
       ? mediaRow.tvdbId
       : mediaRow.externalId;
 
+  // Filenames mirror the canonical en-US title.
+  const enLoc = await findMediaLocalized(db, mediaRow.id, "en-US");
   const mediaNaming: MediaNamingInfo = {
-    title: mediaRow.title,
+    title: enLoc?.title ?? "",
     year: mediaRow.year,
     externalId: namingExternalId,
     provider: effectiveProvider,

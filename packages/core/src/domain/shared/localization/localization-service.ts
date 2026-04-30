@@ -269,7 +269,11 @@ export async function upsertEpisodeLocalization(
 
 export interface OverlayableMedia {
   id: string;
-  title: string;
+  // Title/overview/tagline/posterPath/logoPath now live exclusively on
+  // `media_localization` — overlay reads them from there. Inputs may carry
+  // stale copies (legacy callers) but the overlay always sources from the
+  // localized row.
+  title?: string | null;
   overview?: string | null;
   tagline?: string | null;
   posterPath?: string | null;
@@ -293,27 +297,45 @@ export interface OverlayableSeason {
  * with en-US fallback. Preserves every other column on the row. Drop-in
  * replacement for the legacy `applyMediaTranslation` helper but routed through
  * the unified localization read path.
+ *
+ * After Phase 1C-δ the base `media` row no longer carries title/overview/
+ * tagline/posterPath/logoPath — the overlay is the canonical reader for those
+ * fields. When no localization row exists (theoretically only possible for
+ * unpersisted media), the original row is returned unchanged.
  */
 export async function applyMediaLocalizationOverlay<T extends OverlayableMedia>(
   db: Database,
   row: T,
   language: string,
-): Promise<T> {
+): Promise<T & {
+  title: string;
+  overview: string | null;
+  tagline: string | null;
+  posterPath: string | null;
+  logoPath: string | null;
+}> {
   const loc = await findMediaLocalized(db, row.id, language);
-  if (!loc) return row;
-  return {
-    ...row,
-    title: loc.title,
-    overview: loc.overview,
-    tagline: loc.tagline,
-    posterPath: loc.posterPath,
-    logoPath: loc.logoPath,
-  };
+  const overlay = loc
+    ? {
+        title: loc.title,
+        overview: loc.overview,
+        tagline: loc.tagline,
+        posterPath: loc.posterPath,
+        logoPath: loc.logoPath,
+      }
+    : {
+        title: row.title ?? "",
+        overview: row.overview ?? null,
+        tagline: row.tagline ?? null,
+        posterPath: row.posterPath ?? null,
+        logoPath: row.logoPath ?? null,
+      };
+  return { ...row, ...overlay } as T & typeof overlay;
 }
 
 export interface OverlayableMediaItem {
   id?: string | null;
-  title: string;
+  title?: string | null;
   overview?: string | null;
   posterPath?: string | null;
   logoPath?: string | null;
@@ -333,21 +355,28 @@ export async function applyMediaItemsLocalizationOverlay<
   const ids = items
     .map((i) => i.id)
     .filter((id): id is string => typeof id === "string" && id.length > 0);
-  if (ids.length === 0) return items;
-  const localized = await findMediaLocalizedMany(db, ids, language);
-  if (localized.length === 0) return items;
+  const localized = ids.length > 0
+    ? await findMediaLocalizedMany(db, ids, language)
+    : [];
   const locById = new Map(localized.map((l) => [l.id, l]));
   return items.map((item) => {
-    if (!item.id) return item;
-    const loc = locById.get(item.id);
-    if (!loc) return item;
+    const loc = item.id ? locById.get(item.id) : undefined;
+    if (!loc) {
+      return {
+        ...item,
+        title: item.title ?? "",
+        overview: item.overview ?? null,
+        posterPath: item.posterPath ?? null,
+        logoPath: item.logoPath ?? null,
+      } as T;
+    }
     return {
       ...item,
       title: loc.title,
       overview: loc.overview,
       posterPath: loc.posterPath,
       logoPath: loc.logoPath,
-    };
+    } as T;
   });
 }
 

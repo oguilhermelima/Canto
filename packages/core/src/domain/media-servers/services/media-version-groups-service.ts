@@ -120,11 +120,12 @@ function matchesTab(
  */
 export async function listMediaVersionGroups(
   db: Database,
+  language: string,
   filters: MediaVersionGroupsFilters,
   page: number,
   pageSize: number,
 ): Promise<MediaVersionGroupsPage> {
-  const rows = await fetchMediaVersionsWithMedia(db, {
+  const rows = await fetchMediaVersionsWithMedia(db, language, {
     server: filters.server,
     search: filters.search,
   });

@@ -330,11 +330,11 @@ export const media = pgTable(
     externalId: integer("external_id").notNull(),
     provider: varchar("provider", { length: 20 }).notNull(), // 'tmdb' | 'tvdb'
 
-    // Identity
-    title: varchar("title", { length: 500 }).notNull(),
+    // Identity — per-language `title`, `overview`, `tagline`, `posterPath`,
+    // `logoPath` were dropped in Phase 1C-δ. They live exclusively on
+    // `media_localization` now (en-US row is canonical, COALESCEd with the
+    // user's language at read time).
     originalTitle: varchar("original_title", { length: 500 }),
-    overview: text("overview"),
-    tagline: varchar("tagline", { length: 500 }),
 
     // Dates
     releaseDate: date("release_date"),
@@ -356,10 +356,8 @@ export const media = pgTable(
     popularity: real("popularity"),
     runtime: integer("runtime"),
 
-    // Images
-    posterPath: varchar("poster_path", { length: 255 }),
+    // Images (language-agnostic only; poster/logo live on media_localization)
     backdropPath: varchar("backdrop_path", { length: 255 }),
-    logoPath: varchar("logo_path", { length: 255 }),
 
     // External IDs
     imdbId: varchar("imdb_id", { length: 20 }),
@@ -443,13 +441,17 @@ export const media = pgTable(
     // `findGlobalRecommendations`. Without this the sort forces a full seq
     // scan + in-memory sort (~2.4s); with it, Postgres does an index scan
     // and finishes in single-digit milliseconds.
+    //
+    // Both `poster_path` and `metadata_updated_at` were dropped (1C-δ moved
+    // poster to `media_localization`; aspect-state cleanup folded staleness
+    // into `media_aspect_state`). The quality-filter `EXISTS` subqueries
+    // enforce poster presence and metadata freshness at query time — the
+    // index now only narrows by the 50-vote floor.
     index("idx_media_rec_score")
       .on(
         sql`((${table.voteCount}::numeric * ${table.voteAverage}::numeric + 650.0) / (${table.voteCount}::numeric + 100)) DESC`,
       )
-      .where(
-        sql`${table.posterPath} IS NOT NULL AND ${table.voteCount} >= 50`,
-      ),
+      .where(sql`${table.voteCount} >= 50`),
   ],
 );
 

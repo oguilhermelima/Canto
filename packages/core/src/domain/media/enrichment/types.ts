@@ -33,13 +33,15 @@ export type ApiCapability =
  * Full media row fields strategies actually read. Wider than `CadenceMediaRow`
  * (which only models scheduling-relevant columns) because strategies need
  * provider/external identity to dispatch their inline calls.
+ *
+ * Note: title is no longer carried on the media row after Phase 1C-δ; readers
+ * that need a display title should look it up via the localization service.
  */
 export interface EnrichmentMediaRow extends CadenceMediaRow {
   id: string;
   externalId: number;
   tvdbId: number | null;
   imdbId: string | null;
-  title: string;
 }
 
 /**

@@ -16,6 +16,7 @@ import {
   findMediaFilesByDownloadId,
   updateDownload,
 } from "../../../infra/repositories";
+import { findMediaLocalized } from "../../../infra/media/media-localized-repository";
 import { parseVideoFiles } from "../../../platform/fs/filesystem";
 
 import { resolveSavePath } from "./import-torrent/shared";
@@ -61,6 +62,24 @@ export async function autoImportTorrent(
       ? await findFolderById(db, mediaRow.libraryId)
       : await findDefaultFolder(db);
 
+    // Naming uses the canonical en-US title — release groups and library
+    // folders mirror the English title, not the user's localized variant.
+    const enLoc = await findMediaLocalized(db, mediaRow.id, "en-US");
+    const globalTvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
+    const effectiveProvider = getEffectiveProviderSync(mediaRow, globalTvdbEnabled);
+    const namingExternalId =
+      effectiveProvider === "tvdb" && mediaRow.tvdbId
+        ? mediaRow.tvdbId
+        : mediaRow.externalId;
+
+    const mediaNaming = {
+      title: enLoc?.title ?? "",
+      year: mediaRow.year,
+      externalId: namingExternalId,
+      provider: effectiveProvider,
+      type: mediaRow.type,
+    };
+
     const files = await client.getTorrentFiles(torrentRow.hash);
     const videoFiles = files.filter((f) => isVideoFile(f.name));
     const subtitleFiles = files.filter((f) => isSubtitleFile(f.name));
@@ -72,32 +91,17 @@ export async function autoImportTorrent(
 
     if (mediaRow.type === "movie" && videoFiles.length > 1) {
       console.warn(
-        `[auto-import] Movie "${mediaRow.title}" has ${videoFiles.length} video files — skipping auto-import`,
+        `[auto-import] Movie "${mediaNaming.title}" has ${videoFiles.length} video files — skipping auto-import`,
       );
       await createNotification(db, {
         title: "Movie import skipped",
-        message: `"${mediaRow.title}" has ${videoFiles.length} video files — expected a single file for movies.`,
+        message: `"${mediaNaming.title}" has ${videoFiles.length} video files — expected a single file for movies.`,
         type: "movie_multi_file",
         mediaId: mediaRow.id,
       });
       await updateDownload(db, torrentRow.id, { importing: false });
       return;
     }
-
-    const globalTvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
-    const effectiveProvider = getEffectiveProviderSync(mediaRow, globalTvdbEnabled);
-    const namingExternalId =
-      effectiveProvider === "tvdb" && mediaRow.tvdbId
-        ? mediaRow.tvdbId
-        : mediaRow.externalId;
-
-    const mediaNaming = {
-      title: mediaRow.title,
-      year: mediaRow.year,
-      externalId: namingExternalId,
-      provider: effectiveProvider,
-      type: mediaRow.type,
-    };
 
     let primarySeasonNumber = torrentRow.seasonNumber ?? undefined;
     if (!primarySeasonNumber && mediaRow.type === "show") {
@@ -112,7 +116,7 @@ export async function autoImportTorrent(
     const parsedFiles = parseVideoFiles(videoFiles, mediaRow, mediaNaming, torrentRow, primarySeasonNumber);
 
     if (parsedFiles.length === 0) {
-      console.warn(`[auto-import] No valid files to import for "${mediaRow.title}" — all episodes unresolvable`);
+      console.warn(`[auto-import] No valid files to import for "${mediaNaming.title}" — all episodes unresolvable`);
       await updateDownload(db, torrentRow.id, { importing: false });
       return;
     }
@@ -125,10 +129,10 @@ export async function autoImportTorrent(
     if (importMethod === "local") {
       const libraryPath = libRow?.libraryPath;
       if (!libraryPath) {
-        console.error(`[auto-import] No library path configured for "${mediaRow.title}" — configure paths in Settings > Downloads`);
+        console.error(`[auto-import] No library path configured for "${mediaNaming.title}" — configure paths in Settings > Downloads`);
         await createNotification(db, {
           title: "Import failed — paths not configured",
-          message: `No library path set for "${mediaRow.title}". Go to Settings > Downloads to configure your paths.`,
+          message: `No library path set for "${mediaNaming.title}". Go to Settings > Downloads to configure your paths.`,
           type: "import_failed",
           mediaId: mediaRow.id,
         });
@@ -167,10 +171,10 @@ export async function autoImportTorrent(
     } else {
       const libraryBasePath = libRow?.libraryPath;
       if (!libraryBasePath) {
-        console.error(`[auto-import] No library path configured for "${mediaRow.title}" — configure paths in Settings > Downloads`);
+        console.error(`[auto-import] No library path configured for "${mediaNaming.title}" — configure paths in Settings > Downloads`);
         await createNotification(db, {
           title: "Import failed — paths not configured",
-          message: `No library path set for "${mediaRow.title}". Go to Settings > Downloads to configure your paths.`,
+          message: `No library path set for "${mediaNaming.title}". Go to Settings > Downloads to configure your paths.`,
           type: "import_failed",
           mediaId: mediaRow.id,
         });
@@ -226,11 +230,15 @@ export async function autoImportTorrent(
         contentPath,
       });
 
-      console.log(`[auto-import] [${importMethod}] Imported ${importedCount}/${totalExpected} file(s) for "${mediaRow.title}"`);
-      hooks?.onImported?.(mediaRow);
+      console.log(`[auto-import] [${importMethod}] Imported ${importedCount}/${totalExpected} file(s) for "${mediaNaming.title}"`);
+      hooks?.onImported?.({
+        ...mediaRow,
+        title: mediaNaming.title,
+        libraryId: mediaRow.libraryId ?? null,
+      });
       await createNotification(db, {
         title: "Import complete",
-        message: `Imported ${importedCount} file(s) for "${mediaRow.title}"`,
+        message: `Imported ${importedCount} file(s) for "${mediaNaming.title}"`,
         type: "import_success",
         mediaId: mediaRow.id,
       });
@@ -244,27 +252,27 @@ export async function autoImportTorrent(
       });
 
       console.warn(
-        `[auto-import] [${importMethod}] Partial import: ${importedCount}/${totalExpected} file(s) for "${mediaRow.title}" — will retry (attempt ${newAttempts}/5)`,
+        `[auto-import] [${importMethod}] Partial import: ${importedCount}/${totalExpected} file(s) for "${mediaNaming.title}" — will retry (attempt ${newAttempts}/5)`,
       );
 
       if (newAttempts >= 5) {
         await createNotification(db, {
           title: "Import failed",
-          message: `Failed to import "${mediaRow.title}" after ${newAttempts} attempts. Check your library paths in Settings > Downloads or try importing manually.`,
+          message: `Failed to import "${mediaNaming.title}" after ${newAttempts} attempts. Check your library paths in Settings > Downloads or try importing manually.`,
           type: "import_failed",
           mediaId: mediaRow.id,
         });
       } else if (importedCount > 0) {
         await createNotification(db, {
           title: "Partial import",
-          message: `Imported ${importedCount} of ${totalExpected} file(s) for "${mediaRow.title}". Will retry remaining files.`,
+          message: `Imported ${importedCount} of ${totalExpected} file(s) for "${mediaNaming.title}". Will retry remaining files.`,
           type: "import_failed",
           mediaId: mediaRow.id,
         });
       } else if (newAttempts === 1) {
         await createNotification(db, {
           title: "Import retry",
-          message: `Could not import "${mediaRow.title}" — will retry. If this persists, check your library and download paths in Settings > Downloads.`,
+          message: `Could not import "${mediaNaming.title}" — will retry. If this persists, check your library and download paths in Settings > Downloads.`,
           type: "import_warning",
           mediaId: mediaRow.id,
         });

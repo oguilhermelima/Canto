@@ -2,11 +2,14 @@ import type { Database } from "@canto/db/client";
 import type { GetAllCollectionItemsInput } from "@canto/validators";
 import { findUserCustomCollectionItems } from "../../../infra/lists/list-repository";
 import { getCollectionLayout } from "./collection-layout";
-import { applyMediaItemsLocalizationOverlay } from "../../shared/localization";
 
 /**
  * `userLang` is supplied by the caller (read from `ctx.session.user.language`
  * in tRPC procedures) so we don't `SELECT language FROM user` per page load.
+ *
+ * After Phase 1C-δ the repository overlays media_localization inline (single
+ * query with COALESCE on user-lang + en-US), so no post-call overlay is
+ * required.
  */
 export async function viewAllCollectionItems(
   db: Database,
@@ -16,9 +19,10 @@ export async function viewAllCollectionItems(
 ) {
   const layout = await getCollectionLayout(db, userId, userLang);
 
-  const { items: rawItems, total } = await findUserCustomCollectionItems(
+  const { items, total } = await findUserCustomCollectionItems(
     db,
     userId,
+    userLang,
     layout.hiddenListIds,
     {
       limit: input.limit,
@@ -44,16 +48,6 @@ export async function viewAllCollectionItems(
       showHidden: input.showHidden,
     },
   );
-
-  const translated = await applyMediaItemsLocalizationOverlay(
-    db,
-    rawItems.map((i) => i.media),
-    userLang,
-  );
-  const items = rawItems.map((item, idx) => ({
-    ...item,
-    media: translated[idx]!,
-  }));
 
   return { items, total };
 }

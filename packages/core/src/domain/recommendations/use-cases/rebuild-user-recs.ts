@@ -1,4 +1,5 @@
 import { desc, eq, and, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { getQualityFilters, getWeightedScoreOrder } from "../rules/recommendation-filters";
 import {
   engagementMultiplier,
@@ -11,6 +12,7 @@ import {
   list,
   listItem,
   media,
+  mediaLocalization,
   mediaRecommendation,
 } from "@canto/db/schema";
 import {
@@ -19,6 +21,19 @@ import {
   type UserRecommendationRow,
 } from "../../../infra/recommendations/user-recommendation-repository";
 import { findUserEngagementStates } from "../../../infra/user-media/state-repository";
+
+const EN = "en-US";
+
+/**
+ * Aliased en-US `media_localization` row used by the rec-candidate selects.
+ * Each query that references `recCandidateColumns` must LEFT JOIN this alias
+ * on `(mediaId, language='en-US')` so the COALESCE-free columns resolve.
+ */
+const recLocEn = alias(mediaLocalization, "rec_loc_en");
+const recLocEnJoin = and(
+  eq(recLocEn.mediaId, media.id),
+  eq(recLocEn.language, EN),
+)!;
 
 const MAX_SEEDS = 10;
 const MAX_SEEDS_FROM_COLLECTIONS = 5;
@@ -33,18 +48,19 @@ const ENGAGEMENT_BASE_WEIGHT = 0.85;
  * Columns we read from `media` in every seed-recommendation query so we can
  * persist them denormalized on `user_recommendation`. Centralized here so the
  * SELECT shape stays in lockstep across the watchlist / collection / server
- * paths.
+ * paths. Per-language fields (title/overview/posterPath/logoPath) source
+ * from the en-US `media_localization` row joined as `recLocEn`.
  */
 const recCandidateColumns = {
   mediaId: mediaRecommendation.mediaId,
   externalId: media.externalId,
   provider: media.provider,
   type: media.type,
-  title: media.title,
-  overview: media.overview,
-  posterPath: media.posterPath,
+  title: recLocEn.title,
+  overview: recLocEn.overview,
+  posterPath: recLocEn.posterPath,
   backdropPath: media.backdropPath,
-  logoPath: media.logoPath,
+  logoPath: recLocEn.logoPath,
   voteAverage: media.voteAverage,
   year: media.year,
   releaseDate: media.releaseDate,
@@ -62,7 +78,7 @@ type RecCandidate = {
   externalId: number;
   provider: string;
   type: string;
-  title: string;
+  title: string | null;
   overview: string | null;
   posterPath: string | null;
   backdropPath: string | null;
@@ -86,7 +102,7 @@ function toRecRow(candidate: RecCandidate, weight: number): UserRecommendationRo
     externalId: candidate.externalId,
     provider: candidate.provider,
     type: candidate.type,
-    title: candidate.title,
+    title: candidate.title ?? "",
     overview: candidate.overview,
     posterPath: candidate.posterPath,
     backdropPath: candidate.backdropPath,
@@ -191,6 +207,7 @@ async function processSeed(
     .select(recCandidateColumns)
     .from(mediaRecommendation)
     .innerJoin(media, eq(media.id, mediaRecommendation.mediaId))
+    .leftJoin(recLocEn, recLocEnJoin)
     .where(and(
       eq(mediaRecommendation.sourceMediaId, seedMediaId),
       ...getQualityFilters(),
@@ -390,6 +407,7 @@ export async function addMediaToUserRecs(
     .select(recCandidateColumns)
     .from(mediaRecommendation)
     .innerJoin(media, eq(media.id, mediaRecommendation.mediaId))
+    .leftJoin(recLocEn, recLocEnJoin)
     .where(and(
       eq(mediaRecommendation.sourceMediaId, mediaId),
       ...getQualityFilters(),

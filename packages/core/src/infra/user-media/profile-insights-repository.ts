@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, gt, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { media, userMediaState } from "@canto/db/schema";
+import { mediaI18n } from "../shared/media-i18n";
 
 export async function findUserRatingDistribution(
   db: Database,
@@ -56,13 +57,15 @@ export interface UserRecentActivityRow {
 export async function findUserRecentActivity(
   db: Database,
   userId: string,
+  language: string,
   limit = 8,
 ): Promise<UserRecentActivityRow[]> {
+  const mi = mediaI18n(language);
   return db
     .select({
       mediaId: userMediaState.mediaId,
-      title: media.title,
-      posterPath: media.posterPath,
+      title: mi.title,
+      posterPath: mi.posterPath,
       mediaType: media.type,
       status: userMediaState.status,
       rating: userMediaState.rating,
@@ -71,6 +74,8 @@ export async function findUserRecentActivity(
     })
     .from(userMediaState)
     .innerJoin(media, eq(userMediaState.mediaId, media.id))
+    .leftJoin(mi.locUser, mi.locUserJoin)
+    .leftJoin(mi.locEn, mi.locEnJoin)
     .where(
       and(
         eq(userMediaState.userId, userId),
@@ -99,6 +104,7 @@ export interface ProfileInsights {
 export async function findUserProfileInsights(
   db: Database,
   userId: string,
+  language: string,
 ): Promise<ProfileInsights> {
   const active = and(
     eq(userMediaState.userId, userId),
@@ -141,48 +147,68 @@ export async function findUserProfileInsights(
       .orderBy(desc(count())),
 
     // Hidden gem: user rated much higher than public
-    db.select({
-      title: media.title,
-      posterPath: media.posterPath,
-      backdropPath: media.backdropPath,
-      userRating: userMediaState.rating,
-      publicRating: media.voteAverage,
-    })
-      .from(userMediaState)
-      .innerJoin(media, eq(userMediaState.mediaId, media.id))
-      .where(and(rated, sql`${media.voteAverage} > 0`))
-      .orderBy(sql`${userMediaState.rating} - ${media.voteAverage} desc`)
-      .limit(1),
+    (() => {
+      const mi = mediaI18n(language);
+      return db.select({
+        title: mi.title,
+        posterPath: mi.posterPath,
+        backdropPath: media.backdropPath,
+        userRating: userMediaState.rating,
+        publicRating: media.voteAverage,
+      })
+        .from(userMediaState)
+        .innerJoin(media, eq(userMediaState.mediaId, media.id))
+        .leftJoin(mi.locUser, mi.locUserJoin)
+        .leftJoin(mi.locEn, mi.locEnJoin)
+        .where(and(rated, sql`${media.voteAverage} > 0`))
+        .orderBy(sql`${userMediaState.rating} - ${media.voteAverage} desc`)
+        .limit(1);
+    })(),
 
     // Unpopular opinion: user rated much lower than public
-    db.select({
-      title: media.title,
-      posterPath: media.posterPath,
-      backdropPath: media.backdropPath,
-      userRating: userMediaState.rating,
-      publicRating: media.voteAverage,
-    })
-      .from(userMediaState)
-      .innerJoin(media, eq(userMediaState.mediaId, media.id))
-      .where(and(rated, sql`${media.voteAverage} > 0`))
-      .orderBy(sql`${userMediaState.rating} - ${media.voteAverage} asc`)
-      .limit(1),
+    (() => {
+      const mi = mediaI18n(language);
+      return db.select({
+        title: mi.title,
+        posterPath: mi.posterPath,
+        backdropPath: media.backdropPath,
+        userRating: userMediaState.rating,
+        publicRating: media.voteAverage,
+      })
+        .from(userMediaState)
+        .innerJoin(media, eq(userMediaState.mediaId, media.id))
+        .leftJoin(mi.locUser, mi.locUserJoin)
+        .leftJoin(mi.locEn, mi.locEnJoin)
+        .where(and(rated, sql`${media.voteAverage} > 0`))
+        .orderBy(sql`${userMediaState.rating} - ${media.voteAverage} asc`)
+        .limit(1);
+    })(),
 
     // Shortest completed movie
-    db.select({ title: media.title, runtime: media.runtime })
-      .from(userMediaState)
-      .innerJoin(media, eq(userMediaState.mediaId, media.id))
-      .where(and(completed, eq(media.type, "movie"), sql`${media.runtime} > 0`))
-      .orderBy(asc(media.runtime))
-      .limit(1),
+    (() => {
+      const mi = mediaI18n(language);
+      return db.select({ title: mi.title, runtime: media.runtime })
+        .from(userMediaState)
+        .innerJoin(media, eq(userMediaState.mediaId, media.id))
+        .leftJoin(mi.locUser, mi.locUserJoin)
+        .leftJoin(mi.locEn, mi.locEnJoin)
+        .where(and(completed, eq(media.type, "movie"), sql`${media.runtime} > 0`))
+        .orderBy(asc(media.runtime))
+        .limit(1);
+    })(),
 
     // Longest completed movie
-    db.select({ title: media.title, runtime: media.runtime })
-      .from(userMediaState)
-      .innerJoin(media, eq(userMediaState.mediaId, media.id))
-      .where(and(completed, eq(media.type, "movie"), sql`${media.runtime} > 0`))
-      .orderBy(desc(media.runtime))
-      .limit(1),
+    (() => {
+      const mi = mediaI18n(language);
+      return db.select({ title: mi.title, runtime: media.runtime })
+        .from(userMediaState)
+        .innerJoin(media, eq(userMediaState.mediaId, media.id))
+        .leftJoin(mi.locUser, mi.locUserJoin)
+        .leftJoin(mi.locEn, mi.locEnJoin)
+        .where(and(completed, eq(media.type, "movie"), sql`${media.runtime} > 0`))
+        .orderBy(desc(media.runtime))
+        .limit(1);
+    })(),
 
     // Average runtime
     db.select({ avg: sql<number>`coalesce(avg(${media.runtime}), 0)` })
@@ -227,12 +253,17 @@ export async function findUserProfileInsights(
       .where(active),
 
     // Oldest title
-    db.select({ title: media.title, year: media.year })
-      .from(userMediaState)
-      .innerJoin(media, eq(userMediaState.mediaId, media.id))
-      .where(and(active, sql`${media.year} is not null`))
-      .orderBy(asc(media.year))
-      .limit(1),
+    (() => {
+      const mi = mediaI18n(language);
+      return db.select({ title: mi.title, year: media.year })
+        .from(userMediaState)
+        .innerJoin(media, eq(userMediaState.mediaId, media.id))
+        .leftJoin(mi.locUser, mi.locUserJoin)
+        .leftJoin(mi.locEn, mi.locEnJoin)
+        .where(and(active, sql`${media.year} is not null`))
+        .orderBy(asc(media.year))
+        .limit(1);
+    })(),
 
     // Perfect scores (10/10)
     db.select({ count: count() })

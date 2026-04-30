@@ -5,6 +5,7 @@
 import type { Database } from "@canto/db/client";
 import { getSettings } from "@canto/db/settings";
 import { findMediaById } from "../../../infra/media/media-repository";
+import { findMediaLocalized } from "../../../infra/media/media-localized-repository";
 import {
   findMediaVersionsByMediaId,
   updateMediaVersion,
@@ -105,12 +106,14 @@ export async function updateMediaServerMetadata(
     // future library scan can't stomp the correction.
     if (version.source === "plex" && plexEnabled && plexUrl && plexToken) {
       try {
+        // Plex match-by-name uses the canonical en-US title.
+        const enLoc = await findMediaLocalized(db, mediaRow.id, "en-US");
         await matchPlexItem(
           plexUrl,
           plexToken,
           version.serverItemId,
           mediaRow.externalId,
-          { name: mediaRow.title },
+          { name: enLoc?.title ?? "" },
         );
         await lockPlexFields(plexUrl, plexToken, version.serverItemId, plexType);
 

@@ -109,7 +109,7 @@ export async function getRecommendations(
   }
 
   // ── Path 2: Fallback to global pool ──
-  const poolItems = await findGlobalRecommendations(db, excludeItems, (pageSize + 1) * 3, offset, filters);
+  const poolItems = await findGlobalRecommendations(db, excludeItems, (pageSize + 1) * 3, offset, userLang, filters);
 
   if (poolItems.length > 0) {
     const seen = new Set<string>();
@@ -215,6 +215,7 @@ async function mixWithExploreSlot(
     exploreExcludes,
     slots.length * 2,
     0,
+    userLang,
     filters,
   );
   if (pool.length === 0) return personalized;
