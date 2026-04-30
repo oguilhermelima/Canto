@@ -5,9 +5,12 @@ import {
   type ContinueWatchingFeedRow,
   type ContinueWatchingKeysetCursor,
   type LibraryFeedFilterOptions,
-} from "../../../infra/repositories";
-import { getUserLanguage } from "../../shared/services/user-service";
-import { toDurationSeconds, toProgressPercent } from "../rules/user-media-rules";
+} from "@canto/core/infra/repositories";
+import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
+import {
+  toDurationSeconds,
+  toProgressPercent,
+} from "@canto/core/domain/user-media/rules/user-media-rules";
 
 export interface GetContinueWatchingInput {
   limit: number;

@@ -1,6 +1,10 @@
 import type { Database } from "@canto/db/client";
-import { findDistinctPlaybackMediaPairs } from "../../../infra/repositories";
-import { promoteUserMediaStateFromPlayback } from "./promote-user-media-state-from-playback";
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/user-media/use-cases/promote-user-media-state-from-playback";
+
+export interface ReconcileStatesFromPlaybackDeps {
+  repo: UserMediaRepositoryPort;
+}
 
 export interface ReconcileStatesFromPlaybackResult {
   scanned: number;
@@ -10,15 +14,16 @@ export interface ReconcileStatesFromPlaybackResult {
 
 export async function reconcileStatesFromPlayback(
   db: Database,
+  deps: ReconcileStatesFromPlaybackDeps,
   userId: string,
 ): Promise<ReconcileStatesFromPlaybackResult> {
-  const pairs = await findDistinctPlaybackMediaPairs(db, userId);
+  const pairs = await deps.repo.findDistinctPlaybackMediaPairs(userId);
 
   let promoted = 0;
   const errors: string[] = [];
   for (const pair of pairs) {
     try {
-      const result = await promoteUserMediaStateFromPlayback(db, {
+      const result = await promoteUserMediaStateFromPlayback(db, deps, {
         userId: pair.userId,
         mediaId: pair.mediaId,
       });

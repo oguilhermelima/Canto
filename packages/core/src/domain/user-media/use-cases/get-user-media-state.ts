@@ -1,8 +1,4 @@
-import type { Database } from "@canto/db/client";
-import {
-  findUserMediaState,
-  findUserPlaybackProgress,
-} from "../../../infra/repositories";
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
 
 export interface UserMediaStateResponse {
   mediaId: string;
@@ -16,14 +12,18 @@ export interface UserMediaStateResponse {
   source: string | null;
 }
 
+export interface GetUserMediaStateDeps {
+  repo: UserMediaRepositoryPort;
+}
+
 export async function getUserMediaState(
-  db: Database,
+  deps: GetUserMediaStateDeps,
   userId: string,
   mediaId: string,
 ): Promise<UserMediaStateResponse> {
   const [state, progress] = await Promise.all([
-    findUserMediaState(db, userId, mediaId),
-    findUserPlaybackProgress(db, userId, mediaId),
+    deps.repo.findState(userId, mediaId),
+    deps.repo.findPlayback(userId, mediaId),
   ]);
 
   return {

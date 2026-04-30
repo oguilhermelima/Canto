@@ -1,15 +1,12 @@
 import type { Database } from "@canto/db/client";
-import { logAndSwallow } from "../../../platform/logger/log-error";
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import { findMediaByIdWithSeasons } from "@canto/core/infra/repositories";
 import {
-  addUserWatchHistory,
-  computeAndSyncMediaRating,
-  computeAndSyncSeasonRating,
-  findMediaByIdWithSeasons,
-  findUserWatchHistoryByMedia,
-  upsertUserMediaState,
-  upsertUserRating,
-} from "../../../infra/repositories";
-import { EpisodeNotFoundError, InvalidWatchInputError, SeasonNotFoundError } from "@canto/core/domain/user-media/errors";
+  EpisodeNotFoundError,
+  InvalidWatchInputError,
+  SeasonNotFoundError,
+} from "@canto/core/domain/user-media/errors";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import {
   computeTrackingStatus,
@@ -20,9 +17,16 @@ import {
   sourceForMode,
   type MediaType,
   type WatchedAtMode,
-} from "../rules/user-media-rules";
-import { getUserMediaState, type UserMediaStateResponse } from "./get-user-media-state";
-import { pushWatchStateToServers } from "./push-watch-state";
+} from "@canto/core/domain/user-media/rules/user-media-rules";
+import {
+  getUserMediaState,
+  type UserMediaStateResponse,
+} from "@canto/core/domain/user-media/use-cases/get-user-media-state";
+import { pushWatchStateToServers } from "@canto/core/domain/user-media/use-cases/push-watch-state";
+
+export interface LogWatchedDeps {
+  repo: UserMediaRepositoryPort;
+}
 
 export interface LogWatchedInput {
   mediaId: string;
@@ -49,6 +53,7 @@ type MediaWithSeasons = NonNullable<
 
 export async function logWatched(
   db: Database,
+  deps: LogWatchedDeps,
   userId: string,
   input: LogWatchedInput,
 ): Promise<LogWatchedResult> {
@@ -71,11 +76,11 @@ export async function logWatched(
     : resolveEpisodesToLog(input, media, allEpisodes, releasedEpisodes, now);
 
   if (!input.markDropped) {
-    await persistWatchHistory(db, userId, input, media, episodeIdsToLog, customWatchedAt);
+    await persistWatchHistory(deps, userId, input, media, episodeIdsToLog, customWatchedAt);
   }
 
   const releasedEpisodeIds = new Set(releasedEpisodes.map((e) => e.id));
-  const history = await findUserWatchHistoryByMedia(db, userId, input.mediaId);
+  const history = await deps.repo.findHistoryByMedia(userId, input.mediaId);
   const computedStatus = computeTrackingStatus({
     mediaType: media.type as MediaType,
     history,
@@ -83,7 +88,7 @@ export async function logWatched(
     markDropped: input.markDropped,
   });
 
-  await upsertUserMediaState(db, {
+  await deps.repo.upsertState({
     userId,
     mediaId: input.mediaId,
     status: computedStatus,
@@ -96,10 +101,10 @@ export async function logWatched(
   }
 
   if (input.rating && !input.markDropped) {
-    await applyRating(db, userId, input, media, episodeIdsToLog);
+    await applyRating(deps, userId, input, media, episodeIdsToLog);
   }
 
-  const state = await getUserMediaState(db, userId, input.mediaId);
+  const state = await getUserMediaState(deps, userId, input.mediaId);
   const latestHistoryDate = history[0]?.watchedAt ?? null;
   const trackedItems = input.markDropped ? 0 : episodeIdsToLog.length;
 
@@ -230,7 +235,7 @@ function resolveEpisodesToLog(
 }
 
 async function persistWatchHistory(
-  db: Database,
+  deps: LogWatchedDeps,
   userId: string,
   input: LogWatchedInput,
   media: MediaWithSeasons,
@@ -245,7 +250,7 @@ async function persistWatchHistory(
 
   await Promise.all(
     episodeIdsToLog.map((episodeId) =>
-      addUserWatchHistory(db, {
+      deps.repo.addHistoryEntry({
         userId,
         mediaId: input.mediaId,
         episodeId,
@@ -265,7 +270,7 @@ async function persistWatchHistory(
 }
 
 async function applyRating(
-  db: Database,
+  deps: LogWatchedDeps,
   userId: string,
   input: LogWatchedInput,
   media: MediaWithSeasons,
@@ -279,7 +284,7 @@ async function applyRating(
     const season = media.seasons.find((s) =>
       s.episodes.some((e) => e.id === episodeId),
     );
-    await upsertUserRating(db, {
+    await deps.repo.upsertRating({
       userId,
       mediaId: input.mediaId,
       seasonId: season?.id ?? null,
@@ -289,7 +294,7 @@ async function applyRating(
       isOverride: true,
     });
     if (season) {
-      await computeAndSyncSeasonRating(db, userId, input.mediaId, season.id);
+      await deps.repo.computeAndSyncSeasonRating(userId, input.mediaId, season.id);
     }
     return;
   }
@@ -297,7 +302,7 @@ async function applyRating(
   if (input.scope === "season" && input.seasonNumber !== undefined) {
     const season = media.seasons.find((s) => s.number === input.seasonNumber);
     if (!season) return;
-    await upsertUserRating(db, {
+    await deps.repo.upsertRating({
       userId,
       mediaId: input.mediaId,
       seasonId: season.id,
@@ -306,11 +311,11 @@ async function applyRating(
       comment: input.comment ?? null,
       isOverride: true,
     });
-    await computeAndSyncMediaRating(db, userId, input.mediaId);
+    await deps.repo.computeAndSyncMediaRating(userId, input.mediaId);
     return;
   }
 
-  await upsertUserRating(db, {
+  await deps.repo.upsertRating({
     userId,
     mediaId: input.mediaId,
     seasonId: null,
@@ -319,7 +324,7 @@ async function applyRating(
     comment: input.comment ?? null,
     isOverride: true,
   });
-  await upsertUserMediaState(db, {
+  await deps.repo.upsertState({
     userId,
     mediaId: input.mediaId,
     rating: input.rating,

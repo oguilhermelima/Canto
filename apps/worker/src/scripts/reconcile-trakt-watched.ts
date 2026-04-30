@@ -8,6 +8,7 @@
  */
 import { db } from "@canto/db/client";
 import { reconcileStatesFromPlayback } from "@canto/core/domain/user-media/use-cases/reconcile-states-from-playback";
+import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
 
 async function main() {
   const userId = process.argv[2];
@@ -15,7 +16,8 @@ async function main() {
     console.error("Usage: tsx reconcile-trakt-watched.ts <userId>");
     process.exit(1);
   }
-  const result = await reconcileStatesFromPlayback(db, userId);
+  const repo = makeUserMediaRepository(db);
+  const result = await reconcileStatesFromPlayback(db, { repo }, userId);
   console.log(`scanned=${result.scanned} promoted=${result.promoted}`);
   if (result.errors.length > 0) {
     console.warn(`errors (first ${result.errors.length}):`);

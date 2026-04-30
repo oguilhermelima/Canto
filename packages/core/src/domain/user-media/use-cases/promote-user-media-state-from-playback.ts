@@ -1,17 +1,16 @@
 import type { Database } from "@canto/db/client";
-import {
-  findMediaByIdWithSeasons,
-  findUserMediaState,
-  findUserPlaybackProgressByMedia,
-  findUserWatchHistoryByMedia,
-  upsertUserMediaState,
-} from "../../../infra/repositories";
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import { findMediaByIdWithSeasons } from "@canto/core/infra/repositories";
 import {
   isMediaType,
   isReleasedOnOrBefore,
   type MediaType,
   type TrackingStatus,
-} from "../rules/user-media-rules";
+} from "@canto/core/domain/user-media/rules/user-media-rules";
+
+export interface PromoteUserMediaStateFromPlaybackDeps {
+  repo: UserMediaRepositoryPort;
+}
 
 function normalizeStatus(value: string | null | undefined): TrackingStatus {
   if (
@@ -136,6 +135,7 @@ function latestEventTimestamp(
 
 export async function promoteUserMediaStateFromPlayback(
   db: Database,
+  deps: PromoteUserMediaStateFromPlaybackDeps,
   params: { userId: string; mediaId: string },
 ): Promise<TrackingStatus | null> {
   const mediaRow = await findMediaByIdWithSeasons(db, params.mediaId);
@@ -145,9 +145,9 @@ export async function promoteUserMediaStateFromPlayback(
   const mediaType: MediaType = mediaRow.type;
 
   const [currentState, historyRows, playbackRows] = await Promise.all([
-    findUserMediaState(db, params.userId, params.mediaId),
-    findUserWatchHistoryByMedia(db, params.userId, params.mediaId),
-    findUserPlaybackProgressByMedia(db, params.userId, params.mediaId),
+    deps.repo.findState(params.userId, params.mediaId),
+    deps.repo.findHistoryByMedia(params.userId, params.mediaId),
+    deps.repo.findPlaybackByMedia(params.userId, params.mediaId),
   ]);
 
   const now = new Date();
@@ -193,7 +193,7 @@ export async function promoteUserMediaStateFromPlayback(
   const effectiveStatus =
     promotedStatus ?? (currentStatus === "none" ? null : currentStatus);
 
-  await upsertUserMediaState(db, {
+  await deps.repo.upsertState({
     userId: params.userId,
     mediaId: params.mediaId,
     status: effectiveStatus,

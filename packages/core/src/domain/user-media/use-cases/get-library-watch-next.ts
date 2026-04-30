@@ -1,7 +1,7 @@
 import type { Database } from "@canto/db/client";
-import type { LibraryFeedFilterOptions } from "../../../infra/repositories";
-import { getContinueWatching } from "./get-continue-watching";
-import { getWatchNext } from "./get-watch-next";
+import type { LibraryFeedFilterOptions } from "@canto/core/infra/repositories";
+import { getContinueWatching } from "@canto/core/domain/user-media/use-cases/get-continue-watching";
+import { getWatchNext } from "@canto/core/domain/user-media/use-cases/get-watch-next";
 
 type View = "all" | "continue" | "watch_next";
 type WatchStatus = "in_progress" | "completed" | "not_started";

@@ -21,6 +21,7 @@ import {
   listTraktWatchedMovies,
   listTraktWatchedShows,
 } from "@canto/core/infra/trakt/trakt.adapter";
+import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
 import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/user-media/use-cases/promote-user-media-state-from-playback";
 import {
   parseDateOrNow,
@@ -38,7 +39,8 @@ async function promoteSafely(
   mediaId: string,
 ): Promise<void> {
   try {
-    await promoteUserMediaStateFromPlayback(ctx.db, {
+    const repo = makeUserMediaRepository(ctx.db);
+    await promoteUserMediaStateFromPlayback(ctx.db, { repo }, {
       userId: ctx.userId,
       mediaId,
     });

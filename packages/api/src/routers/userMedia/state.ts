@@ -5,7 +5,7 @@ import {
   trackInput,
   updateMediaStatusInput,
 } from "@canto/validators";
-import { upsertUserMediaState } from "@canto/core/infra/repositories";
+import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
 import { getUserMediaState } from "@canto/core/domain/user-media/use-cases/get-user-media-state";
 import { clearTracking } from "@canto/core/domain/user-media/use-cases/clear-tracking";
 import { reconcileStatesFromPlayback } from "@canto/core/domain/user-media/use-cases/reconcile-states-from-playback";
@@ -13,14 +13,16 @@ import { reconcileStatesFromPlayback } from "@canto/core/domain/user-media/use-c
 export const stateRouter = createTRPCRouter({
   getState: protectedProcedure
     .input(mediaIdInput)
-    .query(({ ctx, input }) =>
-      getUserMediaState(ctx.db, ctx.session.user.id, input.mediaId),
-    ),
+    .query(({ ctx, input }) => {
+      const repo = makeUserMediaRepository(ctx.db);
+      return getUserMediaState({ repo }, ctx.session.user.id, input.mediaId);
+    }),
 
   updateState: protectedProcedure
     .input(updateMediaStatusInput)
     .mutation(async ({ ctx, input }) => {
-      await upsertUserMediaState(ctx.db, {
+      const repo = makeUserMediaRepository(ctx.db);
+      await repo.upsertState({
         userId: ctx.session.user.id,
         mediaId: input.mediaId,
         ...(input.status !== undefined && { status: input.status }),
@@ -32,7 +34,8 @@ export const stateRouter = createTRPCRouter({
   track: protectedProcedure
     .input(trackInput)
     .mutation(async ({ ctx, input }) => {
-      await upsertUserMediaState(ctx.db, {
+      const repo = makeUserMediaRepository(ctx.db);
+      await repo.upsertState({
         userId: ctx.session.user.id,
         mediaId: input.mediaId,
         status: input.status,
@@ -43,7 +46,8 @@ export const stateRouter = createTRPCRouter({
   toggleFavorite: protectedProcedure
     .input(toggleFavoriteInput)
     .mutation(async ({ ctx, input }) => {
-      await upsertUserMediaState(ctx.db, {
+      const repo = makeUserMediaRepository(ctx.db);
+      await repo.upsertState({
         userId: ctx.session.user.id,
         mediaId: input.mediaId,
         isFavorite: input.isFavorite,
@@ -53,11 +57,13 @@ export const stateRouter = createTRPCRouter({
 
   clearTracking: protectedProcedure
     .input(mediaIdInput)
-    .mutation(({ ctx, input }) =>
-      clearTracking(ctx.db, ctx.session.user.id, input.mediaId),
-    ),
+    .mutation(({ ctx, input }) => {
+      const repo = makeUserMediaRepository(ctx.db);
+      return clearTracking(ctx.db, { repo }, ctx.session.user.id, input.mediaId);
+    }),
 
-  reconcileStatesFromPlayback: protectedProcedure.mutation(({ ctx }) =>
-    reconcileStatesFromPlayback(ctx.db, ctx.session.user.id),
-  ),
+  reconcileStatesFromPlayback: protectedProcedure.mutation(({ ctx }) => {
+    const repo = makeUserMediaRepository(ctx.db);
+    return reconcileStatesFromPlayback(ctx.db, { repo }, ctx.session.user.id);
+  }),
 });

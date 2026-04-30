@@ -1,8 +1,8 @@
-import type { Database } from "@canto/db/client";
-import {
-  upsertUserMediaState,
-  upsertUserRating,
-} from "../../../infra/repositories";
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+
+export interface RateMediaDeps {
+  repo: UserMediaRepositoryPort;
+}
 
 export interface RateMediaInput {
   mediaId: string;
@@ -13,11 +13,11 @@ export interface RateMediaInput {
 }
 
 export async function rateMedia(
-  db: Database,
+  deps: RateMediaDeps,
   userId: string,
   input: RateMediaInput,
 ): Promise<{ success: true }> {
-  await upsertUserRating(db, {
+  await deps.repo.upsertRating({
     userId,
     mediaId: input.mediaId,
     seasonId: input.seasonId ?? null,
@@ -28,7 +28,7 @@ export async function rateMedia(
   });
 
   if (!input.episodeId && !input.seasonId) {
-    await upsertUserMediaState(db, {
+    await deps.repo.upsertState({
       userId,
       mediaId: input.mediaId,
       rating: input.rating,

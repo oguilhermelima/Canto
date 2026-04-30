@@ -1,10 +1,10 @@
 import type { Database } from "@canto/db/client";
-import {
-  computeAndSyncMediaRating,
-  computeAndSyncSeasonRating,
-  deleteUserRating,
-  findMediaByIdWithSeasons,
-} from "../../../infra/repositories";
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import { findMediaByIdWithSeasons } from "@canto/core/infra/repositories";
+
+export interface RemoveRatingDeps {
+  repo: UserMediaRepositoryPort;
+}
 
 export interface RemoveRatingInput {
   mediaId: string;
@@ -14,11 +14,11 @@ export interface RemoveRatingInput {
 
 export async function removeRating(
   db: Database,
+  deps: RemoveRatingDeps,
   userId: string,
   input: RemoveRatingInput,
 ): Promise<{ success: true }> {
-  await deleteUserRating(
-    db,
+  await deps.repo.deleteRating(
     userId,
     input.mediaId,
     input.seasonId ?? null,
@@ -31,10 +31,10 @@ export async function removeRating(
       s.episodes.some((e) => e.id === input.episodeId),
     );
     if (season) {
-      await computeAndSyncSeasonRating(db, userId, input.mediaId, season.id);
+      await deps.repo.computeAndSyncSeasonRating(userId, input.mediaId, season.id);
     }
   } else if (input.seasonId) {
-    await computeAndSyncMediaRating(db, userId, input.mediaId);
+    await deps.repo.computeAndSyncMediaRating(userId, input.mediaId);
   }
 
   return { success: true };

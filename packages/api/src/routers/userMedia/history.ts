@@ -4,7 +4,7 @@ import {
   mediaIdInput,
   removeHistoryEntriesInput,
 } from "@canto/validators";
-import { findUserWatchHistoryByMedia } from "@canto/core/infra/repositories";
+import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
 import { logWatched } from "@canto/core/domain/user-media/use-cases/log-watched";
 import { markDropped } from "@canto/core/domain/user-media/use-cases/mark-dropped";
 import { removeHistoryEntries } from "@canto/core/domain/user-media/use-cases/remove-history-entries";
@@ -12,15 +12,16 @@ import { removeHistoryEntries } from "@canto/core/domain/user-media/use-cases/re
 export const historyRouter = createTRPCRouter({
   logWatched: protectedProcedure
     .input(logWatchedInput)
-    .mutation(({ ctx, input }) =>
-      logWatched(ctx.db, ctx.session.user.id, input),
-    ),
+    .mutation(({ ctx, input }) => {
+      const repo = makeUserMediaRepository(ctx.db);
+      return logWatched(ctx.db, { repo }, ctx.session.user.id, input);
+    }),
 
   getHistory: protectedProcedure
     .input(mediaIdInput)
     .query(async ({ ctx, input }) => {
-      const history = await findUserWatchHistoryByMedia(
-        ctx.db,
+      const repo = makeUserMediaRepository(ctx.db);
+      const history = await repo.findHistoryByMedia(
         ctx.session.user.id,
         input.mediaId,
       );
@@ -34,13 +35,15 @@ export const historyRouter = createTRPCRouter({
 
   removeHistoryEntries: protectedProcedure
     .input(removeHistoryEntriesInput)
-    .mutation(({ ctx, input }) =>
-      removeHistoryEntries(ctx.db, ctx.session.user.id, input),
-    ),
+    .mutation(({ ctx, input }) => {
+      const repo = makeUserMediaRepository(ctx.db);
+      return removeHistoryEntries(ctx.db, { repo }, ctx.session.user.id, input);
+    }),
 
   markDropped: protectedProcedure
     .input(mediaIdInput)
-    .mutation(({ ctx, input }) =>
-      markDropped(ctx.db, ctx.session.user.id, input.mediaId),
-    ),
+    .mutation(({ ctx, input }) => {
+      const repo = makeUserMediaRepository(ctx.db);
+      return markDropped(ctx.db, { repo }, ctx.session.user.id, input.mediaId);
+    }),
 });

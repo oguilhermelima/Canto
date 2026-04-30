@@ -1,24 +1,23 @@
 import type { Database } from "@canto/db/client";
-import { logAndSwallow } from "../../../platform/logger/log-error";
-import {
-  deleteUserWatchHistoryByIds,
-  findMediaByIdWithSeasons,
-  findUserWatchHistoryByMedia,
-  softDeleteUserPlaybackProgress,
-  upsertUserMediaState,
-} from "../../../infra/repositories";
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import { findMediaByIdWithSeasons } from "@canto/core/infra/repositories";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import {
   computeTrackingStatus,
   isMediaType,
   isReleasedOnOrBefore,
   type MediaType,
-} from "../rules/user-media-rules";
+} from "@canto/core/domain/user-media/rules/user-media-rules";
 import {
   getUserMediaState,
   type UserMediaStateResponse,
-} from "./get-user-media-state";
-import { pushWatchStateToServers } from "./push-watch-state";
+} from "@canto/core/domain/user-media/use-cases/get-user-media-state";
+import { pushWatchStateToServers } from "@canto/core/domain/user-media/use-cases/push-watch-state";
+
+export interface RemoveHistoryEntriesDeps {
+  repo: UserMediaRepositoryPort;
+}
 
 export interface RemoveHistoryEntriesInput {
   mediaId: string;
@@ -33,6 +32,7 @@ export interface RemoveHistoryEntriesResult {
 
 export async function removeHistoryEntries(
   db: Database,
+  deps: RemoveHistoryEntriesDeps,
   userId: string,
   input: RemoveHistoryEntriesInput,
 ): Promise<RemoveHistoryEntriesResult> {
@@ -40,13 +40,12 @@ export async function removeHistoryEntries(
   if (!media) throw new MediaNotFoundError(input.mediaId);
 
   const { count: removedItems, episodeIds: removedEpisodeIds } =
-    await deleteUserWatchHistoryByIds(db, userId, input.mediaId, [
+    await deps.repo.deleteHistoryByIds(userId, input.mediaId, [
       ...new Set(input.entryIds),
     ]);
 
   if (removedEpisodeIds.length > 0) {
-    await softDeleteUserPlaybackProgress(
-      db,
+    await deps.repo.softDeletePlayback(
       userId,
       input.mediaId,
       removedEpisodeIds,
@@ -61,7 +60,7 @@ export async function removeHistoryEntries(
       .map((episode) => episode.id),
   );
 
-  const history = await findUserWatchHistoryByMedia(db, userId, input.mediaId);
+  const history = await deps.repo.findHistoryByMedia(userId, input.mediaId);
   const mediaType: MediaType = isMediaType(media.type) ? media.type : "movie";
   const computedStatus = computeTrackingStatus({
     mediaType,
@@ -69,7 +68,7 @@ export async function removeHistoryEntries(
     releasedEpisodeIds,
   });
 
-  await upsertUserMediaState(db, {
+  await deps.repo.upsertState({
     userId,
     mediaId: input.mediaId,
     status: computedStatus,
@@ -81,7 +80,7 @@ export async function removeHistoryEntries(
     );
   }
 
-  const state = await getUserMediaState(db, userId, input.mediaId);
+  const state = await getUserMediaState(deps, userId, input.mediaId);
   return {
     success: true,
     removedItems,

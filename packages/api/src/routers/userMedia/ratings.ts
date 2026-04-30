@@ -7,45 +7,50 @@ import {
   rateInput,
   removeRatingInput,
 } from "@canto/validators";
-import {
-  findEpisodeRatingsFromAllUsers,
-  findMediaReviews,
-  findReviewById,
-  findUserRatingsByMedia,
-} from "@canto/core/infra/repositories";
+import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
 import { rateMedia } from "@canto/core/domain/user-media/use-cases/rate-media";
 import { removeRating } from "@canto/core/domain/user-media/use-cases/remove-rating";
 
 export const ratingsRouter = createTRPCRouter({
   rate: protectedProcedure
     .input(rateInput)
-    .mutation(({ ctx, input }) =>
-      rateMedia(ctx.db, ctx.session.user.id, input),
-    ),
+    .mutation(({ ctx, input }) => {
+      const repo = makeUserMediaRepository(ctx.db);
+      return rateMedia({ repo }, ctx.session.user.id, input);
+    }),
 
   removeRating: protectedProcedure
     .input(removeRatingInput)
-    .mutation(({ ctx, input }) =>
-      removeRating(ctx.db, ctx.session.user.id, input),
-    ),
+    .mutation(({ ctx, input }) => {
+      const repo = makeUserMediaRepository(ctx.db);
+      return removeRating(ctx.db, { repo }, ctx.session.user.id, input);
+    }),
 
   getRatings: protectedProcedure
     .input(mediaIdInput)
-    .query(({ ctx, input }) =>
-      findUserRatingsByMedia(ctx.db, ctx.session.user.id, input.mediaId),
-    ),
+    .query(({ ctx, input }) => {
+      const repo = makeUserMediaRepository(ctx.db);
+      return repo.findRatingsByMedia(ctx.session.user.id, input.mediaId);
+    }),
 
   getMediaReviews: protectedProcedure
     .input(getMediaReviewsInput)
-    .query(({ ctx, input }) => findMediaReviews(ctx.db, input.mediaId, input)),
+    .query(({ ctx, input }) => {
+      const repo = makeUserMediaRepository(ctx.db);
+      return repo.findMediaReviews(input.mediaId, input);
+    }),
 
   getReviewById: protectedProcedure
     .input(getReviewByIdInput)
-    .query(({ ctx, input }) => findReviewById(ctx.db, input.reviewId)),
+    .query(({ ctx, input }) => {
+      const repo = makeUserMediaRepository(ctx.db);
+      return repo.findReviewById(input.reviewId);
+    }),
 
   getEpisodeReviews: protectedProcedure
     .input(getEpisodeReviewsInput)
-    .query(({ ctx, input }) =>
-      findEpisodeRatingsFromAllUsers(ctx.db, input.episodeId),
-    ),
+    .query(({ ctx, input }) => {
+      const repo = makeUserMediaRepository(ctx.db);
+      return repo.findEpisodeRatingsFromAllUsers(input.episodeId);
+    }),
 });

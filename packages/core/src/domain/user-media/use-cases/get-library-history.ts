@@ -5,15 +5,15 @@ import {
   findUserWatchHistoryByMediaIds,
   findUserWatchHistoryFeed,
   type LibraryFeedFilterOptions,
-} from "../../../infra/repositories";
-import { getUserLanguage } from "../../shared/services/user-service";
+} from "@canto/core/infra/repositories";
+import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
 import {
   isReleasedOnOrBefore,
   isServerSource,
   toDurationSeconds,
   toMinuteKey,
   toProgressPercent,
-} from "../rules/user-media-rules";
+} from "@canto/core/domain/user-media/rules/user-media-rules";
 
 type WatchStatus = "in_progress" | "completed" | "not_started";
 
