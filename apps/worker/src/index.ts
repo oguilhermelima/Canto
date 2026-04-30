@@ -156,9 +156,11 @@ async function setupSchedules(): Promise<void> {
     { name: QUEUES.folderScan, opts: DEFAULT_JOB_OPTS },
   );
 
+  // Jittered start mirrors repack-supersede so two 6h jobs don't align over
+  // time on the same instance.
   await queues.validateDownloads.upsertJobScheduler(
     "validate-downloads-scheduler",
-    { every: 6 * 60 * 60 * 1000 },
+    { every: 6 * 60 * 60 * 1000, startDate: jitterStart(10 * 60 * 1000) },
     { name: QUEUES.validateDownloads, opts: DEFAULT_JOB_OPTS },
   );
 
@@ -276,7 +278,9 @@ const workers = [
       const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
       await ensureMedia(db, mediaId, spec, { tmdb, tvdb });
     },
-    { concurrency: 3 },
+    // Raised from 3 to 6 — TMDB/qBit rate limits aren't the bottleneck and
+    // the daily cadence sweep (batch=500) clears in ~3h instead of ~12h.
+    { concurrency: 6 },
   ),
 ];
 
