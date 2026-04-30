@@ -14,7 +14,6 @@ import {
   upsertUserPreference,
 } from "@canto/core/infra/file-organization/library-repository";
 import {
-  findFolderById,
   seedDefaultFolders,
 } from "@canto/core/infra/file-organization/folder-repository";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";

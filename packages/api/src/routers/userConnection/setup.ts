@@ -106,7 +106,7 @@ export const setupRouter = createTRPCRouter({
         }
         token = result.token;
         externalUserId = result.userId;
-      } else if (input.provider === "jellyfin") {
+      } else {
         const url = await getSetting("jellyfin.url");
         if (!url) {
           throw new TRPCError({

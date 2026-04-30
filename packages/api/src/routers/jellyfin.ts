@@ -18,7 +18,7 @@ import { updateFolder } from "@canto/core/infra/file-organization/folder-reposit
 
 export const jellyfinRouter = createTRPCRouter({
   /** Test connection and auto-sync libraries when connected */
-  testConnection: adminProcedure.query(async ({ ctx }) => {
+  testConnection: adminProcedure.query(async () => {
     const creds = await getJellyfinCredentials();
     if (!creds) return { connected: false, error: "Jellyfin URL or API key not configured" };
 

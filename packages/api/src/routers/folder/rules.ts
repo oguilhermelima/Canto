@@ -115,7 +115,7 @@ export const folderRulesProcedures = {
           await dispatchJellyfinSync().catch(
             logAndSwallow("folder.addServerLink:dispatchJellyfinSync"),
           );
-        } else if (input.serverType === "plex") {
+        } else {
           await dispatchPlexSync().catch(
             logAndSwallow("folder.addServerLink:dispatchPlexSync"),
           );

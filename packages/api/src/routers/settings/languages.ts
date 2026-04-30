@@ -49,7 +49,7 @@ export const settingsLanguagesRouter = createTRPCRouter({
           query: { disableCookieCache: true },
           asResponse: true,
         });
-        const setCookies = refreshed.headers.getSetCookie?.() ?? [];
+        const setCookies = refreshed.headers.getSetCookie();
         for (const cookie of setCookies) {
           ctx.resHeaders.append("set-cookie", cookie);
         }

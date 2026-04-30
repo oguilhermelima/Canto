@@ -13,7 +13,7 @@ import { updateFolder, findAllServerLinks } from "@canto/core/infra/file-organiz
 
 export const plexRouter = createTRPCRouter({
   /** Test connection and auto-sync libraries */
-  testConnection: adminProcedure.query(async ({ ctx }) => {
+  testConnection: adminProcedure.query(async () => {
     const creds = await getPlexCredentials();
     if (!creds) return { connected: false, error: "Plex URL or token not configured" };
 

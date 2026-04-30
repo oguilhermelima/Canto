@@ -37,7 +37,7 @@ export const mediaVersioningRouter = createTRPCRouter({
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
       if (row.type !== "show") throw new TRPCError({ code: "BAD_REQUEST", message: "Provider override only applies to shows" });
 
-      const currentSeasons = (row.seasons ?? []).filter((s: { number: number }) => s.number > 0);
+      const currentSeasons = row.seasons.filter((s: { number: number }) => s.number > 0);
       const mediaFiles = await findMediaFilesByMediaId(ctx.db, input.id);
       const versions = await findMediaVersionsByMediaId(ctx.db, input.id);
 

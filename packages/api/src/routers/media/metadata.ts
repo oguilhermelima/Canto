@@ -54,7 +54,7 @@ export const mediaMetadataRouter = createTRPCRouter({
     const localized = await applyMediaLocalizationOverlay(row, userLang, {
       localization,
     });
-    if (localized.seasons && localized.seasons.length > 0) {
+    if (localized.seasons.length > 0) {
       const overlayedSeasons = await applySeasonsLocalizationOverlay(
         row.id,
         localized.seasons,
