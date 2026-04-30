@@ -40,6 +40,7 @@
   },
   "scripts": {
     "clean": "rm -rf .cache dist node_modules",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -62,8 +63,11 @@
     "tailwind-merge": "^3.0.1"
   },
   "devDependencies": {
+    "@canto/eslint-config": "workspace:*",
     "@canto/tsconfig": "workspace:*",
     "@types/react": "^19.0.0",
+    "eslint": "catalog:",
+    "eslint-plugin-react-hooks": "^7.0.1",
     "react": "^19.0.0",
     "typescript": "catalog:"
   },

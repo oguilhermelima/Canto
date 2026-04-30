@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "clean": "rm -rf .cache dist node_modules",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -18,9 +19,11 @@
     "drizzle-orm": "catalog:"
   },
   "devDependencies": {
+    "@canto/eslint-config": "workspace:*",
     "@canto/tsconfig": "workspace:*",
     "@types/node": "^22.13.0",
     "dotenv-cli": "^11.0.0",
+    "eslint": "catalog:",
     "tsx": "^4.19.3",
     "typescript": "catalog:"
   }

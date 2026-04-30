@@ -12,13 +12,16 @@
   "scripts": {
     "clean": "rm -rf .cache dist node_modules",
     "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@canto/eslint-config": "workspace:*",
     "@canto/tsconfig": "workspace:*",
+    "eslint": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:"
   }
