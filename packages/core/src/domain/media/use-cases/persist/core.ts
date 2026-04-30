@@ -331,25 +331,30 @@ export async function persistSeasons(
       .returning();
 
     if (insertedSeason && s.episodes && s.episodes.length > 0) {
-      await db.insert(episode).values(
-        s.episodes.map((ep) => ({
-          seasonId: insertedSeason.id,
-          number: ep.number,
-          externalId: ep.externalId,
-          title: ep.title,
-          overview: ep.overview,
-          airDate: ep.airDate || null,
-          runtime: ep.runtime,
-          stillPath: ep.stillPath,
-          voteAverage: ep.voteAverage,
-          voteCount: ep.voteCount,
-          absoluteNumber: ep.absoluteNumber,
-          finaleType: ep.finaleType,
-          episodeType: ep.episodeType,
-          crew: ep.crew,
-          guestStars: ep.guestStars,
-        })),
-      );
+      await db
+        .insert(episode)
+        .values(
+          s.episodes.map((ep) => ({
+            seasonId: insertedSeason.id,
+            number: ep.number,
+            externalId: ep.externalId,
+            title: ep.title,
+            overview: ep.overview,
+            airDate: ep.airDate || null,
+            runtime: ep.runtime,
+            stillPath: ep.stillPath,
+            voteAverage: ep.voteAverage,
+            voteCount: ep.voteCount,
+            absoluteNumber: ep.absoluteNumber,
+            finaleType: ep.finaleType,
+            episodeType: ep.episodeType,
+            crew: ep.crew,
+            guestStars: ep.guestStars,
+          })),
+        )
+        .onConflictDoNothing({
+          target: [episode.seasonId, episode.number],
+        });
     }
   }
 }
