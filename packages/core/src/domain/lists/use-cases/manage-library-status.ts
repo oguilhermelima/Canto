@@ -1,9 +1,5 @@
-import type { Database } from "@canto/db/client";
 import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
-import {
-  findMediaById,
-  updateMedia,
-} from "@canto/core/infra/media/media-repository";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 
 interface LibraryStatusUpdate {
   inLibrary: boolean;
@@ -11,12 +7,13 @@ interface LibraryStatusUpdate {
 }
 
 /**
- * Cross-context use case (media + lists). Media reads/writes still live on
- * `db` until the media wave lands; the server-library list manipulation goes
- * through `ListsRepositoryPort`.
+ * Cross-context use case (media + lists). Both reads/writes flow through
+ * their dedicated ports — `MediaRepositoryPort` for the media row, the
+ * `ListsRepositoryPort` for the server-library list manipulation.
  */
 export interface ManageLibraryStatusDeps {
   repo: ListsRepositoryPort;
+  media: MediaRepositoryPort;
 }
 
 /**
@@ -25,11 +22,10 @@ export interface ManageLibraryStatusDeps {
  */
 export async function setLibraryStatus(
   deps: ManageLibraryStatusDeps,
-  db: Database,
   mediaId: string,
   status: LibraryStatusUpdate,
 ) {
-  const existing = await findMediaById(db, mediaId);
+  const existing = await deps.media.findById(mediaId);
   if (!existing) return null;
 
   // Already in the desired state
@@ -41,7 +37,7 @@ export async function setLibraryStatus(
     return existing;
   }
 
-  const updated = await updateMedia(db, mediaId, {
+  const updated = await deps.media.updateMedia(mediaId, {
     inLibrary: status.inLibrary,
     ...(status.downloaded !== undefined && { downloaded: status.downloaded }),
     addedAt: existing.addedAt ?? new Date(),

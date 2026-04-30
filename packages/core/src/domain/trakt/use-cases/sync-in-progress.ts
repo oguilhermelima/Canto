@@ -1,4 +1,3 @@
-import { findEpisodeIdByMediaAndNumbers } from "@canto/core/infra/repositories";
 import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
 import type { TraktPlaybackProgressRef } from "@canto/core/domain/trakt/types/trakt-api";
@@ -55,8 +54,7 @@ export async function pullInProgress(
       typeof ref.seasonNumber === "number" &&
       typeof ref.episodeNumber === "number"
     ) {
-      episodeId = await findEpisodeIdByMediaAndNumbers(
-        ctx.db,
+      episodeId = await deps.media.findEpisodeIdByMediaAndNumbers(
         mediaId,
         ref.seasonNumber,
         ref.episodeNumber,

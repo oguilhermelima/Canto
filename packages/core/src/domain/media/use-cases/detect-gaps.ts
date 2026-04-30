@@ -10,11 +10,11 @@ import {
   season,
   seasonLocalization,
 } from "@canto/db/schema";
-import { findAspectSucceededAt } from "../../../infra/media/media-aspect-state-repository";
+import { findAspectSucceededAt } from "@canto/core/infra/media/media-aspect-state-repository";
 
 const EN = "en-US";
-import type { Aspect, GapReport } from "./ensure-media.types";
-import { EXTRAS_TTL_MS, METADATA_TTL_MS } from "./ensure-media.types";
+import type { Aspect, GapReport } from "@canto/core/domain/media/use-cases/ensure-media.types";
+import { EXTRAS_TTL_MS, METADATA_TTL_MS } from "@canto/core/domain/media/use-cases/ensure-media.types";
 
 /**
  * Inspect DB state and compute what's missing for the given languages.

@@ -22,6 +22,7 @@ import {
   resolveMediaVersion,
   resolveMediaVersionPreview,
 } from "@canto/core/domain/media/use-cases/resolve-media-version";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { discoverServerLibraries } from "@canto/core/domain/media-servers/use-cases/discover-libraries";
 import { updateMediaServerMetadata } from "@canto/core/domain/media-servers/use-cases/update-metadata";
 import { getMediaAvailability } from "@canto/core/domain/media/services/media-availability-service";
@@ -119,21 +120,23 @@ export const syncRouter = createTRPCRouter({
     .input(resolveMediaVersionInput)
     .query(async ({ ctx, input }) => {
       const tmdb = await getTmdbProvider();
+      const media = makeMediaRepository(ctx.db);
       const scope = input.versionId
         ? { versionId: input.versionId, tmdbId: input.tmdbId, type: input.type }
         : { mediaId: input.mediaId!, tmdbId: input.tmdbId, type: input.type };
-      return resolveMediaVersionPreview(ctx.db, scope, tmdb);
+      return resolveMediaVersionPreview(ctx.db, { media }, scope, tmdb);
     }),
 
   resolveMediaVersion: adminProcedure
     .input(resolveMediaVersionInput)
     .mutation(async ({ ctx, input }) => {
       const tmdb = await getTmdbProvider();
+      const media = makeMediaRepository(ctx.db);
       const scope = input.versionId
         ? { versionId: input.versionId, tmdbId: input.tmdbId, type: input.type }
         : { mediaId: input.mediaId!, tmdbId: input.tmdbId, type: input.type };
 
-      const result = await resolveMediaVersion(ctx.db, scope, tmdb, {
+      const result = await resolveMediaVersion(ctx.db, { media }, scope, tmdb, {
         dryRun: input.dryRun,
       });
 

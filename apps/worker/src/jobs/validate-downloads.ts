@@ -5,8 +5,8 @@ import { getSetting } from "@canto/db/settings";
 import {
   findDownloadedLibraryMedia,
   findImportedFilesByMediaIds,
-  updateMedia,
 } from "@canto/core/infra/media/media-repository";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
 import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
 
@@ -39,6 +39,7 @@ export async function handleValidateDownloads(): Promise<void> {
   }
 
   const notificationsRepo = makeNotificationsRepository(db);
+  const media = makeMediaRepository(db);
   let invalidated = 0;
 
   for (const row of downloadedMedia) {
@@ -46,7 +47,7 @@ export async function handleValidateDownloads(): Promise<void> {
 
     if (files.length === 0) {
       // No imported files in DB — mark as not downloaded
-      await updateMedia(db, row.id, { downloaded: false });
+      await media.updateMedia(row.id, { downloaded: false });
       invalidated++;
       continue;
     }
@@ -66,7 +67,7 @@ export async function handleValidateDownloads(): Promise<void> {
     const anyExists = checks.some((ok) => ok);
 
     if (!anyExists) {
-      await updateMedia(db, row.id, { downloaded: false });
+      await media.updateMedia(row.id, { downloaded: false });
       await createNotification(
         { repo: notificationsRepo },
         {

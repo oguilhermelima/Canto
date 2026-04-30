@@ -10,10 +10,8 @@ import { detectMissingEpisodes } from "@canto/core/domain/media/use-cases/detect
 import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
 import { getProwlarrClient } from "@canto/core/infra/indexers/prowlarr.adapter";
 import { findBlocklistByMediaId } from "@canto/core/infra/content-enrichment/extras-repository";
-import {
-  findMediaByIdWithSeasons,
-  findMonitoredShowsForRss,
-} from "@canto/core/infra/media/media-repository";
+import { findMonitoredShowsForRss } from "@canto/core/infra/media/media-repository";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import {
   findDownloadConfig,
   findReleaseGroupLookups,
@@ -36,6 +34,7 @@ export async function handleRssSync(): Promise<void> {
 
   // 1. Find monitored shows
   const monitoredShows = await findMonitoredShowsForRss(db);
+  const media = makeMediaRepository(db);
 
   if (monitoredShows.length === 0) return;
 
@@ -136,7 +135,7 @@ export async function handleRssSync(): Promise<void> {
 
       if (allTargetEps.length === 0) continue;
 
-      const missingEpisodes = await detectMissingEpisodes(db, matchedShow.id, seasonNum, allTargetEps);
+      const missingEpisodes = await detectMissingEpisodes(db, { media }, matchedShow.id, seasonNum, allTargetEps);
       if (missingEpisodes.length === 0) continue;
 
       // Download!
@@ -175,8 +174,9 @@ export async function handleRssSync(): Promise<void> {
 }
 
 async function getAllSeasonEpisodes(seasonNum: number, mediaId: string): Promise<number[]> {
-  const mediaRow = await findMediaByIdWithSeasons(db, mediaId);
+  const media = makeMediaRepository(db);
+  const mediaRow = await media.findByIdWithSeasons(mediaId);
   if (!mediaRow) return [];
-  const seasonRow = mediaRow.seasons?.find((s) => s.number === seasonNum);
-  return seasonRow?.episodes?.map((e) => e.number) ?? [];
+  const seasonRow = mediaRow.seasons.find((s) => s.number === seasonNum);
+  return seasonRow?.episodes.map((e) => e.number) ?? [];
 }

@@ -2,7 +2,7 @@
 /*  Use-case: Resolve TMDB ID from external IDs (trust-first, no title search) */
 /* -------------------------------------------------------------------------- */
 
-import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 
 const TMDB_DELAY_MS = 300;
 const TMDB_MAX_RETRIES = 3;

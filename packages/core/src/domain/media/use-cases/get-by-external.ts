@@ -1,21 +1,17 @@
 import type { Database } from "@canto/db/client";
-import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import type { MediaType, ProviderName } from "@canto/providers";
-import { persistMedia } from "./persist";
+import { persistMedia } from "@canto/core/domain/media/use-cases/persist";
 import { getSetting } from "@canto/db/settings";
-import { logAndSwallow } from "../../../platform/logger/log-error";
-import {
-  findMediaByExternalId,
-  findMediaByAnyReference,
-  findMediaByIdWithSeasons,
-  findAspectSucceededAt,
-} from "../../../infra/repositories";
-import { dispatchEnsureMedia } from "../../../platform/queue/bullmq-dispatcher";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import { findAspectSucceededAt } from "@canto/core/infra/media/media-aspect-state-repository";
+import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
 import {
   applyMediaLocalizationOverlay,
   applySeasonsLocalizationOverlay,
-} from "../../shared/localization";
-import { getUserLanguage } from "../../shared/services/user-service";
+} from "@canto/core/domain/shared/localization/localization-service";
+import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
 
 interface GetByExternalInput {
   externalId: number;
@@ -23,12 +19,22 @@ interface GetByExternalInput {
   type: MediaType;
 }
 
+export interface GetByExternalDeps {
+  media: MediaRepositoryPort;
+}
+
 /**
  * "Persist on visit" — check DB first, otherwise fetch from provider and
  * insert media + seasons + episodes, then return the DB record.
+ *
+ * Note: localization overlay (`applyMediaLocalizationOverlay`,
+ * `applySeasonsLocalizationOverlay`) and aspect-state cadence reads still
+ * resolve via the legacy infra helpers — those land on dedicated ports in
+ * Wave 9B (localization) and 9B's cadence carve-out.
  */
 export async function getByExternal(
   db: Database,
+  deps: GetByExternalDeps,
   input: GetByExternalInput,
   userId: string,
   providerFactory: (name: "tmdb" | "tvdb") => Promise<MediaProviderPort>,
@@ -37,8 +43,18 @@ export async function getByExternal(
   const tvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
 
   const existing = tvdbEnabled
-    ? await findMediaByAnyReference(db, input.externalId, input.provider, undefined, undefined, input.type)
-    : await findMediaByExternalId(db, input.externalId, input.provider, input.type);
+    ? await deps.media.findByAnyReference(
+        input.externalId,
+        input.provider,
+        undefined,
+        undefined,
+        input.type,
+      )
+    : await deps.media.findByExternalId(
+        input.externalId,
+        input.provider,
+        input.type,
+      );
 
   const getUserLang = () => getUserLanguage(db, userId);
 
@@ -64,9 +80,11 @@ export async function getByExternal(
   const normalized = await provider.getMetadata(input.externalId, input.type, { supportedLanguages: supportedLangs });
 
   if (tvdbEnabled) {
-    const crossRef = await findMediaByAnyReference(
-      db, normalized.externalId, normalized.provider,
-      normalized.imdbId, normalized.tvdbId,
+    const crossRef = await deps.media.findByAnyReference(
+      normalized.externalId,
+      normalized.provider,
+      normalized.imdbId ?? undefined,
+      normalized.tvdbId ?? undefined,
     );
     if (crossRef) {
       const lang = await getUserLang();
@@ -88,7 +106,7 @@ export async function getByExternal(
     }).catch(logAndSwallow("media:getByExternal dispatchEnsureMedia(structure)"));
   }
 
-  const result = await findMediaByIdWithSeasons(db, inserted.id);
+  const result = await deps.media.findByIdWithSeasons(inserted.id);
   if (!result) throw new Error("Media not found after insert");
   const lang = await getUserLang();
   const localized = await applyMediaLocalizationOverlay(db, result, lang);

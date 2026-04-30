@@ -3,7 +3,6 @@ import type { Database } from "@canto/db/client";
 import { list, listItem, media } from "@canto/db/schema";
 import {
   addListItem,
-  findMediaByAnyReference,
   markListItemsPushed,
   removeListItem,
 } from "@canto/core/infra/repositories";
@@ -12,6 +11,7 @@ import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-r
 import type { UserConnectionRepositoryPort } from "@canto/core/domain/media-servers/ports/user-connection-repository.port";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
 import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import type {
   TraktIds,
@@ -62,9 +62,9 @@ export interface LocalRatingRef extends LocalMediaRef {
  * declares its own `Deps` view onto a subset of these so the call sites stay
  * honest about what they touch.
  *
- * `findMediaByAnyReference` and `findEpisodeIdByMediaAndNumbers` still resolve
- * via the media-context infra repos directly — those tables are not yet
- * wrapped by a port and a media-wave will land in a future iteration.
+ * Wave 9A wired the `media` port into trakt sync — `findByAnyReference` and
+ * `findEpisodeIdByMediaAndNumbers` now flow through it instead of the
+ * legacy infra helpers.
  */
 export interface SyncDeps {
   traktApi: TraktApiPort;
@@ -72,6 +72,7 @@ export interface SyncDeps {
   userMedia: UserMediaRepositoryPort;
   userConnection: UserConnectionRepositoryPort;
   lists: ListsRepositoryPort;
+  media: MediaRepositoryPort;
   providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort };
 }
 
@@ -192,6 +193,7 @@ export function toTraktRatingsBody(
 }
 
 export interface ResolveMediaDeps {
+  media: MediaRepositoryPort;
   providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort };
 }
 
@@ -206,8 +208,7 @@ export async function resolveMediaFromTraktRef(
   const cached = cache.get(key);
   if (cached !== undefined) return cached;
 
-  const byAnyReference = await findMediaByAnyReference(
-    db,
+  const byAnyReference = await deps.media.findByAnyReference(
     ref.ids.tmdb ?? ref.ids.tvdb ?? 0,
     ref.ids.tmdb ? "tmdb" : "tvdb",
     ref.ids.imdb,

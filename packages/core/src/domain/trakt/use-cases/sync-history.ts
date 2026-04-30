@@ -1,6 +1,5 @@
 import { and, desc, eq, isNull, ne } from "drizzle-orm";
 import { episode, media, season, userWatchHistory } from "@canto/db/schema";
-import { findEpisodeIdByMediaAndNumbers } from "@canto/core/infra/repositories";
 import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
 import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
@@ -78,8 +77,7 @@ export async function pullHistory(
         typeof remote.seasonNumber === "number" &&
         typeof remote.episodeNumber === "number"
       ) {
-        episodeId = await findEpisodeIdByMediaAndNumbers(
-          ctx.db,
+        episodeId = await deps.media.findEpisodeIdByMediaAndNumbers(
           mediaId,
           remote.seasonNumber,
           remote.episodeNumber,
@@ -285,8 +283,7 @@ export async function linkPulledHistoryBackfill(
       typeof remote.seasonNumber === "number" &&
       typeof remote.episodeNumber === "number"
     ) {
-      episodeId = await findEpisodeIdByMediaAndNumbers(
-        ctx.db,
+      episodeId = await deps.media.findEpisodeIdByMediaAndNumbers(
         mediaId,
         remote.seasonNumber,
         remote.episodeNumber,

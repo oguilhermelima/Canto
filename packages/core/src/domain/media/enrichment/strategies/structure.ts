@@ -1,9 +1,10 @@
-import { reconcileShowStructure } from "../../use-cases/reconcile-show-structure";
+import { reconcileShowStructure } from "@canto/core/domain/media/use-cases/reconcile-show-structure";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import type {
   ApplyArgs,
   MediaEnrichmentStrategy,
   SharedMetadataResponse,
-} from "../types";
+} from "@canto/core/domain/media/enrichment/types";
 
 /**
  * Show season/episode scaffolding. For TMDB-native shows running on the
@@ -38,10 +39,11 @@ export const structureStrategy: MediaEnrichmentStrategy<
       // re-attach files/playback) so we delegate rather than duplicating the
       // critical section. Translation dispatch is suppressed because the
       // `translations` strategy runs later in this same pass.
+      const media = makeMediaRepository(db);
       await reconcileShowStructure(
         db,
+        { media, tmdb: deps.tmdb, tvdb: deps.tvdb },
         mediaId,
-        { tmdb: deps.tmdb, tvdb: deps.tvdb },
         { force: true, dispatchTranslations: false },
       );
       ctx.result.providerCalls.tvdb += 1;

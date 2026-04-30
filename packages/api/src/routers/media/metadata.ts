@@ -19,6 +19,7 @@ import {
   findMediaById,
   findMediaByIdWithSeasons,
 } from "@canto/core/infra/media/media-repository";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import {
   applyMediaLocalizationOverlay,
   applySeasonsLocalizationOverlay,
@@ -63,8 +64,9 @@ export const mediaMetadataRouter = createTRPCRouter({
   getByExternal: protectedProcedure
     .input(getByExternalInput)
     .query(async ({ ctx, input }) => {
+      const media = makeMediaRepository(ctx.db);
       const result = await getByExternal(
-        ctx.db, input, ctx.session.user.id,
+        ctx.db, { media }, input, ctx.session.user.id,
         getProviderWithKey,
         () => getActiveUserLanguages(ctx.db).then((s) => [...s]),
       );
@@ -142,7 +144,13 @@ export const mediaMetadataRouter = createTRPCRouter({
           columns: { id: true },
         });
         if (!hasTvdbSeasons) {
-          await reconcileShowStructure(ctx.db, row.id, { tmdb, tvdb, dispatcher: jobDispatcher }, { force: true });
+          const media = makeMediaRepository(ctx.db);
+          await reconcileShowStructure(
+            ctx.db,
+            { media, tmdb, tvdb, dispatcher: jobDispatcher },
+            row.id,
+            { force: true },
+          );
         }
       }
 

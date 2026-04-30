@@ -5,30 +5,40 @@ import {
   buildTmdbEpisodeMap,
   overlayTmdbEpisodeData,
   overlayTmdbSeasonData,
-} from "./persist";
-import { getActiveUserLanguages } from "../../shared/services/user-service";
-import {
-  findMediaById,
-  updateMedia,
-} from "../../../infra/repositories";
-import { findMediaLocalized } from "../../../infra/media/media-localized-repository";
-import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
-import { logAndSwallow } from "../../../platform/logger/log-error";
-import type { JobDispatcherPort } from "../../shared/ports/job-dispatcher.port";
-import { getEffectiveProvider } from "../../shared/rules/effective-provider";
-import { upsertMediaLocalization } from "../../shared/localization";
+} from "@canto/core/domain/media/use-cases/persist";
+import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import { findMediaLocalized } from "@canto/core/infra/media/media-localized-repository";
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
+import { getEffectiveProvider } from "@canto/core/domain/shared/rules/effective-provider";
+import { upsertMediaLocalization } from "@canto/core/domain/shared/localization/localization-service";
+
+export interface ReconcileShowStructureDeps {
+  media: MediaRepositoryPort;
+  tmdb: MediaProviderPort;
+  tvdb: MediaProviderPort;
+  dispatcher?: JobDispatcherPort;
+}
 
 /**
  * Reconcile season/episode structure from TVDB without touching TMDB metadata.
  * Saves structure in English (fast), then dispatches per-language translation jobs.
+ *
+ * Localization writes (`upsertMediaLocalization`, `findMediaLocalized`) and
+ * the persist sub-flows (`persistTranslations`, `applyTvdbSeasons`,
+ * `overlayTmdb*`) still resolve via the legacy infra helpers — they're
+ * Wave 9B / 9C territory. The media-row reads/writes here flow through
+ * the Wave 9A port.
  */
 export async function reconcileShowStructure(
   db: Database,
+  deps: ReconcileShowStructureDeps,
   mediaId: string,
-  deps: { tmdb: MediaProviderPort; tvdb: MediaProviderPort; dispatcher?: JobDispatcherPort },
   options?: { force?: boolean; dispatchTranslations?: boolean },
 ): Promise<void> {
-  const row = await findMediaById(db, mediaId);
+  const row = await deps.media.findById(mediaId);
   if (!row || row.type !== "show") return;
 
   if (!options?.force) {
@@ -54,7 +64,7 @@ export async function reconcileShowStructure(
       } catch { /* not found */ }
     }
     if (!tvdbId) return;
-    if (!isAlreadyTvdb) await updateMedia(db, mediaId, { tvdbId });
+    if (!isAlreadyTvdb) await deps.media.updateMedia(mediaId, { tvdbId });
   }
 
   // Fetch TVDB structure in English only (fast, no per-language episode fetching)
@@ -109,7 +119,7 @@ export async function reconcileShowStructure(
 
       // Update base media (only language-agnostic fields after Phase 1C-δ).
       if (tmdbMeta.backdropPath) {
-        await updateMedia(db, mediaId, { backdropPath: tmdbMeta.backdropPath });
+        await deps.media.updateMedia(mediaId, { backdropPath: tmdbMeta.backdropPath });
       }
 
       // Persist the localized image fields into media_localization en-US.

@@ -14,6 +14,7 @@ import {
   findMediaByIdWithSeasons,
   updateMedia,
 } from "@canto/core/infra/media/media-repository";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { findMediaFilesByMediaId } from "@canto/core/infra/media/media-file-repository";
 import { findMediaVersionsByMediaId } from "@canto/core/infra/media/media-version-repository";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
@@ -60,7 +61,13 @@ export const mediaVersioningRouter = createTRPCRouter({
 
       if (effectiveProvider === "tvdb") {
         const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
-        await reconcileShowStructure(ctx.db, input.id, { tmdb, tvdb, dispatcher: jobDispatcher }, { force: true });
+        const media = makeMediaRepository(ctx.db);
+        await reconcileShowStructure(
+          ctx.db,
+          { media, tmdb, tvdb, dispatcher: jobDispatcher },
+          input.id,
+          { force: true },
+        );
       } else {
         const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
         const supportedLangs = [...await getActiveUserLanguages(ctx.db)];

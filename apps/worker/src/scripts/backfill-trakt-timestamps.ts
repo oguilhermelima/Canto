@@ -21,7 +21,7 @@ import {
   userMediaState,
   userRating,
 } from "@canto/db/schema";
-import { findMediaByAnyReference } from "@canto/core/infra/repositories";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { makeTraktApi } from "@canto/core/infra/trakt/trakt-api.adapter-bindings";
 import { makeTraktRepository } from "@canto/core/infra/trakt/trakt-repository.adapter";
 import { makeUserConnectionRepository } from "@canto/core/infra/media-servers/user-connection-repository.adapter";
@@ -39,14 +39,15 @@ interface ConnContext {
   api: TraktApiPort;
 }
 
+const mediaRepo = makeMediaRepository(db);
+
 async function resolveLocalMedia(
   type: "movie" | "show",
   ids: TraktIds,
 ): Promise<string | null> {
   const externalId = ids.tmdb ?? ids.tvdb ?? 0;
   if (!externalId) return null;
-  const found = await findMediaByAnyReference(
-    db,
+  const found = await mediaRepo.findByAnyReference(
     externalId,
     ids.tmdb ? "tmdb" : "tvdb",
     ids.imdb,

@@ -8,20 +8,16 @@
 /* -------------------------------------------------------------------------- */
 
 import type { Database } from "@canto/db/client";
-import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
-import { persistMedia } from "./persist";
-import { getActiveUserLanguages } from "../../shared/services/user-service";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import { persistMedia } from "@canto/core/domain/media/use-cases/persist";
+import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 import {
   findMediaVersionById,
   findMediaVersionsByMediaId,
   updateMediaVersion,
-  findMediaByAnyReference,
-  findMediaById,
-  updateMedia,
-  deleteMedia,
-  isMediaOrphaned,
-} from "../../../infra/repositories";
-import { findMediaLocalized } from "../../../infra/media/media-localized-repository";
+} from "@canto/core/infra/media/media-version-repository";
+import { findMediaLocalized } from "@canto/core/infra/media/media-localized-repository";
 
 export type ResolveMediaVersionInput =
   | { versionId: string; tmdbId: number; type: "movie" | "show" }
@@ -42,6 +38,10 @@ export interface ResolutionResult {
   orphanedMediaDeleted: number;
 }
 
+export interface ResolveMediaVersionDeps {
+  media: MediaRepositoryPort;
+}
+
 /**
  * Dry-run helper: report what `resolveMediaVersion` would do without
  * touching the database. Used by the UI to show the user a confirmation
@@ -49,10 +49,11 @@ export interface ResolutionResult {
  */
 export async function resolveMediaVersionPreview(
   db: Database,
+  deps: ResolveMediaVersionDeps,
   input: ResolveMediaVersionInput,
   tmdb: MediaProviderPort,
 ): Promise<ResolutionPreview> {
-  return (await resolveMediaVersion(db, input, tmdb, { dryRun: true })) as ResolutionPreview;
+  return (await resolveMediaVersion(db, deps, input, tmdb, { dryRun: true })) as ResolutionPreview;
 }
 
 /**
@@ -62,9 +63,16 @@ export async function resolveMediaVersionPreview(
  * orphaned.
  *
  * In `dryRun` mode no mutations are performed — returns a ResolutionPreview.
+ *
+ * Note: `media_version` reads/writes still go through the legacy infra
+ * repo (`media-version-repository`) — those are Wave 8 territory and were
+ * partially ported on the torrents port. A future cross-context
+ * coordination point will fold version updates into a higher-level use
+ * case; until then this use case touches both ports' tables directly.
  */
 export async function resolveMediaVersion(
   db: Database,
+  deps: ResolveMediaVersionDeps,
   input: ResolveMediaVersionInput,
   tmdb: MediaProviderPort,
   opts: { dryRun?: boolean } = {},
@@ -77,7 +85,7 @@ export async function resolveMediaVersion(
   const oldMediaIds = new Set<string>();
   for (const v of versions) if (v.mediaId) oldMediaIds.add(v.mediaId);
 
-  const existingTarget = await findMediaByAnyReference(db, input.tmdbId, "tmdb");
+  const existingTarget = await deps.media.findByAnyReference(input.tmdbId, "tmdb");
 
   let targetMediaId: string;
   let targetTitle: string;
@@ -108,7 +116,7 @@ export async function resolveMediaVersion(
         addedAt: new Date(),
       };
       if (firstPath) mediaUpdates.libraryPath = firstPath;
-      await updateMedia(db, inserted.id, mediaUpdates);
+      await deps.media.updateMedia(inserted.id, mediaUpdates);
       targetMediaId = inserted.id;
     }
   }
@@ -132,10 +140,10 @@ export async function resolveMediaVersion(
     // Still need to check torrents via isMediaOrphaned — pass a sentinel
     // exclude so the version-count side of the check matches our logic.
     // Since `remaining` is already 0 we just need the torrent check:
-    const orphaned = await isMediaOrphaned(db, oldId, versions[0]?.id);
+    const orphaned = await deps.media.isMediaOrphaned(oldId, versions[0]?.id);
     if (!orphaned) continue;
 
-    const row = await findMediaById(db, oldId);
+    const row = await deps.media.findById(oldId);
     if (row) {
       const orphanLoc = await findMediaLocalized(db, row.id, "en-US");
       orphanedMedia.push({ id: row.id, title: orphanLoc?.title ?? "", year: row.year ?? null });
@@ -166,9 +174,9 @@ export async function resolveMediaVersion(
   let orphanedDeleted = 0;
   for (const oldId of oldMediaIds) {
     if (oldId === targetMediaId) continue;
-    const stillOrphaned = await isMediaOrphaned(db, oldId);
+    const stillOrphaned = await deps.media.isMediaOrphaned(oldId);
     if (stillOrphaned) {
-      await deleteMedia(db, oldId);
+      await deps.media.deleteMedia(oldId);
       orphanedDeleted++;
       console.log(`[resolve-media-version] Deleted orphaned media ${oldId}`);
     }

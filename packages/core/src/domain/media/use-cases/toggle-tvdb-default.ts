@@ -1,9 +1,11 @@
-import { and, eq } from "drizzle-orm";
-import type { Database } from "@canto/db/client";
-import { media } from "@canto/db/schema";
 import { setSetting } from "@canto/db/settings";
-import { dispatchEnsureMedia } from "../../../platform/queue/bullmq-dispatcher";
-import { logAndSwallow } from "../../../platform/logger/log-error";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+
+export interface ToggleTvdbDefaultDeps {
+  media: MediaRepositoryPort;
+}
 
 /**
  * Flip the `tvdb.defaultShows` flag and eagerly re-run the structure
@@ -23,23 +25,20 @@ import { logAndSwallow } from "../../../platform/logger/log-error";
  * the toggle; the daily cadence sweep would catch any miss anyway.
  */
 export async function toggleTvdbDefault(
-  db: Database,
+  deps: ToggleTvdbDefaultDeps,
   enabled: boolean,
 ): Promise<{ success: true; reprocessing: number }> {
   await setSetting("tvdb.defaultShows", enabled);
-  const shows = await db
-    .select({ id: media.id })
-    .from(media)
-    .where(and(eq(media.inLibrary, true), eq(media.type, "show")));
+  const showIds = await deps.media.findShowIdsInLibrary();
 
   void Promise.all(
-    shows.map((show) =>
-      dispatchEnsureMedia(show.id, {
+    showIds.map((id) =>
+      dispatchEnsureMedia(id, {
         aspects: ["structure"],
         force: true,
-      }).catch(logAndSwallow(`toggleTvdbDefault dispatch ${show.id}`)),
+      }).catch(logAndSwallow(`toggleTvdbDefault dispatch ${id}`)),
     ),
   );
 
-  return { success: true, reprocessing: shows.length };
+  return { success: true, reprocessing: showIds.length };
 }

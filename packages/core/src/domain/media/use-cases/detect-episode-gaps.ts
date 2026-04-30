@@ -2,25 +2,36 @@
 /*  Use-case: Detect missing episodes for monitored shows                    */
 /* -------------------------------------------------------------------------- */
 
-import type { Database } from "@canto/db/client";
 import { and, eq } from "drizzle-orm";
+import type { Database } from "@canto/db/client";
 import { mediaFile } from "@canto/db/schema";
-import { findMediaByIdWithSeasons } from "../../../infra/repositories";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+
+export interface DetectMissingEpisodesDeps {
+  media: MediaRepositoryPort;
+}
 
 /**
  * For a given show and season, find episode numbers that don't have
  * an imported media file yet.
+ *
+ * The `media_file` lookup still hits the DB directly via Drizzle —
+ * Wave 8's torrents port covers writes / status flips but not the
+ * "any file imported for this episode?" projection. TODO(wave 8 follow-up):
+ * surface a `findImportedByEpisodeId` helper on the torrents port and
+ * inject it here.
  */
 export async function detectMissingEpisodes(
   db: Database,
+  deps: DetectMissingEpisodesDeps,
   mediaId: string,
   seasonNumber: number,
   targetEpisodes: number[],
 ): Promise<number[]> {
-  const mediaRow = await findMediaByIdWithSeasons(db, mediaId);
+  const mediaRow = await deps.media.findByIdWithSeasons(mediaId);
   if (!mediaRow) return [];
 
-  const seasonRow = mediaRow.seasons?.find((s) => s.number === seasonNumber);
+  const seasonRow = mediaRow.seasons.find((s) => s.number === seasonNumber);
   if (!seasonRow?.episodes) return [];
 
   const missingEpisodes: number[] = [];

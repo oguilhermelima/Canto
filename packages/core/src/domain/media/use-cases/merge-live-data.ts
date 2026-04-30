@@ -1,11 +1,11 @@
 import type { Database } from "@canto/db/client";
-import type { DownloadClientPort } from "../../shared/ports/download-client";
-import type { LiveData } from "../../torrents/types/torrent";
+import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
+import type { LiveData } from "@canto/core/domain/torrents/types/torrent";
 import {
   updateDownload,
   updateDownloadBatch,
-} from "../../../infra/repositories";
-import { logAndSwallow } from "../../../platform/logger/log-error";
+} from "@canto/core/infra/torrents/download-repository";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 
 type TorrentRow = Awaited<ReturnType<Database["query"]["download"]["findMany"]>>[number];
 

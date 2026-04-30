@@ -13,7 +13,6 @@
 /*  per-(media, episode) playback rows with isCompleted=true.                  */
 /* -------------------------------------------------------------------------- */
 
-import { findEpisodeIdByMediaAndNumbers } from "@canto/core/infra/repositories";
 import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
 import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/user-media/use-cases/promote-user-media-state-from-playback";
@@ -115,8 +114,7 @@ export async function pullWatchedShows(
     // its episode rows and is computed on read.
     let touchedAny = false;
     for (const ep of remote.episodes) {
-      const episodeId = await findEpisodeIdByMediaAndNumbers(
-        ctx.db,
+      const episodeId = await deps.media.findEpisodeIdByMediaAndNumbers(
         mediaId,
         ep.seasonNumber,
         ep.episodeNumber,
