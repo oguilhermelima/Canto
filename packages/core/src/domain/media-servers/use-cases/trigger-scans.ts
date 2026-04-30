@@ -6,7 +6,7 @@ import type { Database } from "@canto/db/client";
 import { getSetting, getSettings } from "@canto/db/settings";
 import type { JellyfinAdapterPort } from "@canto/core/domain/media-servers/ports/jellyfin-adapter.port";
 import type { PlexAdapterPort } from "@canto/core/domain/media-servers/ports/plex-adapter.port";
-import { findAllServerLinks } from "@canto/core/infra/repositories";
+import { findAllServerLinks } from "@canto/core/infra/file-organization/folder-repository";
 
 export interface ImportedMedia {
   id: string;

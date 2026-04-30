@@ -14,17 +14,23 @@ import { runWithConcurrency } from "@canto/core/platform/concurrency/run-with-co
 import type { MediaVersionRow } from "@canto/core/infra/media/media-version-repository";
 import {
   findEnabledSyncLinks,
+  updateServerLinksBatch,
+} from "@canto/core/infra/file-organization/folder-repository";
+import {
   findAllUserConnections,
-  upsertUserPlaybackProgress,
+  clearUserConnectionStale,
+  markUserConnectionStale,
+} from "@canto/core/infra/media-servers/user-connection-repository";
+import {
   addToUserMediaLibrary,
   pruneStaleUserMediaLibrary,
+} from "@canto/core/infra/user-media/library-repository";
+import { upsertUserPlaybackProgress } from "@canto/core/infra/user-media/playback-progress-repository";
+import {
   pruneStaleMediaVersions,
   touchMediaVersionsSeen,
-  reconcileMediaInLibrary,
-  updateServerLinksBatch,
-  markUserConnectionStale,
-  clearUserConnectionStale,
-} from "@canto/core/infra/repositories";
+} from "@canto/core/infra/media/media-version-repository";
+import { reconcileMediaInLibrary } from "@canto/core/infra/media/media-repository";
 import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
 import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/user-media/use-cases/promote-user-media-state-from-playback";
 import { pushPlaybackPositionToServers } from "@canto/core/domain/user-media/use-cases/push-playback-position";

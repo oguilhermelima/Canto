@@ -1,13 +1,15 @@
 import type { Database } from "@canto/db/client";
 
 import {
-  findFolderById,
   findAllFolders,
-} from "../../../../infra/repositories";
-import { findWatchProvidersByMediaId } from "../../../../infra/content-enrichment/extras-repository";
-import { updateMedia } from "../../../../infra/media/media-repository";
-import { resolveFolder } from "../../rules/folder-routing";
-import type { RoutableMedia } from "../../rules/folder-routing";
+  findFolderById,
+} from "@canto/core/infra/file-organization/folder-repository";
+import { findWatchProvidersByMediaId } from "@canto/core/infra/content-enrichment/extras-repository";
+import { updateMedia } from "@canto/core/infra/media/media-repository";
+import {
+  resolveFolder,
+  type RoutableMedia,
+} from "@canto/core/domain/torrents/rules/folder-routing";
 
 export interface RoutableMediaRow {
   id: string;

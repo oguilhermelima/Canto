@@ -7,7 +7,7 @@ import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-cl
 import {
   findDownloadsByHashes,
   updateDownloadBatch,
-} from "@canto/core/infra/repositories";
+} from "@canto/core/infra/torrents/download-repository";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 import { runWithConcurrency } from "@canto/core/platform/concurrency/run-with-concurrency";
 

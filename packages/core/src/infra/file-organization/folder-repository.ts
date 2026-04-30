@@ -7,7 +7,7 @@ import {
   type PersistedFolderRules,
   type RoutingRules,
 } from "@canto/db/schema";
-import { normalizeFolderRules } from "../../domain/torrents/rules/folder-routing";
+import { normalizeFolderRules } from "@canto/core/domain/torrents/rules/folder-routing";
 
 /** Converts legacy-shape `rules` into the canonical `RoutingRules` shape on read. */
 function normalizeFolderRow<T extends { rules: PersistedFolderRules | null }>(

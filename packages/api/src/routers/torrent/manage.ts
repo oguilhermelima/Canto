@@ -17,13 +17,17 @@ import {
 } from "@canto/core/domain/torrents/use-cases/download-torrent";
 import { retryTorrent } from "@canto/core/domain/torrents/use-cases/retry-torrent";
 import { renameTorrent } from "@canto/core/domain/torrents/use-cases/rename-torrent";
+import { makeFoldersRepository } from "@canto/core/infra/file-organization/folders-repository.adapter";
+import { makeTorrentsRepository } from "@canto/core/infra/torrents/torrents-repository.adapter";
 import {
+  deleteDownload as deleteTorrentRecord,
   findDownloadById,
   updateDownload,
-  deleteDownload as deleteTorrentRecord,
+} from "@canto/core/infra/torrents/download-repository";
+import {
   deleteMediaFilesByDownloadId,
   deletePendingMediaFilesByDownloadId,
-} from "@canto/core/infra/repositories";
+} from "@canto/core/infra/media/media-file-repository";
 
 import { createTRPCRouter, adminProcedure } from "../../trpc";
 
@@ -46,7 +50,15 @@ export const torrentManageRouter = createTRPCRouter({
     .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
       const qb = await getDownloadClient();
-      const result = await retryTorrent(ctx.db, input.id, qb);
+      const result = await retryTorrent(
+        ctx.db,
+        {
+          torrents: makeTorrentsRepository(ctx.db),
+          folders: makeFoldersRepository(ctx.db),
+        },
+        input.id,
+        qb,
+      );
       if (!result) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
       return result;
     }),
@@ -144,7 +156,11 @@ export const torrentManageRouter = createTRPCRouter({
   rename: adminProcedure
     .input(renameTorrentInput)
     .mutation(async ({ ctx, input }) => {
-      const result = await renameTorrent(ctx.db, input.id, input.newName);
+      const result = await renameTorrent(
+        { repo: makeTorrentsRepository(ctx.db) },
+        input.id,
+        input.newName,
+      );
       if (!result) throw new TRPCError({ code: "NOT_FOUND", message: "Torrent not found" });
       return result;
     }),

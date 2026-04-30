@@ -1,6 +1,9 @@
-import type { Quality, Source } from "../types/common";
-import { QUALITY_HIERARCHY, SOURCE_HIERARCHY } from "./quality";
-import type { ScoringRules } from "../../shared/rules/scoring-rules";
+import type { Quality, Source } from "@canto/core/domain/torrents/types/common";
+import {
+  QUALITY_HIERARCHY,
+  SOURCE_HIERARCHY,
+} from "@canto/core/domain/torrents/rules/quality";
+import type { ScoringRules } from "@canto/core/domain/shared/rules/scoring-rules";
 
 /**
  * One entry in {@link DownloadProfile.allowedFormats}. Releases whose

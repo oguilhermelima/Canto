@@ -1,6 +1,6 @@
 import nodePath from "node:path";
 
-import type { FileSystemPort } from "../../shared/ports/file-system.port";
+import type { FileSystemPort } from "@canto/core/domain/shared/ports/file-system.port";
 
 export interface BrowseFolderResult {
   path: string;

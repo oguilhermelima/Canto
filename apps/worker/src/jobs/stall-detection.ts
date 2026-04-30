@@ -4,10 +4,11 @@ import { buildIndexers } from "@canto/core/infra/indexers/indexer-factory";
 import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
 import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
 import { retryStalledTorrent } from "@canto/core/domain/torrents/use-cases/retry-stalled-torrent";
+import { makeTorrentsRepository } from "@canto/core/infra/torrents/torrents-repository.adapter";
 import {
   findDownloadsByStatus,
   updateDownload,
-} from "@canto/core/infra/repositories";
+} from "@canto/core/infra/torrents/download-repository";
 
 /** How long a torrent must be downloading with no progress before we consider it stalled (ms) */
 const STALL_THRESHOLD_MS = 60 * 60 * 1000; // 60 minutes
@@ -80,7 +81,13 @@ export async function handleStallDetection(): Promise<void> {
 
       // Auto-retry: search for alternative and download
       if (row.mediaId) {
-        await retryStalledTorrent(db, row, indexers, qb);
+        await retryStalledTorrent(
+          db,
+          { torrents: makeTorrentsRepository(db) },
+          row,
+          indexers,
+          qb,
+        );
       }
     } catch (err) {
       console.error(

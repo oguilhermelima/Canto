@@ -21,12 +21,12 @@ import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
 import { updateMedia } from "@canto/core/infra/media/media-repository";
 import {
-  findDownloadById,
-  findDownloadByHash,
-  updateDownload,
-  createDownload,
   claimDownloadForImport,
-} from "@canto/core/infra/repositories";
+  createDownload,
+  findDownloadByHash,
+  findDownloadById,
+  updateDownload,
+} from "@canto/core/infra/torrents/download-repository";
 
 import { createTRPCRouter, adminProcedure } from "../../trpc";
 

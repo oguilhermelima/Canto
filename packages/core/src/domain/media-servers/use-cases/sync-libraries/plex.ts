@@ -3,7 +3,7 @@ import type { Database } from "@canto/db/client";
 import {
   findServerLink,
   upsertServerLink,
-} from "@canto/core/infra/repositories";
+} from "@canto/core/infra/file-organization/folder-repository";
 import { autoElectDefault } from "@canto/core/domain/media-servers/use-cases/shared/sync-helpers";
 
 type PlexSection = { key: string; title: string; type: string; Location: Array<{ path: string }> };

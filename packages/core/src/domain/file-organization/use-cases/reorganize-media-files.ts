@@ -2,22 +2,24 @@ import path from "node:path";
 
 import type { Database } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
-import { getEffectiveProvider } from "../../shared/rules/effective-provider";
+import { getEffectiveProvider } from "@canto/core/domain/shared/rules/effective-provider";
 import {
-  buildMediaDir,
   buildFileName,
+  buildMediaDir,
   type MediaNamingInfo,
-} from "../../shared/rules/naming";
-import type { DownloadClientPort } from "../../shared/ports/download-client";
-import type { FileSystemPort } from "../../shared/ports/file-system.port";
+} from "@canto/core/domain/shared/rules/naming";
+import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
+import type { FileSystemPort } from "@canto/core/domain/shared/ports/file-system.port";
+import { findMediaByIdWithSeasons } from "@canto/core/infra/media/media-repository";
 import {
-  findMediaByIdWithSeasons,
   findMediaFilesByMediaId,
-  findDownloadsByMediaId,
   updateMediaFile,
+} from "@canto/core/infra/media/media-file-repository";
+import {
+  findDownloadsByMediaId,
   updateDownload,
-} from "../../../infra/repositories";
-import { findMediaLocalized } from "../../../infra/media/media-localized-repository";
+} from "@canto/core/infra/torrents/download-repository";
+import { findMediaLocalized } from "@canto/core/infra/media/media-localized-repository";
 
 // ── Public types ───────────────────────────────────────────────────────────
 

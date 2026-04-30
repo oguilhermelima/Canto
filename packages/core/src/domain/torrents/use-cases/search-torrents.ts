@@ -5,37 +5,38 @@ import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import {
   explainConfidence,
   type ConfidenceBreakdown,
-} from "../../shared/rules/scoring";
-import type { ScoringRules } from "../../shared/rules/scoring-rules";
-import { resolveMediaFlavor } from "../../shared/rules/media-flavor";
+} from "@canto/core/domain/shared/rules/scoring";
+import type { ScoringRules } from "@canto/core/domain/shared/rules/scoring-rules";
+import { resolveMediaFlavor } from "@canto/core/domain/shared/rules/media-flavor";
 import {
   parseReleaseAttributes,
   type ReleaseAttributes,
-} from "../rules/release-attributes";
+} from "@canto/core/domain/torrents/rules/release-attributes";
 import {
   applyDownloadProfile,
   meetsCutoff,
   type DownloadProfile,
-} from "../rules/download-profile";
+} from "@canto/core/domain/torrents/rules/download-profile";
 import type {
   ReleaseFlavor,
   ReleaseGroupTierSets,
-} from "../rules/release-groups";
-import type { ConfidenceContext } from "../types/common";
-import type { IndexerResult, SearchContext } from "../types/torrent";
-import type { IndexerPort } from "../ports/indexer";
-import {
-  findMediaById,
-  findBlocklistByMediaId,
-} from "../../../infra/repositories";
-import { findMediaLocalized } from "../../../infra/media/media-localized-repository";
-import { findActiveDownloadProfile } from "../../../infra/torrents/download-profile-repository";
-import { findReleaseGroupLookups } from "../../../infra/torrents/download-config-repository";
-import { extractHashFromMagnet } from "../rules/torrent-rules";
+} from "@canto/core/domain/torrents/rules/release-groups";
+import type { ConfidenceContext } from "@canto/core/domain/torrents/types/common";
+import type {
+  IndexerResult,
+  SearchContext,
+} from "@canto/core/domain/torrents/types/torrent";
+import type { IndexerPort } from "@canto/core/domain/torrents/ports/indexer";
+import { findMediaById } from "@canto/core/infra/media/media-repository";
+import { findBlocklistByMediaId } from "@canto/core/infra/content-enrichment/extras-repository";
+import { findMediaLocalized } from "@canto/core/infra/media/media-localized-repository";
+import { findActiveDownloadProfile } from "@canto/core/infra/torrents/download-profile-repository";
+import { findReleaseGroupLookups } from "@canto/core/infra/torrents/download-config-repository";
+import { extractHashFromMagnet } from "@canto/core/domain/torrents/rules/torrent-rules";
 import {
   matchesSearchIntent,
   type SearchIntent,
-} from "../rules/parsing-episodes";
+} from "@canto/core/domain/torrents/rules/parsing-episodes";
 
 /**
  * Stable dedupe key. Prefers the magnet info-hash so the same release

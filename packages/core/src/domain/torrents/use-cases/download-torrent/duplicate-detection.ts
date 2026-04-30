@@ -3,7 +3,7 @@ import type { Database } from "@canto/db/client";
 import {
   findDuplicateMovieFile,
   findDuplicateEpisodeFile,
-} from "../../../../infra/repositories";
+} from "@canto/core/infra/media/media-file-repository";
 
 export interface EpisodeRef {
   id: string;

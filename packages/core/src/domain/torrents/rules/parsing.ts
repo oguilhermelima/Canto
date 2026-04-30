@@ -8,8 +8,8 @@ export {
   SUBTITLE_EXTENSIONS,
   isSubtitleFile,
   parseSubtitleLanguage,
-} from "./parsing-episodes";
-export { detectLanguages } from "./parsing-languages";
+} from "@canto/core/domain/torrents/rules/parsing-episodes";
+export { detectLanguages } from "@canto/core/domain/torrents/rules/parsing-languages";
 export {
   detectReleaseGroup,
   detectCodec,
@@ -20,6 +20,6 @@ export {
   detectRepackCount,
   isHybridRelease,
   detectStreamingService,
-} from "./parsing-release";
-export { classifyReleaseGroup } from "./release-groups";
-export type { ReleaseGroupTier } from "./release-groups";
+} from "@canto/core/domain/torrents/rules/parsing-release";
+export { classifyReleaseGroup } from "@canto/core/domain/torrents/rules/release-groups";
+export type { ReleaseGroupTier } from "@canto/core/domain/torrents/rules/release-groups";

@@ -1,6 +1,12 @@
-import type { TorrentInfo } from "../../shared/ports/download-client";
-import { parseEpisodes, parseSeasons } from "./parsing";
-import { detectQuality, detectSource } from "./quality";
+import type { TorrentInfo } from "@canto/core/domain/shared/ports/download-client";
+import {
+  parseEpisodes,
+  parseSeasons,
+} from "@canto/core/domain/torrents/rules/parsing";
+import {
+  detectQuality,
+  detectSource,
+} from "@canto/core/domain/torrents/rules/quality";
 
 /**
  * Extract the info-hash from a magnet URI, if present.

@@ -6,7 +6,7 @@ import {
   findDownloadedLibraryMedia,
   findImportedFilesByMediaIds,
   updateMedia,
-} from "@canto/core/infra/repositories";
+} from "@canto/core/infra/media/media-repository";
 import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
 import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
 

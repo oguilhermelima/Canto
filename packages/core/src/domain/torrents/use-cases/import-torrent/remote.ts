@@ -1,14 +1,17 @@
 import path from "node:path";
 
 import type { Database } from "@canto/db/client";
-import type { DownloadClientPort, TorrentFileInfo } from "@canto/core/domain/shared/ports/download-client";
+import type {
+  DownloadClientPort,
+  TorrentFileInfo,
+} from "@canto/core/domain/shared/ports/download-client";
 import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
 import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
 import {
   type ParsedFile,
   buildSubtitleName,
 } from "@canto/core/platform/fs/filesystem";
-import { upsertMediaFile } from "./shared";
+import { upsertMediaFile } from "@canto/core/domain/torrents/use-cases/import-torrent/shared";
 
 interface MediaNaming {
   title: string;

@@ -1,12 +1,12 @@
 import path from "node:path";
 
 import type { Database } from "@canto/db/client";
-import type { DownloadClientPort } from "../../../shared/ports/download-client";
+import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
 import {
   createMediaFileNoConflict,
   updateMediaFile,
-} from "../../../../infra/repositories";
-import type { ParsedFile } from "../../../../platform/fs/filesystem";
+} from "@canto/core/infra/media/media-file-repository";
+import type { ParsedFile } from "@canto/core/platform/fs/filesystem";
 
 /**
  * Resolve the save path qBittorrent reports for a given hash. Used to locate

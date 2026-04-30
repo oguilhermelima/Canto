@@ -1,15 +1,15 @@
-import type { Database } from "@canto/db/client";
-import {
-  findDownloadById,
-  updateDownload,
-} from "../../../infra/repositories";
-import { getQBClient } from "../../../infra/torrent-clients/qbittorrent.adapter";
+import type { TorrentsRepositoryPort } from "@canto/core/domain/torrents/ports/torrents-repository.port";
+import { getQBClient } from "@canto/core/infra/torrent-clients/qbittorrent.adapter";
 
 /**
  * Rename a torrent's main file in qBittorrent.
  */
-export async function renameTorrent(db: Database, torrentId: string, newName: string) {
-  const row = await findDownloadById(db, torrentId);
+export async function renameTorrent(
+  deps: { repo: TorrentsRepositoryPort },
+  torrentId: string,
+  newName: string,
+) {
+  const row = await deps.repo.findDownloadById(torrentId);
   if (!row) return null;
   if (!row.hash) throw new Error("Torrent has no hash");
 
@@ -24,6 +24,6 @@ export async function renameTorrent(db: Database, torrentId: string, newName: st
     : newName + ext;
 
   await qb.renameFile(row.hash, mainFile.name, newPath);
-  await updateDownload(db, torrentId, { title: newName });
+  await deps.repo.updateDownload(torrentId, { title: newName });
   return { success: true };
 }

@@ -15,15 +15,17 @@ import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-cl
 import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
 import { buildIndexers } from "@canto/core/infra/indexers/indexer-factory";
 import {
-  findUnimportedDownloads,
-  ensureServerLibrary,
-  addListItem,
-  updateRequestStatus,
   claimDownloadForImport,
+  findUnimportedDownloads,
   resetStaleImports,
   updateDownload,
-  updateMedia,
-} from "@canto/core/infra/repositories";
+} from "@canto/core/infra/torrents/download-repository";
+import { updateMedia } from "@canto/core/infra/media/media-repository";
+import {
+  addListItem,
+  ensureServerLibrary,
+} from "@canto/core/infra/lists/list-repository";
+import { updateRequestStatus } from "@canto/core/infra/requests/request-repository";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 
 interface ImportedMediaContext {

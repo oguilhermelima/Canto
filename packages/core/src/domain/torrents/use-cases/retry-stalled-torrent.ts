@@ -3,16 +3,13 @@
 /* -------------------------------------------------------------------------- */
 
 import type { Database } from "@canto/db/client";
-import type { DownloadClientPort } from "../../shared/ports/download-client";
-import type { IndexerPort } from "../ports/indexer";
-import { searchTorrents } from "./search-torrents";
-import { downloadTorrent } from "./download-torrent";
-import {
-  createBlocklistEntry,
-  findDownloadById,
-} from "../../../infra/repositories";
-import { findDownloadConfig } from "../../../infra/torrents/download-config-repository";
-import { applyAdminDownloadPolicy } from "../../shared/rules/scoring-rules";
+import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
+import type { IndexerPort } from "@canto/core/domain/torrents/ports/indexer";
+import type { TorrentsRepositoryPort } from "@canto/core/domain/torrents/ports/torrents-repository.port";
+import { searchTorrents } from "@canto/core/domain/torrents/use-cases/search-torrents";
+import { downloadTorrent } from "@canto/core/domain/torrents/use-cases/download-torrent";
+import { findDownloadConfig } from "@canto/core/infra/torrents/download-config-repository";
+import { applyAdminDownloadPolicy } from "@canto/core/domain/shared/rules/scoring-rules";
 
 interface StalledTorrent {
   id: string;
@@ -24,6 +21,7 @@ interface StalledTorrent {
 
 export async function retryStalledTorrent(
   db: Database,
+  deps: { torrents: TorrentsRepositoryPort },
   row: StalledTorrent,
   indexers: IndexerPort[],
   qbClient: DownloadClientPort,
@@ -32,7 +30,7 @@ export async function retryStalledTorrent(
 
   // Blocklist the stalled torrent
   try {
-    await createBlocklistEntry(db, {
+    await deps.torrents.createBlocklistEntry({
       mediaId: row.mediaId,
       title: row.title,
       reason: "stalled",
@@ -43,7 +41,7 @@ export async function retryStalledTorrent(
 
   // Remove stalled torrent from qBit
   try {
-    const stalledRow = await findDownloadById(db, row.id);
+    const stalledRow = await deps.torrents.findDownloadById(row.id);
     if (stalledRow?.hash) {
       await qbClient.deleteTorrent(stalledRow.hash, false);
     }

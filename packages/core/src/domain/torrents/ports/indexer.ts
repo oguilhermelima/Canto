@@ -1,4 +1,7 @@
-import type { IndexerResult, SearchContext } from "../types/torrent";
+import type {
+  IndexerResult,
+  SearchContext,
+} from "@canto/core/domain/torrents/types/torrent";
 
 export interface IndexerPort {
   /** Stable identifier ("prowlarr" / "jackett"). Used by the per-indexer

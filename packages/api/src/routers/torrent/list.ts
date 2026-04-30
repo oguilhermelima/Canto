@@ -9,7 +9,7 @@ import { mergeLiveData } from "@canto/core/domain/media/use-cases/merge-live-dat
 import {
   findAllDownloads,
   findDownloadsByMediaId,
-} from "@canto/core/infra/repositories";
+} from "@canto/core/infra/torrents/download-repository";
 
 import { createTRPCRouter, adminProcedure } from "../../trpc";
 

@@ -3,12 +3,12 @@
 /* -------------------------------------------------------------------------- */
 
 import type { Database } from "@canto/db/client";
-import type { DownloadClientPort } from "../../shared/ports/download-client";
-import type { IndexerPort } from "../ports/indexer";
-import { searchTorrents } from "./search-torrents";
-import { downloadTorrent } from "./download-torrent";
-import { applyAdminDownloadPolicy } from "../../shared/rules/scoring-rules";
-import { findDownloadConfig } from "../../../infra/torrents/download-config-repository";
+import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
+import type { IndexerPort } from "@canto/core/domain/torrents/ports/indexer";
+import { searchTorrents } from "@canto/core/domain/torrents/use-cases/search-torrents";
+import { downloadTorrent } from "@canto/core/domain/torrents/use-cases/download-torrent";
+import { applyAdminDownloadPolicy } from "@canto/core/domain/shared/rules/scoring-rules";
+import { findDownloadConfig } from "@canto/core/infra/torrents/download-config-repository";
 
 interface ContinuousDownloadMedia {
   id: string;

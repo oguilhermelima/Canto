@@ -4,19 +4,17 @@
 
 import type { Database } from "@canto/db/client";
 
-import type { DownloadClientPort } from "../../shared/ports/download-client";
-import { compareToProfile } from "../rules/download-profile";
-import { detectReleaseGroup } from "../rules/parsing-release";
-import { resolveMediaFlavor } from "../../shared/rules/media-flavor";
-import {
-  findDownloadById,
-  findMediaById,
-  findMediaFilesByDownloadId,
-} from "../../../infra/repositories";
-import { findActiveDownloadProfile } from "../../../infra/torrents/download-profile-repository";
-import type { Quality, Source } from "../types/common";
-import type { SearchResult } from "./search-torrents";
-import { replaceTorrent } from "./download-torrent";
+import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
+import { compareToProfile } from "@canto/core/domain/torrents/rules/download-profile";
+import { detectReleaseGroup } from "@canto/core/domain/torrents/rules/parsing-release";
+import { resolveMediaFlavor } from "@canto/core/domain/shared/rules/media-flavor";
+import { findDownloadById } from "@canto/core/infra/torrents/download-repository";
+import { findMediaById } from "@canto/core/infra/media/media-repository";
+import { findMediaFilesByDownloadId } from "@canto/core/infra/media/media-file-repository";
+import { findActiveDownloadProfile } from "@canto/core/infra/torrents/download-profile-repository";
+import type { Quality, Source } from "@canto/core/domain/torrents/types/common";
+import type { SearchResult } from "@canto/core/domain/torrents/use-cases/search-torrents";
+import { replaceTorrent } from "@canto/core/domain/torrents/use-cases/download-torrent";
 
 /**
  * Outcome of an auto-supersede attempt. The job logger uses the `reason`

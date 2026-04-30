@@ -1,25 +1,25 @@
 import { join, basename, extname } from "node:path";
 
 import type { Database } from "@canto/db/client";
-import { persistMedia } from "../../media/use-cases/persist";
-import { getActiveUserLanguages } from "../../shared/services/user-service";
+import { persistMedia } from "@canto/core/domain/media/use-cases/persist";
+import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 
-import type { FileSystemPort } from "../../shared/ports/file-system.port";
-import { parseFolderMediaInfo } from "../../torrents/rules/parsing";
-import { VIDEO_EXTENSIONS } from "../../shared/rules/naming";
-import { getTmdbProvider } from "../../../platform/http/tmdb-client";
+import type { FileSystemPort } from "@canto/core/domain/shared/ports/file-system.port";
+import { parseFolderMediaInfo } from "@canto/core/domain/torrents/rules/parsing";
+import { VIDEO_EXTENSIONS } from "@canto/core/domain/shared/rules/naming";
+import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import {
   findMediaByAnyReference,
   updateMedia,
-} from "../../../infra/media/media-repository";
-import { findAspectSucceededAt } from "../../../infra/media/media-aspect-state-repository";
+} from "@canto/core/infra/media/media-repository";
+import { findAspectSucceededAt } from "@canto/core/infra/media/media-aspect-state-repository";
 import {
-  ensureServerLibrary,
   addListItem,
-} from "../../../infra/lists/list-repository";
-import { dispatchEnsureMedia } from "../../../platform/queue/bullmq-dispatcher";
-import { logAndSwallow } from "../../../platform/logger/log-error";
-import { runWithConcurrency } from "../../../platform/concurrency/run-with-concurrency";
+  ensureServerLibrary,
+} from "@canto/core/infra/lists/list-repository";
+import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import { runWithConcurrency } from "@canto/core/platform/concurrency/run-with-concurrency";
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                    */

@@ -5,30 +5,37 @@ import { BlocklistedReleaseError, DownloadClientError, DuplicateDownloadError, I
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 import { resolveDownloadUrl } from "@canto/core/platform/http/follow-redirects";
-import { detectQuality, detectSource } from "../../rules/quality";
-import { parseSeasons, parseEpisodes } from "../../rules/parsing";
+import { detectQuality, detectSource } from "@canto/core/domain/torrents/rules/quality";
+import {
+  parseSeasons,
+  parseEpisodes,
+} from "@canto/core/domain/torrents/rules/parsing";
 import {
   detectRepackCount,
   detectReleaseGroup,
-} from "../../rules/parsing-release";
-import { extractHashFromMagnet } from "../../rules/torrent-rules";
+} from "@canto/core/domain/torrents/rules/parsing-release";
+import { extractHashFromMagnet } from "@canto/core/domain/torrents/rules/torrent-rules";
 import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
+import { findMediaByIdWithSeasons, updateMedia } from "@canto/core/infra/media/media-repository";
 import {
-  findMediaByIdWithSeasons,
-  findDownloadByTitle,
-  findDownloadByHash,
   createDownload,
-  updateDownload,
   deleteDownload,
+  findDownloadByHash,
+  findDownloadByTitle,
+  updateDownload,
+} from "@canto/core/infra/torrents/download-repository";
+import {
   createMediaFile,
   deleteMediaFilesByDownloadId,
-  findBlocklistEntry,
-} from "@canto/core/infra/repositories";
-import { updateMedia } from "@canto/core/infra/media/media-repository";
+} from "@canto/core/infra/media/media-file-repository";
+import { findBlocklistEntry } from "@canto/core/infra/content-enrichment/extras-repository";
 import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
 import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
-import { resolveDownloadConfig } from "./folder-resolution";
-import { resolveEpisodeIds, detectDuplicates } from "./duplicate-detection";
+import { resolveDownloadConfig } from "@canto/core/domain/torrents/use-cases/download-torrent/folder-resolution";
+import {
+  detectDuplicates,
+  resolveEpisodeIds,
+} from "@canto/core/domain/torrents/use-cases/download-torrent/duplicate-detection";
 
 type TorrentRow = NonNullable<Awaited<ReturnType<typeof findDownloadByTitle>>>;
 

@@ -1,5 +1,8 @@
-import type { Quality, Source } from "../types/common";
-import { detectQuality, detectSource } from "./quality";
+import type { Quality, Source } from "@canto/core/domain/torrents/types/common";
+import {
+  detectQuality,
+  detectSource,
+} from "@canto/core/domain/torrents/rules/quality";
 import {
   detectAudioChannels,
   detectAudioCodec,
@@ -10,14 +13,14 @@ import {
   detectRepackCount,
   detectStreamingService,
   isHybridRelease,
-} from "./parsing-release";
-import { detectLanguages } from "./parsing-languages";
+} from "@canto/core/domain/torrents/rules/parsing-release";
+import { detectLanguages } from "@canto/core/domain/torrents/rules/parsing-languages";
 import {
   classifyReleaseGroup,
   type ReleaseGroupTier,
   type ReleaseGroupTierSets,
   type ReleaseFlavor,
-} from "./release-groups";
+} from "@canto/core/domain/torrents/rules/release-groups";
 
 /**
  * CAM / Telesync keywords that survive in indexer titles even when the

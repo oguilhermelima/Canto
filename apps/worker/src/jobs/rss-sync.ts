@@ -9,11 +9,11 @@ import { matchRssTitle } from "@canto/core/domain/torrents/rules/rss-matching";
 import { detectMissingEpisodes } from "@canto/core/domain/media/use-cases/detect-episode-gaps";
 import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
 import { getProwlarrClient } from "@canto/core/infra/indexers/prowlarr.adapter";
+import { findBlocklistByMediaId } from "@canto/core/infra/content-enrichment/extras-repository";
 import {
-  findBlocklistByMediaId,
   findMediaByIdWithSeasons,
   findMonitoredShowsForRss,
-} from "@canto/core/infra/repositories";
+} from "@canto/core/infra/media/media-repository";
 import {
   findDownloadConfig,
   findReleaseGroupLookups,

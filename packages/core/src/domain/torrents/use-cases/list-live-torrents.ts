@@ -1,12 +1,12 @@
 import type { Database } from "@canto/db/client";
-import type { DownloadClientPort } from "../../shared/ports/download-client";
+import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
 import {
   findAllDownloadsPaginated,
   countAllDownloads,
-} from "../../../infra/repositories";
-import { findMediaById } from "../../../infra/media/media-repository";
-import { findMediaLocalizedMany } from "../../../infra/media/media-localized-repository";
-import { mergeLiveData } from "../../media/use-cases/merge-live-data";
+} from "@canto/core/infra/torrents/download-repository";
+import { findMediaById } from "@canto/core/infra/media/media-repository";
+import { findMediaLocalizedMany } from "@canto/core/infra/media/media-localized-repository";
+import { mergeLiveData } from "@canto/core/domain/media/use-cases/merge-live-data";
 
 /**
  * List live torrent data from qBittorrent merged with DB records + media info.

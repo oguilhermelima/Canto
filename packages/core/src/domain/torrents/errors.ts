@@ -1,4 +1,4 @@
-import { DomainError } from "../shared/errors";
+import { DomainError } from "@canto/core/domain/shared/errors";
 
 export class BlocklistedReleaseError extends DomainError {
   readonly code = "CONFLICT" as const;

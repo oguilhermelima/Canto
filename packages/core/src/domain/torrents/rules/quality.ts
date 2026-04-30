@@ -1,4 +1,4 @@
-import type { Quality, Source } from "../types/common";
+import type { Quality, Source } from "@canto/core/domain/torrents/types/common";
 
 export const QUALITY_HIERARCHY = [
   "uhd",

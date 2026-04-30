@@ -1,18 +1,23 @@
+import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
+import type { FoldersRepositoryPort } from "@canto/core/domain/file-organization/ports/folders-repository.port";
+import type { TorrentsRepositoryPort } from "@canto/core/domain/torrents/ports/torrents-repository.port";
+import { findMediaById } from "@canto/core/infra/media/media-repository";
 import type { Database } from "@canto/db/client";
-import type { DownloadClientPort } from "../../shared/ports/download-client";
-import {
-  findDownloadById,
-  updateDownload,
-} from "../../../infra/repositories";
-import { findMediaById } from "../../../infra/media/media-repository";
-import { findFolderById, findDefaultFolder } from "../../../infra/file-organization/folder-repository";
 
 /**
  * Re-download a torrent that was removed or errored.
  * Resolves the correct qBittorrent category and re-adds the torrent.
  */
-export async function retryTorrent(db: Database, torrentId: string, qb: DownloadClientPort) {
-  const row = await findDownloadById(db, torrentId);
+export async function retryTorrent(
+  db: Database,
+  deps: {
+    torrents: TorrentsRepositoryPort;
+    folders: FoldersRepositoryPort;
+  },
+  torrentId: string,
+  qb: DownloadClientPort,
+) {
+  const row = await deps.torrents.findDownloadById(torrentId);
   if (!row) return null;
 
   const url = row.magnetUrl ?? row.downloadUrl;
@@ -21,10 +26,10 @@ export async function retryTorrent(db: Database, torrentId: string, qb: Download
   const linkedMedia = row.mediaId ? await findMediaById(db, row.mediaId) : null;
   let retryCategory: string;
   if (linkedMedia?.libraryId) {
-    const folder = await findFolderById(db, linkedMedia.libraryId);
+    const folder = await deps.folders.findFolderById(linkedMedia.libraryId);
     retryCategory = folder?.qbitCategory ?? "default";
   } else {
-    const folder = await findDefaultFolder(db);
+    const folder = await deps.folders.findDefaultFolder();
     retryCategory = folder?.qbitCategory ?? "default";
   }
 
@@ -36,5 +41,9 @@ export async function retryTorrent(db: Database, torrentId: string, qb: Download
     if (match?.[1]) newHash = match[1].toLowerCase();
   }
 
-  return updateDownload(db, torrentId, { hash: newHash, status: "downloading", progress: 0 });
+  return deps.torrents.updateDownload(torrentId, {
+    hash: newHash,
+    status: "downloading",
+    progress: 0,
+  });
 }

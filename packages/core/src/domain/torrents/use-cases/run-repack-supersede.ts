@@ -1,15 +1,18 @@
 import type { Database } from "@canto/db/client";
 
-import type { DownloadClientPort } from "../../shared/ports/download-client";
-import type { ScoringRules } from "../../shared/rules/scoring-rules";
-import type { IndexerPort } from "../ports/indexer";
-import { findRecentImportedDownloads } from "../../../infra/torrents/download-repository";
-import { runWithConcurrency } from "../../../platform/concurrency/run-with-concurrency";
+import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
+import type { ScoringRules } from "@canto/core/domain/shared/rules/scoring-rules";
+import type { IndexerPort } from "@canto/core/domain/torrents/ports/indexer";
+import { findRecentImportedDownloads } from "@canto/core/infra/torrents/download-repository";
+import { runWithConcurrency } from "@canto/core/platform/concurrency/run-with-concurrency";
 import {
   autoSupersedeWithRepack,
   type AutoSupersedeOutcome,
-} from "./auto-supersede";
-import { searchTorrents, type SearchResult } from "./search-torrents";
+} from "@canto/core/domain/torrents/use-cases/auto-supersede";
+import {
+  searchTorrents,
+  type SearchResult,
+} from "@canto/core/domain/torrents/use-cases/search-torrents";
 
 export interface RunRepackSupersedeOpts {
   /** How far back to scan for imported downloads. */
