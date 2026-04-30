@@ -281,6 +281,13 @@
       "when": 1777513967125,
       "tag": "0039_tan_sabretooth",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1777578290442,
+      "tag": "0040_chilly_tusk",
+      "breakpoints": true
     }
   ]
 }

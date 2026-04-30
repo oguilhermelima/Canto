@@ -78,7 +78,7 @@ export function makeMediaExtrasRepository(
     },
     insertCredits: async (rows) => {
       if (rows.length === 0) return;
-      await db.insert(mediaCredit).values(rows.map(creditToRow));
+      await db.insert(mediaCredit).values(rows.map(creditToRow)).onConflictDoNothing();
     },
 
     // ─── Videos ───
@@ -93,7 +93,7 @@ export function makeMediaExtrasRepository(
     },
     insertVideos: async (rows) => {
       if (rows.length === 0) return;
-      await db.insert(mediaVideo).values(rows.map(videoToRow));
+      await db.insert(mediaVideo).values(rows.map(videoToRow)).onConflictDoNothing();
     },
     findTrailerKeysForMediaIds: async (mediaIds) => {
       if (mediaIds.length === 0) return new Map();
@@ -131,7 +131,7 @@ export function makeMediaExtrasRepository(
     },
     insertWatchProviders: async (rows) => {
       if (rows.length === 0) return;
-      await db.insert(mediaWatchProvider).values(rows.map(watchProviderToRow));
+      await db.insert(mediaWatchProvider).values(rows.map(watchProviderToRow)).onConflictDoNothing();
     },
     findWatchProviderLinks: async () => {
       return db

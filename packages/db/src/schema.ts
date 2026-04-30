@@ -1067,7 +1067,20 @@ export const mediaCredit = pgTable(
     type: varchar("type", { length: 10 }).notNull(),
     order: integer("order").notNull().default(0),
   },
-  (table) => [index("idx_credit_media").on(table.mediaId)],
+  (table) => [
+    index("idx_credit_media").on(table.mediaId),
+    // Cast credits use `character` and leave `job` null; crew credits use
+    // `job` (a person can hold several crew jobs on the same title) and
+    // leave `character` null. COALESCE so two NULLs in the same slot still
+    // count as a duplicate (PG default treats NULL ≠ NULL in unique indexes).
+    uniqueIndex("uq_credit_natural").on(
+      table.mediaId,
+      table.personId,
+      table.type,
+      sql`COALESCE(${table.character}, '')`,
+      sql`COALESCE(${table.job}, '')`,
+    ),
+  ],
 );
 
 // ─── Media videos (replaces extrasCache videos) ───
@@ -1093,6 +1106,7 @@ export const mediaVideo = pgTable(
     // after the main media-list query. Replaces the per-row correlated
     // subquery that previously lived inside `mediaI18n.trailerKey`.
     index("idx_video_media_type_site").on(table.mediaId, table.type, table.site),
+    uniqueIndex("uq_video_natural").on(table.mediaId, table.externalKey),
   ],
 );
 
@@ -1113,6 +1127,12 @@ export const mediaWatchProvider = pgTable(
   },
   (table) => [
     index("idx_wp_media").on(table.mediaId),
+    uniqueIndex("uq_wp_natural").on(
+      table.mediaId,
+      table.providerId,
+      table.region,
+      table.type,
+    ),
   ],
 );
 
