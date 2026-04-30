@@ -10,64 +10,17 @@ import {
 } from "@canto/db/schema";
 
 const EN = "en-US";
-import type { RecsFilters } from "../../domain/recommendations/types/recs-filters";
+import type { RecsFilters } from "@canto/core/domain/recommendations/types/recs-filters";
+import type {
+  UserRecommendationReadRow,
+  UserRecommendationRow,
+} from "@canto/core/domain/recommendations/types/user-recommendation";
 import {
   buildRecsFilterConditions,
   recsSortOrder,
   USER_REC_COLUMNS,
-} from "./recs-filter-builder";
-
-/**
- * Row shape carried through `rebuildUserRecommendations` /
- * `upsertUserRecommendations`. Everything past `weight` is denormalized
- * directly from the source `media` row so the read path can skip the JOIN.
- */
-export interface UserRecommendationRow {
-  mediaId: string;
-  weight: number;
-  externalId: number | null;
-  provider: string | null;
-  type: string | null;
-  title: string | null;
-  overview: string | null;
-  posterPath: string | null;
-  backdropPath: string | null;
-  logoPath: string | null;
-  voteAverage: number | null;
-  year: number | null;
-  releaseDate: string | null;
-  genres: string[] | null;
-  genreIds: number[] | null;
-  runtime: number | null;
-  originalLanguage: string | null;
-  contentRating: string | null;
-  status: string | null;
-  popularity: number | null;
-}
-
-/**
- * Read shape returned by `findUserRecommendations` / `findUserSpotlightItems`.
- * The fields we *guarantee* by the WHERE clause (`title IS NOT NULL` implies
- * the row was populated by the denormalizing rebuild) are narrowed to
- * non-null here so callers don't have to re-check.
- */
-export interface UserRecommendationReadRow {
-  id: string;
-  externalId: number;
-  provider: string;
-  mediaType: "movie" | "show";
-  title: string;
-  overview: string | null;
-  posterPath: string | null;
-  backdropPath: string | null;
-  logoPath: string | null;
-  releaseDate: string | null;
-  voteAverage: number | null;
-  genres: string[] | null;
-  genreIds: number[] | null;
-  trailerKey: string | null;
-  relevance: number;
-}
+} from "@canto/core/infra/recommendations/recs-filter-builder";
+import { toInsert, toReadRow } from "@canto/core/infra/recommendations/user-recommendation.mapper";
 
 /** Keep only the highest weight per mediaId, preserving denormalized fields. */
 function bestRowByMedia(rows: UserRecommendationRow[]): Map<string, UserRecommendationRow> {
@@ -101,31 +54,9 @@ export async function rebuildUserRecommendations(
   const currentVersion = userRow?.recsVersion ?? 0;
   const nextVersion = currentVersion + 1;
 
-  const deduped = [...bestRowByMedia(rows).values()].map((r) => ({
-    userId,
-    mediaId: r.mediaId,
-    weight: r.weight,
-    version: nextVersion,
-    active: false,
-    externalId: r.externalId,
-    provider: r.provider,
-    type: r.type,
-    title: r.title,
-    overview: r.overview,
-    posterPath: r.posterPath,
-    backdropPath: r.backdropPath,
-    logoPath: r.logoPath,
-    voteAverage: r.voteAverage,
-    year: r.year,
-    releaseDate: r.releaseDate,
-    genres: r.genres,
-    genreIds: r.genreIds,
-    runtime: r.runtime,
-    originalLanguage: r.originalLanguage,
-    contentRating: r.contentRating,
-    status: r.status,
-    popularity: r.popularity,
-  }));
+  const deduped = [...bestRowByMedia(rows).values()].map((r) =>
+    toInsert(userId, r, nextVersion, false),
+  );
 
   // Step 1: Insert new rows as inactive (outside transaction for performance)
   for (let i = 0; i < deduped.length; i += 500) {
@@ -195,31 +126,9 @@ export async function upsertUserRecommendations(
   });
   const currentVersion = userRow?.recsVersion ?? 0;
 
-  const deduped = [...bestRowByMedia(rows).values()].map((r) => ({
-    userId,
-    mediaId: r.mediaId,
-    weight: r.weight,
-    version: currentVersion,
-    active: true,
-    externalId: r.externalId,
-    provider: r.provider,
-    type: r.type,
-    title: r.title,
-    overview: r.overview,
-    posterPath: r.posterPath,
-    backdropPath: r.backdropPath,
-    logoPath: r.logoPath,
-    voteAverage: r.voteAverage,
-    year: r.year,
-    releaseDate: r.releaseDate,
-    genres: r.genres,
-    genreIds: r.genreIds,
-    runtime: r.runtime,
-    originalLanguage: r.originalLanguage,
-    contentRating: r.contentRating,
-    status: r.status,
-    popularity: r.popularity,
-  }));
+  const deduped = [...bestRowByMedia(rows).values()].map((r) =>
+    toInsert(userId, r, currentVersion, true),
+  );
 
   for (let i = 0; i < deduped.length; i += 500) {
     await db
@@ -230,59 +139,7 @@ export async function upsertUserRecommendations(
 }
 
 // Re-export for consumers that import from this file
-export type { RecsFilters } from "../../domain/recommendations/types/recs-filters";
-
-/**
- * Narrow the raw row to `UserRecommendationReadRow`. The query's WHERE clause
- * already guarantees `title IS NOT NULL`, and rebuilds always populate
- * `externalId` / `provider` / `type` together with `title`, so the runtime
- * filter is defensive — TS just doesn't know that.
- */
-function narrowReadRow(r: {
-  id: string;
-  externalId: number | null;
-  provider: string | null;
-  mediaType: string | null;
-  title: string | null;
-  overview: string | null;
-  posterPath: string | null;
-  backdropPath: string | null;
-  logoPath: string | null;
-  releaseDate: string | null;
-  voteAverage: number | null;
-  genres: string[] | null;
-  genreIds: number[] | null;
-  trailerKey?: string | null;
-  relevance: number;
-}): UserRecommendationReadRow | null {
-  if (
-    r.externalId === null
-    || r.provider === null
-    || r.mediaType === null
-    || r.title === null
-  ) {
-    return null;
-  }
-  if (r.mediaType !== "movie" && r.mediaType !== "show") return null;
-
-  return {
-    id: r.id,
-    externalId: r.externalId,
-    provider: r.provider,
-    mediaType: r.mediaType,
-    title: r.title,
-    overview: r.overview,
-    posterPath: r.posterPath,
-    backdropPath: r.backdropPath,
-    logoPath: r.logoPath,
-    releaseDate: r.releaseDate,
-    voteAverage: r.voteAverage,
-    genres: r.genres,
-    genreIds: r.genreIds,
-    trailerKey: r.trailerKey ?? null,
-    relevance: r.relevance,
-  };
-}
+export type { RecsFilters } from "@canto/core/domain/recommendations/types/recs-filters";
 
 /**
  * Per-user recommendation query.
@@ -407,7 +264,7 @@ export async function findUserRecommendations(
 
   const out: UserRecommendationReadRow[] = [];
   for (const r of rows) {
-    const narrowed = narrowReadRow({
+    const narrowed = toReadRow({
       id: r.id,
       externalId: r.externalId,
       provider: r.provider,
@@ -633,7 +490,7 @@ export async function findUserSpotlightItems(
 
   const out: UserRecommendationReadRow[] = [];
   for (const r of rows) {
-    const narrowed = narrowReadRow({
+    const narrowed = toReadRow({
       id: r.id,
       externalId: r.externalId,
       provider: r.provider,

@@ -2,26 +2,9 @@ import { sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { mediaVideo } from "@canto/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
-import { findMediaLocalizedMany } from "../media/media-localized-repository";
-
-export interface BecauseWatchedRec {
-  sourceMediaId: string;
-  mediaId: string;
-  externalId: number;
-  provider: string;
-  type: "movie" | "show";
-  title: string;
-  posterPath: string | null;
-  backdropPath: string | null;
-  logoPath: string | null;
-  overview: string | null;
-  voteAverage: number | null;
-  year: number | null;
-  releaseDate: string | null;
-  genreIds: number[] | null;
-  trailerKey: string | null;
-  rank: number;
-}
+import type { BecauseWatchedRec } from "@canto/core/domain/recommendations/types/because-watched";
+import { toBecauseWatchedRec } from "@canto/core/infra/recommendations/because-watched.mapper";
+import { findMediaLocalizedMany } from "@canto/core/infra/media/media-localized-repository";
 
 interface RawRow extends Record<string, unknown> {
   sourceMediaId: string;
@@ -175,27 +158,33 @@ export async function findBecauseWatchedRecs(
     });
   }
 
-  return rows
-    .filter((r) => r.type === "movie" || r.type === "show")
-    .map((r) => {
-      const loc = localizedByMedia.get(r.mediaId);
-      return {
-        sourceMediaId: r.sourceMediaId,
-        mediaId: r.mediaId,
-        externalId: r.externalId,
-        provider: r.provider,
-        type: r.type as "movie" | "show",
-        title: loc?.title ?? r.title,
-        posterPath: loc?.posterPath ?? r.posterPath,
-        backdropPath: r.backdropPath,
-        logoPath: loc?.logoPath ?? r.logoPath,
-        overview: r.overview,
-        voteAverage: r.voteAverage,
-        year: r.year,
-        releaseDate: r.releaseDate,
-        genreIds: r.genreIds,
-        trailerKey: trailerByMedia.get(r.mediaId) ?? null,
-        rank: r.rn,
-      };
+  const out: BecauseWatchedRec[] = [];
+  for (const r of rows) {
+    const loc = localizedByMedia.get(r.mediaId);
+    const rec = toBecauseWatchedRec({
+      sourceMediaId: r.sourceMediaId,
+      mediaId: r.mediaId,
+      externalId: r.externalId,
+      provider: r.provider,
+      type: r.type,
+      title: r.title,
+      fallbackTitle: r.title,
+      posterPath: r.posterPath,
+      backdropPath: r.backdropPath,
+      logoPath: r.logoPath,
+      overview: r.overview,
+      voteAverage: r.voteAverage,
+      year: r.year,
+      releaseDate: r.releaseDate,
+      genreIds: r.genreIds,
+      trailerKey: trailerByMedia.get(r.mediaId) ?? null,
+      rank: r.rn,
+      localizedTitle: loc?.title ?? null,
+      localizedOverview: loc?.overview ?? null,
+      localizedPosterPath: loc?.posterPath ?? null,
+      localizedLogoPath: loc?.logoPath ?? null,
     });
+    if (rec) out.push(rec);
+  }
+  return out;
 }

@@ -1,12 +1,12 @@
 import type { Database } from "@canto/db/client";
-import { cached } from "../../../platform/cache/redis";
-import { fetchFromTmdb } from "../../../platform/http/tmdb-raw";
+import { cached } from "@canto/core/platform/cache/redis";
+import { fetchFromTmdb } from "@canto/core/platform/http/tmdb-raw";
 import {
   groupByBrand,
   type BrandedProvider,
   type WatchProvider,
-} from "../rules/canonical-brand";
-import { getUserWatchPreferences } from "../../shared/services/user-service";
+} from "@canto/core/domain/recommendations/rules/canonical-brand";
+import { getUserWatchPreferences } from "@canto/core/domain/shared/services/user-service";
 
 export type UserWatchProvidersResult = {
   region: string;

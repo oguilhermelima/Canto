@@ -1,12 +1,12 @@
 import type { Database } from "@canto/db/client";
-import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import type { SearchResult } from "@canto/providers";
 import { getSetting, setSetting } from "@canto/db/settings";
-import { buildExclusionSet } from "./recommendation-service";
-import { applyMediaItemsLocalizationOverlay } from "../../shared/localization";
-import { mapPoolItem } from "../../shared/mappers/media-mapper";
-import { findRecommendedMediaWithBackdrops } from "../../../infra/content-enrichment/extras-repository";
-import { findUserSpotlightItems } from "../../../infra/recommendations/user-recommendation-repository";
+import { buildExclusionSet } from "@canto/core/domain/recommendations/use-cases/recommendation-service";
+import { applyMediaItemsLocalizationOverlay } from "@canto/core/domain/shared/localization/localization-service";
+import { mapPoolItem } from "@canto/core/domain/shared/mappers/media-mapper";
+import { findRecommendedMediaWithBackdrops } from "@canto/core/infra/content-enrichment/extras-repository";
+import { findUserSpotlightItems } from "@canto/core/infra/recommendations/user-recommendation-repository";
 
 interface TrendingFetcher {
   (type: "movie" | "show"): Promise<{ results: SearchResult[] }>;

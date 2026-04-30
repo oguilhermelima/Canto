@@ -1,11 +1,15 @@
 import { desc, eq, and, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { getQualityFilters, getWeightedScoreOrder } from "../rules/recommendation-filters";
+import {
+  getQualityFilters,
+  getWeightedScoreOrder,
+} from "@canto/core/domain/recommendations/rules/recommendation-filters";
 import {
   engagementMultiplier,
   isNegativeSignal,
   type EngagementSignal,
-} from "../rules/engagement-signals";
+} from "@canto/core/domain/recommendations/rules/engagement-signals";
+import type { UserRecommendationRow } from "@canto/core/domain/recommendations/types/user-recommendation";
 
 import type { Database } from "@canto/db/client";
 import {
@@ -18,9 +22,8 @@ import {
 import {
   rebuildUserRecommendations,
   upsertUserRecommendations,
-  type UserRecommendationRow,
-} from "../../../infra/recommendations/user-recommendation-repository";
-import { findUserEngagementStates } from "../../../infra/user-media/state-repository";
+} from "@canto/core/infra/recommendations/user-recommendation-repository";
+import { findUserEngagementStates } from "@canto/core/infra/user-media/state-repository";
 
 const EN = "en-US";
 

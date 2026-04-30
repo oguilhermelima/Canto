@@ -1,17 +1,21 @@
-import type { Database } from "@canto/db/client";
+import type { RecommendationsRepositoryPort } from "@canto/core/domain/recommendations/ports/recommendations-repository.port";
+import { dispatchRebuildUserRecs } from "@canto/core/platform/queue/bullmq-dispatcher";
 
-import { findUsersForDailyRecsCheck } from "../../../infra/recommendations/user-recommendation-repository";
-import { dispatchRebuildUserRecs } from "../../../platform/queue/bullmq-dispatcher";
+export interface EnqueueDailyRecsRebuildDeps {
+  repo: RecommendationsRepositoryPort;
+}
 
 /**
  * Find every user whose recs have gone stale (null or >24h) and enqueue a
  * rebuild for each. Returns the number of users dispatched so the caller can
  * log a single summary line.
  */
-export async function enqueueDailyRecsRebuild(db: Database): Promise<number> {
-  const users = await findUsersForDailyRecsCheck(db);
-  for (const u of users) {
-    await dispatchRebuildUserRecs(u.id);
+export async function enqueueDailyRecsRebuild(
+  deps: EnqueueDailyRecsRebuildDeps,
+): Promise<number> {
+  const userIds = await deps.repo.findUsersForDailyRecsCheck();
+  for (const userId of userIds) {
+    await dispatchRebuildUserRecs(userId);
   }
-  return users.length;
+  return userIds.length;
 }

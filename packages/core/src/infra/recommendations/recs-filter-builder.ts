@@ -1,7 +1,7 @@
 import { asc, desc, sql } from "drizzle-orm";
 import type { AnyColumn, SQL } from "drizzle-orm";
 import { userRecommendation } from "@canto/db/schema";
-import type { RecsFilters } from "../../domain/recommendations/types/recs-filters";
+import type { RecsFilters } from "@canto/core/domain/recommendations/types/recs-filters";
 
 /**
  * Column refs the filter builder needs. The same filter shape is reused against

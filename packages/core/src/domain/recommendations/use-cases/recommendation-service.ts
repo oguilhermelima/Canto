@@ -1,8 +1,8 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { media, userMediaState } from "@canto/db/schema";
-import { findLibraryExternalIds } from "../../../infra/media/media-repository";
-import { findUserListExternalIds } from "../../../infra/lists/list-repository";
+import { findLibraryExternalIds } from "@canto/core/infra/media/media-repository";
+import { findUserListExternalIds } from "@canto/core/infra/lists/list-repository";
 
 /**
  * Build the set of `(externalId, provider)` pairs the recs/spotlight readers

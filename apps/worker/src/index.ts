@@ -24,6 +24,7 @@ import type { RunSectionInput } from "@canto/core/domain/trakt/run-section";
 import { handleTraktListDelete, handleTraktListDeleteSweep } from "./jobs/trakt-list-delete";
 import { rebuildUserRecs } from "@canto/core/domain/recommendations/use-cases/rebuild-user-recs";
 import { enqueueDailyRecsRebuild } from "@canto/core/domain/recommendations/use-cases/enqueue-daily-recs-rebuild";
+import { makeRecommendationsRepository } from "@canto/core/infra/recommendations/recommendations-repository.adapter";
 import { ensureMedia } from "@canto/core/domain/media/use-cases/ensure-media";
 import type { EnsureMediaJob } from "@canto/core/platform/queue/bullmq-dispatcher";
 import { QUEUES } from "@canto/core/platform/queue/queue-names";
@@ -248,7 +249,9 @@ const workers = [
   makeWorker(QUEUES.rssSync, () => handleRssSync()),
 
   makeWorker(QUEUES.dailyRecsCheck, async (_data, log) => {
-    const dispatched = await enqueueDailyRecsRebuild(db);
+    const dispatched = await enqueueDailyRecsRebuild({
+      repo: makeRecommendationsRepository(db),
+    });
     if (dispatched > 0) log.info({ users: dispatched }, "recs refresh dispatched");
   }),
 

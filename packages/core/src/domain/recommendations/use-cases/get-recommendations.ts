@@ -1,21 +1,20 @@
 import type { Database } from "@canto/db/client";
-import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
-import { buildExclusionSet } from "./recommendation-service";
-import { applyMediaItemsLocalizationOverlay } from "../../shared/localization";
-import { mapPoolItem } from "../../shared/mappers/media-mapper";
-import { rankByMmr } from "../rules/mmr-diversity";
-import { exploreSlotPositions, mixExploreSlots } from "../rules/explore-mix";
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import { buildExclusionSet } from "@canto/core/domain/recommendations/use-cases/recommendation-service";
+import { applyMediaItemsLocalizationOverlay } from "@canto/core/domain/shared/localization/localization-service";
+import { mapPoolItem } from "@canto/core/domain/shared/mappers/media-mapper";
+import { rankByMmr } from "@canto/core/domain/recommendations/rules/mmr-diversity";
 import {
-  findUserRecommendations,
+  exploreSlotPositions,
+  mixExploreSlots,
+} from "@canto/core/domain/recommendations/rules/explore-mix";
+import type { RecsFilters } from "@canto/core/domain/recommendations/types/recs-filters";
+import {
   countUserRecommendations,
-  type RecsFilters,
-} from "../../../infra/recommendations/user-recommendation-repository";
-import {
-  findGlobalRecommendations,
-} from "../../../infra/content-enrichment/extras-repository";
-import {
-  findLibraryMediaBrief,
-} from "../../../infra/media/media-repository";
+  findUserRecommendations,
+} from "@canto/core/infra/recommendations/user-recommendation-repository";
+import { findGlobalRecommendations } from "@canto/core/infra/content-enrichment/extras-repository";
+import { findLibraryMediaBrief } from "@canto/core/infra/media/media-repository";
 
 interface GetRecommendationsInput {
   userId: string;
