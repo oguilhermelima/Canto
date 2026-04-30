@@ -147,12 +147,16 @@ export async function findUnimportedDownloads(db: Database) {
       // Max 5 retries before giving up on stuck downloads.
       lt(download.importAttempts, 5),
       // First attempt (importAttempts === 0) is always eligible.
-      // Subsequent attempts use linear backoff: 10min * importAttempts.
+      // Subsequent attempts use exponential backoff capped at 180 minutes:
+      //   wait = 10min * min(18, 2^importAttempts)
+      // attempts 1..5 → 20m, 40m, 80m, 160m, 180m. Linear growth was too
+      // aggressive on persistent failures (qBit unreachable, FS full) where
+      // we'd hammer the same broken state every 10–50 minutes.
       or(
         eq(download.importAttempts, 0),
         lt(
           download.updatedAt,
-          sql`NOW() - INTERVAL '10 minutes' * ${download.importAttempts}`,
+          sql`NOW() - INTERVAL '10 minutes' * LEAST(18, POWER(2, ${download.importAttempts}))`,
         ),
       ),
     ),

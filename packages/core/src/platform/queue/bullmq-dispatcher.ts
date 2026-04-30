@@ -25,6 +25,7 @@ const getTraktSyncSectionQueue = createQueueGetter(QUEUES.traktSyncSection);
 const getTraktListDeleteQueue = createQueueGetter(QUEUES.traktListDelete);
 const getFolderScanQueue = createQueueGetter(QUEUES.folderScan);
 const getEnsureMediaQueue = createQueueGetter(QUEUES.ensureMedia);
+const getImportTorrentsQueue = createQueueGetter(QUEUES.importTorrents);
 
 export async function dispatchRebuildUserRecs(userId: string): Promise<void> {
   const q = await getRebuildUserRecsQueue();
@@ -123,6 +124,19 @@ export async function dispatchTraktListDelete(
 export async function dispatchFolderScan(): Promise<boolean> {
   const q = await getFolderScanQueue();
   return dispatchUniqueJob(q, "folder-scan-run");
+}
+
+/**
+ * Dispatch an on-demand import-torrents run (deduplicates active/waiting jobs).
+ *
+ * The cron scheduler in apps/worker/src/index.ts fires the queue every 2 min;
+ * any manual triggers (API endpoints, completion webhooks) should funnel
+ * through this dispatcher so we never end up with two concurrent handlers
+ * claiming non-overlapping subsets of the same download list.
+ */
+export async function dispatchImportTorrents(): Promise<boolean> {
+  const q = await getImportTorrentsQueue();
+  return dispatchUniqueJob(q, "import-torrents-run");
 }
 
 export interface EnsureMediaJob {

@@ -38,21 +38,47 @@ export async function importLocalVideoFiles(
   const linkedPaths = new Set<string>();
   let crossFsNotified = false;
 
+  // Pre-compute alt-season directories so multi-season torrents call mkdir
+  // once per unique season instead of once per file. The primary season's
+  // directory is created by the caller before this function runs.
+  const altSeasonDirs = new Map<number, string>();
+  const seasonsToCreate = new Set<number>();
+  for (const pf of parsedFiles) {
+    if (pf.seasonNumber !== undefined && pf.seasonNumber !== primarySeasonNumber) {
+      seasonsToCreate.add(pf.seasonNumber);
+    }
+  }
+  for (const seasonNum of seasonsToCreate) {
+    const altMediaDir = buildMediaDir(mediaNaming, seasonNum);
+    const dir = path.join(libraryPath, altMediaDir);
+    try {
+      await fs.mkdir(dir, { recursive: true });
+      altSeasonDirs.set(seasonNum, dir);
+    } catch (mkErr) {
+      const code = (mkErr as NodeJS.ErrnoException).code;
+      console.error(
+        `[auto-import] mkdir failed for "${dir}" (${code}) — files for season ${seasonNum} will be skipped`,
+      );
+      // Leave altSeasonDirs[seasonNum] unset so the loop below skips files
+      // targeting this season (preserves prior throw-then-skip semantics).
+    }
+  }
+
   for (const pf of parsedFiles) {
     try {
       let fileTargetDir = targetDir;
       if (pf.seasonNumber !== undefined && pf.seasonNumber !== primarySeasonNumber) {
-        const altMediaDir = buildMediaDir(mediaNaming, pf.seasonNumber);
-        fileTargetDir = path.join(libraryPath, altMediaDir);
-        try {
-          await fs.mkdir(fileTargetDir, { recursive: true });
-        } catch (mkErr) {
-          const code = (mkErr as NodeJS.ErrnoException).code;
+        const cached = altSeasonDirs.get(pf.seasonNumber);
+        if (!cached) {
+          // mkdir failed for this season; skip the file (matches previous
+          // behavior where mkErr was rethrown and caught by the outer
+          // try/catch as a per-file error).
           console.error(
-            `[auto-import] mkdir failed for "${fileTargetDir}" (${code}) — file "${pf.file.name}" will be skipped`,
+            `[auto-import] Skipping "${pf.file.name}" — alt-season dir was not created`,
           );
-          throw mkErr;
+          continue;
         }
+        fileTargetDir = cached;
       }
 
       const sourcePath = path.join(savePath, pf.file.name);
