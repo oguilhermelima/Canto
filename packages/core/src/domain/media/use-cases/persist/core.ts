@@ -7,6 +7,7 @@ import { getSetting } from "@canto/db/settings";
 
 import type { MediaAspectStateRepositoryPort } from "@canto/core/domain/media/ports/media-aspect-state-repository.port";
 import type { MediaContentRatingRepositoryPort } from "@canto/core/domain/media/ports/media-content-rating-repository.port";
+import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import { loadCadenceKnobs } from "@canto/core/domain/media/use-cases/cadence/cadence-knobs";
@@ -33,6 +34,7 @@ import { normalizedMediaToResponse } from "@canto/core/domain/shared/mappers/med
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import { makeMediaAspectStateRepository } from "@canto/core/infra/media/media-aspect-state-repository.adapter";
 import { makeMediaContentRatingRepository } from "@canto/core/infra/media/media-content-rating-repository.adapter";
+import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import {
@@ -61,6 +63,7 @@ export interface PersistDeps {
   localization: MediaLocalizationRepositoryPort;
   aspectState: MediaAspectStateRepositoryPort;
   contentRating: MediaContentRatingRepositoryPort;
+  extras: MediaExtrasRepositoryPort;
 }
 
 function withFallback(
@@ -75,6 +78,7 @@ function withFallback(
       partial?.aspectState ?? makeMediaAspectStateRepository(db),
     contentRating:
       partial?.contentRating ?? makeMediaContentRatingRepository(db),
+    extras: partial?.extras ?? makeMediaExtrasRepository(db),
   };
 }
 
@@ -471,7 +475,10 @@ export async function persistFullMedia(
     }
   }
 
-  await persistExtras(db, mediaId, extras);
+  await persistExtras(db, mediaId, extras, {
+    extras: deps.extras,
+    localization: deps.localization,
+  });
 
   await db
     .update(media)
@@ -658,7 +665,9 @@ export async function resolveMedia(
     const finalMedia = withRating.seasons && withRating.seasons.length > 0
       ? { ...withRating, seasons: await applySeasonsLocalizationOverlay(db, existing.id, withRating.seasons, lang) }
       : withRating;
-    const extras = await loadExtrasFromDB(db, existing.id, lang);
+    const extras = await loadExtrasFromDB(db, existing.id, lang, {
+      extras: deps.extras,
+    });
 
     // Lazy fill: if this user's language has gaps, enqueue an ensureMedia
     // job in the background so the next visit has everything.
@@ -691,7 +700,9 @@ export async function resolveMedia(
     const finalMedia = withRating.seasons && withRating.seasons.length > 0
       ? { ...withRating, seasons: await applySeasonsLocalizationOverlay(db, persisted.id, withRating.seasons, lang) }
       : withRating;
-    const extras = await loadExtrasFromDB(db, persisted.id, lang);
+    const extras = await loadExtrasFromDB(db, persisted.id, lang, {
+      extras: deps.extras,
+    });
 
     return {
       source: "db" as const,

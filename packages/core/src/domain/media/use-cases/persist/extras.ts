@@ -1,28 +1,32 @@
 import { and, eq, inArray } from "drizzle-orm";
 
 import type { MediaExtras } from "@canto/providers";
-import {
-  media,
-  mediaCredit,
-  mediaRecommendation,
-  mediaVideo,
-  mediaWatchProvider,
-} from "@canto/db/schema";
+import { media } from "@canto/db/schema";
 import type { Database } from "@canto/db/client";
 
-import { logAndSwallow } from "../../../../platform/logger/log-error";
-import { dispatchEnsureMedia } from "../../../../platform/queue/bullmq-dispatcher";
-import { upsertMediaLocalization } from "../../../shared/localization";
+import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
+
+const EN = "en-US";
+
+export interface PersistExtrasDeps {
+  extras: MediaExtrasRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
+}
 
 /**
  * Persist media extras (credits, videos, watch providers, recommendations).
- * Handles delete + re-insert for simple tables and diff-based updates for
- * recommendation junctions.
+ * Handles delete + re-insert for simple tables and full re-link for the
+ * recommendation junctions. Wave 9C threads the extras + localization ports
+ * through `deps`.
  */
 export async function persistExtras(
   db: Database,
   mediaId: string,
   extras: MediaExtras,
+  deps: PersistExtrasDeps,
 ): Promise<void> {
   // Each similar/recommendation needs a media row to link to via the junction
   // table. Stub rows (no media_aspect_state row for `metadata`) trigger a
@@ -30,7 +34,10 @@ export async function persistExtras(
 
   const allRecItems = [
     ...extras.similar.map((r) => ({ result: r, sourceType: "similar" as const })),
-    ...extras.recommendations.map((r) => ({ result: r, sourceType: "recommendation" as const })),
+    ...extras.recommendations.map((r) => ({
+      result: r,
+      sourceType: "recommendation" as const,
+    })),
   ];
 
   const uniqueItems = new Map<string, (typeof allRecItems)[number]>();
@@ -77,10 +84,9 @@ export async function persistExtras(
           recMediaIdByKey.set(key, inserted.id);
           // After Phase 1C-δ, title/overview/posterPath/logoPath live only on
           // media_localization en-US. Persist the stub's i18n payload there.
-          await upsertMediaLocalization(
-            db,
+          await deps.localization.upsertMediaLocalization(
             inserted.id,
-            "en-US",
+            EN,
             {
               title: item.result.title,
               overview: item.result.overview ?? null,
@@ -110,95 +116,112 @@ export async function persistExtras(
     }
   }
 
-  await db.transaction(async (tx) => {
-    await tx.delete(mediaCredit).where(eq(mediaCredit.mediaId, mediaId));
-    await tx.delete(mediaVideo).where(eq(mediaVideo.mediaId, mediaId));
-    await tx.delete(mediaWatchProvider).where(eq(mediaWatchProvider.mediaId, mediaId));
-    await tx.delete(mediaRecommendation).where(eq(mediaRecommendation.sourceMediaId, mediaId));
+  // Replace simple tables for this media via the port.
+  await deps.extras.deleteCreditsByMediaId(mediaId);
+  await deps.extras.deleteVideosByMediaId(mediaId);
+  await deps.extras.deleteWatchProvidersByMediaId(mediaId);
+  await deps.extras.deleteRecommendationsBySource(mediaId);
 
-    if (extras.credits.cast.length > 0) {
-      await tx.insert(mediaCredit).values(
-        extras.credits.cast.map((c, i) => ({
+  if (extras.credits.cast.length > 0) {
+    await deps.extras.insertCredits(
+      extras.credits.cast.map((c, i) => ({
+        mediaId,
+        personId: c.id,
+        name: c.name,
+        character: c.character,
+        profilePath: c.profilePath,
+        type: "cast" as const,
+        order: c.order ?? i,
+      })),
+    );
+  }
+
+  if (extras.credits.crew.length > 0) {
+    await deps.extras.insertCredits(
+      extras.credits.crew.map((c, i) => ({
+        mediaId,
+        personId: c.id,
+        name: c.name,
+        department: c.department,
+        job: c.job,
+        profilePath: c.profilePath,
+        type: "crew" as const,
+        order: i,
+      })),
+    );
+  }
+
+  if (extras.videos.length > 0) {
+    await deps.extras.insertVideos(
+      extras.videos.map((v) => ({
+        mediaId,
+        externalKey: v.key,
+        site: v.site,
+        name: v.name,
+        type: v.type,
+        official: v.official,
+        language: v.language ?? null,
+      })),
+    );
+  }
+
+  if (extras.watchProviders) {
+    const wpRows: Array<{
+      mediaId: string;
+      providerId: number;
+      providerName: string;
+      logoPath: string | null;
+      type: string;
+      region: string;
+    }> = [];
+
+    for (const [region, data] of Object.entries(extras.watchProviders)) {
+      for (const wp of data.flatrate ?? []) {
+        wpRows.push({
           mediaId,
-          personId: c.id,
-          name: c.name,
-          character: c.character,
-          profilePath: c.profilePath,
-          type: "cast" as const,
-          order: c.order ?? i,
-        })),
-      );
-    }
-
-    if (extras.credits.crew.length > 0) {
-      await tx.insert(mediaCredit).values(
-        extras.credits.crew.map((c, i) => ({
-          mediaId,
-          personId: c.id,
-          name: c.name,
-          department: c.department,
-          job: c.job,
-          profilePath: c.profilePath,
-          type: "crew" as const,
-          order: i,
-        })),
-      );
-    }
-
-    if (extras.videos.length > 0) {
-      await tx.insert(mediaVideo).values(
-        extras.videos.map((v) => ({
-          mediaId,
-          externalKey: v.key,
-          site: v.site,
-          name: v.name,
-          type: v.type,
-          official: v.official,
-          language: v.language ?? null,
-        })),
-      );
-    }
-
-    if (extras.watchProviders) {
-      const wpRows: Array<{
-        mediaId: string;
-        providerId: number;
-        providerName: string;
-        logoPath: string | undefined;
-        type: string;
-        region: string;
-      }> = [];
-
-      for (const [region, data] of Object.entries(extras.watchProviders)) {
-        for (const wp of data.flatrate ?? []) {
-          wpRows.push({ mediaId, providerId: wp.providerId, providerName: wp.providerName, logoPath: wp.logoPath, type: "stream", region });
-        }
-        for (const wp of data.rent ?? []) {
-          wpRows.push({ mediaId, providerId: wp.providerId, providerName: wp.providerName, logoPath: wp.logoPath, type: "rent", region });
-        }
-        for (const wp of data.buy ?? []) {
-          wpRows.push({ mediaId, providerId: wp.providerId, providerName: wp.providerName, logoPath: wp.logoPath, type: "buy", region });
-        }
+          providerId: wp.providerId,
+          providerName: wp.providerName,
+          logoPath: wp.logoPath ?? null,
+          type: "stream",
+          region,
+        });
       }
-
-      if (wpRows.length > 0) {
-        await tx.insert(mediaWatchProvider).values(wpRows);
+      for (const wp of data.rent ?? []) {
+        wpRows.push({
+          mediaId,
+          providerId: wp.providerId,
+          providerName: wp.providerName,
+          logoPath: wp.logoPath ?? null,
+          type: "rent",
+          region,
+        });
+      }
+      for (const wp of data.buy ?? []) {
+        wpRows.push({
+          mediaId,
+          providerId: wp.providerId,
+          providerName: wp.providerName,
+          logoPath: wp.logoPath ?? null,
+          type: "buy",
+          region,
+        });
       }
     }
 
-    for (const item of uniqueItems.values()) {
-      const key = `${item.result.provider ?? "tmdb"}-${item.result.externalId}`;
-      const recMediaId = recMediaIdByKey.get(key);
-      if (!recMediaId) continue;
-
-      await tx
-        .insert(mediaRecommendation)
-        .values({
-          mediaId: recMediaId,
-          sourceMediaId: mediaId,
-          sourceType: item.sourceType,
-        })
-        .onConflictDoNothing();
+    if (wpRows.length > 0) {
+      await deps.extras.insertWatchProviders(wpRows);
     }
-  });
+  }
+
+  for (const item of uniqueItems.values()) {
+    const key = `${item.result.provider ?? "tmdb"}-${item.result.externalId}`;
+    const recMediaId = recMediaIdByKey.get(key);
+    if (!recMediaId) continue;
+
+    await deps.extras.insertRecommendation({
+      mediaId: recMediaId,
+      sourceMediaId: mediaId,
+      sourceType: item.sourceType,
+    });
+  }
 }

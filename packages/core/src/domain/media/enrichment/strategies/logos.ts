@@ -36,6 +36,7 @@ export const logosStrategy: MediaEnrichmentStrategy<undefined> = {
         ctx.mediaRow.type as MediaType,
         ctx.languages,
         deps.tmdb,
+        { localization: ctx.deps.localization },
       );
       ctx.result.providerCalls.tmdb += written.calls;
       ctx.result.writes.logos = written.writes;

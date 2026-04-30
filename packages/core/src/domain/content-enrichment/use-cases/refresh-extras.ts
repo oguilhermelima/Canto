@@ -2,32 +2,33 @@ import { and, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import type { Database } from "@canto/db/client";
-import {
-  media,
-  mediaCredit,
-  mediaLocalization,
-  mediaRecommendation,
-  mediaVideo,
-  mediaWatchProvider,
-} from "@canto/db/schema";
-import { getActiveUserLanguages } from "../../shared/services/user-service";
+import { media, mediaLocalization } from "@canto/db/schema";
 import type { MediaType } from "@canto/providers";
-import { findMediaById } from "../../../infra/repositories";
-import { findMediaLocalized } from "../../../infra/media/media-localized-repository";
-import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
-import { mapSearchResultToMediaFields } from "../rules/pool-scoring";
-import { upsertMediaLocalization } from "../../shared/localization";
-import { dispatchEnsureMedia } from "../../../platform/queue/bullmq-dispatcher";
-import { logAndSwallow } from "../../../platform/logger/log-error";
+
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import { mapSearchResultToMediaFields } from "@canto/core/domain/content-enrichment/rules/pool-scoring";
+import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
+import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 
 const EN = "en-US";
+
+export interface RefreshExtrasDeps {
+  tmdb: MediaProviderPort;
+  extras: MediaExtrasRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
+  media: MediaRepositoryPort;
+}
 
 export async function refreshExtras(
   db: Database,
   mediaId: string,
-  deps: { tmdb: MediaProviderPort },
+  deps: RefreshExtrasDeps,
 ): Promise<void> {
-  const row = await findMediaById(db, mediaId);
+  const row = await deps.media.findById(mediaId);
   if (!row) return;
 
   const tmdb = deps.tmdb;
@@ -41,24 +42,36 @@ export async function refreshExtras(
         const found = await tmdb.findByImdbId(row.imdbId);
         const match = found.find((r) => r.type === row.type);
         if (match) extrasExternalId = match.externalId;
-      } catch { /* fallback to title search */ }
+      } catch {
+        /* fallback to title search */
+      }
     }
     // If IMDB didn't work, try title search using the en-US localization.
     if (extrasExternalId === row.externalId) {
-      const enLoc = await findMediaLocalized(db, row.id, EN);
+      const enLoc = await deps.localization.findLocalizedById(row.id, EN);
       const searchTitle = enLoc?.title;
       if (searchTitle) {
         try {
-          const search = await tmdb.search(searchTitle, row.type as "movie" | "show");
-          if (search.results.length > 0) extrasExternalId = search.results[0]!.externalId;
-        } catch { /* skip extras if we can't find TMDB equivalent */ }
+          const search = await tmdb.search(
+            searchTitle,
+            row.type as "movie" | "show",
+          );
+          if (search.results.length > 0)
+            extrasExternalId = search.results[0]!.externalId;
+        } catch {
+          /* skip extras if we can't find TMDB equivalent */
+        }
       }
     }
-    if (extrasExternalId === row.externalId && row.provider !== "tmdb") return; // Can't find TMDB match
+    // Inside this branch `row.provider !== "tmdb"`; if neither IMDB nor
+    // title search rebound the external id, we can't find a TMDB equivalent.
+    if (extrasExternalId === row.externalId) return;
   }
 
-  const supportedLangs = [...await getActiveUserLanguages(db)];
-  const extras = await tmdb.getExtras(extrasExternalId, row.type as MediaType, { supportedLanguages: supportedLangs });
+  const supportedLangs = [...(await getActiveUserLanguages(db))];
+  const extras = await tmdb.getExtras(extrasExternalId, row.type as MediaType, {
+    supportedLanguages: supportedLangs,
+  });
 
   // ── Pre-transaction: build recommendation items and fetch trailers/logos (NETWORK I/O) ──
 
@@ -82,46 +95,48 @@ export async function refreshExtras(
   }
 
   // Fetch existing media_recommendation entries BEFORE the transaction (for diff)
-  const existingRecs = await db
-    .select({
-      id: mediaRecommendation.id,
-      mediaId: mediaRecommendation.mediaId,
-      sourceType: mediaRecommendation.sourceType,
-    })
-    .from(mediaRecommendation)
-    .where(eq(mediaRecommendation.sourceMediaId, mediaId));
+  const existingRecs =
+    await deps.extras.findRecommendationsForSource(mediaId);
 
   // Also look up existing media rows for the recommended items' external IDs
   // Check both tmdb provider AND tvdb-provider rows (which store tvdb_id = external_id)
   // to avoid creating cross-provider duplicates. After Phase 1C-δ titles live
   // on `media_localization` (en-US row is canonical), so the tvdb cross-match
   // joins through that table.
-  const recExternalIds = [...uniqueRecItems.values()].map((i) => i.result.externalId);
+  const recExternalIds = [...uniqueRecItems.values()].map(
+    (i) => i.result.externalId,
+  );
   const recTitles = [...uniqueRecItems.values()].map((i) => i.result.title);
   const recLocEn = alias(mediaLocalization, "rec_loc_en");
-  const existingMedia = recExternalIds.length > 0
-    ? await db
-        .select({
-          id: media.id,
-          externalId: media.externalId,
-          title: recLocEn.title,
-          logoPath: recLocEn.logoPath,
-          provider: media.provider,
-          type: media.type,
-        })
-        .from(media)
-        .leftJoin(
-          recLocEn,
-          and(eq(recLocEn.mediaId, media.id), eq(recLocEn.language, EN)),
-        )
-        .where(
-          sql`(
-            (${media.externalId} IN (${sql.join(recExternalIds.map((id) => sql`${id}`), sql`, `)}) AND ${media.provider} = 'tmdb')
-            OR (${media.provider} = 'tvdb' AND ${media.type} = ${row.type} AND ${recLocEn.title} IN (${sql.join(recTitles.map((t) => sql`${t}`), sql`, `)}))
+  const existingMedia =
+    recExternalIds.length > 0
+      ? await db
+          .select({
+            id: media.id,
+            externalId: media.externalId,
+            title: recLocEn.title,
+            logoPath: recLocEn.logoPath,
+            provider: media.provider,
+            type: media.type,
+          })
+          .from(media)
+          .leftJoin(
+            recLocEn,
+            and(eq(recLocEn.mediaId, media.id), eq(recLocEn.language, EN)),
+          )
+          .where(
+            sql`(
+            (${media.externalId} IN (${sql.join(
+              recExternalIds.map((id) => sql`${id}`),
+              sql`, `,
+            )}) AND ${media.provider} = 'tmdb')
+            OR (${media.provider} = 'tvdb' AND ${media.type} = ${row.type} AND ${recLocEn.title} IN (${sql.join(
+              recTitles.map((t) => sql`${t}`),
+              sql`, `,
+            )}))
           )`,
-        )
-    : [];
-  // Map by TMDB external ID; for tvdb-provider rows, build a title lookup fallback
+          )
+      : [];
   const existingMediaByExtId = new Map(
     existingMedia.filter((m) => m.provider === "tmdb").map((m) => [m.externalId, m]),
   );
@@ -136,8 +151,9 @@ export async function refreshExtras(
 
   // Only fetch trailers + logos for items that don't already have them
   const itemsNeedingFetch = [...uniqueRecItems.values()].filter((item) => {
-    const existing = existingMediaByExtId.get(item.result.externalId)
-      ?? existingMediaByTitle.get(item.result.title);
+    const existing =
+      existingMediaByExtId.get(item.result.externalId) ??
+      existingMediaByTitle.get(item.result.title);
     return !existing?.logoPath;
   });
 
@@ -179,30 +195,27 @@ export async function refreshExtras(
       logoPath: logoMap.get(item.result.externalId),
     }),
   );
-  const newKeys = new Set(
-    newRecFields.map((r) => `${r.provider}-${r.externalId}`),
-  );
 
   // ── Upsert media rows for recommendations (may already exist) ──
   const mediaIdByExtKey = new Map<string, string>();
   for (const fields of newRecFields) {
     const key = `${fields.provider}-${fields.externalId}`;
-    const existing = existingMediaByExtId.get(fields.externalId)
-      ?? existingMediaByTitle.get(fields.title);
+    const existing =
+      existingMediaByExtId.get(fields.externalId) ??
+      existingMediaByTitle.get(fields.title);
     if (existing) {
       mediaIdByExtKey.set(key, existing.id);
       if (!existing.logoPath && fields.logoPath) {
         // After Phase 1C-δ, logoPath is only persisted on media_localization.
-        await upsertMediaLocalization(
-          db,
+        await deps.localization.upsertMediaLocalization(
           existing.id,
-          "en-US",
+          EN,
           { title: fields.title, logoPath: fields.logoPath },
           "tmdb",
         );
       }
     } else {
-      const [inserted] = await db.insert(media).values({
+      const inserted = await deps.media.createMedia({
         type: fields.type,
         externalId: fields.externalId,
         provider: fields.provider,
@@ -210,15 +223,14 @@ export async function refreshExtras(
         releaseDate: fields.releaseDate || null,
         voteAverage: fields.voteAverage ?? null,
         downloaded: false,
-      }).onConflictDoNothing().returning();
+      });
       if (inserted) {
         mediaIdByExtKey.set(key, inserted.id);
         // After Phase 1C-δ, title/overview/posterPath/logoPath live only on
         // media_localization en-US.
-        await upsertMediaLocalization(
-          db,
+        await deps.localization.upsertMediaLocalization(
           inserted.id,
-          "en-US",
+          EN,
           {
             title: fields.title,
             overview: fields.overview ?? null,
@@ -233,12 +245,6 @@ export async function refreshExtras(
         void dispatchEnsureMedia(inserted.id).catch(
           logAndSwallow("refresh-extras dispatchEnsureMedia"),
         );
-      } else {
-        const conflict = await db.query.media.findFirst({
-          where: and(eq(media.externalId, fields.externalId), eq(media.provider, fields.provider), eq(media.type, fields.type)),
-          columns: { id: true },
-        });
-        if (conflict) mediaIdByExtKey.set(key, conflict.id);
       }
     }
   }
@@ -248,142 +254,133 @@ export async function refreshExtras(
     existingRecs.map((r) => [r.mediaId, r]),
   );
 
-  // ── Transaction: only DB writes, no network I/O ──
+  // ── DB writes via port: replace simple tables, diff recommendations ──
+  await deps.extras.deleteCreditsByMediaId(mediaId);
+  await deps.extras.deleteVideosByMediaId(mediaId);
+  await deps.extras.deleteWatchProvidersByMediaId(mediaId);
 
-  await db.transaction(async (tx) => {
-    // Clear existing data for this media
-    await tx.delete(mediaCredit).where(eq(mediaCredit.mediaId, mediaId));
-    await tx.delete(mediaVideo).where(eq(mediaVideo.mediaId, mediaId));
-    await tx
-      .delete(mediaWatchProvider)
-      .where(eq(mediaWatchProvider.mediaId, mediaId));
+  // Insert credits (cast)
+  if (extras.credits.cast.length > 0) {
+    await deps.extras.insertCredits(
+      extras.credits.cast.map((c, i) => ({
+        mediaId,
+        personId: c.id,
+        name: c.name,
+        character: c.character,
+        profilePath: c.profilePath,
+        type: "cast" as const,
+        order: c.order ?? i,
+      })),
+    );
+  }
 
-    // Insert credits (cast)
-    if (extras.credits.cast.length > 0) {
-      await tx.insert(mediaCredit).values(
-        extras.credits.cast.map((c, i) => ({
+  // Insert credits (crew)
+  if (extras.credits.crew.length > 0) {
+    await deps.extras.insertCredits(
+      extras.credits.crew.map((c, i) => ({
+        mediaId,
+        personId: c.id,
+        name: c.name,
+        department: c.department,
+        job: c.job,
+        profilePath: c.profilePath,
+        type: "crew" as const,
+        order: i,
+      })),
+    );
+  }
+
+  // Insert videos (with language tag for localization)
+  if (extras.videos.length > 0) {
+    await deps.extras.insertVideos(
+      extras.videos.map((v) => ({
+        mediaId,
+        externalKey: v.key,
+        site: v.site,
+        name: v.name,
+        type: v.type,
+        official: v.official,
+        language: v.language ?? null,
+      })),
+    );
+  }
+
+  // Insert watch providers (flatten all regions)
+  if (extras.watchProviders) {
+    const wpRows: Array<{
+      mediaId: string;
+      providerId: number;
+      providerName: string;
+      logoPath: string | null;
+      type: string;
+      region: string;
+    }> = [];
+
+    for (const [region, data] of Object.entries(extras.watchProviders)) {
+      for (const wp of data.flatrate ?? []) {
+        wpRows.push({
           mediaId,
-          personId: c.id,
-          name: c.name,
-          character: c.character,
-          profilePath: c.profilePath,
-          type: "cast" as const,
-          order: c.order ?? i,
-        })),
-      );
-    }
-
-    // Insert credits (crew)
-    if (extras.credits.crew.length > 0) {
-      await tx.insert(mediaCredit).values(
-        extras.credits.crew.map((c, i) => ({
-          mediaId,
-          personId: c.id,
-          name: c.name,
-          department: c.department,
-          job: c.job,
-          profilePath: c.profilePath,
-          type: "crew" as const,
-          order: i,
-        })),
-      );
-    }
-
-    // Insert videos (with language tag for localization)
-    if (extras.videos.length > 0) {
-      await tx.insert(mediaVideo).values(
-        extras.videos.map((v) => ({
-          mediaId,
-          externalKey: v.key,
-          site: v.site,
-          name: v.name,
-          type: v.type,
-          official: v.official,
-          language: v.language ?? null,
-        })),
-      );
-    }
-
-    // Insert watch providers (flatten all regions)
-    if (extras.watchProviders) {
-      const wpRows: Array<{
-        mediaId: string;
-        providerId: number;
-        providerName: string;
-        logoPath: string | undefined;
-        type: string;
-        region: string;
-      }> = [];
-
-      for (const [region, data] of Object.entries(extras.watchProviders)) {
-        for (const wp of data.flatrate ?? []) {
-          wpRows.push({
-            mediaId,
-            providerId: wp.providerId,
-            providerName: wp.providerName,
-            logoPath: wp.logoPath,
-            type: "stream",
-            region,
-          });
-        }
-        for (const wp of data.rent ?? []) {
-          wpRows.push({
-            mediaId,
-            providerId: wp.providerId,
-            providerName: wp.providerName,
-            logoPath: wp.logoPath,
-            type: "rent",
-            region,
-          });
-        }
-        for (const wp of data.buy ?? []) {
-          wpRows.push({
-            mediaId,
-            providerId: wp.providerId,
-            providerName: wp.providerName,
-            logoPath: wp.logoPath,
-            type: "buy",
-            region,
-          });
-        }
+          providerId: wp.providerId,
+          providerName: wp.providerName,
+          logoPath: wp.logoPath ?? null,
+          type: "stream",
+          region,
+        });
       }
-
-      if (wpRows.length > 0) {
-        await tx.insert(mediaWatchProvider).values(wpRows);
+      for (const wp of data.rent ?? []) {
+        wpRows.push({
+          mediaId,
+          providerId: wp.providerId,
+          providerName: wp.providerName,
+          logoPath: wp.logoPath ?? null,
+          type: "rent",
+          region,
+        });
+      }
+      for (const wp of data.buy ?? []) {
+        wpRows.push({
+          mediaId,
+          providerId: wp.providerId,
+          providerName: wp.providerName,
+          logoPath: wp.logoPath ?? null,
+          type: "buy",
+          region,
+        });
       }
     }
 
-    // ── Diff-based media_recommendation update ──
-
-    // Delete junction entries for items no longer in the TMDB response
-    const newRecMediaIds = new Set(mediaIdByExtKey.values());
-    const toDelete = existingRecs
-      .filter((r) => !newRecMediaIds.has(r.mediaId))
-      .map((r) => r.id);
-    if (toDelete.length > 0) {
-      await tx.delete(mediaRecommendation).where(
-        sql`${mediaRecommendation.id} IN (${sql.join(
-          toDelete.map((id) => sql`${id}`),
-          sql`, `,
-        )})`,
-      );
+    if (wpRows.length > 0) {
+      await deps.extras.insertWatchProviders(wpRows);
     }
+  }
 
-    // Insert new junction entries (skip existing)
-    for (const fields of newRecFields) {
-      const key = `${fields.provider}-${fields.externalId}`;
-      const recMediaId = mediaIdByExtKey.get(key);
-      if (!recMediaId) continue;
-      if (existingRecByMediaId.has(recMediaId)) continue; // Already linked
+  // ── Diff-based media_recommendation update ──
 
-      await tx
-        .insert(mediaRecommendation)
-        .values({
-          mediaId: recMediaId,
-          sourceMediaId: mediaId,
-          sourceType: fields.sourceType,
-        })
-        .onConflictDoNothing();
-    }
-  });
+  // Delete junction entries for items no longer in the TMDB response
+  const newRecMediaIds = new Set(mediaIdByExtKey.values());
+  const toDelete = existingRecs
+    .filter((r) => !newRecMediaIds.has(r.mediaId))
+    .map((r) => r.id);
+  if (toDelete.length > 0) {
+    await deps.extras.deleteRecommendationsByIds(toDelete);
+  }
+
+  // Insert new junction entries (skip existing)
+  for (const fields of newRecFields) {
+    const key = `${fields.provider}-${fields.externalId}`;
+    const recMediaId = mediaIdByExtKey.get(key);
+    if (!recMediaId) continue;
+    if (existingRecByMediaId.has(recMediaId)) continue; // Already linked
+
+    await deps.extras.insertRecommendation({
+      mediaId: recMediaId,
+      sourceMediaId: mediaId,
+      sourceType: fields.sourceType,
+    });
+  }
+
+  // `trailerMap` is collected for parity with the legacy implementation but
+  // not yet persisted — recommendation items get their trailers re-resolved
+  // via the per-media `media_video` table. Suppress unused-variable noise.
+  void trailerMap;
 }

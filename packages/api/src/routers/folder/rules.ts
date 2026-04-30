@@ -18,7 +18,7 @@ import {
   upsertServerLink,
 } from "@canto/core/infra/file-organization/folder-repository";
 import { findMediaById } from "@canto/core/infra/media/media-repository";
-import { findWatchProvidersByMediaId } from "@canto/core/infra/content-enrichment/extras-repository";
+import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import {
   dispatchJellyfinSync,
   dispatchPlexSync,
@@ -41,7 +41,7 @@ export const folderRulesProcedures = {
 
       const [folders, watchProviders] = await Promise.all([
         findAllFolders(ctx.db),
-        findWatchProvidersByMediaId(ctx.db, media.id),
+        makeMediaExtrasRepository(ctx.db).findWatchProvidersByMediaId(media.id),
       ]);
       const routable: RoutableMedia = {
         type: media.type,

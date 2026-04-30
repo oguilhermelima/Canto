@@ -20,6 +20,7 @@ import {
   findMediaByIdWithSeasons,
 } from "@canto/core/infra/media/media-repository";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import {
   applyMediaLocalizationOverlay,
   applySeasonsLocalizationOverlay,
@@ -94,7 +95,9 @@ export const mediaMetadataRouter = createTRPCRouter({
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
 
       const settingsLang = (await getSetting("general.language")) ?? "en-US";
-      const extras = await loadExtrasFromDB(ctx.db, input.id, settingsLang);
+      const extras = await loadExtrasFromDB(ctx.db, input.id, settingsLang, {
+        extras: makeMediaExtrasRepository(ctx.db),
+      });
 
       // If extras tables have data, return them
       if (extras.credits.cast.length > 0 || extras.videos.length > 0) {

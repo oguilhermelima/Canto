@@ -5,7 +5,7 @@ import { getSetting, setSetting } from "@canto/db/settings";
 import { buildExclusionSet } from "@canto/core/domain/recommendations/use-cases/recommendation-service";
 import { applyMediaItemsLocalizationOverlay } from "@canto/core/domain/shared/localization/localization-service";
 import { mapPoolItem } from "@canto/core/domain/shared/mappers/media-mapper";
-import { findRecommendedMediaWithBackdrops } from "@canto/core/infra/content-enrichment/extras-repository";
+import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import { findUserSpotlightItems } from "@canto/core/infra/recommendations/user-recommendation-repository";
 
 interface TrendingFetcher {
@@ -40,7 +40,11 @@ export async function getSpotlight(
   }
 
   // Path 2: Global pool fallback (localization joined inline)
-  const poolItems = await findRecommendedMediaWithBackdrops(db, userLang, SPOTLIGHT_LIMIT * 3);
+  const extras = makeMediaExtrasRepository(db);
+  const poolItems = await extras.findRecommendedMediaWithBackdrops(
+    userLang,
+    SPOTLIGHT_LIMIT * 3,
+  );
   if (poolItems.length > 0) {
     const seen = new Set<string>();
     const unique = poolItems.filter((item) => {

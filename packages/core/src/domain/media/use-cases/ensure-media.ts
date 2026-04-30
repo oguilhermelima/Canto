@@ -3,6 +3,7 @@ import { getSetting } from "@canto/db/settings";
 
 import type { MediaAspectStateRepositoryPort } from "@canto/core/domain/media/ports/media-aspect-state-repository.port";
 import type { MediaContentRatingRepositoryPort } from "@canto/core/domain/media/ports/media-content-rating-repository.port";
+import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type {
@@ -40,6 +41,7 @@ import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-
 import { findMediaById } from "@canto/core/infra/repositories";
 import { makeMediaAspectStateRepository } from "@canto/core/infra/media/media-aspect-state-repository.adapter";
 import { makeMediaContentRatingRepository } from "@canto/core/infra/media/media-content-rating-repository.adapter";
+import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
@@ -59,6 +61,7 @@ export interface EnsureMediaDeps {
   localization: MediaLocalizationRepositoryPort;
   aspectState: MediaAspectStateRepositoryPort;
   contentRating: MediaContentRatingRepositoryPort;
+  extras: MediaExtrasRepositoryPort;
   tmdb: MediaProviderPort;
   tvdb: MediaProviderPort;
 }
@@ -200,6 +203,7 @@ async function resolveDeps(
       partial?.aspectState ?? makeMediaAspectStateRepository(db),
     contentRating:
       partial?.contentRating ?? makeMediaContentRatingRepository(db),
+    extras: partial?.extras ?? makeMediaExtrasRepository(db),
     tmdb: partial?.tmdb ?? (await getTmdbProvider()),
     tvdb: partial?.tvdb ?? (await getTvdbProvider()),
   };

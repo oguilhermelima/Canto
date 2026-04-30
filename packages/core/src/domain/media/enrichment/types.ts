@@ -3,6 +3,7 @@ import type { ProviderName } from "@canto/providers";
 
 import type { MediaAspectStateRepositoryPort } from "@canto/core/domain/media/ports/media-aspect-state-repository.port";
 import type { MediaContentRatingRepositoryPort } from "@canto/core/domain/media/ports/media-content-rating-repository.port";
+import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type {
@@ -58,6 +59,7 @@ export interface EnrichmentDeps {
   localization: MediaLocalizationRepositoryPort;
   aspectState: MediaAspectStateRepositoryPort;
   contentRating: MediaContentRatingRepositoryPort;
+  extras: MediaExtrasRepositoryPort;
   tmdb: MediaProviderPort;
   tvdb: MediaProviderPort;
 }

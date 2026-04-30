@@ -1,25 +1,33 @@
 import type { Database } from "@canto/db/client";
-import {
-  findCreditsByMediaId,
-  findVideosByMediaId,
-  findWatchProvidersByMediaId,
-  findRecommendationsBySource,
-} from "../../../infra/content-enrichment/extras-repository";
-import { applyMediaItemsLocalizationOverlay } from "../../shared/localization";
-import { mapPoolItem } from "../../shared/mappers/media-mapper";
+
+import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
+import { applyMediaItemsLocalizationOverlay } from "@canto/core/domain/shared/localization/localization-service";
+import { mapPoolItem } from "@canto/core/domain/shared/mappers/media-mapper";
+
+export interface LoadExtrasDeps {
+  extras: MediaExtrasRepositoryPort;
+}
 
 /**
- * Load extras (credits, videos, watch providers, similar, recs) from DB tables
- * for an already-persisted media item.
+ * Load extras (credits, videos, watch providers, similar, recs) from DB
+ * tables for an already-persisted media item. The caller threads in the
+ * extras port; localization overlay still goes through `db` because the
+ * mapper helpers JOIN against the structural `media` row.
  */
-export async function loadExtrasFromDB(db: Database, mediaId: string, lang: string) {
-  const [credits, videos, watchProviders, similar, recommendations] = await Promise.all([
-    findCreditsByMediaId(db, mediaId),
-    findVideosByMediaId(db, mediaId),
-    findWatchProvidersByMediaId(db, mediaId),
-    findRecommendationsBySource(db, mediaId, "similar", lang),
-    findRecommendationsBySource(db, mediaId, "recommendation", lang),
-  ]);
+export async function loadExtrasFromDB(
+  db: Database,
+  mediaId: string,
+  lang: string,
+  deps: LoadExtrasDeps,
+) {
+  const [credits, videos, watchProviders, similar, recommendations] =
+    await Promise.all([
+      deps.extras.findCreditsByMediaId(mediaId),
+      deps.extras.findVideosByMediaId(mediaId),
+      deps.extras.findWatchProvidersByMediaId(mediaId),
+      deps.extras.findRecommendationsBySource(mediaId, "similar", lang),
+      deps.extras.findRecommendationsBySource(mediaId, "recommendation", lang),
+    ]);
 
   const cast = credits
     .filter((c) => c.type === "cast")
@@ -41,12 +49,27 @@ export async function loadExtrasFromDB(db: Database, mediaId: string, lang: stri
       profilePath: c.profilePath ?? undefined,
     }));
 
-  const wpByRegion: Record<string, {
-    link?: string;
-    flatrate?: Array<{ providerId: number; providerName: string; logoPath: string }>;
-    rent?: Array<{ providerId: number; providerName: string; logoPath: string }>;
-    buy?: Array<{ providerId: number; providerName: string; logoPath: string }>;
-  }> = {};
+  const wpByRegion: Record<
+    string,
+    {
+      link?: string;
+      flatrate?: Array<{
+        providerId: number;
+        providerName: string;
+        logoPath: string;
+      }>;
+      rent?: Array<{
+        providerId: number;
+        providerName: string;
+        logoPath: string;
+      }>;
+      buy?: Array<{
+        providerId: number;
+        providerName: string;
+        logoPath: string;
+      }>;
+    }
+  > = {};
 
   for (const wp of watchProviders) {
     if (!wpByRegion[wp.region]) wpByRegion[wp.region] = {};
@@ -80,17 +103,19 @@ export async function loadExtrasFromDB(db: Database, mediaId: string, lang: stri
     site: v.site,
     type: v.type,
     official: v.official,
-    language: (v as { language?: string }).language ?? null,
+    language: v.language ?? null,
   }));
 
   // Prefer user's full locale (e.g., "pt-BR"), then 2-letter prefix ("pt"), then en/untagged
   const exactLangVideos = mappedVideos.filter((v) => v.language === lang);
-  const userLangVideos = exactLangVideos.length > 0
-    ? exactLangVideos
-    : mappedVideos.filter((v) => v.language === langPrefix);
-  const finalVideos = userLangVideos.length > 0
-    ? userLangVideos
-    : mappedVideos.filter((v) => !v.language || v.language === "en");
+  const userLangVideos =
+    exactLangVideos.length > 0
+      ? exactLangVideos
+      : mappedVideos.filter((v) => v.language === langPrefix);
+  const finalVideos =
+    userLangVideos.length > 0
+      ? userLangVideos
+      : mappedVideos.filter((v) => !v.language || v.language === "en");
 
   // Sort by type: Trailer > Teaser > rest
   finalVideos.sort((a, b) => {

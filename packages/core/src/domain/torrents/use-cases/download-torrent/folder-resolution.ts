@@ -4,7 +4,7 @@ import {
   findAllFolders,
   findFolderById,
 } from "@canto/core/infra/file-organization/folder-repository";
-import { findWatchProvidersByMediaId } from "@canto/core/infra/content-enrichment/extras-repository";
+import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import { updateMedia } from "@canto/core/infra/media/media-repository";
 import {
   resolveFolder,
@@ -70,9 +70,10 @@ export async function resolveDownloadConfig(
     }
   }
 
+  const extras = makeMediaExtrasRepository(db);
   const [folders, watchProviders] = await Promise.all([
     findAllFolders(db),
-    findWatchProvidersByMediaId(db, mediaRow.id),
+    extras.findWatchProvidersByMediaId(mediaRow.id),
   ]);
   const routable: RoutableMedia = {
     type: mediaRow.type,

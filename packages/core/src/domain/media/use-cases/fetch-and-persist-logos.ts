@@ -1,7 +1,9 @@
 import type { Database } from "@canto/db/client";
 import type { MediaType } from "@canto/providers";
-import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
-import { upsertLangLogos } from "../../content-enrichment/use-cases/upsert-lang-logos";
+
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import { upsertLangLogos } from "@canto/core/domain/content-enrichment/use-cases/upsert-lang-logos";
 
 /**
  * Fetch language-specific logos via TMDB `/{type}/{id}/images` and upsert
@@ -17,6 +19,7 @@ export async function fetchAndPersistLogos(
   type: MediaType,
   languages: string[],
   tmdb: MediaProviderPort,
+  deps: { localization?: MediaLocalizationRepositoryPort } = {},
 ): Promise<{ calls: number; writes: number }> {
   if (!tmdb.getImages) return { calls: 0, writes: 0 };
 
@@ -34,6 +37,8 @@ export async function fetchAndPersistLogos(
   }
   if (byLang.size === 0) return { calls: 1, writes: 0 };
 
-  const writes = await upsertLangLogos(db, mediaId, byLang, nonEnLangs);
+  const writes = await upsertLangLogos(db, mediaId, byLang, nonEnLangs, {
+    localization: deps.localization,
+  });
   return { calls: 1, writes };
 }

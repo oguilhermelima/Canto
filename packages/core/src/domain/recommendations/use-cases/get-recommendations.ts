@@ -13,7 +13,7 @@ import {
   countUserRecommendations,
   findUserRecommendations,
 } from "@canto/core/infra/recommendations/user-recommendation-repository";
-import { findGlobalRecommendations } from "@canto/core/infra/content-enrichment/extras-repository";
+import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import { findLibraryMediaBrief } from "@canto/core/infra/media/media-repository";
 
 interface GetRecommendationsInput {
@@ -53,6 +53,7 @@ export async function getRecommendations(
   const offset = page * pageSize;
   const useMmr = page === 0 && !filters.sortBy;
 
+  const extras = makeMediaExtrasRepository(db);
   const { excludeItems } = await buildExclusionSet(db, userId);
 
   // ── Path 1: Per-user recommendations ──
@@ -108,7 +109,13 @@ export async function getRecommendations(
   }
 
   // ── Path 2: Fallback to global pool ──
-  const poolItems = await findGlobalRecommendations(db, excludeItems, (pageSize + 1) * 3, offset, userLang, filters);
+  const poolItems = await extras.findGlobalRecommendations(
+    excludeItems,
+    (pageSize + 1) * 3,
+    offset,
+    userLang,
+    filters,
+  );
 
   if (poolItems.length > 0) {
     const seen = new Set<string>();
@@ -209,8 +216,7 @@ async function mixWithExploreSlot(
 
   // Pull 2× the slot count so we can dedup against `personalizedExclude`
   // even when the global pool has overlap with the personalised page.
-  const pool = await findGlobalRecommendations(
-    db,
+  const pool = await makeMediaExtrasRepository(db).findGlobalRecommendations(
     exploreExcludes,
     slots.length * 2,
     0,

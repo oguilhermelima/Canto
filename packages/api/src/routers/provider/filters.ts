@@ -9,7 +9,7 @@ import { tmdbCertification } from "@canto/db/schema";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
-import { findWatchProviderLinks } from "@canto/core/infra/content-enrichment/extras-repository";
+import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import { getFilterOptions } from "@canto/core/domain/recommendations/use-cases/get-filter-options";
 import { searchFilterEntities } from "@canto/core/domain/recommendations/use-cases/search-filter-entities";
 import { getUserWatchProviders } from "@canto/core/domain/recommendations/use-cases/get-user-watch-providers";
@@ -40,10 +40,10 @@ export const providerFiltersRouter = createTRPCRouter({
     ),
 
   watchProviderLinks: publicProcedure.query(async ({ ctx }) => {
-    const rows = await findWatchProviderLinks(ctx.db);
+    const rows = await makeMediaExtrasRepository(ctx.db).findWatchProviderLinks();
     const mapping: Record<number, string> = {};
     for (const row of rows) {
-      mapping[row.providerId] = row.searchUrlTemplate!;
+      if (row.searchUrlTemplate) mapping[row.providerId] = row.searchUrlTemplate;
     }
     return mapping;
   }),

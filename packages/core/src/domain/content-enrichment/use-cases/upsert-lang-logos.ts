@@ -1,7 +1,7 @@
-import { and, eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { mediaLocalization } from "@canto/db/schema";
-import { upsertMediaLocalization } from "../../shared/localization";
+
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 
 /**
  * Resolve a TMDB iso_639_1 code (e.g. "pt") onto the supported full locale
@@ -41,6 +41,10 @@ export function resolveSupportedLocale(
   return prefixMatches === 1 ? prefixMatch : null;
 }
 
+export interface UpsertLangLogosDeps {
+  localization?: MediaLocalizationRepositoryPort;
+}
+
 /**
  * Upsert language-specific logo paths into media_localization.
  *
@@ -61,8 +65,12 @@ export async function upsertLangLogos(
   mediaId: string,
   byLangIso639_1: Map<string, string>,
   targetLanguages: Iterable<string>,
+  deps: UpsertLangLogosDeps = {},
 ): Promise<number> {
   if (byLangIso639_1.size === 0) return 0;
+
+  const localization =
+    deps.localization ?? makeMediaLocalizationRepository(db);
 
   const supported = new Set<string>();
   for (const code of targetLanguages) {
@@ -70,17 +78,8 @@ export async function upsertLangLogos(
     supported.add(code);
   }
 
-  const enLocRow = await db
-    .select({ title: mediaLocalization.title })
-    .from(mediaLocalization)
-    .where(
-      and(
-        eq(mediaLocalization.mediaId, mediaId),
-        eq(mediaLocalization.language, "en-US"),
-      ),
-    )
-    .limit(1);
-  const enTitle = enLocRow[0]?.title;
+  const enLoc = await localization.findOne(mediaId, "en-US");
+  const enTitle = enLoc?.title;
   if (!enTitle) return 0;
 
   let writes = 0;
@@ -88,8 +87,7 @@ export async function upsertLangLogos(
     const targetLocale = resolveSupportedLocale(tmdbCode, supported);
     if (!targetLocale) continue;
     try {
-      await upsertMediaLocalization(
-        db,
+      await localization.upsertMediaLocalization(
         mediaId,
         targetLocale,
         { title: enTitle, logoPath },
