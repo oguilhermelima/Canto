@@ -165,8 +165,8 @@ export async function autoImportTorrent(
 
       contentPath = targetDir;
     } else {
-      const containerBasePath = libRow?.libraryPath;
-      if (!containerBasePath) {
+      const libraryBasePath = libRow?.libraryPath;
+      if (!libraryBasePath) {
         console.error(`[auto-import] No library path configured for "${mediaRow.title}" — configure paths in Settings > Downloads`);
         await createNotification(db, {
           title: "Import failed — paths not configured",
@@ -177,10 +177,27 @@ export async function autoImportTorrent(
         await updateDownload(db, torrentRow.id, { importing: false });
         return;
       }
-      const targetLocation = `${containerBasePath}/${mediaDir}`;
+      // qBit and worker may mount the same host volume under different container
+      // paths (e.g. qBit `/medias/Animes`, worker `/media/Animes`). qBit's API
+      // only understands its own mount path, so use the folder's downloadPath
+      // when telling qBit where to move files; fall back to libraryPath if it's
+      // not set (single-mount setups).
+      const qbitBasePath = libRow?.downloadPath ?? libraryBasePath;
+      const qbitTargetLocation = `${qbitBasePath}/${mediaDir}`;
+      const libraryTargetLocation = `${libraryBasePath}/${mediaDir}`;
+
+      // Pre-create the series folder via the worker's mount so qBit always
+      // sees a valid destination on the shared volume.
+      try {
+        await deps.fs.mkdir(libraryTargetLocation, { recursive: true });
+      } catch (err) {
+        console.error(`[auto-import] Failed to create target dir "${libraryTargetLocation}":`, err);
+        await updateDownload(db, torrentRow.id, { importing: false });
+        return;
+      }
 
       importedCount = await importRemoteVideoFiles(
-        parsedFiles, client, torrentRow.hash, targetLocation,
+        parsedFiles, client, torrentRow.hash, qbitTargetLocation, libraryTargetLocation,
         libRow ?? null, placeholders, alreadyImported, db, mediaRow, torrentRow, files,
       );
 
@@ -195,7 +212,7 @@ export async function autoImportTorrent(
         freshSubtitleFiles, client, torrentRow.hash, mediaRow, mediaNaming, torrentRow, primarySeasonNumber,
       );
 
-      contentPath = targetLocation;
+      contentPath = libraryTargetLocation;
     }
 
     const totalExpected = videoFiles.length;
@@ -242,6 +259,13 @@ export async function autoImportTorrent(
           title: "Partial import",
           message: `Imported ${importedCount} of ${totalExpected} file(s) for "${mediaRow.title}". Will retry remaining files.`,
           type: "import_failed",
+          mediaId: mediaRow.id,
+        });
+      } else if (newAttempts === 1) {
+        await createNotification(db, {
+          title: "Import retry",
+          message: `Could not import "${mediaRow.title}" — will retry. If this persists, check your library and download paths in Settings > Downloads.`,
+          type: "import_warning",
           mediaId: mediaRow.id,
         });
       }

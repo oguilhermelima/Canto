@@ -21,7 +21,8 @@ export async function importRemoteVideoFiles(
   parsedFiles: ParsedFile[],
   client: DownloadClientPort,
   hash: string,
-  targetLocation: string,
+  qbitTargetLocation: string,
+  libraryTargetLocation: string,
   _libRow: { libraryPath: string | null } | null,
   placeholders: Array<{ id: string; episodeId: string | null }>,
   alreadyImported: Array<{ id: string; episodeId: string | null }>,
@@ -108,8 +109,8 @@ export async function importRemoteVideoFiles(
   }
 
   try {
-    await client.setLocation(hash, targetLocation);
-    console.log(`[auto-import] Remote move → ${targetLocation}`);
+    await client.setLocation(hash, qbitTargetLocation);
+    console.log(`[auto-import] Remote move → ${qbitTargetLocation}`);
   } catch (err) {
     console.error(`[auto-import] setLocation failed:`, err instanceof Error ? err.message : err);
     return 0;
@@ -122,7 +123,7 @@ export async function importRemoteVideoFiles(
   const MAX_MOVE_MS = 30 * 60 * 1000;
   const POLL_INTERVAL_MS = 3000;
   const deadline = Date.now() + MAX_MOVE_MS;
-  const normalizedTarget = path.normalize(targetLocation);
+  const normalizedTarget = path.normalize(qbitTargetLocation);
 
   let moved = false;
   while (Date.now() < deadline) {
@@ -140,7 +141,7 @@ export async function importRemoteVideoFiles(
 
   if (!moved) {
     console.error(
-      `[auto-import] Remote move did not complete within ${MAX_MOVE_MS / 60000} minutes — files may not have moved to "${targetLocation}"`,
+      `[auto-import] Remote move did not complete within ${MAX_MOVE_MS / 60000} minutes — files may not have moved to "${qbitTargetLocation}"`,
     );
     return 0;
   }
@@ -164,7 +165,7 @@ export async function importRemoteVideoFiles(
   for (const [pf, match] of matchForPf) {
     try {
       const finalName = renamedByOriginal.get(match.name) ?? match.name;
-      const finalPath = `${targetLocation}/${finalName}`;
+      const finalPath = `${libraryTargetLocation}/${finalName}`;
       importedCount += await upsertMediaFile(
         db,
         pf,
