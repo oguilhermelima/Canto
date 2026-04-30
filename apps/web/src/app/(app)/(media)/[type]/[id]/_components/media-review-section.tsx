@@ -40,7 +40,7 @@ export function MediaReviewSection({
 
   const allReviews = reviewsData?.reviews ?? [];
   const total = reviewsData?.total ?? 0;
-  const userId = session?.user?.id;
+  const userId = session?.user.id;
 
   // Check if user already has a media-level review
   const hasMediaReview = allReviews.some(

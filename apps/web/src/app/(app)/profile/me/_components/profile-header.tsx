@@ -91,7 +91,7 @@ export function ProfileHeader({ children }: ProfileHeaderProps): React.JSX.Eleme
   const handleShare = useCallback(async () => {
     if (!user?.id) return;
     const url = `${window.location.origin}/profile/${user.id}`;
-    const displayName = user.name ?? "my";
+    const displayName = user.name;
     try {
       if (typeof navigator.share === "function") {
         await navigator.share({

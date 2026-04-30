@@ -190,12 +190,14 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
         watchedAt: entry.watchedAt,
         source: entry.source,
         episode: entry.episode,
+        // FIXME(wave-11): ESLint sees progressValue as non-null (false positive from tRPC inference)
+        // but tsc types it as nullable; the guard is load-bearing for typecheck.
         progress: entry.progressPercent != null
           ? {
               percent: entry.progressPercent,
-              value: entry.progressValue ?? 0,
+              value: entry.progressValue ?? 0, // eslint-disable-line @typescript-eslint/no-unnecessary-condition
               total: entry.progressTotal ?? 0,
-              unit: (entry.progressUnit ?? "seconds"),
+              unit: entry.progressUnit ?? "seconds",
             }
           : null,
         isCompleted: entry.isCompleted ?? null,
@@ -235,7 +237,7 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
               percent: item.progressPercent,
               value: item.progressValue ?? 0,
               total: item.progressTotal ?? 0,
-              unit: (item.progressUnit ?? "seconds") as "seconds" | "episodes",
+              unit: item.progressUnit ?? "seconds", // eslint-disable-line @typescript-eslint/no-unnecessary-condition
             }
           : null,
         isCompleted: false,
@@ -284,7 +286,7 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
     isLoading: active.isLoading,
     isError: active.isError,
     refetch: () => void active.refetch(),
-    hasNextPage: active.hasNextPage ?? false,
+    hasNextPage: active.hasNextPage,
     isFetchingNextPage: active.isFetchingNextPage,
     onFetchNextPage,
     mediaType,

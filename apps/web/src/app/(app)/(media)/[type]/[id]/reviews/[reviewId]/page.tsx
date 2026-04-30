@@ -28,13 +28,6 @@ export default function ReviewDetailPage(): React.JSX.Element {
     reviewId: params.reviewId,
   });
 
-  const { data: resolvedData } = trpc.media.resolve.useQuery({
-    externalId: parseInt(params.id, 10),
-    type: mediaType,
-    provider: "tmdb",
-  });
-
-  const media = resolvedData?.media;
   const backHref = `/${params.type}/${params.id}/reviews`;
 
   useDocumentTitle(

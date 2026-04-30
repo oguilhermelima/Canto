@@ -69,7 +69,7 @@ export function ProfileStep({
     setSaving(true);
     try {
       const tasks: Promise<unknown>[] = [];
-      if (image && image !== (session?.user?.image ?? null)) {
+      if (image && image !== (session?.user.image ?? null)) {
         tasks.push(authClient.updateUser({ image }));
       }
       const profileChanged =

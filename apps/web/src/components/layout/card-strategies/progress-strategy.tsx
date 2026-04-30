@@ -41,7 +41,7 @@ function formatDuration(seconds: number): string {
 }
 
 function episodeBadgeLabel(item: BrowseItem): string | null {
-  if (item.episode?.seasonNumber != null && item.episode?.number != null) {
+  if (item.episode?.seasonNumber != null && item.episode.number != null) {
     return `S${String(item.episode.seasonNumber).padStart(2, "0")}E${String(item.episode.number).padStart(2, "0")}`;
   }
   return null;

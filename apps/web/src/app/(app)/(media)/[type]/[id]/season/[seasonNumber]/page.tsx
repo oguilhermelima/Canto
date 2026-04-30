@@ -33,7 +33,7 @@ export default function SeasonDetailPage(): React.JSX.Element {
   const mediaId = resolvedData?.mediaId;
 
   const season = useMemo(
-    () => media?.seasons?.find((s: { number: number }) => s.number === seasonNum),
+    () => media?.seasons.find((s: { number: number }) => s.number === seasonNum),
     [media?.seasons, seasonNum],
   );
 

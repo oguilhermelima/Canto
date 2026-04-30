@@ -84,10 +84,13 @@ function DiaryCard({
     return (
       <div className={cn("relative shrink-0", CARD_WIDTH_CLASS)}>
         <Skeleton className="aspect-video w-full rounded-xl" />
-        {cardImage && !imageReady && (
-          <img
-            src={tmdbThumbLoader({ src: cardImage, width: 780, quality: 75 })}
+        {cardImage && (
+          <Image
+            loader={tmdbThumbLoader}
+            src={cardImage}
             alt=""
+            width={780}
+            height={440}
             onLoad={() => setImageReady(true)}
             className="invisible absolute h-0 w-0"
           />

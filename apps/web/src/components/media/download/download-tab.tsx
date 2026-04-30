@@ -98,7 +98,7 @@ export function DownloadTab({
       onDownloadAuto();
     } else if (mode === "seasons") {
       onSearchGranular();
-    } else if (mode === "custom") {
+    } else {
       const q = customQuery.trim();
       if (q) onSearchAdvanced(q);
     }

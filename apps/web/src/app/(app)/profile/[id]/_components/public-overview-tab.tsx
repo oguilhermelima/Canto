@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Play, Star } from "lucide-react";
+import { Play, Star } from "lucide-react";
 import { Skeleton } from "@canto/ui/skeleton";
 import { trpc } from "@/lib/trpc/client";
 import { tmdbBackdropLoader, tmdbPosterLoader } from "@/lib/tmdb-image";
@@ -418,9 +418,9 @@ export function PublicOverviewTab({ userId }: { userId: string }): React.JSX.Ele
       {isEnabled("year_in_progress") && (
         <ThisYearHero
           stats={{
-            completedThisYear: overview.stats?.completedThisYear ?? 0,
-            averageRating: overview.stats?.averageRating ?? null,
-            totalMinutes: overview.stats?.totalMinutes ?? 0,
+            completedThisYear: overview.stats.completedThisYear,
+            averageRating: overview.stats.averageRating,
+            totalMinutes: overview.stats.totalMinutes,
           }}
           topGenre={topGenre}
           posters={overview.recentCompleted as MediaItem[]}

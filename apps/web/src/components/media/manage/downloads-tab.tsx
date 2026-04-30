@@ -46,7 +46,7 @@ export function DownloadsTab({
 }: DownloadsTabProps): React.JSX.Element {
   const allTorrents = (liveTorrents ?? []) as TorrentItem[];
   const totalFiles =
-    (movieFiles?.length ?? 0) +
+    movieFiles.length +
     Array.from(filesByEpKey.values()).reduce(
       (count, files) => count + files.length,
       0,

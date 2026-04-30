@@ -98,9 +98,12 @@ export function UpcomingScheduleCard({
       <div className="relative w-[280px] shrink-0 sm:w-[300px] lg:w-[340px] 2xl:w-[380px]">
         <Skeleton className="aspect-video w-full rounded-xl" />
         {cardImage && !imageReady && (
-          <img
-            src={tmdbThumbLoader({ src: cardImage, width: 780, quality: 75 })}
+          <Image
+            loader={tmdbThumbLoader}
+            src={cardImage}
             alt=""
+            width={780}
+            height={440}
             onLoad={() => setImageReady(true)}
             className="invisible absolute h-0 w-0"
           />

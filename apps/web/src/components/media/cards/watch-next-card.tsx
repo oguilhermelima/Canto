@@ -123,9 +123,12 @@ export function WatchNextCard({
       <div className={cn("mt-1 flex flex-col", CARD_WIDTH)}>
         <Skeleton className="aspect-video w-full rounded-xl" />
         {cardImage && (
-          <img
-            src={tmdbThumbLoader({ src: cardImage, width: 780, quality: 75 })}
+          <Image
+            loader={tmdbThumbLoader}
+            src={cardImage}
             alt=""
+            width={780}
+            height={440}
             onLoad={() => setImageReady(true)}
             className="invisible absolute h-0 w-0"
           />

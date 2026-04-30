@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import Image from "next/image";
 import { Eye, Loader2 } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { useHiddenMedia } from "@/hooks/use-hidden-media";
@@ -102,10 +103,11 @@ function HiddenMediaCard({
     <div className="group relative flex flex-col">
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-muted">
         {item.posterPath ? (
-          <img
+          <Image
             src={`https://image.tmdb.org/t/p/w342${item.posterPath}`}
             alt={item.title}
-            className="h-full w-full object-cover opacity-50"
+            fill
+            className="object-cover opacity-50"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted-foreground">

@@ -60,7 +60,7 @@ export default function RequestsPage(): React.JSX.Element {
   );
 
   const sentinelRef = useInfiniteScroll({
-    hasNextPage: hasNextPage ?? false,
+    hasNextPage,
     isFetchingNextPage,
     onFetchNextPage: () => void fetchNextPage(),
   });

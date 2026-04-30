@@ -18,6 +18,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@canto/ui/popover";
+import Image from "next/image";
 import { Bookmark, Check, ChevronLeft, ChevronRight, Eye, Server, X } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import type { HomeSectionConfig } from "@canto/db/schema";
@@ -478,7 +479,7 @@ function CollectionPreviewStack({ posters, type }: { posters: string[]; type: st
             style={{ left: `${index * 14}px`, zIndex: index + 1 }}
           >
             {poster ? (
-              <img src={posterSrc(poster)} alt="" className="h-full w-full object-cover" />
+              <Image src={posterSrc(poster)} alt="" fill className="object-cover" />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                 <Icon className="h-3 w-3" />
@@ -508,11 +509,11 @@ function StylePreview({ value }: { value: string }): React.JSX.Element {
   if (value === "spotlight") {
     return (
       <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl">
-        <img src="/backdrop-example.webp" alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <Image src="/backdrop-example.webp" alt="" fill className="object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black from-5% via-black/40 via-35% to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-5">
-          <img src="/logo-example.webp" alt="Il Sorpasso" className="h-8 w-auto self-start drop-shadow-lg sm:h-10" />
+          <Image src="/logo-example.webp" alt="Il Sorpasso" width={160} height={40} className="h-8 w-auto self-start drop-shadow-lg sm:h-10" />
           <div className="flex flex-wrap items-center gap-x-2 text-xs text-foreground">
             <span>Movie</span><span className="text-foreground">|</span>
             <span className="text-yellow-400">8.0</span><span className="text-foreground">|</span>
@@ -536,7 +537,7 @@ function StylePreview({ value }: { value: string }): React.JSX.Element {
       <div className="flex w-full justify-center overflow-hidden rounded-xl bg-black py-4">
         <div className="group/card relative h-72 w-44 shrink-0 overflow-hidden rounded-xl transition-[width] duration-300 ease-in-out hover:w-full hover:border hover:border-border">
           <div className="absolute inset-0 transition-opacity duration-300 group-hover/card:pointer-events-none group-hover/card:opacity-0">
-            <img src="/poster-example.webp" alt="" className="h-full w-full object-cover" />
+            <Image src="/poster-example.webp" alt="" fill className="object-cover" />
           </div>
           <div className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/card:opacity-100">
             <iframe
@@ -547,7 +548,7 @@ function StylePreview({ value }: { value: string }): React.JSX.Element {
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10" />
             <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent" />
             <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-5">
-              <img src="/logo-example.webp" alt="Il Sorpasso" className="h-6 w-auto self-start drop-shadow-lg" />
+              <Image src="/logo-example.webp" alt="Il Sorpasso" width={160} height={32} className="h-6 w-auto self-start drop-shadow-lg" />
               <div className="flex items-center gap-2 text-sm text-white/70">
                 <span>Movie</span><span className="text-white/30">·</span>
                 <span className="text-yellow-400">8.0</span><span className="text-white/30">·</span><span>1962</span>

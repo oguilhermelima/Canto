@@ -42,7 +42,7 @@ export default function DownloadsPage(): React.JSX.Element {
     [query.data],
   );
   const sentinelRef = useInfiniteScroll({
-    hasNextPage: query.hasNextPage ?? false,
+    hasNextPage: query.hasNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
     onFetchNextPage: () => void query.fetchNextPage(),
   });
@@ -95,7 +95,7 @@ export default function DownloadsPage(): React.JSX.Element {
           isLoading={query.isLoading}
           isError={query.isError}
           onRetry={() => void utils.torrent.listLive.invalidate()}
-          hasNextPage={query.hasNextPage ?? false}
+          hasNextPage={query.hasNextPage}
           isFetchingNextPage={query.isFetchingNextPage}
           sentinelRef={sentinelRef}
           actions={actions}

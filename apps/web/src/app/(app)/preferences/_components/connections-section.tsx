@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@canto/ui/dialog";
+import Image from "next/image";
 import { Plus, Loader2, Unlink, CheckCircle2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@canto/ui/cn";
@@ -92,7 +93,7 @@ function ProviderIcon({
   const brand = BRAND[provider];
   if (provider === "trakt") {
     return (
-      <img
+      <Image
         src={brand.logo}
         alt=""
         width={size}

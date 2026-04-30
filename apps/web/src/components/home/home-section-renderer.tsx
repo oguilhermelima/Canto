@@ -40,7 +40,7 @@ export function HomeSectionRenderer({ section }: HomeSectionRendererProps): Reac
         return <RecentlyAddedSource sectionId={id} title={title} style={style} />;
       case "collection": {
         const cfg = config as Record<string, unknown>;
-        const listId = String(cfg?.listId || "");
+        const listId = String(cfg.listId ?? "");
         return listId ? <CollectionSource sectionId={id} title={title} style={style} listId={listId} /> : null;
       }
       case "watch_providers":

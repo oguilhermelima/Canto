@@ -42,8 +42,7 @@ export function ContinueWatchingSource({ sectionId, title, style }: ContinueWatc
       progress:
         item.progressPercent != null &&
         item.progressValue != null &&
-        item.progressTotal != null &&
-        item.progressUnit != null
+        item.progressTotal != null
           ? {
               percent: item.progressPercent,
               value: item.progressValue,

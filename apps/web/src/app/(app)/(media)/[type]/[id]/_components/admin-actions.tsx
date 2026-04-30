@@ -40,7 +40,7 @@ export function AdminActions({
         );
         const progress = Math.max(
           0,
-          Math.min(1, torrent.live?.progress ?? torrent.progress ?? 0),
+          Math.min(1, torrent.live?.progress ?? torrent.progress),
         );
         return { resolved, progress };
       }),
