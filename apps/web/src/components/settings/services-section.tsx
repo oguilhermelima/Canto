@@ -36,6 +36,7 @@ import { useWatchRegion } from "@/hooks/use-watch-region";
 import { useDirectSearch } from "@/hooks/use-direct-search";
 import { SectionCard, SettingsSection } from "@/components/settings/shared";
 import { FieldInput } from "@/components/settings/_primitives";
+import { RefreshCadenceSection } from "@/components/settings/refresh-cadence-section";
 import {
   SETTINGS_REGISTRY
   
@@ -1022,6 +1023,8 @@ export function MetadataProvidersSection(): React.JSX.Element {
       <SettingsSection title="Use TVDB for season/episode structure" description="Validate and fix the season and episode structure using TVDB data.">
         <TvdbDefaultToggle />
       </SettingsSection>
+
+      <RefreshCadenceSection />
 
       <SettingsSection title="Maintenance" description="Tools for managing your metadata library.">
         <SectionCard title="Maintenance">
