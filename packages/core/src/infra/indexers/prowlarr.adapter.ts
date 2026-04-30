@@ -41,6 +41,7 @@ export class ProwlarrClient implements IndexerPort {
 
     const response = await fetch(`${this.baseUrl}/api/v1/indexer`, {
       headers: { "X-Api-Key": this.apiKey, Accept: "application/json" },
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!response.ok) {
