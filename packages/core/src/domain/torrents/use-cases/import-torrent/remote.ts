@@ -17,6 +17,17 @@ interface MediaNaming {
   type: string;
 }
 
+export interface ImportRemoteVideoFilesResult {
+  importedCount: number;
+  /**
+   * Post-move file list as reported by qBit after the torrent has finished
+   * relocating. Empty array if the move failed or the post-move fetch threw.
+   * Callers reuse this to drive subtitle imports and nested-folder warnings
+   * without making a second `getTorrentFiles` round-trip.
+   */
+  postMoveFiles: TorrentFileInfo[];
+}
+
 export async function importRemoteVideoFiles(
   parsedFiles: ParsedFile[],
   client: DownloadClientPort,
@@ -30,7 +41,7 @@ export async function importRemoteVideoFiles(
   mediaRow: { id: string },
   torrentRow: { id: string; quality: string; source: string },
   originalFiles: TorrentFileInfo[],
-): Promise<number> {
+): Promise<ImportRemoteVideoFilesResult> {
   // Match each parsed file against the PRE-MOVE torrent file list so we can
   // rename files in place BEFORE asking qBit to move them. Renaming is instant
   // (it just changes the internal path within the torrent), whereas
@@ -113,7 +124,7 @@ export async function importRemoteVideoFiles(
     console.log(`[auto-import] Remote move → ${qbitTargetLocation}`);
   } catch (err) {
     console.error(`[auto-import] setLocation failed:`, err instanceof Error ? err.message : err);
-    return 0;
+    return { importedCount: 0, postMoveFiles: [] };
   }
 
   // Poll until qBittorrent has finished moving files to the new location.
@@ -143,22 +154,28 @@ export async function importRemoteVideoFiles(
     console.error(
       `[auto-import] Remote move did not complete within ${MAX_MOVE_MS / 60000} minutes — files may not have moved to "${qbitTargetLocation}"`,
     );
-    return 0;
+    return { importedCount: 0, postMoveFiles: [] };
+  }
+
+  // Single post-move fetch — reused below for the nested-folder warning AND
+  // returned to the caller so subtitle import can match against the fresh
+  // names without another qBit round-trip. Pre-refactor this fetched 3×
+  // total (here, in the caller for subtitles, and for the nested check).
+  let postMoveFiles: TorrentFileInfo[] = [];
+  try {
+    postMoveFiles = await client.getTorrentFiles(hash);
+  } catch {
+    // Non-critical — proceed with empty list (subtitle pass becomes a no-op).
   }
 
   // Warn if any file is still under a subfolder after rename+move. Sibling
   // files of nested releases (samples, .nfo, .txt) cannot be cleaned up from
   // the worker — filesystem cleanup is intentionally out of scope here.
-  try {
-    const finalFiles = await client.getTorrentFiles(hash);
-    const nested = finalFiles.filter((f) => f.name.includes("/"));
-    if (nested.length > 0) {
-      console.warn(
-        `[auto-import] Torrent ${hash} still has ${nested.length} file(s) under subfolders after import: ${nested.map((f) => f.name).join(", ")}`,
-      );
-    }
-  } catch {
-    // Non-critical
+  const nested = postMoveFiles.filter((f) => f.name.includes("/"));
+  if (nested.length > 0) {
+    console.warn(
+      `[auto-import] Torrent ${hash} still has ${nested.length} file(s) under subfolders after import: ${nested.map((f) => f.name).join(", ")}`,
+    );
   }
 
   let importedCount = 0;
@@ -180,7 +197,7 @@ export async function importRemoteVideoFiles(
     }
   }
 
-  return importedCount;
+  return { importedCount, postMoveFiles };
 }
 
 export async function importRemoteSubtitleFiles(

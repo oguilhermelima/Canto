@@ -14,6 +14,7 @@ import {
   findFolderById,
   findDefaultFolder,
   findMediaFilesByDownloadId,
+  findMediaFilesByMediaId,
   updateDownload,
 } from "../../../infra/repositories";
 import { findMediaLocalized } from "../../../infra/media/media-localized-repository";
@@ -33,24 +34,61 @@ export interface ImportHooks {
 
 type ImportMethod = "local" | "remote";
 
+export type AutoImportMediaRow = NonNullable<
+  Awaited<ReturnType<typeof findMediaByIdWithSeasons>>
+>;
+export type AutoImportMediaFiles = Awaited<
+  ReturnType<typeof findMediaFilesByMediaId>
+>;
+
+/**
+ * What `autoImportTorrent` returns. Callers (cron handler, manual API) reuse
+ * the data here instead of re-querying download → media → files →
+ * localization after a successful import.
+ *
+ * - `imported` mirrors the `download.imported` flag we wrote.
+ * - `mediaRow`, `mediaLocalizationEn` are populated as soon as `findMediaByIdWithSeasons`
+ *   resolves (so partial-failure paths still surface them).
+ * - `mediaFiles` is populated only on the success path — refetched once
+ *   here to power downstream Jellyfin auto-merge counts.
+ */
+export interface AutoImportResult {
+  imported: boolean;
+  importedCount: number;
+  contentPath: string | null;
+  mediaRow: AutoImportMediaRow | null;
+  mediaFiles: AutoImportMediaFiles | null;
+  mediaLocalizationEn: { title: string } | null;
+}
+
 export async function autoImportTorrent(
   db: Database,
   torrentRow: typeof downloadSchema.$inferSelect,
   client: DownloadClientPort,
   deps: { fs: FileSystemPort },
   hooks?: ImportHooks,
-): Promise<void> {
-  if (!torrentRow.hash || !torrentRow.mediaId) {
-    await updateDownload(db, torrentRow.id, { importing: false });
-    return;
-  }
+): Promise<AutoImportResult> {
+  const result: AutoImportResult = {
+    imported: false,
+    importedCount: 0,
+    contentPath: null,
+    mediaRow: null,
+    mediaFiles: null,
+    mediaLocalizationEn: null,
+  };
+  // Single deferred update — every early-return / success / partial / catch
+  // path mutates this and the `finally` block writes it once. Was 11 separate
+  // updateDownload calls per attempt before this refactor.
+  const downloadUpdate: Partial<typeof downloadSchema.$inferInsert> = {
+    importing: false,
+  };
 
   try {
+    if (!torrentRow.hash || !torrentRow.mediaId) return result;
+
     const mediaRow = await findMediaByIdWithSeasons(db, torrentRow.mediaId);
-    if (!mediaRow) {
-      await updateDownload(db, torrentRow.id, { importing: false });
-      return;
-    }
+    if (!mediaRow) return result;
+    result.mediaRow = mediaRow;
 
     const placeholders = await findMediaFilesByDownloadId(db, torrentRow.id, "pending");
     const alreadyImported = await findMediaFilesByDownloadId(db, torrentRow.id, "imported");
@@ -65,6 +103,8 @@ export async function autoImportTorrent(
     // Naming uses the canonical en-US title — release groups and library
     // folders mirror the English title, not the user's localized variant.
     const enLoc = await findMediaLocalized(db, mediaRow.id, "en-US");
+    const mediaLocalizationEn = { title: enLoc?.title ?? "" };
+    result.mediaLocalizationEn = mediaLocalizationEn;
     const globalTvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
     const effectiveProvider = getEffectiveProviderSync(mediaRow, globalTvdbEnabled);
     const namingExternalId =
@@ -73,7 +113,7 @@ export async function autoImportTorrent(
         : mediaRow.externalId;
 
     const mediaNaming = {
-      title: enLoc?.title ?? "",
+      title: mediaLocalizationEn.title,
       year: mediaRow.year,
       externalId: namingExternalId,
       provider: effectiveProvider,
@@ -84,10 +124,7 @@ export async function autoImportTorrent(
     const videoFiles = files.filter((f) => isVideoFile(f.name));
     const subtitleFiles = files.filter((f) => isSubtitleFile(f.name));
 
-    if (videoFiles.length === 0) {
-      await updateDownload(db, torrentRow.id, { importing: false });
-      return;
-    }
+    if (videoFiles.length === 0) return result;
 
     if (mediaRow.type === "movie" && videoFiles.length > 1) {
       console.warn(
@@ -99,8 +136,7 @@ export async function autoImportTorrent(
         type: "movie_multi_file",
         mediaId: mediaRow.id,
       });
-      await updateDownload(db, torrentRow.id, { importing: false });
-      return;
+      return result;
     }
 
     let primarySeasonNumber = torrentRow.seasonNumber ?? undefined;
@@ -117,8 +153,7 @@ export async function autoImportTorrent(
 
     if (parsedFiles.length === 0) {
       console.warn(`[auto-import] No valid files to import for "${mediaNaming.title}" — all episodes unresolvable`);
-      await updateDownload(db, torrentRow.id, { importing: false });
-      return;
+      return result;
     }
 
     const mediaDir = buildMediaDir(mediaNaming, primarySeasonNumber);
@@ -136,8 +171,7 @@ export async function autoImportTorrent(
           type: "import_failed",
           mediaId: mediaRow.id,
         });
-        await updateDownload(db, torrentRow.id, { importing: false });
-        return;
+        return result;
       }
       const targetDir = path.join(libraryPath, mediaDir);
 
@@ -145,8 +179,7 @@ export async function autoImportTorrent(
         await deps.fs.mkdir(targetDir, { recursive: true });
       } catch (err) {
         console.error(`[auto-import] Failed to create target dir "${targetDir}":`, err);
-        await updateDownload(db, torrentRow.id, { importing: false });
-        return;
+        return result;
       }
 
       let savePath: string;
@@ -154,8 +187,7 @@ export async function autoImportTorrent(
         savePath = await resolveSavePath(client, torrentRow.hash);
       } catch (err) {
         console.error(`[auto-import] Failed to resolve save path for "${torrentRow.title}":`, err instanceof Error ? err.message : err);
-        await updateDownload(db, torrentRow.id, { importing: false });
-        return;
+        return result;
       }
 
       importedCount = await importLocalVideoFiles(
@@ -178,8 +210,7 @@ export async function autoImportTorrent(
           type: "import_failed",
           mediaId: mediaRow.id,
         });
-        await updateDownload(db, torrentRow.id, { importing: false });
-        return;
+        return result;
       }
       // qBit and worker may mount the same host volume under different container
       // paths (e.g. qBit `/medias/Animes`, worker `/media/Animes`). qBit's API
@@ -196,19 +227,19 @@ export async function autoImportTorrent(
         await deps.fs.mkdir(libraryTargetLocation, { recursive: true });
       } catch (err) {
         console.error(`[auto-import] Failed to create target dir "${libraryTargetLocation}":`, err);
-        await updateDownload(db, torrentRow.id, { importing: false });
-        return;
+        return result;
       }
 
-      importedCount = await importRemoteVideoFiles(
+      const remoteResult = await importRemoteVideoFiles(
         parsedFiles, client, torrentRow.hash, qbitTargetLocation, libraryTargetLocation,
         libRow ?? null, placeholders, alreadyImported, db, mediaRow, torrentRow, files,
       );
+      importedCount = remoteResult.importedCount;
 
-      // Re-fetch file list after remote move — the original subtitleFiles have
-      // stale pre-move paths that would cause renameFile to fail.
-      const movedAllFiles = await client.getTorrentFiles(torrentRow.hash);
-      const freshSubtitleFiles = movedAllFiles
+      // Reuse the post-move file list returned from importRemoteVideoFiles —
+      // the pre-move `subtitleFiles` paths would be stale (qBit reports
+      // post-move filenames). Saves a redundant getTorrentFiles call.
+      const freshSubtitleFiles = remoteResult.postMoveFiles
         .filter((f) => isSubtitleFile(f.name))
         .map((f) => ({ name: f.name, size: f.size }));
 
@@ -222,13 +253,27 @@ export async function autoImportTorrent(
     const totalExpected = videoFiles.length;
     const allImported = importedCount >= totalExpected;
 
+    result.importedCount = importedCount;
+    result.contentPath = contentPath;
+    downloadUpdate.importMethod = importMethod;
+    downloadUpdate.contentPath = contentPath;
+
     if (allImported) {
-      await updateDownload(db, torrentRow.id, {
-        imported: true,
-        importing: false,
-        importMethod,
-        contentPath,
-      });
+      downloadUpdate.imported = true;
+      result.imported = true;
+      // Fetch the full per-media file list once so the handler's post-loop
+      // doesn't need a separate findMediaFilesByMediaId per imported torrent.
+      // The list drives Jellyfin's multi-version auto-merge count. A failure
+      // here is non-fatal — the import has already succeeded on disk + DB;
+      // worst case the handler skips this media's scan trigger.
+      try {
+        result.mediaFiles = await findMediaFilesByMediaId(db, mediaRow.id);
+      } catch (err) {
+        console.error(
+          `[auto-import] Failed to load media files for ${mediaRow.id}:`,
+          err instanceof Error ? err.message : err,
+        );
+      }
 
       console.log(`[auto-import] [${importMethod}] Imported ${importedCount}/${totalExpected} file(s) for "${mediaNaming.title}"`);
       hooks?.onImported?.({
@@ -244,12 +289,7 @@ export async function autoImportTorrent(
       });
     } else {
       const newAttempts = (torrentRow.importAttempts ?? 0) + 1;
-      await updateDownload(db, torrentRow.id, {
-        importing: false,
-        importMethod,
-        contentPath,
-        importAttempts: newAttempts,
-      });
+      downloadUpdate.importAttempts = newAttempts;
 
       console.warn(
         `[auto-import] [${importMethod}] Partial import: ${importedCount}/${totalExpected} file(s) for "${mediaNaming.title}" — will retry (attempt ${newAttempts}/5)`,
@@ -280,6 +320,18 @@ export async function autoImportTorrent(
     }
   } catch (err) {
     console.error(`[auto-import] Unexpected error for "${torrentRow.title}":`, err instanceof Error ? err.message : err);
-    await updateDownload(db, torrentRow.id, { importing: false });
+  } finally {
+    // Single write at the end — wrapping in try/catch so a DB hiccup here
+    // doesn't mask the actual import outcome from the caller.
+    try {
+      await updateDownload(db, torrentRow.id, downloadUpdate);
+    } catch (err) {
+      console.error(
+        `[auto-import] Failed to persist download update for ${torrentRow.id}:`,
+        err instanceof Error ? err.message : err,
+      );
+    }
   }
+
+  return result;
 }

@@ -1,5 +1,9 @@
 import { db } from "@canto/db/client";
-import { autoImportTorrent } from "@canto/core/domain/torrents/use-cases/import-torrent";
+import {
+  autoImportTorrent,
+  type AutoImportMediaRow,
+  type AutoImportMediaFiles,
+} from "@canto/core/domain/torrents/use-cases/import-torrent";
 import { tryContinuousDownload } from "@canto/core/domain/torrents/use-cases/continuous-download";
 import {
   triggerMediaServerScans,
@@ -10,9 +14,6 @@ import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem"
 import { buildIndexers } from "@canto/core/infra/indexers/indexer-factory";
 import {
   findUnimportedDownloads,
-  findDownloadById,
-  findMediaById,
-  findMediaFilesByMediaId,
   ensureServerLibrary,
   addListItem,
   updateRequestStatus,
@@ -21,8 +22,13 @@ import {
   updateDownload,
   updateMedia,
 } from "@canto/core/infra/repositories";
-import { findMediaLocalized } from "@canto/core/infra/media/media-localized-repository";
 import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+
+interface ImportedMediaContext {
+  mediaRow: AutoImportMediaRow;
+  mediaFiles: AutoImportMediaFiles;
+  mediaLocalizationEn: { title: string };
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Main handler                                                               */
@@ -45,7 +51,10 @@ export async function handleImportTorrents(): Promise<void> {
   );
 
   const importedFolderIds = new Set<string>();
-  const importedMediaIds = new Set<string>();
+  // Cache the media context returned by autoImportTorrent so the post-loop
+  // scan trigger doesn't have to re-query findMediaById /
+  // findMediaFilesByMediaId / findMediaLocalized per imported torrent.
+  const mediaContexts = new Map<string, ImportedMediaContext>();
   const fs = createNodeFileSystemAdapter();
 
   for (const row of toImport) {
@@ -58,12 +67,11 @@ export async function handleImportTorrents(): Promise<void> {
       }
 
       const qbClient = await getDownloadClient();
-      await autoImportTorrent(db, claimed, qbClient, { fs });
+      const result = await autoImportTorrent(db, claimed, qbClient, { fs });
 
-      // Re-read row to check if import succeeded
-      const updated = await findDownloadById(db, row.id);
+      if (result.imported && result.mediaRow && result.mediaLocalizationEn) {
+        const { mediaRow, mediaLocalizationEn } = result;
 
-      if (updated?.imported) {
         // Mark the torrent as imported in qBittorrent by updating its category
         try {
           const [torrentInfo] = await qbClient.listTorrents({ hashes: [row.hash!] });
@@ -81,62 +89,65 @@ export async function handleImportTorrents(): Promise<void> {
             err instanceof Error ? err.message : err,
           );
         }
-        // Get the library ID from the linked media and mark as downloaded
-        const mediaRow = updated.mediaId
-          ? await findMediaById(db, updated.mediaId)
-          : null;
-        if (mediaRow) {
-          if (!mediaRow.downloaded) {
-            await updateMedia(db, mediaRow.id, {
-              downloaded: true,
-              addedAt: mediaRow.addedAt ?? new Date(),
-            });
-          }
-          if (mediaRow.libraryId) {
-            importedFolderIds.add(mediaRow.libraryId);
-          }
-          importedMediaIds.add(mediaRow.id);
+
+        // Mark the media as downloaded the first time we import any of its files.
+        if (!mediaRow.downloaded) {
+          await updateMedia(db, mediaRow.id, {
+            downloaded: true,
+            addedAt: mediaRow.addedAt ?? new Date(),
+          });
+        }
+        if (mediaRow.libraryId) {
+          importedFolderIds.add(mediaRow.libraryId);
+        }
+        // Cache only when mediaFiles loaded — the post-loop trigger relies on
+        // the file count, so a failed load skips the scan for this media.
+        // Newer imports for the same media row replace earlier cached files
+        // so triggerMediaServerScans counts the freshest media-server view.
+        if (result.mediaFiles) {
+          mediaContexts.set(mediaRow.id, {
+            mediaRow,
+            mediaFiles: result.mediaFiles,
+            mediaLocalizationEn,
+          });
         }
 
         // Add to Server Library list
-        if (updated.mediaId) {
-          try {
-            const serverLib = await ensureServerLibrary(db);
-            await addListItem(db, { listId: serverLib.id, mediaId: updated.mediaId });
-          } catch { /* already in server library */ }
+        try {
+          const serverLib = await ensureServerLibrary(db);
+          await addListItem(db, { listId: serverLib.id, mediaId: mediaRow.id });
+        } catch { /* already in server library */ }
 
-          // Update download requests to "downloaded"
-          try {
-            await updateRequestStatus(db, updated.mediaId, "downloaded");
-          } catch { /* no pending requests */ }
-        }
+        // Update download requests to "downloaded"
+        try {
+          await updateRequestStatus(db, mediaRow.id, "downloaded");
+        } catch { /* no pending requests */ }
 
         // Continuous download: try to grab next episode (matching quality)
-        if (updated.mediaId && mediaRow) {
-          const enLoc = await findMediaLocalized(db, mediaRow.id, "en-US");
-          const indexers = await buildIndexers();
-          void tryContinuousDownload(
-            db,
-            {
-              id: mediaRow.id,
-              type: mediaRow.type,
-              continuousDownload: mediaRow.continuousDownload,
-              title: enLoc?.title ?? "",
-            },
-            row.seasonNumber,
-            row.episodeNumbers,
-            { quality: row.quality, source: row.source },
-            indexers,
-            qbClient,
-          ).catch(logAndSwallow("import-torrents tryContinuousDownload"));
-        }
+        const indexers = await buildIndexers();
+        void tryContinuousDownload(
+          db,
+          {
+            id: mediaRow.id,
+            type: mediaRow.type,
+            continuousDownload: mediaRow.continuousDownload,
+            title: mediaLocalizationEn.title,
+          },
+          row.seasonNumber,
+          row.episodeNumbers,
+          { quality: row.quality, source: row.source },
+          indexers,
+          qbClient,
+        ).catch(logAndSwallow("import-torrents tryContinuousDownload"));
       }
     } catch (err) {
       console.error(
         `[import-torrents] Error importing "${row.title}":`,
         err instanceof Error ? err.message : err,
       );
-      // Reset importing flag so the torrent can be retried on next cycle
+      // Defensive reset — autoImportTorrent's own try/finally already clears
+      // the flag, but if the call itself or downstream code throws before
+      // that finally runs we still want the row eligible for retry.
       await updateDownload(db, row.id, { importing: false }).catch(
         logAndSwallow("import-torrents reset importing flag"),
       );
@@ -146,20 +157,14 @@ export async function handleImportTorrents(): Promise<void> {
   // Trigger media server scans after successful imports
   if (importedFolderIds.size > 0) {
     const importedMedias: ImportedMedia[] = [];
-    for (const mediaId of importedMediaIds) {
-      const mediaRow = await findMediaById(db, mediaId);
-      if (!mediaRow) continue;
-      const files = await findMediaFilesByMediaId(db, mediaId);
-      const importedCount = files.filter((f) => f.status === "imported").length;
-      // Title now lives on media_localization; en-US is the canonical row used
-      // by media-server search (Jellyfin/Plex titles are en-US labelled).
-      const enLoc = await findMediaLocalized(db, mediaRow.id, "en-US");
+    for (const ctx of mediaContexts.values()) {
+      const importedCount = ctx.mediaFiles.filter((f) => f.status === "imported").length;
       importedMedias.push({
-        id: mediaRow.id,
-        title: enLoc?.title ?? "",
-        type: mediaRow.type,
-        externalId: mediaRow.externalId,
-        provider: mediaRow.provider,
+        id: ctx.mediaRow.id,
+        title: ctx.mediaLocalizationEn.title,
+        type: ctx.mediaRow.type,
+        externalId: ctx.mediaRow.externalId,
+        provider: ctx.mediaRow.provider,
         mediaFileCount: importedCount,
       });
     }
