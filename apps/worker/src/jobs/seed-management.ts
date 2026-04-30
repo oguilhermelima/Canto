@@ -5,9 +5,14 @@ import { db } from "@canto/db/client";
 import { getSettings } from "@canto/db/settings";
 import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
 import {
-  findDownloadByHash,
-  updateDownload,
+  findDownloadsByHashes,
+  updateDownloadBatch,
 } from "@canto/core/infra/repositories";
+import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import { runWithConcurrency } from "@canto/core/platform/concurrency/run-with-concurrency";
+
+/** qBit's WebUI handles ~10 concurrent deletions without rate-limiting. */
+const QBIT_DELETE_CONCURRENCY = 10;
 
 /**
  * Seed management: removes torrents from the download client once they've
@@ -37,24 +42,35 @@ export async function handleSeedManagement(): Promise<void> {
 
   const liveTorrents = await client.listTorrents();
   const now = Math.floor(Date.now() / 1000);
-  let removed = 0;
 
-  for (const torrent of liveTorrents) {
-    // Only process completed torrents (uploading/seeding states)
-    if (torrent.progress < 1) continue;
+  // Pre-filter to completed torrents and batch-load their DB rows.
+  const completed = liveTorrents.filter((t) => t.progress >= 1);
+  if (completed.length === 0) return;
 
-    // Check if this torrent is tracked, imported, and not currently being imported
-    const dbRow = await findDownloadByHash(db, torrent.hash);
+  const dbRows = await findDownloadsByHashes(
+    db,
+    completed.map((t) => t.hash),
+  );
+  const dbByHash = new Map(
+    dbRows.filter((r) => r.hash != null).map((r) => [r.hash as string, r]),
+  );
+
+  type Removal = {
+    torrent: (typeof completed)[number];
+    dbRow: (typeof dbRows)[number];
+  };
+
+  const toRemove: Removal[] = [];
+  for (const torrent of completed) {
+    const dbRow = dbByHash.get(torrent.hash);
     if (!dbRow || !dbRow.imported || dbRow.importing) continue;
 
     let shouldRemove = false;
 
-    // Check ratio limit
     if (ratioLimit != null && torrent.ratio >= ratioLimit) {
       shouldRemove = true;
     }
 
-    // Check time limit
     if (timeLimitHours != null && torrent.completion_on > 0) {
       const seededSeconds = now - torrent.completion_on;
       if (seededSeconds >= timeLimitHours * 3600) {
@@ -62,8 +78,14 @@ export async function handleSeedManagement(): Promise<void> {
       }
     }
 
-    if (!shouldRemove) continue;
+    if (shouldRemove) toRemove.push({ torrent, dbRow });
+  }
 
+  if (toRemove.length === 0) return;
+
+  const removedIds: string[] = [];
+
+  await runWithConcurrency(toRemove, QBIT_DELETE_CONCURRENCY, async ({ torrent, dbRow }: Removal) => {
     try {
       const shouldCleanup = cleanupFiles && dbRow.importMethod !== "remote";
 
@@ -76,15 +98,15 @@ export async function handleSeedManagement(): Promise<void> {
       // Fetch file list BEFORE deleting the torrent (it won't be available after)
       let filePaths: string[] = [];
       if (shouldCleanup) {
-        const files = await client.getTorrentFiles(torrent.hash).catch(() => []);
+        const files = await client.getTorrentFiles(torrent.hash).catch((err) => {
+          logAndSwallow(`seed-management:getTorrentFiles ${torrent.name}`)(err);
+          return [];
+        });
         filePaths = files.map((f) => path.join(torrent.save_path, f.name));
       }
 
       // Remove torrent from client (keep files for now)
       await client.deleteTorrent(torrent.hash, false);
-
-      // Update DB status
-      await updateDownload(db, dbRow.id, { status: "completed" });
 
       console.log(
         `[seed-management] Removed "${torrent.name}" (ratio: ${torrent.ratio.toFixed(2)}, seeded: ${torrent.completion_on > 0 ? Math.round((now - torrent.completion_on) / 3600) : "?"}h)`,
@@ -96,7 +118,9 @@ export async function handleSeedManagement(): Promise<void> {
           const parentDirs = new Set<string>();
 
           for (const filePath of filePaths) {
-            await unlink(filePath).catch(() => {});
+            await unlink(filePath).catch(
+              logAndSwallow(`seed-management:unlink ${filePath}`),
+            );
             console.log(`[seed-management] Cleaned up file: ${filePath}`);
             parentDirs.add(path.dirname(filePath));
           }
@@ -105,7 +129,9 @@ export async function handleSeedManagement(): Promise<void> {
           for (const dir of parentDirs) {
             // Don't try to remove the save_path root itself
             if (dir !== torrent.save_path) {
-              await rmdir(dir).catch(() => {});
+              await rmdir(dir).catch(
+                logAndSwallow(`seed-management:rmdir ${dir}`),
+              );
             }
           }
         } catch (err) {
@@ -113,16 +139,20 @@ export async function handleSeedManagement(): Promise<void> {
         }
       }
 
-      removed++;
+      removedIds.push(dbRow.id);
     } catch (err) {
       console.error(
         `[seed-management] Failed to remove "${torrent.name}":`,
         err instanceof Error ? err.message : err,
       );
     }
-  }
+  });
 
-  if (removed > 0) {
-    console.log(`[seed-management] Removed ${removed} torrent(s) that exceeded seed limits`);
+  // Single batched DB write for all successful removals.
+  if (removedIds.length > 0) {
+    await updateDownloadBatch(db, removedIds, { status: "completed" });
+    console.log(
+      `[seed-management] Removed ${removedIds.length} torrent(s) that exceeded seed limits`,
+    );
   }
 }

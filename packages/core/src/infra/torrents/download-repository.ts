@@ -16,6 +16,23 @@ export async function findDownloadByHash(db: Database, hash: string) {
   });
 }
 
+export async function findDownloadsByHashes(db: Database, hashes: string[]) {
+  if (hashes.length === 0) return [];
+  return db.query.download.findMany({
+    where: inArray(download.hash, hashes),
+  });
+}
+
+export async function findDownloadsByStatus(
+  db: Database,
+  status: typeof download.$inferSelect.status,
+) {
+  return db.query.download.findMany({
+    where: eq(download.status, status),
+    orderBy: (t, { desc: d }) => [d(t.createdAt)],
+  });
+}
+
 export async function findDownloadByTitle(db: Database, title: string) {
   return db.query.download.findFirst({
     where: eq(download.title, title),
