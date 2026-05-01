@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
@@ -74,7 +74,6 @@ export function useWatchedToggle({
   trackingStatus,
 }: UseWatchedToggleArgs): UseWatchedToggleResult {
   const utils = trpc.useUtils();
-  const isMovie = mediaType === "movie";
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ModalTab>("track");
   const [scope, setScope] = useState<WatchScope>(
@@ -161,74 +160,79 @@ export function useWatchedToggle({
     { enabled: open && activeTab === "history" },
   );
 
-  useEffect(() => {
-    if (!open) return;
-    setActiveTab("track");
-    setDateMode("just_now");
-    setCustomWatchedAt(toDatetimeLocalString(new Date()));
-    setBulkMode("all");
-    setSelectedHistoryEntryIds([]);
+  // Reset modal state on open transition. React docs: adjust state during
+  // render rather than syncing in an effect.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
+    if (open) {
+      setActiveTab("track");
+      setDateMode("just_now");
+      setCustomWatchedAt(toDatetimeLocalString(new Date()));
+      setBulkMode("all");
+      setSelectedHistoryEntryIds([]);
 
-    if (mediaType === "movie") {
-      setScope("movie");
-      setSeasonNumber(undefined);
-      setSelectedEpisodeIds([]);
-      return;
+      if (mediaType === "movie") {
+        setScope("movie");
+        setSeasonNumber(undefined);
+        setSelectedEpisodeIds([]);
+      } else {
+        const latestSeason = releasedSeasons[releasedSeasons.length - 1];
+        const latestEpisode =
+          latestSeason?.episodes[latestSeason.episodes.length - 1];
+        setScope("episode");
+        setSeasonNumber(latestSeason?.number);
+        setSelectedEpisodeIds(latestEpisode ? [latestEpisode.id] : []);
+      }
     }
+  }
 
-    const latestSeason = releasedSeasons[releasedSeasons.length - 1];
-    const latestEpisode =
-      latestSeason?.episodes[latestSeason.episodes.length - 1];
-    setScope("episode");
-    setSeasonNumber(latestSeason?.number);
-    setSelectedEpisodeIds(latestEpisode ? [latestEpisode.id] : []);
-  }, [open, mediaType, releasedSeasons, isMovie]);
-
-  useEffect(() => {
-    if (!open || mediaType !== "show" || scope !== "episode") return;
-
+  // Keep season + episode selection consistent when scope is "episode".
+  // Each setter is gated by an inequality check, so the block self-stabilizes.
+  if (open && mediaType === "show" && scope === "episode") {
     const selectedSeason =
       seasonNumber !== undefined
         ? releasedSeasons.find((season) => season.number === seasonNumber)
         : undefined;
     const fallbackSeason =
       selectedSeason ?? releasedSeasons[releasedSeasons.length - 1];
+
     if (!fallbackSeason) {
-      setSeasonNumber(undefined);
-      setSelectedEpisodeIds([]);
-      return;
+      if (seasonNumber !== undefined) setSeasonNumber(undefined);
+      if (selectedEpisodeIds.length > 0) setSelectedEpisodeIds([]);
+    } else {
+      if (seasonNumber !== fallbackSeason.number) {
+        setSeasonNumber(fallbackSeason.number);
+      }
+      const seasonEpisodeIds = new Set(
+        fallbackSeason.episodes.map((episode) => episode.id),
+      );
+      const validSelected = selectedEpisodeIds.filter((id) =>
+        seasonEpisodeIds.has(id),
+      );
+      if (validSelected.length !== selectedEpisodeIds.length) {
+        setSelectedEpisodeIds(validSelected);
+      }
     }
+  }
 
-    if (seasonNumber !== fallbackSeason.number) {
-      setSeasonNumber(fallbackSeason.number);
-    }
-
-    const seasonEpisodeIds = new Set(
-      fallbackSeason.episodes.map((episode) => episode.id),
-    );
-    const validSelected = selectedEpisodeIds.filter((id) =>
-      seasonEpisodeIds.has(id),
-    );
-
-    if (validSelected.length !== selectedEpisodeIds.length) {
-      setSelectedEpisodeIds(validSelected);
-    }
-  }, [
-    open,
-    mediaType,
-    scope,
-    seasonNumber,
-    releasedSeasons,
-    selectedEpisodeIds,
-  ]);
-
-  useEffect(() => {
-    if (!open || mediaType !== "show") return;
-    if (scope === "show" || scope === "season") {
+  // Mirror scopedEpisodes into selectedEpisodeIds whenever scope flips to
+  // "show" or "season". Snapshot pattern fires on scope or scopedEpisodes
+  // ref changes only, avoiding render loops.
+  const [prevSyncScope, setPrevSyncScope] = useState(scope);
+  const [prevSyncEpisodes, setPrevSyncEpisodes] = useState(scopedEpisodes);
+  if (prevSyncScope !== scope || prevSyncEpisodes !== scopedEpisodes) {
+    setPrevSyncScope(scope);
+    setPrevSyncEpisodes(scopedEpisodes);
+    if (
+      open &&
+      mediaType === "show" &&
+      (scope === "show" || scope === "season")
+    ) {
       setSelectedEpisodeIds(scopedEpisodes.map((episode) => episode.id));
       setBulkMode("all");
     }
-  }, [open, mediaType, scope, scopedEpisodes]);
+  }
 
   // Clear history selection when leaving the history tab — useState snapshot
   // pattern (React docs: "You Might Not Need an Effect").
