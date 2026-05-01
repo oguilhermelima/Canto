@@ -6,15 +6,19 @@ import { cn } from "@canto/ui/cn";
 const MAX_DOTS = 5;
 
 function SpotlightProgressFill({ slideKey }: { slideKey: number }): React.JSX.Element {
+  // Remount on slide change so the animation restarts cleanly with fresh state.
+  return <SpotlightProgressFillInner key={slideKey} />;
+}
+
+function SpotlightProgressFillInner(): React.JSX.Element {
   const [started, setStarted] = useState(false);
 
   useEffect(() => {
-    setStarted(false);
     const raf = requestAnimationFrame(() => {
       requestAnimationFrame(() => setStarted(true));
     });
     return () => cancelAnimationFrame(raf);
-  }, [slideKey]);
+  }, []);
 
   return (
     <div

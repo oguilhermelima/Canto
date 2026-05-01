@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Star } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { trpc } from "@/lib/trpc/client";
@@ -16,12 +16,17 @@ export function RatingControl({
 }: RatingControlProps): React.JSX.Element {
   const utils = trpc.useUtils();
   const [hoverRating, setHoverRating] = useState<number | null>(null);
-  const [selectedRating, setSelectedRating] = useState<number>(initialRating ?? 0);
+  // Optimistic rating overrides the prop only after a local click; cleared
+  // back to the server value whenever the prop refetches.
+  const [optimisticRating, setOptimisticRating] = useState<number | null>(null);
+  const [optimisticForRating, setOptimisticForRating] = useState<number | null | undefined>(initialRating);
 
-  // Sync when prop changes (e.g. after refetch)
-  useEffect(() => {
-    setSelectedRating(initialRating ?? 0);
-  }, [initialRating]);
+  if (optimisticForRating !== initialRating) {
+    setOptimisticForRating(initialRating);
+    setOptimisticRating(null);
+  }
+
+  const selectedRating = optimisticRating ?? initialRating ?? 0;
 
   const rateMutation = trpc.userMedia.rate.useMutation({
     onSuccess: () => {
@@ -32,7 +37,7 @@ export function RatingControl({
   const currentDisplayRating = hoverRating ?? selectedRating;
 
   const handleRate = (value: number) => {
-    setSelectedRating(value);
+    setOptimisticRating(value);
     rateMutation.mutate({ mediaId, rating: value });
   };
 

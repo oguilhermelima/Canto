@@ -204,11 +204,11 @@ function SeasonBlock({
 
   const isSpecials = season.number === 0;
   const sNum = String(season.number).padStart(2, "0");
-  const epCount = episodes.length || season.episodeCount || 0;
+  const epCount = episodes.length > 0 ? episodes.length : (season.episodeCount ?? 0);
   const year = season.airDate
     ? new Date(season.airDate).getFullYear()
     : null;
-  const rawTitle = season.name || `Season ${season.number}`;
+  const rawTitle = season.name ?? `Season ${season.number}`;
   const seasonTitle = isSpecials
     ? "Specials"
     : rawTitle.replace(
@@ -336,7 +336,7 @@ function SeasonBlock({
                             ? ep.stillPath
                             : `https://image.tmdb.org/t/p/w400${ep.stillPath}`
                         }
-                        alt={ep.title || `Episode ${ep.number}`}
+                        alt={ep.title ?? `Episode ${ep.number}`}
                         fill
                         className="object-cover"
                         fadeDuration={300}
@@ -370,7 +370,7 @@ function SeasonBlock({
                       )}
                     </div>
                     <p className="mt-0.5 line-clamp-1 text-xs font-semibold leading-snug">
-                      {ep.title || `Episode ${ep.number}`}
+                      {ep.title ?? `Episode ${ep.number}`}
                     </p>
                   </div>
 

@@ -176,25 +176,29 @@ export function useDownloadModal(
         for (const s of seasons) {
           const ep = s.episodes.find((e) => e.id === epId);
           if (ep) {
-            if (!episodesBySeasonFromSelection.has(s.number))
-              episodesBySeasonFromSelection.set(s.number, []);
-            episodesBySeasonFromSelection.get(s.number)!.push(ep.number);
+            const bucket = episodesBySeasonFromSelection.get(s.number);
+            if (bucket) {
+              bucket.push(ep.number);
+            } else {
+              episodesBySeasonFromSelection.set(s.number, [ep.number]);
+            }
           }
         }
       }
 
+      const firstEntry = [...episodesBySeasonFromSelection.entries()][0];
       if (seasonNums.length > 0 && episodesBySeasonFromSelection.size === 0) {
         setTorrentSearchContext({ seasonNumber: seasonNums[0] });
-      } else if (episodesBySeasonFromSelection.size === 1) {
-        const [sn, eps] = [...episodesBySeasonFromSelection.entries()][0]!;
+      } else if (episodesBySeasonFromSelection.size === 1 && firstEntry) {
+        const [sn, eps] = firstEntry;
         setTorrentSearchContext({
           seasonNumber: sn,
           episodeNumbers: eps.sort((a, b) => a - b),
         });
       } else if (seasonNums.length > 0) {
         setTorrentSearchContext({ seasonNumber: seasonNums[0] });
-      } else if (episodesBySeasonFromSelection.size > 0) {
-        const [sn, eps] = [...episodesBySeasonFromSelection.entries()][0]!;
+      } else if (firstEntry) {
+        const [sn, eps] = firstEntry;
         setTorrentSearchContext({
           seasonNumber: sn,
           episodeNumbers: eps.sort((a, b) => a - b),

@@ -37,7 +37,7 @@ export function WhereToWatch({
   servers?: { jellyfin?: { url: string }; plex?: { url: string } } | null;
 }): React.JSX.Element | null {
   const hasProviders = flatrateProviders.length > 0 || rentBuyProviders.length > 0;
-  const hasServers = servers?.jellyfin || servers?.plex;
+  const hasServers = servers?.jellyfin ?? servers?.plex;
 
   if (!hasProviders && !hasServers) return null;
 
@@ -54,7 +54,7 @@ export function WhereToWatch({
               Your Library
             </p>
             <div className="-my-2 flex gap-3 overflow-x-auto py-2" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
-              {servers.jellyfin && (
+              {servers?.jellyfin && (
                 <a
                   href={servers.jellyfin.url}
                   target="_blank"
@@ -73,7 +73,7 @@ export function WhereToWatch({
                   <span className="bg-gradient-to-r from-[#a95ce0] to-[#4bb8e8] bg-clip-text text-sm font-medium text-transparent">Jellyfin</span>
                 </a>
               )}
-              {servers.plex && (
+              {servers?.plex && (
                 <a
                   href={servers.plex.url}
                   target="_blank"

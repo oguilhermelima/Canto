@@ -104,7 +104,7 @@ export default function ReviewsPage(): React.JSX.Element {
       }
     }
     return eps;
-  }, [media?.seasons, mediaType]);
+  }, [media, mediaType]);
 
   useEffect(() => { setVisibleCount(PAGE_SIZE); }, [scopeFilter, episodeFilter, sortBy]);
   useEffect(() => { window.scrollTo(0, 0); }, []);

@@ -29,9 +29,10 @@ interface DynamicSectionProps {
 /* ── Mappers: SectionItem[] → component-specific shapes ── */
 
 function toSpotlightItems(items: SectionItem[]): SpotlightItem[] {
-  return items
-    .filter((item) => item.backdropPath)
-    .map((item) => ({
+  const result: SpotlightItem[] = [];
+  for (const item of items) {
+    if (!item.backdropPath) continue;
+    result.push({
       externalId: typeof item.externalId === "string" ? parseInt(item.externalId, 10) : item.externalId,
       provider: item.provider,
       type: item.type,
@@ -39,11 +40,13 @@ function toSpotlightItems(items: SectionItem[]): SpotlightItem[] {
       overview: item.overview ?? undefined,
       year: item.year ?? undefined,
       voteAverage: item.voteAverage ?? undefined,
-      backdropPath: item.backdropPath!,
+      backdropPath: item.backdropPath,
       logoPath: item.logoPath ?? null,
       genres: item.genres ?? [],
       genreIds: item.genreIds ?? [],
-    }));
+    });
+  }
+  return result;
 }
 
 function toBackdropItems(items: SectionItem[]) {

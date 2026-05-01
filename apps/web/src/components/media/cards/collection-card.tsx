@@ -23,6 +23,7 @@ export function CollectionCard({
 }): React.JSX.Element {
   const posters = (list.previewPosters ?? []).slice(0, 4);
   const count = posters.length;
+  const firstPoster = posters[0];
 
   return (
     <Link
@@ -30,10 +31,10 @@ export function CollectionCard({
       className="group relative mt-1 flex w-[300px] shrink-0 overflow-hidden rounded-2xl ring-1 ring-border/40 transition-[box-shadow,transform] duration-300 hover:ring-2 hover:ring-foreground/30 sm:w-[340px] lg:w-[380px] 2xl:w-[420px]"
     >
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-muted">
-        {count > 0 ? (
+        {firstPoster ? (
           <>
             <Image
-              src={posterSrc(posters[0]!, 342)}
+              src={posterSrc(firstPoster, 342)}
               alt=""
               fill
               className="scale-125 object-cover blur-2xl"

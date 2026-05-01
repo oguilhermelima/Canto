@@ -32,10 +32,11 @@ export function MembershipBadges({
 
   const tooltipLines: string[] = [];
   if (inWatchlist) tooltipLines.push("In Watchlist");
-  if (otherCount > 0) {
+  const firstOther = otherCollections[0];
+  if (firstOther) {
     tooltipLines.push(
       otherCount === 1
-        ? `Also in: ${otherCollections[0]!.name}`
+        ? `Also in: ${firstOther.name}`
         : `Also in ${otherCount} collections: ${otherCollections
             .map((c) => c.name)
             .join(", ")}`,

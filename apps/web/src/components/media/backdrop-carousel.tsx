@@ -133,14 +133,16 @@ export function BackdropCarousel({
                   }
                   onHide={
                     item.externalId
-                      ? () =>
+                      ? () => {
+                          if (!item.externalId) return;
                           hide({
-                            externalId: item.externalId!,
+                            externalId: item.externalId,
                             provider: item.provider ?? "tmdb",
                             type: item.type,
                             title: item.title,
                             posterPath: null,
-                          })
+                          });
+                        }
                       : undefined
                   }
                   className="w-[220px] shrink-0 sm:w-[280px] lg:w-[340px] 2xl:w-[380px]"

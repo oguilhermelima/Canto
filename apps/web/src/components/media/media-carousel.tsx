@@ -146,15 +146,16 @@ export function MediaCarousel({
                       ? {
                           topLeft: (
                             <HideMediaButton
-                              onClick={() =>
+                              onClick={() => {
+                                if (!item.externalId) return;
                                 hide({
-                                  externalId: item.externalId!,
+                                  externalId: item.externalId,
                                   provider: item.provider ?? "tmdb",
                                   type: item.type,
                                   title: item.title,
                                   posterPath: item.posterPath,
-                                })
-                              }
+                                });
+                              }}
                               title={item.title}
                             />
                           ),

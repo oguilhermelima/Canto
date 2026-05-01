@@ -116,7 +116,7 @@ function SeasonBlock({
 
   const isSpecials = season.seasonNumber === 0;
   const sNum = String(season.seasonNumber).padStart(2, "0");
-  const epCount = episodes.length || season.episodeCount || 0;
+  const epCount = episodes.length > 0 ? episodes.length : (season.episodeCount ?? 0);
   const year = season.airDate
     ? new Date(season.airDate).getFullYear()
     : null;

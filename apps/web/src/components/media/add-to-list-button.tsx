@@ -88,7 +88,7 @@ export function AddToListButton({
 
   const { data: lists } = trpc.list.getAll.useQuery();
   const { data: inLists } = trpc.list.isInLists.useQuery(
-    { mediaId: mediaId! },
+    { mediaId: mediaId ?? "" },
     { enabled: !!mediaId },
   );
 
