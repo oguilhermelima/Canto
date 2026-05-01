@@ -84,7 +84,7 @@ export function RequestCard({
             {media?.year && (
               <span>{media.year} · {media.type === "show" ? "TV Show" : "Movie"}</span>
             )}
-            {isAdmin && req.user != null && (
+            {isAdmin && req.user && (
               <span className="flex items-center gap-1.5">
                 <User size={13} className="text-muted-foreground" />
                 {req.user.name ?? req.user.email}

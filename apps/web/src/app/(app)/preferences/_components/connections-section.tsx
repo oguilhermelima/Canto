@@ -139,7 +139,7 @@ function ConnectionCard({
   const [confirming, setConfirming] = useState(false);
   const provider = conn.provider as Provider;
   const brand = BRAND[provider];
-  const isStale = conn.staleReason != null;
+  const isStale = conn.staleReason !== null;
 
   return (
     <div

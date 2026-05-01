@@ -100,7 +100,7 @@ export default function RequestsPage(): React.JSX.Element {
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
           const title = req.media.title.toLowerCase();
-          const userName = ("user" in req && req.user != null)
+          const userName = ("user" in req && req.user)
             ? ((req.user as { name: string | null }).name ?? (req.user as { email: string }).email).toLowerCase()
             : "";
           if (!title.includes(q) && !userName.includes(q)) return false;
