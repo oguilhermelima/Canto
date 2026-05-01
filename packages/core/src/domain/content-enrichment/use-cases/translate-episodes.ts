@@ -1,18 +1,18 @@
 import { TvdbProvider } from "@canto/providers";
 
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 
 export interface TranslateEpisodesDeps {
   localization: MediaLocalizationRepositoryPort;
   media: MediaRepositoryPort;
+  logger: LoggerPort;
 }
 
 /**
  * Fetch episode + season translations for a single language from TVDB.
  * Designed to run as a background job — one job per (mediaId, language) pair.
- *
- * Wave 9C threads the localization + media ports through `deps`.
  */
 export async function translateEpisodes(
   deps: TranslateEpisodesDeps,
@@ -21,13 +21,11 @@ export async function translateEpisodes(
   language: string,
   tvdb: TvdbProvider,
 ): Promise<void> {
-  const localization = deps.localization;
-  const media = deps.media;
+  const { localization, media, logger } = deps;
 
   const lang3 = TvdbProvider.toIso639_2(language);
   if (lang3 === "eng") return;
 
-  // Fetch episodes in the target language from TVDB
   let localEpisodes: Array<{
     name: string | null;
     overview: string | null;
@@ -37,10 +35,11 @@ export async function translateEpisodes(
   try {
     localEpisodes = await fetchAllEpisodes(tvdb, tvdbId, lang3);
   } catch (err) {
-    console.warn(
-      `[translate-episodes] TVDB returned no episodes for ${tvdbId} in ${lang3}:`,
-      err instanceof Error ? err.message : err,
-    );
+    logger.warn("translate-episodes: TVDB returned no episodes", {
+      tvdbId,
+      lang: lang3,
+      err: err instanceof Error ? err.message : err,
+    });
     return;
   }
 
@@ -70,7 +69,7 @@ export async function translateEpisodes(
           const t: { name?: string; overview?: string } = await tvdb.request(
             `/seasons/${s.externalId}/translations/${lang3}`,
           );
-          if (t?.name || t?.overview) {
+          if (t.name ?? t.overview) {
             seasonTransRows.push({
               seasonId: s.id,
               language,
@@ -143,9 +142,11 @@ export async function translateEpisodes(
     );
   }
 
-  console.log(
-    `[translate-episodes] ${language}: ${seasonTransRows.length} seasons, ${epTransRows.length} episodes translated`,
-  );
+  logger.info?.("translate-episodes: translated", {
+    language,
+    seasons: seasonTransRows.length,
+    episodes: epTransRows.length,
+  });
 }
 
 // ── Helpers ──
@@ -157,6 +158,8 @@ type EpRow = {
   seasonNumber: number;
 };
 
+const TVDB_PAGE_SIZE = 500;
+
 async function fetchAllEpisodes(
   tvdb: TvdbProvider,
   seriesId: number,
@@ -165,15 +168,14 @@ async function fetchAllEpisodes(
   const all: EpRow[] = [];
   let page = 0;
 
-   
   while (true) {
     const data: { episodes: EpRow[] } = await tvdb.request(
       `/series/${seriesId}/episodes/default/${lang}?page=${page}`,
     );
-    const episodes = data?.episodes ?? [];
+    const episodes = data.episodes;
     if (episodes.length === 0) break;
     all.push(...episodes);
-    if (episodes.length < 500) break;
+    if (episodes.length < TVDB_PAGE_SIZE) break;
     page++;
   }
 

@@ -44,7 +44,11 @@ export const translationsStrategy: MediaEnrichmentStrategy<
 
     try {
       await translateEpisodes(
-        { localization: ctx.deps.localization, media: ctx.deps.media },
+        {
+          localization: ctx.deps.localization,
+          media: ctx.deps.media,
+          logger: ctx.deps.logger,
+        },
         mediaId,
         ctx.mediaRow.tvdbId,
         lang,
