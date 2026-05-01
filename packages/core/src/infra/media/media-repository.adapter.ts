@@ -253,6 +253,23 @@ export function makeMediaRepository(db: Database): MediaRepositoryPort {
     },
 
     // ─── Season reads ───
+    countSeasonsByMediaId: async (mediaId) => {
+      const [row] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(season)
+        .where(eq(season.mediaId, mediaId));
+      return row?.n ?? 0;
+    },
+
+    countEpisodesByMediaId: async (mediaId) => {
+      const [row] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(episode)
+        .innerJoin(season, eq(episode.seasonId, season.id))
+        .where(eq(season.mediaId, mediaId));
+      return row?.n ?? 0;
+    },
+
     findSeasonsByMediaId: async (mediaId) => {
       const rows = await db.query.season.findMany({
         where: eq(season.mediaId, mediaId),

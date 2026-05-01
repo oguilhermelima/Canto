@@ -107,6 +107,10 @@ export interface MediaExtrasRepositoryPort {
   /** Bulk insert. Empty input is a no-op. */
   insertCredits(rows: NewMediaCredit[]): Promise<void>;
 
+  /** Number of credit rows for a media — drives the extras gap detector
+   *  without pulling the full list. */
+  countCreditsByMediaId(mediaId: string): Promise<number>;
+
   // ─── Videos (trailers, teasers, …) ───
 
   /** Read every video for a media. */

@@ -83,6 +83,13 @@ export function makeMediaExtrasRepository(
       if (rows.length === 0) return;
       await db.insert(mediaCredit).values(rows.map(creditToRow)).onConflictDoNothing();
     },
+    countCreditsByMediaId: async (mediaId) => {
+      const [row] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(mediaCredit)
+        .where(eq(mediaCredit.mediaId, mediaId));
+      return row?.n ?? 0;
+    },
 
     // ─── Videos ───
     findVideosByMediaId: async (mediaId) => {

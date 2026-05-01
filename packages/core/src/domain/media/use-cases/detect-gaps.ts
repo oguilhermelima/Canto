@@ -1,20 +1,25 @@
-import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
+import type { MediaAspectStateRepositoryPort } from "@canto/core/domain/media/ports/media-aspect-state-repository.port";
+import type { MediaContentRatingRepositoryPort } from "@canto/core/domain/media/ports/media-content-rating-repository.port";
+import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type {
+  Aspect,
+  GapReport,
+} from "@canto/core/domain/media/use-cases/ensure-media.types";
 import {
-  episode,
-  episodeLocalization,
-  media,
-  mediaContentRating,
-  mediaCredit,
-  mediaLocalization,
-  season,
-  seasonLocalization,
-} from "@canto/db/schema";
-import { findAspectSucceededAt } from "@canto/core/infra/media/media-aspect-state-repository";
+  EXTRAS_TTL_MS,
+  METADATA_TTL_MS,
+} from "@canto/core/domain/media/use-cases/ensure-media.types";
 
-const EN = "en-US";
-import type { Aspect, GapReport } from "@canto/core/domain/media/use-cases/ensure-media.types";
-import { EXTRAS_TTL_MS, METADATA_TTL_MS } from "@canto/core/domain/media/use-cases/ensure-media.types";
+export interface DetectGapsDeps {
+  media: MediaRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
+  aspectState: MediaAspectStateRepositoryPort;
+  contentRating: MediaContentRatingRepositoryPort;
+  extras: MediaExtrasRepositoryPort;
+}
 
 /**
  * Inspect DB state and compute what's missing for the given languages.
@@ -25,17 +30,15 @@ import { EXTRAS_TTL_MS, METADATA_TTL_MS } from "@canto/core/domain/media/use-cas
  * - `details`: per-aspect breakdown so callers can display meaningful info.
  */
 export async function detectGaps(
-  db: Database,
+  // The `db` parameter is retained on the public signature so existing
+  // callers in other contexts keep their `(db, mediaId, languages)` shape;
+  // future deprecations will switch to a deps-only signature.
+  _db: Database,
+  deps: DetectGapsDeps,
   mediaId: string,
   languages: string[],
 ): Promise<GapReport> {
-  const mediaRow = await db.query.media.findFirst({
-    where: eq(media.id, mediaId),
-    columns: {
-      id: true,
-      type: true,
-    },
-  });
+  const mediaRow = await deps.media.findById(mediaId);
 
   if (!mediaRow) {
     return {
@@ -61,23 +64,29 @@ export async function detectGaps(
     episodeCount,
     translationCounts,
     logoLangs,
-    extrasRows,
+    extrasCount,
     contentRatingCount,
     metadataSucceededAt,
     extrasSucceededAt,
   ] = await Promise.all([
-    isShow ? countSeasons(db, mediaId) : Promise.resolve(0),
-    isShow ? countEpisodes(db, mediaId) : Promise.resolve(0),
+    isShow ? deps.media.countSeasonsByMediaId(mediaId) : Promise.resolve(0),
+    isShow ? deps.media.countEpisodesByMediaId(mediaId) : Promise.resolve(0),
     nonEnLangs.length > 0
-      ? countTranslationsPerLang(db, mediaId, nonEnLangs, isShow)
-      : Promise.resolve<TranslationCounts>({}),
+      ? deps.localization.countTranslationsPerLanguage(
+          mediaId,
+          nonEnLangs,
+          isShow,
+        )
+      : Promise.resolve<
+          Record<string, { media: number; season: number; episode: number }>
+        >({}),
     nonEnLangs.length > 0
-      ? listLogoLangs(db, mediaId)
+      ? deps.localization.findLogoLanguagesByMediaId(mediaId)
       : Promise.resolve<string[]>([]),
-    countExtrasQuick(db, mediaId),
-    countContentRatings(db, mediaId),
-    findAspectSucceededAt(db, mediaId, "metadata"),
-    findAspectSucceededAt(db, mediaId, "extras"),
+    deps.extras.countCreditsByMediaId(mediaId),
+    deps.contentRating.countByMediaId(mediaId),
+    deps.aspectState.findSucceededAt(mediaId, "metadata"),
+    deps.aspectState.findSucceededAt(mediaId, "extras"),
   ]);
 
   const now = Date.now();
@@ -87,7 +96,8 @@ export async function detectGaps(
 
   const structureMissing = isShow && seasonCount === 0;
 
-  const translationsMissingByLang: GapReport["details"]["translationsMissingByLang"] = {};
+  const translationsMissingByLang: GapReport["details"]["translationsMissingByLang"] =
+    {};
   for (const lang of nonEnLangs) {
     const counts = translationCounts[lang] ?? {
       media: 0,
@@ -112,14 +122,15 @@ export async function detectGaps(
   const extrasStale =
     !extrasSucceededAt ||
     now - extrasSucceededAt.getTime() > EXTRAS_TTL_MS ||
-    extrasRows === 0;
+    extrasCount === 0;
 
   const contentRatingsMissing = contentRatingCount === 0;
 
   const gaps: Aspect[] = [];
   if (metadataStale) gaps.push("metadata");
   if (structureMissing) gaps.push("structure");
-  if (Object.keys(translationsMissingByLang).length > 0) gaps.push("translations");
+  if (Object.keys(translationsMissingByLang).length > 0)
+    gaps.push("translations");
   if (logosMissingByLang.length > 0) gaps.push("logos");
   if (extrasStale) gaps.push("extras");
   if (contentRatingsMissing) gaps.push("contentRatings");
@@ -137,141 +148,4 @@ export async function detectGaps(
       contentRatingsMissing,
     },
   };
-}
-
-interface TranslationCounts {
-  [lang: string]: { media: number; season: number; episode: number };
-}
-
-async function countSeasons(db: Database, mediaId: string): Promise<number> {
-  const [row] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(season)
-    .where(eq(season.mediaId, mediaId));
-  return row?.n ?? 0;
-}
-
-async function countEpisodes(db: Database, mediaId: string): Promise<number> {
-  const [row] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(episode)
-    .innerJoin(season, eq(episode.seasonId, season.id))
-    .where(eq(season.mediaId, mediaId));
-  return row?.n ?? 0;
-}
-
-async function countTranslationsPerLang(
-  db: Database,
-  mediaId: string,
-  languages: string[],
-  isShow: boolean,
-): Promise<TranslationCounts> {
-  const result: TranslationCounts = {};
-  for (const lang of languages) {
-    result[lang] = { media: 0, season: 0, episode: 0 };
-  }
-
-  // Counts from `media_localization` (and the new season/episode localization
-  // tables). The en-US row is the canonical baseline — never counted as a
-  // translation here. The `languages` filter already excludes en-US (callers
-  // pass `nonEnLangs`), but we add an explicit guard to keep the count semantics
-  // safe regardless of caller intent.
-  const mediaLocRows = await db
-    .select({ language: mediaLocalization.language })
-    .from(mediaLocalization)
-    .where(
-      and(
-        eq(mediaLocalization.mediaId, mediaId),
-        sql`${mediaLocalization.language} IN (${sql.join(
-          languages.map((l) => sql`${l}`),
-          sql`, `,
-        )})`,
-        ne(mediaLocalization.language, EN),
-      ),
-    );
-  for (const row of mediaLocRows) {
-    const bucket = result[row.language];
-    if (bucket) bucket.media = 1;
-  }
-
-  if (!isShow) return result;
-
-  const seasonLocRows = await db
-    .select({
-      language: seasonLocalization.language,
-      n: sql<number>`count(*)::int`,
-    })
-    .from(seasonLocalization)
-    .innerJoin(season, eq(seasonLocalization.seasonId, season.id))
-    .where(
-      and(
-        eq(season.mediaId, mediaId),
-        sql`${seasonLocalization.language} IN (${sql.join(
-          languages.map((l) => sql`${l}`),
-          sql`, `,
-        )})`,
-        ne(seasonLocalization.language, EN),
-      ),
-    )
-    .groupBy(seasonLocalization.language);
-  for (const row of seasonLocRows) {
-    const bucket = result[row.language];
-    if (bucket) bucket.season = row.n;
-  }
-
-  const episodeLocRows = await db
-    .select({
-      language: episodeLocalization.language,
-      n: sql<number>`count(*)::int`,
-    })
-    .from(episodeLocalization)
-    .innerJoin(episode, eq(episodeLocalization.episodeId, episode.id))
-    .innerJoin(season, eq(episode.seasonId, season.id))
-    .where(
-      and(
-        eq(season.mediaId, mediaId),
-        sql`${episodeLocalization.language} IN (${sql.join(
-          languages.map((l) => sql`${l}`),
-          sql`, `,
-        )})`,
-        ne(episodeLocalization.language, EN),
-      ),
-    )
-    .groupBy(episodeLocalization.language);
-  for (const row of episodeLocRows) {
-    const bucket = result[row.language];
-    if (bucket) bucket.episode = row.n;
-  }
-
-  return result;
-}
-
-async function listLogoLangs(db: Database, mediaId: string): Promise<string[]> {
-  const rows = await db
-    .select({ language: mediaLocalization.language })
-    .from(mediaLocalization)
-    .where(
-      and(
-        eq(mediaLocalization.mediaId, mediaId),
-        isNotNull(mediaLocalization.logoPath),
-        ne(mediaLocalization.language, EN),
-      ),
-    );
-  return rows.map((r) => r.language);
-}
-
-async function countExtrasQuick(db: Database, mediaId: string): Promise<number> {
-  const [row] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(mediaCredit)
-    .where(eq(mediaCredit.mediaId, mediaId));
-  return row?.n ?? 0;
-}
-
-async function countContentRatings(db: Database, mediaId: string): Promise<number> {
-  const [row] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(mediaContentRating)
-    .where(eq(mediaContentRating.mediaId, mediaId));
-  return row?.n ?? 0;
 }

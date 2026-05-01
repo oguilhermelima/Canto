@@ -1,7 +1,4 @@
-import { eq, and } from "drizzle-orm";
-
 import type { Database } from "@canto/db/client";
-import { media } from "@canto/db/schema";
 
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
@@ -13,6 +10,8 @@ import {
 } from "@canto/core/domain/content-enrichment/use-cases/upsert-lang-logos";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { MediaProvider } from "@canto/core/domain/media/types/media";
 import { upsertMediaLocalization } from "@canto/core/domain/shared/localization/localization-service";
 
 /** Deduplicates concurrent getImages calls for the same externalId */
@@ -22,11 +21,12 @@ export interface FetchLogosDeps {
   logger: LoggerPort;
   dispatcher: JobDispatcherPort;
   localization: MediaLocalizationRepositoryPort;
+  media: MediaRepositoryPort;
 }
 
 export interface FetchLogoItem {
   externalId: number;
-  provider: string;
+  provider: MediaProvider;
   type: "movie" | "show";
   title: string;
   posterPath?: string | null;
@@ -189,7 +189,7 @@ export async function fetchLogos(
       }
     } else {
       try {
-        const [row] = await db.insert(media).values({
+        const inserted = await deps.media.tryCreateMedia({
           type: item.type,
           externalId: item.externalId,
           provider: item.provider,
@@ -197,22 +197,16 @@ export async function fetchLogos(
           year: item.year ?? null,
           voteAverage: item.voteAverage ?? null,
           downloaded: false,
-        }).onConflictDoNothing({
-          target: [media.externalId, media.provider, media.type],
-        }).returning({ id: media.id });
+        });
 
-        // onConflictDoNothing returns no row when the conflict fires; look it up.
-        if (row?.id) {
-          mediaId = row.id;
+        if (inserted) {
+          mediaId = inserted.id;
         } else {
-          const conflict = await db.query.media.findFirst({
-            where: and(
-              eq(media.externalId, item.externalId),
-              eq(media.provider, item.provider),
-              eq(media.type, item.type),
-            ),
-            columns: { id: true },
-          });
+          const conflict = await deps.media.findByExternalId(
+            item.externalId,
+            item.provider,
+            item.type,
+          );
           mediaId = conflict?.id;
         }
 

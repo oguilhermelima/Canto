@@ -171,6 +171,7 @@ export const mediaDiscoveryRouter = createTRPCRouter({
           logger: makeConsoleLogger(),
           dispatcher: jobDispatcher,
           localization: makeMediaLocalizationRepository(ctx.db),
+          media: makeMediaRepository(ctx.db),
         },
         tmdb,
         [input],

@@ -145,4 +145,25 @@ export interface MediaLocalizationRepositoryPort {
     payload: EpisodeLocalizationPayload,
     source: LocalizationSource,
   ): Promise<void>;
+
+  // ─── Gap detection ───
+
+  /**
+   * Per-language presence count for the media + (optional) season + episode
+   * localization tables. Returns one entry per requested language with the
+   * count of rows present (media is 0 or 1; season/episode is 0..N). The
+   * en-US baseline is excluded from the counts so callers can compare to the
+   * structure totals without subtracting it.
+   */
+  countTranslationsPerLanguage(
+    mediaId: string,
+    languages: LocaleCode[],
+    includeStructure: boolean,
+  ): Promise<
+    Record<string, { media: number; season: number; episode: number }>
+  >;
+
+  /** Distinct non-en-US languages that already have a logoPath persisted on
+   *  the media-localization table. */
+  findLogoLanguagesByMediaId(mediaId: string): Promise<string[]>;
 }

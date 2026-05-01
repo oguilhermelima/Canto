@@ -136,7 +136,12 @@ export async function handleRssSync(): Promise<void> {
 
       if (allTargetEps.length === 0) continue;
 
-      const missingEpisodes = await detectMissingEpisodes(db, { media }, matchedShow.id, seasonNum, allTargetEps);
+      const missingEpisodes = await detectMissingEpisodes(
+        { media, torrents },
+        matchedShow.id,
+        seasonNum,
+        allTargetEps,
+      );
       if (missingEpisodes.length === 0) continue;
 
       // Download!

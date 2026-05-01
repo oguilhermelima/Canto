@@ -28,6 +28,7 @@ import { makeRecommendationsRepository } from "@canto/core/infra/recommendations
 import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
 import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
 import { ensureMedia } from "@canto/core/domain/media/use-cases/ensure-media";
+import { makePersistDeps } from "@canto/core/composition/persist-deps";
 import type { EnsureMediaJob } from "@canto/core/platform/queue/bullmq-dispatcher";
 import { QUEUES } from "@canto/core/platform/queue/queue-names";
 import { getRedisConnection } from "@canto/core/platform/queue/redis-config";
@@ -291,8 +292,17 @@ const workers = [
   makeWorker<EnsureMediaJob>(
     QUEUES.ensureMedia,
     async ({ mediaId, spec }) => {
-      const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
-      await ensureMedia(db, mediaId, spec, { tmdb, tvdb });
+      const [tmdb, tvdb] = await Promise.all([
+        getTmdbProvider(),
+        getTvdbProvider(),
+      ]);
+      const persist = makePersistDeps(db);
+      await ensureMedia(
+        db,
+        { ...persist, tmdb, tvdb },
+        mediaId,
+        spec,
+      );
     },
     // Raised from 3 to 8 — TMDB/qBit rate limits aren't the bottleneck and
     // backlogs of 20k+ jobs (manual reprocess + cadence sweep stacking) drain

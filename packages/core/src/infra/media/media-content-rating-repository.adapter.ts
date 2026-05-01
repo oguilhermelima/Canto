@@ -32,6 +32,14 @@ export function makeMediaContentRatingRepository(
       return row ? contentRatingToDomain(row) : null;
     },
 
+    countByMediaId: async (mediaId) => {
+      const [row] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(mediaContentRating)
+        .where(eq(mediaContentRating.mediaId, mediaId));
+      return row?.n ?? 0;
+    },
+
     upsertMany: async (rows) => {
       if (rows.length === 0) return;
       const seen = new Set<string>();

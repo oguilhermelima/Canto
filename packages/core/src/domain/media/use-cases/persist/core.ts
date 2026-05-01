@@ -67,14 +67,14 @@ export interface PersistDeps {
  */
 async function detectAndEnqueueLazyFill(
   db: Database,
-  dispatcher: JobDispatcherPort,
+  deps: PersistDeps,
   mediaId: string,
   language: string,
 ): Promise<void> {
   if (!language || language.startsWith("en")) return;
-  const report = await detectGaps(db, mediaId, [language]);
+  const report = await detectGaps(db, deps, mediaId, [language]);
   if (report.gaps.length === 0) return;
-  await dispatcher.enrichMedia(mediaId, {
+  await deps.dispatcher.enrichMedia(mediaId, {
     languages: [language],
     aspects: report.gaps,
   });
@@ -636,9 +636,7 @@ export async function resolveMedia(
 
     // Lazy fill: if this user's language has gaps, enqueue an ensureMedia
     // job in the background so the next visit has everything.
-    void detectAndEnqueueLazyFill(db, deps.dispatcher, existing.id, lang).catch(
-      () => {},
-    );
+    void detectAndEnqueueLazyFill(db, deps, existing.id, lang).catch(() => {});
 
     return {
       source: "db" as const,

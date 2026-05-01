@@ -182,6 +182,13 @@ export interface MediaRepositoryPort {
   /** Read every season for a media, episodes inlined and sorted. */
   findSeasonsByMediaId(mediaId: string): Promise<SeasonWithEpisodes[]>;
 
+  /** Number of season rows persisted for a media — drives the gap detector
+   *  without pulling episode payloads. */
+  countSeasonsByMediaId(mediaId: string): Promise<number>;
+
+  /** Number of episode rows for a media (joined via season). */
+  countEpisodesByMediaId(mediaId: string): Promise<number>;
+
   // ─── Episode reads ───
 
   /**

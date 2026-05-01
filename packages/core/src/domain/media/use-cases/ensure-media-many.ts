@@ -1,4 +1,8 @@
 import type { Database } from "@canto/db/client";
+import type { MediaAspectStateRepositoryPort } from "@canto/core/domain/media/ports/media-aspect-state-repository.port";
+import type { MediaContentRatingRepositoryPort } from "@canto/core/domain/media/ports/media-content-rating-repository.port";
+import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import { detectGaps } from "@canto/core/domain/media/use-cases/detect-gaps";
@@ -33,6 +37,10 @@ export interface EnsureMediaManyResult {
 export interface EnsureMediaManyDeps {
   dispatcher: JobDispatcherPort;
   media: MediaRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
+  aspectState: MediaAspectStateRepositoryPort;
+  contentRating: MediaContentRatingRepositoryPort;
+  extras: MediaExtrasRepositoryPort;
 }
 
 /**
@@ -85,7 +93,7 @@ export async function ensureMediaMany(
       aspectsToDispatch =
         spec.aspects && spec.aspects.length > 0 ? spec.aspects : ALL_ASPECTS;
     } else {
-      const gaps = await detectGaps(db, row.id, languages);
+      const gaps = await detectGaps(db, deps, row.id, languages);
       aspectsToDispatch = spec.aspects
         ? spec.aspects.filter((a) => gaps.gaps.includes(a))
         : gaps.gaps;

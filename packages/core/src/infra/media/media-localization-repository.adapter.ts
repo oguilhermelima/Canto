@@ -1,4 +1,4 @@
-import { and, eq, or, sql } from "drizzle-orm";
+import { and, eq, isNotNull, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import type { Database } from "@canto/db/client";
@@ -206,6 +206,109 @@ export function makeMediaLocalizationRepository(
             updatedAt: now,
           },
         });
+    },
+
+    // ─── Gap detection ───
+    countTranslationsPerLanguage: async (
+      mediaId,
+      languages,
+      includeStructure,
+    ) => {
+      const result: Record<
+        string,
+        { media: number; season: number; episode: number }
+      > = {};
+      for (const lang of languages) {
+        result[lang] = { media: 0, season: 0, episode: 0 };
+      }
+      if (languages.length === 0) return result;
+
+      const langInClause = sql`${mediaLocalization.language} IN (${sql.join(
+        languages.map((l) => sql`${l}`),
+        sql`, `,
+      )})`;
+
+      const mediaLocRows = await db
+        .select({ language: mediaLocalization.language })
+        .from(mediaLocalization)
+        .where(
+          and(
+            eq(mediaLocalization.mediaId, mediaId),
+            langInClause,
+            ne(mediaLocalization.language, EN),
+          ),
+        );
+      for (const row of mediaLocRows) {
+        const bucket = result[row.language];
+        if (bucket) bucket.media = 1;
+      }
+
+      if (!includeStructure) return result;
+
+      const seasonLangIn = sql`${seasonLocalization.language} IN (${sql.join(
+        languages.map((l) => sql`${l}`),
+        sql`, `,
+      )})`;
+      const seasonLocRows = await db
+        .select({
+          language: seasonLocalization.language,
+          n: sql<number>`count(*)::int`,
+        })
+        .from(seasonLocalization)
+        .innerJoin(season, eq(seasonLocalization.seasonId, season.id))
+        .where(
+          and(
+            eq(season.mediaId, mediaId),
+            seasonLangIn,
+            ne(seasonLocalization.language, EN),
+          ),
+        )
+        .groupBy(seasonLocalization.language);
+      for (const row of seasonLocRows) {
+        const bucket = result[row.language];
+        if (bucket) bucket.season = row.n;
+      }
+
+      const episodeLangIn = sql`${episodeLocalization.language} IN (${sql.join(
+        languages.map((l) => sql`${l}`),
+        sql`, `,
+      )})`;
+      const episodeLocRows = await db
+        .select({
+          language: episodeLocalization.language,
+          n: sql<number>`count(*)::int`,
+        })
+        .from(episodeLocalization)
+        .innerJoin(episode, eq(episodeLocalization.episodeId, episode.id))
+        .innerJoin(season, eq(episode.seasonId, season.id))
+        .where(
+          and(
+            eq(season.mediaId, mediaId),
+            episodeLangIn,
+            ne(episodeLocalization.language, EN),
+          ),
+        )
+        .groupBy(episodeLocalization.language);
+      for (const row of episodeLocRows) {
+        const bucket = result[row.language];
+        if (bucket) bucket.episode = row.n;
+      }
+
+      return result;
+    },
+
+    findLogoLanguagesByMediaId: async (mediaId) => {
+      const rows = await db
+        .select({ language: mediaLocalization.language })
+        .from(mediaLocalization)
+        .where(
+          and(
+            eq(mediaLocalization.mediaId, mediaId),
+            isNotNull(mediaLocalization.logoPath),
+            ne(mediaLocalization.language, EN),
+          ),
+        );
+      return rows.map((r) => r.language);
     },
   };
 }

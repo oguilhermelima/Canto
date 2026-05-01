@@ -92,6 +92,10 @@ export interface TorrentsRepositoryPort {
     quality: string,
     source: string,
   ): Promise<MediaFile | null>;
+  /** True when at least one imported `media_file` row points at this
+   *  episode. Used by the gap detector to skip episodes whose download
+   *  is already on disk. */
+  hasImportedFileForEpisode(episodeId: string): Promise<boolean>;
   createMediaFile(input: NewMediaFile): Promise<MediaFile>;
   /** Insert without conflict (used by retry paths that may re-insert the same row). */
   createMediaFileNoConflict(input: NewMediaFile): Promise<void>;

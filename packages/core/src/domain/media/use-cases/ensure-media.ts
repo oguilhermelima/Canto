@@ -14,10 +14,9 @@ import { loadCadenceKnobs } from "@canto/core/domain/media/use-cases/cadence/cad
 import { effectiveProvider } from "@canto/core/domain/media/use-cases/cadence/effective-provider";
 import type { Outcome } from "@canto/core/domain/media/use-cases/cadence/compute-next-eligible";
 import {
-  computePlan
-  
+  computePlan,
 } from "@canto/core/domain/media/use-cases/cadence/compute-plan";
-import type {CadenceSignal} from "@canto/core/domain/media/use-cases/cadence/compute-plan";
+import type { CadenceSignal } from "@canto/core/domain/media/use-cases/cadence/compute-plan";
 import {
   buildForceAspects,
   buildMediaContext,
@@ -37,20 +36,11 @@ import type {
 import { enrichmentRegistry } from "@canto/core/domain/media/enrichment/registry";
 import { fireSharedCapabilities } from "@canto/core/domain/media/enrichment/fire-call";
 import { topoSortPlanItems } from "@canto/core/domain/media/enrichment/topo-sort";
+import { EnsureMediaNotFoundError } from "@canto/core/domain/media/errors";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
-import { findMediaById } from "@canto/core/infra/media/media-repository";
-import { makeMediaAspectStateRepository } from "@canto/core/infra/media/media-aspect-state-repository.adapter";
-import { makeMediaContentRatingRepository } from "@canto/core/infra/media/media-content-rating-repository.adapter";
-import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
-import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
-import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
-import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
-import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
-import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
-import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
 
 /**
  * Repository ports the orchestrator needs. Callers (HTTP routers, worker
@@ -88,18 +78,16 @@ export interface EnsureMediaDeps {
  */
 export async function ensureMedia(
   db: Database,
+  deps: EnsureMediaDeps,
   mediaId: string,
   spec: EnsureMediaSpec = {},
-  deps?: Partial<EnsureMediaDeps>,
 ): Promise<EnsureMediaResult> {
   const start = Date.now();
   const result: EnsureMediaResult = initResult(mediaId);
 
-  const resolvedDeps = await resolveDeps(db, deps);
-
-  const mediaRow = await findMediaById(db, mediaId);
+  const mediaRow = await deps.media.findById(mediaId);
   if (!mediaRow) {
-    throw new Error(`ensureMedia: media ${mediaId} not found`);
+    throw new EnsureMediaNotFoundError(mediaId);
   }
 
   const languages = (
@@ -108,7 +96,7 @@ export async function ensureMedia(
   result.languagesProcessed = languages;
 
   const knobs = await loadCadenceKnobs(db);
-  const aspectStates = await resolvedDeps.aspectState.findAllForMedia(mediaId);
+  const aspectStates = await deps.aspectState.findAllForMedia(mediaId);
   const stateByKey = new Map<string, MediaAspectState>(
     aspectStates.map((r) => [stateKey(r.aspect as Aspect, r.scope), r]),
   );
@@ -150,14 +138,14 @@ export async function ensureMedia(
     spec,
     result,
     scratch: {},
-    deps: resolvedDeps,
+    deps,
   };
 
   // 1. Fire shared capabilities once each. Self-fetched capabilities
   //    (logos / extras / per-scope translations) come back undefined.
   const responses = await fireSharedCapabilities(plan.items, ctx, {
-    tmdb: resolvedDeps.tmdb,
-    tvdb: resolvedDeps.tvdb,
+    tmdb: deps.tmdb,
+    tvdb: deps.tvdb,
   });
 
   // 2. Topologically sort plan items so e.g. metadata writes commit before
@@ -174,14 +162,14 @@ export async function ensureMedia(
         scope: item.scope,
         ctx,
         response: responses.get(strategy.needs),
-        deps: { tmdb: resolvedDeps.tmdb, tvdb: resolvedDeps.tvdb },
+        deps: { tmdb: deps.tmdb, tvdb: deps.tvdb },
       });
     } catch (err) {
       outcome = classifyError(err);
     }
 
     await writeAspectState({
-      aspectState: resolvedDeps.aspectState,
+      aspectState: deps.aspectState,
       mediaId,
       aspect: item.aspect,
       scope: item.scope,
@@ -196,26 +184,6 @@ export async function ensureMedia(
 
   result.durationMs = Date.now() - start;
   return result;
-}
-
-async function resolveDeps(
-  db: Database,
-  partial: Partial<EnsureMediaDeps> | undefined,
-): Promise<EnsureMediaDeps> {
-  return {
-    media: partial?.media ?? makeMediaRepository(db),
-    localization:
-      partial?.localization ?? makeMediaLocalizationRepository(db),
-    aspectState:
-      partial?.aspectState ?? makeMediaAspectStateRepository(db),
-    contentRating:
-      partial?.contentRating ?? makeMediaContentRatingRepository(db),
-    extras: partial?.extras ?? makeMediaExtrasRepository(db),
-    tmdb: partial?.tmdb ?? (await getTmdbProvider()),
-    tvdb: partial?.tvdb ?? (await getTvdbProvider()),
-    logger: partial?.logger ?? makeConsoleLogger(),
-    dispatcher: partial?.dispatcher ?? jobDispatcher,
-  };
 }
 
 function initResult(mediaId: string): EnsureMediaResult {
@@ -239,7 +207,3 @@ function initResult(mediaId: string): EnsureMediaResult {
     durationMs: 0,
   };
 }
-
-// Re-export the base media row helper so that callers building bulk flows
-// don't need a second import.
-export { findMediaById };

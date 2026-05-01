@@ -1,4 +1,6 @@
+import { and, eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
+import { mediaFile } from "@canto/db/schema";
 import type { TorrentsRepositoryPort } from "@canto/core/domain/torrents/ports/torrents-repository.port";
 import {
   countAllDownloads,
@@ -151,6 +153,16 @@ export function makeTorrentsRepository(db: Database): TorrentsRepositoryPort {
     findDuplicateEpisodeFile: async (episodeId, quality, source) => {
       const row = await findDuplicateEpisodeFile(db, episodeId, quality, source);
       return row ? mediaFileToDomain(row) : null;
+    },
+    hasImportedFileForEpisode: async (episodeId) => {
+      const row = await db.query.mediaFile.findFirst({
+        where: and(
+          eq(mediaFile.episodeId, episodeId),
+          eq(mediaFile.status, "imported"),
+        ),
+        columns: { id: true },
+      });
+      return row !== undefined;
     },
     createMediaFile: async (input) => {
       const row = await createMediaFile(db, mediaFileToRow(input));

@@ -22,6 +22,10 @@ export interface MediaContentRatingRepositoryPort {
     region: string,
   ): Promise<MediaContentRating | null>;
 
+  /** Number of content-rating rows persisted for a media — drives the
+   *  cadence gap detector. */
+  countByMediaId(mediaId: string): Promise<number>;
+
   // ─── Writes ───
 
   /**
