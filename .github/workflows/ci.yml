@@ -1,15 +1,5 @@
 name: CI
 
-# CI runs typecheck + tests on every push/PR. Lint runs in non-strict mode
-# until Waves 10/11 close the remaining technical debt:
-#   - Wave 10: extract 263 boundary leaks (domain/** → infra/platform).
-#     Once done, the no-restricted-imports rule promotes from "warn" to
-#     "error" inside packages/core/eslint.config.js.
-#   - Wave 11: sweep the ~370 remaining lint errors (no-unnecessary-condition
-#     in legacy code, no-img-element, no-explicit-any, no-unused-vars).
-#     Once done, swap the `lint` step below for `lint:strict` (which adds
-#     --max-warnings=0 and turns the CI into a hard wall).
-
 on:
   push:
     branches: [main]
@@ -40,8 +30,5 @@ jobs:
       - name: Test
         run: pnpm exec turbo run test
 
-      # Non-strict lint: surfaces warnings/errors but doesn't block the
-      # build while Waves 10/11 are in flight. Promote to `pnpm lint:strict`
-      # once both sweeps are complete.
-      - name: Lint
-        run: pnpm lint
+      - name: Lint (strict — zero warnings)
+        run: pnpm lint:strict
