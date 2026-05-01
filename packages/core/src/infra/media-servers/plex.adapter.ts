@@ -488,7 +488,7 @@ export async function setPlexPlaybackPosition(
     return;
   }
   const durationMs = await fetchPlexItemDuration(url, token, ratingKey);
-  if (durationMs == null) {
+  if (durationMs === null) {
     throw new Error(
       `Plex timeline update aborted: could not resolve duration for ratingKey=${ratingKey}`,
     );

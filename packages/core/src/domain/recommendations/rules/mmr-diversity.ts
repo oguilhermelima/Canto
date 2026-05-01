@@ -47,13 +47,18 @@ export function rankByMmr<T extends DiversityCandidate>(
     let bestIdx = -1;
     let bestScore = -Infinity;
     for (const candidate of remaining) {
+      const candGenres = genreSets[candidate];
+      const candNorm = norm[candidate];
+      if (candGenres === undefined || candNorm === undefined) continue;
       let maxSim = 0;
       for (const chosen of selected) {
-        const sim = jaccard(genreSets[candidate]!, genreSets[chosen]!);
+        const chosenGenres = genreSets[chosen];
+        if (chosenGenres === undefined) continue;
+        const sim = jaccard(candGenres, chosenGenres);
         if (sim > maxSim) maxSim = sim;
         if (maxSim === 1) break;
       }
-      const score = lambda * norm[candidate]! - (1 - lambda) * maxSim;
+      const score = lambda * candNorm - (1 - lambda) * maxSim;
       if (score > bestScore) {
         bestScore = score;
         bestIdx = candidate;
@@ -64,7 +69,10 @@ export function rankByMmr<T extends DiversityCandidate>(
     remaining.delete(bestIdx);
   }
 
-  return selected.map((i) => items[i]!);
+  return selected.flatMap((i) => {
+    const item = items[i];
+    return item === undefined ? [] : [item];
+  });
 }
 
 function jaccard(a: Set<number>, b: Set<number>): number {

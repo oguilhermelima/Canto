@@ -423,15 +423,14 @@ export async function findContinueWatchingFeed(
   // `idx_user_playback_active` orders rows the same way, so the planner can
   // skip directly to the cursor row.
   if (cursor) {
-    conditions.push(
-      or(
-        lt(userPlaybackProgress.lastWatchedAt, cursor.lastWatchedAt),
-        and(
-          eq(userPlaybackProgress.lastWatchedAt, cursor.lastWatchedAt),
-          lt(userPlaybackProgress.id, cursor.id),
-        ),
-      )!,
+    const cursorOr = or(
+      lt(userPlaybackProgress.lastWatchedAt, cursor.lastWatchedAt),
+      and(
+        eq(userPlaybackProgress.lastWatchedAt, cursor.lastWatchedAt),
+        lt(userPlaybackProgress.id, cursor.id),
+      ),
     );
+    if (cursorOr !== undefined) conditions.push(cursorOr);
   }
 
   const rows = await db

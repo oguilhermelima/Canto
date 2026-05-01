@@ -25,7 +25,10 @@ export function mixExploreSlots<T>(personalized: T[], explore: T[]): T[] {
   const positions = exploreSlotPositions(result.length);
   const limit = Math.min(positions.length, explore.length);
   for (let i = 0; i < limit; i++) {
-    result[positions[i]!] = explore[i]!;
+    const pos = positions[i];
+    const item = explore[i];
+    if (pos === undefined || item === undefined) continue;
+    result[pos] = item;
   }
   return result;
 }

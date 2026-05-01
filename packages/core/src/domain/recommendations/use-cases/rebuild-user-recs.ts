@@ -322,8 +322,7 @@ export async function addMediaToUserRecs(
   }
 
   const rows: UserRecommendationRow[] = [];
-  for (let rank = 0; rank < recItems.length; rank++) {
-    const candidate = recItems[rank]!;
+  for (const [rank, candidate] of recItems.entries()) {
     if (negativeMedia.has(candidate.mediaId)) continue;
     rows.push(toRecRow(candidate, 1.0 * rankMultiplier(rank + 1)));
   }

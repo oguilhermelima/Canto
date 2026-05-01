@@ -98,7 +98,8 @@ export function makeUserMediaRepository(db: Database): UserMediaRepositoryPort {
     // ── Watch History ──
     addHistoryEntry: async (input) => {
       const row = await addUserWatchHistory(db, historyToRow(input));
-      return historyToDomain(row!);
+      if (!row) throw new Error("addHistoryEntry: insert returned no row");
+      return historyToDomain(row);
     },
     findHistory: async (userId, mediaId, episodeId) => {
       const rows = await findUserWatchHistory(db, userId, mediaId, episodeId ?? null);
@@ -200,7 +201,8 @@ export function makeUserMediaRepository(db: Database): UserMediaRepositoryPort {
     // ── Library ──
     addToLibrary: async (input) => {
       const row = await addToUserMediaLibrary(db, libraryToRow(input));
-      return libraryToDomain(row!);
+      if (!row) throw new Error("addToLibrary: insert returned no row");
+      return libraryToDomain(row);
     },
     isInLibrary: (userId, mediaId) => isInUserMediaLibrary(db, userId, mediaId),
     findLibraryMediaIds: (userId) => findUserMediaLibraryIds(db, userId),

@@ -130,16 +130,13 @@ export async function findGlobalRecommendations(
 ) {
   const released = sql`(${media.releaseDate} <= CURRENT_DATE OR ${media.releaseDate} IS NULL)`;
 
-  const excludeConditions =
-    excludeItems.length > 0
-      ? excludeItems.map(
-          (item) =>
-            and(
-              eq(media.externalId, item.externalId),
-              eq(media.provider, item.provider),
-            )!,
-        )
-      : [];
+  const excludeConditions = excludeItems.flatMap((item) => {
+    const cond = and(
+      eq(media.externalId, item.externalId),
+      eq(media.provider, item.provider),
+    );
+    return cond === undefined ? [] : [cond];
+  });
 
   const mi = mediaI18n(language);
   const filterConditions = buildRecsFilterConditions(filters, {

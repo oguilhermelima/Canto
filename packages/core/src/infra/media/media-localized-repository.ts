@@ -153,5 +153,7 @@ export async function findMediaLocalizedByExternalMany(
     )
     .filter((c): c is NonNullable<typeof c> => c !== undefined);
   if (conditions.length === 0) return [];
-  return runQuery(db, language, or(...conditions)!);
+  const where = or(...conditions);
+  if (where === undefined) return [];
+  return runQuery(db, language, where);
 }

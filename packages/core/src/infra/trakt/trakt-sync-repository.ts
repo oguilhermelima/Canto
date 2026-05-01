@@ -63,7 +63,8 @@ export async function upsertTraktListLink(
     })
     .returning();
 
-  return row!;
+  if (!row) throw new Error("upsertTraktListLink: insert returned no row");
+  return row;
 }
 
 export async function deleteTraktListLinksNotIn(
@@ -170,7 +171,8 @@ export async function upsertTraktSyncState(
     })
     .returning();
 
-  return row!;
+  if (!row) throw new Error("upsertTraktSyncState: insert returned no row");
+  return row;
 }
 
 /** Atomic update of a single section's watermark — called by the section

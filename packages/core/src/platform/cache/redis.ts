@@ -58,13 +58,11 @@ function createRedisCache(connection: RedisConnectionOptions): CachePort {
 let cacheInstance: CachePort | null = null;
 
 function getCache(): CachePort {
-  if (!cacheInstance) {
-    cacheInstance = createRedisCache({
-      host: process.env.REDIS_HOST ?? "localhost",
-      port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
-      password: process.env.REDIS_PASSWORD,
-    });
-  }
+  cacheInstance ??= createRedisCache({
+    host: process.env.REDIS_HOST ?? "localhost",
+    port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+    password: process.env.REDIS_PASSWORD,
+  });
   return cacheInstance;
 }
 

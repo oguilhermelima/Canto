@@ -443,17 +443,17 @@ export async function refreshTraktAccessTokenIfNeeded(
   }
 
   const expiresAt = conn.tokenExpiresAt;
-  const shouldRefresh = !!(
-    conn.refreshToken &&
-    expiresAt &&
-    expiresAt.getTime() <= Date.now() + 30_000
-  );
+  const refreshToken = conn.refreshToken;
+  const shouldRefresh =
+    refreshToken !== null &&
+    expiresAt !== null &&
+    expiresAt.getTime() <= Date.now() + 30_000;
 
   if (!shouldRefresh) {
     return { accessToken };
   }
 
-  const refreshed = await refreshTraktToken(conn.refreshToken!);
+  const refreshed = await refreshTraktToken(refreshToken);
   const nextExpiresAt = new Date(
     (refreshed.created_at + refreshed.expires_in) * 1000,
   );

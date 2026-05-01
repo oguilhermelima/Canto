@@ -50,7 +50,10 @@ export async function findRecCandidatesForSeed(
   const recLocEnJoin = and(
     eq(recLocEn.mediaId, media.id),
     eq(recLocEn.language, EN),
-  )!;
+  );
+  if (recLocEnJoin === undefined) {
+    throw new Error("findRecCandidatesForSeed: empty rec-localization join");
+  }
 
   const rows = await db
     .select({

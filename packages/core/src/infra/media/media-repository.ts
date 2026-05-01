@@ -309,7 +309,9 @@ function buildLibraryFilters(input: ListInput, mi: MediaI18n): SQL {
     }
   }
 
-  return and(...conditions)!;
+  const combined = and(...conditions);
+  if (combined === undefined) throw new Error("buildSearchWhere: empty condition list");
+  return combined;
 }
 
 function buildOrderBy(
@@ -395,7 +397,9 @@ export async function listLibraryMedia(
         ),
       );
 
-    where = and(where, sql`${media.id} IN (${accessibleMediaIds})`)!;
+    const next = and(where, sql`${media.id} IN (${accessibleMediaIds})`);
+    if (next === undefined) throw new Error("findLibraryFeed: empty access filter");
+    where = next;
   }
 
   const orderBy = buildOrderBy(input.sortBy, input.sortOrder, mi);

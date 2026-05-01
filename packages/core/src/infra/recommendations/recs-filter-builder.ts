@@ -80,12 +80,12 @@ export function buildRecsFilterConditions(
     }
   }
   if (language) conditions.push(sql`${columns.originalLanguage} = ${language}`);
-  if (scoreMin != null) conditions.push(sql`${columns.voteAverage} >= ${scoreMin}`);
-  if (scoreMax != null) conditions.push(sql`${columns.voteAverage} <= ${scoreMax}`);
+  if (scoreMin !== undefined) conditions.push(sql`${columns.voteAverage} >= ${scoreMin}`);
+  if (scoreMax !== undefined) conditions.push(sql`${columns.voteAverage} <= ${scoreMax}`);
   if (yearMin) conditions.push(sql`${columns.releaseDate} >= ${yearMin + "-01-01"}`);
   if (yearMax) conditions.push(sql`${columns.releaseDate} <= ${yearMax + "-12-31"}`);
-  if (runtimeMin != null) conditions.push(sql`${columns.runtime} >= ${runtimeMin}`);
-  if (runtimeMax != null) conditions.push(sql`${columns.runtime} <= ${runtimeMax}`);
+  if (runtimeMin !== undefined) conditions.push(sql`${columns.runtime} >= ${runtimeMin}`);
+  if (runtimeMax !== undefined) conditions.push(sql`${columns.runtime} <= ${runtimeMax}`);
   if (certification) conditions.push(sql`${columns.contentRating} = ${certification}`);
   if (status) conditions.push(sql`${columns.status} = ${status}`);
 

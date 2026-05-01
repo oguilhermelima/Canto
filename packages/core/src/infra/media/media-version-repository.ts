@@ -98,12 +98,11 @@ export async function fetchMediaVersionsWithMedia(
   if (filters.server) conditions.push(eq(mediaVersion.source, filters.server));
   if (filters.search) {
     const needle = `%${filters.search}%`;
-    conditions.push(
-      or(
-        ilike(mediaVersion.serverItemTitle, needle),
-        sql`${mi.title} ILIKE ${needle}`,
-      )!,
+    const searchOr = or(
+      ilike(mediaVersion.serverItemTitle, needle),
+      sql`${mi.title} ILIKE ${needle}`,
     );
+    if (searchOr !== undefined) conditions.push(searchOr);
   }
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 

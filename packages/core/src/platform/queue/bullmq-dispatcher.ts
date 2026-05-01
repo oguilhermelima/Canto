@@ -10,9 +10,7 @@ const REMOVE_ON_FAIL = 50;
 function createQueueGetter(name: QueueName): () => Promise<Queue> {
   let queue: Queue | null = null;
   return async () => {
-    if (!queue) {
-      queue = new Queue(name, { connection: getRedisConnection() });
-    }
+    queue ??= new Queue(name, { connection: getRedisConnection() });
     return queue;
   };
 }

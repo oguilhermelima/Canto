@@ -299,7 +299,8 @@ export async function createList(
 ) {
   const nextPos = await getMaxListPosition(db, data.userId ?? null) + 1;
   const [row] = await db.insert(list).values({ ...data, position: nextPos }).returning();
-  return row!;
+  if (!row) throw new Error("createList: insert returned no row");
+  return row;
 }
 
 export async function updateList(
@@ -339,13 +340,13 @@ export async function reorderLists(
   orderedIds: string[],
 ): Promise<void> {
   await db.transaction(async (tx) => {
-    for (let i = 0; i < orderedIds.length; i++) {
+    for (const [i, listId] of orderedIds.entries()) {
       await tx
         .update(list)
         .set({ position: i, updatedAt: new Date() })
         .where(
           and(
-            eq(list.id, orderedIds[i]!),
+            eq(list.id, listId),
             or(eq(list.userId, userId), eq(list.type, "server")),
           ),
         );
@@ -835,13 +836,13 @@ export async function reorderListItems(
   orderedItemIds: string[],
 ): Promise<void> {
   await db.transaction(async (tx) => {
-    for (let i = 0; i < orderedItemIds.length; i++) {
+    for (const [i, itemId] of orderedItemIds.entries()) {
       await tx
         .update(listItem)
         .set({ position: i })
         .where(
           and(
-            eq(listItem.id, orderedItemIds[i]!),
+            eq(listItem.id, itemId),
             eq(listItem.listId, listId),
           ),
         );

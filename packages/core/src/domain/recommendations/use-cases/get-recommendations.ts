@@ -160,7 +160,8 @@ export async function getRecommendations(
   const seedStart = (page * 3) % allLibrary.length;
   const seeds: typeof allLibrary = [];
   for (let i = 0; i < 3 && i < allLibrary.length; i++) {
-    seeds.push(allLibrary[(seedStart + i) % allLibrary.length]!);
+    const candidate = allLibrary[(seedStart + i) % allLibrary.length];
+    if (candidate !== undefined) seeds.push(candidate);
   }
 
   const libraryKeys = new Set(excludeItems.map((m) => `${m.provider}-${m.externalId}`));

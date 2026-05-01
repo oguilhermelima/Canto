@@ -74,7 +74,7 @@ export async function persistExtras(
           externalId: item.result.externalId,
           provider,
           backdropPath: item.result.backdropPath ?? null,
-          releaseDate: item.result.releaseDate || null,
+          releaseDate: item.result.releaseDate !== undefined && item.result.releaseDate.length > 0 ? item.result.releaseDate : null,
           year: item.result.year ?? null,
           voteAverage: item.result.voteAverage ?? null,
           genreIds: item.result.genreIds ?? [],

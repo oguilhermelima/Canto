@@ -52,7 +52,8 @@ export async function upsertUserRating(
       })
       .where(eq(userRating.id, existing.id))
       .returning();
-    return updated!;
+    if (!updated) throw new Error("upsertUserRating: update returned no row");
+    return updated;
   }
 
   const [inserted] = await db
@@ -69,7 +70,8 @@ export async function upsertUserRating(
       updatedAt: stamp,
     })
     .returning();
-  return inserted!;
+  if (!inserted) throw new Error("upsertUserRating: insert returned no row");
+  return inserted;
 }
 
 export async function findUserRating(

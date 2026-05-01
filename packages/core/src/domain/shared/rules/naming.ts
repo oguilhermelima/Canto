@@ -118,10 +118,10 @@ export function buildFileName(
     opts.torrentTitle,
   );
 
-  if (media.type === "show" && opts.seasonNumber != null && opts.episodeNumber != null) {
+  if (media.type === "show" && opts.seasonNumber !== undefined && opts.episodeNumber !== undefined) {
     const sn = String(opts.seasonNumber).padStart(2, "0");
     const en = String(opts.episodeNumber).padStart(2, "0");
-    const epRange = opts.episodeEndNumber != null && opts.episodeEndNumber > opts.episodeNumber
+    const epRange = opts.episodeEndNumber !== undefined && opts.episodeEndNumber > opts.episodeNumber
       ? `-E${String(opts.episodeEndNumber).padStart(2, "0")}`
       : "";
     const epTitle = opts.episodeTitle ? ` - ${sanitizeName(opts.episodeTitle)}` : "";

@@ -99,7 +99,8 @@ export async function createInvitation(
     .insert(listInvitation)
     .values({ ...data, token, expiresAt })
     .returning();
-  return row!;
+  if (!row) throw new Error("createInvitation: insert returned no row");
+  return row;
 }
 
 export async function findInvitationByToken(db: Database, token: string) {

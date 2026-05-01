@@ -13,13 +13,17 @@ const xmlParser = new XMLParser({
  * This helper normalizes to a plain string.
  */
 function text(value: unknown): string {
-  if (value == null) return "";
+  if (value === null || value === undefined) return "";
   if (typeof value === "string") return value;
   if (typeof value === "number") return String(value);
   if (typeof value === "object" && "#text" in (value as Record<string, unknown>)) {
     return String((value as Record<string, unknown>)["#text"] ?? "");
   }
   return String(value);
+}
+
+function firstNonEmpty(...vals: (string | undefined)[]): string | undefined {
+  return vals.find((v) => v !== undefined && v.length > 0);
 }
 
 /**
@@ -74,28 +78,26 @@ export function parseTorznabXml(
 
       const description = text(item.description);
 
-      const sizeStr = text(item.size) || attrs.size || "0";
+      const sizeStr = firstNonEmpty(text(item.size), attrs.size) ?? "0";
       const size = parseInt(sizeStr, 10);
       if (isNaN(size)) continue;
 
       // Download URL from enclosure or link
       const enclosure = item.enclosure as Record<string, unknown> | undefined;
       const downloadUrl =
-        text(enclosure?.["@_url"]) ||
-        text(item.link) ||
-        null;
+        firstNonEmpty(text(enclosure?.["@_url"]), text(item.link)) ?? null;
 
-      const guid = text(item.guid) || text(item.link) || "";
+      const guid = firstNonEmpty(text(item.guid), text(item.link)) ?? "";
 
       results.push({
         guid,
         title,
-        description: description || null,
+        description: firstNonEmpty(description) ?? null,
         size,
         publishDate: pubDate,
-        downloadUrl: downloadUrl || null,
+        downloadUrl: downloadUrl ?? null,
         magnetUrl: attrs.magneturl ?? null,
-        infoUrl: text(item.comments) || null,
+        infoUrl: firstNonEmpty(text(item.comments)) ?? null,
         indexer: indexerName,
         seeders,
         leechers: Math.max(0, peers - seeders),

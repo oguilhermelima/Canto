@@ -17,7 +17,9 @@ export async function findUserRatingDistribution(
     .groupBy(userMediaState.rating)
     .orderBy(asc(userMediaState.rating));
 
-  return rows.map((r) => ({ rating: r.rating!, count: r.count }));
+  return rows.flatMap((r) =>
+    r.rating === null ? [] : [{ rating: r.rating, count: r.count }],
+  );
 }
 
 export async function findUserTopGenres(
@@ -281,25 +283,27 @@ export async function findUserProfileInsights(
 
   return {
     decadeDistribution: decadeRows.map((r) => ({ decade: r.decade, count: r.count })),
-    hiddenGem: hiddenGemRows[0] ? {
+    hiddenGem: hiddenGemRows[0] && hiddenGemRows[0].userRating !== null ? {
       title: hiddenGemRows[0].title,
       posterPath: hiddenGemRows[0].posterPath,
       backdropPath: hiddenGemRows[0].backdropPath,
-      userRating: hiddenGemRows[0].userRating!,
+      userRating: hiddenGemRows[0].userRating,
       publicRating: Number(hiddenGemRows[0].publicRating),
     } : null,
-    unpopularOpinion: unpopularRows[0] ? {
+    unpopularOpinion: unpopularRows[0] && unpopularRows[0].userRating !== null ? {
       title: unpopularRows[0].title,
       posterPath: unpopularRows[0].posterPath,
       backdropPath: unpopularRows[0].backdropPath,
-      userRating: unpopularRows[0].userRating!,
+      userRating: unpopularRows[0].userRating,
       publicRating: Number(unpopularRows[0].publicRating),
     } : null,
     shortestMovie: shortestRows[0]?.runtime ? { title: shortestRows[0].title, runtime: shortestRows[0].runtime } : null,
     longestMovie: longestRows[0]?.runtime ? { title: longestRows[0].title, runtime: longestRows[0].runtime } : null,
     averageRuntime: Number(avgRow?.avg ?? 0),
     countries: countryRows.map((r) => ({ country: r.country, count: r.count })),
-    languages: languageRows.filter((r) => r.language !== null).map((r) => ({ language: r.language!, count: r.count })),
+    languages: languageRows.flatMap((r) =>
+      r.language === null ? [] : [{ language: r.language, count: r.count }],
+    ),
     recentPercent: totalActive > 0 ? Math.round((recentCount / totalActive) * 100) : 0,
     oldestTitle: oldestRows[0]?.year ? { title: oldestRows[0].title, year: oldestRows[0].year } : null,
     perfectScores: perfectRow?.count ?? 0,
