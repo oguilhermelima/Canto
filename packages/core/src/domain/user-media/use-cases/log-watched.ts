@@ -18,7 +18,7 @@ import {
   
   
 } from "@canto/core/domain/user-media/rules/user-media-rules";
-import type {MediaType, WatchedAtMode} from "@canto/core/domain/user-media/rules/user-media-rules";
+import type { WatchedAtMode } from "@canto/core/domain/user-media/rules/user-media-rules";
 import {
   getUserMediaState
   

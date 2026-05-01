@@ -328,7 +328,6 @@ function buildLastActivityIndex(
 ): Map<string, Date> {
   const index = new Map<string, Date>();
   for (const row of historyRows) {
-    if (!row.watchedAt) continue;
     const current = index.get(row.mediaId);
     if (!current || row.watchedAt.getTime() > current.getTime()) {
       index.set(row.mediaId, row.watchedAt);
