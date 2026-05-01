@@ -197,4 +197,31 @@ export default [
       eqeqeq: ["error", "always"],
     },
   },
+  {
+    files: ["src/domain/media-servers/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "error",
+      "@typescript-eslint/no-non-null-assertion": "error",
+      "@typescript-eslint/prefer-nullish-coalescing": "error",
+      eqeqeq: ["error", "always"],
+    },
+  },
+  {
+    files: ["src/domain/sync/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "error",
+      "@typescript-eslint/no-non-null-assertion": "error",
+      "@typescript-eslint/prefer-nullish-coalescing": "error",
+      eqeqeq: ["error", "always"],
+    },
+  },
+  {
+    // Test fixtures in sync/__tests__ rely on bracket access into known-shape
+    // hand-built fixtures; loosening `no-non-null-assertion` here keeps the
+    // forcing function on production code without churn in test harnesses.
+    files: ["src/domain/sync/__tests__/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-non-null-assertion": "warn",
+    },
+  },
 ];
