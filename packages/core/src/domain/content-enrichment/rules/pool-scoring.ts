@@ -11,14 +11,14 @@ export function mapSearchResultToMediaFields(
 ) {
   return {
     externalId: result.externalId,
-    provider: result.provider ?? "tmdb",
+    provider: result.provider,
     type: result.type,
     title: result.title,
     overview: result.overview,
     posterPath: result.posterPath,
     backdropPath: result.backdropPath,
     logoPath: extras?.logoPath ?? null,
-    releaseDate: result.releaseDate || null,
+    releaseDate: result.releaseDate ?? null,
     voteAverage: result.voteAverage,
     sourceType,
   };
