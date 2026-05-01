@@ -184,7 +184,7 @@ export async function fetchLogos(
       if (logo && !existing.logoPath) {
         // After Phase 1C-δ, logoPath lives only on media_localization.
         await upsertMediaLocalization(
-          db,
+          deps,
           existing.id,
           "en-US",
           { title: item.title, posterPath: item.posterPath ?? null, logoPath: logo },
@@ -218,7 +218,7 @@ export async function fetchLogos(
           // After Phase 1C-δ, title/posterPath/logoPath live only on
           // media_localization en-US.
           await upsertMediaLocalization(
-            db,
+            deps,
             mediaId,
             "en-US",
             { title: item.title, posterPath: item.posterPath ?? null, logoPath: logo },

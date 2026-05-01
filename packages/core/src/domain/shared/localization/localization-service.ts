@@ -1,19 +1,3 @@
-import { and, eq, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
-import type { Database } from "@canto/db/client";
-import {
-  episode,
-  episodeLocalization,
-  mediaLocalization,
-  season,
-  seasonLocalization,
-} from "@canto/db/schema";
-import {
-  findMediaLocalized,
-  findMediaLocalizedByExternal,
-  findMediaLocalizedByExternalMany,
-  findMediaLocalizedMany,
-} from "@canto/core/infra/media/media-localized-repository";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type {
   EpisodeLocalizationPayload,
@@ -24,8 +8,6 @@ import type {
   MediaLocalizationPayload,
   SeasonLocalizationPayload,
 } from "@canto/core/domain/shared/localization/types";
-
-const EN = "en-US";
 
 /**
  * Deps bag every overlay helper accepts. Wave 9C2 routed the overlay reads
@@ -38,29 +20,34 @@ export interface LocalizationOverlayDeps {
 }
 
 export async function resolveLocalizedMedia(
-  db: Database,
+  deps: LocalizationOverlayDeps,
   mediaId: string,
   language: string,
 ): Promise<LocalizedMedia | null> {
-  return findMediaLocalized(db, mediaId, language);
+  return deps.localization.findLocalizedById(mediaId, language);
 }
 
 export async function resolveLocalizedMediaByExternal(
-  db: Database,
+  deps: LocalizationOverlayDeps,
   externalId: number,
   provider: string,
   type: string,
   language: string,
 ): Promise<LocalizedMedia | null> {
-  return findMediaLocalizedByExternal(db, externalId, provider, type, language);
+  return deps.localization.findLocalizedByExternal(
+    externalId,
+    provider,
+    type,
+    language,
+  );
 }
 
 export async function resolveLocalizedMediaMany(
-  db: Database,
+  deps: LocalizationOverlayDeps,
   mediaIds: string[],
   language: string,
 ): Promise<LocalizedMedia[]> {
-  return findMediaLocalizedMany(db, mediaIds, language);
+  return deps.localization.findLocalizedManyByIds(mediaIds, language);
 }
 
 /**
@@ -70,225 +57,72 @@ export async function resolveLocalizedMediaMany(
  * responses).
  */
 export async function resolveLocalizedMediaByExternalMany(
-  db: Database,
+  deps: LocalizationOverlayDeps,
   refs: Array<{ externalId: number; provider: string; type: string }>,
   language: string,
 ): Promise<LocalizedMedia[]> {
-  return findMediaLocalizedByExternalMany(db, refs, language);
+  return deps.localization.findLocalizedManyByExternal(refs, language);
 }
 
 export async function resolveLocalizedSeasons(
-  db: Database,
+  deps: LocalizationOverlayDeps,
   mediaId: string,
   language: string,
 ): Promise<LocalizedSeason[]> {
-  const isEn = language === EN;
-  const locEn = alias(seasonLocalization, "loc_en");
-
-  if (isEn) {
-    return db
-      .select({
-        id: season.id,
-        mediaId: season.mediaId,
-        number: season.number,
-        posterPath: season.posterPath,
-        airDate: season.airDate,
-        episodeCount: season.episodeCount,
-        voteAverage: season.voteAverage,
-        name: sql<string | null>`${locEn.name}`,
-        overview: sql<string | null>`${locEn.overview}`,
-      })
-      .from(season)
-      .leftJoin(
-        locEn,
-        and(eq(locEn.seasonId, season.id), eq(locEn.language, EN)),
-      )
-      .where(eq(season.mediaId, mediaId))
-      .orderBy(season.number);
-  }
-
-  const locUser = alias(seasonLocalization, "loc_user");
-  return db
-    .select({
-      id: season.id,
-      mediaId: season.mediaId,
-      number: season.number,
-      posterPath: season.posterPath,
-      airDate: season.airDate,
-      episodeCount: season.episodeCount,
-      voteAverage: season.voteAverage,
-      name: sql<string | null>`COALESCE(${locUser.name}, ${locEn.name})`,
-      overview: sql<string | null>`COALESCE(${locUser.overview}, ${locEn.overview})`,
-    })
-    .from(season)
-    .leftJoin(
-      locUser,
-      and(eq(locUser.seasonId, season.id), eq(locUser.language, language)),
-    )
-    .leftJoin(
-      locEn,
-      and(eq(locEn.seasonId, season.id), eq(locEn.language, EN)),
-    )
-    .where(eq(season.mediaId, mediaId))
-    .orderBy(season.number);
+  return deps.localization.findLocalizedSeasonsByMedia(mediaId, language);
 }
 
 export async function resolveLocalizedEpisodes(
-  db: Database,
+  deps: LocalizationOverlayDeps,
   seasonId: string,
   language: string,
 ): Promise<LocalizedEpisode[]> {
-  const isEn = language === EN;
-  const locEn = alias(episodeLocalization, "loc_en");
-
-  if (isEn) {
-    return db
-      .select({
-        id: episode.id,
-        seasonId: episode.seasonId,
-        number: episode.number,
-        externalId: episode.externalId,
-        airDate: episode.airDate,
-        runtime: episode.runtime,
-        stillPath: episode.stillPath,
-        voteAverage: episode.voteAverage,
-        voteCount: episode.voteCount,
-        title: sql<string | null>`${locEn.title}`,
-        overview: sql<string | null>`${locEn.overview}`,
-      })
-      .from(episode)
-      .leftJoin(
-        locEn,
-        and(eq(locEn.episodeId, episode.id), eq(locEn.language, EN)),
-      )
-      .where(eq(episode.seasonId, seasonId))
-      .orderBy(episode.number);
-  }
-
-  const locUser = alias(episodeLocalization, "loc_user");
-  return db
-    .select({
-      id: episode.id,
-      seasonId: episode.seasonId,
-      number: episode.number,
-      externalId: episode.externalId,
-      airDate: episode.airDate,
-      runtime: episode.runtime,
-      stillPath: episode.stillPath,
-      voteAverage: episode.voteAverage,
-      voteCount: episode.voteCount,
-      title: sql<string | null>`COALESCE(${locUser.title}, ${locEn.title})`,
-      overview: sql<string | null>`COALESCE(${locUser.overview}, ${locEn.overview})`,
-    })
-    .from(episode)
-    .leftJoin(
-      locUser,
-      and(eq(locUser.episodeId, episode.id), eq(locUser.language, language)),
-    )
-    .leftJoin(
-      locEn,
-      and(eq(locEn.episodeId, episode.id), eq(locEn.language, EN)),
-    )
-    .where(eq(episode.seasonId, seasonId))
-    .orderBy(episode.number);
+  return deps.localization.findLocalizedEpisodesBySeason(seasonId, language);
 }
 
 export async function upsertMediaLocalization(
-  db: Database,
+  deps: LocalizationOverlayDeps,
   mediaId: string,
   language: string,
   payload: MediaLocalizationPayload,
   source: LocalizationSource,
 ): Promise<void> {
-  const now = new Date();
-  await db
-    .insert(mediaLocalization)
-    .values({
-      mediaId,
-      language,
-      title: payload.title,
-      overview: payload.overview ?? null,
-      tagline: payload.tagline ?? null,
-      posterPath: payload.posterPath ?? null,
-      logoPath: payload.logoPath ?? null,
-      trailerKey: payload.trailerKey ?? null,
-      source,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: [mediaLocalization.mediaId, mediaLocalization.language],
-      set: {
-        title: payload.title,
-        overview: sql`COALESCE(EXCLUDED.overview, ${mediaLocalization.overview})`,
-        tagline: sql`COALESCE(EXCLUDED.tagline, ${mediaLocalization.tagline})`,
-        posterPath: sql`COALESCE(EXCLUDED.poster_path, ${mediaLocalization.posterPath})`,
-        logoPath: sql`COALESCE(EXCLUDED.logo_path, ${mediaLocalization.logoPath})`,
-        trailerKey: sql`COALESCE(EXCLUDED.trailer_key, ${mediaLocalization.trailerKey})`,
-        source,
-        updatedAt: now,
-      },
-    });
+  await deps.localization.upsertMediaLocalization(
+    mediaId,
+    language,
+    payload,
+    source,
+  );
 }
 
 export async function upsertSeasonLocalization(
-  db: Database,
+  deps: LocalizationOverlayDeps,
   seasonId: string,
   language: string,
   payload: SeasonLocalizationPayload,
   source: LocalizationSource,
 ): Promise<void> {
-  const now = new Date();
-  await db
-    .insert(seasonLocalization)
-    .values({
-      seasonId,
-      language,
-      name: payload.name ?? null,
-      overview: payload.overview ?? null,
-      source,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: [seasonLocalization.seasonId, seasonLocalization.language],
-      set: {
-        name: sql`COALESCE(EXCLUDED.name, ${seasonLocalization.name})`,
-        overview: sql`COALESCE(EXCLUDED.overview, ${seasonLocalization.overview})`,
-        source,
-        updatedAt: now,
-      },
-    });
+  await deps.localization.upsertSeasonLocalization(
+    seasonId,
+    language,
+    payload,
+    source,
+  );
 }
 
 export async function upsertEpisodeLocalization(
-  db: Database,
+  deps: LocalizationOverlayDeps,
   episodeId: string,
   language: string,
   payload: EpisodeLocalizationPayload,
   source: LocalizationSource,
 ): Promise<void> {
-  const now = new Date();
-  await db
-    .insert(episodeLocalization)
-    .values({
-      episodeId,
-      language,
-      title: payload.title ?? null,
-      overview: payload.overview ?? null,
-      source,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: [episodeLocalization.episodeId, episodeLocalization.language],
-      set: {
-        title: sql`COALESCE(EXCLUDED.title, ${episodeLocalization.title})`,
-        overview: sql`COALESCE(EXCLUDED.overview, ${episodeLocalization.overview})`,
-        source,
-        updatedAt: now,
-      },
-    });
+  await deps.localization.upsertEpisodeLocalization(
+    episodeId,
+    language,
+    payload,
+    source,
+  );
 }
 
 // ─── Overlay helpers (drop-in replacements for legacy translation-service) ───

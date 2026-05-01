@@ -139,7 +139,7 @@ export async function reconcileShowStructure(
       // backdropPath stays only on the base media row.
       if (tmdbMeta.posterPath || tmdbMeta.logoPath) {
         await upsertMediaLocalization(
-          db,
+          deps,
           mediaId,
           "en-US",
           {
