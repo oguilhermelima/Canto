@@ -136,4 +136,13 @@ export default [
       eqeqeq: ["error", "always"],
     },
   },
+  {
+    files: ["src/domain/lists/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "error",
+      "@typescript-eslint/no-non-null-assertion": "error",
+      "@typescript-eslint/prefer-nullish-coalescing": "error",
+      eqeqeq: ["error", "always"],
+    },
+  },
 ];
