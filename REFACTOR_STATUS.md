@@ -455,6 +455,17 @@ DOD (a-j): boundary 25 → 0; drizzle clean; typed errors via `domain/torrents/e
 
 **Deferrals**: 23 `!` em `parsing-episodes.ts` (W11-final / W12 cleanup); `mergeLiveData` boundary leak ainda em `domain/media` (W10.8); `folder-scan.ts` worker importa infra/file-organization caller-side (composition root, ok).
 
+#### W10.11 — `trakt` ✅ (Teammate L, 2026-05-01)
+
+| Commit | Escopo |
+|---|---|
+| `30ca008f` | new `TraktAuthPort` + `makeTraktAuth` adapter — coordinator/run-section drop the `refreshTraktAccessTokenIfNeeded` infra import. `findEnabledTraktConnections` extended to accept optional `connectionId`. `coordinateTraktSync` no longer requires a `Database` handle; user-triggered resync routes through `userConnection.findByUserId`. |
+| `a0314c30` | shared.ts drops `addListItem` / `removeListItem` / `markListItemsPushed` infra imports → `deps.lists.*`. `ListsRepositoryPort` gains `markItemsPushed`; `NewListItem.addedAt` exposed so the Trakt-real `listed_at` flows through the port. `findOrCreateUniqueListSlug` uses `lists.findBySlug`. |
+| `0583184c` | drizzle helpers gone (8 sites): `lists.findUserCustomLists` / `findUserListByType` / `findUserTombstonedListIds` / `findItemsForSync`; `userMedia.findFavoritesForSync` / `findOverrideRatingsForSync` / `findUnpushedHistoryForTrakt` / `findHistoryByExactWatch`. Cross-context sync projections (`UserFavoriteSyncRow`, `UserRatingSyncRow`, `UserWatchHistoryPushRow`, `ListItemSyncRow`) live alongside their owning domain types. |
+| `d8cb6e3e` | `logSyncDecision` routes through `LoggerPort.info` instead of `console.log`; `logger` threaded into `RunTraktSectionDeps` + `SyncListMembershipDeps`, wired in `apps/worker/src/jobs/trakt-sync.ts`. |
+
+DOD (a-j): boundary 3 → 0; drizzle 8 → 0; zero `throw new Error` (already true); zero `console.log` (1 → 0); ESLint per-folder override at `error` for `no-restricted-imports` + `no-non-null-assertion` + `prefer-nullish-coalescing` + `eqeqeq`. `coordinateTraktSync` signature trimmed (no Database). 10/10 typecheck + 152/152 tests green per commit.
+
 ### Convenção de paths de imports (decidida 2026-04-30, em adoção desde Wave 1)
 
 **Regra única**: TODO import usa o nome do package (`@canto/<pkg>/<full-path>`). Zero `./` ou `../`.
