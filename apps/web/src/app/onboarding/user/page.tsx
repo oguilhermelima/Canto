@@ -35,14 +35,18 @@ export default function UserOnboardingPage(): React.JSX.Element {
 
   const completeOnboarding = trpc.auth.completeOnboarding.useMutation();
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  // Rehydrate step index from localStorage once on first client render —
+  // SSR-safe via the `hydrated` flag (server renders 0, client adjusts during
+  // its first render).
+  const [hydrated, setHydrated] = useState(false);
+  if (!hydrated && typeof window !== "undefined") {
+    setHydrated(true);
     const saved = window.localStorage.getItem(PROGRESS_KEY);
     if (saved) {
       const parsed = parseInt(saved, 10);
       if (Number.isFinite(parsed) && parsed >= 0) setCurrentStep(parsed);
     }
-  }, []);
+  }
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -64,10 +68,11 @@ export default function UserOnboardingPage(): React.JSX.Element {
   }, [providersReady]);
 
   // Clamp rehydrated index if providers changed between sessions — otherwise
-  // the lookup returns undefined and FadeIn renders nothing.
-  useEffect(() => {
-    if (currentStep > steps.length - 1) setCurrentStep(steps.length - 1);
-  }, [steps.length, currentStep]);
+  // the lookup returns undefined and FadeIn renders nothing. Adjust during
+  // render so React re-renders with the corrected value before painting.
+  if (currentStep > steps.length - 1) {
+    setCurrentStep(steps.length - 1);
+  }
 
   const step = steps[Math.min(currentStep, steps.length - 1)] ?? "welcome";
 
