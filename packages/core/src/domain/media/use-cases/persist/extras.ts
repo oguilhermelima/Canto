@@ -6,8 +6,8 @@ import type { Database } from "@canto/db/client";
 
 import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
-import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
 
 const EN = "en-US";
 
@@ -15,6 +15,7 @@ export interface PersistExtrasDeps {
   extras: MediaExtrasRepositoryPort;
   localization: MediaLocalizationRepositoryPort;
   logger: LoggerPort;
+  dispatcher: JobDispatcherPort;
 }
 
 /**
@@ -99,7 +100,7 @@ export async function persistExtras(
           // Stub row from TMDB's recs/similar payload — enqueue full metadata
           // fetch so read paths (filtered on the metadata aspect having
           // succeeded) can surface it.
-          void dispatchEnsureMedia(inserted.id).catch(
+          void deps.dispatcher.enrichMedia(inserted.id).catch(
             deps.logger.logAndSwallow("persistExtras dispatchEnsureMedia"),
           );
         } else {

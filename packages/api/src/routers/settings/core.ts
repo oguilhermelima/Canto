@@ -22,6 +22,7 @@ import {
 import { createTRPCRouter, adminProcedure } from "../../trpc";
 import { testService } from "@canto/core/platform/testing/service-tester";
 import { dispatchRebuildUserRecs } from "@canto/core/platform/queue/bullmq-dispatcher";
+import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
 import { ensureMediaMany } from "@canto/core/domain/media/use-cases/ensure-media-many";
 import { syncTmdbCertifications } from "@canto/core/domain/content-enrichment/use-cases/sync-tmdb-certifications";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
@@ -105,7 +106,7 @@ export const settingsCoreRouter = createTRPCRouter({
           } catch (err) {
             console.error("[settings.refreshMedia] cert sync failed:", err);
           }
-          await ensureMediaMany(ctx.db, filter, spec);
+          await ensureMediaMany(ctx.db, { dispatcher: jobDispatcher }, filter, spec);
         })().catch((err) => {
           console.error("[settings.refreshMedia] bulk dispatch failed:", err);
         });
@@ -125,7 +126,7 @@ export const settingsCoreRouter = createTRPCRouter({
         };
       }
 
-      return ensureMediaMany(ctx.db, filter, spec, { dryRun: input.dryRun });
+      return ensureMediaMany(ctx.db, { dispatcher: jobDispatcher }, filter, spec, { dryRun: input.dryRun });
     }),
 
   rebuildUserRecommendations: adminProcedure.mutation(async ({ ctx }) => {

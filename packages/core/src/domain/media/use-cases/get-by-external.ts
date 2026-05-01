@@ -3,12 +3,12 @@ import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/p
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
+import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import type { MediaType, ProviderName } from "@canto/providers";
 import { persistMedia } from "@canto/core/domain/media/use-cases/persist";
 import { getSetting } from "@canto/db/settings";
 import { findAspectSucceededAt } from "@canto/core/infra/media/media-aspect-state-repository";
 import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
-import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
 import {
   applyMediaLocalizationOverlay,
   applySeasonsLocalizationOverlay,
@@ -24,6 +24,7 @@ interface GetByExternalInput {
 export interface GetByExternalDeps {
   media: MediaRepositoryPort;
   logger: LoggerPort;
+  dispatcher: JobDispatcherPort;
   /** Optional — falls back to building from `db` when not supplied. */
   localization?: MediaLocalizationRepositoryPort;
 }
@@ -69,7 +70,7 @@ export async function getByExternal(
     const extrasSucceededAt = await findAspectSucceededAt(db, existing.id, "extras");
     const isStale = !extrasSucceededAt || Date.now() - extrasSucceededAt.getTime() > STALE_MS;
     if (isStale)
-      void dispatchEnsureMedia(existing.id, { aspects: ["extras"] }).catch(
+      void deps.dispatcher.enrichMedia(existing.id, { aspects: ["extras"] }).catch(
         deps.logger.logAndSwallow("media:getByExternal dispatchEnsureMedia(extras)"),
       );
     const lang = await getUserLang();
@@ -120,7 +121,7 @@ export async function getByExternal(
   const inserted = await persistMedia(db, normalized, { crossRefLookup: tvdbEnabled });
 
   if (tvdbEnabled && normalized.type === "show" && normalized.provider === "tmdb") {
-    void dispatchEnsureMedia(inserted.id, {
+    void deps.dispatcher.enrichMedia(inserted.id, {
       aspects: ["structure"],
       force: true,
     }).catch(deps.logger.logAndSwallow("media:getByExternal dispatchEnsureMedia(structure)"));

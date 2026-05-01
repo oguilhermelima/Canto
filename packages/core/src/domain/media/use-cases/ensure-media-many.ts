@@ -1,15 +1,15 @@
 import type { Database } from "@canto/db/client";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import { detectGaps } from "@canto/core/domain/media/use-cases/detect-gaps";
 import {
   ALL_ASPECTS
-  
-  
+
+
 } from "@canto/core/domain/media/use-cases/ensure-media.types";
 import type {Aspect, EnsureMediaSpec} from "@canto/core/domain/media/use-cases/ensure-media.types";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
-import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
 
 export interface EnsureMediaManyFilter {
   mediaIds?: string[];
@@ -31,6 +31,7 @@ export interface EnsureMediaManyResult {
 }
 
 export interface EnsureMediaManyDeps {
+  dispatcher: JobDispatcherPort;
   /** Optional — falls back to building from `db` when not supplied. */
   media?: MediaRepositoryPort;
 }
@@ -48,10 +49,10 @@ export interface EnsureMediaManyDeps {
  */
 export async function ensureMediaMany(
   db: Database,
+  deps: EnsureMediaManyDeps,
   filter: EnsureMediaManyFilter,
   spec: EnsureMediaSpec = {},
   opts: EnsureMediaManyOptions = {},
-  deps: EnsureMediaManyDeps = {},
 ): Promise<EnsureMediaManyResult> {
   const languages = spec.languages ?? [...(await getActiveUserLanguages(db))];
   const mediaRepo = deps.media ?? makeMediaRepository(db);
@@ -103,7 +104,7 @@ export async function ensureMediaMany(
     }
 
     if (!opts.dryRun) {
-      await dispatchEnsureMedia(row.id, {
+      await deps.dispatcher.enrichMedia(row.id, {
         languages,
         aspects: aspectsToDispatch,
         force: spec.force,

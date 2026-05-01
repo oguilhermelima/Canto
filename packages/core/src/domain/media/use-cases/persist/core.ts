@@ -11,6 +11,7 @@ import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/m
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
+import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import { loadCadenceKnobs } from "@canto/core/domain/media/use-cases/cadence/cadence-knobs";
 import {
   buildMediaContext,
@@ -46,7 +47,7 @@ import {
   findMediaByIdWithSeasons,
 } from "@canto/core/infra/media/media-repository";
 import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
-import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
+import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
 import {
   applyMediaLocalizationOverlay,
   applySeasonsLocalizationOverlay,
@@ -67,6 +68,7 @@ export interface PersistDeps {
   contentRating: MediaContentRatingRepositoryPort;
   extras: MediaExtrasRepositoryPort;
   logger: LoggerPort;
+  dispatcher: JobDispatcherPort;
 }
 
 function withFallback(
@@ -83,6 +85,7 @@ function withFallback(
       partial?.contentRating ?? makeMediaContentRatingRepository(db),
     extras: partial?.extras ?? makeMediaExtrasRepository(db),
     logger: partial?.logger ?? makeConsoleLogger(),
+    dispatcher: partial?.dispatcher ?? jobDispatcher,
   };
 }
 
@@ -93,13 +96,14 @@ function withFallback(
  */
 async function detectAndEnqueueLazyFill(
   db: Database,
+  dispatcher: JobDispatcherPort,
   mediaId: string,
   language: string,
 ): Promise<void> {
   if (!language || language.startsWith("en")) return;
   const report = await detectGaps(db, mediaId, [language]);
   if (report.gaps.length === 0) return;
-  await dispatchEnsureMedia(mediaId, {
+  await dispatcher.enrichMedia(mediaId, {
     languages: [language],
     aspects: report.gaps,
   });
@@ -488,6 +492,7 @@ export async function persistFullMedia(
     extras: deps.extras,
     localization: deps.localization,
     logger: deps.logger,
+    dispatcher: deps.dispatcher,
   });
 
   await db
@@ -597,7 +602,7 @@ async function fetchPersistAndDispatch(
   if (result.tvdbId && result.tvdbSeasons?.length) {
     const nonEnLangs = supportedLangs.filter((l) => !l.startsWith("en"));
     for (const lang of nonEnLangs) {
-      void dispatchEnsureMedia(mediaId, {
+      void deps.dispatcher.enrichMedia(mediaId, {
         aspects: ["translations"],
         languages: [lang],
       }).catch(deps.logger.logAndSwallow(`${tag} dispatchEnsureMedia(translations)`));
@@ -691,7 +696,7 @@ export async function resolveMedia(
 
     // Lazy fill: if this user's language has gaps, enqueue an ensureMedia
     // job in the background so the next visit has everything.
-    void detectAndEnqueueLazyFill(db, existing.id, lang).catch(() => {});
+    void detectAndEnqueueLazyFill(db, deps.dispatcher, existing.id, lang).catch(() => {});
 
     return {
       source: "db" as const,

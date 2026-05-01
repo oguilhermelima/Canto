@@ -11,15 +11,16 @@ import {
   resolveSupportedLocale,
   upsertLangLogos,
 } from "@canto/core/domain/content-enrichment/use-cases/upsert-lang-logos";
+import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import { upsertMediaLocalization } from "@canto/core/domain/shared/localization/localization-service";
 import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
-import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
 
 /** Deduplicates concurrent getImages calls for the same externalId */
 const inflightFetches = new Map<string, Promise<string | undefined>>();
 
 export interface FetchLogosDeps {
   logger: LoggerPort;
+  dispatcher: JobDispatcherPort;
 }
 
 export interface FetchLogoItem {
@@ -227,7 +228,7 @@ export async function fetchLogos(
           );
           // Browse-time stub — enqueue metadata fetch so filtered reads pick it
           // up once enriched.
-          void dispatchEnsureMedia(mediaId).catch(
+          void deps.dispatcher.enrichMedia(mediaId).catch(
             deps.logger.logAndSwallow("fetch-logos dispatchEnsureMedia"),
           );
         }

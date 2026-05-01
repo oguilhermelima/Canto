@@ -18,8 +18,7 @@ export interface RefreshExtrasDeps {
   localization: MediaLocalizationRepositoryPort;
   media: MediaRepositoryPort;
   logger: LoggerPort;
-  // FIXME(wave-10): make required once domain/media/enrichment/strategies/extras.ts threads dispatcher
-  dispatcher?: JobDispatcherPort;
+  dispatcher: JobDispatcherPort;
 }
 
 export async function refreshExtras(
@@ -210,7 +209,7 @@ export async function refreshExtras(
       // Stub row from TMDB's recs/similar payload — enqueue full metadata
       // fetch so the row is filled in before any user-facing query surfaces
       // it (read paths filter on the metadata aspect having succeeded).
-      void deps.dispatcher?.enrichMedia(inserted.id).catch(
+      void deps.dispatcher.enrichMedia(inserted.id).catch(
         deps.logger.logAndSwallow("refresh-extras dispatchEnsureMedia"),
       );
     }

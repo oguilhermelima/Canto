@@ -14,7 +14,7 @@ import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-
 import { getSetting, getSettings, setSettingRaw } from "@canto/db/settings";
 
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
-import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
+import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import {
   findMediaByAnyReference,
   updateMedia,
@@ -194,6 +194,7 @@ async function ensureMediaAnchor(
   db: Database,
   tmdb: MediaProviderPort,
   logger: LoggerPort,
+  dispatcher: JobDispatcherPort,
   scanned: ScannedMediaItem,
   cache: MediaAnchorCache,
   supportedLangs: readonly string[],
@@ -238,7 +239,7 @@ async function ensureMediaAnchor(
       "metadata",
     );
     if (!metadataSucceededAt) {
-      void dispatchEnsureMedia(existing.id).catch(
+      void dispatcher.enrichMedia(existing.id).catch(
         logger.logAndSwallow("sync-pipeline dispatchEnsureMedia"),
       );
     }
@@ -266,7 +267,7 @@ async function ensureMediaAnchor(
   };
   if (scanned.libraryId) mediaUpdates.libraryId = scanned.libraryId;
   await updateMedia(db, inserted.id, mediaUpdates);
-  void dispatchEnsureMedia(inserted.id).catch(
+  void dispatcher.enrichMedia(inserted.id).catch(
     logger.logAndSwallow("sync-pipeline dispatchEnsureMedia"),
   );
 
@@ -384,6 +385,7 @@ async function loadServerConfig(): Promise<ServerConfig> {
  */
 export interface RunSyncPipelineDeps {
   logger: LoggerPort;
+  dispatcher: JobDispatcherPort;
 }
 
 export async function runSyncPipeline(
@@ -425,7 +427,7 @@ export async function runSyncPipeline(
     for (let i = 0; i < deduplicated.length; i += BATCH_SIZE) {
       const batch = deduplicated.slice(i, i + BATCH_SIZE);
       for (const scanned of batch) {
-        await processOne(db, tmdb, deps.logger, scanned, {
+        await processOne(db, tmdb, deps.logger, deps.dispatcher, scanned, {
           tag,
           config,
           mediaCache,
@@ -491,6 +493,7 @@ async function processOne(
   db: Database,
   tmdb: MediaProviderPort,
   logger: LoggerPort,
+  dispatcher: JobDispatcherPort,
   scanned: ScannedMediaItem,
   ctx: ProcessCtx,
 ): Promise<void> {
@@ -501,6 +504,7 @@ async function processOne(
       db,
       tmdb,
       logger,
+      dispatcher,
       scanned,
       mediaCache,
       supportedLangs,

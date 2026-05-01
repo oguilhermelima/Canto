@@ -16,8 +16,7 @@ export interface ManageListItemsDeps {
   recs: RecommendationsRepositoryPort;
   userMedia: UserMediaRepositoryPort;
   logger: LoggerPort;
-  // FIXME(wave-10): make required once callers in packages/api wire this port
-  dispatcher?: JobDispatcherPort;
+  dispatcher: JobDispatcherPort;
 }
 
 /**
@@ -45,7 +44,7 @@ export async function addItemToList(
   void deps.recs.removeMediaFromUserRecs(userId, input.mediaId).catch(
     deps.logger.logAndSwallow("list:addItem removeMediaFromUserRecs"),
   );
-  void deps.dispatcher?.enrichMedia(input.mediaId).catch(
+  void deps.dispatcher.enrichMedia(input.mediaId).catch(
     deps.logger.logAndSwallow("list:addItem dispatchEnsureMedia"),
   );
   void addMediaToUserRecs(

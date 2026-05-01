@@ -12,6 +12,7 @@ import { getSetting } from "@canto/db/settings";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import { runWithConcurrency } from "@canto/core/platform/concurrency/run-with-concurrency";
 import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
+import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
 import type { MediaVersionRow } from "@canto/core/infra/media/media-version-repository";
 import {
   findEnabledSyncLinks,
@@ -538,7 +539,7 @@ export async function runReverseSync(options: ReverseSyncOptions = {}): Promise<
         `[reverse-sync] Syncing ${needGlobalSync.length} new items for global library from user ${conn.userId}`,
       );
       try {
-        await runSyncPipeline(db, tmdb, { logger: makeConsoleLogger() }, needGlobalSync, `${provider}-sync`, {
+        await runSyncPipeline(db, tmdb, { logger: makeConsoleLogger(), dispatcher: jobDispatcher }, needGlobalSync, `${provider}-sync`, {
           forUserId: conn.userId,
         });
       } catch (err) {

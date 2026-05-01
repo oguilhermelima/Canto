@@ -71,7 +71,10 @@ export const mediaMetadataRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const media = makeMediaRepository(ctx.db);
       const result = await getByExternal(
-        ctx.db, { media, logger: makeConsoleLogger() }, input, ctx.session.user.id,
+        ctx.db,
+        { media, logger: makeConsoleLogger(), dispatcher: jobDispatcher },
+        input,
+        ctx.session.user.id,
         getProviderWithKey,
         () => getActiveUserLanguages(ctx.db).then((s) => [...s]),
       );
