@@ -1,4 +1,4 @@
-import type { MediaVersionRepositoryPort } from "@canto/core/domain/media/ports/media-version-repository.port";
+import type { MediaVersionRepositoryPort } from "@canto/core/domain/media-servers/ports/media-version-repository.port";
 
 export interface MediaAvailabilityDeps {
   mediaVersion: MediaVersionRepositoryPort;
@@ -14,7 +14,7 @@ export async function getMediaAvailability(
   mediaId: string,
 ) {
   const versions =
-    await deps.mediaVersion.findVersionsWithEpisodesByMediaId(mediaId);
+    await deps.mediaVersion.findWithEpisodesByMediaId(mediaId);
 
   const sources: Array<{
     type: "jellyfin" | "plex";

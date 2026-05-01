@@ -164,7 +164,7 @@ export const syncRouter = createTRPCRouter({
       const mutated = result as { mediaId: string; suggestedName: string };
       if (input.updateMediaServer && mutated.mediaId) {
         await updateMediaServerMetadata(mutated.mediaId, {
-          media,
+          media: makeMediaRepository(ctx.db),
           mediaVersions: makeMediaVersionRepository(ctx.db),
           localization: makeMediaLocalizationRepository(ctx.db),
           credentials: makeServerCredentials(),
