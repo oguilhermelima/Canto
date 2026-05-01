@@ -2,10 +2,10 @@ import type { Database } from "@canto/db/client";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { MediaType, ProviderName } from "@canto/providers";
 import { persistMedia } from "@canto/core/domain/media/use-cases/persist";
 import { getSetting } from "@canto/db/settings";
-import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 import { findAspectSucceededAt } from "@canto/core/infra/media/media-aspect-state-repository";
 import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
@@ -23,6 +23,7 @@ interface GetByExternalInput {
 
 export interface GetByExternalDeps {
   media: MediaRepositoryPort;
+  logger: LoggerPort;
   /** Optional — falls back to building from `db` when not supplied. */
   localization?: MediaLocalizationRepositoryPort;
 }
@@ -69,7 +70,7 @@ export async function getByExternal(
     const isStale = !extrasSucceededAt || Date.now() - extrasSucceededAt.getTime() > STALE_MS;
     if (isStale)
       void dispatchEnsureMedia(existing.id, { aspects: ["extras"] }).catch(
-        logAndSwallow("media:getByExternal dispatchEnsureMedia(extras)"),
+        deps.logger.logAndSwallow("media:getByExternal dispatchEnsureMedia(extras)"),
       );
     const lang = await getUserLang();
     const localized = await applyMediaLocalizationOverlay(existing, lang, {
@@ -122,7 +123,7 @@ export async function getByExternal(
     void dispatchEnsureMedia(inserted.id, {
       aspects: ["structure"],
       force: true,
-    }).catch(logAndSwallow("media:getByExternal dispatchEnsureMedia(structure)"));
+    }).catch(deps.logger.logAndSwallow("media:getByExternal dispatchEnsureMedia(structure)"));
   }
 
   const result = await deps.media.findByIdWithSeasons(inserted.id);

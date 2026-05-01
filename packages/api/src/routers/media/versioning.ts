@@ -23,6 +23,7 @@ import { fetchMediaMetadata } from "@canto/core/domain/media/use-cases/fetch-med
 import { getEffectiveProvider } from "@canto/core/domain/shared/rules/effective-provider";
 import { reconcileShowStructure } from "@canto/core/domain/media/use-cases/reconcile-show-structure";
 import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
+import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 import { executeReorganizeMediaFiles } from "@canto/core/domain/file-organization/use-cases/reorganize-media-files";
 import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
 import { updateMediaServerMetadata } from "@canto/core/domain/media-servers/use-cases/update-metadata";
@@ -64,7 +65,7 @@ export const mediaVersioningRouter = createTRPCRouter({
         const media = makeMediaRepository(ctx.db);
         await reconcileShowStructure(
           ctx.db,
-          { media, tmdb, tvdb, dispatcher: jobDispatcher },
+          { media, tmdb, tvdb, dispatcher: jobDispatcher, logger: makeConsoleLogger() },
           input.id,
           { force: true },
         );

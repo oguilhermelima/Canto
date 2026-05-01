@@ -21,6 +21,8 @@ import { createTRPCRouter, adminProcedure, protectedProcedure, publicProcedure, 
 import { SERVICE_ENABLED_KEY } from "@canto/core/domain/media-servers/rules/service-keys";
 import { toggleTvdbDefault } from "@canto/core/domain/media/use-cases/toggle-tvdb-default";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
+import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 import {
   authenticateJellyfin,
   authenticatePlex,
@@ -64,7 +66,10 @@ export const settingsServicesRouter = createTRPCRouter({
     .input(toggleTvdbDefaultInput)
     .mutation(({ ctx, input }) => {
       const media = makeMediaRepository(ctx.db);
-      return toggleTvdbDefault({ media }, input.enabled);
+      return toggleTvdbDefault(
+        { media, dispatcher: jobDispatcher, logger: makeConsoleLogger() },
+        input.enabled,
+      );
     }),
 
   isOnboardingCompleted: publicProcedure.query(async () => {

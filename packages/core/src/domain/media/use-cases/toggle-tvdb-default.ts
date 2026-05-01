@@ -1,10 +1,12 @@
 import { setSetting } from "@canto/db/settings";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
-import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
-import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 
 export interface ToggleTvdbDefaultDeps {
   media: MediaRepositoryPort;
+  dispatcher: JobDispatcherPort;
+  logger: LoggerPort;
 }
 
 /**
@@ -33,10 +35,9 @@ export async function toggleTvdbDefault(
 
   void Promise.all(
     showIds.map((id) =>
-      dispatchEnsureMedia(id, {
-        aspects: ["structure"],
-        force: true,
-      }).catch(logAndSwallow(`toggleTvdbDefault dispatch ${id}`)),
+      deps.dispatcher
+        .enrichMedia(id, { aspects: ["structure"], force: true })
+        .catch(deps.logger.logAndSwallow(`toggleTvdbDefault dispatch ${id}`)),
     ),
   );
 

@@ -6,7 +6,7 @@ import type { Database } from "@canto/db/client";
 
 import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
-import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
 
 const EN = "en-US";
@@ -14,6 +14,7 @@ const EN = "en-US";
 export interface PersistExtrasDeps {
   extras: MediaExtrasRepositoryPort;
   localization: MediaLocalizationRepositoryPort;
+  logger: LoggerPort;
 }
 
 /**
@@ -99,7 +100,7 @@ export async function persistExtras(
           // fetch so read paths (filtered on the metadata aspect having
           // succeeded) can surface it.
           void dispatchEnsureMedia(inserted.id).catch(
-            logAndSwallow("persistExtras dispatchEnsureMedia"),
+            deps.logger.logAndSwallow("persistExtras dispatchEnsureMedia"),
           );
         } else {
           const existing = await db.query.media.findFirst({

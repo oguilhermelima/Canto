@@ -1,5 +1,6 @@
 import type { Database } from "@canto/db/client";
 import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import {
   findAllDownloadsPaginated,
   countAllDownloads,
@@ -8,12 +9,17 @@ import { findMediaById } from "@canto/core/infra/media/media-repository";
 import { findMediaLocalizedMany } from "@canto/core/infra/media/media-localized-repository";
 import { mergeLiveData } from "@canto/core/domain/media/use-cases/merge-live-data";
 
+export interface ListLiveTorrentsDeps {
+  logger: LoggerPort;
+}
+
 /**
  * List live torrent data from qBittorrent merged with DB records + media info.
  * Supports offset-based pagination via cursor.
  */
 export async function listLiveTorrents(
   db: Database,
+  deps: ListLiveTorrentsDeps,
   language: string,
   limit: number,
   offset: number,
@@ -23,7 +29,7 @@ export async function listLiveTorrents(
     findAllDownloadsPaginated(db, limit, offset),
     countAllDownloads(db),
   ]);
-  const merged = await mergeLiveData(db, dbRows, qb);
+  const merged = await mergeLiveData(db, deps, dbRows, qb);
 
   // Batch-fetch linked media info; title/posterPath now live on
   // media_localization, so resolve them via the user's language with en-US

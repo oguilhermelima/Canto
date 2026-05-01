@@ -1,16 +1,21 @@
 import type { Database } from "@canto/db/client";
 import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { LiveData } from "@canto/core/domain/torrents/types/torrent";
 import {
   updateDownload,
   updateDownloadBatch,
 } from "@canto/core/infra/torrents/download-repository";
-import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 
 type TorrentRow = Awaited<ReturnType<Database["query"]["download"]["findMany"]>>[number];
 
+export interface MergeLiveDataDeps {
+  logger: LoggerPort;
+}
+
 export async function mergeLiveData(
   db: Database,
+  deps: MergeLiveDataDeps,
   dbRows: TorrentRow[],
   qbClient: DownloadClientPort,
 ): Promise<Array<{ row: TorrentRow; live: LiveData | null }>> {
@@ -58,7 +63,7 @@ export async function mergeLiveData(
         (row as { fileSize: number | null }).fileSize = live.size;
       }
       (row as { progress: number }).progress = live.progress;
-      void updateDownload(db, row.id, updates).catch(logAndSwallow("merge-live-data updateDownload"));
+      void updateDownload(db, row.id, updates).catch(deps.logger.logAndSwallow("merge-live-data updateDownload"));
     }
   }
 
@@ -98,7 +103,7 @@ export async function mergeLiveData(
     byStatus.get(status)!.push(id);
   }
   for (const [status, ids] of byStatus) {
-    void updateDownloadBatch(db, ids, { status }).catch(logAndSwallow("merge-live-data updateDownloadBatch"));
+    void updateDownloadBatch(db, ids, { status }).catch(deps.logger.logAndSwallow("merge-live-data updateDownloadBatch"));
   }
 
   // Update in-memory statuses

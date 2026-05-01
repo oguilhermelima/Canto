@@ -14,7 +14,7 @@ import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trp
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
 import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
-import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import { logAndSwallow, makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 import {
   findMediaById,
   findMediaByIdWithSeasons,
@@ -71,7 +71,7 @@ export const mediaMetadataRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const media = makeMediaRepository(ctx.db);
       const result = await getByExternal(
-        ctx.db, { media }, input, ctx.session.user.id,
+        ctx.db, { media, logger: makeConsoleLogger() }, input, ctx.session.user.id,
         getProviderWithKey,
         () => getActiveUserLanguages(ctx.db).then((s) => [...s]),
       );
@@ -154,7 +154,7 @@ export const mediaMetadataRouter = createTRPCRouter({
           const media = makeMediaRepository(ctx.db);
           await reconcileShowStructure(
             ctx.db,
-            { media, tmdb, tvdb, dispatcher: jobDispatcher },
+            { media, tmdb, tvdb, dispatcher: jobDispatcher, logger: makeConsoleLogger() },
             row.id,
             { force: true },
           );

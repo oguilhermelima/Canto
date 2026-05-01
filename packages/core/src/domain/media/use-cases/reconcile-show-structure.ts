@@ -10,8 +10,8 @@ import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import { findMediaLocalized } from "@canto/core/infra/media/media-localized-repository";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
-import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import { getEffectiveProvider } from "@canto/core/domain/shared/rules/effective-provider";
 import { upsertMediaLocalization } from "@canto/core/domain/shared/localization/localization-service";
 
@@ -19,6 +19,7 @@ export interface ReconcileShowStructureDeps {
   media: MediaRepositoryPort;
   tmdb: MediaProviderPort;
   tvdb: MediaProviderPort;
+  logger: LoggerPort;
   dispatcher?: JobDispatcherPort;
 }
 
@@ -162,7 +163,7 @@ export async function reconcileShowStructure(
     for (const lang of nonEnLangs) {
       void dispatcher
         .enrichMedia(mediaId, { aspects: ["translations"], languages: [lang] })
-        .catch(logAndSwallow("reconcile enrichMedia translations"));
+        .catch(deps.logger.logAndSwallow("reconcile enrichMedia translations"));
     }
   }
 

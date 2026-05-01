@@ -40,7 +40,12 @@ export const structureStrategy: MediaEnrichmentStrategy<
       // `translations` strategy runs later in this same pass.
       await reconcileShowStructure(
         db,
-        { media: ctx.deps.media, tmdb: deps.tmdb, tvdb: deps.tvdb },
+        {
+          media: ctx.deps.media,
+          tmdb: deps.tmdb,
+          tvdb: deps.tvdb,
+          logger: ctx.deps.logger,
+        },
         mediaId,
         { force: true, dispatchTranslations: false },
       );

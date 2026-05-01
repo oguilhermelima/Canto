@@ -10,6 +10,7 @@ import type { MediaContentRatingRepositoryPort } from "@canto/core/domain/media/
 import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import { loadCadenceKnobs } from "@canto/core/domain/media/use-cases/cadence/cadence-knobs";
 import {
   buildMediaContext,
@@ -44,7 +45,7 @@ import {
   findMediaByExternalId,
   findMediaByIdWithSeasons,
 } from "@canto/core/infra/media/media-repository";
-import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
 import {
   applyMediaLocalizationOverlay,
@@ -65,6 +66,7 @@ export interface PersistDeps {
   aspectState: MediaAspectStateRepositoryPort;
   contentRating: MediaContentRatingRepositoryPort;
   extras: MediaExtrasRepositoryPort;
+  logger: LoggerPort;
 }
 
 function withFallback(
@@ -80,6 +82,7 @@ function withFallback(
     contentRating:
       partial?.contentRating ?? makeMediaContentRatingRepository(db),
     extras: partial?.extras ?? makeMediaExtrasRepository(db),
+    logger: partial?.logger ?? makeConsoleLogger(),
   };
 }
 
@@ -484,6 +487,7 @@ export async function persistFullMedia(
   await persistExtras(db, mediaId, extras, {
     extras: deps.extras,
     localization: deps.localization,
+    logger: deps.logger,
   });
 
   await db
@@ -596,7 +600,7 @@ async function fetchPersistAndDispatch(
       void dispatchEnsureMedia(mediaId, {
         aspects: ["translations"],
         languages: [lang],
-      }).catch(logAndSwallow(`${tag} dispatchEnsureMedia(translations)`));
+      }).catch(deps.logger.logAndSwallow(`${tag} dispatchEnsureMedia(translations)`));
     }
   }
 

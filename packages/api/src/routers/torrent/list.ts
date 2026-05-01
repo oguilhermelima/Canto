@@ -6,6 +6,7 @@ import {
 import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
 import { listLiveTorrents } from "@canto/core/domain/torrents/use-cases/list-live-torrents";
 import { mergeLiveData } from "@canto/core/domain/media/use-cases/merge-live-data";
+import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 import {
   findAllDownloads,
   findDownloadsByMediaId,
@@ -24,7 +25,7 @@ export const torrentListRouter = createTRPCRouter({
     .input(listLiveTorrentsInput)
     .query(async ({ ctx, input }) => {
       const qb = await getDownloadClient();
-      return listLiveTorrents(ctx.db, ctx.session.user.language, input.limit, input.cursor, qb);
+      return listLiveTorrents(ctx.db, { logger: makeConsoleLogger() }, ctx.session.user.language, input.limit, input.cursor, qb);
     }),
 
   listLiveByMedia: adminProcedure
@@ -33,7 +34,7 @@ export const torrentListRouter = createTRPCRouter({
       const dbRows = await findDownloadsByMediaId(ctx.db, input.mediaId);
       if (dbRows.length === 0) return [];
       const qb = await getDownloadClient();
-      const merged = await mergeLiveData(ctx.db, dbRows, qb);
+      const merged = await mergeLiveData(ctx.db, { logger: makeConsoleLogger() }, dbRows, qb);
       return merged.map((item) => ({ ...item.row, live: item.live }));
     }),
 

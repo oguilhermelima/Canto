@@ -5,6 +5,7 @@ import { media } from "@canto/db/schema";
 
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { SearchResult } from "@canto/providers";
 import {
   resolveSupportedLocale,
@@ -13,10 +14,13 @@ import {
 import { upsertMediaLocalization } from "@canto/core/domain/shared/localization/localization-service";
 import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
-import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 
 /** Deduplicates concurrent getImages calls for the same externalId */
 const inflightFetches = new Map<string, Promise<string | undefined>>();
+
+export interface FetchLogosDeps {
+  logger: LoggerPort;
+}
 
 export interface FetchLogoItem {
   externalId: number;
@@ -42,6 +46,7 @@ export interface FetchLogoItem {
  */
 export async function fetchLogos(
   db: Database,
+  deps: FetchLogosDeps,
   tmdb: MediaProviderPort,
   items: FetchLogoItem[],
   language?: string,
@@ -223,7 +228,7 @@ export async function fetchLogos(
           // Browse-time stub — enqueue metadata fetch so filtered reads pick it
           // up once enriched.
           void dispatchEnsureMedia(mediaId).catch(
-            logAndSwallow("fetch-logos dispatchEnsureMedia"),
+            deps.logger.logAndSwallow("fetch-logos dispatchEnsureMedia"),
           );
         }
       } catch (err) {
