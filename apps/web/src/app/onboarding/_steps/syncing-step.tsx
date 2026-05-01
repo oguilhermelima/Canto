@@ -17,12 +17,23 @@ export function SyncingStep({
   settings?: Settings;
   configureFooter: ConfigureFooter;
 }): React.JSX.Element {
-  const [tasks, setTasks] = useState<MagicTask[]>([]);
-  const [allDone, setAllDone] = useState(false);
-  const started = useRef(false);
-
   const jellyfinEnabled = settings?.["jellyfin.enabled"] === true;
   const plexEnabled = settings?.["plex.enabled"] === true;
+
+  // Initialize the task list synchronously from the props on first render so
+  // we don't have to setState inside the mount effect.
+  const [tasks, setTasks] = useState<MagicTask[]>(() => {
+    const initial: MagicTask[] = [];
+    if (jellyfinEnabled) initial.push({ id: "jellyfin", label: "Syncing Jellyfin library", icon: Tv, status: "pending" });
+    if (plexEnabled) initial.push({ id: "plex", label: "Syncing Plex library", icon: Film, status: "pending" });
+    initial.push({ id: "recs", label: "Building recommendations", icon: Sparkles, status: "pending" });
+    if (initial.length === 1) {
+      initial.unshift({ id: "organize", label: "Organizing your library", icon: FolderSync, status: "skipped" });
+    }
+    return initial;
+  });
+  const [allDone, setAllDone] = useState(false);
+  const started = useRef(false);
 
   const syncJellyfin = trpc.jellyfin.syncLibraries.useMutation();
   const syncPlex = trpc.plex.syncLibraries.useMutation();
@@ -74,18 +85,10 @@ export function SyncingStep({
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-
-    const initial: MagicTask[] = [];
-    if (jellyfinEnabled) initial.push({ id: "jellyfin", label: "Syncing Jellyfin library", icon: Tv, status: "pending" });
-    if (plexEnabled) initial.push({ id: "plex", label: "Syncing Plex library", icon: Film, status: "pending" });
-    initial.push({ id: "recs", label: "Building recommendations", icon: Sparkles, status: "pending" });
-
-    if (initial.length === 1) {
-      initial.unshift({ id: "organize", label: "Organizing your library", icon: FolderSync, status: "skipped" });
-    }
-
-    setTasks(initial);
-    void runTasks(initial);
+    // Defer one microtask so the setState calls inside runTasks happen after
+    // commit instead of during it (avoids cascading renders during the mount
+    // effect that the React-hooks lint rule warns about).
+    queueMicrotask(() => void runTasks(tasks));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
