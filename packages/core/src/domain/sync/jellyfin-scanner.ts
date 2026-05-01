@@ -9,8 +9,9 @@
 
 import {
   SyncAuthError,
-  isAuthStatus,
-} from "@canto/core/domain/sync/types";
+  SyncFetchError,
+} from "@canto/core/domain/sync/errors";
+import { isAuthStatus } from "@canto/core/domain/sync/types";
 import type {
   ExternalIds,
   ScannedMediaItem,
@@ -245,7 +246,7 @@ async function fetchItemsPage(
   if (!res.ok) {
     const msg = `Jellyfin API returned HTTP ${res.status} for library ${libraryId} (${includeTypes}) at offset ${startIndex}`;
     if (isAuthStatus(res.status)) throw new SyncAuthError(msg, res.status);
-    throw new Error(msg);
+    throw new SyncFetchError(msg, res.status);
   }
   return (await res.json()) as JellyfinItemsResponse;
 }

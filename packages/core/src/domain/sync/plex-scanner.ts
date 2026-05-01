@@ -9,8 +9,9 @@
 
 import {
   SyncAuthError,
-  isAuthStatus,
-} from "@canto/core/domain/sync/types";
+  SyncFetchError,
+} from "@canto/core/domain/sync/errors";
+import { isAuthStatus } from "@canto/core/domain/sync/types";
 import type {
   ExternalIds,
   MediaKind,
@@ -205,7 +206,7 @@ async function fetchPlexPage(
   if (!res.ok) {
     const msg = `Plex API returned HTTP ${res.status} for library ${lib.plexLibraryId} at offset ${offset}`;
     if (isAuthStatus(res.status)) throw new SyncAuthError(msg, res.status);
-    throw new Error(msg);
+    throw new SyncFetchError(msg, res.status);
   }
   return (await res.json()) as PlexMediaContainer;
 }

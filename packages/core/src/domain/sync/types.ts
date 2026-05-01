@@ -78,19 +78,7 @@ export interface SyncSummary {
   error?: string;
 }
 
-/**
- * Thrown by server scanners when the upstream server rejects the request
- * as unauthorized (HTTP 401/403). The worker catches this to mark the
- * user_connection as stale so the UI can prompt the user to re-authenticate.
- */
-export class SyncAuthError extends Error {
-  readonly status: number;
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = "SyncAuthError";
-    this.status = status;
-  }
-}
+export { SyncAuthError, SyncFetchError } from "@canto/core/domain/sync/errors";
 
 export function isAuthStatus(status: number): boolean {
   return status === 401 || status === 403;
