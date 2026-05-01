@@ -12,7 +12,6 @@ import type {
   WatchProviderLink,
 } from "@canto/core/domain/media/types/media-watch-provider";
 import type {
-  MediaRecommendation,
   NewMediaRecommendation,
   RecommendationSourceType,
 } from "@canto/core/domain/media/types/media-recommendation";

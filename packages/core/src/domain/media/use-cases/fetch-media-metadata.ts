@@ -75,7 +75,8 @@ export async function fetchMediaMetadata(
     if (!resolvedTvdbId) {
       try {
         const results = await deps.tvdb.search(media.title, "show");
-        if (results.results.length > 0) resolvedTvdbId = results.results[0]!.externalId;
+        const first = results.results[0];
+        if (first) resolvedTvdbId = first.externalId;
       } catch {
         tvdbFailed = true;
       }
@@ -148,7 +149,8 @@ async function resolveAndFetchExtras(
   if (tmdbExternalId === undefined) {
     try {
       const search = await tmdb.search(metadata.title, type);
-      if (search.results.length > 0) tmdbExternalId = search.results[0]!.externalId;
+      const first = search.results[0];
+      if (first) tmdbExternalId = first.externalId;
     } catch { /* skip extras if we can't find TMDB equivalent */ }
   }
 

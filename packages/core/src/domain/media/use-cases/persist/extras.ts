@@ -47,7 +47,7 @@ export async function persistExtras(
 
   const uniqueItems = new Map<string, (typeof allRecItems)[number]>();
   for (const item of allRecItems) {
-    const key = `${item.result.provider ?? "tmdb"}-${item.result.externalId}`;
+    const key = `${item.result.provider}-${item.result.externalId}`;
     if (!uniqueItems.has(key)) uniqueItems.set(key, item);
   }
 
@@ -64,12 +64,12 @@ export async function persistExtras(
     );
 
     for (const item of uniqueItems.values()) {
-      const key = `${item.result.provider ?? "tmdb"}-${item.result.externalId}`;
+      const key = `${item.result.provider}-${item.result.externalId}`;
       const existingId = existingByExtId.get(item.result.externalId);
       if (existingId) {
         recMediaIdByKey.set(key, existingId);
       } else {
-        const provider = (item.result.provider ?? "tmdb") as MediaProvider;
+        const provider: MediaProvider = item.result.provider;
         const inserted = await deps.media.tryCreateMedia({
           type: item.result.type,
           externalId: item.result.externalId,
@@ -122,14 +122,14 @@ export async function persistExtras(
 
   if (extras.credits.cast.length > 0) {
     await deps.extras.insertCredits(
-      extras.credits.cast.map((c, i) => ({
+      extras.credits.cast.map((c, _i) => ({
         mediaId,
         personId: c.id,
         name: c.name,
         character: c.character,
         profilePath: c.profilePath,
         type: "cast" as const,
-        order: c.order ?? i,
+        order: c.order,
       })),
     );
   }
@@ -179,7 +179,7 @@ export async function persistExtras(
           mediaId,
           providerId: wp.providerId,
           providerName: wp.providerName,
-          logoPath: wp.logoPath ?? null,
+          logoPath: wp.logoPath,
           type: "stream",
           region,
         });
@@ -189,7 +189,7 @@ export async function persistExtras(
           mediaId,
           providerId: wp.providerId,
           providerName: wp.providerName,
-          logoPath: wp.logoPath ?? null,
+          logoPath: wp.logoPath,
           type: "rent",
           region,
         });
@@ -199,7 +199,7 @@ export async function persistExtras(
           mediaId,
           providerId: wp.providerId,
           providerName: wp.providerName,
-          logoPath: wp.logoPath ?? null,
+          logoPath: wp.logoPath,
           type: "buy",
           region,
         });
@@ -212,7 +212,7 @@ export async function persistExtras(
   }
 
   for (const item of uniqueItems.values()) {
-    const key = `${item.result.provider ?? "tmdb"}-${item.result.externalId}`;
+    const key = `${item.result.provider}-${item.result.externalId}`;
     const recMediaId = recMediaIdByKey.get(key);
     if (!recMediaId) continue;
 

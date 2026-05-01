@@ -12,6 +12,7 @@ import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/p
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
+import type { NormalizedMedia } from "@canto/providers";
 import { getEffectiveProvider } from "@canto/core/domain/shared/rules/effective-provider";
 import { upsertMediaLocalization } from "@canto/core/domain/shared/localization/localization-service";
 
@@ -62,7 +63,8 @@ export async function reconcileShowStructure(
     if (enTitle) {
       try {
         const results = await tvdb.search(enTitle, "show");
-        if (results.results.length > 0) tvdbId = results.results[0]!.externalId;
+        const first = results.results[0];
+        if (first) tvdbId = first.externalId;
       } catch { /* not found */ }
     }
     if (!tvdbId) return;
@@ -82,7 +84,11 @@ export async function reconcileShowStructure(
   // history, ratings, files), transaction safety, and TMDB still image overlay.
   if (!isAlreadyTvdb) {
     // Build a minimal NormalizedMedia to pass TMDB seasons for still overlay
-    const tmdbNormalized = { ...tvdbData, provider: row.provider, externalId: row.externalId } as import("@canto/providers").NormalizedMedia;
+    const tmdbNormalized = {
+      ...tvdbData,
+      provider: row.provider,
+      externalId: row.externalId,
+    } as NormalizedMedia;
     // Fetch TMDB metadata to get episode stills for overlay
     try {
       const tmdbData = await deps.tmdb.getMetadata(row.externalId, "show");

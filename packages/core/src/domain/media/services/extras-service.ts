@@ -72,8 +72,7 @@ export async function loadExtrasFromDB(
   > = {};
 
   for (const wp of watchProviders) {
-    if (!wpByRegion[wp.region]) wpByRegion[wp.region] = {};
-    const region = wpByRegion[wp.region]!;
+    const region = (wpByRegion[wp.region] ??= {});
     const entry = {
       providerId: wp.providerId,
       providerName: wp.providerName,

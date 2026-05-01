@@ -1,6 +1,7 @@
 import type { Aspect } from "@canto/core/domain/media/types/media-aspect-state";
 import type { MediaEnrichmentStrategy } from "@canto/core/domain/media/enrichment/types";
 import type { PlanItem } from "@canto/core/domain/media/use-cases/cadence/compute-plan";
+import { EnrichmentRegistryCycleError } from "@canto/core/domain/media/errors";
 
 /**
  * Topologically sort plan items by their strategy's `dependsOn` so that
@@ -31,7 +32,8 @@ export function topoSortPlanItems(
   const queue: Aspect[] = aspects.filter((a) => (inDegree.get(a) ?? 0) === 0);
 
   while (queue.length > 0) {
-    const next = queue.shift()!;
+    const next = queue.shift();
+    if (!next) break;
     ordered.push(next);
     for (const a of aspects) {
       if (registry[a].dependsOn.includes(next)) {
@@ -43,7 +45,7 @@ export function topoSortPlanItems(
   }
 
   if (ordered.length !== aspects.length) {
-    throw new Error("enrichment registry has a dependency cycle");
+    throw new EnrichmentRegistryCycleError();
   }
 
   const aspectRank = new Map<Aspect, number>(

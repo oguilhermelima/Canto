@@ -15,10 +15,8 @@ import {
 import type { NormalizedMedia, NormalizedSeason } from "@canto/providers";
 
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
-import {
-  persistSeasons,
-  type PersistDeps,
-} from "@canto/core/domain/media/use-cases/persist/core";
+import { persistSeasons } from "@canto/core/domain/media/use-cases/persist/core";
+import type { PersistDeps } from "@canto/core/domain/media/use-cases/persist/core";
 
 interface TvdbOverlayDeps extends Pick<PersistDeps, "media"> {
   localization: MediaLocalizationRepositoryPort;
@@ -85,7 +83,7 @@ export async function overlayTmdbEpisodeData(
   const updates: Array<{ id: string; data: TmdbEpisodeData }> = [];
   for (const s of seasons) {
     for (const ep of s.episodes) {
-      if (ep.absoluteNumber == null) continue;
+      if (ep.absoluteNumber === null) continue;
       const tmdb = tmdbEpMap.get(ep.absoluteNumber);
       if (tmdb) updates.push({ id: ep.id, data: tmdb });
     }
@@ -99,8 +97,12 @@ export async function overlayTmdbEpisodeData(
       .update(episode)
       .set({
         ...(u.data.stillPath ? { stillPath: u.data.stillPath } : {}),
-        ...(u.data.voteAverage != null ? { voteAverage: u.data.voteAverage } : {}),
-        ...(u.data.voteCount != null ? { voteCount: u.data.voteCount } : {}),
+        ...(u.data.voteAverage !== undefined
+          ? { voteAverage: u.data.voteAverage }
+          : {}),
+        ...(u.data.voteCount !== undefined
+          ? { voteCount: u.data.voteCount }
+          : {}),
         ...(u.data.episodeType ? { episodeType: u.data.episodeType } : {}),
         ...(u.data.crew ? { crew: u.data.crew } : {}),
         ...(u.data.guestStars ? { guestStars: u.data.guestStars } : {}),
@@ -132,7 +134,7 @@ export async function overlayTmdbSeasonData(
 
   for (const s of dbSeasons) {
     const tmdb = tmdbSeasonByNumber.get(s.number);
-    if (tmdb?.voteAverage != null) {
+    if (tmdb?.voteAverage !== undefined) {
       await db
         .update(season)
         .set({ voteAverage: tmdb.voteAverage })
@@ -335,7 +337,7 @@ export async function applyTvdbSeasons(
   for (const s of newSeasons) {
     newSeasonIdByNumber.set(s.number, s.id);
     for (const e of s.episodes) {
-      if (e.absoluteNumber != null) newEpByAbsolute.set(e.absoluteNumber, e.id);
+      if (e.absoluteNumber !== null) newEpByAbsolute.set(e.absoluteNumber, e.id);
       newEpBySeasonEp.set(`${s.number}-${e.number}`, e.id);
     }
   }
@@ -343,7 +345,7 @@ export async function applyTvdbSeasons(
   function resolveNewEpId(oldEpId: string): string | undefined {
     const info = epIdentity.get(oldEpId);
     if (!info) return undefined;
-    if (info.absoluteNumber != null) {
+    if (info.absoluteNumber !== null) {
       const id = newEpByAbsolute.get(info.absoluteNumber);
       if (id) return id;
     }
@@ -352,7 +354,7 @@ export async function applyTvdbSeasons(
 
   function resolveNewSeasonId(oldSeasonId: string): string | undefined {
     const num = existingSeasons.find((s) => s.id === oldSeasonId)?.number;
-    return num != null ? newSeasonIdByNumber.get(num) : undefined;
+    return num !== undefined ? newSeasonIdByNumber.get(num) : undefined;
   }
 
   for (const r of detachedFiles) {
@@ -381,13 +383,18 @@ export async function applyTvdbSeasons(
   if (savedSeasonTranslations.length > 0) {
     const seasonTransSeen = new Set<string>();
     const seasonTransRows = savedSeasonTranslations
-      .filter((t) => newSeasonIdByNumber.has(t.seasonNumber))
-      .map((t) => ({
-        seasonId: newSeasonIdByNumber.get(t.seasonNumber)!,
-        language: t.language,
-        name: t.name,
-        overview: t.overview,
-      }))
+      .map((t) => {
+        const seasonId = newSeasonIdByNumber.get(t.seasonNumber);
+        return seasonId === undefined
+          ? null
+          : {
+              seasonId,
+              language: t.language,
+              name: t.name,
+              overview: t.overview,
+            };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null)
       .filter((r) => {
         const key = `${r.seasonId}-${r.language}`;
         if (seasonTransSeen.has(key)) return false;
@@ -408,9 +415,13 @@ export async function applyTvdbSeasons(
     const epTransRows: Array<{ episodeId: string; language: string; title: string | null; overview: string | null }> = [];
     const epTransSeen = new Set<string>();
     for (const t of savedEpTranslations) {
-      let newEpId: string | undefined;
-      if (t.absoluteNumber != null) newEpId = newEpByAbsolute.get(t.absoluteNumber);
-      if (!newEpId) newEpId = newEpBySeasonEp.get(`${t.seasonNumber}-${t.episodeNumber}`);
+      const fromAbs =
+        t.absoluteNumber !== null
+          ? newEpByAbsolute.get(t.absoluteNumber)
+          : undefined;
+      const newEpId =
+        fromAbs ??
+        newEpBySeasonEp.get(`${t.seasonNumber}-${t.episodeNumber}`);
       if (!newEpId) continue;
       const dedupKey = `${newEpId}-${t.language}`;
       if (epTransSeen.has(dedupKey)) continue;

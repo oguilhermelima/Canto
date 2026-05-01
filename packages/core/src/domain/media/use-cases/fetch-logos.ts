@@ -112,8 +112,9 @@ export async function fetchLogos(
             if (!existing) {
               existing = (async () => {
                 const tmdbType = item.type === "show" ? "tv" as const : "movie" as const;
-                const images = await tmdb.getImages!(item.externalId, tmdbType);
-                const logos = images.logos ?? [];
+                if (!tmdb.getImages) return undefined;
+                const images = await tmdb.getImages(item.externalId, tmdbType);
+                const logos = images.logos;
 
                 // Store best logo per language for translations
                 const byLang = new Map<string, string>();
@@ -130,7 +131,8 @@ export async function fetchLogos(
                 const enLogos = logos.filter(
                   (l) => l.iso_639_1 === "en" || l.iso_639_1 === null,
                 );
-                return enLogos.length > 0 ? enLogos[0]!.file_path : undefined;
+                const first = enLogos[0];
+                return first ? first.file_path : undefined;
               })();
               inflightFetches.set(cacheKey, existing);
             }

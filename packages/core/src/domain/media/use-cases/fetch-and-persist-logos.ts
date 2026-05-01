@@ -26,7 +26,7 @@ export async function fetchAndPersistLogos(
 
   const tmdbType = type === "show" ? "tv" : "movie";
   const images = await tmdb.getImages(externalId, tmdbType);
-  const logos = images.logos ?? [];
+  const logos = images.logos;
 
   const byLang = new Map<string, string>();
   for (const l of logos) {

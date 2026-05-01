@@ -3,6 +3,7 @@
 /* -------------------------------------------------------------------------- */
 
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import { TmdbCallExhaustedError } from "@canto/core/domain/media/errors";
 
 const TMDB_DELAY_MS = 300;
 const TMDB_MAX_RETRIES = 3;
@@ -28,7 +29,7 @@ async function tmdbCall<T>(fn: () => Promise<T>): Promise<T> {
       throw err;
     }
   }
-  throw new Error("TMDB call failed after retries");
+  throw new TmdbCallExhaustedError();
 }
 
 export { tmdbCall };
@@ -66,8 +67,10 @@ export async function resolveExternalId(
       return { tmdbId: item.tmdbId, resolvedType: item.type };
     }
 
-    if (item.imdbId && tmdb.findByImdbId) {
-      const results = await tmdbCall(() => tmdb.findByImdbId!(item.imdbId!));
+    const findByImdbId = tmdb.findByImdbId;
+    if (item.imdbId && findByImdbId) {
+      const imdbId = item.imdbId;
+      const results = await tmdbCall(() => findByImdbId(imdbId));
       const match = results.find((r) => r.type === item.type) ?? results[0];
       if (match) {
         return {
@@ -77,8 +80,10 @@ export async function resolveExternalId(
       }
     }
 
-    if (item.tvdbId && tmdb.findByTvdbId) {
-      const results = await tmdbCall(() => tmdb.findByTvdbId!(item.tvdbId!));
+    const findByTvdbId = tmdb.findByTvdbId;
+    if (item.tvdbId && findByTvdbId) {
+      const tvdbId = item.tvdbId;
+      const results = await tmdbCall(() => findByTvdbId(tvdbId));
       const match = results.find((r) => r.type === item.type) ?? results[0];
       if (match) {
         return {
