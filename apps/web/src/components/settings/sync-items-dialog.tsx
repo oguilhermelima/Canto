@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useDebounceValue } from "usehooks-ts";
 import {
   Dialog,
@@ -148,16 +148,22 @@ export function SyncItemsDialog({
 
   const utils = trpc.useUtils();
 
-  // Reset page + expansion when filters change
-  useEffect(() => {
+  // Reset page + expansion when filters change (React docs: adjust state on
+  // dep change during render rather than in an effect).
+  const filterKey = `${tab}|${serverFilter}|${debouncedSearch}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey);
     setPage(1);
     setExpandedIds(new Set());
-  }, [tab, serverFilter, debouncedSearch]);
+  }
 
-  // Reset expansion on page change
-  useEffect(() => {
+  // Reset expansion on page change.
+  const [prevPage, setPrevPage] = useState(page);
+  if (prevPage !== page) {
+    setPrevPage(page);
     setExpandedIds(new Set());
-  }, [page]);
+  }
 
   const trimmedSearch = debouncedSearch.trim();
 
