@@ -20,14 +20,15 @@ function normalizeResolution(res: string | null): string | null {
 
 export function QualityChips({ meta }: { meta: QualityMeta }): React.JSX.Element | null {
   const resolution = normalizeResolution(meta.resolution);
-  const hasAny =
-    resolution ||
-    meta.videoCodec ||
-    meta.hdr ||
-    meta.primaryAudioLang ||
-    meta.fileSize != null;
-
-  if (!hasAny) return null;
+  if (
+    !resolution &&
+    !meta.videoCodec &&
+    !meta.hdr &&
+    !meta.primaryAudioLang &&
+    meta.fileSize === null
+  ) {
+    return null;
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
@@ -55,7 +56,7 @@ export function QualityChips({ meta }: { meta: QualityMeta }): React.JSX.Element
           {meta.primaryAudioLang}
         </span>
       )}
-      {meta.fileSize != null && meta.fileSize > 0 && (
+      {meta.fileSize !== null && meta.fileSize > 0 && (
         <span className="flex items-center gap-1.5 font-medium text-foreground">
           <HardDrive size={12} className="text-muted-foreground" />
           {formatBytes(meta.fileSize)}

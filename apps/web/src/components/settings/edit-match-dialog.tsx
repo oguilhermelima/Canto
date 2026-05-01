@@ -362,7 +362,7 @@ function OrphanConfirmation({
                 Re-pointing {preview.versionsAffected}{" "}
                 {preview.versionsAffected === 1 ? "version" : "versions"} to{" "}
                 {preview.targetTitle}
-                {preview.targetYear != null && ` (${preview.targetYear})`}
+                {preview.targetYear !== null && ` (${preview.targetYear})`}
               </p>
               <p className="mt-2 text-sm text-foreground">
                 This will also delete {count} orphaned media{" "}
@@ -375,7 +375,7 @@ function OrphanConfirmation({
                     className="text-xs text-muted-foreground"
                   >
                     · {m.title}
-                    {m.year != null && ` (${m.year})`}
+                    {m.year !== null && ` (${m.year})`}
                   </li>
                 ))}
                 {extra > 0 && (

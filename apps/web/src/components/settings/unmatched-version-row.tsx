@@ -64,7 +64,7 @@ export function UnmatchedVersionRow({
           <p className="truncate text-sm font-semibold text-foreground">
             {version.serverItemTitle}
           </p>
-          {version.serverItemYear != null && (
+          {version.serverItemYear !== null && (
             <span className="shrink-0 text-xs text-muted-foreground">
               {version.serverItemYear}
             </span>
