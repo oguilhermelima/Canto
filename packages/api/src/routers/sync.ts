@@ -30,7 +30,7 @@ import { listMediaVersionGroups } from "@canto/core/domain/media-servers/service
 import { makeJellyfinAdapter } from "@canto/core/infra/media-servers/jellyfin.adapter-bindings";
 import { makePlexAdapter } from "@canto/core/infra/media-servers/plex.adapter-bindings";
 import { makeUserConnectionRepository } from "@canto/core/infra/media-servers/user-connection-repository.adapter";
-import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import { logAndSwallow } from "@canto/core/platform/logger/console-logger.adapter";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                     */

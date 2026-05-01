@@ -13,8 +13,8 @@ import { persistMedia } from "@canto/core/domain/media/use-cases/persist";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 import { getSetting, getSettings, setSettingRaw } from "@canto/db/settings";
 
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
-import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 import {
   findMediaByAnyReference,
   updateMedia,
@@ -193,6 +193,7 @@ export function toMediaVersionInsert(
 async function ensureMediaAnchor(
   db: Database,
   tmdb: MediaProviderPort,
+  logger: LoggerPort,
   scanned: ScannedMediaItem,
   cache: MediaAnchorCache,
   supportedLangs: readonly string[],
@@ -238,7 +239,7 @@ async function ensureMediaAnchor(
     );
     if (!metadataSucceededAt) {
       void dispatchEnsureMedia(existing.id).catch(
-        logAndSwallow("sync-pipeline dispatchEnsureMedia"),
+        logger.logAndSwallow("sync-pipeline dispatchEnsureMedia"),
       );
     }
     const anchor: ResolvedMediaAnchor = {
@@ -266,7 +267,7 @@ async function ensureMediaAnchor(
   if (scanned.libraryId) mediaUpdates.libraryId = scanned.libraryId;
   await updateMedia(db, inserted.id, mediaUpdates);
   void dispatchEnsureMedia(inserted.id).catch(
-    logAndSwallow("sync-pipeline dispatchEnsureMedia"),
+    logger.logAndSwallow("sync-pipeline dispatchEnsureMedia"),
   );
 
   const anchor: ResolvedMediaAnchor = {
@@ -381,9 +382,14 @@ async function loadServerConfig(): Promise<ServerConfig> {
  * result. Passing a filtered batch in here must not wipe siblings that
  * were skipped by a caller-side "recently synced" optimisation.
  */
+export interface RunSyncPipelineDeps {
+  logger: LoggerPort;
+}
+
 export async function runSyncPipeline(
   db: Database,
   tmdb: MediaProviderPort,
+  deps: RunSyncPipelineDeps,
   scannedItems: ScannedMediaItem[],
   tag: string,
   opts: SyncPipelineOptions = {},
@@ -419,7 +425,7 @@ export async function runSyncPipeline(
     for (let i = 0; i < deduplicated.length; i += BATCH_SIZE) {
       const batch = deduplicated.slice(i, i + BATCH_SIZE);
       for (const scanned of batch) {
-        await processOne(db, tmdb, scanned, {
+        await processOne(db, tmdb, deps.logger, scanned, {
           tag,
           config,
           mediaCache,
@@ -484,6 +490,7 @@ interface ProcessCtx {
 async function processOne(
   db: Database,
   tmdb: MediaProviderPort,
+  logger: LoggerPort,
   scanned: ScannedMediaItem,
   ctx: ProcessCtx,
 ): Promise<void> {
@@ -493,6 +500,7 @@ async function processOne(
     const anchor = await ensureMediaAnchor(
       db,
       tmdb,
+      logger,
       scanned,
       mediaCache,
       supportedLangs,

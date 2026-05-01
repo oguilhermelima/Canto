@@ -5,6 +5,7 @@ import { applyAdminDownloadPolicy } from "@canto/core/domain/shared/rules/scorin
 import { findDownloadConfig } from "@canto/core/infra/torrents/download-config-repository";
 import { buildIndexers } from "@canto/core/infra/indexers/indexer-factory";
 import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
+import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 
 import type { JobLogger } from "../lib/job-logger";
 
@@ -19,7 +20,7 @@ export async function handleRepackSupersede(log: JobLogger): Promise<void> {
 
   const config = await findDownloadConfig(db);
   const rules = applyAdminDownloadPolicy(config.rules, config.policy);
-  const outcome = await runRepackSupersede(db, { indexers, qbClient, rules });
+  const outcome = await runRepackSupersede(db, { indexers, qbClient, rules, logger: makeConsoleLogger() });
 
   if (outcome.scanned === 0 && outcome.replaced === 0) return;
   for (const r of outcome.replacements) {

@@ -1,6 +1,7 @@
 import { db } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
 import { downloadTorrent } from "@canto/core/domain/torrents/use-cases/download-torrent";
+import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 import { calculateConfidence } from "@canto/core/domain/shared/rules/scoring";
 import { resolveMediaFlavor } from "@canto/core/domain/shared/rules/media-flavor";
 import { parseReleaseAttributes } from "@canto/core/domain/torrents/rules/release-attributes";
@@ -147,6 +148,7 @@ export async function handleRssSync(): Promise<void> {
       const qb = await getDownloadClient();
       await downloadTorrent(
         db,
+        { logger: makeConsoleLogger() },
         {
           mediaId: matchedShow.id,
           title: item.title,

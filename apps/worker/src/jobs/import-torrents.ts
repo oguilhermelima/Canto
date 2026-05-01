@@ -28,7 +28,9 @@ import {
   ensureServerLibrary,
 } from "@canto/core/infra/lists/list-repository";
 import { updateRequestStatus } from "@canto/core/infra/requests/request-repository";
-import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
+
+const logger = makeConsoleLogger();
 
 interface ImportedMediaContext {
   mediaRow: AutoImportMediaRow;
@@ -141,6 +143,7 @@ export async function handleImportTorrents(): Promise<void> {
         const indexers = await buildIndexers();
         void tryContinuousDownload(
           db,
+          { logger },
           {
             id: mediaRow.id,
             type: mediaRow.type,
@@ -152,7 +155,7 @@ export async function handleImportTorrents(): Promise<void> {
           { quality: row.quality, source: row.source },
           indexers,
           qbClient,
-        ).catch(logAndSwallow("import-torrents tryContinuousDownload"));
+        ).catch(logger.logAndSwallow("import-torrents tryContinuousDownload"));
       }
     } catch (err) {
       console.error(
@@ -163,7 +166,7 @@ export async function handleImportTorrents(): Promise<void> {
       // the flag, but if the call itself or downstream code throws before
       // that finally runs we still want the row eligible for retry.
       await updateDownload(db, row.id, { importing: false }).catch(
-        logAndSwallow("import-torrents reset importing flag"),
+        logger.logAndSwallow("import-torrents reset importing flag"),
       );
     }
   }

@@ -6,6 +6,7 @@ import {
 } from "@canto/core/infra/file-organization/folder-repository";
 import { scanFolderForMedia } from "@canto/core/domain/file-organization/use-cases/scan-folder-for-media";
 import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
+import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 
 export async function handleFolderScan(): Promise<void> {
   const enabled = await getSetting("sync.folderScan.enabled");
@@ -16,6 +17,7 @@ export async function handleFolderScan(): Promise<void> {
 
   const folders = await findAllFolders(db);
   const fs = createNodeFileSystemAdapter();
+  const logger = makeConsoleLogger();
 
   let totalImported = 0;
   let totalSkipped = 0;
@@ -33,7 +35,7 @@ export async function handleFolderScan(): Promise<void> {
     scannedFolders++;
 
     for (const path of allPaths) {
-      const result = await scanFolderForMedia(db, path, folder.id, { fs });
+      const result = await scanFolderForMedia(db, path, folder.id, { fs, logger });
       totalImported += result.imported;
       totalSkipped += result.skipped;
       totalFailed += result.failed;

@@ -1,6 +1,7 @@
 import type { Database } from "@canto/db/client";
 
 import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { ScoringRules } from "@canto/core/domain/shared/rules/scoring-rules";
 import type { IndexerPort } from "@canto/core/domain/torrents/ports/indexer";
 import { findRecentImportedDownloads } from "@canto/core/infra/torrents/download-repository";
@@ -45,6 +46,7 @@ interface Deps {
   indexers: IndexerPort[];
   qbClient: DownloadClientPort;
   rules: ScoringRules;
+  logger: LoggerPort;
 }
 
 const DEFAULT_LOOKBACK_DAYS = 14;
@@ -134,6 +136,7 @@ export async function runRepackSupersede(
     try {
       supersede = await autoSupersedeWithRepack(
         db,
+        { logger: deps.logger },
         { currentDownloadId: item.row.id, candidate: best },
         deps.qbClient,
       );

@@ -4,6 +4,7 @@
 
 import type { Database } from "@canto/db/client";
 import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { IndexerPort } from "@canto/core/domain/torrents/ports/indexer";
 import type { TorrentsRepositoryPort } from "@canto/core/domain/torrents/ports/torrents-repository.port";
 import { searchTorrents } from "@canto/core/domain/torrents/use-cases/search-torrents";
@@ -21,7 +22,7 @@ interface StalledTorrent {
 
 export async function retryStalledTorrent(
   db: Database,
-  deps: { torrents: TorrentsRepositoryPort },
+  deps: { torrents: TorrentsRepositoryPort; logger: LoggerPort },
   row: StalledTorrent,
   indexers: IndexerPort[],
   qbClient: DownloadClientPort,
@@ -79,6 +80,7 @@ export async function retryStalledTorrent(
 
     await downloadTorrent(
       db,
+      { logger: deps.logger },
       {
         mediaId: row.mediaId,
         title: best.title,

@@ -19,6 +19,7 @@ import { retryTorrent } from "@canto/core/domain/torrents/use-cases/retry-torren
 import { renameTorrent } from "@canto/core/domain/torrents/use-cases/rename-torrent";
 import { makeFoldersRepository } from "@canto/core/infra/file-organization/folders-repository.adapter";
 import { makeTorrentsRepository } from "@canto/core/infra/torrents/torrents-repository.adapter";
+import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 import {
   deleteDownload as deleteTorrentRecord,
   findDownloadById,
@@ -36,14 +37,14 @@ export const torrentManageRouter = createTRPCRouter({
     .input(torrentDownloadInput)
     .mutation(async ({ ctx, input }) => {
       const qb = await getDownloadClient();
-      return downloadTorrent(ctx.db, input, qb);
+      return downloadTorrent(ctx.db, { logger: makeConsoleLogger() }, input, qb);
     }),
 
   replace: adminProcedure
     .input(torrentReplaceInput)
     .mutation(async ({ ctx, input }) => {
       const qb = await getDownloadClient();
-      return replaceTorrent(ctx.db, input, qb);
+      return replaceTorrent(ctx.db, { logger: makeConsoleLogger() }, input, qb);
     }),
 
   retry: adminProcedure

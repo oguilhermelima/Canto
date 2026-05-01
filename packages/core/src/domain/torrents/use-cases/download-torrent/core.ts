@@ -3,7 +3,7 @@ import type { TorrentDownloadInput } from "@canto/validators";
 
 import { BlocklistedReleaseError, DownloadClientError, DuplicateDownloadError, InvalidDownloadInputError, TorrentPersistenceError } from "@canto/core/domain/torrents/errors";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
-import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import { resolveDownloadUrl } from "@canto/core/platform/http/follow-redirects";
 import { detectQuality, detectSource } from "@canto/core/domain/torrents/rules/quality";
 import {
@@ -48,6 +48,10 @@ export interface CoreDownloadOptions {
   skipDedup: boolean;
 }
 
+export interface DownloadTorrentDeps {
+  logger: LoggerPort;
+}
+
 /**
  * Shared download logic used by both `downloadTorrent` and `replaceTorrent`.
  *
@@ -67,6 +71,7 @@ export interface CoreDownloadOptions {
  */
 export async function coreDownload(
   db: Database,
+  deps: DownloadTorrentDeps,
   input: DownloadInput,
   opts: CoreDownloadOptions,
   qbClient: DownloadClientPort,
@@ -290,7 +295,7 @@ export async function coreDownload(
         type: "download_failed",
         mediaId: input.mediaId,
       },
-    ).catch(logAndSwallow("download-torrent createNotification"));
+    ).catch(deps.logger.logAndSwallow("download-torrent createNotification"));
 
     throw new DownloadClientError(
       `Failed to add torrent to qBittorrent: ${qbErr instanceof Error ? qbErr.message : "Unknown error"}`,
@@ -305,8 +310,9 @@ export async function coreDownload(
  */
 export async function downloadTorrent(
   db: Database,
+  deps: DownloadTorrentDeps,
   input: DownloadInput,
   qbClient: DownloadClientPort,
 ): Promise<TorrentRow> {
-  return coreDownload(db, input, { skipDedup: false }, qbClient);
+  return coreDownload(db, deps, input, { skipDedup: false }, qbClient);
 }

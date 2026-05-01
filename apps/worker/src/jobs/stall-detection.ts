@@ -5,6 +5,7 @@ import { createNotification } from "@canto/core/domain/notifications/use-cases/c
 import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
 import { retryStalledTorrent } from "@canto/core/domain/torrents/use-cases/retry-stalled-torrent";
 import { makeTorrentsRepository } from "@canto/core/infra/torrents/torrents-repository.adapter";
+import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 import {
   findDownloadsByStatus,
   updateDownload,
@@ -83,7 +84,7 @@ export async function handleStallDetection(): Promise<void> {
       if (row.mediaId) {
         await retryStalledTorrent(
           db,
-          { torrents: makeTorrentsRepository(db) },
+          { torrents: makeTorrentsRepository(db), logger: makeConsoleLogger() },
           row,
           indexers,
           qb,

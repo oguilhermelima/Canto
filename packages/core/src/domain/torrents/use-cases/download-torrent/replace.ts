@@ -5,9 +5,9 @@ import { deleteMediaFile } from "@canto/core/infra/media/media-file-repository";
 import type { findDownloadByTitle } from "@canto/core/infra/torrents/download-repository";
 import {
   coreDownload
-  
+
 } from "@canto/core/domain/torrents/use-cases/download-torrent/core";
-import type {DownloadInput} from "@canto/core/domain/torrents/use-cases/download-torrent/core";
+import type {DownloadInput, DownloadTorrentDeps} from "@canto/core/domain/torrents/use-cases/download-torrent/core";
 
 type TorrentRow = NonNullable<Awaited<ReturnType<typeof findDownloadByTitle>>>;
 
@@ -22,6 +22,7 @@ export interface ReplaceInput extends DownloadInput {
  */
 export async function replaceTorrent(
   db: Database,
+  deps: DownloadTorrentDeps,
   input: ReplaceInput,
   qbClient: DownloadClientPort,
 ): Promise<TorrentRow> {
@@ -29,5 +30,5 @@ export async function replaceTorrent(
     await deleteMediaFile(db, fileId);
   }
 
-  return coreDownload(db, input, { skipDedup: true }, qbClient);
+  return coreDownload(db, deps, input, { skipDedup: true }, qbClient);
 }

@@ -23,7 +23,7 @@ import {
   dispatchJellyfinSync,
   dispatchPlexSync,
 } from "@canto/core/platform/queue/bullmq-dispatcher";
-import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import { logAndSwallow } from "@canto/core/platform/logger/console-logger.adapter";
 import {
   resolveFolder
   

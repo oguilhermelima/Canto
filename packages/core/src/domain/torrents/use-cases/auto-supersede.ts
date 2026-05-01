@@ -5,6 +5,7 @@
 import type { Database } from "@canto/db/client";
 
 import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import { compareToProfile } from "@canto/core/domain/torrents/rules/download-profile";
 import { detectReleaseGroup } from "@canto/core/domain/torrents/rules/parsing-release";
 import { resolveMediaFlavor } from "@canto/core/domain/shared/rules/media-flavor";
@@ -62,6 +63,7 @@ export interface AutoSupersedeArgs {
  */
 export async function autoSupersedeWithRepack(
   db: Database,
+  deps: { logger: LoggerPort },
   args: AutoSupersedeArgs,
   qbClient: DownloadClientPort,
 ): Promise<AutoSupersedeOutcome> {
@@ -136,6 +138,7 @@ export async function autoSupersedeWithRepack(
 
   await replaceTorrent(
     db,
+    { logger: deps.logger },
     {
       mediaId: current.mediaId,
       title: candidate.title,

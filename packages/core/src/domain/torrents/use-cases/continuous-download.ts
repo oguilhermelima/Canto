@@ -4,6 +4,7 @@
 
 import type { Database } from "@canto/db/client";
 import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { IndexerPort } from "@canto/core/domain/torrents/ports/indexer";
 import { searchTorrents } from "@canto/core/domain/torrents/use-cases/search-torrents";
 import { downloadTorrent } from "@canto/core/domain/torrents/use-cases/download-torrent";
@@ -17,8 +18,13 @@ interface ContinuousDownloadMedia {
   title: string;
 }
 
+export interface TryContinuousDownloadDeps {
+  logger: LoggerPort;
+}
+
 export async function tryContinuousDownload(
   db: Database,
+  deps: TryContinuousDownloadDeps,
   mediaRow: ContinuousDownloadMedia,
   importedSeasonNumber: number | null,
   importedEpisodeNumbers: number[] | null,
@@ -62,7 +68,7 @@ export async function tryContinuousDownload(
     }
     console.log(`[continuous-download] Auto-downloading "${best.title}" (confidence: ${best.confidence})`);
 
-    await downloadTorrent(db, {
+    await downloadTorrent(db, deps, {
       mediaId: mediaRow.id,
       title: best.title,
       magnetUrl: best.magnetUrl ?? undefined,

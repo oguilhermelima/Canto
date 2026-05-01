@@ -17,8 +17,8 @@ import {
   addListItem,
   ensureServerLibrary,
 } from "@canto/core/infra/lists/list-repository";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import { dispatchEnsureMedia } from "@canto/core/platform/queue/bullmq-dispatcher";
-import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 import { runWithConcurrency } from "@canto/core/platform/concurrency/run-with-concurrency";
 
 /* -------------------------------------------------------------------------- */
@@ -80,7 +80,7 @@ export async function scanFolderForMedia(
   db: Database,
   folderPath: string,
   libraryId: string,
-  deps: { fs: FileSystemPort },
+  deps: { fs: FileSystemPort; logger: LoggerPort },
 ): Promise<{ imported: number; skipped: number; failed: number }> {
   if (scanningFolders.has(folderPath)) {
     console.log(`[folder-scan] Already scanning ${folderPath} — skipping`);
@@ -188,7 +188,7 @@ export async function scanFolderForMedia(
         );
         if (!metadataSucceededAt) {
           dispatchEnsureMedia(existing.id).catch(
-            logAndSwallow("folder-scan dispatchEnsureMedia"),
+            deps.logger.logAndSwallow("folder-scan dispatchEnsureMedia"),
           );
         }
 
@@ -208,7 +208,7 @@ export async function scanFolderForMedia(
         addedAt: new Date(),
       });
       dispatchEnsureMedia(inserted.id).catch(
-        logAndSwallow("folder-scan dispatchEnsureMedia"),
+        deps.logger.logAndSwallow("folder-scan dispatchEnsureMedia"),
       );
 
       try {

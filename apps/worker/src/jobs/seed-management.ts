@@ -8,7 +8,7 @@ import {
   findDownloadsByHashes,
   updateDownloadBatch,
 } from "@canto/core/infra/torrents/download-repository";
-import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import { logAndSwallow } from "@canto/core/platform/logger/console-logger.adapter";
 import { runWithConcurrency } from "@canto/core/platform/concurrency/run-with-concurrency";
 
 /** qBit's WebUI handles ~10 concurrent deletions without rate-limiting. */
