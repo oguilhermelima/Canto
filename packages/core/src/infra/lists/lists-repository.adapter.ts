@@ -249,5 +249,12 @@ export function makeListsRepository(db: Database): ListsRepositoryPort {
 
     upsertUserPreference: (userId, key, value) =>
       upsertUserPreference(db, userId, key, value),
+
+    // ── Transaction boundary ──
+    // `tx` from drizzle's `db.transaction` is structurally a `Database` (it
+    // shares `query`/`update`/`insert`/etc.). Cast at the boundary so the
+    // tx-scoped clone reuses every existing read/write helper unchanged.
+    withTransaction: (fn) =>
+      db.transaction(async (tx) => fn(makeListsRepository(tx as Database))),
   };
 }

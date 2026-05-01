@@ -210,4 +210,17 @@ export interface ListsRepositoryPort {
     key: string,
     value: unknown,
   ): Promise<void>;
+
+  // ── Transaction boundary ──
+
+  /**
+   * Run `fn` inside a database transaction with a tx-scoped clone of this
+   * port. Use when a read-then-write sequence must be atomic (e.g. accept
+   * invitation: read pending invite → flip status → insert membership row).
+   * The returned port mirrors this one but every call goes through the open
+   * transaction; on `fn` throw the whole sequence rolls back.
+   */
+  withTransaction<T>(
+    fn: (tx: ListsRepositoryPort) => Promise<T>,
+  ): Promise<T>;
 }

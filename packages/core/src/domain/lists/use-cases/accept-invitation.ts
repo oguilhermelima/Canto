@@ -14,21 +14,28 @@ export async function acceptListInvitation(
   userId: string,
   input: AcceptListInvitationInput,
 ) {
-  const invitation = await deps.repo.findInvitationByToken(input.token);
-  if (!invitation) throw new ListInvitationNotFoundError();
-  if (invitation.status !== "pending") {
-    throw new ListInvitationInvalidError("Invitation already used");
-  }
-  if (new Date() > invitation.expiresAt) {
-    throw new ListInvitationInvalidError("Invitation expired");
-  }
+  // Wrap the read-then-write sequence so two concurrent acceptances of the
+  // same token can't both flip status and both insert a membership row. The
+  // pending-status guard runs inside the txn against the freshly-read
+  // invitation, so the second caller sees `accepted` and bails before
+  // `addMember` runs.
+  return deps.repo.withTransaction(async (tx) => {
+    const invitation = await tx.findInvitationByToken(input.token);
+    if (!invitation) throw new ListInvitationNotFoundError();
+    if (invitation.status !== "pending") {
+      throw new ListInvitationInvalidError("Invitation already used");
+    }
+    if (new Date() > invitation.expiresAt) {
+      throw new ListInvitationInvalidError("Invitation expired");
+    }
 
-  await deps.repo.acceptInvitation(input.token);
-  await deps.repo.addMember({
-    listId: invitation.listId,
-    userId,
-    role: invitation.role,
+    await tx.acceptInvitation(input.token);
+    await tx.addMember({
+      listId: invitation.listId,
+      userId,
+      role: invitation.role,
+    });
+
+    return { success: true, listId: invitation.listId };
   });
-
-  return { success: true, listId: invitation.listId };
 }
