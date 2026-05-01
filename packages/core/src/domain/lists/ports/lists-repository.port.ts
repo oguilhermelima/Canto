@@ -82,6 +82,10 @@ export interface ListsRepositoryPort {
     type: "watchlist" | "custom" | "server",
   ): Promise<List | null>;
   ensureServerLibrary(): Promise<List>;
+  /** Idempotent reconciliation pass: ensures the shared "Server library" list
+   *  contains exactly the media currently observed on connected servers.
+   *  `tag` is logged for diagnostics. */
+  reconcileServerLibrary(tag: string): Promise<void>;
   create(input: NewList): Promise<List>;
   update(id: string, input: UpdateListInput): Promise<List | undefined>;
   softDelete(id: string): Promise<void>;

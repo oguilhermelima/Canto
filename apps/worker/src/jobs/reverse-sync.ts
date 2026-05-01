@@ -16,6 +16,10 @@ import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter
 import { makeJellyfinAdapter } from "@canto/core/infra/media-servers/jellyfin.adapter-bindings";
 import { makePlexAdapter } from "@canto/core/infra/media-servers/plex.adapter-bindings";
 import { makeMediaServerPush } from "@canto/core/infra/media-servers/media-server-push.adapter";
+import { makeMediaVersionRepository } from "@canto/core/infra/media/media-version-repository.adapter";
+import { makeMediaAspectStateRepository } from "@canto/core/infra/media/media-aspect-state-repository.adapter";
+import { makeListsRepository } from "@canto/core/infra/lists/lists-repository.adapter";
+import { makeServerCredentials } from "@canto/core/infra/media-servers/server-credentials.adapter";
 import type { MediaVersionRow } from "@canto/core/infra/media/media-version-repository";
 import {
   findEnabledSyncLinks,
@@ -44,17 +48,20 @@ import {
   scanPlexLibraries,
   runSyncPipeline,
   SyncAuthError,
+} from "@canto/core/domain/sync";
+import type {
+  JellyfinLibraryRef,
+  PlexLibraryRef,
+  ScannedMediaItem,
+  ServerSource,
+} from "@canto/core/domain/sync";
+import {
+  batchResolveEpisodesByMediaAndNumbers,
   batchResolveMediaByExternalRefs,
   batchResolveMediaVersionsByServerItemIds,
-  batchResolveEpisodesByMediaAndNumbers,
+  findEpisodeIdInMap,
   findMediaInRefs,
-  findEpisodeIdInMap
-  
-  
-  
-  
-} from "@canto/core/domain/sync";
-import type {JellyfinLibraryRef, PlexLibraryRef, ScannedMediaItem, ServerSource} from "@canto/core/domain/sync";
+} from "@canto/core/infra/sync/batch-resolvers";
 
 const SKIP_RECENTLY_SYNCED_MS = 6 * 60 * 60 * 1000; // 6 hours
 
@@ -548,6 +555,12 @@ export async function runReverseSync(options: ReverseSyncOptions = {}): Promise<
             dispatcher: jobDispatcher,
             jellyfin: makeJellyfinAdapter(),
             plex: makePlexAdapter(),
+            media: makeMediaRepository(db),
+            mediaVersions: makeMediaVersionRepository(db),
+            mediaAspectState: makeMediaAspectStateRepository(db),
+            lists: makeListsRepository(db),
+            userMedia: makeUserMediaRepository(db),
+            credentials: makeServerCredentials(),
           },
           needGlobalSync,
           `${provider}-sync`,

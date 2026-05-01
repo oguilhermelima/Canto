@@ -8,56 +8,49 @@
 /* -------------------------------------------------------------------------- */
 
 import type { Database } from "@canto/db/client";
-import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
-import { persistMedia } from "@canto/core/domain/media/use-cases/persist";
-import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
-import { getSetting, getSettings, setSettingRaw } from "@canto/db/settings";
+import { getSetting, setSettingRaw } from "@canto/db/settings";
 
-import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
-import {
-  findMediaByAnyReference,
-  updateMedia,
-} from "@canto/core/infra/media/media-repository";
-import {
-  createMediaVersionEpisodes,
-  deleteMediaVersionEpisodesByVersionId,
-  upsertMediaVersion
-  
-} from "@canto/core/infra/media/media-version-repository";
-import type {MediaVersionInsert} from "@canto/core/infra/media/media-version-repository";
-import {
-  addListItem,
-  ensureServerLibrary,
-} from "@canto/core/infra/lists/list-repository";
-import { addToUserMediaLibrary } from "@canto/core/infra/user-media/library-repository";
-import { findAspectSucceededAt } from "@canto/core/infra/media/media-aspect-state-repository";
-import { reconcileServerLibrary } from "@canto/core/infra/lists/list-repository";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 
+import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
+import type { MediaAspectStateRepositoryPort } from "@canto/core/domain/media/ports/media-aspect-state-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { UpdateMediaInput } from "@canto/core/domain/media/types/media";
+import { persistMedia } from "@canto/core/domain/media/use-cases/persist";
 import {
   resolveExternalId,
   tmdbCall,
 } from "@canto/core/domain/media/use-cases/resolve-external-id";
+
 import type { JellyfinAdapterPort } from "@canto/core/domain/media-servers/ports/jellyfin-adapter.port";
+import type { MediaVersionRepositoryPort } from "@canto/core/domain/media-servers/ports/media-version-repository.port";
 import type { PlexAdapterPort } from "@canto/core/domain/media-servers/ports/plex-adapter.port";
+import type { ServerCredentialsPort } from "@canto/core/domain/media-servers/ports/server-credentials.port";
+import type { MediaVersionInsert } from "@canto/core/domain/media-servers/types/media-version";
 import {
   fetchJellyfinMediaInfo,
   fetchPlexMediaInfo,
 } from "@canto/core/domain/media-servers/use-cases/fetch-info";
 import type { MediaFileInfo } from "@canto/core/domain/media-servers/use-cases/fetch-info";
 
+import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+
+import {
+  createMediaAnchorCache,
+} from "@canto/core/domain/sync/media-resolution-cache";
+import type {
+  MediaAnchorCache,
+  ResolvedMediaAnchor,
+} from "@canto/core/domain/sync/media-resolution-cache";
 import type {
   ScannedMediaItem,
   SyncResult,
   SyncSummary,
 } from "@canto/core/domain/sync/types";
 import { emptySummary } from "@canto/core/domain/sync/types";
-import {
-  createMediaAnchorCache
-  
-  
-} from "@canto/core/domain/sync/media-resolution-cache";
-import type {MediaAnchorCache, ResolvedMediaAnchor} from "@canto/core/domain/sync/media-resolution-cache";
 
 /* -------------------------------------------------------------------------- */
 /*  Constants                                                                  */
@@ -73,15 +66,28 @@ const STATUS_KEY_PREFIX = "sync.mediaImport.status";
 /* -------------------------------------------------------------------------- */
 
 interface ServerConfig {
-  jellyfinUrl: string | null | undefined;
-  jellyfinKey: string | null | undefined;
-  plexUrl: string | null | undefined;
-  plexToken: string | null | undefined;
+  jellyfinUrl: string | null;
+  jellyfinKey: string | null;
+  plexUrl: string | null;
+  plexToken: string | null;
 }
 
 export interface SyncPipelineOptions {
   /** If set, sync output is also linked into this user's personal library. */
   forUserId?: string;
+}
+
+export interface RunSyncPipelineDeps {
+  logger: LoggerPort;
+  dispatcher: JobDispatcherPort;
+  jellyfin: JellyfinAdapterPort;
+  plex: PlexAdapterPort;
+  media: MediaRepositoryPort;
+  mediaVersions: MediaVersionRepositoryPort;
+  mediaAspectState: MediaAspectStateRepositoryPort;
+  lists: ListsRepositoryPort;
+  userMedia: UserMediaRepositoryPort;
+  credentials: ServerCredentialsPort;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -182,6 +188,16 @@ export function toMediaVersionInsert(
 /*  Media resolution + persistence                                             */
 /* -------------------------------------------------------------------------- */
 
+interface EnsureMediaAnchorArgs {
+  db: Database;
+  tmdb: MediaProviderPort;
+  deps: RunSyncPipelineDeps;
+  scanned: ScannedMediaItem;
+  cache: MediaAnchorCache;
+  supportedLangs: readonly string[];
+  tvdbEnabled: boolean;
+}
+
 /**
  * Ensure the media row exists in the DB. Three branches:
  *   1. In-memory cache hit → return it.
@@ -192,15 +208,9 @@ export function toMediaVersionInsert(
  * Returns null if external-id resolution itself fails.
  */
 async function ensureMediaAnchor(
-  db: Database,
-  tmdb: MediaProviderPort,
-  logger: LoggerPort,
-  dispatcher: JobDispatcherPort,
-  scanned: ScannedMediaItem,
-  cache: MediaAnchorCache,
-  supportedLangs: readonly string[],
-  tvdbEnabled: boolean,
+  args: EnsureMediaAnchorArgs,
 ): Promise<ResolvedMediaAnchor | null> {
+  const { db, tmdb, deps, scanned, cache, supportedLangs, tvdbEnabled } = args;
   const resolved = await resolveExternalId(tmdb, {
     tmdbId: scanned.externalIds.tmdb,
     imdbId: scanned.externalIds.imdb,
@@ -211,13 +221,10 @@ async function ensureMediaAnchor(
 
   const cached = cache.get(resolved.tmdbId);
   if (cached) {
-    // Don't flip isNewImport for subsequent observations of the same tmdbId
-    // in the same batch — only the first one counts as an import.
     return { ...cached, isNewImport: false };
   }
 
-  const existing = await findMediaByAnyReference(
-    db,
+  const existing = await deps.media.findByAnyReference(
     resolved.tmdbId,
     "tmdb",
     scanned.externalIds.imdb,
@@ -225,23 +232,22 @@ async function ensureMediaAnchor(
   );
 
   if (existing) {
-    const updates: Record<string, unknown> = {};
+    const updates: UpdateMediaInput = {};
     if (!existing.inLibrary) updates.inLibrary = true;
     if (!existing.downloaded) updates.downloaded = true;
     if (!existing.libraryId && scanned.libraryId) updates.libraryId = scanned.libraryId;
     if (!existing.libraryPath && scanned.path) updates.libraryPath = scanned.path;
     if (!existing.addedAt) updates.addedAt = new Date();
     if (Object.keys(updates).length > 0) {
-      await updateMedia(db, existing.id, updates);
+      await deps.media.updateMedia(existing.id, updates);
     }
-    const metadataSucceededAt = await findAspectSucceededAt(
-      db,
+    const metadataSucceededAt = await deps.mediaAspectState.findSucceededAt(
       existing.id,
       "metadata",
     );
     if (!metadataSucceededAt) {
-      void dispatcher.enrichMedia(existing.id).catch(
-        logger.logAndSwallow("sync-pipeline dispatchEnsureMedia"),
+      void deps.dispatcher.enrichMedia(existing.id).catch(
+        deps.logger.logAndSwallow("sync-pipeline dispatchEnsureMedia"),
       );
     }
     const anchor: ResolvedMediaAnchor = {
@@ -253,23 +259,22 @@ async function ensureMediaAnchor(
     return anchor;
   }
 
-  // Brand new media: pull from TMDB
   const normalized = await tmdbCall(() =>
     tmdb.getMetadata(resolved.tmdbId, resolved.resolvedType, {
       supportedLanguages: supportedLangs as string[],
     }),
   );
   const inserted = await persistMedia(db, normalized, { crossRefLookup: tvdbEnabled });
-  const mediaUpdates: Record<string, unknown> = {
+  const mediaUpdates: UpdateMediaInput = {
     inLibrary: true,
     downloaded: true,
     libraryPath: scanned.path,
     addedAt: new Date(),
   };
   if (scanned.libraryId) mediaUpdates.libraryId = scanned.libraryId;
-  await updateMedia(db, inserted.id, mediaUpdates);
-  void dispatcher.enrichMedia(inserted.id).catch(
-    logger.logAndSwallow("sync-pipeline dispatchEnsureMedia"),
+  await deps.media.updateMedia(inserted.id, mediaUpdates);
+  void deps.dispatcher.enrichMedia(inserted.id).catch(
+    deps.logger.logAndSwallow("sync-pipeline dispatchEnsureMedia"),
   );
 
   const anchor: ResolvedMediaAnchor = {
@@ -313,9 +318,9 @@ async function fetchMediaFilesFor(
 
 /**
  * Pick the top-level MediaFileInfo to attach to the media_version row.
- * For movies there's exactly one entry; for shows we synthesize a header
- * by taking the first episode as a representative and leaving per-episode
- * quality to the media_version_episode children.
+ * For movies there's exactly one entry; for shows we surface the first
+ * episode as a representative — per-episode detail still lives in
+ * media_version_episode children.
  */
 function pickTopLevelFileInfo(
   files: MediaFileInfo[],
@@ -323,26 +328,20 @@ function pickTopLevelFileInfo(
 ): MediaFileInfo | undefined {
   if (files.length === 0) return undefined;
   if (type === "movie") return files[0];
-  const first = files[0];
-  if (!first) return undefined;
-  // For a show, the row-level quality columns summarize the first episode's
-  // encoding — good enough for UI facets. Per-episode detail still lives in
-  // media_version_episode.
-  return first;
+  return files[0];
 }
 
 async function persistEpisodesFor(
-  db: Database,
+  mediaVersions: MediaVersionRepositoryPort,
   versionId: string,
   files: MediaFileInfo[],
 ): Promise<void> {
-  await deleteMediaVersionEpisodesByVersionId(db, versionId);
+  await mediaVersions.deleteEpisodesByVersionId(versionId);
   const episodeFiles = files.filter(
-    (f) => f.seasonNumber != null || f.episodeNumber != null,
+    (f) => f.seasonNumber !== undefined || f.episodeNumber !== undefined,
   );
   if (episodeFiles.length === 0) return;
-  await createMediaVersionEpisodes(
-    db,
+  await mediaVersions.createEpisodes(
     episodeFiles.map((f) => ({
       versionId,
       seasonNumber: f.seasonNumber,
@@ -368,18 +367,18 @@ async function persistEpisodesFor(
 /*  Main use-case                                                              */
 /* -------------------------------------------------------------------------- */
 
-async function loadServerConfig(): Promise<ServerConfig> {
-  const s = await getSettings([
-    "jellyfin.url",
-    "jellyfin.apiKey",
-    "plex.url",
-    "plex.token",
+async function loadServerConfig(
+  credentials: ServerCredentialsPort,
+): Promise<ServerConfig> {
+  const [jellyfin, plex] = await Promise.all([
+    credentials.getJellyfin(),
+    credentials.getPlex(),
   ]);
   return {
-    jellyfinUrl: s["jellyfin.url"],
-    jellyfinKey: s["jellyfin.apiKey"],
-    plexUrl: s["plex.url"],
-    plexToken: s["plex.token"],
+    jellyfinUrl: jellyfin?.url ?? null,
+    jellyfinKey: jellyfin?.apiKey ?? null,
+    plexUrl: plex?.url ?? null,
+    plexToken: plex?.token ?? null,
   };
 }
 
@@ -393,13 +392,6 @@ async function loadServerConfig(): Promise<ServerConfig> {
  * result. Passing a filtered batch in here must not wipe siblings that
  * were skipped by a caller-side "recently synced" optimisation.
  */
-export interface RunSyncPipelineDeps {
-  logger: LoggerPort;
-  dispatcher: JobDispatcherPort;
-  jellyfin: JellyfinAdapterPort;
-  plex: PlexAdapterPort;
-}
-
 export async function runSyncPipeline(
   db: Database,
   tmdb: MediaProviderPort,
@@ -419,7 +411,7 @@ export async function runSyncPipeline(
 
   const syncRunStart = new Date();
   const tvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
-  const config = await loadServerConfig();
+  const config = await loadServerConfig(deps.credentials);
   const supportedLangs = [...(await getActiveUserLanguages(db))];
 
   // Phase 1 + 2 — validate + dedupe
@@ -460,7 +452,7 @@ export async function runSyncPipeline(
 
     // Phase 5 — reconcile the Server Library list (idempotent)
     try {
-      await reconcileServerLibrary(db, tag);
+      await deps.lists.reconcileServerLibrary(tag);
     } catch (err) {
       console.warn(`[${tag}] Failed to reconcile Server Library:`, err);
     }
@@ -511,24 +503,20 @@ async function processOne(
   const { tag, config, mediaCache, supportedLangs, tvdbEnabled, syncRunStart, summary, opts } = ctx;
 
   try {
-    const anchor = await ensureMediaAnchor(
+    const anchor = await ensureMediaAnchor({
       db,
       tmdb,
-      deps.logger,
-      deps.dispatcher,
+      deps,
       scanned,
-      mediaCache,
+      cache: mediaCache,
       supportedLangs,
       tvdbEnabled,
-    );
+    });
 
     if (!anchor) {
-      // Trust Plex/Jellyfin as the source of truth: we never title-match
-      // here. No provider id → "unmatched", admin action required.
       console.log(`[${tag}] Unmatched: ${scanned.title} (${scanned.year})`);
       summary.unmatched++;
-      await upsertMediaVersion(
-        db,
+      await deps.mediaVersions.upsert(
         toMediaVersionInsert(scanned, {
           result: "unmatched",
           reason: "No provider id on server — admin action required",
@@ -538,17 +526,16 @@ async function processOne(
       return;
     }
 
-    // Add to shared Server Library list
     try {
-      const serverLib = await ensureServerLibrary(db);
-      await addListItem(db, { listId: serverLib.id, mediaId: anchor.mediaId });
+      const serverLib = await deps.lists.ensureServerLibrary();
+      await deps.lists.addItem({ listId: serverLib.id, mediaId: anchor.mediaId });
     } catch {
       /* already in server library */
     }
 
     if (opts.forUserId) {
       try {
-        await addToUserMediaLibrary(db, {
+        await deps.userMedia.addToLibrary({
           userId: opts.forUserId,
           mediaId: anchor.mediaId,
           source: scanned.source,
@@ -563,7 +550,6 @@ async function processOne(
     if (anchor.isNewImport) summary.imported++;
     else summary.skipped++;
 
-    // Fetch quality metadata from the server so it lands on the upsert.
     let files: MediaFileInfo[] = [];
     try {
       files = await fetchMediaFilesFor(deps.jellyfin, deps.plex, scanned, config);
@@ -572,8 +558,7 @@ async function processOne(
     }
     const topLevel = pickTopLevelFileInfo(files, scanned.type);
 
-    const upserted = await upsertMediaVersion(
-      db,
+    const upserted = await deps.mediaVersions.upsert(
       toMediaVersionInsert(scanned, {
         mediaId: anchor.mediaId,
         tmdbId: anchor.tmdbId,
@@ -586,7 +571,7 @@ async function processOne(
 
     if (upserted && scanned.type === "show" && files.length > 0) {
       try {
-        await persistEpisodesFor(db, upserted.id, files);
+        await persistEpisodesFor(deps.mediaVersions, upserted.id, files);
       } catch (err) {
         console.error(`[${tag}] Failed to persist episodes for ${scanned.title}:`, err);
       }
@@ -599,8 +584,7 @@ async function processOne(
     const msg = err instanceof Error ? err.message : "Unknown error";
     console.error(`[${tag}] Error processing ${scanned.title}:`, msg);
     summary.failed++;
-    await upsertMediaVersion(
-      db,
+    await deps.mediaVersions.upsert(
       toMediaVersionInsert(scanned, {
         result: "failed",
         reason: msg.slice(0, 500),

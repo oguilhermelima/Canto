@@ -34,6 +34,7 @@ import {
   hardDeleteList,
   markListItemsPushed,
   moveListItems,
+  reconcileServerLibrary,
   removeListItem,
   removeListItems,
   reorderListItems,
@@ -128,6 +129,7 @@ export function makeListsRepository(db: Database): ListsRepositoryPort {
       const row = await ensureServerLibrary(db);
       return listToDomain(row);
     },
+    reconcileServerLibrary: (tag) => reconcileServerLibrary(db, tag),
     create: async (input) => {
       const row = await createList(db, listToRow(input));
       return listToDomain(row);
