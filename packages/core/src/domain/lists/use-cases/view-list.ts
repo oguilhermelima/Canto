@@ -1,4 +1,3 @@
-import type { Database } from "@canto/db/client";
 import type { GetListBySlugInput } from "@canto/validators";
 import { ListNotFoundError } from "@canto/core/domain/lists/errors";
 import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
@@ -11,7 +10,6 @@ export interface ViewListDeps {
 
 export async function viewListBySlug(
   deps: ViewListDeps,
-  _db: Database,
   userId: string,
   userLang: string,
   input: GetListBySlugInput,

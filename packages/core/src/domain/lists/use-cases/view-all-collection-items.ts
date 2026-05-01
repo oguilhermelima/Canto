@@ -1,4 +1,3 @@
-import type { Database } from "@canto/db/client";
 import type { GetAllCollectionItemsInput } from "@canto/validators";
 import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
 import { getCollectionLayout } from "@canto/core/domain/lists/use-cases/collection-layout";
@@ -11,12 +10,11 @@ export interface ViewAllCollectionItemsDeps {
 
 export async function viewAllCollectionItems(
   deps: ViewAllCollectionItemsDeps,
-  db: Database,
   userId: string,
   userLang: string,
   input: GetAllCollectionItemsInput,
 ) {
-  const layout = await getCollectionLayout(deps, db, userId, userLang);
+  const layout = await getCollectionLayout(deps, userId, userLang);
 
   const { items, total } = await deps.repo.findUserCustomCollectionItems(
     userId,

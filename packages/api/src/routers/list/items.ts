@@ -106,7 +106,6 @@ export const listItemsRouter = createTRPCRouter({
       const repo = makeListsRepository(ctx.db);
       return viewAllCollectionItems(
         { repo },
-        ctx.db,
         ctx.session.user.id,
         ctx.session.user.language,
         input,

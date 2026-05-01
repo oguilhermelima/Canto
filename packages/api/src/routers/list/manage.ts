@@ -30,7 +30,6 @@ export const listManageRouter = createTRPCRouter({
     const repo = makeListsRepository(ctx.db);
     return getCollectionLayout(
       { repo },
-      ctx.db,
       ctx.session.user.id,
       ctx.session.user.language,
     );
@@ -42,7 +41,6 @@ export const listManageRouter = createTRPCRouter({
       const repo = makeListsRepository(ctx.db);
       return updateCollectionLayout(
         { repo },
-        ctx.db,
         ctx.session.user.id,
         ctx.session.user.language,
         input,
@@ -76,7 +74,6 @@ export const listManageRouter = createTRPCRouter({
       const repo = makeListsRepository(ctx.db);
       return viewListBySlug(
         { repo },
-        ctx.db,
         ctx.session.user.id,
         ctx.session.user.language,
         input,

@@ -1,4 +1,3 @@
-import type { Database } from "@canto/db/client";
 import type { UpdateCollectionLayoutInput } from "@canto/validators";
 import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
 import type { CollectionLayoutPreference } from "@canto/core/domain/lists/rules/list-rules";
@@ -31,7 +30,6 @@ export interface CollectionLayoutDeps {
 
 export async function getCollectionLayout(
   deps: CollectionLayoutDeps,
-  _db: Database,
   userId: string,
   userLang: string,
 ): Promise<CollectionLayoutPreference> {
@@ -48,7 +46,6 @@ export async function getCollectionLayout(
 
 export async function updateCollectionLayout(
   deps: CollectionLayoutDeps,
-  _db: Database,
   userId: string,
   userLang: string,
   input: UpdateCollectionLayoutInput,
