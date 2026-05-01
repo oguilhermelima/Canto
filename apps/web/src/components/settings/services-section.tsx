@@ -188,7 +188,18 @@ function ServiceRow({
   const [dirty, setDirty] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => {
+  // React docs: adjust state during render rather than syncing in an effect.
+  const [prevSyncKey, setPrevSyncKey] = useState<{
+    allSettings: typeof allSettings;
+    fields: typeof fields;
+    isEnabled: boolean;
+  }>({ allSettings, fields, isEnabled });
+  if (
+    prevSyncKey.allSettings !== allSettings ||
+    prevSyncKey.fields !== fields ||
+    prevSyncKey.isEnabled !== isEnabled
+  ) {
+    setPrevSyncKey({ allSettings, fields, isEnabled });
     if (allSettings && fields) {
       const v: Record<string, string> = {};
       let hasValues = false;
@@ -201,7 +212,7 @@ function ServiceRow({
       // Auto-expand if enabled but not yet configured
       if (isEnabled && !hasValues) setExpanded(true);
     }
-  }, [allSettings, fields, isEnabled]);
+  }
 
   const handleToggle = (): void => {
     toggleService.mutate({ service: serviceKey, enabled: !isEnabled });
@@ -363,14 +374,18 @@ function MediaServerRow({
   const [dirty, setDirty] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => {
+  // React docs: adjust state during render rather than syncing in an effect.
+  const urlSyncKey = `${String(allSettings ? "ready" : "loading")}|${urlField.key}|${apiKeyField.key}|${String(isEnabled)}|${String(allSettings?.[urlField.key] ?? "")}|${String(allSettings?.[apiKeyField.key] ?? "")}`;
+  const [prevUrlSyncKey, setPrevUrlSyncKey] = useState(urlSyncKey);
+  if (prevUrlSyncKey !== urlSyncKey) {
+    setPrevUrlSyncKey(urlSyncKey);
     if (allSettings) {
       setUrl((allSettings[urlField.key] as string | undefined) ?? "");
       setApiKey((allSettings[apiKeyField.key] as string | undefined) ?? "");
       setDirty(false);
       if (isEnabled && !allSettings[urlField.key]) setExpanded(true);
     }
-  }, [allSettings, urlField.key, apiKeyField.key, isEnabled]);
+  }
 
   const handleSave = (): void => {
     setMany.mutate(
@@ -562,7 +577,10 @@ function TmdbSection(): React.JSX.Element {
   const [dirty, setDirty] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => {
+  // React docs: adjust state during render rather than syncing in an effect.
+  const [prevTmdbAllSettings, setPrevTmdbAllSettings] = useState(allSettings);
+  if (prevTmdbAllSettings !== allSettings) {
+    setPrevTmdbAllSettings(allSettings);
     if (allSettings?.["tmdb.apiKey"]) {
       setTmdbKey(allSettings["tmdb.apiKey"] as string);
       setDirty(false);
@@ -570,7 +588,7 @@ function TmdbSection(): React.JSX.Element {
       // Auto-expand when no key is configured
       setExpanded(true);
     }
-  }, [allSettings]);
+  }
 
   if (isLoading) return <div className="px-5 py-5"><Skeleton className="h-10 w-full" /></div>;
 
@@ -673,13 +691,16 @@ function TvdbApiKeySection(): React.JSX.Element {
   const [dirty, setDirty] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => {
+  // React docs: adjust state during render rather than syncing in an effect.
+  const [prevTvdbAllSettings, setPrevTvdbAllSettings] = useState(allSettings);
+  if (prevTvdbAllSettings !== allSettings) {
+    setPrevTvdbAllSettings(allSettings);
     if (allSettings) {
       setApiKey((allSettings["tvdb.apiKey"] as string | undefined) ?? "");
       setDirty(false);
       if (!allSettings["tvdb.apiKey"]) setExpanded(true);
     }
-  }, [allSettings]);
+  }
 
   if (isLoading) return <div className="px-5 py-5"><Skeleton className="h-10 w-full" /></div>;
 
@@ -1171,13 +1192,16 @@ function PlexServerSection(): React.JSX.Element {
   const [dirty, setDirty] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => {
+  // React docs: adjust state during render rather than syncing in an effect.
+  const [prevPlexSync, setPrevPlexSync] = useState({ allSettings, isEnabled });
+  if (prevPlexSync.allSettings !== allSettings || prevPlexSync.isEnabled !== isEnabled) {
+    setPrevPlexSync({ allSettings, isEnabled });
     if (allSettings) {
       setUrl((allSettings["plex.url"] as string | undefined) ?? "");
       setDirty(false);
       if (isEnabled && !allSettings["plex.url"]) setExpanded(true);
     }
-  }, [allSettings, isEnabled]);
+  }
 
   const handleToggle = (): void => {
     toggleService.mutate({ service: "plex", enabled: !isEnabled });
