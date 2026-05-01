@@ -1,5 +1,28 @@
+import { DomainError } from "@canto/core/domain/shared/errors";
+
 /** Branded id for the `media` table primary key. */
 export type MediaId = string & { readonly __brand: "MediaId" };
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export class InvalidMediaIdError extends DomainError {
+  readonly code = "BAD_REQUEST" as const;
+
+  constructor(raw: string) {
+    super(`Invalid media id: ${raw}`);
+  }
+}
+
+/**
+ * Validate a string at the brand boundary and return it as a `MediaId`. The
+ * single `as MediaId` here is the brand cast — the regex is the runtime
+ * guarantee the type system relies on.
+ */
+export function parseMediaId(raw: string): MediaId {
+  if (!UUID_RE.test(raw)) throw new InvalidMediaIdError(raw);
+  return raw as MediaId;
+}
 
 /** Discriminator for movie vs show. */
 export type MediaType = "movie" | "show";

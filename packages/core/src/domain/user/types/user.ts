@@ -1,4 +1,27 @@
+import { DomainError } from "@canto/core/domain/shared/errors";
+
 export type UserId = string & { readonly __brand: "UserId" };
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export class InvalidUserIdError extends DomainError {
+  readonly code = "BAD_REQUEST" as const;
+
+  constructor(raw: string) {
+    super(`Invalid user id: ${raw}`);
+  }
+}
+
+/**
+ * Validate a string at the brand boundary and return it as a `UserId`. The
+ * single `as UserId` here is the brand cast — the regex is the runtime
+ * guarantee the type system relies on.
+ */
+export function parseUserId(raw: string): UserId {
+  if (!UUID_RE.test(raw)) throw new InvalidUserIdError(raw);
+  return raw as UserId;
+}
 
 export type UserRole = "admin" | "user";
 
