@@ -20,7 +20,7 @@ export function makeUserPreferences(db: Database): UserPreferencesPort {
       });
       if (!row) return null;
       return {
-        language: row.language ?? null,
+        language: row.language,
         watchRegion: row.watchRegion,
       };
     },
@@ -29,9 +29,7 @@ export function makeUserPreferences(db: Database): UserPreferencesPort {
         .selectDistinct({ language: user.language })
         .from(user)
         .where(isNotNull(user.language));
-      return rows
-        .map((r) => r.language)
-        .filter((l): l is string => typeof l === "string" && l.length > 0);
+      return rows.map((r) => r.language).filter((l) => l.length > 0);
     },
   };
 }

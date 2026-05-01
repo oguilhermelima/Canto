@@ -259,23 +259,11 @@ export default [
   },
   {
     // Documented boundary-leak grandfathers — the `no-restricted-imports`
-    // rule is silenced on these files (rather than left as `warn`) so the
-    // strict lint pass succeeds. The leaks themselves are tracked in the
-    // refactor history; any NEW code in these files that adds new infra
-    // imports should be caught in code review, not by lint:
-    //   - persist/tvdb-overlay.ts: detach/re-attach flow uses an explicit
-    //     `db.transaction` that crosses into user-media and torrents
-    //     tables; porting needs a cross-context tx-scoped port.
-    //   - shared/localization/localization-service.ts: 18+ cross-context
-    //     consumers; deserves a dedicated pass.
-    //   - shared/services/{content-rating,user}-service.ts: thin shims
-    //     that haven't been converted yet.
-    files: [
-      "src/domain/media/use-cases/persist/tvdb-overlay.ts",
-      "src/domain/shared/localization/localization-service.ts",
-      "src/domain/shared/services/content-rating-service.ts",
-      "src/domain/shared/services/user-service.ts",
-    ],
+    // rule is silenced on these files. `tvdb-overlay.ts` still owns the
+    // detach/re-attach flow with an explicit `db.transaction` that crosses
+    // into user-media and torrents tables; porting needs a cross-context
+    // tx-scoped port.
+    files: ["src/domain/media/use-cases/persist/tvdb-overlay.ts"],
     rules: {
       "no-restricted-imports": "off",
     },
