@@ -522,14 +522,39 @@ function PlexOAuthSection({ serverUrl, disabled, onSuccess, isConnected }: { ser
     { enabled: polling && pinData !== null, refetchInterval: 2000 },
   );
 
+  // Detect transitions on async pin-check data. Update state during render
+  // (React-recommended over setState-in-effect) and fire toast side effects
+  // from a follow-up effect.
+  const pinAuthenticated = pinCheck.data?.authenticated === true;
+  const pinExpired = pinCheck.data?.expired === true;
+  const [prevPinAuthenticated, setPrevPinAuthenticated] = useState(false);
+  const [prevPinExpired, setPrevPinExpired] = useState(false);
+  const justPinAuthenticated = pinAuthenticated && !prevPinAuthenticated;
+  const justPinExpired = pinExpired && !prevPinExpired;
+  const serverName = pinCheck.data?.serverName ?? null;
+  const username = pinCheck.data?.username ?? null;
+
+  if (justPinAuthenticated) {
+    setPrevPinAuthenticated(true);
+    setPolling(false);
+    setPinData(null);
+  }
+  if (justPinExpired) {
+    setPrevPinExpired(true);
+    setPolling(false);
+    setPinData(null);
+  }
+
   useEffect(() => {
-    if (pinCheck.data?.authenticated) {
-      setPolling(false); setPinData(null);
-      toast.success(pinCheck.data.serverName ? `Connected to ${pinCheck.data.serverName}${pinCheck.data.username ? ` as ${pinCheck.data.username}` : ""}` : `Signed in${pinCheck.data.username ? ` as ${pinCheck.data.username}` : ""}`);
+    if (justPinAuthenticated) {
+      const userSuffix = username !== null ? ` as ${username}` : "";
+      toast.success(
+        serverName !== null ? `Connected to ${serverName}${userSuffix}` : `Signed in${userSuffix}`,
+      );
       onSuccess();
     }
-    if (pinCheck.data?.expired) { setPolling(false); setPinData(null); toast.error("Authentication expired. Please try again."); }
-  }, [pinCheck.data, onSuccess]);
+    if (justPinExpired) toast.error("Authentication expired. Please try again.");
+  }, [justPinAuthenticated, justPinExpired, serverName, username, onSuccess]);
 
   const handleSignIn = (): void => {
     createPin.mutate(undefined, {
