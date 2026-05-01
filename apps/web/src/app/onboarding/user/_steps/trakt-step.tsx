@@ -41,20 +41,32 @@ export function TraktUserStep({
     return () => clearTimeout(id);
   }, [polling]);
 
+  // Detect transitions on async query data. Update state during render
+  // (React-recommended over setState-in-effect) and fire toast side effects
+  // from a follow-up effect.
+  const traktAuthenticated = checkDevice.data?.authenticated === true;
+  const traktExpired = checkDevice.data?.expired === true;
+  const [prevTraktAuthenticated, setPrevTraktAuthenticated] = useState(false);
+  const [prevTraktExpired, setPrevTraktExpired] = useState(false);
+  const justAuthenticated = traktAuthenticated && !prevTraktAuthenticated;
+  const justExpired = traktExpired && !prevTraktExpired;
+
+  if (justAuthenticated) {
+    setPrevTraktAuthenticated(true);
+    setPolling(false);
+    setDeviceCode(null);
+    setConnected(true);
+  }
+  if (justExpired) {
+    setPrevTraktExpired(true);
+    setPolling(false);
+    setDeviceCode(null);
+  }
+
   useEffect(() => {
-    const data = checkDevice.data;
-    if (!data) return;
-    if (data.authenticated) {
-      setPolling(false);
-      setDeviceCode(null);
-      setConnected(true);
-      toast.success("Trakt account linked");
-    } else if (data.expired) {
-      setPolling(false);
-      setDeviceCode(null);
-      toast.error("Trakt authorization expired");
-    }
-  }, [checkDevice.data]);
+    if (justAuthenticated) toast.success("Trakt account linked");
+    if (justExpired) toast.error("Trakt authorization expired");
+  }, [justAuthenticated, justExpired]);
 
   const handleStart = (): void => {
     createDevice.mutate(undefined, {

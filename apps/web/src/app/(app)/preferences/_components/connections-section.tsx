@@ -422,50 +422,83 @@ function AddConnectionForm({
     { enabled: traktPolling && !!traktDeviceCode, refetchInterval: traktPollInterval },
   );
 
+  // Detect transitions on async query data. We update state synchronously
+  // during render (React-recommended over setState-in-effect) and fire
+  // toast/onSuccess side effects from a follow-up effect that watches the
+  // same transition flags.
+  const plexAuthed = plexPinCheck.data?.authenticated === true;
+  const plexExpired = plexPinCheck.data?.expired === true;
+  const traktAuthed = traktDeviceCheck.data?.authenticated === true;
+  const traktExpired = traktDeviceCheck.data?.expired === true;
+  const traktErrorMsg = traktDeviceCheck.error?.message ?? null;
+
+  const [prevPlexAuthed, setPrevPlexAuthed] = useState(false);
+  const [prevPlexExpired, setPrevPlexExpired] = useState(false);
+  const [prevTraktAuthed, setPrevTraktAuthed] = useState(false);
+  const [prevTraktExpired, setPrevTraktExpired] = useState(false);
+  const [prevTraktErrorMsg, setPrevTraktErrorMsg] = useState<string | null>(null);
+
+  const justPlexAuthed = plexAuthed && !prevPlexAuthed;
+  const justPlexExpired = plexExpired && !prevPlexExpired;
+  const justTraktAuthed = traktAuthed && !prevTraktAuthed;
+  const justTraktExpired = traktExpired && !prevTraktExpired;
+  const newTraktError =
+    traktErrorMsg !== null && traktErrorMsg !== prevTraktErrorMsg ? traktErrorMsg : null;
+
+  if (justPlexAuthed) {
+    setPrevPlexAuthed(true);
+    setPolling(false);
+    setPinData(null);
+  }
+  if (justPlexExpired) {
+    setPrevPlexExpired(true);
+    setPolling(false);
+    setPinData(null);
+  }
+  if (justTraktAuthed) {
+    setPrevTraktAuthed(true);
+    setTraktPolling(false);
+    setTraktDeviceCode(null);
+    setTraktUserCode(null);
+    setTraktVerificationUrl(null);
+    setTraktAuthError(null);
+  }
+  if (justTraktExpired) {
+    setPrevTraktExpired(true);
+    setTraktPolling(false);
+    setTraktDeviceCode(null);
+    setTraktUserCode(null);
+    setTraktVerificationUrl(null);
+    setLoading(false);
+    setTraktAuthError(null);
+  }
+  if (newTraktError !== null) {
+    setPrevTraktErrorMsg(newTraktError);
+    setTraktPolling(false);
+    setLoading(false);
+    setTraktAuthError(newTraktError);
+  }
+
   useEffect(() => {
-    if (plexPinCheck.data?.authenticated) {
-      setPolling(false);
-      setPinData(null);
+    if (justPlexAuthed) {
       toast.success("Plex connected — your library is being imported");
       onSuccess();
     }
-    if (plexPinCheck.data?.expired) {
-      setPolling(false);
-      setPinData(null);
-      toast.error("Auth session expired");
-    }
-  }, [plexPinCheck.data, onSuccess]);
-
-  useEffect(() => {
-    if (traktDeviceCheck.data?.authenticated) {
-      setTraktPolling(false);
-      setTraktDeviceCode(null);
-      setTraktUserCode(null);
-      setTraktVerificationUrl(null);
-      setTraktAuthError(null);
+    if (justPlexExpired) toast.error("Auth session expired");
+    if (justTraktAuthed) {
       toast.success("Trakt connected — sync has started");
       onSuccess();
-      return;
     }
-
-    if (traktDeviceCheck.data?.expired) {
-      setTraktPolling(false);
-      setTraktDeviceCode(null);
-      setTraktUserCode(null);
-      setTraktVerificationUrl(null);
-      setLoading(false);
-      setTraktAuthError(null);
-      toast.error("Trakt authorization expired");
-    }
-  }, [traktDeviceCheck.data, onSuccess]);
-
-  useEffect(() => {
-    if (!traktDeviceCheck.error) return;
-    setTraktPolling(false);
-    setLoading(false);
-    setTraktAuthError(traktDeviceCheck.error.message);
-    toast.error(traktDeviceCheck.error.message);
-  }, [traktDeviceCheck.error]);
+    if (justTraktExpired) toast.error("Trakt authorization expired");
+    if (newTraktError !== null) toast.error(newTraktError);
+  }, [
+    justPlexAuthed,
+    justPlexExpired,
+    justTraktAuthed,
+    justTraktExpired,
+    newTraktError,
+    onSuccess,
+  ]);
 
   const handlePlexOAuth = () => {
     setLoading(true);
