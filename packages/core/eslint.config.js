@@ -224,4 +224,20 @@ export default [
       "@typescript-eslint/no-non-null-assertion": "warn",
     },
   },
+  {
+    // Media context — broadest port-first refactor. `eqeqeq` and
+    // `no-non-null-assertion` are promoted to `error` so future regressions
+    // fail the build. `no-restricted-imports` stays at warn because
+    // `persist/tvdb-overlay.ts` still reaches into user-media + torrents
+    // tables for the detach/re-attach flow; porting that transactional
+    // surface needs cross-context coordination.
+    // `prefer-nullish-coalescing` stays at warn because the persist pipeline
+    // intentionally treats empty strings as null (`releaseDate || null`),
+    // which `??` does not preserve.
+    files: ["src/domain/media/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-non-null-assertion": "error",
+      eqeqeq: ["error", "always"],
+    },
+  },
 ];

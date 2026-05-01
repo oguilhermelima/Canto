@@ -499,6 +499,46 @@ DOD: 5 infra leaks (1 jellyfin.adapter, 1 plex.adapter, 1 user-connection-reposi
 
 DOD (a-j): boundary 3 → 0; drizzle 8 → 0; zero `throw new Error` (already true); zero `console.log` (1 → 0); ESLint per-folder override at `error` for `no-restricted-imports` + `no-non-null-assertion` + `prefer-nullish-coalescing` + `eqeqeq`. `coordinateTraktSync` signature trimmed (no Database).
 
+#### W10.8 — `media` ✅ partial (Teammate J, 2026-05-01)
+
+Maior contexto + W10.5 absorption. Threading expanded to require full
+`PersistDeps` everywhere (no fallback adapters in domain).
+
+| Commit | Escopo |
+|---|---|
+| `10fb13ed` | **W10.5 absorbed**: introduce `LibraryFeedRepositoryPort` (13 methods) + `makeLibraryFeedRepository` adapter. Port-first the 4 read-only feed use cases (`get-continue-watching`, `get-library-history`, `get-upcoming-schedule`, `get-watch-next`). Row types lifted into `domain/user-media/types/library-feed.ts`. Callers wired: `userMedia/feed.ts` + `profile/public.ts`. |
+| `c8fc0346` | port-first persist orchestration. `PersistDeps` is now required everywhere; `withFallback` deleted. `MediaRepositoryPort` gains `tryCreateMedia`, `hasTvdbReconciledStructure`, `bulkCreateEpisodesIgnoringConflicts`. New slim `MediaVersionRepositoryPort` (3 methods) + adapter. New `composition/persist-deps.ts` factory. Typed errors: `MediaInsertConflictError`, `MediaUpdateFailedError`, `MediaPostInsertNotFoundError`, `EmptyVersionListError`, `MediaVersionNotFoundError`. Cross-context callers (file-organization, sync, trakt) widened to thread persist deps. |
+| `4188bdb1` | port-first `mergeLiveData` (drops the `as unknown as` cast — W10.7 carryover), `getMediaAvailability`, `ensureMediaMany`. New port method `findVersionsWithEpisodesByMediaId` on `MediaVersionRepositoryPort`. `reconcile-show-structure` swaps `findMediaLocalized` infra for `deps.localization.findLocalizedById`. |
+| `ad1ad56e` | port-first `ensureMedia` + `detectGaps` + `detect-episode-gaps` + `fetch-logos`. `EnsureMediaDeps` required. Six new count-style port methods (`countSeasonsByMediaId`, `countEpisodesByMediaId` on media; `countTranslationsPerLanguage`, `findLogoLanguagesByMediaId` on localization; `countCreditsByMediaId` on extras; `countByMediaId` on contentRating). New `hasImportedFileForEpisode` on `TorrentsRepositoryPort` for the gap detector. Typed error `EnsureMediaNotFoundError` replaces `throw new Error`. |
+| `8627c437` | port-first `persist/translations` + `persist/extras`. New `findIdsByExternalIdsForProvider` on `MediaRepositoryPort` for the dedup batch lookup; `persistSeasons` accessed via `findSeasonsByMediaId` rather than ad-hoc `db.query`. |
+| `5d534eff` | latent-error sweep: drop dead `?? "tmdb"` / `?? null` fallbacks, replace `Forbidden non-null assertion` with guard clauses, `==`/`!=` → `===`/`!==` in tvdb-overlay, top-level `import type NormalizedMedia` in reconcile-show-structure, `??=` for the wpByRegion bucket, drop unused `MediaRecommendation` import, replace `EnrichmentRegistryCycleError` + `TmdbCallExhaustedError` typed errors. |
+
+DOD (a-j): boundary leaks 8 → 0 (zero `@canto/core/infra/*` or
+`@canto/core/platform/*` imports in `domain/media/**`). Drizzle-orm
+clean except for `persist/tvdb-overlay.ts` (3 imports — see deferrals).
+Typed errors via new `domain/media/errors.ts` (8 classes). 4 `throw new
+Error` strings replaced; the 5th lives in tvdb-overlay (deferred).
+ESLint per-folder block on `domain/media/**` promotes
+`no-non-null-assertion` + `eqeqeq` to error; `no-restricted-imports`
+and `prefer-nullish-coalescing` stay at warn (see deferrals).
+
+**Deferrals** (cross-context, intentional):
+
+- `persist/tvdb-overlay.ts` retains drizzle imports for the
+  detach/re-attach flow that crosses into user-media (`userRating`,
+  `userPlaybackProgress`, `userWatchHistory`) + torrents (`mediaFile`)
+  tables and runs inside an explicit `db.transaction`. Porting this
+  surface needs cross-context coordination across W10.10 / W10.11 plus
+  a tx-scoped port story. 6 callsites flagged for follow-up.
+- `prefer-nullish-coalescing` warnings in `persist/{core,extras,translations}.ts`
+  are intentional `releaseDate || null` empty-string-to-null patterns
+  that `??` cannot express. Proper fix lives in the provider layer
+  (drop `""` from the producer side).
+- 2 `console.log` warnings in `reconcile-show-structure.ts` will move
+  to `LoggerPort` when the comment-cleanup pass runs.
+
+**Stitching note**: J's slim `MediaVersionRepositoryPort` (3 métodos em `domain/media/ports/`) foi colapsado no port maior do K (`domain/media-servers/ports/media-version-repository.port.ts`, 13 métodos). `resolveMediaVersion` agora consome o port do K diretamente — a duplicação foi removida no stitching.
+
 ### Convenção de paths de imports (decidida 2026-04-30, em adoção desde Wave 1)
 
 **Regra única**: TODO import usa o nome do package (`@canto/<pkg>/<full-path>`). Zero `./` ou `../`.
