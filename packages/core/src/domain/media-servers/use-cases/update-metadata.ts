@@ -9,6 +9,7 @@ import type { JellyfinAdapterPort } from "@canto/core/domain/media-servers/ports
 import type { MediaVersionRepositoryPort } from "@canto/core/domain/media-servers/ports/media-version-repository.port";
 import type { PlexAdapterPort } from "@canto/core/domain/media-servers/ports/plex-adapter.port";
 import type { ServerCredentialsPort } from "@canto/core/domain/media-servers/ports/server-credentials.port";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 
 export interface ServerUpdateResult {
   jellyfin: boolean;
@@ -24,6 +25,7 @@ export interface UpdateMediaServerMetadataDeps {
   credentials: ServerCredentialsPort;
   plex: PlexAdapterPort;
   jellyfin: JellyfinAdapterPort;
+  logger?: LoggerPort;
 }
 
 export async function updateMediaServerMetadata(
@@ -78,9 +80,9 @@ export async function updateMediaServerMetadata(
 
         result.jellyfin = true;
       } catch (err) {
-        console.warn(
-          `[update-metadata] Jellyfin match update failed for item ${version.serverItemId}:`,
-          err instanceof Error ? err.message : err,
+        deps.logger?.warn(
+          `[update-metadata] Jellyfin match update failed for item ${version.serverItemId}`,
+          { err: err instanceof Error ? err.message : err },
         );
       }
       continue;
@@ -119,9 +121,9 @@ export async function updateMediaServerMetadata(
 
         result.plex = true;
       } catch (err) {
-        console.warn(
-          `[update-metadata] Plex match update failed for item ${version.serverItemId}:`,
-          err instanceof Error ? err.message : err,
+        deps.logger?.warn(
+          `[update-metadata] Plex match update failed for item ${version.serverItemId}`,
+          { err: err instanceof Error ? err.message : err },
         );
       }
     }
