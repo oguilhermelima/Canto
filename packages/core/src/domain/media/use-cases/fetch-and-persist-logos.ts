@@ -1,4 +1,3 @@
-import type { Database } from "@canto/db/client";
 import type { MediaType } from "@canto/providers";
 
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
@@ -13,13 +12,12 @@ import { upsertLangLogos } from "@canto/core/domain/content-enrichment/use-cases
  * non-en language to look up) and the number of language rows written.
  */
 export async function fetchAndPersistLogos(
-  db: Database,
+  deps: { localization: MediaLocalizationRepositoryPort },
   mediaId: string,
   externalId: number,
   type: MediaType,
   languages: string[],
   tmdb: MediaProviderPort,
-  deps: { localization?: MediaLocalizationRepositoryPort } = {},
 ): Promise<{ calls: number; writes: number }> {
   if (!tmdb.getImages) return { calls: 0, writes: 0 };
 
@@ -37,8 +35,6 @@ export async function fetchAndPersistLogos(
   }
   if (byLang.size === 0) return { calls: 1, writes: 0 };
 
-  const writes = await upsertLangLogos(db, mediaId, byLang, nonEnLangs, {
-    localization: deps.localization,
-  });
+  const writes = await upsertLangLogos(deps, mediaId, byLang, nonEnLangs);
   return { calls: 1, writes };
 }

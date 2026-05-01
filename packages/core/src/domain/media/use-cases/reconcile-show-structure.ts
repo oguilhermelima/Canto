@@ -8,6 +8,7 @@ import {
 } from "@canto/core/domain/media/use-cases/persist";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import { findMediaLocalized } from "@canto/core/infra/media/media-localized-repository";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
@@ -17,6 +18,7 @@ import { upsertMediaLocalization } from "@canto/core/domain/shared/localization/
 
 export interface ReconcileShowStructureDeps {
   media: MediaRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
   tmdb: MediaProviderPort;
   tvdb: MediaProviderPort;
   logger: LoggerPort;
@@ -88,7 +90,9 @@ export async function reconcileShowStructure(
       if (tmdbData.seasons) tmdbNormalized.seasons = tmdbData.seasons;
     } catch { /* keep TVDB seasons if TMDB fails */ }
 
-    await applyTvdbSeasons(db, mediaId, tvdbData.seasons, tmdbNormalized);
+    await applyTvdbSeasons(db, mediaId, tvdbData.seasons, tmdbNormalized, {
+      localization: deps.localization,
+    });
   }
 
   const supportedLangs = [...(await getActiveUserLanguages(db))];
@@ -141,11 +145,16 @@ export async function reconcileShowStructure(
 
       // Persist TMDB media-level translations (title, overview, posters, logos)
       if (tmdbMeta.translations) {
-        await persistTranslations(db, mediaId, {
-          ...tmdbMeta,
-          seasonTranslations: undefined,
-          episodeTranslations: undefined,
-        } as typeof tmdbMeta);
+        await persistTranslations(
+          db,
+          mediaId,
+          {
+            ...tmdbMeta,
+            seasonTranslations: undefined,
+            episodeTranslations: undefined,
+          } as typeof tmdbMeta,
+          { localization: deps.localization },
+        );
       }
     } catch (err) {
       console.warn(`[reconcile] TMDB backfill failed for "${enTitle}":`, err instanceof Error ? err.message : err);

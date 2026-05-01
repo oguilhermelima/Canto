@@ -1,36 +1,28 @@
-import type { Database } from "@canto/db/client";
 import { TvdbProvider } from "@canto/providers";
 
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
-import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
-import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 
 export interface TranslateEpisodesDeps {
-  localization?: MediaLocalizationRepositoryPort;
-  media?: MediaRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
+  media: MediaRepositoryPort;
 }
 
 /**
  * Fetch episode + season translations for a single language from TVDB.
  * Designed to run as a background job — one job per (mediaId, language) pair.
  *
- * Wave 9C threads the localization + media ports through `deps`. The default
- * fallback constructs adapters off `db` so legacy callers (e.g. the worker
- * job that still imports the function directly) keep working without
- * touching their entry point.
+ * Wave 9C threads the localization + media ports through `deps`.
  */
 export async function translateEpisodes(
-  db: Database,
+  deps: TranslateEpisodesDeps,
   mediaId: string,
   tvdbId: number,
   language: string,
   tvdb: TvdbProvider,
-  deps: TranslateEpisodesDeps = {},
 ): Promise<void> {
-  const localization =
-    deps.localization ?? makeMediaLocalizationRepository(db);
-  const media = deps.media ?? makeMediaRepository(db);
+  const localization = deps.localization;
+  const media = deps.media;
 
   const lang3 = TvdbProvider.toIso639_2(language);
   if (lang3 === "eng") return;

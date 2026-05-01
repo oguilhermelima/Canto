@@ -16,7 +16,6 @@ import type { NormalizedMedia, NormalizedSeason } from "@canto/providers";
 
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import { persistSeasons } from "@canto/core/domain/media/use-cases/persist/core";
-import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 
 interface TvdbOverlayDeps {
   localization: MediaLocalizationRepositoryPort;
@@ -157,10 +156,9 @@ export async function applyTvdbSeasons(
   mediaId: string,
   tvdbSeasons: NormalizedSeason[],
   normalized: NormalizedMedia,
-  opts?: { deps?: Partial<TvdbOverlayDeps> },
+  deps: TvdbOverlayDeps,
 ): Promise<void> {
-  const localization =
-    opts?.deps?.localization ?? makeMediaLocalizationRepository(db);
+  const localization = deps.localization;
 
   const existingSeasons = await db.query.season.findMany({
     where: eq(season.mediaId, mediaId),

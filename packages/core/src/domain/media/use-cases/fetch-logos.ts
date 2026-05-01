@@ -12,8 +12,8 @@ import {
   upsertLangLogos,
 } from "@canto/core/domain/content-enrichment/use-cases/upsert-lang-logos";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import { upsertMediaLocalization } from "@canto/core/domain/shared/localization/localization-service";
-import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 
 /** Deduplicates concurrent getImages calls for the same externalId */
 const inflightFetches = new Map<string, Promise<string | undefined>>();
@@ -21,6 +21,7 @@ const inflightFetches = new Map<string, Promise<string | undefined>>();
 export interface FetchLogosDeps {
   logger: LoggerPort;
   dispatcher: JobDispatcherPort;
+  localization: MediaLocalizationRepositoryPort;
 }
 
 export interface FetchLogoItem {
@@ -62,8 +63,7 @@ export async function fetchLogos(
   // `MediaLocalizationRepositoryPort.findLogoOverlayByExternalRefs` helper —
   // browse-time logo resolution flows through the port like every other
   // localization read.
-  const localization = makeMediaLocalizationRepository(db);
-  const existingRows = await localization.findLogoOverlayByExternalRefs(
+  const existingRows = await deps.localization.findLogoOverlayByExternalRefs(
     items.map((i) => ({
       externalId: i.externalId,
       provider: i.provider,
@@ -244,7 +244,7 @@ export async function fetchLogos(
     // future pt-BR readers to find logos persisted from this browse).
     if (mediaId && langLogos && langLogos.size > 0) {
       const supportedForWrite = supported ?? (await getActiveUserLanguages(db));
-      await upsertLangLogos(db, mediaId, langLogos, supportedForWrite);
+      await upsertLangLogos({ localization: deps.localization }, mediaId, langLogos, supportedForWrite);
     }
   }
 
@@ -262,18 +262,17 @@ export async function fetchLogos(
  */
 export async function enrichBrowseWithLogos<
   T extends { results: SearchResult[]; totalPages: number; totalResults: number },
->(db: Database, data: T, language?: string): Promise<T> {
+>(deps: { localization: MediaLocalizationRepositoryPort }, data: T, language?: string): Promise<T> {
   if (data.results.length === 0) return data;
 
   const useLangJoin = !!language && !language.startsWith("en");
-  const localization = makeMediaLocalizationRepository(db);
 
   const refs = data.results.map((r) => ({
     externalId: r.externalId,
     provider: r.provider,
     type: r.type,
   }));
-  const rows = await localization.findLogoOverlayByExternalRefs(
+  const rows = await deps.localization.findLogoOverlayByExternalRefs(
     refs,
     useLangJoin ? language : "en-US",
   );

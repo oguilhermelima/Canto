@@ -213,7 +213,7 @@ export async function persistMedia(
   );
 
   await persistSeasons(db, inserted.id, normalized);
-  await persistTranslations(db, inserted.id, normalized, { deps });
+  await persistTranslations(db, inserted.id, normalized, { localization: deps.localization });
   await persistContentRatings(inserted.id, normalized, { deps });
   return inserted;
 }
@@ -307,7 +307,7 @@ export async function updateMediaFromNormalized(
     await upsertSeasons(db, mediaId, normalized);
   }
 
-  await persistTranslations(db, mediaId, normalized, { deps });
+  await persistTranslations(db, mediaId, normalized, { localization: deps.localization });
   await persistContentRatings(mediaId, normalized, { deps });
 
   return updated;
@@ -479,7 +479,7 @@ export async function persistFullMedia(
   }
 
   if (tvdbSeasons && tvdbSeasons.length > 0) {
-    await applyTvdbSeasons(db, mediaId, tvdbSeasons, normalized, { deps });
+    await applyTvdbSeasons(db, mediaId, tvdbSeasons, normalized, { localization: deps.localization });
     if (tvdbId) {
       await db
         .update(media)
@@ -690,8 +690,9 @@ export async function resolveMedia(
           ),
         }
       : withRating;
-    const extras = await loadExtrasFromDB(db, existing.id, lang, {
+    const extras = await loadExtrasFromDB(existing.id, lang, {
       extras: deps.extras,
+      localization: deps.localization,
     });
 
     // Lazy fill: if this user's language has gaps, enqueue an ensureMedia
@@ -735,8 +736,9 @@ export async function resolveMedia(
           ),
         }
       : withRating;
-    const extras = await loadExtrasFromDB(db, persisted.id, lang, {
+    const extras = await loadExtrasFromDB(persisted.id, lang, {
       extras: deps.extras,
+      localization: deps.localization,
     });
 
     return {

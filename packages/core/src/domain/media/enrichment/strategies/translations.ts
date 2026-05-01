@@ -27,7 +27,7 @@ export const translationsStrategy: MediaEnrichmentStrategy<
   async applyToAspect(
     args: ApplyArgs<SharedMetadataResponse | undefined>,
   ) {
-    const { db, mediaId, scope, ctx, response, deps } = args;
+    const { mediaId, scope, ctx, response, deps } = args;
     if (!ctx.result.aspectsExecuted.includes("translations")) {
       ctx.result.aspectsExecuted.push("translations");
     }
@@ -44,7 +44,7 @@ export const translationsStrategy: MediaEnrichmentStrategy<
 
     try {
       await translateEpisodes(
-        db,
+        { localization: ctx.deps.localization, media: ctx.deps.media },
         mediaId,
         ctx.mediaRow.tvdbId,
         lang,

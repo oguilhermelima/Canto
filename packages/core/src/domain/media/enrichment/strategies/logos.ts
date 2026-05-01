@@ -19,7 +19,7 @@ export const logosStrategy: MediaEnrichmentStrategy<undefined> = {
   dependsOn: ["metadata"],
   needs: "tmdb.images",
   async applyToAspect(args: ApplyArgs<undefined>) {
-    const { db, mediaId, ctx, deps } = args;
+    const { mediaId, ctx, deps } = args;
 
     const cached = readCache(ctx);
     if (cached.fired) {
@@ -30,13 +30,12 @@ export const logosStrategy: MediaEnrichmentStrategy<undefined> = {
 
     try {
       const written = await fetchAndPersistLogos(
-        db,
+        { localization: ctx.deps.localization },
         mediaId,
         ctx.mediaRow.externalId,
         ctx.mediaRow.type as MediaType,
         ctx.languages,
         deps.tmdb,
-        { localization: ctx.deps.localization },
       );
       ctx.result.providerCalls.tmdb += written.calls;
       ctx.result.writes.logos = written.writes;

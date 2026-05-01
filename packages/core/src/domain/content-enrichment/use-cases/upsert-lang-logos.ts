@@ -1,7 +1,4 @@
-import type { Database } from "@canto/db/client";
-
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
-import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 
 /**
  * Resolve a TMDB iso_639_1 code (e.g. "pt") onto the supported full locale
@@ -42,7 +39,7 @@ export function resolveSupportedLocale(
 }
 
 export interface UpsertLangLogosDeps {
-  localization?: MediaLocalizationRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
 }
 
 /**
@@ -61,16 +58,14 @@ export interface UpsertLangLogosDeps {
  * helper requires a title and the next translations refresh will seed it.
  */
 export async function upsertLangLogos(
-  db: Database,
+  deps: UpsertLangLogosDeps,
   mediaId: string,
   byLangIso639_1: Map<string, string>,
   targetLanguages: Iterable<string>,
-  deps: UpsertLangLogosDeps = {},
 ): Promise<number> {
   if (byLangIso639_1.size === 0) return 0;
 
-  const localization =
-    deps.localization ?? makeMediaLocalizationRepository(db);
+  const localization = deps.localization;
 
   const supported = new Set<string>();
   for (const code of targetLanguages) {

@@ -1,15 +1,11 @@
-import type { Database } from "@canto/db/client";
-
 import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import { applyMediaItemsLocalizationOverlay } from "@canto/core/domain/shared/localization/localization-service";
 import { mapPoolItem } from "@canto/core/domain/shared/mappers/media-mapper";
-import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 
 export interface LoadExtrasDeps {
   extras: MediaExtrasRepositoryPort;
-  /** Optional — falls back to building from `db` when not supplied. */
-  localization?: MediaLocalizationRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
 }
 
 /**
@@ -19,12 +15,11 @@ export interface LoadExtrasDeps {
  * not supplied so router-level callers stay terse.
  */
 export async function loadExtrasFromDB(
-  db: Database,
   mediaId: string,
   lang: string,
   deps: LoadExtrasDeps,
 ) {
-  const localization = deps.localization ?? makeMediaLocalizationRepository(db);
+  const localization = deps.localization;
   const [credits, videos, watchProviders, similar, recommendations] =
     await Promise.all([
       deps.extras.findCreditsByMediaId(mediaId),

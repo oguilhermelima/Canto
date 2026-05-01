@@ -15,6 +15,7 @@ import {
   updateMedia,
 } from "@canto/core/infra/media/media-repository";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import { findMediaFilesByMediaId } from "@canto/core/infra/media/media-file-repository";
 import { findMediaVersionsByMediaId } from "@canto/core/infra/media/media-version-repository";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
@@ -65,7 +66,14 @@ export const mediaVersioningRouter = createTRPCRouter({
         const media = makeMediaRepository(ctx.db);
         await reconcileShowStructure(
           ctx.db,
-          { media, tmdb, tvdb, dispatcher: jobDispatcher, logger: makeConsoleLogger() },
+          {
+            media,
+            localization: makeMediaLocalizationRepository(ctx.db),
+            tmdb,
+            tvdb,
+            dispatcher: jobDispatcher,
+            logger: makeConsoleLogger(),
+          },
           input.id,
           { force: true },
         );

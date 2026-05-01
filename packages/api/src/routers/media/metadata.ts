@@ -72,7 +72,12 @@ export const mediaMetadataRouter = createTRPCRouter({
       const media = makeMediaRepository(ctx.db);
       const result = await getByExternal(
         ctx.db,
-        { media, logger: makeConsoleLogger(), dispatcher: jobDispatcher },
+        {
+          media,
+          localization: makeMediaLocalizationRepository(ctx.db),
+          logger: makeConsoleLogger(),
+          dispatcher: jobDispatcher,
+        },
         input,
         ctx.session.user.id,
         getProviderWithKey,
@@ -102,8 +107,9 @@ export const mediaMetadataRouter = createTRPCRouter({
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
 
       const settingsLang = (await getSetting("general.language")) ?? "en-US";
-      const extras = await loadExtrasFromDB(ctx.db, input.id, settingsLang, {
+      const extras = await loadExtrasFromDB(input.id, settingsLang, {
         extras: makeMediaExtrasRepository(ctx.db),
+        localization: makeMediaLocalizationRepository(ctx.db),
       });
 
       // If extras tables have data, return them
@@ -157,7 +163,14 @@ export const mediaMetadataRouter = createTRPCRouter({
           const media = makeMediaRepository(ctx.db);
           await reconcileShowStructure(
             ctx.db,
-            { media, tmdb, tvdb, dispatcher: jobDispatcher, logger: makeConsoleLogger() },
+            {
+              media,
+              localization: makeMediaLocalizationRepository(ctx.db),
+              tmdb,
+              tvdb,
+              dispatcher: jobDispatcher,
+              logger: makeConsoleLogger(),
+            },
             row.id,
             { force: true },
           );

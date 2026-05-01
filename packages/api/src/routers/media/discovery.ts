@@ -81,14 +81,22 @@ export const mediaDiscoveryRouter = createTRPCRouter({
             if (input.dateTo && r.releaseDate && r.releaseDate > input.dateTo) return false;
             return true;
           });
-          return enrichBrowseWithLogos(appDb, {
-            ...searchResults,
-            results: filtered,
-            totalResults: filtered.length,
-          }, browseSettingsLang);
+          return enrichBrowseWithLogos(
+            { localization: makeMediaLocalizationRepository(appDb) },
+            {
+              ...searchResults,
+              results: filtered,
+              totalResults: filtered.length,
+            },
+            browseSettingsLang,
+          );
         }
 
-        return enrichBrowseWithLogos(appDb, searchResults, browseSettingsLang);
+        return enrichBrowseWithLogos(
+          { localization: makeMediaLocalizationRepository(appDb) },
+          searchResults,
+          browseSettingsLang,
+        );
       }
 
       const cacheKey = `browse:${input.type}:${input.mode}:${input.query ?? ""}:${input.genres ?? ""}:${input.language ?? ""}:${input.sortBy ?? ""}:${input.dateFrom ?? ""}:${input.dateTo ?? ""}:${input.keywords ?? ""}:${input.scoreMin ?? ""}:${input.scoreMax ?? ""}:${input.runtimeMax ?? ""}:${input.certification ?? ""}:${input.status ?? ""}:${input.watchProviders ?? ""}:${input.watchRegion ?? ""}:${input.runtimeMin ?? ""}:${page}:${browseSettingsLang}`;
@@ -136,7 +144,11 @@ export const mediaDiscoveryRouter = createTRPCRouter({
 
         return filterReleased(await provider.discover(input.type, discoverOpts));
       });
-      return enrichBrowseWithLogos(appDb, browseResults, browseSettingsLang);
+      return enrichBrowseWithLogos(
+        { localization: makeMediaLocalizationRepository(appDb) },
+        browseResults,
+        browseSettingsLang,
+      );
     }),
 
   getPerson: publicProcedure
@@ -153,7 +165,17 @@ export const mediaDiscoveryRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const tmdb = await getTmdbProvider();
       const userLang = ctx.session.user.language;
-      const result = await fetchLogos(ctx.db, { logger: makeConsoleLogger(), dispatcher: jobDispatcher }, tmdb, [input], userLang);
+      const result = await fetchLogos(
+        ctx.db,
+        {
+          logger: makeConsoleLogger(),
+          dispatcher: jobDispatcher,
+          localization: makeMediaLocalizationRepository(ctx.db),
+        },
+        tmdb,
+        [input],
+        userLang,
+      );
       const key = `${input.provider}-${input.type}-${input.externalId}`;
       return { logoPath: result[key] ?? null };
     }),

@@ -8,7 +8,6 @@ import type { MediaType, ProviderName } from "@canto/providers";
 import { persistMedia } from "@canto/core/domain/media/use-cases/persist";
 import { getSetting } from "@canto/db/settings";
 import { findAspectSucceededAt } from "@canto/core/infra/media/media-aspect-state-repository";
-import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import {
   applyMediaLocalizationOverlay,
   applySeasonsLocalizationOverlay,
@@ -23,10 +22,9 @@ interface GetByExternalInput {
 
 export interface GetByExternalDeps {
   media: MediaRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
   logger: LoggerPort;
   dispatcher: JobDispatcherPort;
-  /** Optional — falls back to building from `db` when not supplied. */
-  localization?: MediaLocalizationRepositoryPort;
 }
 
 /**
@@ -47,7 +45,7 @@ export async function getByExternal(
   getSupportedLangs: () => Promise<string[]>,
 ) {
   const tvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
-  const localization = deps.localization ?? makeMediaLocalizationRepository(db);
+  const localization = deps.localization;
 
   const existing = tvdbEnabled
     ? await deps.media.findByAnyReference(

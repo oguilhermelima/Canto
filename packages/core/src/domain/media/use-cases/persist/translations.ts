@@ -6,7 +6,6 @@ import type { NormalizedMedia } from "@canto/providers";
 
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { LocalizationSource } from "@canto/core/domain/media/types/media-localization";
-import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 
 interface PersistTranslationsDeps {
@@ -23,10 +22,9 @@ export async function persistTranslations(
   db: Database,
   mediaId: string,
   normalized: NormalizedMedia,
-  opts?: { deps?: Partial<PersistTranslationsDeps> },
+  deps: PersistTranslationsDeps,
 ): Promise<void> {
-  const localization =
-    opts?.deps?.localization ?? makeMediaLocalizationRepository(db);
+  const localization = deps.localization;
 
   const supported = await getActiveUserLanguages(db);
   const locSource: LocalizationSource =
