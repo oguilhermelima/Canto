@@ -176,13 +176,13 @@ export async function getRecommendations(
     seeds.map(async (item) => {
       try {
         const extras = await tmdb.getExtras(Number(item.externalId), item.type as "movie" | "show");
-        for (const rec of extras.recommendations ?? []) {
-          const key = `${rec.provider ?? "tmdb"}-${rec.externalId}`;
+        for (const rec of extras.recommendations) {
+          const key = `${rec.provider}-${rec.externalId}`;
           if (libraryKeys.has(key) || seenKeys.has(key)) continue;
           seenKeys.add(key);
           results.push({
-            externalId: rec.externalId, provider: rec.provider ?? "tmdb",
-            type: (rec.type ?? item.type) as "movie" | "show",
+            externalId: rec.externalId, provider: rec.provider,
+            type: rec.type as "movie" | "show",
             title: rec.title, posterPath: rec.posterPath ?? null,
             backdropPath: rec.backdropPath ?? null, year: rec.year,
             voteAverage: rec.voteAverage, overview: rec.overview,

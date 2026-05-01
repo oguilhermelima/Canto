@@ -56,7 +56,7 @@ export async function getSpotlight(
   if (poolItems.length > 0) {
     const seen = new Set<string>();
     const unique = poolItems.filter((item) => {
-      const key = `${item.provider ?? "tmdb"}-${item.externalId}`;
+      const key = `${item.provider}-${item.externalId}`;
       if (seen.has(key) || excludeSet.has(key)) return false;
       seen.add(key);
       return true;
@@ -123,8 +123,8 @@ export async function getSpotlight(
         if (tmdb.getImages) {
           const tmdbType = item.type === "show" ? "tv" as const : "movie" as const;
           const images = await tmdb.getImages(item.externalId, tmdbType);
-          const enLogos = (images.logos ?? []).filter((l) => l.iso_639_1 === "en");
-          logoPath = enLogos.length > 0 ? enLogos[0]!.file_path : null;
+          const enLogos = images.logos.filter((l) => l.iso_639_1 === "en");
+          logoPath = enLogos[0]?.file_path ?? null;
         }
 
         return {
