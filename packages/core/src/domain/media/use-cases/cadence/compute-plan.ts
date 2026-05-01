@@ -138,9 +138,7 @@ export function computePlan(input: ComputePlanInput): EnrichmentPlan {
   //    translations. Without this, a user who adds a new language after a
   //    media was persisted never gets a `(logos, lang)` plan item from the
   //    cadence sweep (it only sees existing state rows), so localized logos
-  //    stay un-fetched until the user explicitly visits the media. This
-  //    parity with translations keeps the cadence sweep self-healing for
-  //    new languages.
+  //    stay un-fetched until the user explicitly visits the media.
   const logosScopes = new Set(
     input.state
       .filter((r) => r.aspect === LOGOS_ASPECT)
@@ -160,10 +158,8 @@ export function computePlan(input: ComputePlanInput): EnrichmentPlan {
     }
   }
 
-  // `knobs` and `signal` are not currently consumed here; they are exposed
-  // on the input so callers can pass everything in one struct and the next
-  // wave of behaviour (signal-aware shortcuts, knob-driven thresholds) does
-  // not need a signature change. Touch them so unused-warnings stay quiet.
+  // `knobs` and `signal` are accepted in the input shape but unused today;
+  // referenced here so unused-warnings stay quiet.
   void input.knobs;
   void input.signal;
 

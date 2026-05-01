@@ -59,9 +59,8 @@ const KEYS = [
  * effect on this module — every other cadence function is pure.
  */
 export async function loadCadenceKnobs(db: Database): Promise<CadenceKnobs> {
-  // The current settings module reads via the ambient `db` import; we still
-  // accept `db` here so callers wire it through DI consistently with the rest
-  // of the use-cases (and so a future refactor can make the read explicit).
+  // `db` is unused — the settings module reads via an ambient import. Accepted
+  // here so callers wire DI consistently with the rest of the use-cases.
   void db;
   const values = await getSettings(KEYS);
   return {
