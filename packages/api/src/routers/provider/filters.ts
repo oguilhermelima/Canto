@@ -85,7 +85,9 @@ export const providerFiltersRouter = createTRPCRouter({
 
       if (rows.length === 0) {
         const tmdb = await getTmdbProvider();
-        await syncTmdbCertifications(ctx.db, tmdb);
+        await syncTmdbCertifications(tmdb, {
+          extras: makeMediaExtrasRepository(ctx.db),
+        });
         rows = await ctx.db
           .select({
             region: tmdbCertification.region,

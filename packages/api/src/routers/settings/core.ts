@@ -26,6 +26,7 @@ import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter
 import { ensureMediaMany } from "@canto/core/domain/media/use-cases/ensure-media-many";
 import { syncTmdbCertifications } from "@canto/core/domain/content-enrichment/use-cases/sync-tmdb-certifications";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
+import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 
 export const settingsCoreRouter = createTRPCRouter({
   getAll: adminProcedure.query(() => getAllSettings()),
@@ -102,7 +103,9 @@ export const settingsCoreRouter = createTRPCRouter({
         void (async () => {
           try {
             const tmdb = await getTmdbProvider();
-            await syncTmdbCertifications(ctx.db, tmdb);
+            await syncTmdbCertifications(tmdb, {
+              extras: makeMediaExtrasRepository(ctx.db),
+            });
           } catch (err) {
             console.error("[settings.refreshMedia] cert sync failed:", err);
           }
