@@ -2,11 +2,11 @@
 /*  Use-case: Trigger library scans on connected media servers               */
 /* -------------------------------------------------------------------------- */
 
-import type { Database } from "@canto/db/client";
-import { getSetting, getSettings } from "@canto/db/settings";
+import { getSetting } from "@canto/db/settings";
+import type { FoldersRepositoryPort } from "@canto/core/domain/file-organization/ports/folders-repository.port";
 import type { JellyfinAdapterPort } from "@canto/core/domain/media-servers/ports/jellyfin-adapter.port";
 import type { PlexAdapterPort } from "@canto/core/domain/media-servers/ports/plex-adapter.port";
-import { findAllServerLinks } from "@canto/core/infra/file-organization/folder-repository";
+import type { ServerCredentialsPort } from "@canto/core/domain/media-servers/ports/server-credentials.port";
 
 export interface ImportedMedia {
   id: string;
@@ -19,9 +19,14 @@ export interface ImportedMedia {
 }
 
 export interface TriggerMediaServerScansDeps {
+  folders: FoldersRepositoryPort;
+  credentials: ServerCredentialsPort;
   plex: PlexAdapterPort;
   jellyfin: JellyfinAdapterPort;
 }
+
+const AUTO_MERGE_MAX_ATTEMPTS = 20;
+const AUTO_MERGE_DELAY_MS = 3000;
 
 async function isAutoMergeEnabled(): Promise<boolean> {
   const value = await getSetting("autoMergeVersions");
@@ -40,11 +45,8 @@ async function tryJellyfinAutoMergeForMedia(
   apiKey: string,
   media: ImportedMedia,
 ): Promise<void> {
-  const MAX_ATTEMPTS = 20;
-  const DELAY_MS = 3000;
-
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    await new Promise((r) => setTimeout(r, DELAY_MS));
+  for (let attempt = 0; attempt < AUTO_MERGE_MAX_ATTEMPTS; attempt++) {
+    await new Promise((r) => setTimeout(r, AUTO_MERGE_DELAY_MS));
     const items = await jellyfin
       .findMoviesByProviderId(url, apiKey, media)
       .catch(() => []);
@@ -65,31 +67,21 @@ async function tryJellyfinAutoMergeForMedia(
 }
 
 export async function triggerMediaServerScans(
-  db: Database,
   deps: TriggerMediaServerScansDeps,
   importedMedias: ImportedMedia[] = [],
 ): Promise<void> {
-  const links = await findAllServerLinks(db);
+  const links = await deps.folders.findAllServerLinks();
   if (links.length === 0) return;
 
-  const {
-    "jellyfin.url": jellyfinUrl,
-    "jellyfin.apiKey": jellyfinKey,
-    "plex.url": plexUrl,
-    "plex.token": plexToken,
-  } = await getSettings([
-    "jellyfin.url",
-    "jellyfin.apiKey",
-    "plex.url",
-    "plex.token",
-  ]);
+  const jellyfinCreds = await deps.credentials.getJellyfin();
+  const plexCreds = await deps.credentials.getPlex();
 
   for (const link of links) {
-    if (link.serverType === "jellyfin" && jellyfinUrl && jellyfinKey) {
+    if (link.serverType === "jellyfin" && jellyfinCreds) {
       try {
         await deps.jellyfin.triggerScan(
-          jellyfinUrl,
-          jellyfinKey,
+          jellyfinCreds.url,
+          jellyfinCreds.apiKey,
           link.serverLibraryId ?? undefined,
         );
         console.log(
@@ -102,11 +94,11 @@ export async function triggerMediaServerScans(
       }
     }
 
-    if (link.serverType === "plex" && plexUrl && plexToken) {
+    if (link.serverType === "plex" && plexCreds) {
       try {
         await deps.plex.scanLibrary(
-          plexUrl,
-          plexToken,
+          plexCreds.url,
+          plexCreds.token,
           link.serverLibraryId ? [link.serverLibraryId] : undefined,
         );
         console.log(`[import-torrents] Triggered Plex scan for section ${link.serverLibraryId}`);
@@ -118,7 +110,7 @@ export async function triggerMediaServerScans(
 
   // Post-scan auto-merge for Jellyfin multi-version movies.
   // Plex detects multi-versions automatically from folder layout — nothing to do.
-  if (jellyfinUrl && jellyfinKey && importedMedias.length > 0) {
+  if (jellyfinCreds && importedMedias.length > 0) {
     const autoMerge = await isAutoMergeEnabled();
     if (autoMerge) {
       const candidates = importedMedias.filter(
@@ -127,8 +119,8 @@ export async function triggerMediaServerScans(
       for (const media of candidates) {
         await tryJellyfinAutoMergeForMedia(
           deps.jellyfin,
-          jellyfinUrl,
-          jellyfinKey,
+          jellyfinCreds.url,
+          jellyfinCreds.apiKey,
           media,
         ).catch((err) =>
           console.warn(

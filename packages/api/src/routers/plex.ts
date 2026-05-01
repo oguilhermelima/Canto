@@ -6,6 +6,7 @@ import { createTRPCRouter, adminProcedure } from "../trpc";
 import { syncPlexLibraries } from "@canto/core/domain/media-servers/use-cases/sync-libraries/plex";
 import { testPlexConnection, scanPlexLibrary, getPlexSections } from "@canto/core/infra/media-servers/plex.adapter";
 import { updateFolder, findAllServerLinks } from "@canto/core/infra/file-organization/folder-repository";
+import { makeFoldersRepository } from "@canto/core/infra/file-organization/folders-repository.adapter";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                    */
@@ -34,7 +35,12 @@ export const plexRouter = createTRPCRouter({
         message: "Plex not configured",
       });
     }
-    return syncPlexLibraries(ctx.db, creds.url, creds.token, getPlexSections);
+    return syncPlexLibraries(
+      makeFoldersRepository(ctx.db),
+      creds.url,
+      creds.token,
+      getPlexSections,
+    );
   }),
 
   scan: adminProcedure.mutation(async ({ ctx }) => {

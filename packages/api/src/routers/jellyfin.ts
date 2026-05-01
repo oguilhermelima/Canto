@@ -11,6 +11,7 @@ import {
   getJellyfinLibraryFolders,
 } from "@canto/core/infra/media-servers/jellyfin.adapter";
 import { updateFolder } from "@canto/core/infra/file-organization/folder-repository";
+import { makeFoldersRepository } from "@canto/core/infra/file-organization/folders-repository.adapter";
 
 /* -------------------------------------------------------------------------- */
 /*  Router                                                                    */
@@ -39,7 +40,12 @@ export const jellyfinRouter = createTRPCRouter({
         message: "Jellyfin not configured",
       });
     }
-    return syncJellyfinLibraries(ctx.db, creds.url, creds.apiKey, getJellyfinLibraryFolders);
+    return syncJellyfinLibraries(
+      makeFoldersRepository(ctx.db),
+      creds.url,
+      creds.apiKey,
+      getJellyfinLibraryFolders,
+    );
   }),
 
   toggleLibrary: adminProcedure

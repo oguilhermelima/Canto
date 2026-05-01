@@ -1,25 +1,26 @@
-import type { Database } from "@canto/db/client";
-
-import {
-  findServerLink,
-  upsertServerLink,
-} from "@canto/core/infra/file-organization/folder-repository";
+import type { FoldersRepositoryPort } from "@canto/core/domain/file-organization/ports/folders-repository.port";
 import { autoElectDefault } from "@canto/core/domain/media-servers/use-cases/shared/sync-helpers";
+import type { SyncedLibraryEntry } from "@canto/core/domain/media-servers/use-cases/sync-libraries/jellyfin";
 
-type PlexSection = { key: string; title: string; type: string; Location: Array<{ path: string }> };
+interface PlexSection {
+  key: string;
+  title: string;
+  type: string;
+  Location: Array<{ path: string }>;
+}
 
 /**
  * Sync Plex server sections → folder_server_link rows.
  * For each Plex section, upsert a link to track it for reverse-sync.
  */
 export async function syncPlexLibraries(
-  db: Database,
+  folders: FoldersRepositoryPort,
   url: string,
   token: string,
   getSections: (url: string, token: string) => Promise<PlexSection[]>,
-): Promise<Array<{ id: string; name: string; action: "created" | "updated" }>> {
+): Promise<SyncedLibraryEntry[]> {
   const sections = await getSections(url, token);
-  const synced: Array<{ id: string; name: string; action: "created" | "updated" }> = [];
+  const synced: SyncedLibraryEntry[] = [];
 
   for (const section of sections) {
     if (!["movie", "show"].includes(section.type)) continue;
@@ -27,9 +28,9 @@ export async function syncPlexLibraries(
     const serverPath = section.Location[0]?.path ?? null;
     const contentType = section.type === "movie" ? "movies" : "shows";
 
-    const existingLink = await findServerLink(db, "plex", section.key);
+    const existingLink = await folders.findServerLink("plex", section.key);
 
-    const link = await upsertServerLink(db, {
+    const link = await folders.upsertServerLink({
       serverType: "plex",
       serverLibraryId: section.key,
       serverLibraryName: section.title,
@@ -38,12 +39,12 @@ export async function syncPlexLibraries(
     });
 
     synced.push({
-      id: link!.id,
+      id: link.id,
       name: section.title,
       action: existingLink ? "updated" : "created",
     });
   }
 
-  await autoElectDefault(db);
+  await autoElectDefault(folders);
   return synced;
 }

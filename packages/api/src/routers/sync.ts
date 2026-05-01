@@ -29,7 +29,10 @@ import { getMediaAvailability } from "@canto/core/domain/media/services/media-av
 import { listMediaVersionGroups } from "@canto/core/domain/media-servers/services/media-version-groups-service";
 import { makeJellyfinAdapter } from "@canto/core/infra/media-servers/jellyfin.adapter-bindings";
 import { makePlexAdapter } from "@canto/core/infra/media-servers/plex.adapter-bindings";
+import { makeServerCredentials } from "@canto/core/infra/media-servers/server-credentials.adapter";
 import { makeUserConnectionRepository } from "@canto/core/infra/media-servers/user-connection-repository.adapter";
+import { makeFoldersRepository } from "@canto/core/infra/file-organization/folders-repository.adapter";
+import { makeMediaVersionRepository } from "@canto/core/infra/media/media-version-repository.adapter";
 import { logAndSwallow } from "@canto/core/platform/logger/console-logger.adapter";
 
 /* -------------------------------------------------------------------------- */
@@ -210,10 +213,11 @@ export const syncRouter = createTRPCRouter({
     .input(discoverServerLibrariesInput)
     .query(({ ctx, input }) =>
       discoverServerLibraries(
-        ctx.db,
         input.serverType,
         {
           repo: makeUserConnectionRepository(ctx.db),
+          folders: makeFoldersRepository(ctx.db),
+          credentials: makeServerCredentials(),
           plex: makePlexAdapter(),
           jellyfin: makeJellyfinAdapter(),
         },

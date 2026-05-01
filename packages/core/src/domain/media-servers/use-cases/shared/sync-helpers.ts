@@ -1,22 +1,19 @@
-import type { Database } from "@canto/db/client";
-import {
-  findAllFolders,
-  updateFolder,
-} from "@canto/core/infra/file-organization/folder-repository";
+import type { FoldersRepositoryPort } from "@canto/core/domain/file-organization/ports/folders-repository.port";
 
 /**
- * Ensure at least one download folder is marked as default.
- * If none is default, pick the first enabled folder.
+ * Ensure at least one download folder is marked as default. If none is set,
+ * promote the first enabled folder, falling back to the first folder of any.
  */
-export async function autoElectDefault(db: Database): Promise<void> {
-  const folders = await findAllFolders(db);
-  if (folders.length === 0) return;
+export async function autoElectDefault(
+  folders: FoldersRepositoryPort,
+): Promise<void> {
+  const all = await folders.findAllFolders();
+  if (all.length === 0) return;
 
-  const hasDefault = folders.some((f) => f.isDefault);
-  if (hasDefault) return;
+  if (all.some((f) => f.isDefault)) return;
 
-  const first = folders.find((f) => f.enabled) ?? folders[0];
-  if (first) {
-    await updateFolder(db, first.id, { isDefault: true });
+  const candidate = all.find((f) => f.enabled) ?? all[0];
+  if (candidate) {
+    await folders.updateFolder(candidate.id, { isDefault: true });
   }
 }

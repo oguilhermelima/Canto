@@ -1,14 +1,15 @@
 import type { JellyfinAdapterPort } from "@canto/core/domain/media-servers/ports/jellyfin-adapter.port";
 import type { PlexAdapterPort } from "@canto/core/domain/media-servers/ports/plex-adapter.port";
+import type { ServerCredentialsPort } from "@canto/core/domain/media-servers/ports/server-credentials.port";
 import type { UserConnectionRepositoryPort } from "@canto/core/domain/media-servers/ports/user-connection-repository.port";
 import type {
   ConnectionKind,
   UserConnection,
 } from "@canto/core/domain/media-servers/types/user-connection";
 import {
-  getJellyfinCredentials,
-  getPlexCredentials,
-} from "@canto/core/platform/secrets/server-credentials";
+  ServerNotConfiguredError,
+  UserConnectionMissingAuthError,
+} from "@canto/core/domain/media-servers/errors";
 
 export interface UserConnectionAuthResult {
   success: boolean;
@@ -18,13 +19,7 @@ export interface UserConnectionAuthResult {
   error?: string;
 }
 
-/** Thrown when the global admin credentials for a media server aren't set. */
-export class ServerNotConfiguredError extends Error {
-  constructor(public readonly provider: "plex" | "jellyfin") {
-    super(`${provider} server not configured by administrator`);
-    this.name = "ServerNotConfiguredError";
-  }
-}
+export type { ServerNotConfiguredError, UserConnectionMissingAuthError };
 
 /**
  * Authenticate a per-user Plex token against the admin-configured Plex
@@ -32,9 +27,9 @@ export class ServerNotConfiguredError extends Error {
  */
 export async function authenticatePlexUser(
   token: string,
-  deps: { plex: PlexAdapterPort },
+  deps: { plex: PlexAdapterPort; credentials: ServerCredentialsPort },
 ): Promise<UserConnectionAuthResult> {
-  const creds = await getPlexCredentials();
+  const creds = await deps.credentials.getPlex();
   if (!creds) throw new ServerNotConfiguredError("plex");
 
   try {
@@ -66,9 +61,9 @@ export async function authenticatePlexUser(
  */
 export async function authenticateJellyfinUser(
   input: { token: string } | { username: string; password: string },
-  deps: { jellyfin: JellyfinAdapterPort },
+  deps: { jellyfin: JellyfinAdapterPort; credentials: ServerCredentialsPort },
 ): Promise<UserConnectionAuthResult> {
-  const creds = await getJellyfinCredentials();
+  const creds = await deps.credentials.getJellyfin();
   if (!creds) throw new ServerNotConfiguredError("jellyfin");
 
   try {
@@ -127,7 +122,7 @@ export async function addOrUpdateUserConnection(
   deps: { repo: UserConnectionRepositoryPort },
 ): Promise<UserConnection | undefined> {
   if (!authResult.success || !authResult.token || !authResult.externalUserId) {
-    throw new Error("Cannot add connection without successful authentication");
+    throw new UserConnectionMissingAuthError();
   }
 
   const existing = await deps.repo.findByProvider(userId, provider);

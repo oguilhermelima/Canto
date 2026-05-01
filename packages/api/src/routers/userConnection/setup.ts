@@ -11,7 +11,9 @@ import {
 import { discoverServerLibraries } from "@canto/core/domain/media-servers/use-cases/discover-libraries";
 import { makeJellyfinAdapter } from "@canto/core/infra/media-servers/jellyfin.adapter-bindings";
 import { makePlexAdapter } from "@canto/core/infra/media-servers/plex.adapter-bindings";
+import { makeServerCredentials } from "@canto/core/infra/media-servers/server-credentials.adapter";
 import { makeUserConnectionRepository } from "@canto/core/infra/media-servers/user-connection-repository.adapter";
+import { makeFoldersRepository } from "@canto/core/infra/file-organization/folders-repository.adapter";
 import { upsertServerLink } from "@canto/core/infra/file-organization/folder-repository";
 import {
   dispatchJellyfinSync,
@@ -33,10 +35,11 @@ export async function setupLibrariesForConnection(
 ): Promise<void> {
   try {
     const libraries = await discoverServerLibraries(
-      db,
       provider,
       {
         repo: makeUserConnectionRepository(db),
+        folders: makeFoldersRepository(db),
+        credentials: makeServerCredentials(),
         plex: makePlexAdapter(),
         jellyfin: makeJellyfinAdapter(),
       },
