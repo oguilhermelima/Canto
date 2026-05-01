@@ -2,106 +2,175 @@
 
 Status doc for the `packages/core` architecture overhaul. **Pendente em cima; histórico embaixo.**
 
-**Last updated**: 2026-04-30 (pós Wave Final partial)
+**Last updated**: 2026-05-01 (pós Wave 10 round 2 + replanejamento vertical)
 **Current `main` tip**: ver `git log --oneline -1`
 
 ---
 
-## ⏳ Pendente
+## ⏳ Pendente — vertical slicing por contexto
 
-### Wave 10 — Eliminar 263 boundary leaks em `domain/` (~6-9h)
+> **Mudança estrutural (2026-05-01)**: o plano antigo organizava Wave 10/11/12 por **categoria de leak** (boundary, lint sweep, build). Resultado: mesmos arquivos tocados N vezes, callers atualizados N vezes, contexto nunca "fechado". O novo plano fatia **vertical por contexto** — cada wave entrega um contexto 100% refatorado (boundary + drizzle + naming + branded IDs + typed errors + bad smells + lint sweep), tudo em um pass. **Wave 11a (rule promotion warn → error)** vira side effect: cada context wave promove regras a `error` via per-folder override no eslint config. Quando os 11 contextos têm seus blocks, o flip global é puro housekeeping.
 
-A regra ESLint de boundary do Wave Final ficou em modo `warn` por causa de 263 violations descobertas. Cada uma é um vazamento real onde domain importa direto de infra/platform/drizzle-orm em vez de usar port via deps.
+### Checklist por contexto (Definition of Done)
 
-**Distribuição por contexto:**
+Cada Context Wave (W10.X) só fecha quando o contexto cumpre os 10 critérios abaixo:
 
-| Contexto | Violations |
-|---|---:|
-| `domain/media/use-cases` | 18 |
-| `domain/torrents/use-cases` | 16 |
-| `domain/user-media/use-cases` | 14 |
-| `domain/recommendations/use-cases` | 10 |
-| `domain/media-servers/use-cases` | 10 |
-| `domain/trakt/use-cases` | 8 |
-| Restante (file-organization, content-enrichment, lists, sync, services, rules) | ~187 |
+(a) **Boundary cleanup** — zero imports de `@canto/core/infra/*` ou `@canto/core/platform/*` em `domain/<ctx>/**`. Deps threading (`logger`, `dispatcher`, `repos`) via interface DI. Existing ports em `domain/shared/ports/` reused; new ports criados se necessário.
 
-**Distribuição por categoria:**
+(b) **Drizzle helpers gone** — zero `import { eq, and, sql, inArray, ... } from "drizzle-orm"` em `domain/<ctx>/**`. Queries movidas pra repo methods. Type-only imports (`import type { ... } from "drizzle-orm"`) seguem permitidos.
 
-| Categoria | Sites |
-|---|---:|
-| Helpers `drizzle-orm` runtime (`eq`, `and`, `sql`, `inArray`) inline em domain | 142 |
-| Imports diretos `@canto/core/infra/media/media-repository` | 21 |
-| `platform/logger/log-error` (precisa **LoggerPort** novo) | 16 |
-| `platform/queue/bullmq-dispatcher` (`JobDispatcherPort` existe mas é bypassada) | 11 |
-| `media-localization-repository.adapter` direto | 11 |
-| `media-localized-repository`, `lists/list-repo`, `file-organization/folder-repo`, `torrents/download-repo` | 8 cada |
+(c) **Naming consistency em ports** — `find*` → `T | null`, `get*` → `T` ou throw, `list*` → `T[]`, `count*` → `number`. Renomear inconsistências quando o port é tocado.
 
-**Estratégia**: split em sub-waves por contexto (10a/b/c/...). Cada sub-wave threada deps através das use cases que vazam, full-port-ifica chamadas, deleta queries inline em favor de métodos de port.
+(d) **Branded ID parse no API boundary** — zero `as MediaId` / `as UserId` em consumers (api/worker). Helpers `parseMediaId(raw): MediaId` em `domain/<ctx>/types/<entity>.ts`. Boundary chama parse; domain confia no tipo.
 
-**Tarefa nova nesta wave**: criar `LoggerPort` em `domain/shared/ports/logger.port.ts` e adapter em `platform/logger/`. Substituir 16 sites de `logAndSwallow` direto.
+(e) **Typed domain errors** — zero `throw new Error("string")` em `domain/<ctx>/`. Subclasses de `DomainError` em `domain/<ctx>/errors.ts`. Cliente API mapeia error class → HTTP status.
 
-**Tarefas adjuntas (mesma wave, contemporâneas ao boundary cleanup):**
+(f) **Sweep latent errors** — zero `no-unnecessary-condition`, `no-non-null-assertion`, `prefer-nullish-coalescing`, `eqeqeq` em `domain/<ctx>/**`. Aplicar checklist anti-bad-smells (16 antipatterns abaixo) sem criar código pior.
 
-1. **Naming consistency em ports** — padronizar verbos:
-   - `find*` → retorna `T | null`, não throw.
-   - `get*` → retorna `T` ou throw.
-   - `list*` → retorna `T[]`.
-   - `count*` → retorna `number`.
+(g) **Anti-bad-smells pass** — passada disciplinada nos files do contexto (ver lista abaixo). Não negociável: comments verbosos AI-style removidos, magic numbers em const nomeada, mutação → imutabilidade onde clarifica, dead branches removidos, etc.
 
-   Hoje há mistura de `findX` / `getX` / `loadX` / `fetchX` no mesmo port. Renomear seguindo a regra acima quando passar pelo arquivo.
+(h) **Callers atualizados** — `apps/worker/**` e `packages/api/**` que consomem use cases do contexto compilam + funcionam end-to-end. Tests + typecheck verde.
 
-2. **Branded IDs: parse vs cast nas fronteiras** — hoje muito `id as MediaId` em consumers (API/worker). Criar `parseMediaId(raw: string): MediaId` em `domain/media/types/media.ts` (idem por entity branded) com validação de UUID. API boundaries chamam `parseMediaId(input.id)`; dentro do domain confia. Remove o `as` shortcut.
+(i) **ESLint per-folder override habilitado** — bloco em `packages/core/eslint.config.js`:
 
-3. **Domain errors tipadas** — vários sites ainda fazem `throw new Error("string")` cru. Migrar pra subclasses de `DomainError` (já existem em `<ctx>/errors.ts`). Cliente API mapeia error class → HTTP status.
+```js
+{
+  files: ["src/domain/<ctx>/**/*.ts"],
+  rules: {
+    "no-restricted-imports": "error",
+    "@typescript-eslint/no-non-null-assertion": "error",
+    "@typescript-eslint/prefer-nullish-coalescing": "error",
+    eqeqeq: ["error", "always"],
+  },
+},
+```
 
-4. **Composition root `buildCoreDeps(db)`** — `apps/worker/src/index.ts` constrói ~10 adapters manualmente. Extrair `buildCoreDeps(db): CoreDeps` em `packages/core/src/composition.ts` retornando `{ media, user, lists, recommendations, mediaServers, trakt, userMedia, torrents, folders, notifications, extras, localization, aspectState, contentRating, logger }`. tRPC context usa o mesmo helper.
+Promovido a `error` só pros files daquele contexto. Forcing function pra evitar regressão em futuros PRs.
 
-**Critério de done**:
-- `pnpm -F @canto/core lint` zero warnings de `no-restricted-imports` em `domain/**`. Promover regra para `error` final.
-- Verbos `find/get/list/count` consistentes em todos os ports.
-- Zero `as <Brand>Id` em consumers (todos via `parse*Id`).
-- Zero `throw new Error(string)` em domain (tudo via DomainError subclasses).
-- Worker entry e tRPC context usam `buildCoreDeps`.
+(j) **Status doc atualizado** — linha do contexto no histórico abaixo, marcado ✅.
 
-### Wave 11 — Lint hardening + qualidade de código (~3-4h)
+### Lista de Context Waves (W10.1–W10.11)
 
-Promover regras `warn → error` que sobraram + sweep dos errors latentes + erradicar bad smells. Esta wave é tanto sobre **regras strict** quanto sobre **disciplina de código** — não é OK fazer fix-só-para-passar-lint que produz código pior.
+Survey real do `domain/**` (file counts, leak counts, port readiness):
 
-#### 11a — Promover regras restantes a `error`
+| # | Contexto | Files | Top leaks | Estado | Estimativa |
+|---|---|---:|---|---|---:|
+| **W10.1** | `notifications` | 3 | 0 infra, 0 drizzle, 0 `!` | quase clean — quick win | 15 min |
+| **W10.2** | `lists` | 19 | 0 infra residual, 7 `!` | partial round 1 | 30 min |
+| **W10.3** | `recommendations` | 19 | 5 platform (cache, tmdb), 8 `!` | partial round 1 | 45 min |
+| **W10.4** | `content-enrichment` | 5 | 1 infra residual, 3 `!`, sem ports próprios | partial round 1 | 30 min |
+| **W10.5** | `user-media` | 28 | 11 infra, 13 `!`, plex/jellyfin direto | parcial — push-state heavy | 75 min |
+| **W10.6** | `file-organization` | 10 | 3 infra, 5 `!`, 1 throw Error | acopla c/ torrents | 40 min |
+| **W10.7** | `torrents` | 36 | 25 infra, 22 `!`, 2 throw Error, fs direto | A skippou — maior em sites | 100 min |
+| **W10.8** | `media` | 56 | 8+ infra residual, 7 drizzle, 27 `!`, 5 throw Error | maior + complexo | 120 min |
+| **W10.9** | `sync` | 5 | 5 infra, 1 drizzle, 4 `!` | acopla c/ media-servers | 30 min |
+| **W10.10** | `media-servers` | 23 | 9 infra, 13 `!`, 2 throw Error, **MediaServerPort bypassed** | precisa wireup do port (já definido, 0 consumers) | 75 min |
+| **W10.11** | `trakt` | 17 | 3 infra, 8 drizzle, 10 `!` | médio | 60 min |
+| **Total** | | **221 files** | | | **~10h trabalho agregado** |
 
-Em `tooling/eslint/base.js` e `apps/web/eslint.config.js`:
+### Parallelização — 2 rounds, worktree-isolated teammates
 
-| Regra | Atual | Sites | Alvo |
-|---|---|---:|---|
-| `@typescript-eslint/no-non-null-assertion` | warn | 224 | error |
-| `@typescript-eslint/prefer-nullish-coalescing` | warn | 76 | error |
-| `eqeqeq` | warn | 128 | error |
-| `no-unused-vars` | warn em web | — | error |
-| `no-explicit-any` | warn em web | — | error |
-| `import-x/consistent-type-specifier-style` | warn em web | — | error |
-| `react-hooks/exhaustive-deps` | warn | — | error |
-| `react-hooks/rules-of-hooks` | warn | — | error |
-| `react-hooks/refs` | warn | — | error |
-| `@next/next/no-img-element` | warn | — | error |
+**Round 1** (paralelo, sem overlap):
+- **Teammate G** → W10.1 + W10.2 + W10.3 (notifications + lists + recommendations — pequenos, baixa coesão entre si, ~90 min)
+- **Teammate H** → W10.4 + W10.5 (content-enrichment + user-media — acoplados via push-state e ensure-media, ~105 min)
+- **Teammate I** → W10.6 + W10.7 (file-organization + torrents — acoplados, file-org importa torrents/rules, ~140 min)
 
-Remover override "soft-fail categories of pre-existing debt" de `apps/web/eslint.config.js`.
+Round 1 wall-clock: **~140 min** (limited by I).
 
-#### 11b — Sweep dos 241 errors latentes
+**Round 2** (após R1 mergear):
+- **Teammate J** → W10.8 (media — maior, complexo, sozinho, ~120 min)
+- **Teammate K** → W10.9 + W10.10 (sync + media-servers — sync orquestra media-servers, ~105 min)
+- **Teammate L** → W10.11 (trakt — sozinho, ~60 min)
 
-| Package | Errors |
-|---|---:|
-| api | 14 |
-| web | 36 |
-| core | 92 |
-| providers | 99 |
+Round 2 wall-clock: **~120 min** (limited by J).
 
-Dominados por `no-unnecessary-condition` (197 sites). Round-by-round, auto-fix primeiro depois manual.
+**Stitching** (entre rounds, pelo leader):
+- Cherry-pick por contexto ou rebase se sem conflito
+- Resolver merge conflicts em `eslint.config.js` (cada teammate adiciona seu block — append-only)
+- Resolver conflicts em ports compartilhados (`MediaRepositoryPort`, etc — se teammate adicionou método)
+- Smoke run typecheck + tests entre integrações
 
-#### 11c — Code quality / anti-bad-smells (NÃO NEGOCIÁVEL)
+### Garantias contra timeout (lições wave-10-B)
 
-Quando corrigir lint, **NÃO criar código pior**. Cada fix deve respeitar SOLID e evitar os smells abaixo. Se o fix correto exige refatoração maior, pare e levante na sessão — melhor deixar o lint warn temporariamente do que poluir o código.
+Cada teammate prompt instrui:
 
-**Anti-patterns a evitar:**
+1. **Commit por sub-passo** (boundary → drizzle → naming → errors → smells → sweep → eslint block) — não num commit gigante. Aim for 5–7 commits por contexto.
+2. **Typecheck antes de cada commit** — 10/10 verde sempre.
+3. **Tests antes de cada commit** — 152 verde sempre.
+4. **Worktree isolada** — `isolation: "worktree"` no Agent call evita race com main.
+5. **Cap escopo** — cada teammate recebe contextos específicos, não "limpe tudo que sobrou".
+6. **Report progress se idle** — se passar de 200 tool uses sem commit, parar e reportar bloqueio.
+
+### Tasks globais pós-context-waves
+
+#### W11-final (~30 min) — Lint global flip cleanup
+
+Quando todos 11 contextos têm seus blocks `error`:
+
+- Em `tooling/eslint/base.js`: trocar defaults `warn` por `error` (no-non-null-assertion, prefer-nullish-coalescing, eqeqeq).
+- Em `packages/core/eslint.config.js`: deletar os 11 per-context override blocks (redundantes — defaults agora são error).
+- Substituir override block global de `domain/**` `no-restricted-imports` warn por error.
+- Verificar `pnpm lint:strict` zero warnings em domain.
+
+#### W11f (~30-45 min) — Cross-cutting que não cabe num contexto
+
+- **Transaction boundaries**: auditar `download-torrent`, `import-torrent`, `manage-list-items`, `accept-invitation`, `promote-user-media-state-from-playback` — read-then-write sem txn. Adicionar `withTransaction(fn)` ao port shape onde necessário.
+- **Magic timeouts/TTLs em const nomeada**: `5 * 60 * 1000`, `30 * 24 * 60 * 60 * 1000`, etc espalhados. Mover pra `domain/<ctx>/constants.ts`.
+- **Input validation no API boundary**: confirmar que todo tRPC procedure passa input por validator de `packages/validators` antes de use case. Use case confia no shape.
+- **`buildCoreDeps(db): CoreDeps` factory** em `packages/core/src/composition.ts` retornando `{ media, user, lists, recommendations, mediaServers, trakt, userMedia, torrents, folders, notifications, extras, localization, aspectState, contentRating, logger, dispatcher }`. Worker entry e tRPC context usam o mesmo helper.
+
+#### W12 (~60-90 min) — Build clean + lockdown final
+
+- `pnpm -F @canto/web build` zero warnings.
+- CI workflow troca step `Lint` → `pnpm lint:strict` (max-warnings=0).
+- `apps/web/next.config.ts`: remover `eslint: { ignoreDuringBuilds: true }` band-aid.
+- `apps/web/eslint.config.js`: remover override "soft-fail categories of pre-existing debt".
+- `scripts/codemod/package.json` ganha stub `"test": "exit 0"` (ou turbo filter no CI) pra `pnpm exec turbo run test` não falhar.
+- **Comment cleanup pass** (passada manual ou semi-automática):
+  - Procurar comments inline verbosos AI-style e removê-los onde código bem-nomeado é suficiente.
+  - Consolidar restantes em docstrings (JSDoc) seguindo a regra: 1 frase do que faz + 1 particularidade não-óbvia.
+  - Comentários "// was: X" / "// removed Y" / narrativas de refactor → deletar.
+  - Hot spots conhecidos: `domain/torrents/use-cases/import-torrent*.ts`, `domain/media/use-cases/persist/*.ts`, `domain/media/use-cases/cadence/*.ts`.
+- **Atualizar `.claude/skills/handbook`** (skill do projeto) com tudo que vem das waves:
+  - Convenção de imports `@canto/<pkg>/...`.
+  - Port-first / deps-injection padrão.
+  - Anti-bad-smells (lista completa abaixo).
+  - SOLID checklist.
+  - Onde mora cada port (mapa por contexto).
+- **Atualizar `CLAUDE.md`** (raiz do projeto):
+  - Substituir descrição genérica de "Code Style" por linkagem à handbook + regras críticas (sem comments inline verbosos, port-first, etc).
+  - Adicionar seção "Architecture" com mapa de contextos + ports.
+- REFACTOR_STATUS.md final marca tudo ✅. Mover pra `.claude/handbook/refactor-history.md` (artefato histórico) ao invés de manter na raiz.
+
+#### W13 — Nice-to-have (opcional, pós-refactor)
+
+Não bloqueia nada. Roda quando der tempo.
+
+1. **Use case tests via port mocks** — agora que tudo é port-first, escrever tests é trivial. Cobertura atual heavy em cadence/parsing/scoring (puros) mas baixa em use cases. Mock de port + asserts em `deps.repo.X.toHaveBeenCalledWith(...)`. Alvo: cada use case top-traffic com 1+ test happy path + 1 edge.
+
+2. **Per-context `index.ts` (public surface)** — `domain/<ctx>/index.ts` re-exporta só o que é público (use cases + types + ports + errors). API surface vira explícita. Custo: ~14 arquivos. Benefício: discoverability + lint pode bloquear imports de internals.
+
+3. **Structured logging** — depois do `LoggerPort` (Wave 10), substituir `logger.warn("[ctx] msg" + value)` por `logger.warn({ event: "ctx.event", mediaId, userId }, "msg")`. Habilita query/grep por evento, integração com observabilidade futura.
+
+4. **Composition root: factory pattern por entry point** — `composition/{worker,api,test}.ts` por entry. Test version usa mocks. Reduz duplicação + acelera testes.
+
+### Total estimado
+
+| Bloco | Wall-clock |
+|---|---|
+| Context Waves W10.1–11 (paralelo, 2 rounds) | **~3.5–4.5h** (~10h trabalho agregado) |
+| Stitching entre rounds + post | ~30 min |
+| W11-final (lint global flip) | 30 min |
+| W11f (txn + constants + validators + buildCoreDeps) | 30–45 min |
+| W12 (build clean + handbook + CLAUDE.md) | 60–90 min |
+| **Total restante (W10–W12)** | **~5.5–7h wall-clock** |
+| W13 (nice-to-have, opcional) | 4–6h |
+
+(Plano horizontal anterior era ~13–17h sequencial. Ganho: ~2x via parallelização + per-context lint forcing function que evita revisita.)
+
+### Anti-bad-smells (referência) — NÃO NEGOCIÁVEL
+
+Quando corrigir lint nos contextos, **NÃO criar código pior**. Cada fix deve respeitar SOLID e evitar os smells abaixo. Se o fix correto exige refatoração maior, pare e levante na sessão — melhor deixar o lint warn temporariamente do que poluir o código.
 
 1. **Defensive null/undefined check em valor que TS já garante non-null**
    - ❌ `if (obj == null || obj == undefined) return;` quando o tipo é `Obj` (não `Obj | null`)
@@ -157,22 +226,21 @@ Quando corrigir lint, **NÃO criar código pior**. Cada fix deve respeitar SOLID
     - ❌ `try { ... } catch {}` — perde diagnóstico
     - ✅ `try { ... } catch (err) { logger.warn(...) }` ou propagate.
 
-13. **Wave-de-anti-pattern: domain importando infra direto** (escopo Wave 10)
+13. **Domain importando infra direto** (escopo Wave 10 — checklist (a))
     - ❌ `import { eq } from "drizzle-orm"; ... db.query.foo.findMany({ where: eq(...) })`
     - ✅ `await deps.repo.findFoo(filter)` — repo abstrai SQL.
 
 14. **Inline comments verbosos — código com cara de AI**
     O codebase acumulou muitos comments inline (`// fazendo X agora porque Y`, `// pré-computa Z pra evitar W`) que parecem AI documentando-se pra outra sessão de AI. Isso polui o código e dá smell de "gerado por LLM".
-    - ❌ `// Single deferred update — every early-return / success / partial / catch path mutates this and the finally block writes it once. Was 11 separate updateDownload calls per attempt before this refactor.` (comments contando história do refactor)
-    - ❌ `// Pre-compute alt-season directories so multi-season torrents call mkdir once per unique season instead of once per file.` (comment narrando otimização)
-    - ❌ `// Match each parsed file against the PRE-MOVE torrent file list...` (comment explicando o algoritmo linha-a-linha)
+    - ❌ Comments contando história do refactor (`// was: 11 calls; now: 1`)
+    - ❌ Comments narrando otimização linha-a-linha
     - ❌ `// loop over items\nfor (...)` — redundante
     - ✅ Default: **SEM COMENTÁRIOS INLINE**. Código bem nomeado já diz o que faz.
     - ✅ Documentação concentrada em **docstring (JSDoc)** acima de função/classe pública, com no máximo:
       1. Uma frase descrevendo o que a função faz.
       2. UMA particularidade não-óbvia se necessário (constraint hidden, side effect surpreendente, edge case).
     - ✅ Comment inline raríssimo — só quando o leitor futuro vai parar e perguntar "por quê?": invariante hidden, workaround pra bug específico (com link), constraint de framework.
-    - ❌ `// TODO:` deixados pelo refactor (que viraram dívida)  →  ✅ se for TODO real, registrar em issue/lista; se não, deletar.
+    - ❌ `// TODO:` deixados pelo refactor → ✅ se for TODO real, registrar em issue/lista; se não, deletar.
 
     **Princípio**: o leitor humano não precisa de você narrando o código. Se removê-lo deixar ambíguo, melhore o nome ou a estrutura, não adicione comment.
 
@@ -184,7 +252,7 @@ Quando corrigir lint, **NÃO criar código pior**. Cada fix deve respeitar SOLID
     - ❌ Extrair helper compartilhado de 3 use cases que coincidem em 5 linhas mas têm semânticas diferentes
     - ✅ Esperar 4-5 sites com mesma semântica antes de DRYficar.
 
-#### 11d — SOLID checklist
+### SOLID checklist (referência)
 
 Quando refatorar:
 
@@ -194,82 +262,28 @@ Quando refatorar:
 - **I** (Interface Segregation): use cases declaram só o que usam (`deps: { repo }` não `deps: { everything }`). Já é o padrão das waves; manter.
 - **D** (Dependency Inversion): depender de port (abstrato), não de adapter (concreto). Wave 10 fecha isso.
 
-#### 11e — Code review gate
+### Code review gate
 
-Antes de mergear Wave 11, pair-review (ou self-review estrito) das mudanças:
+Antes de mergear cada Context Wave, pair-review (ou self-review estrito) das mudanças:
 
 - Cada `if (x == null)` → checar se o tipo justifica a checagem ou se é defensive bloat.
 - Cada `as X` → checar se há narrowing alternativo.
 - Cada `!` → checar se há guard clause melhor.
 - Cada use case modificado → confirmar que não cresceu nem assumiu mais responsabilidades.
 
-#### 11f — Tarefas adjuntas de qualidade
-
-1. **Transaction boundaries explícitas** — alguns use cases fazem read-then-write sem txn (race-conditioneable). Auditar `download-torrent`, `import-torrent`, `manage-list-items`, `accept-invitation`, `promote-user-media-state-from-playback`. Adicionar `withTransaction(fn)` ao port shape onde necessário; use case envolve operação não-atômica.
-
-2. **Magic timeouts/TTLs em const nomeada** — `5 * 60 * 1000`, `30 * 24 * 60 * 60 * 1000`, `60 * 60 * 1000` espalhados em domain code. Mover pra `domain/<ctx>/constants.ts` com nome documentado (`STALL_THRESHOLD_MS`, `METADATA_TTL_MS` — alguns já existem em `ensure-media.types.ts`, replicar pattern). Em rules pure, `const FOO_MS = ... as const;`.
-
-3. **Input validation no API boundary** — alguns tRPC procedures aceitam input sem Zod (recebe `string` arbitrário e re-valida em domain ou nada). Padronizar: todo input passa por validator de `packages/validators` antes de chegar em use case. Use case confia no shape.
-
-### Wave 12 — Build clean + lockdown final (~60-90 min)
-
-- `pnpm -F @canto/web build` zero warnings (Next/Turbopack residuais — geralmente 5-15 itens).
-- CI workflow troca step `Lint` → `pnpm lint:strict` (max-warnings=0).
-- `scripts/codemod/package.json` ganha stub `"test": "exit 0"` (ou turbo filter no CI) pra `pnpm exec turbo run test` não falhar.
-- **Comment cleanup pass** (passada manual ou semi-automática):
-  - Procurar comments inline verbosos e removê-los onde código bem-nomeado é suficiente.
-  - Consolidar restantes em docstrings (JSDoc) seguindo a regra: 1 frase do que faz + 1 particularidade não-óbvia.
-  - Comentários "// was: X" / "// removed Y" / narrativas de refactor → deletar.
-  - Hot spots conhecidos: `domain/torrents/use-cases/import-torrent*.ts`, `domain/media/use-cases/persist/*.ts`, `domain/media/use-cases/cadence/*.ts` (rica em comments do refactor anterior).
-- **Atualizar `.claude/skills/handbook`** (skill do projeto) com tudo que vem das waves:
-  - Convenção de imports `@canto/<pkg>/...`.
-  - Port-first / deps-injection padrão.
-  - Anti-bad-smells (lista completa do Wave 11c).
-  - SOLID checklist.
-  - Onde mora cada port (mapa por contexto).
-- **Atualizar `CLAUDE.md`** (raiz do projeto):
-  - Substituir descrição genérica de "Code Style" por linkagem à handbook + regras críticas (sem comments inline verbosos, port-first, etc).
-  - Adicionar seção "Architecture" com mapa de contextos + ports.
-- REFACTOR_STATUS.md final marca tudo ✅. Pode mover este doc pra `.claude/handbook/refactor-history.md` (artefato histórico) ao invés de manter na raiz.
-- Verificar Phase 5.5 folder consolidation (codemod move folders pro `user-actions/`, `media-servers/scans/`, etc) — opcional, vertical-slice waves tornaram desnecessário pra funcionalidade. Se for fazer, vira Wave 13.
-
-### Wave 13 — Nice-to-have (opcional, pós-refactor)
-
-Não bloqueia nada. Roda quando der tempo.
-
-1. **Use case tests via port mocks** — agora que tudo é port-first, escrever tests é trivial. Cobertura atual heavy em cadence/parsing/scoring (puros) mas baixa em use cases. Mock de port + asserts em `deps.repo.X.toHaveBeenCalledWith(...)`. Alvo: cada use case top-traffic com 1+ test happy path + 1 edge.
-
-2. **Per-context `index.ts` (public surface)** — `domain/<ctx>/index.ts` re-exporta só o que é público (use cases + types + ports + errors). API surface vira explícita. Custo: ~14 arquivos. Benefício: discoverability + lint pode bloquear imports de internals.
-
-3. **Structured logging** — depois do `LoggerPort` (Wave 10), substituir `logger.warn("[ctx] msg" + value)` por `logger.warn({ event: "ctx.event", mediaId, userId }, "msg")`. Habilita query/grep por evento, integração com observabilidade futura.
-
-4. **Composition root: factory pattern por entry point** — todos os `make<X>Repository(db)` constroem na mesma árvore de deps. `composition/{worker,api,test}.ts` por entry. Test version usa mocks. Reduz duplicação + acelera testes.
-
-### Total restante
-
-| Bloco | Estimativa |
-|---|---|
-| Wave 10 (boundary leaks + naming + parse + errors + composition) | 8-11h |
-| Wave 11 (lint sweep + bad smells + txn + constants + validators) | 4-5h |
-| Wave 12 (build + comments cleanup + handbook + CLAUDE.md) | 1-1.5h |
-| Wave 13 (nice-to-have, opcional) | 4-6h |
-| **Total core (W10-W12)** | **~13-17h** |
-| **Total com W13** | **~17-23h** |
-
-Realístico: 7-10 sub-sessões pra W10-W12. W13 é tempo livre.
-
 ---
 
 ## 🧭 Princípios para próximas waves
 
-1. **Tests verdes não-negociáveis**: 144/144 + 10/10 typecheck antes de cada commit.
+1. **Tests verdes não-negociáveis**: 152/152 + 10/10 typecheck antes de cada commit.
 2. **Convenção de imports**: sempre `@canto/<pkg>/<full-path>`. Zero `./` ou `../`. Vide [convenção](#convenção-de-paths-de-imports).
-3. **Wave deve ser shippable**: green-to-green, atomic commit, push imediato.
-4. **Atomic commits**: um commit por wave (ou sub-wave). Mensagem documenta what + why + tradeoffs deferred.
-5. **NÃO pollute na correção de lint**: vide Wave 11c. Lint warn temporário > código pior.
-6. **Defira cross-context não-trivial**: minimum touch + comment TODO. Não tente refatorar 3 contextos numa wave.
-7. **Spawn teammates pra waves >50 tool calls**: paralelize quando possível, serial quando há overlap em arquivos.
-8. **Race conditions na working tree são reais**: se 2 teammates editam files diferentes, ok; se overlap, serial obrigatório.
+3. **Wave deve ser shippable**: green-to-green, atomic commits por sub-passo, push imediato.
+4. **Atomic commits por checklist item**: cada Context Wave gera 5–7 commits (boundary → drizzle → naming → errors → smells → sweep → eslint block). Mensagem documenta what + why + tradeoffs deferred.
+5. **NÃO pollute na correção de lint**: vide checklist anti-bad-smells. Lint warn temporário > código pior.
+6. **Vertical slice por contexto**: cada Context Wave entrega contexto 100% refatorado. Cross-context coupling = mínimo touch + comment TODO; defer pra context wave do outro contexto.
+7. **Spawn teammates pra Context Waves**: worktree-isolated, paralelo entre rounds, serial entre rounds. Cap escopo por teammate.
+8. **Per-context lint forcing function**: cada wave promove regras a `error` no eslint via per-folder override. Forcing function evita regressão futura.
+9. **Race conditions na working tree são reais**: worktree isolation cobre. Stitching pelo leader resolve conflicts em ports compartilhados + eslint.config.js (append-only blocks).
 
 ---
 
@@ -337,6 +351,34 @@ Entre Phase 5 e o trabalho de waves, sprint paralela colapsou per-aspect enrichm
 | 9C2 | `093751d1` | cleanup | overlays + fetch-logos + library JOINs + blocklist callers |
 | Final partial | `707b8f06` + follow-up | lockdown parcial | F1 (delete repositories.ts), F2 (boundary rules em warn), F3 partial, F5 (lint:strict), F7 (CI), F4 partial sweep (ui/db/codemod/worker zero errors) |
 
+### Wave 10 round 1 ✅ (2026-04-30 — partial boundary cleanup horizontal)
+
+Antes do replanejamento vertical, primeira passada por categoria de leak. Mantida porque trouxe ports + adapters foundation que as Context Waves usam.
+
+| Wave | Commit | Escopo |
+|---|---|---|
+| W10A content-enrichment | `4a89c6ae` | refresh-extras → MediaExtrasRepositoryPort |
+| W10A lists heavy reads | `36438730` | lists → ListsRepositoryPort (5 novos métodos) |
+| W10C user-media | `f5e4f5fc` | user-media boundary cleanup |
+| W10C recommendations | `a9ec3292` | recommendations boundary + RecommendationsRepositoryPort novos métodos |
+| W10C api/worker wiring | `8ff1563a` | tRPC + worker callers |
+| Stitching | `8a83790a` | post-merge: manage-list-items conflict, log-watched branded IDs, rebuild-recs imports/casts |
+| W11C cleanup | `fd3b1912` | refresh-extras: drop unnecessary conditions + non-null assertions |
+
+### Wave 10 round 2 ✅ (2026-05-01 — port wireup horizontal antes do pivot vertical)
+
+Continuou o slicing horizontal antes do replanejamento. Reduziu boundary warnings de 263 → ~90.
+
+| Wave | Commit | Escopo |
+|---|---|---|
+| LoggerPort wireup R1 | `6a49a83d` | 6 use cases (user-media, lists, content-enrichment) com deps existentes |
+| LoggerPort wireup R2 | `80513a98` | 7 media use cases + list-live-torrents + structure strategy + EnrichmentDeps |
+| LoggerPort wireup R3 | `b4437268` | sync-pipeline, scan-folder-for-media, download-torrent + 5 entry points; **`platform/logger/log-error.ts` deletado** |
+| JobDispatcherPort wireup | `d8d27e2d` | 8 domain files dropam `dispatchEnsureMedia` direto → `deps.dispatcher.enrichMedia`. EnrichmentDeps + EnsureMediaDeps + PersistDeps + ManageListItemsDeps + RefreshExtrasDeps com dispatcher required. |
+| MediaLocalizationRepositoryPort threading | `c5b84a18` | 7 domain files dropam `makeMediaLocalizationRepository(db)` → `deps.localization`. 9 → 2 leak sites (residuais em withFallback). |
+
+**Resultado**: LoggerPort + JobDispatcherPort + MediaLocalizationRepositoryPort 100% wired no domain. Restante (~90 leaks) endereçado pelas Context Waves W10.1–W10.11.
+
 ### Convenção de paths de imports (decidida 2026-04-30, em adoção desde Wave 1)
 
 **Regra única**: TODO import usa o nome do package (`@canto/<pkg>/<full-path>`). Zero `./` ou `../`.
@@ -349,13 +391,14 @@ Entre Phase 5 e o trabalho de waves, sprint paralela colapsou per-aspect enrichm
 
 **Por quê não `@/...`**: o tsconfig de cada package tem `"@/*": ["./src/*"]`, mas TypeScript respeita o tsconfig do **arquivo de entrada** quando faz resolution. Quando `apps/worker` typechecka e segue source-files de `@canto/core`, o `@/` resolve pra `apps/worker/src/*`, quebrando builds. Self-reference via `@canto/core/...` resolve via pnpm workspace symlink → consistente em todo lugar.
 
-### Tests + typecheck baseline atual
+### Tests + typecheck baseline atual (2026-05-01)
 
 - 10/10 typecheck verde em main.
-- 144/144 tests verde (143 passed + 1 skipped).
-- `pnpm -F @canto/core lint`: 758 problems (boundary warnings + style). Os 263 boundary warnings vão pra Wave 10; restantes pra Wave 11.
-- `pnpm -F @canto/web lint`: 307 problems (1 erro pre-existente parsing + 67 warnings + ~239 com regras strict promovidas).
-- `pnpm exec turbo run lint`: 8/10 packages com errors (4 limpos: ui, db, codemod, worker).
+- 152/152 tests verde (151 passed + 1 skipped).
+- `pnpm -F @canto/core lint`: ~90 boundary warnings restantes em `domain/**` (era 263 no Wave Final). Vão zerar pelas Context Waves W10.1–W10.11.
+- LoggerPort, JobDispatcherPort, MediaLocalizationRepositoryPort 100% wired no domain (round 2 horizontal).
+- `pnpm -F @canto/web lint`: ainda alto, sweep horizontal pendente — abordado pelas Context Waves via per-folder override.
+- `pnpm exec turbo run lint`: variável por package; alvo é zero warnings em todos no W12.
 
 ### Manual verification ainda pendente
 
@@ -369,8 +412,19 @@ Nenhum dev server foi bootado durante o refactor. Antes de confiar no `main`:
 
 ## Resume de waves restantes (ordem)
 
-1. **Wave 10**: zerar 263 boundary leaks. Split por contexto. Promove rule pra `error`.
-2. **Wave 11**: lint sweep + bad-smell eradicação. Não criar código pior pra passar lint.
-3. **Wave 12**: build clean + CI `lint:strict` + final doc. Tudo ✅.
+**Round 1** (paralelo, 3 teammates worktree-isolated, ~140 min wall-clock):
+1. **W10.1 + W10.2 + W10.3** (G): notifications + lists + recommendations
+2. **W10.4 + W10.5** (H): content-enrichment + user-media
+3. **W10.6 + W10.7** (I): file-organization + torrents
 
-Após Wave 12: refactor original COMPLETO. Phase 5.5 folder consolidation fica como nice-to-have opcional (Wave 13?).
+**Round 2** (paralelo após R1 mergear, ~120 min wall-clock):
+4. **W10.8** (J): media (sozinho — maior)
+5. **W10.9 + W10.10** (K): sync + media-servers
+6. **W10.11** (L): trakt
+
+**Solo pós-context-waves** (~120 min):
+7. **W11-final**: flip global eslint warn → error (defaults limpos, blocks per-context dropados).
+8. **W11f**: txn boundaries + magic constants + input validation + `buildCoreDeps(db)` factory.
+9. **W12**: build clean + CI `lint:strict` + handbook + CLAUDE.md atualizados. Tudo ✅.
+
+Após W12: refactor original COMPLETO. Phase 5.5 folder consolidation + W13 nice-to-have ficam opcionais.
