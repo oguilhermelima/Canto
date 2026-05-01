@@ -61,7 +61,9 @@ export const torrentListRouter = createTRPCRouter({
   listClient: adminProcedure.query(async ({ ctx }) => {
     const qb = await getDownloadClient();
     const [live, tracked] = await Promise.all([qb.listTorrents(), findAllDownloads(ctx.db)]);
-    const byHash = new Map(tracked.filter((t) => !!t.hash).map((t) => [t.hash!, t]));
+    const byHash = new Map(
+      tracked.flatMap((t) => (t.hash ? [[t.hash, t] as const] : [])),
+    );
     return live
       .map((item) => {
         const linked = byHash.get(item.hash);

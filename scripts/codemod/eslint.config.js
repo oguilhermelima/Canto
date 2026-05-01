@@ -20,5 +20,9 @@ export default [
         tsconfigRootDir: import.meta.dirname,
       },
     },
+    rules: {
+      // Codemod is a CLI tool; stdout/stderr is its primary output channel.
+      "no-console": "off",
+    },
   },
 ];

@@ -127,11 +127,11 @@ export async function discover(
     params["primary_release_date.gte"] = opts.releaseDateFrom;
   }
   if (opts?.keywordIds) params.with_keywords = opts.keywordIds;
-  if (opts?.minScore != null)
+  if (opts?.minScore !== undefined)
     params["vote_average.gte"] = String(opts.minScore);
-  if (opts?.maxScore != null)
+  if (opts?.maxScore !== undefined)
     params["vote_average.lte"] = String(opts.maxScore);
-  if (opts?.maxRuntime != null)
+  if (opts?.maxRuntime !== undefined)
     params["with_runtime.lte"] = String(opts.maxRuntime);
   if (type === "show" && opts?.firstAirDateTo)
     params["first_air_date.lte"] = opts.firstAirDateTo;
@@ -144,7 +144,7 @@ export async function discover(
   if (opts?.watchProviderIds)
     params.with_watch_providers = opts.watchProviderIds;
   if (opts?.watchRegion) params.watch_region = opts.watchRegion;
-  if (opts?.minRuntime != null)
+  if (opts?.minRuntime !== undefined)
     params["with_runtime.gte"] = String(opts.minRuntime);
 
   const data = await client.fetch<{

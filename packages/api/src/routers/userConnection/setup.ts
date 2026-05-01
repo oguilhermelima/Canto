@@ -213,9 +213,7 @@ export const setupRouter = createTRPCRouter({
         // client is actively streaming. Fall back to the live lookup so older
         // installations (pre-adminUserId) keep working.
         let jellyfinUserId = await getSetting("jellyfin.adminUserId");
-        if (!jellyfinUserId) {
-          jellyfinUserId = await jellyfin.getCurrentUserId(url, apiKey);
-        }
+        jellyfinUserId ??= await jellyfin.getCurrentUserId(url, apiKey);
         if (!jellyfinUserId) {
           throw new TRPCError({
             code: "BAD_REQUEST",

@@ -101,12 +101,13 @@ export const providerFiltersRouter = createTRPCRouter({
 
       const grouped: Record<string, Array<{ value: string; label: string; meaning: string | null }>> = {};
       for (const row of rows) {
-        if (!grouped[row.region]) grouped[row.region] = [];
-        grouped[row.region]!.push({
+        const bucket = grouped[row.region] ?? [];
+        bucket.push({
           value: row.rating,
           label: row.rating,
           meaning: row.meaning,
         });
+        grouped[row.region] = bucket;
       }
       return grouped;
     }),

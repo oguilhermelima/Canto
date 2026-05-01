@@ -1,5 +1,6 @@
 import type { RecommendationsRepositoryPort } from "@canto/core/domain/recommendations/ports/recommendations-repository.port";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import {
   engagementMultiplier,
   isNegativeSignal,
@@ -19,6 +20,7 @@ const ENGAGEMENT_BASE_WEIGHT = 0.85;
 export interface RebuildUserRecsDeps {
   recs: RecommendationsRepositoryPort;
   userMedia: UserMediaRepositoryPort;
+  logger: LoggerPort;
 }
 
 type RecCandidate = Awaited<
@@ -96,10 +98,12 @@ function selectSeeds(
     let added = false;
     for (const genre of genreKeys) {
       if (seeds.length >= limit) break;
-      const bucket = byGenre.get(genre)!;
-      const cursor = cursors.get(genre)!;
-      if (cursor < bucket.length) {
-        seeds.push(bucket[cursor]!);
+      const bucket = byGenre.get(genre);
+      const cursor = cursors.get(genre);
+      if (bucket === undefined || cursor === undefined) continue;
+      const next = bucket[cursor];
+      if (next !== undefined) {
+        seeds.push(next);
         cursors.set(genre, cursor + 1);
         added = true;
       }
@@ -136,8 +140,7 @@ async function processSeed(
     deps.rankCap,
   );
 
-  for (let rank = 0; rank < recItems.length; rank++) {
-    const candidate = recItems[rank]!;
+  for (const [rank, candidate] of recItems.entries()) {
     if (deps.negativeMedia.has(candidate.mediaId)) continue;
     deps.rows.push(
       toRecRow(candidate, baseWeight * seedBoost * rankMultiplier(rank + 1)),
@@ -245,22 +248,22 @@ export async function rebuildUserRecs(
   };
 
   // 4. Watchlist seeds (primary)
-  for (let pos = 0; pos < seedMediaIds.length; pos++) {
-    await processSeed(seedMediaIds[pos]!, sourceWeight(pos), seedDeps);
+  for (const [pos, mediaId] of seedMediaIds.entries()) {
+    await processSeed(mediaId, sourceWeight(pos), seedDeps);
   }
 
   // 5. Collection seeds (secondary, lower base weight)
-  for (let pos = 0; pos < collectionSeedMediaIds.length; pos++) {
+  for (const [pos, mediaId] of collectionSeedMediaIds.entries()) {
     const baseWeight =
       COLLECTION_BASE_WEIGHT * (1.0 - (pos / MAX_SEEDS_FROM_COLLECTIONS) * 0.4);
-    await processSeed(collectionSeedMediaIds[pos]!, baseWeight, seedDeps);
+    await processSeed(mediaId, baseWeight, seedDeps);
   }
 
   // 6. Engagement-only seeds (between collection and server in priority)
-  for (let pos = 0; pos < engagementSeedMediaIds.length; pos++) {
+  for (const [pos, mediaId] of engagementSeedMediaIds.entries()) {
     const baseWeight =
       ENGAGEMENT_BASE_WEIGHT * (1.0 - (pos / MAX_ENGAGEMENT_SEEDS) * 0.4);
-    await processSeed(engagementSeedMediaIds[pos]!, baseWeight, seedDeps);
+    await processSeed(mediaId, baseWeight, seedDeps);
   }
 
   // 7. Server library: include if user has few personal items
@@ -286,7 +289,7 @@ export async function rebuildUserRecs(
     ? ` (seeds from ${new Set(watchlistItems.filter((i) => seedMediaIds.includes(i.mediaId)).map((i) => i.genres?.[0] ?? "Other")).size} genres)`
     : "";
 
-  console.log(
+  deps.logger.info?.(
     `[rebuild-user-recs] User ${userId}: ${seedMediaIds.length} watchlist + ${collectionSeedMediaIds.length} collection + ${engagementSeedMediaIds.length} engagement seeds${genreBreakdown}, ${rows.length} weighted recs, ${serverSourceCount} server sources, ${negativeMedia.size} excluded as negative`,
   );
 }
@@ -327,7 +330,7 @@ export async function addMediaToUserRecs(
 
   await deps.recs.upsertUserRecommendations(userId, rows);
 
-  console.log(
+  deps.logger.info?.(
     `[add-media-to-user-recs] User ${userId}: added ${rows.length} recs from media ${mediaId}`,
   );
 }

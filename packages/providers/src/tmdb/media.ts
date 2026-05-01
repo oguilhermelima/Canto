@@ -72,6 +72,12 @@ export function normalizeSearchResult(
 /*  Translations                                                              */
 /* -------------------------------------------------------------------------- */
 
+// TMDB returns empty strings for missing translation fields; collapse those to
+// undefined so the rest of the codebase can rely on `??` semantics.
+function firstNonEmpty(...vals: (string | undefined)[]): string | undefined {
+  return vals.find((v) => v !== undefined && v.length > 0);
+}
+
 function parseTranslations(data: Record<string, unknown>): Translation[] {
   const translationsData = data.translations as
     | {
@@ -91,10 +97,13 @@ function parseTranslations(data: Record<string, unknown>): Translation[] {
   if (!translationsData?.translations) return [];
 
   return translationsData.translations
-    .filter((t) => t.data.title || t.data.name || t.data.overview)
+    .filter(
+      (t) =>
+        firstNonEmpty(t.data.title, t.data.name, t.data.overview) !== undefined,
+    )
     .map((t) => ({
       language: `${t.iso_639_1}-${t.iso_3166_1}`,
-      title: t.data.title || t.data.name,
+      title: firstNonEmpty(t.data.title, t.data.name),
       overview: t.data.overview,
       tagline: t.data.tagline,
     }));
@@ -189,7 +198,7 @@ async function enrichTranslationsWithLocalePoster(
   const byPrefix = new Map<string, string[]>();
   for (const lang of supportedLangs) {
     if (lang.startsWith("en")) continue;
-    const prefix = lang.split("-")[0]!;
+    const prefix = lang.split("-")[0] ?? lang;
     const list = byPrefix.get(prefix) ?? [];
     list.push(lang);
     byPrefix.set(prefix, list);
@@ -198,7 +207,7 @@ async function enrichTranslationsWithLocalePoster(
   // Prefixes where path 1 (tagged-image match) found a poster — safe to disambiguate.
   const prefixesWithPoster = new Set<string>();
   for (const t of translations) {
-    if (t.posterPath) prefixesWithPoster.add(t.language.split("-")[0]!);
+    if (t.posterPath) prefixesWithPoster.add(t.language.split("-")[0] ?? t.language);
   }
 
   const langsToFetch = new Set<string>();

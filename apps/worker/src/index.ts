@@ -281,7 +281,7 @@ const workers = [
     ({ userId }) => {
       const core = buildCoreDeps(db);
       return rebuildUserRecs(
-        { recs: core.recommendations, userMedia: core.userMedia },
+        { recs: core.recommendations, userMedia: core.userMedia, logger: core.logger },
         userId,
       );
     },

@@ -134,7 +134,8 @@ export const mediaMetadataRouter = createTRPCRouter({
       if (row.provider !== "tmdb" && row.imdbId) {
         try {
           const found = await tmdb.findByImdbId(row.imdbId);
-          if (found.length > 0) tmdbExternalId = found[0]!.externalId;
+          const first = found[0];
+          if (first) tmdbExternalId = first.externalId;
         } catch { /* use original ID as fallback */ }
       }
       return tmdb.getExtras(tmdbExternalId, row.type as "movie" | "show");

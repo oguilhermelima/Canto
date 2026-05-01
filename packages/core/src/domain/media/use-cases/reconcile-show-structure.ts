@@ -75,7 +75,7 @@ export async function reconcileShowStructure(
   const tvdbData = await tvdb.getMetadata(tvdbId, "show");
 
   if (!tvdbData.seasons || tvdbData.seasons.length === 0) {
-    console.log(`[reconcile] "${enTitle}": TVDB has no seasons, skipping`);
+    deps.logger.info?.(`[reconcile] "${enTitle}": TVDB has no seasons, skipping`);
     return;
   }
 
@@ -183,7 +183,7 @@ export async function reconcileShowStructure(
   }
 
   const tvdbSeasonCount = tvdbData.seasons.filter((s) => s.number > 0).length;
-  console.log(
+  deps.logger.info?.(
     `[reconcile] "${enTitle}": TVDB structure applied (${tvdbSeasonCount} seasons, ${tvdbData.numberOfEpisodes ?? 0} eps), ${nonEnLangs.length} translation jobs dispatched`,
   );
 }

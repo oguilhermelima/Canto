@@ -127,9 +127,11 @@ export const syncRouter = createTRPCRouter({
       const tmdb = await getTmdbProvider();
       const persist = makePersistDeps(ctx.db);
       const mediaVersion = makeMediaVersionRepository(ctx.db);
-      const scope = input.versionId
+      const scope = input.versionId !== undefined
         ? { versionId: input.versionId, tmdbId: input.tmdbId, type: input.type }
-        : { mediaId: input.mediaId!, tmdbId: input.tmdbId, type: input.type };
+        : input.mediaId !== undefined
+          ? { mediaId: input.mediaId, tmdbId: input.tmdbId, type: input.type }
+          : (() => { throw new Error("Exactly one of versionId or mediaId must be set"); })();
       return resolveMediaVersionPreview(
         ctx.db,
         { ...persist, mediaVersion },
@@ -144,9 +146,11 @@ export const syncRouter = createTRPCRouter({
       const tmdb = await getTmdbProvider();
       const persist = makePersistDeps(ctx.db);
       const mediaVersion = makeMediaVersionRepository(ctx.db);
-      const scope = input.versionId
+      const scope = input.versionId !== undefined
         ? { versionId: input.versionId, tmdbId: input.tmdbId, type: input.type }
-        : { mediaId: input.mediaId!, tmdbId: input.tmdbId, type: input.type };
+        : input.mediaId !== undefined
+          ? { mediaId: input.mediaId, tmdbId: input.tmdbId, type: input.type }
+          : (() => { throw new Error("Exactly one of versionId or mediaId must be set"); })();
 
       const result = await resolveMediaVersion(
         ctx.db,

@@ -1,9 +1,8 @@
-# Canto — Core Architecture Refactor Status
+# Canto — Core Architecture Refactor History
 
-Status doc for the `packages/core` architecture overhaul. **Pendente em cima; histórico embaixo.**
+> **Historical artifact.** The `packages/core` ports-and-adapters refactor concluded on 2026-05-01. Active conventions live in `.claude/skills/handbook/SKILL.md` (and per-scope files: `core.md`, `api.md`, `frontend.md`, `worker.md`). This document is preserved as a record of the planning + execution.
 
-**Last updated**: 2026-05-01 (pós Wave 10 round 2 + replanejamento vertical)
-**Current `main` tip**: ver `git log --oneline -1`
+**Last updated**: 2026-05-01 (refactor concluded — apps/web 0 warnings, lint:strict in CI)
 
 ---
 

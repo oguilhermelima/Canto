@@ -35,7 +35,7 @@ export async function persistTranslations(
         (t) =>
           !t.language.startsWith("en-") &&
           supported.has(t.language) &&
-          (t.title || t.overview),
+          (t.title !== undefined || t.overview !== undefined),
       )
       .map((t) => ({
         mediaId,
@@ -70,11 +70,13 @@ export async function persistTranslations(
     }
   }
 
-  const needSeasonLookup =
-    (normalized.seasonTranslations &&
-      normalized.seasonTranslations.length > 0) ||
-    (normalized.episodeTranslations &&
-      normalized.episodeTranslations.length > 0);
+  const hasSeasonTranslations =
+    normalized.seasonTranslations !== undefined &&
+    normalized.seasonTranslations.length > 0;
+  const hasEpisodeTranslations =
+    normalized.episodeTranslations !== undefined &&
+    normalized.episodeTranslations.length > 0;
+  const needSeasonLookup = hasSeasonTranslations || hasEpisodeTranslations;
 
   if (!needSeasonLookup) return;
 
@@ -91,7 +93,7 @@ export async function persistTranslations(
         if (t.language.startsWith("en-") || !supported.has(t.language))
           return false;
         const sid = seasonIdByNumber.get(t.seasonNumber);
-        return !!sid && (t.name || t.overview);
+        return sid !== undefined && (t.name !== undefined || t.overview !== undefined);
       })
       .map((t) => {
         const seasonId = seasonIdByNumber.get(t.seasonNumber);

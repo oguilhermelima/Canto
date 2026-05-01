@@ -190,15 +190,21 @@ export async function updateMediaFromNormalized(
   return updated;
 }
 
+// TMDB sometimes returns empty strings for absent date fields. Treat those as
+// null so the column stays clean.
+function emptyToNull(s: string | null | undefined): string | null {
+  return s !== null && s !== undefined && s.length > 0 ? s : null;
+}
+
 function buildMediaInsert(normalized: NormalizedMedia) {
   return {
     type: normalized.type,
     externalId: normalized.externalId,
     provider: normalized.provider,
     originalTitle: normalized.originalTitle,
-    releaseDate: normalized.releaseDate || null,
+    releaseDate: emptyToNull(normalized.releaseDate),
     year: normalized.year,
-    lastAirDate: normalized.lastAirDate || null,
+    lastAirDate: emptyToNull(normalized.lastAirDate),
     status: normalized.status,
     genres: normalized.genres,
     genreIds: normalized.genreIds ?? [],
@@ -216,7 +222,7 @@ function buildMediaInsert(normalized: NormalizedMedia) {
     numberOfSeasons: normalized.numberOfSeasons,
     numberOfEpisodes: normalized.numberOfEpisodes,
     inProduction: normalized.inProduction,
-    nextAirDate: normalized.nextAirDate || null,
+    nextAirDate: emptyToNull(normalized.nextAirDate),
     airsTime: normalized.airsTime ?? null,
     networks: normalized.networks,
     budget: normalized.budget,
@@ -235,9 +241,9 @@ function buildMediaUpdate(
     externalId: normalized.externalId,
     provider: normalized.provider,
     originalTitle: normalized.originalTitle,
-    releaseDate: normalized.releaseDate || null,
+    releaseDate: emptyToNull(normalized.releaseDate),
     year: normalized.year,
-    lastAirDate: normalized.lastAirDate || null,
+    lastAirDate: emptyToNull(normalized.lastAirDate),
     status: normalized.status,
     genres: normalized.genres,
     genreIds: normalized.genreIds ?? [],
@@ -259,7 +265,7 @@ function buildMediaUpdate(
           numberOfEpisodes: normalized.numberOfEpisodes,
         }),
     inProduction: normalized.inProduction,
-    nextAirDate: normalized.nextAirDate || null,
+    nextAirDate: emptyToNull(normalized.nextAirDate),
     airsTime: normalized.airsTime ?? null,
     networks: normalized.networks,
     budget: normalized.budget,
@@ -284,7 +290,7 @@ export async function persistSeasons(
       externalId: s.externalId,
       name: s.name,
       overview: s.overview,
-      airDate: s.airDate || null,
+      airDate: emptyToNull(s.airDate),
       posterPath: s.posterPath,
       episodeCount: s.episodeCount,
       seasonType: s.seasonType,
@@ -299,7 +305,7 @@ export async function persistSeasons(
           externalId: ep.externalId,
           title: ep.title,
           overview: ep.overview,
-          airDate: ep.airDate || null,
+          airDate: emptyToNull(ep.airDate),
           runtime: ep.runtime,
           stillPath: ep.stillPath,
           voteAverage: ep.voteAverage,
@@ -334,7 +340,7 @@ async function upsertSeasons(
       externalId: s.externalId,
       name: s.name,
       overview: s.overview,
-      airDate: s.airDate || null,
+      airDate: emptyToNull(s.airDate),
       posterPath: s.posterPath,
       episodeCount: s.episodeCount,
       seasonType: s.seasonType,
@@ -349,7 +355,7 @@ async function upsertSeasons(
           externalId: ep.externalId,
           title: ep.title,
           overview: ep.overview,
-          airDate: ep.airDate || null,
+          airDate: emptyToNull(ep.airDate),
           runtime: ep.runtime,
           stillPath: ep.stillPath,
           voteAverage: ep.voteAverage,

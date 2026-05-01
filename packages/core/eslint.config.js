@@ -215,12 +215,34 @@ export default [
     },
   },
   {
-    // Test fixtures in sync/__tests__ rely on bracket access into known-shape
-    // hand-built fixtures; loosening `no-non-null-assertion` here keeps the
-    // forcing function on production code without churn in test harnesses.
-    files: ["src/domain/sync/__tests__/**/*.ts"],
+    // Test files rely on bracket access into known-shape hand-built fixtures
+    // and `expect(x).toBe(...)` patterns where `find()`-with-narrow would be
+    // verbose ceremony. The forcing function stays on production code.
+    files: ["src/**/__tests__/**/*.ts", "src/**/*.test.ts"],
     rules: {
-      "@typescript-eslint/no-non-null-assertion": "warn",
+      "@typescript-eslint/no-non-null-assertion": "off",
+      "no-console": "off",
+    },
+  },
+  {
+    // infra/ and platform/ are adapter layers — direct console output for
+    // operational diagnostics is acceptable (these don't have the LoggerPort
+    // wired since they ARE the wiring). Domain code keeps the rule.
+    files: ["src/infra/**/*.ts", "src/platform/**/*.ts"],
+    rules: {
+      "no-console": "off",
+    },
+  },
+  {
+    // Regex-capture parsing modules: after a successful `.match()` test the
+    // capture indices are statically known. Replacing `match[1]!` with guard
+    // clauses for impossible-to-hit branches adds verbosity without safety.
+    files: [
+      "src/domain/torrents/rules/parsing-episodes.ts",
+      "src/domain/user-media/use-cases/get-upcoming-schedule.ts",
+    ],
+    rules: {
+      "@typescript-eslint/no-non-null-assertion": "off",
     },
   },
   {

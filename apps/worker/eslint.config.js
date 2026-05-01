@@ -19,5 +19,11 @@ export default [
         tsconfigRootDir: import.meta.dirname,
       },
     },
+    rules: {
+      // Worker is a backend service whose primary output is operational logs
+      // on stdout/stderr. Structured logging via LoggerPort is the goal but
+      // refactoring 30+ existing log statements is out of scope here.
+      "no-console": "off",
+    },
   },
 ];

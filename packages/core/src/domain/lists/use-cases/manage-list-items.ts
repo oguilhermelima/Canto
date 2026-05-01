@@ -48,7 +48,7 @@ export async function addItemToList(
     deps.logger.logAndSwallow("list:addItem dispatchEnsureMedia"),
   );
   void addMediaToUserRecs(
-    { recs: deps.recs, userMedia: deps.userMedia },
+    { recs: deps.recs, userMedia: deps.userMedia, logger: deps.logger },
     userId,
     input.mediaId,
   ).catch(deps.logger.logAndSwallow("list:addItem addMediaToUserRecs"));

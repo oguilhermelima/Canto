@@ -26,6 +26,20 @@ import {
 
 const EN = "en-US";
 
+// drizzle's `and()` returns `SQL | undefined` (the union exists for empty-args
+// or null-arg edge cases). Every call site here passes two non-null conditions
+// so the result is always SQL; narrow with this helper to keep the join fields
+// typed as `SQL` without sprinkling non-null assertions.
+function asSql(
+  expr: ReturnType<typeof and> | undefined,
+  label: string,
+): NonNullable<ReturnType<typeof and>> {
+  if (expr === undefined) {
+    throw new Error(`media-i18n: ${label} produced an empty SQL expression`);
+  }
+  return expr;
+}
+
 type MediaLocAlias = ReturnType<typeof alias<typeof mediaLocalization, string>>;
 type EpisodeLocAlias = ReturnType<
   typeof alias<typeof episodeLocalization, string>
@@ -56,11 +70,14 @@ export function mediaI18n(language: string): MediaI18n {
   return {
     locUser,
     locEn,
-    locUserJoin: and(
-      eq(locUser.mediaId, media.id),
-      eq(locUser.language, language),
-    )!,
-    locEnJoin: and(eq(locEn.mediaId, media.id), eq(locEn.language, EN))!,
+    locUserJoin: asSql(
+      and(eq(locUser.mediaId, media.id), eq(locUser.language, language)),
+      "locUserJoin",
+    ),
+    locEnJoin: asSql(
+      and(eq(locEn.mediaId, media.id), eq(locEn.language, EN)),
+      "locEnJoin",
+    ),
     title: sql<string>`COALESCE(NULLIF(TRIM(${locUser.title}), ''), NULLIF(TRIM(${locEn.title}), ''), '')`,
     overview: sql<string | null>`COALESCE(NULLIF(TRIM(${locUser.overview}), ''), NULLIF(TRIM(${locEn.overview}), ''))`,
     posterPath: sql<string | null>`COALESCE(${locUser.posterPath}, ${locEn.posterPath})`,
@@ -88,14 +105,14 @@ export function episodeI18n(language: string): EpisodeI18n {
   return {
     locUser,
     locEn,
-    locUserJoin: and(
-      eq(locUser.episodeId, episode.id),
-      eq(locUser.language, language),
-    )!,
-    locEnJoin: and(
-      eq(locEn.episodeId, episode.id),
-      eq(locEn.language, EN),
-    )!,
+    locUserJoin: asSql(
+      and(eq(locUser.episodeId, episode.id), eq(locUser.language, language)),
+      "episodeI18n.locUserJoin",
+    ),
+    locEnJoin: asSql(
+      and(eq(locEn.episodeId, episode.id), eq(locEn.language, EN)),
+      "episodeI18n.locEnJoin",
+    ),
     title: sql<string | null>`COALESCE(NULLIF(TRIM(${locUser.title}), ''), NULLIF(TRIM(${locEn.title}), ''))`,
     overview: sql<string | null>`COALESCE(NULLIF(TRIM(${locUser.overview}), ''), NULLIF(TRIM(${locEn.overview}), ''))`,
   };
@@ -116,14 +133,14 @@ export function seasonI18n(language: string): SeasonI18n {
   return {
     locUser,
     locEn,
-    locUserJoin: and(
-      eq(locUser.seasonId, season.id),
-      eq(locUser.language, language),
-    )!,
-    locEnJoin: and(
-      eq(locEn.seasonId, season.id),
-      eq(locEn.language, EN),
-    )!,
+    locUserJoin: asSql(
+      and(eq(locUser.seasonId, season.id), eq(locUser.language, language)),
+      "seasonI18n.locUserJoin",
+    ),
+    locEnJoin: asSql(
+      and(eq(locEn.seasonId, season.id), eq(locEn.language, EN)),
+      "seasonI18n.locEnJoin",
+    ),
     name: sql<string | null>`COALESCE(NULLIF(TRIM(${locUser.name}), ''), NULLIF(TRIM(${locEn.name}), ''))`,
     overview: sql<string | null>`COALESCE(NULLIF(TRIM(${locUser.overview}), ''), NULLIF(TRIM(${locEn.overview}), ''))`,
   };

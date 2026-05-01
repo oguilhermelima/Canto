@@ -500,8 +500,8 @@ export async function findListItems(
   // the list — heavy for shared collections. Skip it when the caller doesn't
   // filter or sort by it; the vast majority of carousel reads don't.
   const needsMemberVotes =
-    membersRatingMin != null ||
-    memberVoteCountMin != null ||
+    membersRatingMin !== undefined ||
+    memberVoteCountMin !== undefined ||
     sortBy === "members_rating.desc" ||
     sortBy === "members_rating.asc";
 
@@ -550,10 +550,10 @@ export async function findListItems(
     conditions.push(sql`${listItem.mediaId} IN (${accessibleMediaIds})`);
   }
 
-  if (memberVotesSubquery && membersRatingMin != null) {
+  if (memberVotesSubquery && membersRatingMin !== undefined) {
     conditions.push(sql`COALESCE(${memberVotesSubquery.avgRating}, 0) >= ${membersRatingMin}`);
   }
-  if (memberVotesSubquery && memberVoteCountMin != null) {
+  if (memberVotesSubquery && memberVoteCountMin !== undefined) {
     conditions.push(sql`COALESCE(${memberVotesSubquery.voteCount}, 0) >= ${memberVoteCountMin}`);
   }
 
@@ -750,12 +750,12 @@ export async function findListItems(
 
   const items = rows.map((row) => {
     const userRating =
-      row.userRating != null ? Number(row.userRating) : null;
+      row.userRating !== null ? Number(row.userRating) : null;
     return {
       listItem: row.listItem,
       media: row.media,
       memberVotes:
-        row.memberVoteCount != null && Number(row.memberVoteCount) > 0
+        row.memberVoteCount !== null && Number(row.memberVoteCount) > 0
           ? {
               totalRating: Number(row.memberTotalRating ?? 0),
               voteCount: Number(row.memberVoteCount),
@@ -1248,7 +1248,7 @@ export async function findUserCustomCollectionItems(
   return {
     items: rows.map((row) => ({
       media: row.media,
-      userRating: row.userRating != null ? Number(row.userRating) : null,
+      userRating: row.userRating !== null ? Number(row.userRating) : null,
       membership: membership.get(row.media.id) ?? {
         inWatchlist: false,
         otherCollections: [],

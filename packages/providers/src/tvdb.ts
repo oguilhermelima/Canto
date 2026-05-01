@@ -99,6 +99,12 @@ function prefixImageUrl(url: string): string {
   return `${TVDB_IMAGE_HOST}/banners/${url}`;
 }
 
+// TVDB returns empty strings (and sometimes nulls) for missing translation
+// fields; collapse to undefined so consumers can rely on `??` semantics.
+function emptyToUndefined(s: string | null | undefined): string | undefined {
+  return s !== null && s !== undefined && s.length > 0 ? s : undefined;
+}
+
 function mapStatus(status: string | null | undefined): string | undefined {
   if (!status) return undefined;
   switch (status) {
@@ -128,12 +134,13 @@ function findArtwork(
 ): string | undefined {
   if (!artworks || artworks.length === 0) return undefined;
   const ofType = artworks.filter((a) => a.type === type);
-  if (ofType.length === 0) return undefined;
+  const [first, ...rest] = ofType;
+  if (!first) return undefined;
   if (preferLang) {
-    const langMatch = ofType.find((a) => a.language === preferLang);
+    const langMatch = [first, ...rest].find((a) => a.language === preferLang);
     if (langMatch) return langMatch.image;
   }
-  return ofType[0]!.image;
+  return first.image;
 }
 
 /**
@@ -185,7 +192,7 @@ export class TvdbProvider implements MetadataProvider {
   static toIso639_2(locale: string): string {
     if (locale === "pt-BR") return "pt";
     if (locale.startsWith("pt")) return "por";
-    const short = locale.split("-")[0]!;
+    const short = locale.split("-")[0] ?? locale;
     return TvdbProvider.ISO_639_MAP[short] ?? "eng";
   }
 
@@ -319,8 +326,8 @@ export class TvdbProvider implements MetadataProvider {
       const engTranslation = await this.request<{ name?: string; overview?: string }>(
         `/series/${externalId}/translations/eng`,
       );
-      engTitle = engTranslation.name || undefined;
-      engOverview = engTranslation.overview || undefined;
+      engTitle = emptyToUndefined(engTranslation.name);
+      engOverview = emptyToUndefined(engTranslation.overview);
     } catch {
       // English translation not available
     }
@@ -342,8 +349,8 @@ export class TvdbProvider implements MetadataProvider {
           const poster = findArtwork(series.artworks, 2, lang3);
           return {
             language: locale,
-            title: t.name || undefined,
-            overview: t.overview || undefined,
+            title: emptyToUndefined(t.name),
+            overview: emptyToUndefined(t.overview),
             posterPath: poster ? prefixImageUrl(poster) : undefined,
           } satisfies Translation;
         }),
@@ -360,8 +367,8 @@ export class TvdbProvider implements MetadataProvider {
         if (t.name || t.overview) {
           translations.push({
             language: this.locale,
-            title: t.name || undefined,
-            overview: t.overview || undefined,
+            title: emptyToUndefined(t.name),
+            overview: emptyToUndefined(t.overview),
           });
         }
       } catch { /* Translation not available */ }
@@ -374,10 +381,9 @@ export class TvdbProvider implements MetadataProvider {
     const episodesBySeason = new Map<number, TvdbEpisode[]>();
     for (const ep of allEpisodes) {
       const seasonNum = ep.seasonNumber;
-      if (!episodesBySeason.has(seasonNum)) {
-        episodesBySeason.set(seasonNum, []);
-      }
-      episodesBySeason.get(seasonNum)!.push(ep);
+      const bucket = episodesBySeason.get(seasonNum) ?? [];
+      bucket.push(ep);
+      episodesBySeason.set(seasonNum, bucket);
     }
 
     // Build NormalizedSeason[] — only include default/official seasons
@@ -493,8 +499,8 @@ export class TvdbProvider implements MetadataProvider {
       backdropPath,
       imdbId: extractImdbId(series.remoteIds),
       tvdbId: series.id,
-      nextAirDate: series.nextAired || undefined,
-      airsTime: series.airsTime ?? undefined,
+      nextAirDate: emptyToUndefined(series.nextAired),
+      airsTime: emptyToUndefined(series.airsTime),
       seasons,
       networks: networks.length > 0 ? networks : undefined,
       numberOfSeasons: regularSeasons.length > 0 ? regularSeasons.length : undefined,

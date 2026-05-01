@@ -52,7 +52,8 @@ export const mediaDiscoveryRouter = createTRPCRouter({
           1800,
           async () => {
             const provider = await getProviderWithKey(input.provider);
-            return provider.search(input.query!, input.type, { page });
+            if (input.query === undefined) throw new Error("query required for search mode");
+            return provider.search(input.query, input.type, { page });
           },
         );
 
@@ -62,23 +63,30 @@ export const mediaDiscoveryRouter = createTRPCRouter({
           : null;
         const genreMode = input.genres?.includes(",") ? "and" : "or";
 
-        const hasPostFilters = genreSet || input.language || input.scoreMin != null || input.scoreMax != null || input.dateFrom || input.dateTo;
+        const hasPostFilters =
+          genreSet !== null ||
+          input.language !== undefined ||
+          input.scoreMin !== undefined ||
+          input.scoreMax !== undefined ||
+          input.dateFrom !== undefined ||
+          input.dateTo !== undefined;
         if (hasPostFilters) {
           const filtered = searchResults.results.filter((r) => {
             if (genreSet && r.genreIds) {
               if (genreMode === "and") {
-                if (!([...genreSet].every((g) => r.genreIds!.includes(g)))) return false;
+                const ids = r.genreIds;
+                if (![...genreSet].every((g) => ids.includes(g))) return false;
               } else {
                 if (!r.genreIds.some((g) => genreSet.has(g))) return false;
               }
             } else if (genreSet && !r.genreIds) {
               return false;
             }
-            if (input.language && r.originalLanguage !== input.language) return false;
-            if (input.scoreMin != null && (r.voteAverage ?? 0) < input.scoreMin) return false;
-            if (input.scoreMax != null && (r.voteAverage ?? 0) > input.scoreMax) return false;
-            if (input.dateFrom && r.releaseDate && r.releaseDate < input.dateFrom) return false;
-            if (input.dateTo && r.releaseDate && r.releaseDate > input.dateTo) return false;
+            if (input.language !== undefined && r.originalLanguage !== input.language) return false;
+            if (input.scoreMin !== undefined && (r.voteAverage ?? 0) < input.scoreMin) return false;
+            if (input.scoreMax !== undefined && (r.voteAverage ?? 0) > input.scoreMax) return false;
+            if (input.dateFrom !== undefined && r.releaseDate && r.releaseDate < input.dateFrom) return false;
+            if (input.dateTo !== undefined && r.releaseDate && r.releaseDate > input.dateTo) return false;
             return true;
           });
           return enrichBrowseWithLogos(
@@ -135,7 +143,17 @@ export const mediaDiscoveryRouter = createTRPCRouter({
         };
 
         if (input.mode === "trending") {
-          const hasFilters = input.genres || input.language || input.keywords || input.scoreMin != null || input.scoreMax != null || input.runtimeMax != null || input.certification || input.status || input.watchProviders || input.runtimeMin != null;
+          const hasFilters =
+            input.genres !== undefined ||
+            input.language !== undefined ||
+            input.keywords !== undefined ||
+            input.scoreMin !== undefined ||
+            input.scoreMax !== undefined ||
+            input.runtimeMax !== undefined ||
+            input.certification !== undefined ||
+            input.status !== undefined ||
+            input.watchProviders !== undefined ||
+            input.runtimeMin !== undefined;
           if (hasFilters) {
             return filterReleased(await provider.discover(input.type, discoverOpts));
           }
