@@ -365,6 +365,18 @@ Antes do replanejamento vertical, primeira passada por categoria de leak. Mantid
 | Stitching | `8a83790a` | post-merge: manage-list-items conflict, log-watched branded IDs, rebuild-recs imports/casts |
 | W11C cleanup | `fd3b1912` | refresh-extras: drop unnecessary conditions + non-null assertions |
 
+### Wave 10 round 3 (vertical Context Waves) — em progresso (2026-05-01)
+
+| Wave | Commits | Estado |
+|---|---|---|
+| **W10.4** content-enrichment | `ce2fce23` (pool-scoring) · `473277cc` (translate-episodes + LoggerPort) · `75528241` (sync-tmdb-certifications boundary) · `e31958ac` (eslint override) | ✅ done — domain/content-enrichment 0 lint warnings, per-folder override at error |
+| **W10.5** user-media | `503e6298` (log-watched + get-watch-next minor lint) | ⚠️ partial — only quick lint fixes applied. Boundary cleanup deferred (see notes) |
+
+**W10.5 deferral notes** (Teammate H):
+- The 4 read-only feed use cases (`get-continue-watching`, `get-library-history`, `get-upcoming-schedule`, `get-watch-next`) reach into 5 infra repos (`library-feed-repository`, `watch-history-repository`, `playback-progress-repository`, `state-repository`, `content-enrichment/extras-repository`). A clean port-first design needs a new `LibraryFeedRepositoryPort` (or extension of `UserMediaRepositoryPort` for the heavy joins). Defer to a follow-up because the surface is large (~15 methods).
+- `push-playback-position.ts` and `push-watch-state.ts` import `infra/media-servers/{plex,jellyfin}.adapter` for write operations not currently exposed by `MediaServerPort` (test/list/scan/fetchInfo only). Deferred to W10.10 (media-servers context) where the port should be extended with `setPlaybackPosition`, `markWatched`, `markUnwatched`, `findItemIdByProvider` etc — that's the right place to design the writeable surface alongside the existing read methods.
+- Working-tree race conditions during the round 1 parallel run made multi-file refactors difficult (changes were repeatedly clobbered by sibling teammates' branch switches in the shared checkout). Single-file lint sweeps committed cleanly; multi-file boundary work needed atomic commits I couldn't reliably stage.
+
 ### Wave 10 round 2 ✅ (2026-05-01 — port wireup horizontal antes do pivot vertical)
 
 Continuou o slicing horizontal antes do replanejamento. Reduziu boundary warnings de 263 → ~90.
