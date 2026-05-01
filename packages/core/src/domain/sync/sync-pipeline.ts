@@ -401,7 +401,7 @@ export async function runSyncPipeline(
   opts: SyncPipelineOptions = {},
 ): Promise<SyncSummary> {
   if (scannedItems.length === 0) {
-    console.log(`[${tag}] No items to process`);
+    deps.logger.info?.(`[${tag}] No items to process`);
     const summary = emptySummary(0);
     summary.status = "completed";
     summary.completedAt = new Date().toISOString();
@@ -421,7 +421,7 @@ export async function runSyncPipeline(
   const summary = emptySummary(deduplicated.length);
   await persistStatus(tag, summary);
 
-  console.log(
+  deps.logger.info?.(
     `[${tag}] Found ${scannedItems.length} items (${deduplicated.length} unique) to process`,
   );
 
@@ -454,22 +454,23 @@ export async function runSyncPipeline(
     try {
       await deps.lists.reconcileServerLibrary(tag);
     } catch (err) {
-      console.warn(`[${tag}] Failed to reconcile Server Library:`, err);
+      deps.logger.warn(`[${tag}] Failed to reconcile Server Library`, {
+        err: err instanceof Error ? err.message : String(err),
+      });
     }
 
     summary.status = "completed";
     summary.completedAt = new Date().toISOString();
     await persistStatus(tag, summary);
-    console.log(
+    deps.logger.info?.(
       `[${tag}] Done. Imported: ${summary.imported}, Skipped: ${summary.skipped}, Unmatched: ${summary.unmatched}, Failed: ${summary.failed}`,
     );
     return summary;
   } catch (err) {
-    console.error(
-      `[${tag}] Sync run failed:`,
-      err instanceof Error ? err.message : err,
-      err instanceof Error ? err.stack : "",
-    );
+    deps.logger.error(`[${tag}] Sync run failed`, {
+      err: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : "",
+    });
     summary.status = "failed";
     summary.error = err instanceof Error ? err.message : String(err);
     summary.completedAt = new Date().toISOString();
@@ -514,7 +515,7 @@ async function processOne(
     });
 
     if (!anchor) {
-      console.log(`[${tag}] Unmatched: ${scanned.title} (${scanned.year})`);
+      deps.logger.info?.(`[${tag}] Unmatched: ${scanned.title} (${scanned.year})`);
       summary.unmatched++;
       await deps.mediaVersions.upsert(
         toMediaVersionInsert(scanned, {
@@ -543,7 +544,9 @@ async function processOne(
           serverItemId: scanned.serverItemId,
         });
       } catch (err) {
-        console.error(`[${tag}] Failed to link media to user library:`, err);
+        deps.logger.error(`[${tag}] Failed to link media to user library`, {
+          err: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 
@@ -554,7 +557,9 @@ async function processOne(
     try {
       files = await fetchMediaFilesFor(deps.jellyfin, deps.plex, scanned, config);
     } catch (err) {
-      console.error(`[${tag}] Failed to fetch media info for ${scanned.title}:`, err);
+      deps.logger.error(`[${tag}] Failed to fetch media info for ${scanned.title}`, {
+        err: err instanceof Error ? err.message : String(err),
+      });
     }
     const topLevel = pickTopLevelFileInfo(files, scanned.type);
 
@@ -573,16 +578,18 @@ async function processOne(
       try {
         await persistEpisodesFor(deps.mediaVersions, upserted.id, files);
       } catch (err) {
-        console.error(`[${tag}] Failed to persist episodes for ${scanned.title}:`, err);
+        deps.logger.error(`[${tag}] Failed to persist episodes for ${scanned.title}`, {
+          err: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 
     if (anchor.isNewImport) {
-      console.log(`[${tag}] Imported: ${scanned.title} (${scanned.year})`);
+      deps.logger.info?.(`[${tag}] Imported: ${scanned.title} (${scanned.year})`);
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    console.error(`[${tag}] Error processing ${scanned.title}:`, msg);
+    deps.logger.error(`[${tag}] Error processing ${scanned.title}`, { err: msg });
     summary.failed++;
     await deps.mediaVersions.upsert(
       toMediaVersionInsert(scanned, {

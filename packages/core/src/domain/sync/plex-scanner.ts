@@ -9,12 +9,13 @@
 
 import {
   SyncAuthError,
-  isAuthStatus
-  
-  
-  
+  isAuthStatus,
 } from "@canto/core/domain/sync/types";
-import type {ExternalIds, MediaKind, ScannedMediaItem} from "@canto/core/domain/sync/types";
+import type {
+  ExternalIds,
+  MediaKind,
+  ScannedMediaItem,
+} from "@canto/core/domain/sync/types";
 
 export interface PlexLibraryRef {
   /** Plex library section id (the number in `/library/sections/:id`). */
@@ -188,10 +189,10 @@ async function fetchPlexPage(
   offset: number,
   sinceMs: number | undefined,
 ): Promise<PlexMediaContainer> {
-  const typeCode = sinceMs != null ? plexTypeCode(lib.type) : null;
-  const typeQuery = typeCode != null ? `&type=${typeCode}` : "";
+  const typeCode = sinceMs !== undefined ? plexTypeCode(lib.type) : null;
+  const typeQuery = typeCode !== null ? `&type=${typeCode}` : "";
   const sinceQuery =
-    sinceMs != null
+    sinceMs !== undefined
       ? `&updatedAt%3E%3D${Math.floor(sinceMs / 1000)}`
       : "";
   const res = await fetch(
@@ -263,7 +264,7 @@ async function scanLibrary(
     return await paginateLibrary(url, token, lib, sinceMs);
   } catch (err) {
     if (
-      sinceMs != null
+      sinceMs !== undefined
       && err instanceof Error
       && err.message.includes("HTTP 400")
     ) {

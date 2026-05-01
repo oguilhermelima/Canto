@@ -9,13 +9,13 @@
 
 import {
   SyncAuthError,
-  isAuthStatus
-  
-  
-  
-  
+  isAuthStatus,
 } from "@canto/core/domain/sync/types";
-import type {ExternalIds, MediaKind, ScannedMediaItem, ScannedPlayback} from "@canto/core/domain/sync/types";
+import type {
+  ExternalIds,
+  ScannedMediaItem,
+  ScannedPlayback,
+} from "@canto/core/domain/sync/types";
 
 export interface JellyfinLibraryRef {
   /** Jellyfin library (ParentId) */
@@ -93,9 +93,9 @@ export function parseJellyfinProviderIds(
   if (!raw) return {};
   const ids: ExternalIds = {};
   const tmdb = parseIntSafe(raw.Tmdb);
-  if (tmdb != null) ids.tmdb = tmdb;
+  if (tmdb !== undefined) ids.tmdb = tmdb;
   const tvdb = parseIntSafe(raw.Tvdb);
-  if (tvdb != null) ids.tvdb = tvdb;
+  if (tvdb !== undefined) ids.tvdb = tvdb;
   if (raw.Imdb) ids.imdb = raw.Imdb;
   return ids;
 }
@@ -167,7 +167,7 @@ const MAPPERS: Record<JellyfinItemType, JellyfinMapper> = {
     const hasPlayback =
       playback.played ||
       (playback.positionSeconds ?? 0) > 0 ||
-      playback.lastPlayedAt != null;
+      playback.lastPlayedAt !== undefined;
     if (!hasPlayback) return null;
 
     const providerIds = parseJellyfinProviderIds(
@@ -234,7 +234,7 @@ async function fetchItemsPage(
     Limit: String(PAGE_SIZE),
   });
   if (jellyfinUserId) query.set("UserId", jellyfinUserId);
-  if (sinceMs != null) {
+  if (sinceMs !== undefined) {
     query.set("MinDateModified", new Date(sinceMs).toISOString());
   }
 

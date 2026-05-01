@@ -105,15 +105,17 @@ async function pushJellyfin(
   }
 
   let itemId = await resolveJellyfinItemIdFromVersions(deps, mediaId);
-  if (!itemId) {
-    itemId = await deps.jellyfinServer.findItemIdByProvider(creds.url, conn.token, {
+  itemId ??= await deps.jellyfinServer.findItemIdByProvider(
+    creds.url,
+    conn.token,
+    {
       title: mediaRow.title,
       externalId: mediaRow.externalId,
       provider: mediaRow.provider,
       type: mediaRow.type === "show" ? "show" : "movie",
       externalUserId: conn.externalUserId,
-    });
-  }
+    },
+  );
   if (!itemId) {
     console.warn(
       `[push-watch-state] No Jellyfin item found for media ${mediaId} (tmdb ${mediaRow.externalId}) on connection ${conn.id}`,

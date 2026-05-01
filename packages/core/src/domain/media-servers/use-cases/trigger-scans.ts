@@ -7,6 +7,7 @@ import type { FoldersRepositoryPort } from "@canto/core/domain/file-organization
 import type { JellyfinAdapterPort } from "@canto/core/domain/media-servers/ports/jellyfin-adapter.port";
 import type { PlexAdapterPort } from "@canto/core/domain/media-servers/ports/plex-adapter.port";
 import type { ServerCredentialsPort } from "@canto/core/domain/media-servers/ports/server-credentials.port";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 
 export interface ImportedMedia {
   id: string;
@@ -23,15 +24,14 @@ export interface TriggerMediaServerScansDeps {
   credentials: ServerCredentialsPort;
   plex: PlexAdapterPort;
   jellyfin: JellyfinAdapterPort;
+  logger: LoggerPort;
 }
 
 const AUTO_MERGE_MAX_ATTEMPTS = 20;
 const AUTO_MERGE_DELAY_MS = 3000;
 
 async function isAutoMergeEnabled(): Promise<boolean> {
-  const value = await getSetting("autoMergeVersions");
-  if (value === undefined || value === null) return true;
-  return value === true;
+  return (await getSetting("autoMergeVersions")) ?? true;
 }
 
 /**
@@ -41,6 +41,7 @@ async function isAutoMergeEnabled(): Promise<boolean> {
  */
 async function tryJellyfinAutoMergeForMedia(
   jellyfin: JellyfinAdapterPort,
+  logger: LoggerPort,
   url: string,
   apiKey: string,
   media: ImportedMedia,
@@ -53,7 +54,7 @@ async function tryJellyfinAutoMergeForMedia(
 
     if (items.length >= media.mediaFileCount) {
       if (items.length >= 2) {
-        console.log(
+        logger.info?.(
           `[auto-merge] Merging ${items.length} Jellyfin items for "${media.title}"`,
         );
         await jellyfin.mergeVersions(url, apiKey, items.map((it) => it.id));
@@ -61,7 +62,7 @@ async function tryJellyfinAutoMergeForMedia(
       return;
     }
   }
-  console.warn(
+  logger.warn(
     `[auto-merge] Timed out waiting for Jellyfin to index "${media.title}" — expected ${media.mediaFileCount}, merge skipped`,
   );
 }
@@ -82,34 +83,36 @@ export async function triggerMediaServerScans(
         await deps.jellyfin.triggerScan(
           jellyfinCreds.url,
           jellyfinCreds.apiKey,
-          link.serverLibraryId ?? undefined,
+          link.serverLibraryId,
         );
-        console.log(
-          link.serverLibraryId
-            ? `[import-torrents] Triggered Jellyfin scan for library ${link.serverLibraryId}`
-            : "[import-torrents] Triggered Jellyfin full library scan",
+        deps.logger.info?.(
+          `[import-torrents] Triggered Jellyfin scan for library ${link.serverLibraryId}`,
         );
       } catch (err) {
-        console.warn("[import-torrents] Failed to trigger Jellyfin scan:", err);
+        deps.logger.warn("[import-torrents] Failed to trigger Jellyfin scan", {
+          err: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 
     if (link.serverType === "plex" && plexCreds) {
       try {
-        await deps.plex.scanLibrary(
-          plexCreds.url,
-          plexCreds.token,
-          link.serverLibraryId ? [link.serverLibraryId] : undefined,
+        await deps.plex.scanLibrary(plexCreds.url, plexCreds.token, [
+          link.serverLibraryId,
+        ]);
+        deps.logger.info?.(
+          `[import-torrents] Triggered Plex scan for section ${link.serverLibraryId}`,
         );
-        console.log(`[import-torrents] Triggered Plex scan for section ${link.serverLibraryId}`);
       } catch (err) {
-        console.warn("[import-torrents] Failed to trigger Plex scan:", err);
+        deps.logger.warn("[import-torrents] Failed to trigger Plex scan", {
+          err: err instanceof Error ? err.message : String(err),
+        });
       }
     }
   }
 
-  // Post-scan auto-merge for Jellyfin multi-version movies.
-  // Plex detects multi-versions automatically from folder layout — nothing to do.
+  // Post-scan auto-merge for Jellyfin multi-version movies. Plex detects
+  // multi-versions automatically from folder layout, so no equivalent step.
   if (jellyfinCreds && importedMedias.length > 0) {
     const autoMerge = await isAutoMergeEnabled();
     if (autoMerge) {
@@ -119,14 +122,14 @@ export async function triggerMediaServerScans(
       for (const media of candidates) {
         await tryJellyfinAutoMergeForMedia(
           deps.jellyfin,
+          deps.logger,
           jellyfinCreds.url,
           jellyfinCreds.apiKey,
           media,
         ).catch((err) =>
-          console.warn(
-            `[auto-merge] Failed for "${media.title}":`,
-            err instanceof Error ? err.message : err,
-          ),
+          deps.logger.warn(`[auto-merge] Failed for "${media.title}"`, {
+            err: err instanceof Error ? err.message : String(err),
+          }),
         );
       }
     }

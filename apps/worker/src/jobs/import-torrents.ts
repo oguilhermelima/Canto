@@ -193,6 +193,7 @@ export async function handleImportTorrents(): Promise<void> {
         credentials: makeServerCredentials(),
         plex: makePlexAdapter(),
         jellyfin: makeJellyfinAdapter(),
+        logger,
       },
       importedMedias,
     );
