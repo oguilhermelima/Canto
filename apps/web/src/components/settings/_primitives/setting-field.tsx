@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState  } from "react";
+import { useState  } from "react";
 import type {ReactNode} from "react";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -74,16 +74,19 @@ export function SettingField<K extends SettingKey>({
   const [value, setValue] = useState<unknown>(undefined);
   const [dirty, setDirty] = useState(false);
 
-  useEffect(() => {
+  // React docs: adjust state during render rather than syncing in an effect.
+  const [prevStoredValue, setPrevStoredValue] = useState(storedValue);
+  const [prevDefault, setPrevDefault] = useState(def.default);
+  if (prevStoredValue !== storedValue || prevDefault !== def.default) {
+    setPrevStoredValue(storedValue);
+    setPrevDefault(def.default);
     if (storedValue !== undefined && storedValue !== null) {
       setValue(storedValue);
       setDirty(false);
-      return;
-    }
-    if (def.default !== undefined) {
+    } else if (def.default !== undefined) {
       setValue(def.default);
     }
-  }, [storedValue, def.default]);
+  }
 
   const persist = (next: unknown): void => {
     setMany.mutate(
