@@ -62,25 +62,23 @@ export const listItemsRouter = createTRPCRouter({
   moveItems: protectedProcedure
     .input(moveListItemsInput)
     .mutation(({ ctx, input }) => {
-      const repo = makeListsRepository(ctx.db);
-      return moveItemsBetweenLists(
-        { repo },
-        input,
-        ctx.session.user.id,
-        ctx.session.user.role,
-      );
+      const deps = {
+        repo: makeListsRepository(ctx.db),
+        recs: makeRecommendationsRepository(ctx.db),
+        userMedia: makeUserMediaRepository(ctx.db),
+      };
+      return moveItemsBetweenLists(deps, input, ctx.session.user.id, ctx.session.user.role);
     }),
 
   restoreItems: protectedProcedure
     .input(restoreListItemsInput)
     .mutation(({ ctx, input }) => {
-      const repo = makeListsRepository(ctx.db);
-      return restoreItemsToList(
-        { repo },
-        input,
-        ctx.session.user.id,
-        ctx.session.user.role,
-      );
+      const deps = {
+        repo: makeListsRepository(ctx.db),
+        recs: makeRecommendationsRepository(ctx.db),
+        userMedia: makeUserMediaRepository(ctx.db),
+      };
+      return restoreItemsToList(deps, input, ctx.session.user.id, ctx.session.user.role);
     }),
 
   isInLists: protectedProcedure

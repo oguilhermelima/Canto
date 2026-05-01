@@ -169,8 +169,8 @@ function resolveEpisodesToLog(
   releasedEpisodes: MediaWithSeasons["seasons"][number]["episodes"],
   now: Date,
 ): Array<string | null> {
-  const allEpisodeIds = new Set(allEpisodes.map((e) => e.id));
-  const releasedEpisodeIds = new Set(releasedEpisodes.map((e) => e.id));
+  const allEpisodeIds = new Set<string>(allEpisodes.map((e) => e.id));
+  const releasedEpisodeIds = new Set<string>(releasedEpisodes.map((e) => e.id));
 
   if (input.selectedEpisodeIds?.length) {
     if (media.type !== "show") {
@@ -247,7 +247,7 @@ async function persistWatchHistory(
 ): Promise<void> {
   const source = sourceForMode(input.watchedAtMode);
   const mediaReleaseDate = parseDateLike(media.releaseDate);
-  const episodeById = new Map(
+  const episodeById = new Map<string, MediaWithSeasons["seasons"][number]["episodes"][number]>(
     media.seasons.flatMap((s) => s.episodes.map((e) => [e.id, e] as const)),
   );
 

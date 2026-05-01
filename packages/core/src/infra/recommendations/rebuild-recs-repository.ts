@@ -1,5 +1,5 @@
 import { alias } from "drizzle-orm/pg-core";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import {
   list,
@@ -52,7 +52,7 @@ export async function findRecCandidatesForSeed(
     eq(recLocEn.language, EN),
   )!;
 
-  return db
+  const rows = await db
     .select({
       mediaId: mediaRecommendation.mediaId,
       externalId: media.externalId,
@@ -84,7 +84,8 @@ export async function findRecCandidatesForSeed(
       ),
     )
     .orderBy(getWeightedScoreOrder())
-    .limit(limit) as RecCandidate[];
+    .limit(limit);
+  return rows;
 }
 
 /**
@@ -111,7 +112,7 @@ export async function findUserListItemsForRecs(
   db: Database,
   userId: string,
 ): Promise<Array<{ mediaId: string; genres: string[] | null; listType: string }>> {
-  return db
+  const rows = await db
     .select({
       mediaId: listItem.mediaId,
       genres: media.genres,
@@ -127,9 +128,6 @@ export async function findUserListItemsForRecs(
         isNull(listItem.deletedAt),
       ),
     )
-    .orderBy(desc(listItem.addedAt)) as Array<{
-      mediaId: string;
-      genres: string[] | null;
-      listType: string;
-    }>;
+    .orderBy(desc(listItem.addedAt));
+  return rows;
 }

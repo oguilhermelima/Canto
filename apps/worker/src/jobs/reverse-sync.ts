@@ -32,6 +32,7 @@ import {
 } from "@canto/core/infra/media/media-version-repository";
 import { reconcileMediaInLibrary } from "@canto/core/infra/media/media-repository";
 import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/user-media/use-cases/promote-user-media-state-from-playback";
 import { pushPlaybackPositionToServers } from "@canto/core/domain/user-media/use-cases/push-playback-position";
 import {
@@ -493,11 +494,12 @@ export async function runReverseSync(options: ReverseSyncOptions = {}): Promise<
     // Independent calls — fan out with bounded concurrency so a user with
     // 1000 watched items doesn't issue 1000 sequential awaits.
     const userMediaRepo = makeUserMediaRepository(db);
+    const mediaRepo = makeMediaRepository(db);
     await runWithConcurrency(
       [...touchedMediaIds],
       10,
       (mediaId) =>
-        promoteUserMediaStateFromPlayback(db, { repo: userMediaRepo }, {
+        promoteUserMediaStateFromPlayback({ repo: userMediaRepo, mediaRepo }, {
           userId: conn.userId,
           mediaId,
         }),
