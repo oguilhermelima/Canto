@@ -49,8 +49,59 @@ These apply across every scope.
 4. **Zod lives in `packages/validators`** — every tRPC input is a named exported schema, and types flow via `z.infer<>`.
 5. **Business logic lives in `packages/core`** — routers, components, and workers are orchestration glue.
 6. **No `useEffect` for data fetching** — use tRPC `useQuery` / `useMutation` / `useInfiniteQuery`. Invalidate via `utils.<router>.<procedure>.invalidate()`.
-7. **File naming** — kebab-case files, PascalCase components.
-8. **No framework imports in `packages/core/domain/`** — no `@trpc/server`, no Next.js, no Expo, no React, no `bullmq`, no `ioredis`.
-9. **Empty/error/end states are space-themed** — use `StateMessage` from `@canto/ui` with a preset from `@canto/ui/presets/space-states`.
-10. **No opacity modifiers on text colors** — `text-foreground/70`, `text-muted-foreground/60` are forbidden. Text stays full-opacity for readability. Opacity on **borders**, **buttons**, and **backgrounds** is fine and expected for visual polish.
-11. **Use `TabBar` from `@canto/ui`** — any horizontal toggle of 2+ options uses the shared primitive.
+7. **No `useEffect` for state sync** — use the "adjust state during render" pattern (`useState` + `if (prev !== current) setX(current)`) or `useSyncExternalStore`.
+8. **File naming** — kebab-case files, PascalCase components.
+9. **No framework imports in `packages/core/domain/`** — no `@trpc/server`, no Next.js, no Expo, no React, no `bullmq`, no `ioredis`.
+10. **Empty/error/end states are space-themed** — use `StateMessage` from `@canto/ui` with a preset from `@canto/ui/presets/space-states`.
+11. **No opacity modifiers on text colors** — `text-foreground/70`, `text-muted-foreground/60` are forbidden. Text stays full-opacity for readability. Opacity on **borders**, **buttons**, and **backgrounds** is fine and expected for visual polish.
+12. **Use `TabBar` from `@canto/ui`** — any horizontal toggle of 2+ options uses the shared primitive.
+13. **Imports use `@canto/<pkg>/<full-path>` everywhere.** Zero `./` or `../`. Move-safe + consistent.
+
+## Ports map (per context)
+
+`packages/core` is hexagonal. Each context owns its repo port; cross-cutting concerns live in `domain/shared/ports/`.
+
+| Context | Ports |
+|---|---|
+| `notifications` | `NotificationsRepositoryPort` |
+| `user` | `UserRepositoryPort` |
+| `lists` | `ListsRepositoryPort` (covers list + listItem + listMember + listInvitation tables) |
+| `recommendations` | `RecommendationsRepositoryPort`, `RecommendationsCatalogPort` |
+| `trakt` | `TraktRepositoryPort`, `TraktApiPort`, `TraktAuthPort` |
+| `media-servers` | `UserConnectionRepositoryPort`, `PlexAdapterPort`, `JellyfinAdapterPort`, `MediaServerPort` (read+write), `ServerCredentialsPort`, `MediaVersionRepositoryPort` |
+| `user-media` | `UserMediaRepositoryPort`, `LibraryFeedRepositoryPort`, `MediaServerPushPort` |
+| `torrents` | `TorrentsRepositoryPort` |
+| `file-organization` | `FoldersRepositoryPort` |
+| `media` | `MediaRepositoryPort`, `MediaLocalizationRepositoryPort`, `MediaAspectStateRepositoryPort`, `MediaContentRatingRepositoryPort`, `MediaExtrasRepositoryPort` |
+| `shared` | `LoggerPort`, `JobDispatcherPort`, `CachePort`, `MediaProviderPort`, `FileSystemPort`, `DownloadClientPort` |
+
+## Composition root
+
+`packages/core/src/composition/core-deps.ts` exports `buildCoreDeps(db): CoreDeps`. Worker entries + tRPC routers call it instead of constructing each adapter manually:
+
+```ts
+const deps = buildCoreDeps(ctx.db);
+await myUseCase(input, deps);
+```
+
+`PersistDeps` (media persist orchestration) is a separate factory at `composition/persist-deps.ts` — used by media-context flows that need persist + media + localization wired together.
+
+## Commit message style
+
+- Conventional commits in English: `feat:`, `fix:`, `refactor:`, `chore:`, `docs:`
+- Subject < 60 chars when possible. Format: `<type>(<scope>): <verb> <object>`
+- Atomic — one logical change per commit
+- No co-author tags
+- No emojis
+- **No wave/phase/round identifiers** in subject or body — refactor history lives in git log + PR descriptions
+
+## Anti-bad-smells (canonical reference)
+
+For the full list (16 antipatterns + SOLID checklist), see `.claude/handbook/refactor-history.md` (archive of the refactor doc). Highlights:
+
+- No defensive null/undefined checks where TS already guarantees non-null.
+- No `==` / `!=` — use strict equality with explicit `=== null || === undefined` if both must be checked.
+- No `!` non-null assertion — use guard clauses, optional chains, or `find()` with narrowing.
+- No `||` where `??` is correct (only diverge on `""` / `0` / `false`).
+- No comments narrating refactor history (`// was: X`, `// removed Y`, phase/wave references) — commit messages own that.
+- No premature DRY — wait for 4-5 sites with same semantics before extracting.
