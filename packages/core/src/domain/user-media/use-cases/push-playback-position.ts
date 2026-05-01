@@ -15,22 +15,28 @@
 /*       does NOT retrigger a push on the next sync cycle.                    */
 /* -------------------------------------------------------------------------- */
 
-import { getSetting } from "@canto/db/settings";
-import type { Database } from "@canto/db/client";
-import {
-  findEpisodeNumbersById,
-  findMediaById,
-} from "@canto/core/infra/media/media-repository";
-import { findMediaVersionsWithEpisodes } from "@canto/core/infra/media/media-version-repository";
-import { findUserConnectionsByUserId } from "@canto/core/infra/media-servers/user-connection-repository";
-import { setJellyfinPlaybackPosition } from "@canto/core/infra/media-servers/jellyfin.adapter";
-import { setPlexPlaybackPosition } from "@canto/core/infra/media-servers/plex.adapter";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { MediaVersionRepositoryPort } from "@canto/core/domain/media-servers/ports/media-version-repository.port";
+import type { ServerCredentialsPort } from "@canto/core/domain/media-servers/ports/server-credentials.port";
+import type { UserConnectionRepositoryPort } from "@canto/core/domain/media-servers/ports/user-connection-repository.port";
+import type {
+  MediaVersionEpisodeRow,
+  MediaVersionRow,
+} from "@canto/core/domain/media-servers/types/media-version";
+import type { UserConnection } from "@canto/core/domain/media-servers/types/user-connection";
+import type { MediaServerPort } from "@canto/core/domain/shared/ports/media-server.port";
 import type { ServerSource } from "@canto/core/domain/sync/types";
 
-type Conn = Awaited<ReturnType<typeof findUserConnectionsByUserId>>[number];
-type VersionWithEpisodes = Awaited<
-  ReturnType<typeof findMediaVersionsWithEpisodes>
->[number];
+type VersionWithEpisodes = MediaVersionRow & { episodes: MediaVersionEpisodeRow[] };
+
+export interface PushPlaybackPositionDeps {
+  media: MediaRepositoryPort;
+  mediaVersions: MediaVersionRepositoryPort;
+  userConnections: UserConnectionRepositoryPort;
+  credentials: ServerCredentialsPort;
+  jellyfinServer: MediaServerPort;
+  plexServer: MediaServerPort;
+}
 
 function logError(scope: string, userId: string, err: unknown): void {
   console.error(
@@ -38,71 +44,6 @@ function logError(scope: string, userId: string, err: unknown): void {
     err instanceof Error ? err.message : err,
   );
 }
-
-export async function pushPlaybackPositionToServers(
-  db: Database,
-  userId: string,
-  mediaId: string,
-  episodeId: string | null | undefined,
-  positionSeconds: number,
-  isCompleted: boolean,
-  excludeSource: ServerSource | null,
-): Promise<void> {
-  const mediaRow = await findMediaById(db, mediaId);
-  if (!mediaRow) return;
-
-  const connections = await findUserConnectionsByUserId(db, userId);
-  const enabled = connections.filter((c) => c.enabled && c.token);
-  if (enabled.length === 0) return;
-
-  let episodeNumbers: { seasonNumber: number; episodeNumber: number } | null =
-    null;
-  if (episodeId) {
-    episodeNumbers = await findEpisodeNumbersById(db, episodeId);
-    if (!episodeNumbers) {
-      console.warn(
-        `[push-playback-position] Could not resolve episode numbers for ${episodeId}`,
-      );
-      return;
-    }
-  }
-
-  const versions = await findMediaVersionsWithEpisodes(db, mediaId);
-
-  const jellyfinConns = enabled.filter(
-    (c) => c.provider === "jellyfin" && excludeSource !== "jellyfin",
-  );
-  const plexConns = enabled.filter(
-    (c) => c.provider === "plex" && excludeSource !== "plex",
-  );
-
-  await Promise.all([
-    ...jellyfinConns.map((conn) =>
-      pushJellyfin(
-        mediaId,
-        versions,
-        episodeNumbers,
-        conn,
-        positionSeconds,
-        isCompleted,
-      ).catch((err) => logError(`jellyfin ${conn.id}`, userId, err)),
-    ),
-    ...plexConns.map((conn) =>
-      pushPlex(
-        mediaId,
-        versions,
-        episodeNumbers,
-        conn,
-        positionSeconds,
-        isCompleted,
-      ).catch((err) => logError(`plex ${conn.id}`, userId, err)),
-    ),
-  ]);
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Resolvers                                                                  */
-/* -------------------------------------------------------------------------- */
 
 function resolveServerItemId(
   versions: VersionWithEpisodes[],
@@ -113,11 +54,9 @@ function resolveServerItemId(
   if (sourceVersions.length === 0) return null;
 
   if (!episodeNumbers) {
-    // Movie: media_version.serverItemId is the item itself.
     return sourceVersions[0]?.serverItemId ?? null;
   }
 
-  // Show: look for the specific episode under any version on this source.
   for (const version of sourceVersions) {
     const match = version.episodes.find(
       (ep) =>
@@ -130,32 +69,28 @@ function resolveServerItemId(
   return null;
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Jellyfin                                                                   */
-/* -------------------------------------------------------------------------- */
-
-async function pushJellyfin(
-  mediaId: string,
+async function pushOne(
+  source: ServerSource,
+  port: MediaServerPort,
+  url: string,
+  conn: UserConnection,
   versions: VersionWithEpisodes[],
   episodeNumbers: { seasonNumber: number; episodeNumber: number } | null,
-  conn: Conn,
   positionSeconds: number,
   isCompleted: boolean,
+  mediaId: string,
 ): Promise<void> {
   if (!conn.token) return;
-  if (!conn.externalUserId) {
+  if (source === "jellyfin" && !conn.externalUserId) {
     console.warn(
       `[push-playback-position] Jellyfin connection ${conn.id} missing externalUserId, skipping`,
     );
     return;
   }
-  const jellyfinUrl = await getSetting("jellyfin.url");
-  if (!jellyfinUrl) return;
-
-  const itemId = resolveServerItemId(versions, "jellyfin", episodeNumbers);
+  const itemId = resolveServerItemId(versions, source, episodeNumbers);
   if (!itemId) {
     console.warn(
-      `[push-playback-position] No Jellyfin item resolved for media ${mediaId}${
+      `[push-playback-position] No ${source} item resolved for media ${mediaId}${
         episodeNumbers
           ? ` S${episodeNumbers.seasonNumber}E${episodeNumbers.episodeNumber}`
           : ""
@@ -163,50 +98,83 @@ async function pushJellyfin(
     );
     return;
   }
-
-  await setJellyfinPlaybackPosition(
-    jellyfinUrl,
-    conn.token,
-    conn.externalUserId,
+  await port.setPlaybackPosition(url, conn.token, {
     itemId,
+    externalUserId: conn.externalUserId,
     positionSeconds,
     isCompleted,
-  );
+  });
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Plex                                                                       */
-/* -------------------------------------------------------------------------- */
-
-async function pushPlex(
+export async function pushPlaybackPositionToServers(
+  deps: PushPlaybackPositionDeps,
+  userId: string,
   mediaId: string,
-  versions: VersionWithEpisodes[],
-  episodeNumbers: { seasonNumber: number; episodeNumber: number } | null,
-  conn: Conn,
+  episodeId: string | null | undefined,
   positionSeconds: number,
   isCompleted: boolean,
+  excludeSource: ServerSource | null,
 ): Promise<void> {
-  if (!conn.token) return;
-  const plexUrl = await getSetting("plex.url");
-  if (!plexUrl) return;
+  const mediaRow = await deps.media.findById(mediaId);
+  if (!mediaRow) return;
 
-  const ratingKey = resolveServerItemId(versions, "plex", episodeNumbers);
-  if (!ratingKey) {
-    console.warn(
-      `[push-playback-position] No Plex ratingKey resolved for media ${mediaId}${
-        episodeNumbers
-          ? ` S${episodeNumbers.seasonNumber}E${episodeNumbers.episodeNumber}`
-          : ""
-      } on connection ${conn.id}`,
-    );
-    return;
+  const connections = await deps.userConnections.findByUserId(userId);
+  const enabled = connections.filter((c) => c.enabled && c.token);
+  if (enabled.length === 0) return;
+
+  let episodeNumbers: { seasonNumber: number; episodeNumber: number } | null = null;
+  if (episodeId) {
+    episodeNumbers = await deps.media.findEpisodeNumbersById(episodeId);
+    if (!episodeNumbers) {
+      console.warn(
+        `[push-playback-position] Could not resolve episode numbers for ${episodeId}`,
+      );
+      return;
+    }
   }
 
-  await setPlexPlaybackPosition(
-    plexUrl,
-    conn.token,
-    ratingKey,
-    positionSeconds,
-    isCompleted,
+  const versions = await deps.mediaVersions.findWithEpisodesByMediaId(mediaId);
+
+  const jellyfinConns = enabled.filter(
+    (c) => c.provider === "jellyfin" && excludeSource !== "jellyfin",
   );
+  const plexConns = enabled.filter(
+    (c) => c.provider === "plex" && excludeSource !== "plex",
+  );
+
+  const jellyfinCreds = jellyfinConns.length > 0 ? await deps.credentials.getJellyfin() : null;
+  const plexCreds = plexConns.length > 0 ? await deps.credentials.getPlex() : null;
+
+  await Promise.all([
+    ...(jellyfinCreds
+      ? jellyfinConns.map((conn) =>
+          pushOne(
+            "jellyfin",
+            deps.jellyfinServer,
+            jellyfinCreds.url,
+            conn,
+            versions,
+            episodeNumbers,
+            positionSeconds,
+            isCompleted,
+            mediaId,
+          ).catch((err) => logError(`jellyfin ${conn.id}`, userId, err)),
+        )
+      : []),
+    ...(plexCreds
+      ? plexConns.map((conn) =>
+          pushOne(
+            "plex",
+            deps.plexServer,
+            plexCreds.url,
+            conn,
+            versions,
+            episodeNumbers,
+            positionSeconds,
+            isCompleted,
+            mediaId,
+          ).catch((err) => logError(`plex ${conn.id}`, userId, err)),
+        )
+      : []),
+  ]);
 }

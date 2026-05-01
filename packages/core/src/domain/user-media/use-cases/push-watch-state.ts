@@ -8,22 +8,30 @@
 /*  server so one bad server never blocks the others or the caller.          */
 /* -------------------------------------------------------------------------- */
 
-import { getSetting } from "@canto/db/settings";
-import type { Database } from "@canto/db/client";
-import { findMediaById } from "@canto/core/infra/media/media-repository";
-import { findMediaVersionsByMediaId } from "@canto/core/infra/media/media-version-repository";
-import { findUserConnectionsByUserId } from "@canto/core/infra/media-servers/user-connection-repository";
-import { findMediaLocalized } from "@canto/core/infra/media/media-localized-repository";
-import {
-  findJellyfinItemIdByProviderForUser,
-  markJellyfinItemPlayed,
-  markJellyfinItemUnplayed,
-} from "@canto/core/infra/media-servers/jellyfin.adapter";
-import {
-  findPlexItemIdByProviderId,
-  markPlexItemUnwatched,
-  markPlexItemWatched,
-} from "@canto/core/infra/media-servers/plex.adapter";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { MediaVersionRepositoryPort } from "@canto/core/domain/media-servers/ports/media-version-repository.port";
+import type { ServerCredentialsPort } from "@canto/core/domain/media-servers/ports/server-credentials.port";
+import type { UserConnectionRepositoryPort } from "@canto/core/domain/media-servers/ports/user-connection-repository.port";
+import type { UserConnection } from "@canto/core/domain/media-servers/types/user-connection";
+import type { MediaServerPort } from "@canto/core/domain/shared/ports/media-server.port";
+
+export interface PushWatchStateDeps {
+  media: MediaRepositoryPort;
+  mediaVersions: MediaVersionRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
+  userConnections: UserConnectionRepositoryPort;
+  credentials: ServerCredentialsPort;
+  jellyfinServer: MediaServerPort;
+  plexServer: MediaServerPort;
+}
+
+interface MediaWithTitle {
+  title: string;
+  provider: string;
+  externalId: number;
+  type: string;
+}
 
 function logError(scope: string, userId: string, err: unknown): void {
   console.error(
@@ -33,58 +41,56 @@ function logError(scope: string, userId: string, err: unknown): void {
 }
 
 export async function pushWatchStateToServers(
-  db: Database,
+  deps: PushWatchStateDeps,
   userId: string,
   mediaId: string,
   watched: boolean,
 ): Promise<void> {
-  const mediaRow = await findMediaById(db, mediaId);
+  const mediaRow = await deps.media.findById(mediaId);
   if (!mediaRow) return;
 
-  // Title for the Jellyfin/Plex search fallback comes from en-US localization.
-  const enLoc = await findMediaLocalized(db, mediaRow.id, "en-US");
-  const mediaWithTitle = {
+  const enLoc = await deps.localization.findOne(mediaRow.id, "en-US");
+  const mediaWithTitle: MediaWithTitle = {
     title: enLoc?.title ?? "",
     provider: mediaRow.provider,
     externalId: mediaRow.externalId,
     type: mediaRow.type,
   };
 
-  const connections = await findUserConnectionsByUserId(db, userId);
+  const connections = await deps.userConnections.findByUserId(userId);
   const enabled = connections.filter((c) => c.enabled && c.token);
   if (enabled.length === 0) return;
 
   const jellyfinConns = enabled.filter((c) => c.provider === "jellyfin");
   const plexConns = enabled.filter((c) => c.provider === "plex");
 
+  const jellyfinCreds = jellyfinConns.length > 0 ? await deps.credentials.getJellyfin() : null;
+  const plexCreds = plexConns.length > 0 ? await deps.credentials.getPlex() : null;
+
   await Promise.all([
-    ...jellyfinConns.map((conn) =>
-      pushJellyfin(db, mediaId, mediaWithTitle, conn, watched).catch((err) =>
-        logError(`jellyfin ${conn.id}`, userId, err),
-      ),
-    ),
-    ...plexConns.map((conn) =>
-      pushPlex(db, mediaId, mediaWithTitle, conn, watched).catch((err) =>
-        logError(`plex ${conn.id}`, userId, err),
-      ),
-    ),
+    ...(jellyfinCreds
+      ? jellyfinConns.map((conn) =>
+          pushJellyfin(deps, jellyfinCreds, conn, mediaId, mediaWithTitle, watched).catch(
+            (err) => logError(`jellyfin ${conn.id}`, userId, err),
+          ),
+        )
+      : []),
+    ...(plexCreds
+      ? plexConns.map((conn) =>
+          pushPlex(deps, plexCreds, conn, mediaId, mediaWithTitle, watched).catch((err) =>
+            logError(`plex ${conn.id}`, userId, err),
+          ),
+        )
+      : []),
   ]);
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Jellyfin                                                                   */
-/* -------------------------------------------------------------------------- */
-
 async function pushJellyfin(
-  db: Database,
+  deps: PushWatchStateDeps,
+  creds: { url: string; apiKey: string },
+  conn: UserConnection,
   mediaId: string,
-  mediaRow: { title: string; provider: string; externalId: number },
-  conn: {
-    id: string;
-    userId: string;
-    token: string | null;
-    externalUserId: string | null;
-  },
+  mediaRow: MediaWithTitle,
   watched: boolean,
 ): Promise<void> {
   if (!conn.token) return;
@@ -94,24 +100,19 @@ async function pushJellyfin(
     );
     return;
   }
-  const jellyfinUrl = await getSetting("jellyfin.url");
-  if (!jellyfinUrl) return;
   if (mediaRow.provider !== "tmdb" && mediaRow.provider !== "tvdb") {
-    // We can only resolve items on the server when the Canto media row has
-    // a tmdb or tvdb id — those are the provider keys Jellyfin exposes.
     return;
   }
 
-  let itemId = await resolveJellyfinItemIdFromVersions(db, mediaId);
+  let itemId = await resolveJellyfinItemIdFromVersions(deps, mediaId);
   if (!itemId) {
-    itemId = await findJellyfinItemIdByProviderForUser(
-      jellyfinUrl,
-      conn.token,
-      conn.externalUserId,
-      mediaRow.title,
-      mediaRow.externalId,
-      mediaRow.provider,
-    );
+    itemId = await deps.jellyfinServer.findItemIdByProvider(creds.url, conn.token, {
+      title: mediaRow.title,
+      externalId: mediaRow.externalId,
+      provider: mediaRow.provider,
+      type: mediaRow.type === "show" ? "show" : "movie",
+      externalUserId: conn.externalUserId,
+    });
   }
   if (!itemId) {
     console.warn(
@@ -121,57 +122,53 @@ async function pushJellyfin(
   }
 
   if (watched) {
-    await markJellyfinItemPlayed(jellyfinUrl, conn.token, conn.externalUserId, itemId);
+    await deps.jellyfinServer.markPlayed(creds.url, conn.token, {
+      itemId,
+      externalUserId: conn.externalUserId,
+    });
   } else {
-    await markJellyfinItemUnplayed(jellyfinUrl, conn.token, conn.externalUserId, itemId);
+    await deps.jellyfinServer.markUnplayed(creds.url, conn.token, {
+      itemId,
+      externalUserId: conn.externalUserId,
+    });
   }
 }
 
 async function resolveJellyfinItemIdFromVersions(
-  db: Database,
+  deps: PushWatchStateDeps,
   mediaId: string,
 ): Promise<string | null> {
-  const versions = await findMediaVersionsByMediaId(db, mediaId);
+  const versions = await deps.mediaVersions.findByMediaId(mediaId);
   const jellyfinVersion = versions.find((v) => v.source === "jellyfin");
   return jellyfinVersion?.serverItemId ?? null;
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Plex                                                                       */
-/* -------------------------------------------------------------------------- */
-
 async function pushPlex(
-  db: Database,
+  deps: PushWatchStateDeps,
+  creds: { url: string; token: string },
+  conn: UserConnection,
   mediaId: string,
-  mediaRow: { title: string; provider: string; externalId: number; type: string },
-  conn: { id: string; token: string | null },
+  mediaRow: MediaWithTitle,
   watched: boolean,
 ): Promise<void> {
   if (!conn.token) return;
-  const plexUrl = await getSetting("plex.url");
-  if (!plexUrl) return;
 
-  // Prefer the serverItemId already persisted by reverse-sync.
-  const versions = await findMediaVersionsByMediaId(db, mediaId);
+  const versions = await deps.mediaVersions.findByMediaId(mediaId);
   const plexVersion = versions.find((v) => v.source === "plex");
   let ratingKey: string | null = plexVersion?.serverItemId ?? null;
 
-  // Fallback: resolve against the live Plex API by provider id. Handles the
-  // case where the user just linked Plex (or added the item) and the next
-  // reverse-sync pass hasn't populated media_version yet.
+  // Fallback: resolve against the live Plex API by provider id when reverse
+  // sync hasn't observed the media yet (fresh link or new item).
   if (
     !ratingKey &&
     (mediaRow.provider === "tmdb" || mediaRow.provider === "tvdb")
   ) {
-    const plexType = mediaRow.type === "show" ? "show" : "movie";
-    ratingKey = await findPlexItemIdByProviderId(
-      plexUrl,
-      conn.token,
-      mediaRow.title,
-      mediaRow.externalId,
-      mediaRow.provider,
-      plexType,
-    );
+    ratingKey = await deps.plexServer.findItemIdByProvider(creds.url, conn.token, {
+      title: mediaRow.title,
+      externalId: mediaRow.externalId,
+      provider: mediaRow.provider,
+      type: mediaRow.type === "show" ? "show" : "movie",
+    });
   }
 
   if (!ratingKey) {
@@ -182,8 +179,8 @@ async function pushPlex(
   }
 
   if (watched) {
-    await markPlexItemWatched(plexUrl, conn.token, ratingKey);
+    await deps.plexServer.markPlayed(creds.url, conn.token, { itemId: ratingKey });
   } else {
-    await markPlexItemUnwatched(plexUrl, conn.token, ratingKey);
+    await deps.plexServer.markUnplayed(creds.url, conn.token, { itemId: ratingKey });
   }
 }

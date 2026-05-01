@@ -6,6 +6,7 @@ import {
 } from "@canto/validators";
 import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { makeMediaServerPush } from "@canto/core/infra/media-servers/media-server-push.adapter";
 import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 import { logWatched } from "@canto/core/domain/user-media/use-cases/log-watched";
 import { markDropped } from "@canto/core/domain/user-media/use-cases/mark-dropped";
@@ -18,7 +19,8 @@ export const historyRouter = createTRPCRouter({
       const repo = makeUserMediaRepository(ctx.db);
       const mediaRepo = makeMediaRepository(ctx.db);
       const logger = makeConsoleLogger();
-      return logWatched(ctx.db, { repo, mediaRepo, logger }, ctx.session.user.id, input);
+      const push = makeMediaServerPush(ctx.db);
+      return logWatched({ repo, mediaRepo, logger, push }, ctx.session.user.id, input);
     }),
 
   getHistory: protectedProcedure
@@ -43,7 +45,12 @@ export const historyRouter = createTRPCRouter({
       const repo = makeUserMediaRepository(ctx.db);
       const mediaRepo = makeMediaRepository(ctx.db);
       const logger = makeConsoleLogger();
-      return removeHistoryEntries(ctx.db, { repo, mediaRepo, logger }, ctx.session.user.id, input);
+      const push = makeMediaServerPush(ctx.db);
+      return removeHistoryEntries(
+        { repo, mediaRepo, logger, push },
+        ctx.session.user.id,
+        input,
+      );
     }),
 
   markDropped: protectedProcedure
@@ -51,6 +58,7 @@ export const historyRouter = createTRPCRouter({
     .mutation(({ ctx, input }) => {
       const repo = makeUserMediaRepository(ctx.db);
       const logger = makeConsoleLogger();
-      return markDropped(ctx.db, { repo, logger }, ctx.session.user.id, input.mediaId);
+      const push = makeMediaServerPush(ctx.db);
+      return markDropped({ repo, logger, push }, ctx.session.user.id, input.mediaId);
     }),
 });

@@ -7,6 +7,7 @@ import {
 } from "@canto/validators";
 import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { makeMediaServerPush } from "@canto/core/infra/media-servers/media-server-push.adapter";
 import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 import { getUserMediaState } from "@canto/core/domain/user-media/use-cases/get-user-media-state";
 import { clearTracking } from "@canto/core/domain/user-media/use-cases/clear-tracking";
@@ -62,7 +63,8 @@ export const stateRouter = createTRPCRouter({
     .mutation(({ ctx, input }) => {
       const repo = makeUserMediaRepository(ctx.db);
       const logger = makeConsoleLogger();
-      return clearTracking(ctx.db, { repo, logger }, ctx.session.user.id, input.mediaId);
+      const push = makeMediaServerPush(ctx.db);
+      return clearTracking({ repo, logger, push }, ctx.session.user.id, input.mediaId);
     }),
 
   reconcileStatesFromPlayback: protectedProcedure.mutation(({ ctx }) => {

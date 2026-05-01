@@ -1,26 +1,24 @@
-import type { Database } from "@canto/db/client";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
+import type { MediaServerPushPort } from "@canto/core/domain/user-media/ports/media-server-push.port";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import {
   computeTrackingStatus,
   isMediaType,
-  isReleasedOnOrBefore
-  
+  isReleasedOnOrBefore,
 } from "@canto/core/domain/user-media/rules/user-media-rules";
-import type {MediaType} from "@canto/core/domain/user-media/rules/user-media-rules";
+import type { MediaType } from "@canto/core/domain/user-media/rules/user-media-rules";
 import {
-  getUserMediaState
-  
+  getUserMediaState,
 } from "@canto/core/domain/user-media/use-cases/get-user-media-state";
-import type {UserMediaStateResponse} from "@canto/core/domain/user-media/use-cases/get-user-media-state";
-import { pushWatchStateToServers } from "@canto/core/domain/user-media/use-cases/push-watch-state";
+import type { UserMediaStateResponse } from "@canto/core/domain/user-media/use-cases/get-user-media-state";
 
 export interface RemoveHistoryEntriesDeps {
   repo: UserMediaRepositoryPort;
   mediaRepo: MediaRepositoryPort;
   logger: LoggerPort;
+  push: MediaServerPushPort;
 }
 
 export interface RemoveHistoryEntriesInput {
@@ -35,7 +33,6 @@ export interface RemoveHistoryEntriesResult {
 }
 
 export async function removeHistoryEntries(
-  db: Database,
   deps: RemoveHistoryEntriesDeps,
   userId: string,
   input: RemoveHistoryEntriesInput,
@@ -79,7 +76,7 @@ export async function removeHistoryEntries(
   });
 
   if (history.length === 0) {
-    void pushWatchStateToServers(db, userId, input.mediaId, false).catch(
+    void deps.push.pushWatchState(userId, input.mediaId, false).catch(
       deps.logger.logAndSwallow("userMedia.removeHistoryEntries:pushWatchStateToServers"),
     );
   }

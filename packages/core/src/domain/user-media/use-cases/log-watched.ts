@@ -1,7 +1,7 @@
-import type { Database } from "@canto/db/client";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
+import type { MediaServerPushPort } from "@canto/core/domain/user-media/ports/media-server-push.port";
 import {
   EpisodeNotFoundError,
   InvalidWatchInputError,
@@ -20,16 +20,15 @@ import {
 } from "@canto/core/domain/user-media/rules/user-media-rules";
 import type { WatchedAtMode } from "@canto/core/domain/user-media/rules/user-media-rules";
 import {
-  getUserMediaState
-  
+  getUserMediaState,
 } from "@canto/core/domain/user-media/use-cases/get-user-media-state";
-import type {UserMediaStateResponse} from "@canto/core/domain/user-media/use-cases/get-user-media-state";
-import { pushWatchStateToServers } from "@canto/core/domain/user-media/use-cases/push-watch-state";
+import type { UserMediaStateResponse } from "@canto/core/domain/user-media/use-cases/get-user-media-state";
 
 export interface LogWatchedDeps {
   repo: UserMediaRepositoryPort;
   mediaRepo: MediaRepositoryPort;
   logger: LoggerPort;
+  push: MediaServerPushPort;
 }
 
 export interface LogWatchedInput {
@@ -56,7 +55,6 @@ type MediaWithSeasons = NonNullable<
 >;
 
 export async function logWatched(
-  db: Database,
   deps: LogWatchedDeps,
   userId: string,
   input: LogWatchedInput,
@@ -99,7 +97,7 @@ export async function logWatched(
   });
 
   if (!input.markDropped && computedStatus === "completed") {
-    void pushWatchStateToServers(db, userId, input.mediaId, true).catch(
+    void deps.push.pushWatchState(userId, input.mediaId, true).catch(
       deps.logger.logAndSwallow("userMedia.logWatched:pushWatchStateToServers"),
     );
   }

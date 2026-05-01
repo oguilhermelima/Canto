@@ -15,6 +15,7 @@ import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.ad
 import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
 import { makeJellyfinAdapter } from "@canto/core/infra/media-servers/jellyfin.adapter-bindings";
 import { makePlexAdapter } from "@canto/core/infra/media-servers/plex.adapter-bindings";
+import { makeMediaServerPush } from "@canto/core/infra/media-servers/media-server-push.adapter";
 import type { MediaVersionRow } from "@canto/core/infra/media/media-version-repository";
 import {
   findEnabledSyncLinks,
@@ -38,7 +39,6 @@ import { reconcileMediaInLibrary } from "@canto/core/infra/media/media-repositor
 import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/user-media/use-cases/promote-user-media-state-from-playback";
-import { pushPlaybackPositionToServers } from "@canto/core/domain/user-media/use-cases/push-playback-position";
 import {
   scanJellyfinLibraries,
   scanPlexLibraries,
@@ -261,8 +261,7 @@ async function syncUserPlaybackAndLibrary(
     if (shouldPush) {
       // Fire-and-forget; the use case swallows per-server errors so one bad
       // server never stalls the sync loop.
-      void pushPlaybackPositionToServers(
-        db,
+      void makeMediaServerPush(db).pushPlaybackPosition(
         userId,
         mediaId,
         episodeId ?? null,
