@@ -121,4 +121,19 @@ export default [
       ],
     },
   },
+  // ----------------------------------------------------------------------
+  // Per-context lockdown (Wave 10 vertical slicing). Each context wave
+  // promotes the boundary + latent-error rules from `warn` to `error` once
+  // the context has been swept clean. Forcing function: future PRs that
+  // regress the contract fail the build.
+  // ----------------------------------------------------------------------
+  {
+    files: ["src/domain/notifications/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "error",
+      "@typescript-eslint/no-non-null-assertion": "error",
+      "@typescript-eslint/prefer-nullish-coalescing": "error",
+      eqeqeq: ["error", "always"],
+    },
+  },
 ];
