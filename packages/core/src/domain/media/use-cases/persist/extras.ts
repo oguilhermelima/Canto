@@ -21,8 +21,7 @@ export interface PersistExtrasDeps {
 /**
  * Persist media extras (credits, videos, watch providers, recommendations).
  * Handles delete + re-insert for simple tables and full re-link for the
- * recommendation junctions. Wave 9C threads the extras + localization ports
- * through `deps`.
+ * recommendation junctions.
  */
 export async function persistExtras(
   _db: Database,
@@ -83,8 +82,6 @@ export async function persistExtras(
         });
         if (inserted) {
           recMediaIdByKey.set(key, inserted.id);
-          // After Phase 1C-δ, title/overview/posterPath/logoPath live only on
-          // media_localization en-US. Persist the stub's i18n payload there.
           await deps.localization.upsertMediaLocalization(
             inserted.id,
             EN,
@@ -114,7 +111,6 @@ export async function persistExtras(
     }
   }
 
-  // Replace simple tables for this media via the port.
   await deps.extras.deleteCreditsByMediaId(mediaId);
   await deps.extras.deleteVideosByMediaId(mediaId);
   await deps.extras.deleteWatchProvidersByMediaId(mediaId);

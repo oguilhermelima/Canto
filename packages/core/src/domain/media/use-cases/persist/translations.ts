@@ -14,8 +14,7 @@ interface PersistTranslationsDeps {
 /**
  * Persist non-English translations for a media (and its seasons/episodes when
  * present) into `media_localization` / `season_localization` /
- * `episode_localization`. Calls flow through the localization port so the
- * write semantics stay aligned with `localization-service`'s overlay reads.
+ * `episode_localization`.
  */
 export async function persistTranslations(
   db: Database,

@@ -44,11 +44,8 @@ import {
 import { getEffectiveProviderSync } from "@canto/core/domain/shared/rules/effective-provider";
 
 /**
- * Repository ports the persist orchestration depends on. Wave 9B threads
- * these through every persist entry-point so the heavy localization +
- * cadence + content-rating writes flow through a single port set instead
- * of ad-hoc helpers. Callers (HTTP routers, worker jobs) build them once
- * at the entry edge and pass them down.
+ * Repository ports the persist orchestration depends on. Callers (HTTP routers,
+ * worker jobs) build them once at the entry edge and pass them down.
  */
 export interface PersistDeps {
   media: MediaRepositoryPort;
@@ -125,9 +122,6 @@ export async function persistMedia(
     throw new MediaInsertConflictError();
   }
 
-  // Persist en-US localization. After Phase 1C-δ this is the only home for
-  // per-language title/overview/tagline/posterPath/logoPath — base media row
-  // no longer has these columns.
   await deps.localization.upsertMediaLocalization(
     inserted.id,
     "en-US",
@@ -157,8 +151,8 @@ export async function updateMediaFromNormalized(
   normalized: NormalizedMedia,
   deps: PersistDeps,
 ): Promise<Media> {
-  // TVDB seasons can have seasonType "official" or "default" depending on the show.
-  // When present, preserve numberOfSeasons/numberOfEpisodes (managed by applyTvdbSeasons).
+  // When TVDB structure is reconciled, preserve numberOfSeasons/numberOfEpisodes
+  // (applyTvdbSeasons manages them).
   const hasTvdbSeasons =
     normalized.type === "show"
       ? await deps.media.hasTvdbReconciledStructure(mediaId)
@@ -171,9 +165,6 @@ export async function updateMediaFromNormalized(
 
   if (!updated) throw new MediaUpdateFailedError();
 
-  // Persist en-US localization. After Phase 1C-δ this is the only home for
-  // per-language title/overview/tagline/posterPath/logoPath — base media row
-  // no longer has these columns.
   await deps.localization.upsertMediaLocalization(
     mediaId,
     "en-US",
@@ -412,23 +403,16 @@ export async function persistFullMedia(
 
   await deps.media.updateMedia(mediaId, { processingStatus: "ready" });
 
-  // Seed media_aspect_state so subsequent fast-path reads short-circuit.
-  // Replaces the legacy `metadata_updated_at` / `extras_updated_at` markers.
-  // The cadence engine recomputes `next_eligible_at` on the next ensureMedia
-  // pass; here we use a stub context to anchor the success timestamps.
   await seedMetadataAndExtrasAspects(db, mediaId, normalized, deps);
 
   return mediaId;
 }
 
 /**
- * Mark `metadata` and `extras` aspects as successfully fetched. Used by the
- * direct persistence paths (persistFullMedia / persistMediaUseCase /
- * resolveMedia) so the fast-path reads on subsequent visits don't re-fetch.
- *
- * The cadence engine still rules everything else: next_eligible_at is
- * computed via the standard `writeAspectState` helper using the freshly
- * inserted media row's release/airing context.
+ * Mark `metadata` and `extras` aspects as successfully fetched so subsequent
+ * fast-path reads don't re-fetch. `next_eligible_at` is computed by the
+ * standard `writeAspectState` helper from the inserted media row's
+ * release/airing context.
  */
 async function seedMetadataAndExtrasAspects(
   db: Database,

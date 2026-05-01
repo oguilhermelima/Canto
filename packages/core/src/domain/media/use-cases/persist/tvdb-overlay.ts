@@ -303,10 +303,8 @@ export async function applyTvdbSeasons(
 
   await db.transaction(async (tx) => {
     await tx.delete(season).where(eq(season.mediaId, mediaId));
-    // persistSeasons goes through deps.media; the surrounding transaction
-    // is enforced by the underlying connection. Future work: thread `tx`
-    // into a tx-scoped MediaRepositoryPort instance once the port supports
-    // explicit transaction boundaries.
+    // persistSeasons writes via deps.media, not the tx-scoped `tx` — the
+    // surrounding transaction is enforced by the underlying connection.
     await persistSeasons(deps, mediaId, {
       ...normalized,
       type: "show",
