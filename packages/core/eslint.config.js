@@ -145,4 +145,18 @@ export default [
       eqeqeq: ["error", "always"],
     },
   },
+  {
+    files: ["src/domain/recommendations/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "error",
+      "@typescript-eslint/prefer-nullish-coalescing": "error",
+      eqeqeq: ["error", "always"],
+      // NOTE: `no-non-null-assertion` stays at warn for this context — 13
+      // existing assertions live in array-iteration helpers
+      // (rebuild-user-recs, get-recommendations, get-spotlight) and the
+      // engagement-signals tests. Promoting to error would force a wider
+      // refactor that doesn't fit in this wave; left as warn so future PRs
+      // see the smell without the build collapsing on inherited debt.
+    },
+  },
 ];
