@@ -23,11 +23,8 @@
 /*  connection (stale watermarks) backfill identically.                        */
 /* -------------------------------------------------------------------------- */
 
-import { and, eq, isNotNull } from "drizzle-orm";
-import type { Database } from "@canto/db/client";
-import { userConnection } from "@canto/db/schema";
-import { refreshTraktAccessTokenIfNeeded } from "@canto/core/infra/trakt/trakt.adapter";
 import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
+import type { TraktAuthPort } from "@canto/core/domain/trakt/ports/trakt-auth.port";
 import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
 import type { UserConnectionRepositoryPort } from "@canto/core/domain/media-servers/ports/user-connection-repository.port";
 import type { TraktLastActivities } from "@canto/core/domain/trakt/types/trakt-api";
@@ -162,28 +159,19 @@ interface CoordinateOptions {
 
 export interface CoordinateTraktSyncDeps {
   traktApi: TraktApiPort;
+  traktAuth: TraktAuthPort;
   trakt: TraktRepositoryPort;
   userConnection: UserConnectionRepositoryPort;
 }
 
 export async function coordinateTraktSync(
-  db: Database,
   deps: CoordinateTraktSyncDeps,
   dispatcher: JobDispatcherPort,
   options: CoordinateOptions = {},
 ): Promise<CoordinateResult> {
-  const conditions = [
-    eq(userConnection.provider, "trakt"),
-    eq(userConnection.enabled, true),
-    isNotNull(userConnection.token),
-  ];
-  if (options.connectionId) {
-    conditions.push(eq(userConnection.id, options.connectionId));
-  }
-
-  const connections = await db.query.userConnection.findMany({
-    where: and(...conditions),
-  });
+  const connections = await deps.userConnection.findEnabledTraktConnections(
+    options.connectionId ? { connectionId: options.connectionId } : undefined,
+  );
 
   let dispatched = 0;
   let skipped = 0;
@@ -198,7 +186,7 @@ export async function coordinateTraktSync(
 
     let activities: TraktLastActivities;
     try {
-      const { accessToken } = await refreshTraktAccessTokenIfNeeded(
+      const { accessToken } = await deps.traktAuth.withFreshAccessToken(
         conn,
         (patch) =>
           deps.userConnection.update(conn.id, patch).then(() => undefined),

@@ -33,13 +33,20 @@ export async function findUserConnectionByProvider(
   });
 }
 
-export async function findEnabledTraktConnections(db: Database) {
+export async function findEnabledTraktConnections(
+  db: Database,
+  opts: { connectionId?: string } = {},
+) {
+  const conditions = [
+    eq(userConnection.enabled, true),
+    eq(userConnection.provider, "trakt"),
+    isNotNull(userConnection.token),
+  ];
+  if (opts.connectionId) {
+    conditions.push(eq(userConnection.id, opts.connectionId));
+  }
   return db.query.userConnection.findMany({
-    where: and(
-      eq(userConnection.enabled, true),
-      eq(userConnection.provider, "trakt"),
-      isNotNull(userConnection.token),
-    ),
+    where: and(...conditions),
   });
 }
 

@@ -11,11 +11,9 @@
 /*       coordinator run replays the section from the same starting point.    */
 /* -------------------------------------------------------------------------- */
 
-import { and, eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { userConnection } from "@canto/db/schema";
-import { refreshTraktAccessTokenIfNeeded } from "@canto/core/infra/trakt/trakt.adapter";
 import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
+import type { TraktAuthPort } from "@canto/core/domain/trakt/ports/trakt-auth.port";
 import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
 import type { UserConnectionRepositoryPort } from "@canto/core/domain/media-servers/ports/user-connection-repository.port";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
@@ -41,6 +39,7 @@ import {
 
 export interface RunTraktSectionDeps {
   traktApi: TraktApiPort;
+  traktAuth: TraktAuthPort;
   trakt: TraktRepositoryPort;
   userConnection: UserConnectionRepositoryPort;
   userMedia: UserMediaRepositoryPort;
@@ -99,17 +98,14 @@ export async function runTraktSection(
   deps: RunTraktSectionDeps,
   input: RunSectionInput,
 ): Promise<void> {
-  const conn = await db.query.userConnection.findFirst({
-    where: and(
-      eq(userConnection.id, input.connectionId),
-      eq(userConnection.provider, "trakt"),
-      eq(userConnection.enabled, true),
-    ),
-  });
-  if (!conn?.token || !conn.userId) return;
+  const conn = await deps.userConnection.findById(input.connectionId);
+  if (!conn || conn.provider !== "trakt" || !conn.enabled) return;
+  if (!conn.token || !conn.userId) return;
 
-  const { accessToken } = await refreshTraktAccessTokenIfNeeded(conn, (patch) =>
-    deps.userConnection.update(conn.id, patch).then(() => undefined),
+  const { accessToken } = await deps.traktAuth.withFreshAccessToken(
+    conn,
+    (patch) =>
+      deps.userConnection.update(conn.id, patch).then(() => undefined),
   );
 
   // `initialSync` biases reconcile decisions toward "import remote" — used

@@ -1,16 +1,14 @@
 import { db } from "@canto/db/client";
-import { eq } from "drizzle-orm";
-import { userConnection } from "@canto/db/schema";
 import { coordinateTraktSync } from "@canto/core/domain/trakt/coordinator";
-import {
-  runTraktSection
-  
-  
+import { runTraktSection } from "@canto/core/domain/trakt/run-section";
+import type {
+  RunSectionInput,
+  RunTraktSectionDeps,
 } from "@canto/core/domain/trakt/run-section";
-import type {RunSectionInput, RunTraktSectionDeps} from "@canto/core/domain/trakt/run-section";
 import { makeListsRepository } from "@canto/core/infra/lists/lists-repository.adapter";
 import { makeUserConnectionRepository } from "@canto/core/infra/media-servers/user-connection-repository.adapter";
 import { makeTraktApi } from "@canto/core/infra/trakt/trakt-api.adapter-bindings";
+import { makeTraktAuth } from "@canto/core/infra/trakt/trakt-auth.adapter";
 import { makeTraktRepository } from "@canto/core/infra/trakt/trakt-repository.adapter";
 import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
@@ -22,6 +20,7 @@ async function buildSectionDeps(): Promise<RunTraktSectionDeps> {
   const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
   return {
     traktApi: makeTraktApi(),
+    traktAuth: makeTraktAuth(),
     trakt: makeTraktRepository(db),
     userConnection: makeUserConnectionRepository(db),
     userMedia: makeUserMediaRepository(db),
@@ -37,9 +36,9 @@ async function buildSectionDeps(): Promise<RunTraktSectionDeps> {
  */
 export async function handleTraktSync(): Promise<void> {
   await coordinateTraktSync(
-    db,
     {
       traktApi: makeTraktApi(),
+      traktAuth: makeTraktAuth(),
       trakt: makeTraktRepository(db),
       userConnection: makeUserConnectionRepository(db),
     },
@@ -53,17 +52,17 @@ export async function handleTraktSync(): Promise<void> {
  * dispatches every section regardless of watermarks.
  */
 export async function handleTraktSyncUser(userId: string): Promise<void> {
+  const userConnections = makeUserConnectionRepository(db);
   const deps = {
     traktApi: makeTraktApi(),
+    traktAuth: makeTraktAuth(),
     trakt: makeTraktRepository(db),
-    userConnection: makeUserConnectionRepository(db),
+    userConnection: userConnections,
   };
-  const connections = await db.query.userConnection.findMany({
-    where: eq(userConnection.userId, userId),
-  });
+  const connections = await userConnections.findByUserId(userId);
   for (const conn of connections) {
     if (conn.provider !== "trakt") continue;
-    await coordinateTraktSync(db, deps, jobDispatcher, {
+    await coordinateTraktSync(deps, jobDispatcher, {
       connectionId: conn.id,
       force: true,
     });

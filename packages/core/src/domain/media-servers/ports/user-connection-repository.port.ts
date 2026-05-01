@@ -23,8 +23,12 @@ export interface UserConnectionRepositoryPort {
     provider: ConnectionKind,
   ): Promise<UserConnection | null>;
   /** Trakt-only: enabled rows with non-null token, used by the periodic
-   *  Trakt sync worker. */
-  findEnabledTraktConnections(): Promise<UserConnection[]>;
+   *  Trakt sync worker. The optional `connectionId` narrows the query to a
+   *  single row — used by the user-triggered resync flow that runs the
+   *  coordinator for one connection. */
+  findEnabledTraktConnections(opts?: {
+    connectionId?: string;
+  }): Promise<UserConnection[]>;
   create(input: NewUserConnection): Promise<UserConnection>;
   update(
     id: string,

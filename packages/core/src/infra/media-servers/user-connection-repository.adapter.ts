@@ -38,8 +38,8 @@ export function makeUserConnectionRepository(
       const row = await findUserConnectionByProvider(db, userId, provider);
       return row ? toDomain(row) : null;
     },
-    findEnabledTraktConnections: async () => {
-      const rows = await findEnabledTraktConnections(db);
+    findEnabledTraktConnections: async (opts) => {
+      const rows = await findEnabledTraktConnections(db, opts);
       return rows.map(toDomain);
     },
     create: async (input) => {
