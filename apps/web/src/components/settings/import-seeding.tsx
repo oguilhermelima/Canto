@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@canto/ui/button";
 import { Input } from "@canto/ui/input";
 import { Switch } from "@canto/ui/switch";
@@ -38,11 +38,12 @@ export function ImportMethodSection(): React.JSX.Element {
   const [importMethod, setImportMethod] = useState<"local" | "remote">("local");
   const [dirty, setDirty] = useState(false);
 
-  useEffect(() => {
-    if (dlSettingsQuery.data && !dirty) {
-      setImportMethod(dlSettingsQuery.data.importMethod);
-    }
-  }, [dlSettingsQuery.data, dirty]);
+  // React docs: adjust state during render rather than syncing in an effect.
+  const [prevData, setPrevData] = useState(dlSettingsQuery.data);
+  if (dlSettingsQuery.data && dlSettingsQuery.data !== prevData && !dirty) {
+    setPrevData(dlSettingsQuery.data);
+    setImportMethod(dlSettingsQuery.data.importMethod);
+  }
 
   const setDlSettings = trpc.library.setDownloadSettings.useMutation({
     onSuccess: () => {
@@ -126,13 +127,14 @@ export function SeedingSection(): React.JSX.Element {
   const [seedCleanup, setSeedCleanup] = useState(false);
   const [dirty, setDirty] = useState(false);
 
-  useEffect(() => {
-    if (dlSettingsQuery.data && !dirty) {
-      setSeedRatio(dlSettingsQuery.data.seedRatioLimit?.toString() ?? "");
-      setSeedTime(dlSettingsQuery.data.seedTimeLimitHours?.toString() ?? "");
-      setSeedCleanup(dlSettingsQuery.data.seedCleanupFiles);
-    }
-  }, [dlSettingsQuery.data, dirty]);
+  // React docs: adjust state during render rather than syncing in an effect.
+  const [prevSeedingData, setPrevSeedingData] = useState(dlSettingsQuery.data);
+  if (dlSettingsQuery.data && dlSettingsQuery.data !== prevSeedingData && !dirty) {
+    setPrevSeedingData(dlSettingsQuery.data);
+    setSeedRatio(dlSettingsQuery.data.seedRatioLimit?.toString() ?? "");
+    setSeedTime(dlSettingsQuery.data.seedTimeLimitHours?.toString() ?? "");
+    setSeedCleanup(dlSettingsQuery.data.seedCleanupFiles);
+  }
 
   const setDlSettings = trpc.library.setDownloadSettings.useMutation({
     onSuccess: () => {
