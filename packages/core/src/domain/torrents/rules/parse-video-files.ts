@@ -1,3 +1,4 @@
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import { buildFileName } from "@canto/core/domain/shared/rules/naming";
 import {
   BARE_EP_PATTERN,
@@ -43,6 +44,7 @@ export function parseVideoFiles(
   },
   torrentRow: { title: string; quality: string; source: string },
   primarySeasonNumber: number | undefined,
+  logger?: LoggerPort,
 ): ParsedFile[] {
   const results: ParsedFile[] = [];
 
@@ -54,7 +56,7 @@ export function parseVideoFiles(
       const seasonNumber = parsed.season ?? primarySeasonNumber;
 
       if (parsed.episodes.length === 0) {
-        console.warn(
+        logger?.warn(
           `[auto-import] Skipping "${vf.name}" — no episode number detected for show`,
         );
         continue;
@@ -74,7 +76,7 @@ export function parseVideoFiles(
         );
 
         if (!matchedEp) {
-          console.warn(
+          logger?.warn(
             `[auto-import] Skipping S${String(seasonNumber ?? 0).padStart(2, "0")}E${String(epNum).padStart(2, "0")} — episode not found in database`,
           );
           continue;

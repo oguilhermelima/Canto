@@ -184,6 +184,7 @@ export async function autoImportTorrent(
       mediaNaming,
       torrentRow,
       primarySeasonNumber,
+      deps.logger,
     );
 
     if (parsedFiles.length === 0) {
