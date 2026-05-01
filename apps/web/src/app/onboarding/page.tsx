@@ -55,7 +55,7 @@ const PROGRESS_KEY = "canto.onboarding.step";
 export default function OnboardingPage(): React.JSX.Element {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
-  const [torrentConnected, setTorrentConnected] = useState(false);
+  const [userToggledTorrent, setUserToggledTorrent] = useState(false);
   const [footerConfig, setFooterConfig] = useState<FooterConfig>({});
 
   const { data: isCompleted, isLoading } =
@@ -64,35 +64,34 @@ export default function OnboardingPage(): React.JSX.Element {
     trpc.settings.getAll.useQuery();
   const completeOnboarding = trpc.settings.completeOnboarding.useMutation();
 
-  // Rehydrate step index on mount so a refresh mid-flow doesn't throw the
-  // user back to the welcome screen. Settings themselves are already persisted
-  // server-side, so the inputs are pre-filled — only the position is lost
-  // without this.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  // Rehydrate step index from localStorage once on first client render —
+  // SSR-safe via the `hydrated` flag (server renders 0, client adjusts during
+  // its first render). Settings themselves are already persisted server-side,
+  // so the inputs are pre-filled — only the position is lost without this.
+  const [hydrated, setHydrated] = useState(false);
+  if (!hydrated && typeof window !== "undefined") {
+    setHydrated(true);
     const saved = window.localStorage.getItem(PROGRESS_KEY);
     if (saved) {
       const parsed = parseInt(saved, 10);
       if (Number.isFinite(parsed) && parsed >= 0) setCurrentStep(parsed);
     }
-  }, []);
+  }
 
-  // Detect if torrent client was already configured before onboarding
-  useEffect(() => {
-    if (allSettings && allSettings["qbittorrent.enabled"] === true) {
-      setTorrentConnected(true);
-    }
-  }, [allSettings]);
+  // Derive torrent-connected state: true once user explicitly connects in this
+  // session, OR if qBittorrent was already configured before onboarding.
+  const torrentConnected =
+    userToggledTorrent || allSettings?.["qbittorrent.enabled"] === true;
 
   const steps = useMemo(() => buildSteps(torrentConnected), [torrentConnected]);
 
   // Clamp rehydrated index if the step list shrank between sessions (e.g. the
   // admin reached "ready" with qbit configured, then returned with it turned
-  // off and the library steps dropped out). Without this we hand FadeIn an
-  // undefined step and render a blank screen.
-  useEffect(() => {
-    if (currentStep > steps.length - 1) setCurrentStep(steps.length - 1);
-  }, [steps.length, currentStep]);
+  // off and the library steps dropped out). Adjust during render so React
+  // re-renders with the corrected value before painting.
+  if (currentStep > steps.length - 1) {
+    setCurrentStep(steps.length - 1);
+  }
 
   const step = steps[Math.min(currentStep, steps.length - 1)] ?? "welcome";
 
@@ -219,7 +218,7 @@ export default function OnboardingPage(): React.JSX.Element {
             {step === "download-client" && (
               <DownloadClientStep
                 onNext={() => {
-                  setTorrentConnected(true);
+                  setUserToggledTorrent(true);
                   next();
                 }}
                 onSkip={next}
