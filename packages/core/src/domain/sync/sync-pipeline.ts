@@ -116,10 +116,13 @@ async function persistStatus(tag: string, summary: SyncSummary): Promise<void> {
 export function validateScannedItems(
   items: ScannedMediaItem[],
   tag: string,
+  logger?: LoggerPort,
 ): ScannedMediaItem[] {
   return items.filter((item) => {
     if (!item.serverItemId) {
-      console.warn(`[${tag}] Scanner emitted ${item.source} item with no serverItemId: ${item.title}`);
+      logger?.warn(
+        `[${tag}] Scanner emitted ${item.source} item with no serverItemId: ${item.title}`,
+      );
       return false;
     }
     return true;
@@ -419,7 +422,7 @@ export async function runSyncPipeline(
   const supportedLangs = [...(await getActiveUserLanguages(db))];
 
   // Phase 1 + 2 — validate + dedupe
-  const validated = validateScannedItems(scannedItems, tag);
+  const validated = validateScannedItems(scannedItems, tag, deps.logger);
   const deduplicated = deduplicateScannedItems(validated);
 
   const summary = emptySummary(deduplicated.length);

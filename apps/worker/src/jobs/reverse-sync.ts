@@ -107,7 +107,7 @@ async function scanForConnection(
     linkId: l.linkId,
     sinceMs: l.sinceMs,
   }));
-  return scanPlexLibraries(plexUrl, token, refs);
+  return scanPlexLibraries(plexUrl, token, refs, makeConsoleLogger());
 }
 
 /* -------------------------------------------------------------------------- */

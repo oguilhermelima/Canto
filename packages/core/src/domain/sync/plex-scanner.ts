@@ -11,6 +11,7 @@ import {
   SyncAuthError,
   SyncFetchError,
 } from "@canto/core/domain/sync/errors";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import { isAuthStatus } from "@canto/core/domain/sync/types";
 import type {
   ExternalIds,
@@ -216,6 +217,7 @@ async function paginateLibrary(
   token: string,
   lib: PlexLibraryRef,
   sinceMs: number | undefined,
+  logger: LoggerPort | undefined,
 ): Promise<ScannedMediaItem[]> {
   const items: ScannedMediaItem[] = [];
   let offset = 0;
@@ -227,7 +229,7 @@ async function paginateLibrary(
     for (const raw of metadata) {
       const mapped = mapPlexItem(raw, lib);
       if (!mapped) {
-        console.warn(
+        logger?.warn(
           `[plex-scanner] Skipping item "${raw.title ?? "?"}" — missing ratingKey or unknown type`,
         );
         continue;
@@ -256,13 +258,14 @@ async function scanLibrary(
   url: string,
   token: string,
   lib: PlexLibraryRef,
+  logger: LoggerPort | undefined,
 ): Promise<ScannedMediaItem[]> {
   const memoKey = deltaRejectedKey(url, lib.plexLibraryId);
   const skipDelta = deltaRejectedLibraries.has(memoKey);
   const sinceMs = skipDelta ? undefined : lib.sinceMs;
 
   try {
-    return await paginateLibrary(url, token, lib, sinceMs);
+    return await paginateLibrary(url, token, lib, sinceMs, logger);
   } catch (err) {
     if (
       sinceMs !== undefined
@@ -270,10 +273,10 @@ async function scanLibrary(
       && err.message.includes("HTTP 400")
     ) {
       deltaRejectedLibraries.add(memoKey);
-      console.warn(
+      logger?.warn(
         `[plex-scanner] Library ${lib.plexLibraryId} rejected delta filter (HTTP 400); falling back to full scan and skipping delta on future cycles`,
       );
-      return paginateLibrary(url, token, lib, undefined);
+      return paginateLibrary(url, token, lib, undefined, logger);
     }
     throw err;
   }
@@ -287,10 +290,11 @@ export async function scanPlexLibraries(
   url: string,
   token: string,
   libs: PlexLibraryRef[],
+  logger?: LoggerPort,
 ): Promise<ScannedMediaItem[]> {
   const all: ScannedMediaItem[] = [];
   for (const lib of libs) {
-    const items = await scanLibrary(url, token, lib);
+    const items = await scanLibrary(url, token, lib, logger);
     all.push(...items);
   }
   return all;
