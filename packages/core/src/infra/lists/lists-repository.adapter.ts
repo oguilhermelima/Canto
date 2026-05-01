@@ -18,15 +18,19 @@ import {
   findListByIdIncludingDeleted,
   findListBySlug,
   findListItems,
+  findListItemsForSync,
   findListOwnerSummary,
   findMediaInLists,
   findPublicListBySlug,
   findServerLibrary,
   findTombstonedTraktLists,
   findUserCustomCollectionItems,
+  findUserCustomLists,
   findUserDefaultVisibility,
+  findUserListByType,
   findUserListExternalIds,
   findUserListsWithCounts,
+  findUserTombstonedListIds,
   hardDeleteList,
   markListItemsPushed,
   moveListItems,
@@ -110,6 +114,16 @@ export function makeListsRepository(db: Database): ListsRepositoryPort {
       const rows = await findTombstonedTraktLists(db);
       return rows.map(toTombstone);
     },
+    findUserCustomLists: async (userId) => {
+      const rows = await findUserCustomLists(db, userId);
+      return rows.map(listToDomain);
+    },
+    findUserTombstonedListIds: (userId) =>
+      findUserTombstonedListIds(db, userId),
+    findUserListByType: async (userId, type) => {
+      const row = await findUserListByType(db, userId, type);
+      return row ? listToDomain(row) : null;
+    },
     ensureServerLibrary: async () => {
       const row = await ensureServerLibrary(db);
       return listToDomain(row);
@@ -161,6 +175,7 @@ export function makeListsRepository(db: Database): ListsRepositoryPort {
       const rows = await findMediaInLists(db, mediaId, userId);
       return rows.map(toMediaInListSummary);
     },
+    findItemsForSync: (listId) => findListItemsForSync(db, listId),
     findUserListExternalIds: (userId) => findUserListExternalIds(db, userId),
 
     // ── Members ──

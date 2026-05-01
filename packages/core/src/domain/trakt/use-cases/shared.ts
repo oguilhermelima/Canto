@@ -1,6 +1,4 @@
-import { and, eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { listItem, media } from "@canto/db/schema";
 import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
 import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
 import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
@@ -361,24 +359,10 @@ export interface LoadLocalListRefsResult {
 }
 
 export async function loadLocalListRefs(
-  db: Database,
+  lists: ListsRepositoryPort,
   listId: string,
 ): Promise<LoadLocalListRefsResult> {
-  const rows = await db
-    .select({
-      mediaId: listItem.mediaId,
-      addedAt: listItem.addedAt,
-      lastPushedAt: listItem.lastPushedAt,
-      deletedAt: listItem.deletedAt,
-      type: media.type,
-      provider: media.provider,
-      externalId: media.externalId,
-      imdbId: media.imdbId,
-      tvdbId: media.tvdbId,
-    })
-    .from(listItem)
-    .innerJoin(media, eq(listItem.mediaId, media.id))
-    .where(eq(listItem.listId, listId));
+  const rows = await lists.findItemsForSync(listId);
 
   const live: LocalMediaRef[] = [];
   const tombstones: LocalTombstone[] = [];
@@ -441,7 +425,7 @@ export async function syncSingleListMembership(
     refs: Array<{ type: "movie" | "show"; ids: TraktIds }>,
   ) => Promise<void>,
 ): Promise<void> {
-  const { live, tombstones } = await loadLocalListRefs(ctx.db, localListId);
+  const { live, tombstones } = await loadLocalListRefs(deps.lists, localListId);
 
   const liveByKey = new Map<string, LocalMediaRef>();
   for (const local of live) {

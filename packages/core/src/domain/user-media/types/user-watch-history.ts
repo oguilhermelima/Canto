@@ -41,3 +41,20 @@ export interface EpisodeByMediaRow {
   episodeTitle: string | null;
   airDate: string | null;
 }
+
+/** Watch-history row joined with media + episode + season identifiers used by
+ *  the Trakt push flow. `seasonNumber` and `episodeNumber` are non-null only
+ *  when the history entry has an `episodeId` (show plays); movie plays leave
+ *  them null. */
+export interface UserWatchHistoryPushRow {
+  id: string;
+  mediaId: string;
+  watchedAt: Date;
+  type: string;
+  provider: string;
+  externalId: number;
+  imdbId: string | null;
+  tvdbId: number | null;
+  seasonNumber: number | null;
+  episodeNumber: number | null;
+}

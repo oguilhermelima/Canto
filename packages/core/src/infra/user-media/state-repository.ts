@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { media, userMediaState, userPlaybackProgress } from "@canto/db/schema";
 import { mediaI18n } from "@canto/core/infra/shared/media-i18n";
+import type { UserFavoriteSyncRow } from "@canto/core/domain/user-media/types/user-media-state";
 
 export async function findUserMediaState(db: Database, userId: string, mediaId: string) {
   return db.query.userMediaState.findFirst({
@@ -252,6 +253,34 @@ export async function findUserEngagementStates(
           sql`${userMediaState.rating} IS NOT NULL`,
           eq(userMediaState.isFavorite, true),
         ),
+      ),
+    );
+}
+
+/**
+ * `userMediaState` rows where `isFavorite=true`, joined with `media` for the
+ * provider/external-id tuple Trakt needs to push or reconcile.
+ */
+export async function findUserFavoritesForSync(
+  db: Database,
+  userId: string,
+): Promise<UserFavoriteSyncRow[]> {
+  return db
+    .select({
+      mediaId: userMediaState.mediaId,
+      updatedAt: userMediaState.updatedAt,
+      type: media.type,
+      provider: media.provider,
+      externalId: media.externalId,
+      imdbId: media.imdbId,
+      tvdbId: media.tvdbId,
+    })
+    .from(userMediaState)
+    .innerJoin(media, eq(userMediaState.mediaId, media.id))
+    .where(
+      and(
+        eq(userMediaState.userId, userId),
+        eq(userMediaState.isFavorite, true),
       ),
     );
 }

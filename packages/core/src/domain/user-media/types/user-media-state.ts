@@ -57,3 +57,15 @@ export interface RecentlyCompletedMediaRow {
   type: "movie" | "show";
   completedAt: Date;
 }
+
+/** Favorite-flagged userMediaState row joined with media identifiers — the
+ *  shape Trakt sync needs to reconcile favorites with the remote. */
+export interface UserFavoriteSyncRow {
+  mediaId: string;
+  updatedAt: Date;
+  type: string;
+  provider: string;
+  externalId: number;
+  imdbId: string | null;
+  tvdbId: number | null;
+}

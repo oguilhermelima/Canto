@@ -38,6 +38,22 @@ export interface MediaInListSummary {
   listType: ListType;
 }
 
+/** List-item row joined with media identifiers — the shape Trakt sync needs
+ *  to reconcile list membership with the remote. Includes both live rows
+ *  (`deletedAt === null`) and tombstones (`deletedAt !== null`); the consumer
+ *  splits them. */
+export interface ListItemSyncRow {
+  mediaId: string;
+  addedAt: Date;
+  lastPushedAt: Date | null;
+  deletedAt: Date | null;
+  type: string;
+  provider: string;
+  externalId: number;
+  imdbId: string | null;
+  tvdbId: number | null;
+}
+
 /** Localized media projection returned by list/collection item queries.
  *  Spreads all `media` table columns plus the per-language overlay from
  *  `media_localization`. Used by `findListItems` and

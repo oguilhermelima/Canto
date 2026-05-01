@@ -1,7 +1,8 @@
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { episode, season, userWatchHistory } from "@canto/db/schema";
+import { episode, media, season, userWatchHistory } from "@canto/db/schema";
 import { episodeI18n } from "@canto/core/infra/shared/media-i18n";
+import type { UserWatchHistoryPushRow } from "@canto/core/domain/user-media/types/user-watch-history";
 
 export async function addUserWatchHistory(
   db: Database,
@@ -44,6 +45,60 @@ export async function findUserWatchHistoryByMedia(
     ),
     orderBy: (t, { desc }) => [desc(t.watchedAt)],
   });
+}
+
+export async function findUserWatchHistoryByExactWatch(
+  db: Database,
+  userId: string,
+  mediaId: string,
+  episodeId: string | null,
+  watchedAt: Date,
+) {
+  return db.query.userWatchHistory.findFirst({
+    where: and(
+      eq(userWatchHistory.userId, userId),
+      eq(userWatchHistory.mediaId, mediaId),
+      episodeId
+        ? eq(userWatchHistory.episodeId, episodeId)
+        : isNull(userWatchHistory.episodeId),
+      eq(userWatchHistory.watchedAt, watchedAt),
+      isNull(userWatchHistory.deletedAt),
+    ),
+    orderBy: (t, { desc }) => [desc(t.id)],
+  });
+}
+
+export async function findUnpushedWatchHistoryForTrakt(
+  db: Database,
+  userId: string,
+  limit: number,
+): Promise<UserWatchHistoryPushRow[]> {
+  return db
+    .select({
+      id: userWatchHistory.id,
+      mediaId: userWatchHistory.mediaId,
+      watchedAt: userWatchHistory.watchedAt,
+      type: media.type,
+      provider: media.provider,
+      externalId: media.externalId,
+      imdbId: media.imdbId,
+      tvdbId: media.tvdbId,
+      seasonNumber: season.number,
+      episodeNumber: episode.number,
+    })
+    .from(userWatchHistory)
+    .innerJoin(media, eq(userWatchHistory.mediaId, media.id))
+    .leftJoin(episode, eq(userWatchHistory.episodeId, episode.id))
+    .leftJoin(season, eq(episode.seasonId, season.id))
+    .where(
+      and(
+        eq(userWatchHistory.userId, userId),
+        isNull(userWatchHistory.deletedAt),
+        ne(userWatchHistory.source, "trakt"),
+      ),
+    )
+    .orderBy(desc(userWatchHistory.watchedAt))
+    .limit(limit);
 }
 
 export async function deleteUserWatchHistoryByIds(

@@ -1,16 +1,15 @@
-import { and, asc, eq, isNull, isNotNull } from "drizzle-orm";
-import { list } from "@canto/db/schema";
 import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
 import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
 import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
 import {
   findOrCreateUniqueListSlug,
   syncSingleListMembership,
-  toTraktListBody
-  
-  
+  toTraktListBody,
 } from "@canto/core/domain/trakt/use-cases/shared";
-import type {SyncContext, SyncListMembershipDeps} from "@canto/core/domain/trakt/use-cases/shared";
+import type {
+  SyncContext,
+  SyncListMembershipDeps,
+} from "@canto/core/domain/trakt/use-cases/shared";
 
 export interface SyncCustomListsDeps extends SyncListMembershipDeps {
   traktApi: TraktApiPort;
@@ -31,20 +30,17 @@ export async function syncCustomLists(
     links.map((link) => [link.traktListId, link]),
   );
 
-  let localCustomLists = await ctx.db.query.list.findMany({
-    where: and(eq(list.userId, ctx.userId), eq(list.type, "custom"), isNull(list.deletedAt)),
-    orderBy: [asc(list.createdAt)],
-  });
-  const localById = new Map(localCustomLists.map((row) => [row.id, row]));
+  let localCustomLists = await deps.lists.findUserCustomLists(ctx.userId);
+  const localById = new Map<string, (typeof localCustomLists)[number]>(
+    localCustomLists.map((row) => [row.id, row]),
+  );
 
   // Lists awaiting Trakt deletion via the worker. We must not re-import their
   // remote mirror, push items into them, or fight the worker for the remote
   // delete — the trakt-list-delete worker owns those rows until it finishes.
-  const tombstonedRows = await ctx.db
-    .select({ id: list.id })
-    .from(list)
-    .where(and(eq(list.userId, ctx.userId), isNotNull(list.deletedAt)));
-  const tombstonedIds = new Set(tombstonedRows.map((r) => r.id));
+  const tombstonedIds = new Set(
+    await deps.lists.findUserTombstonedListIds(ctx.userId),
+  );
 
   const remoteIds = new Set(remoteLists.map((row) => row.ids.trakt));
 
@@ -52,15 +48,7 @@ export async function syncCustomLists(
     for (const link of links) {
       if (!remoteIds.has(link.traktListId)) {
         if (localById.has(link.localListId)) {
-          await ctx.db
-            .delete(list)
-            .where(
-              and(
-                eq(list.id, link.localListId),
-                eq(list.userId, ctx.userId),
-                eq(list.type, "custom"),
-              ),
-            );
+          await deps.lists.hardDelete(link.localListId);
         }
         await deps.trakt.deleteListLinkById(link.id);
       }
@@ -82,10 +70,7 @@ export async function syncCustomLists(
       await deps.trakt.deleteListLinkById(link.id);
     }
 
-    localCustomLists = await ctx.db.query.list.findMany({
-      where: and(eq(list.userId, ctx.userId), eq(list.type, "custom"), isNull(list.deletedAt)),
-      orderBy: [asc(list.createdAt)],
-    });
+    localCustomLists = await deps.lists.findUserCustomLists(ctx.userId);
   }
 
   for (const remote of remoteLists) {
@@ -126,7 +111,7 @@ export async function syncCustomLists(
   const refreshedLinks = await deps.trakt.findListLinksByConnection(
     ctx.connectionId,
   );
-  const refreshedByLocalId = new Map(
+  const refreshedByLocalId = new Map<string, (typeof refreshedLinks)[number]>(
     refreshedLinks.map((link) => [link.localListId, link]),
   );
 

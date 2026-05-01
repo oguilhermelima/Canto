@@ -1,6 +1,7 @@
 import { and, avg, desc, eq, isNull, isNotNull, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { episode, season, user, userMediaState, userRating } from "@canto/db/schema";
+import { episode, media, season, user, userMediaState, userRating } from "@canto/db/schema";
+import type { UserRatingSyncRow } from "@canto/core/domain/user-media/types/user-rating";
 
 /* -------------------------------------------------------------------------- */
 /*  CRUD                                                                      */
@@ -438,4 +439,37 @@ async function syncMediaRatingToState(
         ),
       );
   }
+}
+
+/**
+ * Override (user-set) media-level ratings joined with `media` identifiers —
+ * the surface Trakt sync uses to reconcile ratings with the remote. Excludes
+ * season- and episode-level ratings since Trakt only models media-level
+ * scores.
+ */
+export async function findUserOverrideRatingsForSync(
+  db: Database,
+  userId: string,
+): Promise<UserRatingSyncRow[]> {
+  return db
+    .select({
+      mediaId: userRating.mediaId,
+      rating: userRating.rating,
+      updatedAt: userRating.updatedAt,
+      type: media.type,
+      provider: media.provider,
+      externalId: media.externalId,
+      imdbId: media.imdbId,
+      tvdbId: media.tvdbId,
+    })
+    .from(userRating)
+    .innerJoin(media, eq(userRating.mediaId, media.id))
+    .where(
+      and(
+        eq(userRating.userId, userId),
+        isNull(userRating.seasonId),
+        isNull(userRating.episodeId),
+        eq(userRating.isOverride, true),
+      ),
+    );
 }

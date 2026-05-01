@@ -1,5 +1,3 @@
-import { and, eq } from "drizzle-orm";
-import { media, userMediaState } from "@canto/db/schema";
 import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
 import type {
@@ -29,24 +27,7 @@ export async function syncFavorites(
   ctx: SyncContext,
   deps: SyncFavoritesDeps,
 ): Promise<void> {
-  const localRows = await ctx.db
-    .select({
-      mediaId: userMediaState.mediaId,
-      updatedAt: userMediaState.updatedAt,
-      type: media.type,
-      provider: media.provider,
-      externalId: media.externalId,
-      imdbId: media.imdbId,
-      tvdbId: media.tvdbId,
-    })
-    .from(userMediaState)
-    .innerJoin(media, eq(userMediaState.mediaId, media.id))
-    .where(
-      and(
-        eq(userMediaState.userId, ctx.userId),
-        eq(userMediaState.isFavorite, true),
-      ),
-    );
+  const localRows = await deps.userMedia.findFavoritesForSync(ctx.userId);
 
   const remoteRows = await deps.traktApi.listFavorites(
     ctx.accessToken,

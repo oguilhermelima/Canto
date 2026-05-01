@@ -1,5 +1,3 @@
-import { and, desc, eq, isNull, ne } from "drizzle-orm";
-import { episode, media, season, userWatchHistory } from "@canto/db/schema";
 import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
 import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
@@ -8,11 +6,14 @@ import {
   mediaIdsFromRow,
   mediaRefKey,
   parseDateOrNow,
-  resolveMediaFromTraktRef
-  
-  
+  resolveMediaFromTraktRef,
 } from "@canto/core/domain/trakt/use-cases/shared";
-import type {ResolveMediaDeps, SyncContext} from "@canto/core/domain/trakt/use-cases/shared";
+import type {
+  ResolveMediaDeps,
+  SyncContext,
+} from "@canto/core/domain/trakt/use-cases/shared";
+
+const PUSH_HISTORY_BATCH_SIZE = 200;
 
 export interface SyncHistoryDeps extends ResolveMediaDeps {
   traktApi: TraktApiPort;
@@ -86,17 +87,12 @@ export async function pullHistory(
       }
 
       const watchedAt = parseDateOrNow(remote.watchedAt, ctx.now);
-      const existingLocal = await ctx.db.query.userWatchHistory.findFirst({
-        where: and(
-          eq(userWatchHistory.userId, ctx.userId),
-          eq(userWatchHistory.mediaId, mediaId),
-          episodeId
-            ? eq(userWatchHistory.episodeId, episodeId)
-            : isNull(userWatchHistory.episodeId),
-          eq(userWatchHistory.watchedAt, watchedAt),
-          isNull(userWatchHistory.deletedAt),
-        ),
-      });
+      const existingLocal = await deps.userMedia.findHistoryByExactWatch(
+        ctx.userId,
+        mediaId,
+        episodeId,
+        watchedAt,
+      );
 
       let localId = existingLocal?.id;
       if (!localId) {
@@ -130,32 +126,10 @@ export async function pushHistory(
   ctx: SyncContext,
   deps: SyncHistoryDeps,
 ): Promise<void> {
-  const localRows = await ctx.db
-    .select({
-      id: userWatchHistory.id,
-      mediaId: userWatchHistory.mediaId,
-      watchedAt: userWatchHistory.watchedAt,
-      type: media.type,
-      provider: media.provider,
-      externalId: media.externalId,
-      imdbId: media.imdbId,
-      tvdbId: media.tvdbId,
-      seasonNumber: season.number,
-      episodeNumber: episode.number,
-    })
-    .from(userWatchHistory)
-    .innerJoin(media, eq(userWatchHistory.mediaId, media.id))
-    .leftJoin(episode, eq(userWatchHistory.episodeId, episode.id))
-    .leftJoin(season, eq(episode.seasonId, season.id))
-    .where(
-      and(
-        eq(userWatchHistory.userId, ctx.userId),
-        isNull(userWatchHistory.deletedAt),
-        ne(userWatchHistory.source, "trakt"),
-      ),
-    )
-    .orderBy(desc(userWatchHistory.watchedAt))
-    .limit(200);
+  const localRows = await deps.userMedia.findUnpushedHistoryForTrakt(
+    ctx.userId,
+    PUSH_HISTORY_BATCH_SIZE,
+  );
 
   if (localRows.length === 0) return;
 
@@ -292,18 +266,12 @@ export async function linkPulledHistoryBackfill(
     }
 
     const watchedAt = parseDateOrNow(remote.watchedAt, ctx.now);
-    const localMatch = await ctx.db.query.userWatchHistory.findFirst({
-      where: and(
-        eq(userWatchHistory.userId, ctx.userId),
-        eq(userWatchHistory.mediaId, mediaId),
-        episodeId
-          ? eq(userWatchHistory.episodeId, episodeId)
-          : isNull(userWatchHistory.episodeId),
-        eq(userWatchHistory.watchedAt, watchedAt),
-        isNull(userWatchHistory.deletedAt),
-      ),
-      orderBy: [desc(userWatchHistory.id)],
-    });
+    const localMatch = await deps.userMedia.findHistoryByExactWatch(
+      ctx.userId,
+      mediaId,
+      episodeId,
+      watchedAt,
+    );
     if (!localMatch) continue;
 
     await deps.trakt.attachRemoteIdToHistorySync(

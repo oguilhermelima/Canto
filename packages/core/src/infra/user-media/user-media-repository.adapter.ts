@@ -29,6 +29,7 @@ import {
   findEpisodeRatingsFromAllUsers,
   findMediaReviews,
   findReviewById,
+  findUserOverrideRatingsForSync,
   findUserRating,
   findUserRatingsByMedia,
   upsertUserRating,
@@ -36,6 +37,7 @@ import {
 import {
   findRecentlyCompletedMedia,
   findUserEngagementStates,
+  findUserFavoritesForSync,
   findUserMediaState,
   findUserMediaStatesByMediaIds,
   findUserNegativeSignalExternalIds,
@@ -45,7 +47,9 @@ import {
   addUserWatchHistory,
   deleteUserWatchHistoryByIds,
   findEpisodesByMediaIds,
+  findUnpushedWatchHistoryForTrakt,
   findUserWatchHistory,
+  findUserWatchHistoryByExactWatch,
   findUserWatchHistoryByMedia,
   findUserWatchHistoryByMediaIds,
 } from "@canto/core/infra/user-media/watch-history-repository";
@@ -89,6 +93,7 @@ export function makeUserMediaRepository(db: Database): UserMediaRepositoryPort {
       findUserNegativeSignalExternalIds(db, userId),
     findRecentlyCompletedMedia: (userId, language, mediaType, limit) =>
       findRecentlyCompletedMedia(db, userId, language, mediaType, limit),
+    findFavoritesForSync: (userId) => findUserFavoritesForSync(db, userId),
 
     // ── Watch History ──
     addHistoryEntry: async (input) => {
@@ -109,6 +114,18 @@ export function makeUserMediaRepository(db: Database): UserMediaRepositoryPort {
       deleteUserWatchHistoryByIds(db, userId, mediaId, entryIds),
     findEpisodesByMediaIds: (mediaIds, language) =>
       findEpisodesByMediaIds(db, mediaIds, language),
+    findHistoryByExactWatch: async (userId, mediaId, episodeId, watchedAt) => {
+      const row = await findUserWatchHistoryByExactWatch(
+        db,
+        userId,
+        mediaId,
+        episodeId,
+        watchedAt,
+      );
+      return row ? historyToDomain(row) : null;
+    },
+    findUnpushedHistoryForTrakt: (userId, limit) =>
+      findUnpushedWatchHistoryForTrakt(db, userId, limit),
 
     // ── Rating ──
     upsertRating: async (input) => {
@@ -139,6 +156,8 @@ export function makeUserMediaRepository(db: Database): UserMediaRepositoryPort {
     findReviewById: (reviewId) => findReviewById(db, reviewId),
     findEpisodeRatingsFromAllUsers: (episodeId) =>
       findEpisodeRatingsFromAllUsers(db, episodeId),
+    findOverrideRatingsForSync: (userId) =>
+      findUserOverrideRatingsForSync(db, userId),
 
     // ── Playback Progress ──
     findPlayback: async (userId, mediaId, episodeId) => {

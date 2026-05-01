@@ -12,6 +12,7 @@ import type {
   RecentlyCompletedMediaRow,
   UpsertUserMediaStateInput,
   UserEngagementStateRow,
+  UserFavoriteSyncRow,
   UserMediaState,
   UserMediaStateByMediaRow,
 } from "@canto/core/domain/user-media/types/user-media-state";
@@ -25,12 +26,14 @@ import type {
   CommunityReview,
   UpsertUserRatingInput,
   UserRating,
+  UserRatingSyncRow,
 } from "@canto/core/domain/user-media/types/user-rating";
 import type {
   EpisodeByMediaRow,
   NewUserWatchHistory,
   UserWatchHistory,
   UserWatchHistoryByMediaRow,
+  UserWatchHistoryPushRow,
 } from "@canto/core/domain/user-media/types/user-watch-history";
 
 /**
@@ -71,6 +74,9 @@ export interface UserMediaRepositoryPort {
     mediaType: "movie" | "show" | undefined,
     limit: number,
   ): Promise<RecentlyCompletedMediaRow[]>;
+  /** Favorite-flagged userMediaState rows joined with media — Trakt sync
+   *  source of truth for the favorites surface. */
+  findFavoritesForSync(userId: string): Promise<UserFavoriteSyncRow[]>;
 
   // ── Watch History ──
 
@@ -94,6 +100,22 @@ export interface UserMediaRepositoryPort {
     mediaIds: string[],
     language: string,
   ): Promise<EpisodeByMediaRow[]>;
+  /** Lookup a single live history entry by exact (user, media, episode,
+   *  watchedAt). Used by Trakt pull to dedupe replayed events at the
+   *  watermark boundary. */
+  findHistoryByExactWatch(
+    userId: string,
+    mediaId: string,
+    episodeId: string | null,
+    watchedAt: Date,
+  ): Promise<UserWatchHistory | null>;
+  /** Recent non-Trakt-sourced history rows joined with media + season +
+   *  episode identifiers, ready to be pushed to Trakt. Caller dedupes against
+   *  `trakt_history_sync` to avoid re-pushing already-tracked events. */
+  findUnpushedHistoryForTrakt(
+    userId: string,
+    limit: number,
+  ): Promise<UserWatchHistoryPushRow[]>;
 
   // ── Rating ──
 
@@ -143,6 +165,10 @@ export interface UserMediaRepositoryPort {
       user: { id: string; name: string | null; image: string | null };
     }>
   >;
+  /** Override (user-set) media-level ratings joined with media — Trakt sync
+   *  source of truth for the ratings surface. Excludes season/episode-level
+   *  ratings (Trakt doesn't model those). */
+  findOverrideRatingsForSync(userId: string): Promise<UserRatingSyncRow[]>;
 
   // ── Playback Progress ──
 

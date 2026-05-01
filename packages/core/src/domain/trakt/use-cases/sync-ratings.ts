@@ -1,5 +1,3 @@
-import { and, eq, isNull } from "drizzle-orm";
-import { media, userRating } from "@canto/db/schema";
 import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
 import type {
@@ -31,27 +29,7 @@ export async function syncRatings(
   ctx: SyncContext,
   deps: SyncRatingsDeps,
 ): Promise<void> {
-  const localRows = await ctx.db
-    .select({
-      mediaId: userRating.mediaId,
-      rating: userRating.rating,
-      updatedAt: userRating.updatedAt,
-      type: media.type,
-      provider: media.provider,
-      externalId: media.externalId,
-      imdbId: media.imdbId,
-      tvdbId: media.tvdbId,
-    })
-    .from(userRating)
-    .innerJoin(media, eq(userRating.mediaId, media.id))
-    .where(
-      and(
-        eq(userRating.userId, ctx.userId),
-        isNull(userRating.seasonId),
-        isNull(userRating.episodeId),
-        eq(userRating.isOverride, true),
-      ),
-    );
+  const localRows = await deps.userMedia.findOverrideRatingsForSync(ctx.userId);
 
   const remoteRows = await deps.traktApi.listRatings(
     ctx.accessToken,

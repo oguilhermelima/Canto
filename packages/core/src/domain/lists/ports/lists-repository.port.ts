@@ -12,6 +12,7 @@ import type {
   ListItem,
   ListItemActor,
   ListItemDetail,
+  ListItemSyncRow,
   MediaInListSummary,
   NewListItem,
 } from "@canto/core/domain/lists/types/list-item";
@@ -68,6 +69,18 @@ export interface ListsRepositoryPort {
   findOwnerSummary(ownerId: string): Promise<ListOwnerSummary | null>;
   findServerLibrary(): Promise<List | null>;
   findTombstonedTraktLists(): Promise<ListTombstone[]>;
+  /** Live custom lists for a user. Used by Trakt sync to walk locally-owned
+   *  custom collections and decide which ones to mirror to the remote. */
+  findUserCustomLists(userId: string): Promise<List[]>;
+  /** Tombstoned list ids for a user — set used by Trakt sync to skip rows
+   *  awaiting deletion via the trakt-list-delete worker. */
+  findUserTombstonedListIds(userId: string): Promise<string[]>;
+  /** Live list of a specific type owned by a user (e.g. the user's
+   *  watchlist). */
+  findUserListByType(
+    userId: string,
+    type: "watchlist" | "custom" | "server",
+  ): Promise<List | null>;
   ensureServerLibrary(): Promise<List>;
   create(input: NewList): Promise<List>;
   update(id: string, input: UpdateListInput): Promise<List | undefined>;
@@ -118,6 +131,9 @@ export interface ListsRepositoryPort {
     mediaId: string,
     userId: string,
   ): Promise<MediaInListSummary[]>;
+  /** All list_item rows (live + tombstones) for a list, joined with media
+   *  identifiers. Used by Trakt list-membership sync. */
+  findItemsForSync(listId: string): Promise<ListItemSyncRow[]>;
 
   // ── Members ──
 

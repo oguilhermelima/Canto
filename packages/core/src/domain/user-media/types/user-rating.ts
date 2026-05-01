@@ -36,6 +36,19 @@ export interface UpsertUserRatingInput {
   ratedAt?: Date;
 }
 
+/** Override (user-set) media-level rating row joined with media identifiers
+ *  — the shape Trakt sync needs to reconcile ratings with the remote. */
+export interface UserRatingSyncRow {
+  mediaId: string;
+  rating: number;
+  updatedAt: Date;
+  type: string;
+  provider: string;
+  externalId: number;
+  imdbId: string | null;
+  tvdbId: number | null;
+}
+
 /** Community review projection — userRating + author info from `user`. */
 export interface CommunityReview {
   id: string;

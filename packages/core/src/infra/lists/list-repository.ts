@@ -367,6 +367,47 @@ export async function findTombstonedTraktLists(db: Database) {
     .where(sql`${list.deletedAt} IS NOT NULL`);
 }
 
+/** Live custom lists for a user, ordered by creation. Used by Trakt sync to
+ *  walk the locally-owned custom collections. */
+export async function findUserCustomLists(db: Database, userId: string) {
+  return db.query.list.findMany({
+    where: and(
+      eq(list.userId, userId),
+      eq(list.type, "custom"),
+      isNull(list.deletedAt),
+    ),
+    orderBy: [asc(list.createdAt)],
+  });
+}
+
+/** Tombstoned list ids for a user — set used by Trakt sync to skip rows
+ *  awaiting deletion via the trakt-list-delete worker. */
+export async function findUserTombstonedListIds(
+  db: Database,
+  userId: string,
+): Promise<string[]> {
+  const rows = await db
+    .select({ id: list.id })
+    .from(list)
+    .where(and(eq(list.userId, userId), sql`${list.deletedAt} IS NOT NULL`));
+  return rows.map((r) => r.id);
+}
+
+/** Live list of a specific type owned by a user (e.g. the user's watchlist). */
+export async function findUserListByType(
+  db: Database,
+  userId: string,
+  type: "watchlist" | "custom" | "server",
+) {
+  return db.query.list.findFirst({
+    where: and(
+      eq(list.userId, userId),
+      eq(list.type, type),
+      isNull(list.deletedAt),
+    ),
+  });
+}
+
 export async function softDeleteList(db: Database, id: string): Promise<void> {
   // Rename slug so the unique (userId, slug) index doesn't block the user from
   // re-creating a list with the same slug while the tombstone awaits the worker.
@@ -731,6 +772,27 @@ export async function findListItems(
   });
 
   return { items, total: countRow?.total ?? 0 };
+}
+
+/** List items joined with media identifiers — used by Trakt list sync to
+ *  reconcile membership against the remote. Includes both live rows
+ *  (`deletedAt === null`) and tombstones; the consumer separates them. */
+export async function findListItemsForSync(db: Database, listId: string) {
+  return db
+    .select({
+      mediaId: listItem.mediaId,
+      addedAt: listItem.addedAt,
+      lastPushedAt: listItem.lastPushedAt,
+      deletedAt: listItem.deletedAt,
+      type: media.type,
+      provider: media.provider,
+      externalId: media.externalId,
+      imdbId: media.imdbId,
+      tvdbId: media.tvdbId,
+    })
+    .from(listItem)
+    .innerJoin(media, eq(listItem.mediaId, media.id))
+    .where(eq(listItem.listId, listId));
 }
 
 export async function addListItem(

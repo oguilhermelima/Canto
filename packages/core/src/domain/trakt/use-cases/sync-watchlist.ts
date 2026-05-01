@@ -1,12 +1,11 @@
-import { and, eq } from "drizzle-orm";
-import { list } from "@canto/db/schema";
 import {
   syncSingleListMembership,
-  toTraktListBody
-  
-  
+  toTraktListBody,
 } from "@canto/core/domain/trakt/use-cases/shared";
-import type {SyncContext, SyncListMembershipDeps} from "@canto/core/domain/trakt/use-cases/shared";
+import type {
+  SyncContext,
+  SyncListMembershipDeps,
+} from "@canto/core/domain/trakt/use-cases/shared";
 import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
 
 export interface SyncWatchlistDeps extends SyncListMembershipDeps {
@@ -17,9 +16,7 @@ export async function syncWatchlist(
   ctx: SyncContext,
   deps: SyncWatchlistDeps,
 ): Promise<void> {
-  const watchlist = await ctx.db.query.list.findFirst({
-    where: and(eq(list.userId, ctx.userId), eq(list.type, "watchlist")),
-  });
+  const watchlist = await deps.lists.findUserListByType(ctx.userId, "watchlist");
   if (!watchlist) return;
 
   const remoteWatchlist = await deps.traktApi.listWatchlist(
