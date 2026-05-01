@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { setUserPreferencesInput, updateProfileInput } from "@canto/validators";
 import { user } from "@canto/db/schema";
-import type { UserId } from "@canto/core/domain/user/types/user";
+import { parseUserId } from "@canto/core/domain/user/types/user";
 import { makeUserRepository } from "@canto/core/infra/user/user-repository.adapter";
 import {
   createTRPCRouter,
@@ -41,14 +41,14 @@ export const authRouter = createTRPCRouter({
 
   getUserPreferences: protectedProcedure.query(({ ctx }) => {
     const userRepo = makeUserRepository(ctx.db);
-    return userRepo.findPreferences(ctx.session.user.id as UserId);
+    return userRepo.findPreferences(parseUserId(ctx.session.user.id));
   }),
 
   setUserPreferences: protectedProcedure
     .input(setUserPreferencesInput)
     .mutation(async ({ ctx, input }) => {
       const userRepo = makeUserRepository(ctx.db);
-      await userRepo.setPreferences(ctx.session.user.id as UserId, input);
+      await userRepo.setPreferences(parseUserId(ctx.session.user.id), input);
       return { success: true };
     }),
 
@@ -56,12 +56,12 @@ export const authRouter = createTRPCRouter({
     .input(updateProfileInput)
     .mutation(async ({ ctx, input }) => {
       const userRepo = makeUserRepository(ctx.db);
-      await userRepo.updateProfile(ctx.session.user.id as UserId, input);
+      await userRepo.updateProfile(parseUserId(ctx.session.user.id), input);
       return { success: true };
     }),
 
   getProfile: protectedProcedure.query(({ ctx }) => {
     const userRepo = makeUserRepository(ctx.db);
-    return userRepo.findProfileMetadata(ctx.session.user.id as UserId);
+    return userRepo.findProfileMetadata(parseUserId(ctx.session.user.id));
   }),
 });

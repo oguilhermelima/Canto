@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import type { Database } from "@canto/db/client";
-import type { UserId } from "@canto/core/domain/user/types/user";
+import { parseUserId } from "@canto/core/domain/user/types/user";
 import { makeUserRepository } from "@canto/core/infra/user/user-repository.adapter";
 import { makeListsRepository } from "@canto/core/infra/lists/lists-repository.adapter";
 import {
@@ -36,7 +36,7 @@ async function requireVisibleUser(
   viewerUserId: string,
 ) {
   const userRepo = makeUserRepository(db);
-  const profile = await userRepo.findPublicProfile(targetUserId as UserId);
+  const profile = await userRepo.findPublicProfile(parseUserId(targetUserId));
   if (!profile) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Profile not found" });
   }
