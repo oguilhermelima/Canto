@@ -10,6 +10,7 @@ import {
 } from "@canto/db/schema";
 
 const EN = "en-US";
+import { MS_PER_DAY } from "@canto/core/domain/shared/constants";
 import type { RecsFilters } from "@canto/core/domain/recommendations/types/recs-filters";
 import type {
   UserRecommendationReadRow,
@@ -21,6 +22,8 @@ import {
   USER_REC_COLUMNS,
 } from "@canto/core/infra/recommendations/recs-filter-builder";
 import { toInsert, toReadRow } from "@canto/core/infra/recommendations/user-recommendation.mapper";
+
+const RECS_FRESH_WINDOW_MS = MS_PER_DAY;
 
 /** Keep only the highest weight per mediaId, preserving denormalized fields. */
 function bestRowByMedia(rows: UserRecommendationRow[]): Map<string, UserRecommendationRow> {
@@ -377,14 +380,13 @@ export async function removeMediaFromUserRecs(
 export async function findUsersForDailyRecsCheck(
   db: Database,
 ): Promise<Array<{ id: string }>> {
-  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
-    .toISOString();
+  const cutoff = new Date(Date.now() - RECS_FRESH_WINDOW_MS).toISOString();
 
   return db
     .select({ id: user.id })
     .from(user)
     .where(
-      sql`${user.recsUpdatedAt} IS NULL OR ${user.recsUpdatedAt} < ${twentyFourHoursAgo}::timestamptz`,
+      sql`${user.recsUpdatedAt} IS NULL OR ${user.recsUpdatedAt} < ${cutoff}::timestamptz`,
     );
 }
 
