@@ -1,8 +1,10 @@
 import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 import type { Database } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
-import { addUserConnectionInput } from "@canto/validators";
+import {
+  addUserConnectionInput,
+  reuseAdminCredsInput,
+} from "@canto/validators";
 import {
   authenticateJellyfin,
   authenticatePlex,
@@ -181,7 +183,7 @@ export const setupRouter = createTRPCRouter({
    * the admin's media library view (sensible for family/single-user setups).
    */
   reuseAdminCreds: protectedProcedure
-    .input(z.object({ provider: z.enum(["jellyfin", "plex"]) }))
+    .input(reuseAdminCredsInput)
     .mutation(async ({ ctx, input }) => {
       const repo = makeUserConnectionRepository(ctx.db);
       const plex = makePlexAdapter();

@@ -1,9 +1,10 @@
-import { z } from "zod";
 import { asc, eq } from "drizzle-orm";
 import {
+  certificationsInput,
   filterOptionsInput,
   filterSearchInput,
   genresInput,
+  regionInput,
 } from "@canto/validators";
 import { tmdbCertification } from "@canto/db/schema";
 
@@ -16,8 +17,6 @@ import { getFilterOptions } from "@canto/core/domain/recommendations/use-cases/g
 import { searchFilterEntities } from "@canto/core/domain/recommendations/use-cases/search-filter-entities";
 import { getUserWatchProviders } from "@canto/core/domain/recommendations/use-cases/get-user-watch-providers";
 import { syncTmdbCertifications } from "@canto/core/domain/content-enrichment/use-cases/sync-tmdb-certifications";
-
-const regionInput = z.object({ region: z.string().length(2).optional() }).optional();
 
 export const providerFiltersRouter = createTRPCRouter({
   filterOptions: publicProcedure
@@ -70,7 +69,7 @@ export const providerFiltersRouter = createTRPCRouter({
    * the cache on first call so we don't need a startup hook.
    */
   certifications: publicProcedure
-    .input(z.object({ type: z.enum(["movie", "tv"]) }))
+    .input(certificationsInput)
     .query(async ({ ctx, input }) => {
       let rows = await ctx.db
         .select({

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { regionInput } from "@canto/validators";
 
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
@@ -12,8 +12,6 @@ import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media
 import { makeRecommendationsRepository } from "@canto/core/infra/recommendations/recommendations-repository.adapter";
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
-
-const regionInput = z.object({ region: z.string().length(2).optional() }).optional();
 
 export const providerDiscoveryRouter = createTRPCRouter({
   spotlight: protectedProcedure.query(async ({ ctx }) => {

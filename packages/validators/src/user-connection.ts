@@ -3,6 +3,17 @@ import { z } from "zod";
 export const userConnectionProvider = z.enum(["plex", "jellyfin", "trakt"]);
 export type UserConnectionProvider = z.infer<typeof userConnectionProvider>;
 
+/** Subset of {@link userConnectionProvider} for the media-server-only flows
+ *  (Plex / Jellyfin). Used by `reuseAdminCreds` and similar endpoints that
+ *  don't apply to the Trakt remote. */
+export const mediaServerProvider = z.enum(["jellyfin", "plex"]);
+export type MediaServerProvider = z.infer<typeof mediaServerProvider>;
+
+export const reuseAdminCredsInput = z.object({
+  provider: mediaServerProvider,
+});
+export type ReuseAdminCredsInput = z.infer<typeof reuseAdminCredsInput>;
+
 export const addUserConnectionInput = z.discriminatedUnion("provider", [
   z.object({
     provider: z.literal("plex"),
