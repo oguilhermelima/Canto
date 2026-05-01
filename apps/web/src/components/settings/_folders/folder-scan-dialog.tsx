@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Check,
   ChevronRight,
@@ -46,9 +46,13 @@ export function ScanFoldersDialog({
     onError: (err) => toast.error(err.message),
   });
 
-  useEffect(() => {
+  // React docs: adjust state during render rather than syncing in an effect.
+  const stateKey = `${String(open)}|${scanPath}`;
+  const [prevStateKey, setPrevStateKey] = useState(stateKey);
+  if (prevStateKey !== stateKey) {
+    setPrevStateKey(stateKey);
     if (open) setSelected(new Set());
-  }, [open, scanPath]);
+  }
 
   const toggle = (path: string): void => {
     setSelected((prev) => {

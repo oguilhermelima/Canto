@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@canto/ui/button";
 import {
   Dialog,
@@ -135,9 +135,14 @@ export function RulesEditorDialog({
 }: RulesEditorDialogProps): React.JSX.Element {
   const [draft, setDraft] = useState<UIRules>(() => rulesToUI(rules));
 
-  useEffect(() => {
+  // React docs: adjust state during render rather than syncing in an effect.
+  const [prevOpen, setPrevOpen] = useState(open);
+  const [prevRules, setPrevRules] = useState(rules);
+  if (prevOpen !== open || prevRules !== rules) {
+    setPrevOpen(open);
+    setPrevRules(rules);
     if (open) setDraft(rulesToUI(rules));
-  }, [open, rules]);
+  }
 
   const hasAny = draft.rules.some(
     (r) => r.include.length > 0 || r.exclude.length > 0,

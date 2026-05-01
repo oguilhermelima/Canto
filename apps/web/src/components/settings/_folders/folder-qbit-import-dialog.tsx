@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Check,
   Folder,
@@ -68,9 +68,12 @@ export function AddFromQbittorrentDialog({
     selectableRows.length > 0 &&
     selectableRows.every((r) => selected.has(r.name));
 
-  useEffect(() => {
+  // React docs: adjust state during render rather than syncing in an effect.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
     if (!open) setSelected(new Set());
-  }, [open]);
+  }
 
   const toggle = (name: string): void => {
     setSelected((prev) => {
