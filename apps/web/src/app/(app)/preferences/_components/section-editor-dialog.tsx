@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { cn } from "@canto/ui/cn";
 import { Button } from "@canto/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@canto/ui/dialog";
@@ -611,9 +611,16 @@ export function SectionEditorDialog({
     setConditions(initConditions(c));
   }, []);
 
-  useEffect(() => {
-    if (open) { resetToSection(section); setStep(0); }
-  }, [open, section, resetToSection]);
+  // React docs: adjust state during render rather than syncing in an effect.
+  const stateKey = `${String(open)}|${section?.id ?? "new"}`;
+  const [prevStateKey, setPrevStateKey] = useState(stateKey);
+  if (prevStateKey !== stateKey) {
+    setPrevStateKey(stateKey);
+    if (open) {
+      resetToSection(section);
+      setStep(0);
+    }
+  }
 
   // Genres from TMDB — guess type from conditions
   const tmdbType = (conditions.find((c) => c.field === "type")?.value as string) || "movie";
