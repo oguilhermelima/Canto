@@ -1,25 +1,19 @@
 import { join, basename, extname } from "node:path";
 
 import type { Database } from "@canto/db/client";
-import { persistMedia } from "@canto/core/domain/media/use-cases/persist";
-import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 
 import type { FileSystemPort } from "@canto/core/domain/shared/ports/file-system.port";
-import { parseFolderMediaInfo } from "@canto/core/domain/torrents/rules/parsing";
-import { VIDEO_EXTENSIONS } from "@canto/core/domain/shared/rules/naming";
-import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
-import {
-  findMediaByAnyReference,
-  updateMedia,
-} from "@canto/core/infra/media/media-repository";
-import { findAspectSucceededAt } from "@canto/core/infra/media/media-aspect-state-repository";
-import {
-  addListItem,
-  ensureServerLibrary,
-} from "@canto/core/infra/lists/list-repository";
-import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
-import { runWithConcurrency } from "@canto/core/platform/concurrency/run-with-concurrency";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
+import type { MediaAspectStateRepositoryPort } from "@canto/core/domain/media/ports/media-aspect-state-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import { persistMedia } from "@canto/core/domain/media/use-cases/persist";
+import { runWithConcurrency } from "@canto/core/domain/shared/services/run-with-concurrency";
+import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
+import { VIDEO_EXTENSIONS } from "@canto/core/domain/shared/rules/naming";
+import { parseFolderMediaInfo } from "@canto/core/domain/torrents/rules/parsing";
 
 /* -------------------------------------------------------------------------- */
 /*  Helpers                                                                    */
@@ -76,171 +70,201 @@ async function findVideosByDirectory(
 const SCAN_CONCURRENCY = 4;
 const scanningFolders = new Set<string>();
 
+export interface ScanFolderForMediaDeps {
+  fs: FileSystemPort;
+  logger: LoggerPort;
+  dispatcher: JobDispatcherPort;
+  tmdb: MediaProviderPort;
+  media: MediaRepositoryPort;
+  aspectState: MediaAspectStateRepositoryPort;
+  lists: ListsRepositoryPort;
+}
+
 export async function scanFolderForMedia(
   db: Database,
   folderPath: string,
   libraryId: string,
-  deps: { fs: FileSystemPort; logger: LoggerPort; dispatcher: JobDispatcherPort },
+  deps: ScanFolderForMediaDeps,
 ): Promise<{ imported: number; skipped: number; failed: number }> {
   if (scanningFolders.has(folderPath)) {
-    console.log(`[folder-scan] Already scanning ${folderPath} — skipping`);
+    deps.logger.info?.(`[folder-scan] Already scanning ${folderPath} — skipping`);
     return { imported: 0, skipped: 0, failed: 0 };
   }
 
   scanningFolders.add(folderPath);
   try {
-  // Verify folder exists
-  try {
-    const s = await deps.fs.stat(folderPath);
-    if (!s.isDirectory) {
-      console.log(`[folder-scan] Not a directory: ${folderPath}`);
+    try {
+      const s = await deps.fs.stat(folderPath);
+      if (!s.isDirectory) {
+        deps.logger.warn(`[folder-scan] Not a directory: ${folderPath}`);
+        return { imported: 0, skipped: 0, failed: 0 };
+      }
+    } catch {
+      deps.logger.warn(`[folder-scan] Cannot access: ${folderPath}`);
       return { imported: 0, skipped: 0, failed: 0 };
     }
-  } catch {
-    console.log(`[folder-scan] Cannot access: ${folderPath}`);
-    return { imported: 0, skipped: 0, failed: 0 };
-  }
 
-  const videosByDir = await findVideosByDirectory(deps.fs, folderPath);
-  if (videosByDir.size === 0) {
-    console.log(`[folder-scan] No video files found in ${folderPath}`);
-    return { imported: 0, skipped: 0, failed: 0 };
-  }
-
-  console.log(`[folder-scan] Found ${videosByDir.size} directories with video files in ${folderPath}`);
-
-  const tmdb = await getTmdbProvider();
-  const supportedLangs = [...await getActiveUserLanguages(db)];
-
-  type DirOutcome = "imported" | "skipped" | "failed";
-
-  const processDirectory = async (dirPath: string): Promise<DirOutcome> => {
-    const dirName = basename(dirPath);
-    const parsed = parseFolderMediaInfo(dirName);
-
-    if (!parsed) {
-      console.log(`[folder-scan] Could not parse directory name: ${dirName}`);
-      return "failed";
+    const videosByDir = await findVideosByDirectory(deps.fs, folderPath);
+    if (videosByDir.size === 0) {
+      deps.logger.info?.(`[folder-scan] No video files found in ${folderPath}`);
+      return { imported: 0, skipped: 0, failed: 0 };
     }
 
-    try {
-      // 1. Resolve TMDB ID
-      let tmdbId = parsed.tmdbId;
-      let resolvedType: "movie" | "show" = "movie";
+    deps.logger.info?.(
+      `[folder-scan] Found ${videosByDir.size} directories with video files in ${folderPath}`,
+    );
 
-      if (!tmdbId && parsed.imdbId) {
-        const results = await tmdb.findByImdbId(parsed.imdbId);
-        if (results.length > 0) {
-          tmdbId = results[0]!.externalId;
-          resolvedType = results[0]!.type as "movie" | "show";
-        }
-      }
+    const supportedLangs = [...(await getActiveUserLanguages(db))];
 
-      if (!tmdbId) {
-        const query = parsed.year ? `${parsed.title} ${parsed.year}` : parsed.title;
-        // Search both movies and shows — take the first confident match
-        const movieSearch = await tmdb.search(query, "movie");
-        if (movieSearch.results.length === 1) {
-          tmdbId = movieSearch.results[0]!.externalId;
-          resolvedType = "movie";
-        } else {
-          const showSearch = await tmdb.search(query, "show");
-          if (showSearch.results.length === 1) {
-            tmdbId = showSearch.results[0]!.externalId;
-            resolvedType = "show";
-          }
-        }
-      }
+    type DirOutcome = "imported" | "skipped" | "failed";
 
-      if (!tmdbId) {
-        console.log(`[folder-scan] Could not resolve TMDB ID for: ${dirName}`);
+    const processDirectory = async (dirPath: string): Promise<DirOutcome> => {
+      const dirName = basename(dirPath);
+      const parsed = parseFolderMediaInfo(dirName);
+
+      if (!parsed) {
+        deps.logger.warn(`[folder-scan] Could not parse directory name: ${dirName}`);
         return "failed";
       }
 
-      // 2. Check if already in DB
-      const existing = await findMediaByAnyReference(db, tmdbId, "tmdb", parsed.imdbId);
-
-      if (existing) {
-        // Update if not yet marked as in library / downloaded
-        const updates: Record<string, unknown> = {};
-        if (!existing.inLibrary) updates.inLibrary = true;
-        if (!existing.downloaded) updates.downloaded = true;
-        if (!existing.libraryId) updates.libraryId = libraryId;
-        if (!existing.libraryPath) updates.libraryPath = dirPath;
-        if (!existing.addedAt) updates.addedAt = new Date();
-
-        if (Object.keys(updates).length > 0) {
-          await updateMedia(db, existing.id, updates);
-        }
-
-        const wasAlreadyInLibrary = existing.inLibrary;
-        if (!wasAlreadyInLibrary) {
-          try {
-            const serverLib = await ensureServerLibrary(db);
-            await addListItem(db, { listId: serverLib.id, mediaId: existing.id });
-          } catch { /* already in list */ }
-        }
-
-        const metadataSucceededAt = await findAspectSucceededAt(
-          db,
-          existing.id,
-          "metadata",
-        );
-        if (!metadataSucceededAt) {
-          deps.dispatcher.enrichMedia(existing.id).catch(
-            deps.logger.logAndSwallow("folder-scan dispatchEnsureMedia"),
-          );
-        }
-
-        return wasAlreadyInLibrary ? "skipped" : "imported";
-      }
-
-      // 3. New media — fetch from TMDB, persist, mark as downloaded
-      const normalized = await tmdb.getMetadata(tmdbId, resolvedType, {
-        supportedLanguages: supportedLangs,
-      });
-      const inserted = await persistMedia(db, normalized);
-      await updateMedia(db, inserted.id, {
-        inLibrary: true,
-        downloaded: true,
-        libraryId,
-        libraryPath: dirPath,
-        addedAt: new Date(),
-      });
-      deps.dispatcher.enrichMedia(inserted.id).catch(
-        deps.logger.logAndSwallow("folder-scan dispatchEnsureMedia"),
-      );
-
       try {
-        const serverLib = await ensureServerLibrary(db);
-        await addListItem(db, { listId: serverLib.id, mediaId: inserted.id });
-      } catch { /* already in list */ }
+        let tmdbId = parsed.tmdbId;
+        let resolvedType: "movie" | "show" = "movie";
 
-      console.log(`[folder-scan] Imported: ${parsed.title} (${parsed.year ?? "?"})`);
-      return "imported";
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      console.error(`[folder-scan] Error processing ${dirName}:`, msg);
-      return "failed";
+        if (!tmdbId && parsed.imdbId && deps.tmdb.findByImdbId) {
+          const results = await deps.tmdb.findByImdbId(parsed.imdbId);
+          const first = results[0];
+          if (first) {
+            tmdbId = first.externalId;
+            resolvedType = first.type === "show" ? "show" : "movie";
+          }
+        }
+
+        if (!tmdbId) {
+          const query = parsed.year
+            ? `${parsed.title} ${parsed.year}`
+            : parsed.title;
+          const movieSearch = await deps.tmdb.search(query, "movie");
+          const movieFirst = movieSearch.results[0];
+          if (movieSearch.results.length === 1 && movieFirst) {
+            tmdbId = movieFirst.externalId;
+            resolvedType = "movie";
+          } else {
+            const showSearch = await deps.tmdb.search(query, "show");
+            const showFirst = showSearch.results[0];
+            if (showSearch.results.length === 1 && showFirst) {
+              tmdbId = showFirst.externalId;
+              resolvedType = "show";
+            }
+          }
+        }
+
+        if (!tmdbId) {
+          deps.logger.warn(`[folder-scan] Could not resolve TMDB ID for: ${dirName}`);
+          return "failed";
+        }
+
+        const existing = await deps.media.findByAnyReference(
+          tmdbId,
+          "tmdb",
+          parsed.imdbId,
+        );
+
+        if (existing) {
+          const updates: Record<string, unknown> = {};
+          if (!existing.inLibrary) updates.inLibrary = true;
+          if (!existing.downloaded) updates.downloaded = true;
+          if (!existing.libraryId) updates.libraryId = libraryId;
+          if (!existing.libraryPath) updates.libraryPath = dirPath;
+          if (!existing.addedAt) updates.addedAt = new Date();
+
+          if (Object.keys(updates).length > 0) {
+            await deps.media.updateMedia(existing.id, updates);
+          }
+
+          const wasAlreadyInLibrary = existing.inLibrary;
+          if (!wasAlreadyInLibrary) {
+            try {
+              const serverLib = await deps.lists.ensureServerLibrary();
+              await deps.lists.addItem({
+                listId: serverLib.id,
+                mediaId: existing.id,
+              });
+            } catch {
+              // already in list
+            }
+          }
+
+          const metadataSucceededAt = await deps.aspectState.findSucceededAt(
+            existing.id,
+            "metadata",
+          );
+          if (!metadataSucceededAt) {
+            deps.dispatcher
+              .enrichMedia(existing.id)
+              .catch(deps.logger.logAndSwallow("folder-scan dispatchEnsureMedia"));
+          }
+
+          return wasAlreadyInLibrary ? "skipped" : "imported";
+        }
+
+        const normalized = await deps.tmdb.getMetadata(tmdbId, resolvedType, {
+          supportedLanguages: supportedLangs,
+        });
+        const inserted = await persistMedia(db, normalized);
+        await deps.media.updateMedia(inserted.id, {
+          inLibrary: true,
+          downloaded: true,
+          libraryId,
+          libraryPath: dirPath,
+          addedAt: new Date(),
+        });
+        deps.dispatcher
+          .enrichMedia(inserted.id)
+          .catch(deps.logger.logAndSwallow("folder-scan dispatchEnsureMedia"));
+
+        try {
+          const serverLib = await deps.lists.ensureServerLibrary();
+          await deps.lists.addItem({
+            listId: serverLib.id,
+            mediaId: inserted.id,
+          });
+        } catch {
+          // already in list
+        }
+
+        deps.logger.info?.(
+          `[folder-scan] Imported: ${parsed.title} (${parsed.year ?? "?"})`,
+        );
+        return "imported";
+      } catch (err) {
+        deps.logger.error(`[folder-scan] Error processing ${dirName}`, {
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
+        return "failed";
+      }
+    };
+
+    const dirPaths = Array.from(videosByDir.keys());
+    const outcomes = await runWithConcurrency(
+      dirPaths,
+      SCAN_CONCURRENCY,
+      processDirectory,
+    );
+
+    let imported = 0;
+    let skipped = 0;
+    let failed = 0;
+    for (const o of outcomes) {
+      if (o === "imported") imported++;
+      else if (o === "skipped") skipped++;
+      else failed++;
     }
-  };
 
-  // Run directory scans in parallel — TMDB rate limits aren't the bottleneck
-  // here, the previous 250ms delay was wasted wall-clock per item.
-  const dirPaths = Array.from(videosByDir.keys());
-  const outcomes = await runWithConcurrency(dirPaths, SCAN_CONCURRENCY, processDirectory);
-
-  let imported = 0;
-  let skipped = 0;
-  let failed = 0;
-  for (const o of outcomes) {
-    if (o === "imported") imported++;
-    else if (o === "skipped") skipped++;
-    else failed++;
-  }
-
-  console.log(`[folder-scan] Done: ${imported} imported, ${skipped} skipped, ${failed} failed`);
-  return { imported, skipped, failed };
+    deps.logger.info?.(
+      `[folder-scan] Done: ${imported} imported, ${skipped} skipped, ${failed} failed`,
+    );
+    return { imported, skipped, failed };
   } finally {
     scanningFolders.delete(folderPath);
   }

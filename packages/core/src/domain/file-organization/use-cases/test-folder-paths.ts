@@ -1,8 +1,7 @@
-import type { Database } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
 
+import type { FoldersRepositoryPort } from "@canto/core/domain/file-organization/ports/folders-repository.port";
 import type { FileSystemPort } from "@canto/core/domain/shared/ports/file-system.port";
-import { findAllFolders } from "@canto/core/infra/file-organization/folder-repository";
 
 interface PathResult {
   ok: boolean;
@@ -32,12 +31,12 @@ async function testPath(
  * Test all folder paths for accessibility.
  * Respects the import method setting (local vs remote).
  */
-export async function testFolderPaths(
-  db: Database,
-  deps: { fs: FileSystemPort },
-): Promise<FolderPathResult[]> {
+export async function testFolderPaths(deps: {
+  folders: FoldersRepositoryPort;
+  fs: FileSystemPort;
+}): Promise<FolderPathResult[]> {
   const importMethod = (await getSetting("download.importMethod")) ?? "local";
-  const folders = await findAllFolders(db);
+  const folders = await deps.folders.findAllFolders();
 
   const results: FolderPathResult[] = [];
 

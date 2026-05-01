@@ -1,26 +1,25 @@
 import path from "node:path";
 
-import type { Database } from "@canto/db/client";
 import { getSetting } from "@canto/db/settings";
+
+import {
+  ReorganizeRequiresClientError,
+  ReorganizeWhileImportingError,
+} from "@canto/core/domain/file-organization/errors";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
+import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
+import type { FileSystemPort } from "@canto/core/domain/shared/ports/file-system.port";
 import { getEffectiveProvider } from "@canto/core/domain/shared/rules/effective-provider";
 import {
   buildFileName,
-  buildMediaDir
-  
+  buildMediaDir,
 } from "@canto/core/domain/shared/rules/naming";
-import type {MediaNamingInfo} from "@canto/core/domain/shared/rules/naming";
-import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
-import type { FileSystemPort } from "@canto/core/domain/shared/ports/file-system.port";
-import { findMediaByIdWithSeasons } from "@canto/core/infra/media/media-repository";
-import {
-  findMediaFilesByMediaId,
-  updateMediaFile,
-} from "@canto/core/infra/media/media-file-repository";
-import {
-  findDownloadsByMediaId,
-  updateDownload,
-} from "@canto/core/infra/torrents/download-repository";
-import { findMediaLocalized } from "@canto/core/infra/media/media-localized-repository";
+import type { MediaNamingInfo } from "@canto/core/domain/shared/rules/naming";
+import type { Download } from "@canto/core/domain/torrents/types/download";
+import type { MediaFileWithDetails } from "@canto/core/domain/torrents/types/media-file";
+import type { TorrentsRepositoryPort } from "@canto/core/domain/torrents/ports/torrents-repository.port";
 
 // ── Public types ───────────────────────────────────────────────────────────
 
@@ -35,6 +34,18 @@ export interface ReorganizeResult {
   renamed: number;
   skipped: number;
   failed: Array<{ oldPath: string; error: string }>;
+}
+
+export interface ReorganizeMediaFilesDeps {
+  media: MediaRepositoryPort;
+  torrents: TorrentsRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
+}
+
+export interface ExecuteReorganizeMediaFilesDeps
+  extends ReorganizeMediaFilesDeps {
+  fs: FileSystemPort;
+  client?: DownloadClientPort;
 }
 
 // ── Internal types ─────────────────────────────────────────────────────────
@@ -70,16 +81,84 @@ function buildEpisodeLabel(
   return title ? `S${sn}E${en} - ${title}` : `S${sn}E${en}`;
 }
 
+function buildEntryForMovie(
+  mf: MediaFileWithDetails,
+  mediaNaming: MediaNamingInfo,
+): RenameEntry {
+  const ext = mf.filePath.substring(mf.filePath.lastIndexOf("."));
+  const basePath = extractLibraryBasePath(mf.filePath);
+  const newDir = buildMediaDir(mediaNaming);
+  const newFilename = buildFileName(mediaNaming, {
+    quality: mf.quality ?? undefined,
+    source: mf.source ?? undefined,
+    torrentTitle: mf.download?.title ?? undefined,
+    extension: ext,
+  });
+  const newPath = path.join(basePath, newDir, newFilename);
+  return {
+    mediaFileId: mf.id,
+    downloadId: mf.downloadId,
+    oldPath: mf.filePath,
+    newPath,
+    episodeLabel: mediaNaming.title,
+    status: mf.filePath === newPath ? "skip" : "rename",
+  };
+}
+
+function buildEntryForEpisode(
+  mf: MediaFileWithDetails,
+  mediaNaming: MediaNamingInfo,
+): RenameEntry {
+  const episode = mf.episode;
+  if (!episode) {
+    return {
+      mediaFileId: mf.id,
+      downloadId: mf.downloadId,
+      oldPath: mf.filePath,
+      newPath: mf.filePath,
+      episodeLabel: "Unmapped",
+      status: "unmapped",
+    };
+  }
+
+  const seasonNumber = episode.season.number;
+  const episodeNumber = episode.number;
+  const episodeTitle = episode.title;
+  const ext = mf.filePath.substring(mf.filePath.lastIndexOf("."));
+
+  const basePath = extractLibraryBasePath(mf.filePath);
+  const newDir = buildMediaDir(mediaNaming, seasonNumber);
+  const newFilename = buildFileName(mediaNaming, {
+    seasonNumber,
+    episodeNumber,
+    episodeTitle: episodeTitle ?? undefined,
+    quality: mf.quality ?? undefined,
+    source: mf.source ?? undefined,
+    torrentTitle: mf.download?.title ?? undefined,
+    extension: ext,
+  });
+  const newPath = path.join(basePath, newDir, newFilename);
+
+  return {
+    mediaFileId: mf.id,
+    downloadId: mf.downloadId,
+    oldPath: mf.filePath,
+    newPath,
+    episodeLabel: buildEpisodeLabel(seasonNumber, episodeNumber, episodeTitle),
+    status: mf.filePath === newPath ? "skip" : "rename",
+  };
+}
+
 // ── Shared rename list builder ─────────────────────────────────────────────
 
 async function buildRenameList(
-  db: Database,
+  deps: ReorganizeMediaFilesDeps,
   mediaId: string,
 ): Promise<RenameEntry[]> {
-  const mediaRow = await findMediaByIdWithSeasons(db, mediaId);
-  if (!mediaRow) throw new Error(`Media ${mediaId} not found`);
+  const mediaRow = await deps.media.findByIdWithSeasons(mediaId);
+  if (!mediaRow) throw new MediaNotFoundError(mediaId);
 
-  const mediaFiles = await findMediaFilesByMediaId(db, mediaId);
+  const mediaFiles = await deps.torrents.findMediaFilesByMediaId(mediaId);
   if (mediaFiles.length === 0) return [];
 
   const effectiveProvider = await getEffectiveProvider(mediaRow);
@@ -89,7 +168,7 @@ async function buildRenameList(
       : mediaRow.externalId;
 
   // Filenames mirror the canonical en-US title.
-  const enLoc = await findMediaLocalized(db, mediaRow.id, "en-US");
+  const enLoc = await deps.localization.findLocalizedById(mediaRow.id, "en-US");
   const mediaNaming: MediaNamingInfo = {
     title: enLoc?.title ?? "",
     year: mediaRow.year,
@@ -103,65 +182,12 @@ async function buildRenameList(
   for (const mf of mediaFiles) {
     if (!mf.filePath) continue;
 
-    if (!mf.episode) {
-      if (mediaRow.type === "movie") {
-        const ext = mf.filePath.substring(mf.filePath.lastIndexOf("."));
-        const basePath = extractLibraryBasePath(mf.filePath);
-        const newDir = buildMediaDir(mediaNaming);
-        const newFilename = buildFileName(mediaNaming, {
-          quality: mf.quality ?? undefined,
-          source: mf.source ?? undefined,
-          torrentTitle: mf.download?.title ?? undefined,
-          extension: ext,
-        });
-        const newPath = path.join(basePath, newDir, newFilename);
-        entries.push({
-          mediaFileId: mf.id,
-          downloadId: mf.downloadId,
-          oldPath: mf.filePath,
-          newPath,
-          episodeLabel: mediaNaming.title,
-          status: mf.filePath === newPath ? "skip" : "rename",
-        });
-      } else {
-        entries.push({
-          mediaFileId: mf.id,
-          downloadId: mf.downloadId,
-          oldPath: mf.filePath,
-          newPath: mf.filePath,
-          episodeLabel: "Unmapped",
-          status: "unmapped",
-        });
-      }
+    if (!mf.episode && mediaRow.type === "movie") {
+      entries.push(buildEntryForMovie(mf, mediaNaming));
       continue;
     }
 
-    const seasonNumber = mf.episode.season.number;
-    const episodeNumber = mf.episode.number;
-    const episodeTitle = mf.episode.title;
-    const ext = mf.filePath.substring(mf.filePath.lastIndexOf("."));
-
-    const basePath = extractLibraryBasePath(mf.filePath);
-    const newDir = buildMediaDir(mediaNaming, seasonNumber);
-    const newFilename = buildFileName(mediaNaming, {
-      seasonNumber,
-      episodeNumber,
-      episodeTitle: episodeTitle ?? undefined,
-      quality: mf.quality ?? undefined,
-      source: mf.source ?? undefined,
-      torrentTitle: mf.download?.title ?? undefined,
-      extension: ext,
-    });
-    const newPath = path.join(basePath, newDir, newFilename);
-
-    entries.push({
-      mediaFileId: mf.id,
-      downloadId: mf.downloadId,
-      oldPath: mf.filePath,
-      newPath,
-      episodeLabel: buildEpisodeLabel(seasonNumber, episodeNumber, episodeTitle),
-      status: mf.filePath === newPath ? "skip" : "rename",
-    });
+    entries.push(buildEntryForEpisode(mf, mediaNaming));
   }
 
   return entries;
@@ -170,20 +196,19 @@ async function buildRenameList(
 // ── Preview ────────────────────────────────────────────────────────────────
 
 export async function previewReorganizeMediaFiles(
-  db: Database,
+  deps: ReorganizeMediaFilesDeps,
   mediaId: string,
 ): Promise<FileRenamePreview[]> {
-  return buildRenameList(db, mediaId);
+  return buildRenameList(deps, mediaId);
 }
 
 // ── Execute ────────────────────────────────────────────────────────────────
 
 export async function executeReorganizeMediaFiles(
-  db: Database,
+  deps: ExecuteReorganizeMediaFilesDeps,
   mediaId: string,
-  deps: { fs: FileSystemPort; client?: DownloadClientPort },
 ): Promise<ReorganizeResult> {
-  const entries = await buildRenameList(db, mediaId);
+  const entries = await buildRenameList(deps, mediaId);
   const toRename = entries.filter((e) => e.status === "rename");
   const skipped = entries.filter((e) => e.status !== "rename").length;
 
@@ -191,10 +216,9 @@ export async function executeReorganizeMediaFiles(
     return { renamed: 0, skipped, failed: [] };
   }
 
-  // Security check: no download should be mid-import
-  const downloads = await findDownloadsByMediaId(db, mediaId);
+  const downloads = await deps.torrents.findDownloadsByMediaId(mediaId);
   if (downloads.some((t) => t.importing)) {
-    throw new Error("Cannot reorganize files while a download is being imported");
+    throw new ReorganizeWhileImportingError();
   }
 
   const importMethod =
@@ -202,14 +226,14 @@ export async function executeReorganizeMediaFiles(
   const result: ReorganizeResult = { renamed: 0, skipped, failed: [] };
 
   if (importMethod === "local") {
-    await executeLocalRenames(toRename, result, db, deps.fs);
-  } else {
-    if (!deps.client) {
-      throw new Error("Download client required for remote reorganize");
-    }
-    await executeRemoteRenames(toRename, downloads, deps.client, result, db);
+    await executeLocalRenames(toRename, result, deps);
+    return result;
   }
 
+  if (!deps.client) {
+    throw new ReorganizeRequiresClientError();
+  }
+  await executeRemoteRenames(toRename, downloads, deps.client, result, deps);
   return result;
 }
 
@@ -218,9 +242,9 @@ export async function executeReorganizeMediaFiles(
 async function executeLocalRenames(
   toRename: RenameEntry[],
   result: ReorganizeResult,
-  db: Database,
-  fs: FileSystemPort,
+  deps: ExecuteReorganizeMediaFilesDeps,
 ): Promise<void> {
+  const fs = deps.fs;
   // Detect whether the parent media dir needs renaming (e.g. [tmdbid-X] → [tvdbid-Y])
   const oldParentDirs = new Set<string>();
   const newParentDirs = new Set<string>();
@@ -240,9 +264,9 @@ async function executeLocalRenames(
   const parentRenamedFrom = new Map<string, string>();
 
   if (oldParentDirs.size === 1 && newParentDirs.size === 1) {
-    const oldParent = [...oldParentDirs][0]!;
-    const newParent = [...newParentDirs][0]!;
-    if (oldParent !== newParent) {
+    const [oldParent] = [...oldParentDirs];
+    const [newParent] = [...newParentDirs];
+    if (oldParent && newParent && oldParent !== newParent) {
       try {
         await fs.rename(oldParent, newParent);
         parentRenamedFrom.set(oldParent, newParent);
@@ -270,7 +294,6 @@ async function executeLocalRenames(
   // Rename individual files
   for (const r of toRename) {
     try {
-      // Adjust oldPath if the parent dir was already renamed
       let effectiveOldPath = r.oldPath;
       for (const [oldP, newP] of parentRenamedFrom) {
         if (r.oldPath.startsWith(oldP + path.sep)) {
@@ -280,7 +303,7 @@ async function executeLocalRenames(
       }
 
       await fs.rename(effectiveOldPath, r.newPath);
-      await updateMediaFile(db, r.mediaFileId, { filePath: r.newPath });
+      await deps.torrents.updateMediaFile(r.mediaFileId, { filePath: r.newPath });
       result.renamed++;
     } catch (err) {
       result.failed.push({
@@ -311,16 +334,15 @@ async function executeLocalRenames(
 
 async function executeRemoteRenames(
   toRename: RenameEntry[],
-  downloads: Awaited<ReturnType<typeof findDownloadsByMediaId>>,
+  downloads: Download[],
   client: DownloadClientPort,
   result: ReorganizeResult,
-  db: Database,
+  deps: ExecuteReorganizeMediaFilesDeps,
 ): Promise<void> {
-  const downloadMap = new Map(
+  const downloadMap = new Map<string, Download>(
     downloads.filter((d) => d.hash).map((d) => [d.id, d]),
   );
 
-  // Group renames by download
   const byDownload = new Map<string, RenameEntry[]>();
   for (const r of toRename) {
     if (!r.downloadId) continue;
@@ -342,7 +364,7 @@ async function executeRemoteRenames(
           await client.renameFile(downloadRow.hash, oldRelative, newRelative);
         }
 
-        await updateMediaFile(db, r.mediaFileId, { filePath: r.newPath });
+        await deps.torrents.updateMediaFile(r.mediaFileId, { filePath: r.newPath });
         result.renamed++;
       } catch (err) {
         result.failed.push({
@@ -352,12 +374,13 @@ async function executeRemoteRenames(
       }
     }
 
-    // Update download contentPath if parent dir changed
     const firstEntry = entries[0];
     if (firstEntry) {
       const newContentDir = path.dirname(firstEntry.newPath);
       if (newContentDir !== downloadRow.contentPath) {
-        await updateDownload(db, downloadRow.id, { contentPath: newContentDir });
+        await deps.torrents.updateDownload(downloadRow.id, {
+          contentPath: newContentDir,
+        });
       }
     }
   }

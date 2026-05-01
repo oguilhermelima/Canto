@@ -40,3 +40,24 @@ export interface UpdateMediaFileInput {
   status?: MediaFileStatus;
   sizeBytes?: number | null;
 }
+
+/**
+ * `MediaFile` row with the joined episode + download projections used by the
+ * file-organization rename flow. Episode is null for movie files; download
+ * is null when the row was inserted by a manual import path.
+ */
+export interface MediaFileWithDetails extends MediaFile {
+  episode: {
+    id: string;
+    number: number;
+    title: string | null;
+    seasonId: string;
+    season: { id: string; number: number };
+  } | null;
+  download: {
+    id: string;
+    quality: string;
+    source: string;
+    title: string;
+  } | null;
+}

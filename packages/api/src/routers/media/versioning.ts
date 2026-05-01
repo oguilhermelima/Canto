@@ -27,6 +27,7 @@ import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter
 import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 import { executeReorganizeMediaFiles } from "@canto/core/domain/file-organization/use-cases/reorganize-media-files";
 import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
+import { makeTorrentsRepository } from "@canto/core/infra/torrents/torrents-repository.adapter";
 import { updateMediaServerMetadata } from "@canto/core/domain/media-servers/use-cases/update-metadata";
 import { makeJellyfinAdapter } from "@canto/core/infra/media-servers/jellyfin.adapter-bindings";
 import { makePlexAdapter } from "@canto/core/infra/media-servers/plex.adapter-bindings";
@@ -90,7 +91,15 @@ export const mediaVersioningRouter = createTRPCRouter({
       }
 
       if (input.renameFiles) {
-        await executeReorganizeMediaFiles(ctx.db, input.id, { fs: createNodeFileSystemAdapter() });
+        await executeReorganizeMediaFiles(
+          {
+            media: makeMediaRepository(ctx.db),
+            torrents: makeTorrentsRepository(ctx.db),
+            localization: makeMediaLocalizationRepository(ctx.db),
+            fs: createNodeFileSystemAdapter(),
+          },
+          input.id,
+        );
       }
 
       if (input.updateMediaServer) {

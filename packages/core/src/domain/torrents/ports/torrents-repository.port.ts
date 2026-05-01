@@ -9,6 +9,7 @@ import type {
 } from "@canto/core/domain/torrents/types/download";
 import type {
   MediaFile,
+  MediaFileWithDetails,
   NewMediaFile,
   UpdateMediaFileInput,
 } from "@canto/core/domain/torrents/types/media-file";
@@ -56,6 +57,9 @@ export interface TorrentsRepositoryPort {
     downloadId: string,
     status?: string,
   ): Promise<MediaFile[]>;
+  /** All media-file rows for a media id, with episode + season + download
+   *  details joined inline. Drives the file-organization rename flow. */
+  findMediaFilesByMediaId(mediaId: string): Promise<MediaFileWithDetails[]>;
   /** Movie dedup gate — matches imported rows only. */
   findDuplicateMovieFile(
     mediaId: string,

@@ -14,6 +14,7 @@ import {
   findMediaPathsByFolder,
   removeMediaPath,
 } from "@canto/core/infra/file-organization/folder-repository";
+import { makeFoldersRepository } from "@canto/core/infra/file-organization/folders-repository.adapter";
 import { validatePath } from "@canto/core/domain/file-organization/rules/validate-path";
 import { browseFolder } from "@canto/core/domain/file-organization/use-cases/browse-folder";
 import { testFolderPaths } from "@canto/core/domain/file-organization/use-cases/test-folder-paths";
@@ -87,7 +88,10 @@ export const folderPathsProcedures = {
     }),
 
   testPaths: adminProcedure.mutation(({ ctx }) =>
-    testFolderPaths(ctx.db, { fs: createNodeFileSystemAdapter() }),
+    testFolderPaths({
+      folders: makeFoldersRepository(ctx.db),
+      fs: createNodeFileSystemAdapter(),
+    }),
   ),
 
   listMediaPaths: adminProcedure

@@ -32,6 +32,7 @@ import {
   findDuplicateEpisodeFile,
   findDuplicateMovieFile,
   findMediaFilesByDownloadId,
+  findMediaFilesByMediaId,
   updateMediaFile,
 } from "@canto/core/infra/media/media-file-repository";
 import {
@@ -111,6 +112,32 @@ export function makeTorrentsRepository(db: Database): TorrentsRepositoryPort {
     findMediaFilesByDownloadId: async (downloadId, status) => {
       const rows = await findMediaFilesByDownloadId(db, downloadId, status);
       return rows.map(mediaFileToDomain);
+    },
+    findMediaFilesByMediaId: async (mediaId) => {
+      const rows = await findMediaFilesByMediaId(db, mediaId);
+      return rows.map((row) => ({
+        ...mediaFileToDomain(row),
+        episode: row.episode
+          ? {
+              id: row.episode.id,
+              number: row.episode.number,
+              title: row.episode.title,
+              seasonId: row.episode.seasonId,
+              season: {
+                id: row.episode.season.id,
+                number: row.episode.season.number,
+              },
+            }
+          : null,
+        download: row.download
+          ? {
+              id: row.download.id,
+              quality: row.download.quality,
+              source: row.download.source,
+              title: row.download.title,
+            }
+          : null,
+      }));
     },
     findDuplicateMovieFile: async (mediaId, quality, source) => {
       const row = await findDuplicateMovieFile(db, mediaId, quality, source);
