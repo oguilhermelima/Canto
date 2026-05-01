@@ -4,22 +4,27 @@ import { useState, useEffect, useCallback } from "react";
 import { Film, Clapperboard, Popcorn, Tv, Play, Sparkles, Heart, Star  } from "lucide-react";
 import type {LucideIcon} from "lucide-react";
 
-const ICONS: LucideIcon[] = [Film, Clapperboard, Popcorn, Tv, Play, Sparkles, Heart, Star];
+const ICONS: [LucideIcon, ...LucideIcon[]] = [Film, Clapperboard, Popcorn, Tv, Play, Sparkles, Heart, Star];
 const SLOT_SIZE = 40;
 const SPIN_ICONS = 10; // how many icons to scroll through per spin
 
+function pickIcon(idx: number): LucideIcon {
+  const safe = ((idx % ICONS.length) + ICONS.length) % ICONS.length;
+  return ICONS[safe] ?? ICONS[0];
+}
+
 function SlotReel({ targetIndex, delay }: { targetIndex: number; delay: number }): React.JSX.Element {
   const [animating, setAnimating] = useState(false);
-  const [strip, setStrip] = useState<LucideIcon[]>([ICONS[targetIndex]!]);
+  const [strip, setStrip] = useState<LucideIcon[]>([pickIcon(targetIndex)]);
   const [offset, setOffset] = useState(0);
 
   const spin = useCallback((newTarget: number) => {
     // Build a strip: current icon at top, then random filler, then target at bottom
-    const newStrip: LucideIcon[] = [strip[0]!]; // start with current visible
+    const newStrip: LucideIcon[] = [strip[0] ?? ICONS[0]]; // start with current visible
     for (let i = 0; i < SPIN_ICONS; i++) {
-      newStrip.push(ICONS[(newTarget + i + 3) % ICONS.length]!);
+      newStrip.push(pickIcon(newTarget + i + 3));
     }
-    newStrip.push(ICONS[newTarget]!); // land on target
+    newStrip.push(pickIcon(newTarget)); // land on target
 
     setStrip(newStrip);
     setOffset(0);
@@ -50,7 +55,7 @@ function SlotReel({ targetIndex, delay }: { targetIndex: number; delay: number }
         }}
         onTransitionEnd={() => {
           // After landing, collapse strip to just the final icon
-          setStrip([ICONS[targetIndex]!]);
+          setStrip([pickIcon(targetIndex)]);
           setOffset(0);
           setAnimating(false);
         }}
@@ -67,14 +72,14 @@ function SlotReel({ targetIndex, delay }: { targetIndex: number; delay: number }
 
 function SlotMachine(): React.JSX.Element {
   // Each reel has a different starting offset to avoid showing same icons
-  const [indices, setIndices] = useState([0, 3, 6]);
+  const [indices, setIndices] = useState<[number, number, number]>([0, 3, 6]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setIndices(([a, b, c]) => [
-        (a! + 1) % ICONS.length,
-        (b! + 2) % ICONS.length,
-        (c! + 3) % ICONS.length,
+        (a + 1) % ICONS.length,
+        (b + 2) % ICONS.length,
+        (c + 3) % ICONS.length,
       ]);
     }, 3000);
     return () => clearInterval(interval);
