@@ -22,16 +22,30 @@ import type { Database } from "@canto/db/client";
 import { mediaVersion, mediaVersionEpisode, media } from "@canto/db/schema";
 
 import type { ServerSource } from "../../domain/sync/types";
+import type {
+  MediaSummary,
+  MediaVersionEpisodeInsert,
+  MediaVersionEpisodeRow,
+  MediaVersionGroupCounts,
+  MediaVersionInsert,
+  MediaVersionRow,
+  MediaVersionWithMedia,
+} from "@canto/core/domain/media-servers/types/media-version";
 import { mediaI18n } from "../shared/media-i18n";
 
 /* -------------------------------------------------------------------------- */
-/*  Row types                                                                  */
+/*  Row types — re-exported from the domain types module                     */
 /* -------------------------------------------------------------------------- */
 
-export type MediaVersionRow = typeof mediaVersion.$inferSelect;
-export type MediaVersionInsert = typeof mediaVersion.$inferInsert;
-export type MediaVersionEpisodeRow = typeof mediaVersionEpisode.$inferSelect;
-export type MediaVersionEpisodeInsert = typeof mediaVersionEpisode.$inferInsert;
+export type {
+  MediaSummary,
+  MediaVersionEpisodeInsert,
+  MediaVersionEpisodeRow,
+  MediaVersionGroupCounts,
+  MediaVersionInsert,
+  MediaVersionRow,
+  MediaVersionWithMedia,
+};
 
 /* -------------------------------------------------------------------------- */
 /*  Read APIs                                                                  */
@@ -66,20 +80,6 @@ export async function findMediaVersionsWithEpisodes(db: Database, mediaId: strin
     where: eq(mediaVersion.mediaId, mediaId),
     with: { episodes: true },
   });
-}
-
-export interface MediaSummary {
-  id: string;
-  title: string;
-  type: string;
-  year: number | null;
-  posterPath: string | null;
-  externalId: number | null;
-}
-
-export interface MediaVersionWithMedia {
-  version: MediaVersionRow;
-  media: MediaSummary | null;
 }
 
 /**
@@ -138,13 +138,6 @@ export async function fetchMediaVersionsWithMedia(
           }
         : null,
   }));
-}
-
-export interface MediaVersionGroupCounts {
-  all: number;
-  imported: number;
-  unmatched: number;
-  failed: number;
 }
 
 /**
