@@ -3,6 +3,8 @@ import {
   authenticatePlexServerToken,
   checkPlexTvPin,
   createPlexTvPin,
+  fetchPlexItemWithMedia,
+  fetchPlexShowLeavesWithMedia,
   getPlexItem,
   getPlexSections,
   getPlexTvServerResource,
@@ -33,5 +35,9 @@ export function makePlexAdapter(): PlexAdapterPort {
     lockFields: (url, token, ratingKey, type, fields) =>
       lockPlexFields(url, token, ratingKey, type, fields),
     scanLibrary: (url, token, sectionIds) => scanPlexLibrary(url, token, sectionIds),
+    fetchItemWithMedia: (url, token, ratingKey) =>
+      fetchPlexItemWithMedia(url, token, ratingKey),
+    fetchShowLeavesWithMedia: (url, token, ratingKey) =>
+      fetchPlexShowLeavesWithMedia(url, token, ratingKey),
   };
 }

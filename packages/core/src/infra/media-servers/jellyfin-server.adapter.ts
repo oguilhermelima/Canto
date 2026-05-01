@@ -4,15 +4,14 @@ import type {
   MediaServerPort,
   SetPlaybackPositionInput,
 } from "@canto/core/domain/shared/ports/media-server.port";
+import type { JellyfinAdapterPort } from "@canto/core/domain/media-servers/ports/jellyfin-adapter.port";
 import { fetchJellyfinMediaInfo } from "@canto/core/domain/media-servers/use-cases/fetch-info/jellyfin";
+import { makeJellyfinAdapter } from "@canto/core/infra/media-servers/jellyfin.adapter-bindings";
 import {
   findJellyfinItemIdByProviderForUser,
-  getJellyfinLibraryFolders,
   markJellyfinItemPlayed,
   markJellyfinItemUnplayed,
   setJellyfinPlaybackPosition,
-  testJellyfinConnection,
-  triggerJellyfinScan,
 } from "@canto/core/infra/media-servers/jellyfin.adapter";
 
 function requireJellyfinUserId(
@@ -34,73 +33,80 @@ function requireJellyfinUserId(
  * otherwise. Write methods require `externalUserId` because Jellyfin scopes
  * playback state per-user.
  */
-export const jellyfinMediaServer: MediaServerPort = {
-  testConnection: (url, apiKey) => testJellyfinConnection(url, apiKey),
+export function makeJellyfinMediaServer(
+  jellyfin: JellyfinAdapterPort = makeJellyfinAdapter(),
+): MediaServerPort {
+  return {
+    testConnection: (url, apiKey) => jellyfin.testConnection(url, apiKey),
 
-  listLibraries: async (url, apiKey) => {
-    const folders = await getJellyfinLibraryFolders(url, apiKey);
-    return folders.map((f) => ({
-      id: f.Id,
-      name: f.Name,
-      type: f.CollectionType,
-      paths: f.Locations,
-    }));
-  },
+    listLibraries: async (url, apiKey) => {
+      const folders = await jellyfin.getLibraryFolders(url, apiKey);
+      return folders.map((f) => ({
+        id: f.Id,
+        name: f.Name,
+        type: f.CollectionType,
+        paths: f.Locations,
+      }));
+    },
 
-  scanLibrary: async (url, apiKey, sectionIds) => {
-    if (sectionIds && sectionIds.length > 0) {
-      await Promise.all(
-        sectionIds.map((id) => triggerJellyfinScan(url, apiKey, id)),
-      );
-      return;
-    }
-    await triggerJellyfinScan(url, apiKey);
-  },
+    scanLibrary: async (url, apiKey, sectionIds) => {
+      if (sectionIds && sectionIds.length > 0) {
+        await Promise.all(
+          sectionIds.map((id) => jellyfin.triggerScan(url, apiKey, id)),
+        );
+        return;
+      }
+      await jellyfin.triggerScan(url, apiKey);
+    },
 
-  fetchItemMediaInfo: (url, apiKey, itemId, type) =>
-    fetchJellyfinMediaInfo(url, apiKey, itemId, type),
+    fetchItemMediaInfo: (url, apiKey, itemId, type) =>
+      fetchJellyfinMediaInfo(jellyfin, url, apiKey, itemId, type),
 
-  setPlaybackPosition: (
-    url,
-    apiKey,
-    input: SetPlaybackPositionInput,
-  ): Promise<void> =>
-    setJellyfinPlaybackPosition(
+    setPlaybackPosition: (
       url,
       apiKey,
-      requireJellyfinUserId(input.externalUserId, "setPlaybackPosition"),
-      input.itemId,
-      input.positionSeconds,
-      input.isCompleted,
-    ),
+      input: SetPlaybackPositionInput,
+    ): Promise<void> =>
+      setJellyfinPlaybackPosition(
+        url,
+        apiKey,
+        requireJellyfinUserId(input.externalUserId, "setPlaybackPosition"),
+        input.itemId,
+        input.positionSeconds,
+        input.isCompleted,
+      ),
 
-  markPlayed: (url, apiKey, input: MarkWatchStateInput): Promise<void> =>
-    markJellyfinItemPlayed(
+    markPlayed: (url, apiKey, input: MarkWatchStateInput): Promise<void> =>
+      markJellyfinItemPlayed(
+        url,
+        apiKey,
+        requireJellyfinUserId(input.externalUserId, "markPlayed"),
+        input.itemId,
+      ),
+
+    markUnplayed: (url, apiKey, input: MarkWatchStateInput): Promise<void> =>
+      markJellyfinItemUnplayed(
+        url,
+        apiKey,
+        requireJellyfinUserId(input.externalUserId, "markUnplayed"),
+        input.itemId,
+      ),
+
+    findItemIdByProvider: (
       url,
       apiKey,
-      requireJellyfinUserId(input.externalUserId, "markPlayed"),
-      input.itemId,
-    ),
+      input: FindItemIdByProviderInput,
+    ): Promise<string | null> =>
+      findJellyfinItemIdByProviderForUser(
+        url,
+        apiKey,
+        requireJellyfinUserId(input.externalUserId, "findItemIdByProvider"),
+        input.title,
+        input.externalId,
+        input.provider,
+      ),
+  };
+}
 
-  markUnplayed: (url, apiKey, input: MarkWatchStateInput): Promise<void> =>
-    markJellyfinItemUnplayed(
-      url,
-      apiKey,
-      requireJellyfinUserId(input.externalUserId, "markUnplayed"),
-      input.itemId,
-    ),
-
-  findItemIdByProvider: (
-    url,
-    apiKey,
-    input: FindItemIdByProviderInput,
-  ): Promise<string | null> =>
-    findJellyfinItemIdByProviderForUser(
-      url,
-      apiKey,
-      requireJellyfinUserId(input.externalUserId, "findItemIdByProvider"),
-      input.title,
-      input.externalId,
-      input.provider,
-    ),
-};
+/** Default Jellyfin `MediaServerPort` instance. */
+export const jellyfinMediaServer: MediaServerPort = makeJellyfinMediaServer();

@@ -13,6 +13,8 @@ import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import { runWithConcurrency } from "@canto/core/platform/concurrency/run-with-concurrency";
 import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
+import { makeJellyfinAdapter } from "@canto/core/infra/media-servers/jellyfin.adapter-bindings";
+import { makePlexAdapter } from "@canto/core/infra/media-servers/plex.adapter-bindings";
 import type { MediaVersionRow } from "@canto/core/infra/media/media-version-repository";
 import {
   findEnabledSyncLinks,
@@ -539,9 +541,19 @@ export async function runReverseSync(options: ReverseSyncOptions = {}): Promise<
         `[reverse-sync] Syncing ${needGlobalSync.length} new items for global library from user ${conn.userId}`,
       );
       try {
-        await runSyncPipeline(db, tmdb, { logger: makeConsoleLogger(), dispatcher: jobDispatcher }, needGlobalSync, `${provider}-sync`, {
-          forUserId: conn.userId,
-        });
+        await runSyncPipeline(
+          db,
+          tmdb,
+          {
+            logger: makeConsoleLogger(),
+            dispatcher: jobDispatcher,
+            jellyfin: makeJellyfinAdapter(),
+            plex: makePlexAdapter(),
+          },
+          needGlobalSync,
+          `${provider}-sync`,
+          { forUserId: conn.userId },
+        );
       } catch (err) {
         console.error(
           `[reverse-sync] runSyncPipeline failed for ${provider} (user ${conn.userId}):`,

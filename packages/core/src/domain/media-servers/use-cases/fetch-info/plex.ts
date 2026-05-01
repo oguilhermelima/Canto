@@ -1,18 +1,15 @@
-import {
-  fetchPlexItemWithMedia,
-  fetchPlexShowLeavesWithMedia
-  
-  
-  
-} from "@canto/core/infra/media-servers/plex.adapter";
-import type {PlexStreamEntry, PlexStreamMedia, PlexStreamMetadataItem} from "@canto/core/infra/media-servers/plex.adapter";
+import type { PlexAdapterPort } from "@canto/core/domain/media-servers/ports/plex-adapter.port";
+import type {
+  PlexStreamEntry,
+  PlexStreamMedia,
+  PlexStreamMetadataItem,
+} from "@canto/core/domain/media-servers/types/streams";
 import {
   dedupeLangs,
   normalizeLang,
-  normalizeResolution
-  
+  normalizeResolution,
 } from "@canto/core/domain/media-servers/use-cases/fetch-info/shared";
-import type {MediaFileInfo} from "@canto/core/domain/media-servers/use-cases/fetch-info/shared";
+import type { MediaFileInfo } from "@canto/core/domain/media-servers/use-cases/fetch-info/shared";
 
 export function extractPlexFileInfo(item: PlexStreamMetadataItem): MediaFileInfo {
   const m = item.Media?.[0];
@@ -76,17 +73,18 @@ function detectPlexHdr(
 }
 
 export async function fetchPlexMediaInfo(
+  plex: PlexAdapterPort,
   url: string,
   token: string,
   ratingKey: string,
   type: "movie" | "show",
 ): Promise<MediaFileInfo[]> {
   if (type === "movie") {
-    const item = await fetchPlexItemWithMedia(url, token, ratingKey);
+    const item = await plex.fetchItemWithMedia(url, token, ratingKey);
     return item ? [extractPlexFileInfo(item)] : [];
   }
 
-  const leaves = await fetchPlexShowLeavesWithMedia(url, token, ratingKey);
+  const leaves = await plex.fetchShowLeavesWithMedia(url, token, ratingKey);
   return leaves.map((ep) => {
     const info = extractPlexFileInfo(ep);
     info.seasonNumber = ep.parentIndex;

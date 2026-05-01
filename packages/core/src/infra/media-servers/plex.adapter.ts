@@ -578,47 +578,19 @@ export async function findPlexItemIdByProviderId(
 
 /* -------------------------------------------------------------------------- */
 /*  Stream-level item info (for MediaFileInfo extraction)                      */
+/*                                                                            */
+/*  Type shapes live in `domain/media-servers/types/streams.ts`; re-exported */
+/*  here so existing consumers keep working until they migrate to the port.  */
 /* -------------------------------------------------------------------------- */
 
-export interface PlexStreamEntry {
-  streamType: number; // 1 = video, 2 = audio, 3 = subtitle
-  codec?: string;
-  default?: boolean;
-  selected?: boolean;
-  language?: string;
-  languageCode?: string;
-  languageTag?: string;
-  colorPrimaries?: string;
-  colorTrc?: string;
-  DOVIPresent?: boolean;
-}
+export type {
+  PlexStreamEntry,
+  PlexStreamMedia,
+  PlexStreamMetadataItem,
+  PlexStreamPart,
+} from "@canto/core/domain/media-servers/types/streams";
 
-export interface PlexStreamPart {
-  file?: string;
-  size?: number;
-  duration?: number;
-  Stream?: PlexStreamEntry[];
-}
-
-export interface PlexStreamMedia {
-  videoCodec?: string;
-  audioCodec?: string;
-  container?: string;
-  bitrate?: number;
-  duration?: number;
-  height?: number;
-  videoResolution?: string;
-  videoDynamicRange?: string;
-  videoDoViPresent?: boolean;
-  Part?: PlexStreamPart[];
-}
-
-export interface PlexStreamMetadataItem {
-  ratingKey: string;
-  parentIndex?: number;
-  index?: number;
-  Media?: PlexStreamMedia[];
-}
+import type { PlexStreamMetadataItem } from "@canto/core/domain/media-servers/types/streams";
 
 /** Fetch a single Plex movie item with its Media/Part/Stream fields populated. */
 export async function fetchPlexItemWithMedia(

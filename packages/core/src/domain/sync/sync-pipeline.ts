@@ -38,12 +38,13 @@ import {
   resolveExternalId,
   tmdbCall,
 } from "@canto/core/domain/media/use-cases/resolve-external-id";
+import type { JellyfinAdapterPort } from "@canto/core/domain/media-servers/ports/jellyfin-adapter.port";
+import type { PlexAdapterPort } from "@canto/core/domain/media-servers/ports/plex-adapter.port";
 import {
   fetchJellyfinMediaInfo,
-  fetchPlexMediaInfo
-  
+  fetchPlexMediaInfo,
 } from "@canto/core/domain/media-servers/use-cases/fetch-info";
-import type {MediaFileInfo} from "@canto/core/domain/media-servers/use-cases/fetch-info";
+import type { MediaFileInfo } from "@canto/core/domain/media-servers/use-cases/fetch-info";
 
 import type {
   ScannedMediaItem,
@@ -285,12 +286,15 @@ async function ensureMediaAnchor(
 /* -------------------------------------------------------------------------- */
 
 async function fetchMediaFilesFor(
+  jellyfin: JellyfinAdapterPort,
+  plex: PlexAdapterPort,
   scanned: ScannedMediaItem,
   config: ServerConfig,
 ): Promise<MediaFileInfo[]> {
   if (scanned.source === "jellyfin") {
     if (!config.jellyfinUrl || !config.jellyfinKey) return [];
     return fetchJellyfinMediaInfo(
+      jellyfin,
       config.jellyfinUrl,
       config.jellyfinKey,
       scanned.serverItemId,
@@ -298,7 +302,13 @@ async function fetchMediaFilesFor(
     );
   }
   if (!config.plexUrl || !config.plexToken) return [];
-  return fetchPlexMediaInfo(config.plexUrl, config.plexToken, scanned.serverItemId, scanned.type);
+  return fetchPlexMediaInfo(
+    plex,
+    config.plexUrl,
+    config.plexToken,
+    scanned.serverItemId,
+    scanned.type,
+  );
 }
 
 /**
@@ -386,6 +396,8 @@ async function loadServerConfig(): Promise<ServerConfig> {
 export interface RunSyncPipelineDeps {
   logger: LoggerPort;
   dispatcher: JobDispatcherPort;
+  jellyfin: JellyfinAdapterPort;
+  plex: PlexAdapterPort;
 }
 
 export async function runSyncPipeline(
@@ -427,7 +439,7 @@ export async function runSyncPipeline(
     for (let i = 0; i < deduplicated.length; i += BATCH_SIZE) {
       const batch = deduplicated.slice(i, i + BATCH_SIZE);
       for (const scanned of batch) {
-        await processOne(db, tmdb, deps.logger, deps.dispatcher, scanned, {
+        await processOne(db, tmdb, deps, scanned, {
           tag,
           config,
           mediaCache,
@@ -492,8 +504,7 @@ interface ProcessCtx {
 async function processOne(
   db: Database,
   tmdb: MediaProviderPort,
-  logger: LoggerPort,
-  dispatcher: JobDispatcherPort,
+  deps: RunSyncPipelineDeps,
   scanned: ScannedMediaItem,
   ctx: ProcessCtx,
 ): Promise<void> {
@@ -503,8 +514,8 @@ async function processOne(
     const anchor = await ensureMediaAnchor(
       db,
       tmdb,
-      logger,
-      dispatcher,
+      deps.logger,
+      deps.dispatcher,
       scanned,
       mediaCache,
       supportedLangs,
@@ -555,7 +566,7 @@ async function processOne(
     // Fetch quality metadata from the server so it lands on the upsert.
     let files: MediaFileInfo[] = [];
     try {
-      files = await fetchMediaFilesFor(scanned, config);
+      files = await fetchMediaFilesFor(deps.jellyfin, deps.plex, scanned, config);
     } catch (err) {
       console.error(`[${tag}] Failed to fetch media info for ${scanned.title}:`, err);
     }

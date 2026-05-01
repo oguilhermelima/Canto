@@ -1,14 +1,15 @@
 /* -------------------------------------------------------------------------- */
 /*  PlexAdapterPort                                                           */
 /*                                                                            */
-/*  The narrow surface of Plex HTTP operations the domain layer depends on.  */
-/*  Mirrors the shape of `infra/media-servers/plex.adapter.ts` but only the   */
-/*  functions that use-cases (authenticate, discover, update-metadata,        */
-/*  trigger-scans, services) actually call. The full adapter surface (mark   */
-/*  watched, set playback position, find by guid, fetch leaves with media —   */
-/*  used by `domain/user-media`) stays as direct imports until the user-media */
-/*  wave runs.                                                                */
+/*  Narrow surface of Plex HTTP operations the domain layer depends on.      */
+/*  Mirrors `infra/media-servers/plex.adapter.ts` for the calls the use      */
+/*  cases actually invoke. Higher-level orchestration (mark watched,         */
+/*  playback push) lives behind {@link MediaServerPort}.                     */
 /* -------------------------------------------------------------------------- */
+
+import type {
+  PlexStreamMetadataItem,
+} from "@canto/core/domain/media-servers/types/streams";
 
 export interface PlexSection {
   key: string;
@@ -76,4 +77,16 @@ export interface PlexAdapterPort {
   ): Promise<void>;
   /** Trigger a library scan on one or more Plex sections (all if omitted). */
   scanLibrary(url: string, token: string, sectionIds?: string[]): Promise<void>;
+  /** Fetch a single Plex movie item with its Media/Part/Stream fields populated. */
+  fetchItemWithMedia(
+    url: string,
+    token: string,
+    ratingKey: string,
+  ): Promise<PlexStreamMetadataItem | null>;
+  /** Fetch all leaf episodes under a Plex show with Media/Part/Stream populated. */
+  fetchShowLeavesWithMedia(
+    url: string,
+    token: string,
+    ratingKey: string,
+  ): Promise<PlexStreamMetadataItem[]>;
 }

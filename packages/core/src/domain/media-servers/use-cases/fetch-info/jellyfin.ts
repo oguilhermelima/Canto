@@ -1,17 +1,14 @@
-import {
-  fetchJellyfinItemWithStreams,
-  fetchJellyfinShowEpisodesWithStreams
-  
-  
-} from "@canto/core/infra/media-servers/jellyfin.adapter";
-import type {JellyfinStreamItem, JellyfinStreamMediaStream} from "@canto/core/infra/media-servers/jellyfin.adapter";
+import type { JellyfinAdapterPort } from "@canto/core/domain/media-servers/ports/jellyfin-adapter.port";
+import type {
+  JellyfinStreamItem,
+  JellyfinStreamMediaStream,
+} from "@canto/core/domain/media-servers/types/streams";
 import {
   dedupeLangs,
   normalizeLang,
-  normalizeResolution
-  
+  normalizeResolution,
 } from "@canto/core/domain/media-servers/use-cases/fetch-info/shared";
-import type {MediaFileInfo} from "@canto/core/domain/media-servers/use-cases/fetch-info/shared";
+import type { MediaFileInfo } from "@canto/core/domain/media-servers/use-cases/fetch-info/shared";
 
 export function extractJellyfinFileInfo(item: JellyfinStreamItem): MediaFileInfo {
   const src = item.MediaSources?.[0];
@@ -31,7 +28,7 @@ export function extractJellyfinFileInfo(item: JellyfinStreamItem): MediaFileInfo
     filePath: src?.Path,
     bitrate: src?.Bitrate,
     durationMs:
-      item.RunTimeTicks != null ? Math.floor(item.RunTimeTicks / 10_000) : undefined,
+      item.RunTimeTicks !== undefined ? Math.floor(item.RunTimeTicks / 10_000) : undefined,
     hdr: detectJellyfinHdr(videoStream),
     primaryAudioLang: normalizeLang(defaultAudio?.Language),
     audioLangs: dedupeLangs(audioStreams.map((s) => s.Language)),
@@ -53,17 +50,18 @@ function detectJellyfinHdr(
 }
 
 export async function fetchJellyfinMediaInfo(
+  jellyfin: JellyfinAdapterPort,
   url: string,
   apiKey: string,
   itemId: string,
   type: "movie" | "show",
 ): Promise<MediaFileInfo[]> {
   if (type === "movie") {
-    const item = await fetchJellyfinItemWithStreams(url, apiKey, itemId);
+    const item = await jellyfin.fetchItemWithStreams(url, apiKey, itemId);
     return item ? [extractJellyfinFileInfo(item)] : [];
   }
 
-  const episodes = await fetchJellyfinShowEpisodesWithStreams(url, apiKey, itemId);
+  const episodes = await jellyfin.fetchShowEpisodesWithStreams(url, apiKey, itemId);
   return episodes.map((ep) => {
     const info = extractJellyfinFileInfo(ep);
     info.seasonNumber = ep.ParentIndexNumber;

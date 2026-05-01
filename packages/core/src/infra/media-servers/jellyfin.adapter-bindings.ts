@@ -3,6 +3,8 @@ import {
   applyJellyfinRemoteMatch,
   authenticateJellyfinByName,
   createJellyfinApiKey,
+  fetchJellyfinItemWithStreams,
+  fetchJellyfinShowEpisodesWithStreams,
   findJellyfinApiKey,
   findJellyfinMoviesByProviderId,
   getJellyfinCurrentUserId,
@@ -32,5 +34,9 @@ export function makeJellyfinAdapter(): JellyfinAdapterPort {
     findMoviesByProviderId: (url, apiKey, media) =>
       findJellyfinMoviesByProviderId(url, apiKey, media),
     mergeVersions: (url, apiKey, ids) => mergeJellyfinVersions(url, apiKey, ids),
+    fetchItemWithStreams: (url, apiKey, itemId) =>
+      fetchJellyfinItemWithStreams(url, apiKey, itemId),
+    fetchShowEpisodesWithStreams: (url, apiKey, showId) =>
+      fetchJellyfinShowEpisodesWithStreams(url, apiKey, showId),
   };
 }

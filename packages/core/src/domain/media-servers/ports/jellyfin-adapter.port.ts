@@ -2,11 +2,14 @@
 /*  JellyfinAdapterPort                                                       */
 /*                                                                            */
 /*  Narrow surface of Jellyfin HTTP operations the domain layer depends on.  */
-/*  Mirrors `infra/media-servers/jellyfin.adapter.ts` for the calls actually  */
-/*  invoked by use-cases (authenticate, discover, update-metadata, trigger-   */
-/*  scans, services). Per-user playback push, episode stream fetches, and    */
-/*  remote-match search live in user-media and stay direct until that wave.   */
+/*  Mirrors `infra/media-servers/jellyfin.adapter.ts` for the calls the use  */
+/*  cases actually invoke. Higher-level orchestration (mark played, playback */
+/*  push) lives behind {@link MediaServerPort}.                               */
 /* -------------------------------------------------------------------------- */
+
+import type {
+  JellyfinStreamItem,
+} from "@canto/core/domain/media-servers/types/streams";
 
 export interface JellyfinLibraryFolder {
   Id: string;
@@ -76,4 +79,19 @@ export interface JellyfinAdapterPort {
   ): Promise<JellyfinMovieMatch[]>;
   /** Merge multiple Jellyfin items into a single multi-version entry. */
   mergeVersions(url: string, apiKey: string, ids: string[]): Promise<void>;
+  /** Fetch a single Jellyfin movie item with its media/stream fields populated. */
+  fetchItemWithStreams(
+    url: string,
+    apiKey: string,
+    itemId: string,
+  ): Promise<JellyfinStreamItem | null>;
+  /**
+   * Fetch all episodes under a Jellyfin show id with media/stream fields. The
+   * adapter paginates so callers receive the full list.
+   */
+  fetchShowEpisodesWithStreams(
+    url: string,
+    apiKey: string,
+    showId: string,
+  ): Promise<JellyfinStreamItem[]>;
 }

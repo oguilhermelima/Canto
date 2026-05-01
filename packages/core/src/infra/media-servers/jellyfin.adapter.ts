@@ -470,35 +470,18 @@ export async function findJellyfinItemIdByProviderForUser(
  */
 /* -------------------------------------------------------------------------- */
 /*  Stream-level item info (for MediaFileInfo extraction)                      */
+/*                                                                            */
+/*  Type shapes live in `domain/media-servers/types/streams.ts`; re-exported */
+/*  here so existing consumers keep working until they migrate to the port.  */
 /* -------------------------------------------------------------------------- */
 
-export interface JellyfinStreamMediaStream {
-  Type: string;
-  Codec?: string;
-  Height?: number;
-  Width?: number;
-  BitDepth?: number;
-  VideoRange?: string;
-  VideoRangeType?: string;
-  Language?: string;
-  IsDefault?: boolean;
-}
+export type {
+  JellyfinStreamItem,
+  JellyfinStreamMediaSource,
+  JellyfinStreamMediaStream,
+} from "@canto/core/domain/media-servers/types/streams";
 
-export interface JellyfinStreamMediaSource {
-  Container?: string;
-  Size?: number;
-  Path?: string;
-  Bitrate?: number;
-  MediaStreams?: JellyfinStreamMediaStream[];
-}
-
-export interface JellyfinStreamItem {
-  Id: string;
-  ParentIndexNumber?: number;
-  IndexNumber?: number;
-  RunTimeTicks?: number;
-  MediaSources?: JellyfinStreamMediaSource[];
-}
+import type { JellyfinStreamItem } from "@canto/core/domain/media-servers/types/streams";
 
 const JELLYFIN_STREAM_FIELDS = "MediaSources,MediaStreams,RunTimeTicks";
 
