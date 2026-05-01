@@ -1,41 +1,31 @@
-import { cached } from "@canto/core/platform/cache/redis";
-import { fetchFromTmdb } from "@canto/core/platform/http/tmdb-raw";
+import type { CachePort } from "@canto/core/domain/shared/ports/cache";
+import type {
+  FilterEntity,
+  RecommendationsCatalogPort,
+} from "@canto/core/domain/recommendations/ports/recommendations-catalog.port";
 import type { FilterSearchInput } from "@canto/validators";
 
-export type FilterEntity = {
-  id: number;
-  name: string;
-  logoPath: string | null;
-  originCountry: string;
-};
+const FILTER_SEARCH_TTL_SECONDS = 5 * 60;
 
-interface TmdbSearchResponse {
-  results: Array<{
-    id: number;
-    name: string;
-    logo_path: string | null;
-    origin_country: string;
-  }>;
+export type { FilterEntity };
+
+export interface SearchFilterEntitiesDeps {
+  cache: CachePort;
+  catalog: RecommendationsCatalogPort;
 }
 
 /**
- * Search for networks or companies via TMDB. Backs the "pick a network"
- * / "pick a studio" inputs in the filter sidebar.
+ * Search for networks or companies via TMDB. Backs the "pick a network" /
+ * "pick a studio" inputs in the filter sidebar. Cached 5 minutes per
+ * (type, query).
  */
 export async function searchFilterEntities(
+  deps: SearchFilterEntitiesDeps,
   input: FilterSearchInput,
 ): Promise<FilterEntity[]> {
-  const endpoint =
-    input.type === "networks" ? "/search/network" : "/search/company";
-  return cached(`provider:${input.type}:${input.query}`, 300, async () => {
-    const data = await fetchFromTmdb<TmdbSearchResponse>(endpoint, {
-      query: input.query,
-    });
-    return data.results.map((n) => ({
-      id: n.id,
-      name: n.name,
-      logoPath: n.logo_path,
-      originCountry: n.origin_country,
-    }));
-  });
+  return deps.cache.wrap(
+    `provider:${input.type}:${input.query}`,
+    FILTER_SEARCH_TTL_SECONDS,
+    () => deps.catalog.searchEntities(input.type, input.query),
+  );
 }

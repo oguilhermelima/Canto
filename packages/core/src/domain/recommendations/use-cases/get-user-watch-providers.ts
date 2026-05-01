@@ -1,58 +1,35 @@
 import type { Database } from "@canto/db/client";
-import { cached } from "@canto/core/platform/cache/redis";
-import { fetchFromTmdb } from "@canto/core/platform/http/tmdb-raw";
-import {
-  groupByBrand
-  
-  
-} from "@canto/core/domain/recommendations/rules/canonical-brand";
-import type {BrandedProvider, WatchProvider} from "@canto/core/domain/recommendations/rules/canonical-brand";
+import type { CachePort } from "@canto/core/domain/shared/ports/cache";
+import type { RecommendationsCatalogPort } from "@canto/core/domain/recommendations/ports/recommendations-catalog.port";
+import type { BrandedProvider } from "@canto/core/domain/recommendations/rules/canonical-brand";
 import { getUserWatchPreferences } from "@canto/core/domain/shared/services/user-service";
+
+const USER_WATCH_PROVIDERS_TTL_SECONDS = 24 * 60 * 60;
 
 export type UserWatchProvidersResult = {
   region: string;
   providers: BrandedProvider[];
 };
 
-interface TmdbProvidersResponse {
-  results: Array<{
-    provider_id: number;
-    provider_name: string;
-    logo_path: string;
-    display_priority: number;
-  }>;
-}
-
-async function fetchRegionProviders(region: string): Promise<WatchProvider[]> {
-  const [movieRes, tvRes] = await Promise.all([
-    fetchFromTmdb<TmdbProvidersResponse>("/watch/providers/movie", { watch_region: region }),
-    fetchFromTmdb<TmdbProvidersResponse>("/watch/providers/tv", { watch_region: region }),
-  ]);
-
-  const byId = new Map<number, WatchProvider>();
-  for (const p of [...movieRes.results, ...tvRes.results]) {
-    const priority = p.display_priority;
-    const prev = byId.get(p.provider_id);
-    if (!prev || priority < prev.displayPriority) {
-      byId.set(p.provider_id, {
-        providerId: p.provider_id,
-        providerName: p.provider_name,
-        logoPath: p.logo_path,
-        displayPriority: priority,
-      });
-    }
-  }
-  return Array.from(byId.values());
+export interface GetUserWatchProvidersDeps {
+  cache: CachePort;
+  catalog: RecommendationsCatalogPort;
 }
 
 export async function getUserWatchProviders(
+  deps: GetUserWatchProvidersDeps,
   db: Database,
   userId: string,
   overrideRegion?: string,
 ): Promise<UserWatchProvidersResult> {
-  const region = overrideRegion ?? (await getUserWatchPreferences(db, userId)).watchRegion;
-  return cached(`user-watch-providers:v2:${region}`, 86400, async () => {
-    const providers = await fetchRegionProviders(region);
-    return { region, providers: groupByBrand(providers) };
-  });
+  const region =
+    overrideRegion ?? (await getUserWatchPreferences(db, userId)).watchRegion;
+  return deps.cache.wrap(
+    `user-watch-providers:v2:${region}`,
+    USER_WATCH_PROVIDERS_TTL_SECONDS,
+    async () => {
+      const providers = await deps.catalog.listAllWatchProviders(region);
+      return { region, providers };
+    },
+  );
 }

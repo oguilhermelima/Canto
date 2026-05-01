@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
+import { makeCache } from "@canto/core/platform/cache/cache.adapter";
 import { getSpotlight } from "@canto/core/domain/recommendations/use-cases/get-spotlight";
 import { getGenreTiles } from "@canto/core/domain/recommendations/use-cases/get-genre-tiles";
 import { getTop10 } from "@canto/core/domain/recommendations/use-cases/get-top-10";
@@ -36,13 +37,25 @@ export const providerDiscoveryRouter = createTRPCRouter({
 
   genreTiles: protectedProcedure
     .input(regionInput)
-    .query(({ ctx, input }) =>
-      getGenreTiles(ctx.db, ctx.session.user.id, input?.region),
-    ),
+    .query(async ({ ctx, input }) => {
+      const tmdb = await getTmdbProvider();
+      return getGenreTiles(
+        { cache: makeCache(), tmdb },
+        ctx.db,
+        ctx.session.user.id,
+        input?.region,
+      );
+    }),
 
   top10: protectedProcedure
     .input(regionInput)
-    .query(({ ctx, input }) =>
-      getTop10(ctx.db, ctx.session.user.id, input?.region),
-    ),
+    .query(async ({ ctx, input }) => {
+      const tmdb = await getTmdbProvider();
+      return getTop10(
+        { cache: makeCache(), tmdb },
+        ctx.db,
+        ctx.session.user.id,
+        input?.region,
+      );
+    }),
 });

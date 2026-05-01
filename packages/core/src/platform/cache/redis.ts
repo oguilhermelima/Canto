@@ -15,7 +15,7 @@ function createRedisCache(connection: RedisConnectionOptions): CachePort {
     lazyConnect: true,
   });
 
-  return {
+  const port: CachePort = {
     async get<T>(key: string): Promise<T | null> {
       const hit = await redis.get(key);
       return hit ? (JSON.parse(hit) as T) : null;
@@ -29,7 +29,28 @@ function createRedisCache(connection: RedisConnectionOptions): CachePort {
       const keys = await redis.keys(pattern);
       if (keys.length > 0) await redis.del(...keys);
     },
+
+    async wrap<T>(
+      key: string,
+      ttlSeconds: number,
+      fn: () => Promise<T>,
+    ): Promise<T> {
+      try {
+        const hit = await port.get<T>(key);
+        if (hit !== null) return hit;
+      } catch {
+        // Cache unavailable — fall through to fn().
+      }
+      const result = await fn();
+      try {
+        await port.set(key, result, ttlSeconds);
+      } catch {
+        // Cache unavailable — still return result.
+      }
+      return result;
+    },
   };
+  return port;
 }
 
 /* Singleton + cached() helper */

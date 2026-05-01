@@ -9,6 +9,8 @@ import { tmdbCertification } from "@canto/db/schema";
 
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../../trpc";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
+import { makeCache } from "@canto/core/platform/cache/cache.adapter";
+import { makeRecommendationsCatalog } from "@canto/core/platform/http/recommendations-catalog.adapter";
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import { getFilterOptions } from "@canto/core/domain/recommendations/use-cases/get-filter-options";
 import { searchFilterEntities } from "@canto/core/domain/recommendations/use-cases/search-filter-entities";
@@ -20,11 +22,21 @@ const regionInput = z.object({ region: z.string().length(2).optional() }).option
 export const providerFiltersRouter = createTRPCRouter({
   filterOptions: publicProcedure
     .input(filterOptionsInput)
-    .query(({ input }) => getFilterOptions(input)),
+    .query(({ input }) =>
+      getFilterOptions(
+        { cache: makeCache(), catalog: makeRecommendationsCatalog() },
+        input,
+      ),
+    ),
 
   filterSearch: publicProcedure
     .input(filterSearchInput)
-    .query(({ input }) => searchFilterEntities(input)),
+    .query(({ input }) =>
+      searchFilterEntities(
+        { cache: makeCache(), catalog: makeRecommendationsCatalog() },
+        input,
+      ),
+    ),
 
   genres: publicProcedure
     .input(genresInput.optional())
@@ -36,7 +48,12 @@ export const providerFiltersRouter = createTRPCRouter({
   userWatchProviders: protectedProcedure
     .input(regionInput)
     .query(({ ctx, input }) =>
-      getUserWatchProviders(ctx.db, ctx.session.user.id, input?.region),
+      getUserWatchProviders(
+        { cache: makeCache(), catalog: makeRecommendationsCatalog() },
+        ctx.db,
+        ctx.session.user.id,
+        input?.region,
+      ),
     ),
 
   watchProviderLinks: publicProcedure.query(async ({ ctx }) => {

@@ -1,71 +1,47 @@
-import { cached } from "@canto/core/platform/cache/redis";
-import { fetchFromTmdb } from "@canto/core/platform/http/tmdb-raw";
-import {
-  groupByBrand
-  
-} from "@canto/core/domain/recommendations/rules/canonical-brand";
-import type {BrandedProvider} from "@canto/core/domain/recommendations/rules/canonical-brand";
+import type { CachePort } from "@canto/core/domain/shared/ports/cache";
+import type {
+  RecommendationsCatalogPort,
+  RegionOption,
+} from "@canto/core/domain/recommendations/ports/recommendations-catalog.port";
+import type { BrandedProvider } from "@canto/core/domain/recommendations/rules/canonical-brand";
 import type { FilterOptionsInput } from "@canto/validators";
 
-export type RegionOption = {
-  code: string;
-  englishName: string;
-  nativeName: string;
-};
+const FILTER_OPTIONS_TTL_SECONDS = 24 * 60 * 60;
 
+export type { RegionOption };
 export type WatchProviderOption = BrandedProvider;
 
-interface TmdbRegionsResponse {
-  results: Array<{ iso_3166_1: string; english_name: string; native_name: string }>;
+export interface GetFilterOptionsDeps {
+  cache: CachePort;
+  catalog: RecommendationsCatalogPort;
 }
 
-interface TmdbProvidersResponse {
-  results: Array<{
-    provider_id: number;
-    provider_name: string;
-    logo_path: string;
-    display_priority: number;
-    display_priorities: Record<string, number>;
-  }>;
-}
-
-async function listRegions(): Promise<RegionOption[]> {
-  return cached("provider:regions", 86400, async () => {
-    const data = await fetchFromTmdb<TmdbRegionsResponse>("/watch/providers/regions");
-    return data.results.map((r) => ({
-      code: r.iso_3166_1,
-      englishName: r.english_name,
-      nativeName: r.native_name,
-    }));
-  });
+async function listRegions(deps: GetFilterOptionsDeps): Promise<RegionOption[]> {
+  return deps.cache.wrap(
+    "provider:regions",
+    FILTER_OPTIONS_TTL_SECONDS,
+    () => deps.catalog.listRegions(),
+  );
 }
 
 async function listWatchProviders(
+  deps: GetFilterOptionsDeps,
   mediaType: "movie" | "show",
   region: string,
 ): Promise<WatchProviderOption[]> {
-  return cached(`provider:wp:v2:${mediaType}:${region}`, 86400, async () => {
-    const endpoint =
-      mediaType === "movie" ? "/watch/providers/movie" : "/watch/providers/tv";
-    const data = await fetchFromTmdb<TmdbProvidersResponse>(endpoint, {
-      watch_region: region,
-    });
-    return groupByBrand(
-      data.results.map((p) => ({
-        providerId: p.provider_id,
-        providerName: p.provider_name,
-        logoPath: p.logo_path,
-        displayPriority: p.display_priority,
-      })),
-    );
-  });
+  return deps.cache.wrap(
+    `provider:wp:v2:${mediaType}:${region}`,
+    FILTER_OPTIONS_TTL_SECONDS,
+    () => deps.catalog.listWatchProviders(mediaType, region),
+  );
 }
 
 export async function getFilterOptions(
+  deps: GetFilterOptionsDeps,
   input: FilterOptionsInput,
 ): Promise<RegionOption[] | WatchProviderOption[]> {
-  if (input.type === "regions") return listRegions();
+  if (input.type === "regions") return listRegions(deps);
   const mediaType = input.mediaType ?? "movie";
   const region = input.region ?? "US";
-  return listWatchProviders(mediaType, region);
+  return listWatchProviders(deps, mediaType, region);
 }
