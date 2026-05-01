@@ -2,6 +2,7 @@ import type { Database } from "@canto/db/client";
 import type { CachePort } from "@canto/core/domain/shared/ports/cache";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import { getUserWatchPreferences } from "@canto/core/domain/shared/services/user-service";
+import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
 import type { SearchResult } from "@canto/providers";
 
 const TOP_10_TTL_SECONDS = 30 * 60;
@@ -15,6 +16,7 @@ export type Top10Result = {
 export interface GetTop10Deps {
   cache: CachePort;
   tmdb: MediaProviderPort;
+  userPrefs: UserPreferencesPort;
 }
 
 /**
@@ -27,7 +29,7 @@ export async function getTop10(
   userId: string,
   overrideRegion?: string,
 ): Promise<Top10Result> {
-  const prefs = await getUserWatchPreferences(db, userId);
+  const prefs = await getUserWatchPreferences(deps, userId);
   const region = overrideRegion ?? prefs.watchRegion;
   return deps.cache.wrap(
     `top10:${region}:${prefs.language}`,

@@ -1,17 +1,19 @@
-import { eq, isNotNull } from "drizzle-orm";
-import type { Database } from "@canto/db/client";
-import { user } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
 
 import { MS_PER_MINUTE } from "@canto/core/domain/shared/constants";
+import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
+
+export interface UserPreferencesServiceDeps {
+  userPrefs: UserPreferencesPort;
+}
 
 /** Resolve user's preferred language (defaults to en-US) */
-export async function getUserLanguage(db: Database, userId: string): Promise<string> {
-  const row = await db.query.user.findFirst({
-    where: eq(user.id, userId),
-    columns: { language: true },
-  });
-  return row?.language ?? "en-US";
+export async function getUserLanguage(
+  deps: UserPreferencesServiceDeps,
+  userId: string,
+): Promise<string> {
+  const lang = await deps.userPrefs.findUserLanguage(userId);
+  return lang ?? "en-US";
 }
 
 /**
@@ -19,16 +21,13 @@ export async function getUserLanguage(db: Database, userId: string): Promise<str
  * procedures (spotlight, top10, genre tiles) that need both to key caches.
  */
 export async function getUserWatchPreferences(
-  db: Database,
+  deps: UserPreferencesServiceDeps,
   userId: string,
 ): Promise<{ language: string; watchRegion: string }> {
-  const row = await db.query.user.findFirst({
-    where: eq(user.id, userId),
-    columns: { language: true, watchRegion: true },
-  });
+  const prefs = await deps.userPrefs.findUserWatchPreferences(userId);
   return {
-    language: row?.language ?? "en-US",
-    watchRegion: row?.watchRegion ?? "US",
+    language: prefs?.language ?? "en-US",
+    watchRegion: prefs?.watchRegion ?? "US",
   };
 }
 
@@ -41,16 +40,16 @@ const CACHE_TTL_MS = 5 * MS_PER_MINUTE;
  * including en-US and the `general.language` setting. Drives the eager
  * translation fetch pipeline so we only call TMDB for languages someone uses.
  */
-export async function getActiveUserLanguages(db: Database): Promise<Set<string>> {
-  if (activeUserLanguagesCache && Date.now() - activeUserLanguagesCacheTime < CACHE_TTL_MS) {
+export async function getActiveUserLanguages(
+  deps: UserPreferencesServiceDeps,
+): Promise<Set<string>> {
+  if (
+    activeUserLanguagesCache &&
+    Date.now() - activeUserLanguagesCacheTime < CACHE_TTL_MS
+  ) {
     return activeUserLanguagesCache;
   }
-  const rows = await db
-    .selectDistinct({ language: user.language })
-    .from(user)
-    .where(isNotNull(user.language));
-
-  const codes = new Set<string>(rows.map((r) => r.language).filter((l): l is string => !!l));
+  const codes = new Set<string>(await deps.userPrefs.listActiveUserLanguages());
   codes.add("en-US");
   const settingsLang = await getSetting("general.language");
   if (settingsLang) codes.add(settingsLang);

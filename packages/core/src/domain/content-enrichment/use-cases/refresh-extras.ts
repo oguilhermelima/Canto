@@ -9,6 +9,7 @@ import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-r
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import { mapSearchResultToMediaFields } from "@canto/core/domain/content-enrichment/rules/pool-scoring";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
+import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
 
 const EN = "en-US";
 
@@ -19,6 +20,7 @@ export interface RefreshExtrasDeps {
   media: MediaRepositoryPort;
   logger: LoggerPort;
   dispatcher: JobDispatcherPort;
+  userPrefs: UserPreferencesPort;
 }
 
 export async function refreshExtras(
@@ -66,7 +68,7 @@ export async function refreshExtras(
     if (extrasExternalId === row.externalId) return;
   }
 
-  const supportedLangs = [...(await getActiveUserLanguages(db))];
+  const supportedLangs = [...(await getActiveUserLanguages(deps))];
   const extras = await tmdb.getExtras(extrasExternalId, row.type as MediaType, {
     supportedLanguages: supportedLangs,
   });

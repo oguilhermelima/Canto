@@ -5,10 +5,12 @@ import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/p
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { LocalizationSource } from "@canto/core/domain/media/types/media-localization";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
+import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
 
 interface PersistTranslationsDeps {
   localization: MediaLocalizationRepositoryPort;
   media: MediaRepositoryPort;
+  userPrefs: UserPreferencesPort;
 }
 
 /**
@@ -24,7 +26,7 @@ export async function persistTranslations(
 ): Promise<void> {
   const localization = deps.localization;
 
-  const supported = await getActiveUserLanguages(db);
+  const supported = await getActiveUserLanguages(deps);
   const locSource: LocalizationSource =
     normalized.provider === "tvdb" ? "tvdb" : "tmdb";
 

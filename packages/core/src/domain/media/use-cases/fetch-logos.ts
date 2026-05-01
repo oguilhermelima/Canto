@@ -13,6 +13,7 @@ import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/p
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { MediaProvider } from "@canto/core/domain/media/types/media";
 import { upsertMediaLocalization } from "@canto/core/domain/shared/localization/localization-service";
+import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
 
 /** Deduplicates concurrent getImages calls for the same externalId */
 const inflightFetches = new Map<string, Promise<string | undefined>>();
@@ -22,6 +23,7 @@ export interface FetchLogosDeps {
   dispatcher: JobDispatcherPort;
   localization: MediaLocalizationRepositoryPort;
   media: MediaRepositoryPort;
+  userPrefs: UserPreferencesPort;
 }
 
 export interface FetchLogoItem {
@@ -94,7 +96,7 @@ export async function fetchLogos(
   // hoisting the fetch here keeps the per-item loop synchronous while
   // sharing the same set across response and write paths.
   const supported = useLangJoin
-    ? await getActiveUserLanguages(db)
+    ? await getActiveUserLanguages(deps)
     : null;
 
   // 3. Batch fetch logos from TMDB (groups of 10)
@@ -239,7 +241,7 @@ export async function fetchLogos(
     // we got here without `useLangJoin` (e.g. an `en-US` caller still wants
     // future pt-BR readers to find logos persisted from this browse).
     if (mediaId && langLogos && langLogos.size > 0) {
-      const supportedForWrite = supported ?? (await getActiveUserLanguages(db));
+      const supportedForWrite = supported ?? (await getActiveUserLanguages(deps));
       await upsertLangLogos({ localization: deps.localization }, mediaId, langLogos, supportedForWrite);
     }
   }

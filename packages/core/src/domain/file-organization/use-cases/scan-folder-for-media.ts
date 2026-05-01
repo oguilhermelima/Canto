@@ -15,6 +15,7 @@ import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-r
 import { persistMedia } from "@canto/core/domain/media/use-cases/persist";
 import { runWithConcurrency } from "@canto/core/domain/shared/services/run-with-concurrency";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
+import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
 import { VIDEO_EXTENSIONS } from "@canto/core/domain/shared/rules/naming";
 import { parseFolderMediaInfo } from "@canto/core/domain/torrents/rules/parsing";
 
@@ -84,6 +85,7 @@ export interface ScanFolderForMediaDeps {
   localization: MediaLocalizationRepositoryPort;
   contentRating: MediaContentRatingRepositoryPort;
   extras: MediaExtrasRepositoryPort;
+  userPrefs: UserPreferencesPort;
 }
 
 export async function scanFolderForMedia(
@@ -120,7 +122,7 @@ export async function scanFolderForMedia(
       `[folder-scan] Found ${videosByDir.size} directories with video files in ${folderPath}`,
     );
 
-    const supportedLangs = [...(await getActiveUserLanguages(db))];
+    const supportedLangs = [...(await getActiveUserLanguages(deps))];
 
     type DirOutcome = "imported" | "skipped" | "failed";
 

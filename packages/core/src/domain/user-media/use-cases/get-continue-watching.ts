@@ -7,6 +7,7 @@ import type {
   LibraryFeedFilterOptions,
 } from "@canto/core/domain/user-media/types/library-feed";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
+import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
 import {
   toDurationSeconds,
   toProgressPercent,
@@ -15,6 +16,7 @@ import {
 export interface GetContinueWatchingDeps {
   libraryFeed: LibraryFeedRepositoryPort;
   extras: MediaExtrasRepositoryPort;
+  userPrefs: UserPreferencesPort;
 }
 
 export interface GetContinueWatchingInput {
@@ -106,7 +108,7 @@ export async function getContinueWatching(
     tvStatus: input.tvStatus,
   };
 
-  const userLang = await getUserLanguage(db, userId);
+  const userLang = await getUserLanguage(deps, userId);
 
   const rows = await deps.libraryFeed.findContinueWatchingFeed(
     userId,

@@ -26,6 +26,7 @@ import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media
 import { makeRecommendationsRepository } from "@canto/core/infra/recommendations/recommendations-repository.adapter";
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
+import { makeUserPreferences } from "@canto/core/infra/user/user-preferences.adapter";
 
 async function getProviderWithKey(name: "tmdb" | "tvdb") {
   if (name === "tmdb") return getTmdbProvider();
@@ -190,6 +191,7 @@ export const mediaDiscoveryRouter = createTRPCRouter({
           dispatcher: jobDispatcher,
           localization: makeMediaLocalizationRepository(ctx.db),
           media: makeMediaRepository(ctx.db),
+          userPrefs: makeUserPreferences(ctx.db),
         },
         tmdb,
         [input],

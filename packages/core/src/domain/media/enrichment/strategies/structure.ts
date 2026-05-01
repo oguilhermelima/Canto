@@ -46,6 +46,7 @@ export const structureStrategy: MediaEnrichmentStrategy<
           tmdb: deps.tmdb,
           tvdb: deps.tvdb,
           logger: ctx.deps.logger,
+          userPrefs: ctx.deps.userPrefs,
         },
         mediaId,
         { force: true, dispatchTranslations: false },

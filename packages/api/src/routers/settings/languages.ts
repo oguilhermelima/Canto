@@ -12,10 +12,14 @@ import {
   findSupportedLanguage,
   updateUserLanguage,
 } from "@canto/core/infra/shared/language-repository";
+import { makeUserPreferences } from "@canto/core/infra/user/user-preferences.adapter";
 
 export const settingsLanguagesRouter = createTRPCRouter({
   getUserLanguage: protectedProcedure.query(({ ctx }) =>
-    getUserLanguage(ctx.db, ctx.session.user.id),
+    getUserLanguage(
+      { userPrefs: makeUserPreferences(ctx.db) },
+      ctx.session.user.id,
+    ),
   ),
 
   setUserLanguage: protectedProcedure

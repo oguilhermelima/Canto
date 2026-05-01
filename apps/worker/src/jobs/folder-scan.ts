@@ -11,6 +11,7 @@ import { makeMediaContentRatingRepository } from "@canto/core/infra/media/media-
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { makeUserPreferences } from "@canto/core/infra/user/user-preferences.adapter";
 import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
@@ -62,6 +63,7 @@ export async function handleFolderScan(): Promise<void> {
         localization,
         contentRating,
         extras,
+        userPrefs: makeUserPreferences(db),
       });
       totalImported += result.imported;
       totalSkipped += result.skipped;

@@ -17,6 +17,7 @@ import {
   applySeasonsLocalizationOverlay,
 } from "@canto/core/domain/shared/localization/localization-service";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
+import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
 import { EXTRAS_TTL_MS } from "@canto/core/domain/media/use-cases/ensure-media.types";
 
 interface GetByExternalInput {
@@ -33,6 +34,7 @@ export interface GetByExternalDeps {
   extras: MediaExtrasRepositoryPort;
   logger: LoggerPort;
   dispatcher: JobDispatcherPort;
+  userPrefs: UserPreferencesPort;
 }
 
 /**
@@ -64,7 +66,7 @@ export async function getByExternal(
         input.type,
       );
 
-  const getUserLang = () => getUserLanguage(db, userId);
+  const getUserLang = () => getUserLanguage(deps, userId);
 
   if (existing) {
     const extrasSucceededAt = await deps.aspectState.findSucceededAt(

@@ -17,6 +17,7 @@ import type { MediaMetadata } from "@canto/core/domain/media/use-cases/fetch-med
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
+import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
 
 /**
  * Provider-shaped capability tags. The orchestrator coalesces strategies by
@@ -66,6 +67,7 @@ export interface EnrichmentDeps {
   tvdb: MediaProviderPort;
   logger: LoggerPort;
   dispatcher: JobDispatcherPort;
+  userPrefs: UserPreferencesPort;
 }
 
 /**

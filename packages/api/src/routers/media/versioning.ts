@@ -34,6 +34,7 @@ import { makeJellyfinAdapter } from "@canto/core/infra/media-servers/jellyfin.ad
 import { makePlexAdapter } from "@canto/core/infra/media-servers/plex.adapter-bindings";
 import { makeServerCredentials } from "@canto/core/infra/media-servers/server-credentials.adapter";
 import { makeMediaVersionRepository } from "@canto/core/infra/media/media-version-repository.adapter";
+import { makeUserPreferences } from "@canto/core/infra/user/user-preferences.adapter";
 
 export const mediaVersioningRouter = createTRPCRouter({
   previewProviderOverride: adminProcedure
@@ -77,13 +78,16 @@ export const mediaVersioningRouter = createTRPCRouter({
             tvdb,
             dispatcher: jobDispatcher,
             logger: makeConsoleLogger(),
+            userPrefs: makeUserPreferences(ctx.db),
           },
           input.id,
           { force: true },
         );
       } else {
         const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
-        const supportedLangs = [...await getActiveUserLanguages(ctx.db)];
+        const supportedLangs = [
+          ...(await getActiveUserLanguages({ userPrefs: makeUserPreferences(ctx.db) })),
+        ];
 
         const result = await fetchMediaMetadata(
           row.externalId, row.provider as ProviderName, row.type as MediaType,

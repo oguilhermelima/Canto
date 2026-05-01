@@ -42,6 +42,7 @@ import {
 import { reconcileMediaInLibrary } from "@canto/core/infra/media/media-repository";
 import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { makeUserPreferences } from "@canto/core/infra/user/user-preferences.adapter";
 import { makePersistDeps } from "@canto/core/composition/persist-deps";
 import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/user-media/use-cases/promote-user-media-state-from-playback";
 import {
@@ -563,6 +564,7 @@ export async function runReverseSync(options: ReverseSyncOptions = {}): Promise<
             userMedia: makeUserMediaRepository(db),
             credentials: makeServerCredentials(),
             persist: makePersistDeps(db),
+            userPrefs: makeUserPreferences(db),
           },
           needGlobalSync,
           `${provider}-sync`,

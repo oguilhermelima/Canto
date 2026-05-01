@@ -100,7 +100,7 @@ export async function resolveMediaVersion(
     targetTitle = targetLoc?.title ?? "";
     targetYear = existingTarget.year ?? null;
   } else {
-    const supportedLangs = [...(await getActiveUserLanguages(db))];
+    const supportedLangs = [...(await getActiveUserLanguages(deps))];
     const normalized = await tmdb.getMetadata(input.tmdbId, input.type, {
       supportedLanguages: supportedLangs,
     });

@@ -13,6 +13,7 @@ import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import { makeCache } from "@canto/core/platform/cache/cache.adapter";
 import { makeRecommendationsCatalog } from "@canto/core/platform/http/recommendations-catalog.adapter";
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
+import { makeUserPreferences } from "@canto/core/infra/user/user-preferences.adapter";
 import { getFilterOptions } from "@canto/core/domain/recommendations/use-cases/get-filter-options";
 import { searchFilterEntities } from "@canto/core/domain/recommendations/use-cases/search-filter-entities";
 import { getUserWatchProviders } from "@canto/core/domain/recommendations/use-cases/get-user-watch-providers";
@@ -48,7 +49,11 @@ export const providerFiltersRouter = createTRPCRouter({
     .input(regionInput)
     .query(({ ctx, input }) =>
       getUserWatchProviders(
-        { cache: makeCache(), catalog: makeRecommendationsCatalog() },
+        {
+          cache: makeCache(),
+          catalog: makeRecommendationsCatalog(),
+          userPrefs: makeUserPreferences(ctx.db),
+        },
         ctx.db,
         ctx.session.user.id,
         input?.region,

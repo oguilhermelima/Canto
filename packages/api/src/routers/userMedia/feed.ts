@@ -12,6 +12,7 @@ import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media
 import { makeLibraryFeedRepository } from "@canto/core/infra/user-media/library-feed-repository.adapter";
 import { makeRecommendationsRepository } from "@canto/core/infra/recommendations/recommendations-repository.adapter";
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
+import { makeUserPreferences } from "@canto/core/infra/user/user-preferences.adapter";
 import { getContinueWatching } from "@canto/core/domain/user-media/use-cases/get-continue-watching";
 import { getLibraryWatchNext } from "@canto/core/domain/user-media/use-cases/get-library-watch-next";
 import { getUpcomingSchedule } from "@canto/core/domain/user-media/use-cases/get-upcoming-schedule";
@@ -82,7 +83,13 @@ export const feedRouter = createTRPCRouter({
       const extras = makeMediaExtrasRepository(ctx.db);
       return getLibraryWatchNext(
         ctx.db,
-        { userMedia, recs, libraryFeed, extras },
+        {
+          userMedia,
+          recs,
+          libraryFeed,
+          extras,
+          userPrefs: makeUserPreferences(ctx.db),
+        },
         ctx.session.user.id,
         input,
       );
@@ -95,7 +102,7 @@ export const feedRouter = createTRPCRouter({
       const extras = makeMediaExtrasRepository(ctx.db);
       return getContinueWatching(
         ctx.db,
-        { libraryFeed, extras },
+        { libraryFeed, extras, userPrefs: makeUserPreferences(ctx.db) },
         ctx.session.user.id,
         input,
       );
@@ -110,7 +117,13 @@ export const feedRouter = createTRPCRouter({
       const extras = makeMediaExtrasRepository(ctx.db);
       return getWatchNext(
         ctx.db,
-        { userMedia, recs, libraryFeed, extras },
+        {
+          userMedia,
+          recs,
+          libraryFeed,
+          extras,
+          userPrefs: makeUserPreferences(ctx.db),
+        },
         ctx.session.user.id,
         input,
       );
@@ -122,7 +135,7 @@ export const feedRouter = createTRPCRouter({
       const libraryFeed = makeLibraryFeedRepository(ctx.db);
       return getUpcomingSchedule(
         ctx.db,
-        { libraryFeed },
+        { libraryFeed, userPrefs: makeUserPreferences(ctx.db) },
         ctx.session.user.id,
         input,
       );
@@ -134,7 +147,7 @@ export const feedRouter = createTRPCRouter({
       const libraryFeed = makeLibraryFeedRepository(ctx.db);
       return getLibraryHistory(
         ctx.db,
-        { libraryFeed },
+        { libraryFeed, userPrefs: makeUserPreferences(ctx.db) },
         ctx.session.user.id,
         input,
       );

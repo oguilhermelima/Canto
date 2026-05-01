@@ -33,7 +33,7 @@ export const providerDiscoveryRouter = createTRPCRouter({
       const tmdb = await getTmdbProvider();
       const core = buildCoreDeps(ctx.db);
       return getGenreTiles(
-        { cache: core.cache, tmdb },
+        { cache: core.cache, tmdb, userPrefs: core.userPrefs },
         ctx.db,
         ctx.session.user.id,
         input?.region,
@@ -46,7 +46,7 @@ export const providerDiscoveryRouter = createTRPCRouter({
       const tmdb = await getTmdbProvider();
       const core = buildCoreDeps(ctx.db);
       return getTop10(
-        { cache: core.cache, tmdb },
+        { cache: core.cache, tmdb, userPrefs: core.userPrefs },
         ctx.db,
         ctx.session.user.id,
         input?.region,

@@ -35,6 +35,7 @@ import {
   getActiveUserLanguages,
   getUserWatchPreferences,
 } from "@canto/core/domain/shared/services/user-service";
+import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
 import { normalizedMediaToResponse } from "@canto/core/domain/shared/mappers/media-mapper";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import {
@@ -55,6 +56,7 @@ export interface PersistDeps {
   extras: MediaExtrasRepositoryPort;
   logger: LoggerPort;
   dispatcher: JobDispatcherPort;
+  userPrefs: UserPreferencesPort;
 }
 
 /**
@@ -486,7 +488,7 @@ async function fetchPersistAndDispatch(
     ? getEffectiveProviderSync(existing, globalTvdbEnabled) === "tvdb"
     : globalTvdbEnabled;
 
-  const supportedLangs = [...(await getActiveUserLanguages(db))];
+  const supportedLangs = [...(await getActiveUserLanguages(deps))];
 
   const result = await fetchMediaMetadata(
     input.externalId,
@@ -591,7 +593,7 @@ export async function resolveMedia(
 
   if (existing && metadataSucceededAt && extrasSucceededAt) {
     const { language: lang, watchRegion } = await getUserWatchPreferences(
-      db,
+      deps,
       userId,
     );
     const localized = await applyMediaLocalizationOverlay(existing, lang, {
@@ -641,7 +643,7 @@ export async function resolveMedia(
   const persisted = await deps.media.findByIdWithSeasons(mediaId);
   if (persisted) {
     const { language: lang, watchRegion } = await getUserWatchPreferences(
-      db,
+      deps,
       userId,
     );
     const localized = await applyMediaLocalizationOverlay(persisted, lang, {
@@ -680,7 +682,7 @@ export async function resolveMedia(
   // the live response with the user-language overlay applied client-side
   // so the caller still gets a coherent result instead of a hard error.
   const { language: lang, watchRegion } = await getUserWatchPreferences(
-    db,
+    deps,
     userId,
   );
   const response = normalizedMediaToResponse(result.media, result.tvdbSeasons);

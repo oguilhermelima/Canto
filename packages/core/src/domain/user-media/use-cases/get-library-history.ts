@@ -6,6 +6,7 @@ import type {
   UserWatchHistoryFeedRow,
 } from "@canto/core/domain/user-media/types/library-feed";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
+import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
 import {
   isReleasedOnOrBefore,
   isServerSource,
@@ -16,6 +17,7 @@ import {
 
 export interface GetLibraryHistoryDeps {
   libraryFeed: LibraryFeedRepositoryPort;
+  userPrefs: UserPreferencesPort;
 }
 
 type WatchStatus = "in_progress" | "completed" | "not_started";
@@ -98,7 +100,7 @@ export async function getLibraryHistory(
     watchedTo: input.watchedTo,
   };
 
-  const userLang = await getUserLanguage(db, userId);
+  const userLang = await getUserLanguage(deps, userId);
   const [historyRows, playbackRows] = await Promise.all([
     deps.libraryFeed.findUserWatchHistoryFeed(
       userId,

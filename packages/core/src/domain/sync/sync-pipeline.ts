@@ -38,6 +38,7 @@ import {
 import type { MediaFileInfo } from "@canto/core/domain/media-servers/use-cases/fetch-info";
 
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
 
 import {
   createMediaAnchorCache,
@@ -90,6 +91,7 @@ export interface RunSyncPipelineDeps {
   userMedia: UserMediaRepositoryPort;
   credentials: ServerCredentialsPort;
   persist: PersistDeps;
+  userPrefs: UserPreferencesPort;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -419,7 +421,7 @@ export async function runSyncPipeline(
   const syncRunStart = new Date();
   const tvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
   const config = await loadServerConfig(deps.credentials);
-  const supportedLangs = [...(await getActiveUserLanguages(db))];
+  const supportedLangs = [...(await getActiveUserLanguages(deps))];
 
   // Phase 1 + 2 — validate + dedupe
   const validated = validateScannedItems(scannedItems, tag, deps.logger);

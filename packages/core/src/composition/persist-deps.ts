@@ -5,6 +5,7 @@ import { makeMediaContentRatingRepository } from "@canto/core/infra/media/media-
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { makeUserPreferences } from "@canto/core/infra/user/user-preferences.adapter";
 import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
 
@@ -32,5 +33,6 @@ export function makePersistDeps(
     extras: partial?.extras ?? makeMediaExtrasRepository(db),
     logger: partial?.logger ?? makeConsoleLogger(),
     dispatcher: partial?.dispatcher ?? jobDispatcher,
+    userPrefs: partial?.userPrefs ?? makeUserPreferences(db),
   };
 }

@@ -12,6 +12,7 @@ import type {
   WatchingShowMetadataRow,
 } from "@canto/core/domain/user-media/types/library-feed";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
+import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
 import {
   hasConfirmedPastAirDate,
   toProgressPercent,
@@ -28,6 +29,7 @@ export interface GetWatchNextDeps {
   recs: RecommendationsRepositoryPort;
   libraryFeed: LibraryFeedRepositoryPort;
   extras: MediaExtrasRepositoryPort;
+  userPrefs: UserPreferencesPort;
 }
 
 export type {
@@ -92,7 +94,7 @@ export async function getWatchNext(
   const limit = input.limit;
   const cursor = input.cursor ?? 0;
 
-  const userLang = await getUserLanguage(db, userId);
+  const userLang = await getUserLanguage(deps, userId);
 
   // Next-episode items only make sense for shows. The because-watched
   // builder is run in parallel regardless of mediaType — for movies it

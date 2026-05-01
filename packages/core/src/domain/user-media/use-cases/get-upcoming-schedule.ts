@@ -5,10 +5,12 @@ import type {
   UserListMediaCandidateRow,
 } from "@canto/core/domain/user-media/types/library-feed";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
+import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
 import { parseDateLike } from "@canto/core/domain/user-media/rules/user-media-rules";
 
 export interface GetUpcomingScheduleDeps {
   libraryFeed: LibraryFeedRepositoryPort;
+  userPrefs: UserPreferencesPort;
 }
 
 export interface GetUpcomingScheduleInput {
@@ -77,7 +79,7 @@ export async function getUpcomingSchedule(
   const now = new Date();
   const qNormalized = input.q?.trim().toLowerCase() ?? "";
 
-  const userLang = await getUserLanguage(db, userId);
+  const userLang = await getUserLanguage(deps, userId);
   const listMediaRows = await deps.libraryFeed.findUserListMediaCandidates(
     userId,
     userLang,

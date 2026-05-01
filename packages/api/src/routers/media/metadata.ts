@@ -22,6 +22,7 @@ import {
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
+import { makeUserPreferences } from "@canto/core/infra/user/user-preferences.adapter";
 import { makePersistDeps } from "@canto/core/composition/persist-deps";
 import {
   applyMediaLocalizationOverlay,
@@ -50,7 +51,10 @@ export const mediaMetadataRouter = createTRPCRouter({
     const row = await findMediaByIdWithSeasons(ctx.db, input.id);
     if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Media not found" });
 
-    const userLang = await getUserLanguage(ctx.db, ctx.session.user.id);
+    const userLang = await getUserLanguage(
+      { userPrefs: makeUserPreferences(ctx.db) },
+      ctx.session.user.id,
+    );
     const localization = makeMediaLocalizationRepository(ctx.db);
     const localized = await applyMediaLocalizationOverlay(row, userLang, {
       localization,
@@ -77,7 +81,10 @@ export const mediaMetadataRouter = createTRPCRouter({
         input,
         ctx.session.user.id,
         getProviderWithKey,
-        () => getActiveUserLanguages(ctx.db).then((s) => [...s]),
+        () =>
+          getActiveUserLanguages({
+            userPrefs: makeUserPreferences(ctx.db),
+          }).then((s) => [...s]),
       );
       return result;
     }),
@@ -149,7 +156,11 @@ export const mediaMetadataRouter = createTRPCRouter({
 
       const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
       const effectiveProvider = await getEffectiveProvider(row);
-      const supportedLangs = [...await getActiveUserLanguages(ctx.db)];
+      const supportedLangs = [
+        ...(await getActiveUserLanguages({
+          userPrefs: makeUserPreferences(ctx.db),
+        })),
+      ];
 
       const result = await fetchMediaMetadata(
         row.externalId, row.provider as ProviderName, row.type as MediaType,
@@ -178,6 +189,7 @@ export const mediaMetadataRouter = createTRPCRouter({
               tvdb,
               dispatcher: jobDispatcher,
               logger: makeConsoleLogger(),
+              userPrefs: makeUserPreferences(ctx.db),
             },
             row.id,
             { force: true },

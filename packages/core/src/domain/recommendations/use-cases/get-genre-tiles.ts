@@ -3,6 +3,7 @@ import type { CachePort } from "@canto/core/domain/shared/ports/cache";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import { GENRE_TILE_LIST } from "@canto/core/domain/recommendations/rules/genre-tiles";
 import { getUserWatchPreferences } from "@canto/core/domain/shared/services/user-service";
+import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
 
 const GENRE_TILES_TTL_SECONDS = 24 * 60 * 60;
 
@@ -45,6 +46,7 @@ async function pickBackdropForGenre(
 export interface GetGenreTilesDeps {
   cache: CachePort;
   tmdb: MediaProviderPort;
+  userPrefs: UserPreferencesPort;
 }
 
 /**
@@ -58,7 +60,7 @@ export async function getGenreTiles(
   userId: string,
   overrideRegion?: string,
 ): Promise<GenreTile[]> {
-  const prefs = await getUserWatchPreferences(db, userId);
+  const prefs = await getUserWatchPreferences(deps, userId);
   const region = overrideRegion ?? prefs.watchRegion;
   return deps.cache.wrap(
     `genre-tiles:${region}:${prefs.language}`,

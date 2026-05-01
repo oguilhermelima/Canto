@@ -14,6 +14,7 @@ import type {
   EnsureMediaSpec,
 } from "@canto/core/domain/media/use-cases/ensure-media.types";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
+import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
 
 export interface EnsureMediaManyFilter {
   mediaIds?: string[];
@@ -41,6 +42,7 @@ export interface EnsureMediaManyDeps {
   aspectState: MediaAspectStateRepositoryPort;
   contentRating: MediaContentRatingRepositoryPort;
   extras: MediaExtrasRepositoryPort;
+  userPrefs: UserPreferencesPort;
 }
 
 /**
@@ -61,7 +63,7 @@ export async function ensureMediaMany(
   spec: EnsureMediaSpec = {},
   opts: EnsureMediaManyOptions = {},
 ): Promise<EnsureMediaManyResult> {
-  const languages = spec.languages ?? [...(await getActiveUserLanguages(db))];
+  const languages = spec.languages ?? [...(await getActiveUserLanguages(deps))];
 
   const rows = await deps.media.findEligibleForEnrichment({
     mediaIds: filter.mediaIds,

@@ -41,6 +41,7 @@ import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-pr
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
+import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
 
 /**
  * Repository ports the orchestrator needs. Callers (HTTP routers, worker
@@ -61,6 +62,7 @@ export interface EnsureMediaDeps {
   tvdb: MediaProviderPort;
   logger: LoggerPort;
   dispatcher: JobDispatcherPort;
+  userPrefs: UserPreferencesPort;
 }
 
 /**
@@ -91,7 +93,7 @@ export async function ensureMedia(
   }
 
   const languages = (
-    spec.languages ?? [...(await getActiveUserLanguages(db))]
+    spec.languages ?? [...(await getActiveUserLanguages(deps))]
   ).filter((l) => !!l);
   result.languagesProcessed = languages;
 

@@ -21,6 +21,7 @@ import type { TraktAuthPort } from "@canto/core/domain/trakt/ports/trakt-auth.po
 import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
 import type { LibraryFeedRepositoryPort } from "@canto/core/domain/user-media/ports/library-feed-repository.port";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
+import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
 import type { UserRepositoryPort } from "@canto/core/domain/user/ports/user-repository.port";
 
 import { makeFoldersRepository } from "@canto/core/infra/file-organization/folders-repository.adapter";
@@ -40,6 +41,7 @@ import { makeTraktAuth } from "@canto/core/infra/trakt/trakt-auth.adapter";
 import { makeTraktRepository } from "@canto/core/infra/trakt/trakt-repository.adapter";
 import { makeLibraryFeedRepository } from "@canto/core/infra/user-media/library-feed-repository.adapter";
 import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
+import { makeUserPreferences } from "@canto/core/infra/user/user-preferences.adapter";
 import { makeUserRepository } from "@canto/core/infra/user/user-repository.adapter";
 
 import { makeCache } from "@canto/core/platform/cache/cache.adapter";
@@ -60,6 +62,7 @@ export interface CoreDeps {
   // ── Repository ports (db-bound) ──
   media: MediaRepositoryPort;
   user: UserRepositoryPort;
+  userPrefs: UserPreferencesPort;
   lists: ListsRepositoryPort;
   recommendations: RecommendationsRepositoryPort;
   notifications: NotificationsRepositoryPort;
@@ -99,6 +102,7 @@ export function buildCoreDeps(db: Database): CoreDeps {
   return {
     media: makeMediaRepository(db),
     user: makeUserRepository(db),
+    userPrefs: makeUserPreferences(db),
     lists: makeListsRepository(db),
     recommendations: makeRecommendationsRepository(db),
     notifications: makeNotificationsRepository(db),
