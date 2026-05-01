@@ -169,7 +169,10 @@ export async function reconcileShowStructure(
         );
       }
     } catch (err) {
-      console.warn(`[reconcile] TMDB backfill failed for "${enTitle}":`, err instanceof Error ? err.message : err);
+      deps.logger.warn(
+        `[reconcile] TMDB backfill failed for "${enTitle}"`,
+        { err: err instanceof Error ? err.message : err },
+      );
     }
   }
 

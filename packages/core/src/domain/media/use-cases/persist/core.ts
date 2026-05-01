@@ -494,7 +494,7 @@ async function fetchPersistAndDispatch(
     input.externalId,
     input.provider,
     input.type,
-    providers,
+    { ...providers, logger: deps.logger },
     { useTVDBSeasons, supportedLanguages: supportedLangs },
   );
 

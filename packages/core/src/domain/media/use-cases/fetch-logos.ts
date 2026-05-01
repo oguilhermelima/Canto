@@ -144,7 +144,10 @@ export async function fetchLogos(
               logoMap.set(`${item.type}-${item.externalId}`, logoPath);
             }
           } catch (err) {
-            console.warn(`[fetchLogos] Failed to fetch logo for ${item.type}/${item.externalId}:`, err);
+            deps.logger.warn(
+              `[fetchLogos] Failed to fetch logo for ${item.type}/${item.externalId}`,
+              { err: err instanceof Error ? err.message : err },
+            );
           }
         }),
       );
@@ -231,7 +234,10 @@ export async function fetchLogos(
           );
         }
       } catch (err) {
-        console.warn(`[fetchLogos] Failed to upsert media ${item.type}/${item.externalId}:`, err);
+        deps.logger.warn(
+          `[fetchLogos] Failed to upsert media ${item.type}/${item.externalId}`,
+          { err: err instanceof Error ? err.message : err },
+        );
       }
     }
 

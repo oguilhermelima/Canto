@@ -2,6 +2,7 @@
 /*  Use-case: Resolve TMDB ID from external IDs (trust-first, no title search) */
 /* -------------------------------------------------------------------------- */
 
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import { TmdbCallExhaustedError } from "@canto/core/domain/media/errors";
 
@@ -12,7 +13,14 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function tmdbCall<T>(fn: () => Promise<T>): Promise<T> {
+interface TmdbCallDeps {
+  logger?: LoggerPort;
+}
+
+async function tmdbCall<T>(
+  fn: () => Promise<T>,
+  deps?: TmdbCallDeps,
+): Promise<T> {
   for (let attempt = 0; attempt <= TMDB_MAX_RETRIES; attempt++) {
     try {
       const result = await fn();
@@ -22,7 +30,9 @@ async function tmdbCall<T>(fn: () => Promise<T>): Promise<T> {
       const is429 = err instanceof Error && err.message.includes("429");
       if (is429 && attempt < TMDB_MAX_RETRIES) {
         const backoff = 2_000 * Math.pow(2, attempt);
-        console.warn(`[resolve-external-id] TMDB rate limited, retrying in ${backoff}ms (attempt ${attempt + 1}/${TMDB_MAX_RETRIES})`);
+        deps?.logger?.warn(
+          `[resolve-external-id] TMDB rate limited, retrying in ${backoff}ms (attempt ${attempt + 1}/${TMDB_MAX_RETRIES})`,
+        );
         await sleep(backoff);
         continue;
       }
@@ -61,6 +71,7 @@ export async function resolveExternalId(
     tvdbId?: number;
     type: "movie" | "show";
   },
+  deps?: TmdbCallDeps,
 ): Promise<ResolvedExternalId | null> {
   try {
     if (item.tmdbId) {
@@ -70,7 +81,7 @@ export async function resolveExternalId(
     const findByImdbId = tmdb.findByImdbId;
     if (item.imdbId && findByImdbId) {
       const imdbId = item.imdbId;
-      const results = await tmdbCall(() => findByImdbId(imdbId));
+      const results = await tmdbCall(() => findByImdbId(imdbId), deps);
       const match = results.find((r) => r.type === item.type) ?? results[0];
       if (match) {
         return {
@@ -83,7 +94,7 @@ export async function resolveExternalId(
     const findByTvdbId = tmdb.findByTvdbId;
     if (item.tvdbId && findByTvdbId) {
       const tvdbId = item.tvdbId;
-      const results = await tmdbCall(() => findByTvdbId(tvdbId));
+      const results = await tmdbCall(() => findByTvdbId(tvdbId), deps);
       const match = results.find((r) => r.type === item.type) ?? results[0];
       if (match) {
         return {
@@ -95,9 +106,9 @@ export async function resolveExternalId(
 
     return null;
   } catch (err) {
-    console.warn(
-      `[resolve-external-id] lookup failed, returning null:`,
-      err instanceof Error ? err.message : err,
+    deps?.logger?.warn(
+      `[resolve-external-id] lookup failed, returning null`,
+      { err: err instanceof Error ? err.message : err },
     );
     return null;
   }

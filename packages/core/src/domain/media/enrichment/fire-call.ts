@@ -7,11 +7,13 @@ import type {
 } from "@canto/core/domain/media/enrichment/types";
 import type { PlanItem } from "@canto/core/domain/media/use-cases/cadence/compute-plan";
 import { fetchMediaMetadata } from "@canto/core/domain/media/use-cases/fetch-media-metadata";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 
 interface FireCallDeps {
   tmdb: MediaProviderPort;
   tvdb: MediaProviderPort;
+  logger?: LoggerPort;
 }
 
 /**

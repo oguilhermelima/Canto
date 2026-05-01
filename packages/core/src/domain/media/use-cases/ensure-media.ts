@@ -148,6 +148,7 @@ export async function ensureMedia(
   const responses = await fireSharedCapabilities(plan.items, ctx, {
     tmdb: deps.tmdb,
     tvdb: deps.tvdb,
+    logger: deps.logger,
   });
 
   // 2. Topologically sort plan items so e.g. metadata writes commit before

@@ -6,7 +6,8 @@ import type {
   ProviderName,
 } from "@canto/providers";
 
-import type { MediaProviderPort } from "../../shared/ports/media-provider.port";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
+import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 
 export interface FetchMediaMetadataOpts {
   reprocess?: boolean;
@@ -39,7 +40,7 @@ export async function fetchMediaMetadata(
   externalId: number,
   provider: ProviderName,
   type: MediaType,
-  deps: { tmdb: MediaProviderPort; tvdb: MediaProviderPort },
+  deps: { tmdb: MediaProviderPort; tvdb: MediaProviderPort; logger?: LoggerPort },
   opts?: FetchMediaMetadataOpts,
 ): Promise<MediaMetadata> {
   const supportedLangs = opts?.supportedLanguages;
@@ -96,11 +97,11 @@ export async function fetchMediaMetadata(
         const message = err instanceof Error ? err.message : String(err);
         if (message.includes("404")) {
           tvdbMissingIds.add(resolvedTvdbId);
-          console.warn(
+          deps.logger?.warn(
             `[fetchMediaMetadata] TVDB ${resolvedTvdbId} for "${media.title}" returned 404 — caching miss until next restart`,
           );
         } else {
-          console.warn(
+          deps.logger?.warn(
             `[fetchMediaMetadata] TVDB structure failed for "${media.title}" (tvdbId=${resolvedTvdbId}): ${message}`,
           );
         }
