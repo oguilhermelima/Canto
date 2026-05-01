@@ -36,8 +36,8 @@ export function formatDownloadLabel(
   episodes?: number[] | null,
 ): string {
   if (type === "movie") return "";
-  if (type === "season" && season != null) return `Season ${season}`;
-  if (type === "episode" && season != null && episodes?.length) {
+  if (type === "season" && typeof season === "number") return `Season ${season}`;
+  if (type === "episode" && typeof season === "number" && episodes?.length) {
     const sn = String(season).padStart(2, "0");
     const eps = episodes.map((e) => String(e).padStart(2, "0")).join(", ");
     return `S${sn}E${eps}`;
@@ -138,7 +138,7 @@ export interface ResolvedState {
 }
 
 export function resolveState(dbStatus: string, liveState?: string, progress?: number): ResolvedState {
-  const isCompleted = dbStatus === "completed" || dbStatus === "finished" || (progress != null && progress >= 1);
+  const isCompleted = dbStatus === "completed" || dbStatus === "finished" || (progress ?? 0) >= 1;
 
   if (isCompleted && liveState) {
     if (liveState.includes("paused")) {

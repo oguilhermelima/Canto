@@ -192,7 +192,7 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
         episode: entry.episode,
         // FIXME(wave-11): ESLint sees progressValue as non-null (false positive from tRPC inference)
         // but tsc types it as nullable; the guard is load-bearing for typecheck.
-        progress: entry.progressPercent != null
+        progress: entry.progressPercent !== null
           ? {
               percent: entry.progressPercent,
               value: entry.progressValue ?? 0, // eslint-disable-line @typescript-eslint/no-unnecessary-condition
@@ -232,7 +232,7 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
         watchedAt: item.watchedAt,
         source: item.source,
         episode: item.episode,
-        progress: item.progressPercent != null
+        progress: item.progressPercent !== null
           ? {
               percent: item.progressPercent,
               value: item.progressValue ?? 0,
@@ -257,7 +257,7 @@ export function useLibraryBrowse({ view }: { view: LibraryView }): UseLibraryBro
       watchedAt: item.watchedAt,
       source: item.source,
       episode: item.episode,
-      progress: item.progressPercent != null
+      progress: item.progressPercent !== null
         ? {
             percent: item.progressPercent,
             value: item.progressValue ?? 0,
