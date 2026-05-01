@@ -160,7 +160,7 @@ export function LibraryTab(): React.JSX.Element {
               )}
             >
               {f.label}
-              {count != null && count > 0 && (
+              {(count ?? 0) > 0 && (
                 <span
                   className={cn(
                     "font-mono text-xs tabular-nums",

@@ -80,7 +80,7 @@ function ThisYearHero({
                 Mostly <span className="text-amber-400">{topGenre}</span>
               </>
             )}
-            {stats.averageRating != null && stats.averageRating > 0 && (
+            {stats.averageRating !== null && stats.averageRating > 0 && (
               <>
                 {topGenre && " · "}
                 averaging{" "}
@@ -263,7 +263,7 @@ function HallOfFame({ items }: { items: MediaItem[] }): React.JSX.Element | null
                 sizes="(max-width: 768px) 50vw, 25vw"
               />
             )}
-            {item.rating != null && item.rating > 0 && (
+            {(item.rating ?? 0) > 0 && (
               <div className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 font-mono text-[11px] font-semibold text-amber-400 backdrop-blur">
                 <Star className="h-2.5 w-2.5 fill-current" />
                 {item.rating}

@@ -73,7 +73,7 @@ function TimelineCard({
           </p>
         )}
 
-        {credit.voteAverage != null && credit.voteAverage > 0 && (
+        {credit.voteAverage !== undefined && credit.voteAverage > 0 && (
           <div className="mt-1.5">
             <RatingInline variant="public" value={credit.voteAverage} />
           </div>
