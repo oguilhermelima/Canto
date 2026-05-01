@@ -45,12 +45,11 @@ export default [
   {
     files: ["src/domain/**/*.ts", "src/domain/**/*.tsx"],
     rules: {
-      // NOTE: this rule is intentionally `warn` (not `error`) until the
-      // ~263 known violations in domain/** are extracted in Wave 10.
-      // The fixture in src/__eslint_fixtures__/should-fail.ts proves the
-      // rule still fires; keep it that way so we don't lose the lockdown.
+      // Boundary lockdown is `error` by default — domain code must depend
+      // only on ports. Three files keep the warn-level override below
+      // (documented deferrals).
       "no-restricted-imports": [
-        "warn",
+        "error",
         {
           patterns: [
             {
@@ -227,17 +226,34 @@ export default [
   {
     // Media context — broadest port-first refactor. `eqeqeq` and
     // `no-non-null-assertion` are promoted to `error` so future regressions
-    // fail the build. `no-restricted-imports` stays at warn because
-    // `persist/tvdb-overlay.ts` still reaches into user-media + torrents
-    // tables for the detach/re-attach flow; porting that transactional
-    // surface needs cross-context coordination.
-    // `prefer-nullish-coalescing` stays at warn because the persist pipeline
-    // intentionally treats empty strings as null (`releaseDate || null`),
-    // which `??` does not preserve.
+    // fail the build. `prefer-nullish-coalescing` stays at warn because the
+    // persist pipeline intentionally treats empty strings as null
+    // (`releaseDate || null`), which `??` does not preserve.
     files: ["src/domain/media/**/*.ts"],
     rules: {
       "@typescript-eslint/no-non-null-assertion": "error",
       eqeqeq: ["error", "always"],
+    },
+  },
+  {
+    // Documented boundary-leak deferrals — the `no-restricted-imports`
+    // rule stays at `warn` for these files until their underlying
+    // refactor lands:
+    //   - persist/tvdb-overlay.ts: detach/re-attach flow uses an explicit
+    //     `db.transaction` that crosses into user-media and torrents
+    //     tables; porting needs a cross-context tx-scoped port.
+    //   - shared/localization/localization-service.ts: 18+ cross-context
+    //     consumers; deserves a dedicated pass.
+    //   - shared/services/{content-rating,user}-service.ts: thin shims
+    //     that haven't been converted yet.
+    files: [
+      "src/domain/media/use-cases/persist/tvdb-overlay.ts",
+      "src/domain/shared/localization/localization-service.ts",
+      "src/domain/shared/services/content-rating-service.ts",
+      "src/domain/shared/services/user-service.ts",
+    ],
+    rules: {
+      "no-restricted-imports": "warn",
     },
   },
 ];

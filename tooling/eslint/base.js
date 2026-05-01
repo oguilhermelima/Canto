@@ -33,13 +33,11 @@ export default tseslint.config(
       "@typescript-eslint/await-thenable": "error",
       "@typescript-eslint/no-unnecessary-type-assertion": "error",
       "no-console": ["warn", { allow: ["warn", "error"] }],
-      // Style/safety rules — added in Wave Final (F3) but kept at `warn`
-      // until Wave 11 sweeps the existing violations. Each one represents
-      // hundreds of legacy uses that need careful per-file review:
-      //   - no-non-null-assertion: 224 sites use the `!` operator
-      //   - prefer-nullish-coalescing: 76 sites use `||` with mixed truthy
-      //   - eqeqeq: 128 sites use `==`/`!=` (some are intentional `!= null`)
-      // Wave 11 promotes these to "error" once the sweep is complete.
+      // Defaults stay at `warn` — per-package eslint configs promote to
+      // `error` for code that has been swept clean. Promotion to global
+      // `error` requires a sweep pass across infra/*, platform/*, and the
+      // residual deferrals (parsing-episodes regex, sync test fixtures,
+      // recommendations array helpers, persist/* releaseDate).
       "@typescript-eslint/no-non-null-assertion": "warn",
       "@typescript-eslint/prefer-nullish-coalescing": "warn",
       eqeqeq: ["warn", "always"],
