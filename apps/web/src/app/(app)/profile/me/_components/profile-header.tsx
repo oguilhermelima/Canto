@@ -44,7 +44,9 @@ function BackdropMosaic(): React.JSX.Element | null {
     sortOrder: "desc",
   });
 
-  const backdrops = (data?.items ?? []).filter((i) => i.backdropPath).slice(0, 4);
+  const backdrops = (data?.items ?? [])
+    .flatMap((i) => (i.backdropPath ? [{ ...i, backdropPath: i.backdropPath }] : []))
+    .slice(0, 4);
   if (backdrops.length === 0) return null;
 
   return (
@@ -63,7 +65,7 @@ function BackdropMosaic(): React.JSX.Element | null {
             style={{ WebkitMaskImage: mask, maskImage: mask }}
           >
             <Image
-              src={item.backdropPath!}
+              src={item.backdropPath}
               alt=""
               fill
               className="object-cover"

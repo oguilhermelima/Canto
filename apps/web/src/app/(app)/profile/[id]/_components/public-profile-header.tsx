@@ -25,7 +25,7 @@ interface PublicProfileHeaderProps {
 function BackdropMosaic({ userId }: { userId: string }): React.JSX.Element | null {
   const { data } = trpc.publicProfile.getOverview.useQuery({ id: userId });
   const backdrops = (data?.recentCompleted ?? [])
-    .filter((i) => i.backdropPath)
+    .flatMap((i) => (i.backdropPath ? [{ ...i, backdropPath: i.backdropPath }] : []))
     .slice(0, 4);
   if (backdrops.length === 0) return null;
 
@@ -45,7 +45,7 @@ function BackdropMosaic({ userId }: { userId: string }): React.JSX.Element | nul
             style={{ WebkitMaskImage: mask, maskImage: mask }}
           >
             <Image
-              src={item.backdropPath!}
+              src={item.backdropPath}
               alt=""
               fill
               className="object-cover"

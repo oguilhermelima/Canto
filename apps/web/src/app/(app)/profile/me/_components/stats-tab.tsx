@@ -60,7 +60,9 @@ function JourneyBlock({ stats, insights }: ProfileStoryData): React.JSX.Element 
 
   const countryCount = insights?.countries.length ?? 0;
   const langCount = insights?.languages.length ?? 0;
-  const backdrops = (recentMedia?.items ?? []).filter((i) => i.backdropPath).slice(0, 4);
+  const backdrops = (recentMedia?.items ?? [])
+    .flatMap((i) => (i.backdropPath ? [{ ...i, backdropPath: i.backdropPath }] : []))
+    .slice(0, 4);
 
   return (
     <section className="relative overflow-hidden rounded-2xl border border-border/50">
@@ -80,7 +82,7 @@ function JourneyBlock({ stats, insights }: ProfileStoryData): React.JSX.Element 
                 style={{ WebkitMaskImage: mask, maskImage: mask }}
               >
                 <Image
-                  src={item.backdropPath!}
+                  src={item.backdropPath}
                   alt=""
                   fill
                   className="object-cover"
@@ -143,7 +145,8 @@ function TasteBlock({ genres, insights }: ProfileStoryData): React.JSX.Element |
   if (!genres || genres.length === 0) return null;
 
   const total = genres.reduce((s, g) => s + g.count, 0);
-  const top = genres[0]!;
+  const top = genres[0];
+  if (!top) return null;
   const topPct = total > 0 ? Math.round((top.count / total) * 100) : 0;
   const runners = genres.slice(1, 4).map((g) => g.genre);
 
@@ -267,7 +270,7 @@ function RatingVoiceBlock({
         </div>
       )}
 
-      {(gem?.backdropPath || unpop?.backdropPath) && (
+      {(Boolean(gem?.backdropPath) || Boolean(unpop?.backdropPath)) && (
         <div className="mt-8 grid gap-3 sm:grid-cols-2">
           {gem?.backdropPath && (
             <div className="relative aspect-[16/9] overflow-hidden rounded-xl">
