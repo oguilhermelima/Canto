@@ -153,7 +153,7 @@ export async function reconcileShowStructure(
             seasonTranslations: undefined,
             episodeTranslations: undefined,
           } as typeof tmdbMeta,
-          { localization: deps.localization },
+          { localization: deps.localization, media: deps.media },
         );
       }
     } catch (err) {

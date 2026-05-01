@@ -1,15 +1,14 @@
-import { eq, inArray } from "drizzle-orm";
-
 import type { Database } from "@canto/db/client";
-import { episode, season } from "@canto/db/schema";
 import type { NormalizedMedia } from "@canto/providers";
 
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { LocalizationSource } from "@canto/core/domain/media/types/media-localization";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 
 interface PersistTranslationsDeps {
   localization: MediaLocalizationRepositoryPort;
+  media: MediaRepositoryPort;
 }
 
 /**
@@ -33,7 +32,12 @@ export async function persistTranslations(
   if (normalized.translations && normalized.translations.length > 0) {
     const mTransSeen = new Set<string>();
     const mediaTransRows = normalized.translations
-      .filter((t) => !t.language.startsWith("en-") && supported.has(t.language) && (t.title || t.overview))
+      .filter(
+        (t) =>
+          !t.language.startsWith("en-") &&
+          supported.has(t.language) &&
+          (t.title || t.overview),
+      )
       .map((t) => ({
         mediaId,
         language: t.language,
@@ -68,31 +72,39 @@ export async function persistTranslations(
   }
 
   const needSeasonLookup =
-    (normalized.seasonTranslations && normalized.seasonTranslations.length > 0) ||
-    (normalized.episodeTranslations && normalized.episodeTranslations.length > 0);
+    (normalized.seasonTranslations &&
+      normalized.seasonTranslations.length > 0) ||
+    (normalized.episodeTranslations &&
+      normalized.episodeTranslations.length > 0);
 
   if (!needSeasonLookup) return;
 
-  const seasons = await db.query.season.findMany({
-    where: eq(season.mediaId, mediaId),
-    columns: { id: true, number: true },
-  });
+  const seasons = await deps.media.findSeasonsByMediaId(mediaId);
   const seasonIdByNumber = new Map(seasons.map((s) => [s.number, s.id]));
 
-  if (normalized.seasonTranslations && normalized.seasonTranslations.length > 0) {
+  if (
+    normalized.seasonTranslations &&
+    normalized.seasonTranslations.length > 0
+  ) {
     const sTransSeen = new Set<string>();
     const seasonTransRows = normalized.seasonTranslations
       .filter((t) => {
-        if (t.language.startsWith("en-") || !supported.has(t.language)) return false;
+        if (t.language.startsWith("en-") || !supported.has(t.language))
+          return false;
         const sid = seasonIdByNumber.get(t.seasonNumber);
         return !!sid && (t.name || t.overview);
       })
-      .map((t) => ({
-        seasonId: seasonIdByNumber.get(t.seasonNumber)!,
-        language: t.language,
-        name: t.name ?? null,
-        overview: t.overview ?? null,
-      }))
+      .map((t) => {
+        const seasonId = seasonIdByNumber.get(t.seasonNumber);
+        if (!seasonId) return null;
+        return {
+          seasonId,
+          language: t.language,
+          name: t.name ?? null,
+          overview: t.overview ?? null,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null)
       .filter((r) => {
         const key = `${r.seasonId}-${r.language}`;
         if (sTransSeen.has(key)) return false;
@@ -110,26 +122,23 @@ export async function persistTranslations(
     }
   }
 
-  if (normalized.episodeTranslations && normalized.episodeTranslations.length > 0) {
-    const seasonIds = [...seasonIdByNumber.values()];
-    if (seasonIds.length === 0) return;
-
-    const allEpisodes = await db.query.episode.findMany({
-      where: inArray(episode.seasonId, seasonIds),
-      columns: { id: true, seasonId: true, number: true },
-    });
-
-    const seasonNumById = new Map<string, number>();
-    for (const [num, id] of seasonIdByNumber) seasonNumById.set(id, num);
+  if (
+    normalized.episodeTranslations &&
+    normalized.episodeTranslations.length > 0
+  ) {
+    if (seasons.length === 0) return;
 
     const episodeLookup = new Map<string, string>();
-    for (const ep of allEpisodes) {
-      const sNum = seasonNumById.get(ep.seasonId);
-      if (sNum !== undefined) episodeLookup.set(`${sNum}-${ep.number}`, ep.id);
+    for (const s of seasons) {
+      for (const ep of s.episodes) {
+        episodeLookup.set(`${s.number}-${ep.number}`, ep.id);
+      }
     }
 
     const epTransRowsRaw = normalized.episodeTranslations
-      .filter((t) => !t.language.startsWith("en-") && supported.has(t.language))
+      .filter(
+        (t) => !t.language.startsWith("en-") && supported.has(t.language),
+      )
       .map((t) => {
         const epId = episodeLookup.get(`${t.seasonNumber}-${t.episodeNumber}`);
         if (!epId || (!t.title && !t.overview)) return null;

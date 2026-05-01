@@ -142,9 +142,7 @@ export async function persistMedia(
   );
 
   await persistSeasons(deps, inserted.id, normalized);
-  await persistTranslations(db, inserted.id, normalized, {
-    localization: deps.localization,
-  });
+  await persistTranslations(db, inserted.id, normalized, deps);
   await persistContentRatings(inserted.id, normalized, { deps });
   return inserted;
 }
@@ -195,9 +193,7 @@ export async function updateMediaFromNormalized(
     await upsertSeasons(deps, mediaId, normalized);
   }
 
-  await persistTranslations(db, mediaId, normalized, {
-    localization: deps.localization,
-  });
+  await persistTranslations(db, mediaId, normalized, deps);
   await persistContentRatings(mediaId, normalized, { deps });
 
   return updated;
@@ -412,12 +408,7 @@ export async function persistFullMedia(
     }
   }
 
-  await persistExtras(db, mediaId, extras, {
-    extras: deps.extras,
-    localization: deps.localization,
-    logger: deps.logger,
-    dispatcher: deps.dispatcher,
-  });
+  await persistExtras(db, mediaId, extras, deps);
 
   await deps.media.updateMedia(mediaId, { processingStatus: "ready" });
 

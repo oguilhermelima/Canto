@@ -1,11 +1,10 @@
-import { and, eq, inArray } from "drizzle-orm";
-
 import type { MediaExtras } from "@canto/providers";
-import { media } from "@canto/db/schema";
 import type { Database } from "@canto/db/client";
 
 import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { MediaProvider } from "@canto/core/domain/media/types/media";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 
@@ -14,6 +13,7 @@ const EN = "en-US";
 export interface PersistExtrasDeps {
   extras: MediaExtrasRepositoryPort;
   localization: MediaLocalizationRepositoryPort;
+  media: MediaRepositoryPort;
   logger: LoggerPort;
   dispatcher: JobDispatcherPort;
 }
@@ -25,7 +25,7 @@ export interface PersistExtrasDeps {
  * through `deps`.
  */
 export async function persistExtras(
-  db: Database,
+  _db: Database,
   mediaId: string,
   extras: MediaExtras,
   deps: PersistExtrasDeps,
@@ -35,7 +35,10 @@ export async function persistExtras(
   // full fetch on visit.
 
   const allRecItems = [
-    ...extras.similar.map((r) => ({ result: r, sourceType: "similar" as const })),
+    ...extras.similar.map((r) => ({
+      result: r,
+      sourceType: "similar" as const,
+    })),
     ...extras.recommendations.map((r) => ({
       result: r,
       sourceType: "recommendation" as const,
@@ -52,14 +55,13 @@ export async function persistExtras(
 
   if (uniqueItems.size > 0) {
     const extIds = [...uniqueItems.values()].map((i) => i.result.externalId);
-    const existingRows = await db.query.media.findMany({
-      where: and(
-        inArray(media.externalId, extIds),
-        eq(media.provider, "tmdb"),
-      ),
-      columns: { id: true, externalId: true },
-    });
-    const existingByExtId = new Map(existingRows.map((r) => [r.externalId, r.id]));
+    const existingRows = await deps.media.findIdsByExternalIdsForProvider(
+      extIds,
+      "tmdb",
+    );
+    const existingByExtId = new Map(
+      existingRows.map((r) => [r.externalId, r.id]),
+    );
 
     for (const item of uniqueItems.values()) {
       const key = `${item.result.provider ?? "tmdb"}-${item.result.externalId}`;
@@ -67,21 +69,18 @@ export async function persistExtras(
       if (existingId) {
         recMediaIdByKey.set(key, existingId);
       } else {
-        const [inserted] = await db
-          .insert(media)
-          .values({
-            type: item.result.type,
-            externalId: item.result.externalId,
-            provider: item.result.provider ?? "tmdb",
-            backdropPath: item.result.backdropPath ?? null,
-            releaseDate: item.result.releaseDate || null,
-            year: item.result.year ?? null,
-            voteAverage: item.result.voteAverage ?? null,
-            genreIds: item.result.genreIds ?? [],
-            downloaded: false,
-          })
-          .onConflictDoNothing()
-          .returning();
+        const provider = (item.result.provider ?? "tmdb") as MediaProvider;
+        const inserted = await deps.media.tryCreateMedia({
+          type: item.result.type,
+          externalId: item.result.externalId,
+          provider,
+          backdropPath: item.result.backdropPath ?? null,
+          releaseDate: item.result.releaseDate || null,
+          year: item.result.year ?? null,
+          voteAverage: item.result.voteAverage ?? null,
+          genreIds: item.result.genreIds ?? [],
+          downloaded: false,
+        });
         if (inserted) {
           recMediaIdByKey.set(key, inserted.id);
           // After Phase 1C-δ, title/overview/posterPath/logoPath live only on
@@ -104,14 +103,11 @@ export async function persistExtras(
             deps.logger.logAndSwallow("persistExtras dispatchEnsureMedia"),
           );
         } else {
-          const existing = await db.query.media.findFirst({
-            where: and(
-              eq(media.externalId, item.result.externalId),
-              eq(media.provider, item.result.provider ?? "tmdb"),
-              eq(media.type, item.result.type),
-            ),
-            columns: { id: true },
-          });
+          const existing = await deps.media.findByExternalId(
+            item.result.externalId,
+            provider,
+            item.result.type,
+          );
           if (existing) recMediaIdByKey.set(key, existing.id);
         }
       }

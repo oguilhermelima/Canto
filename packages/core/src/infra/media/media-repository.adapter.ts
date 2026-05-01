@@ -69,6 +69,15 @@ export function makeMediaRepository(db: Database): MediaRepositoryPort {
       return row ? hydrateMediaWithSeasons(row as RawMediaWithSeasons) : null;
     },
 
+    findIdsByExternalIdsForProvider: async (externalIds, provider) => {
+      if (externalIds.length === 0) return [];
+      const rows = await db
+        .select({ id: media.id, externalId: media.externalId })
+        .from(media)
+        .where(and(inArray(media.externalId, externalIds), eq(media.provider, provider)));
+      return rows.map((r) => ({ externalId: r.externalId, id: r.id }));
+    },
+
     findByAnyReference: async (externalId, provider, imdbId, tvdbId, type) => {
       const row = await findMediaByAnyReferenceInfra(
         db,

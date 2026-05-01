@@ -57,6 +57,15 @@ export interface MediaRepositoryPort {
     type?: MediaType,
   ): Promise<(Media & { seasons: SeasonWithEpisodes[] }) | null>;
   /**
+   * Batch lookup keyed off `(externalId, provider)` pairs — returns the
+   * `(externalId, id)` mapping for every match. Used by the extras pipeline
+   * to dedup recommendation/similar stubs before insert.
+   */
+  findIdsByExternalIdsForProvider(
+    externalIds: number[],
+    provider: MediaProvider,
+  ): Promise<Array<{ externalId: number; id: string }>>;
+  /**
    * Cross-reference resolver: tries direct (externalId+provider) first, then
    * falls back to imdbId, then tvdbId, then provider-specific reverse lookups.
    * Returns the row with seasons inlined (matches `findByIdWithSeasons` shape)
