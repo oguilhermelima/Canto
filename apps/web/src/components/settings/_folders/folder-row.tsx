@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   Check,
   ChevronDown,
@@ -178,11 +178,12 @@ function useFolderRowForm(folder: FolderData, onRefresh: () => void) {
     qbitCat !== (folder.qbitCategory ?? "") ||
     downloadProfileId !== (folder.downloadProfileId ?? null);
 
-  // Sync state from server, but skip when user has unsaved edits
-  const prevFolderId = useRef(folder.id);
-  useEffect(() => {
-    const isNewFolder = folder.id !== prevFolderId.current;
-    prevFolderId.current = folder.id;
+  // Sync state from server, but skip when user has unsaved edits.
+  // React docs: adjust state during render rather than syncing in an effect.
+  const [trackedFolder, setTrackedFolder] = useState(folder);
+  if (trackedFolder !== folder) {
+    const isNewFolder = folder.id !== trackedFolder.id;
+    setTrackedFolder(folder);
     if (isNewFolder || !dirty) {
       setName(folder.name);
       setDlPath(folder.downloadPath ?? "");
@@ -192,7 +193,7 @@ function useFolderRowForm(folder: FolderData, onRefresh: () => void) {
       setEditingDlPath(!!folder.downloadPath);
       setEditingLibPath(!!folder.libraryPath);
     }
-  }, [folder]); // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
   const updateFolder = trpc.folder.update.useMutation({
     onSuccess: () => {
