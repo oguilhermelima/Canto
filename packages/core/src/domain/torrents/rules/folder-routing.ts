@@ -39,70 +39,73 @@ function arraysContainAll(a: unknown[] | null, b: unknown[]): boolean {
 function evaluateCondition(cond: RuleCondition, media: RoutableMedia): boolean {
   switch (cond.field) {
     case "type":
-      return cond.op === "eq" && media.type === cond.value;
+      return media.type === cond.value;
 
     case "genre":
-      if (cond.op === "contains_any") return arraysOverlap(media.genres, cond.value);
-      if (cond.op === "contains_all") return arraysContainAll(media.genres, cond.value);
-      if (cond.op === "not_contains_any") return !arraysOverlap(media.genres, cond.value);
-      return false;
+      if (cond.op === "contains_any")
+        return arraysOverlap(media.genres, cond.value);
+      if (cond.op === "contains_all")
+        return arraysContainAll(media.genres, cond.value);
+      return !arraysOverlap(media.genres, cond.value);
 
     case "genreId":
-      if (cond.op === "contains_any") return arraysOverlap(media.genreIds, cond.value);
-      if (cond.op === "contains_all") return arraysContainAll(media.genreIds, cond.value);
-      if (cond.op === "not_contains_any") return !arraysOverlap(media.genreIds, cond.value);
-      return false;
+      if (cond.op === "contains_any")
+        return arraysOverlap(media.genreIds, cond.value);
+      if (cond.op === "contains_all")
+        return arraysContainAll(media.genreIds, cond.value);
+      return !arraysOverlap(media.genreIds, cond.value);
 
     case "originCountry":
-      if (cond.op === "contains_any") return arraysOverlap(media.originCountry, cond.value);
-      if (cond.op === "not_contains_any") return !arraysOverlap(media.originCountry, cond.value);
-      return false;
+      if (cond.op === "contains_any")
+        return arraysOverlap(media.originCountry, cond.value);
+      return !arraysOverlap(media.originCountry, cond.value);
 
     case "originalLanguage":
       if (cond.op === "eq") return media.originalLanguage === cond.value;
-      if (cond.op === "neq") return media.originalLanguage !== cond.value;
-      return false;
+      return media.originalLanguage !== cond.value;
 
     case "contentRating":
       if (cond.op === "eq") return media.contentRating === cond.value;
-      if (cond.op === "in") return Array.isArray(cond.value) ? cond.value.includes(media.contentRating ?? "") : media.contentRating === cond.value;
-      return false;
+      return Array.isArray(cond.value)
+        ? cond.value.includes(media.contentRating ?? "")
+        : media.contentRating === cond.value;
 
     case "provider":
-      return cond.op === "eq" && media.provider === cond.value;
+      return media.provider === cond.value;
 
     case "year":
-      if (media.year == null) return false;
+      if (media.year === null) return false;
       if (cond.op === "eq") return media.year === cond.value;
       if (cond.op === "gte") return media.year >= cond.value;
-      if (cond.op === "lte") return media.year <= cond.value;
-      return false;
+      return media.year <= cond.value;
 
     case "runtime":
-      if (media.runtime == null) return false;
+      if (media.runtime === null) return false;
       if (cond.op === "gte") return media.runtime >= cond.value;
-      if (cond.op === "lte") return media.runtime <= cond.value;
-      return false;
+      return media.runtime <= cond.value;
 
     case "voteAverage":
-      if (media.voteAverage == null) return false;
+      if (media.voteAverage === null) return false;
       if (cond.op === "gte") return media.voteAverage >= cond.value;
-      if (cond.op === "lte") return media.voteAverage <= cond.value;
-      return false;
+      return media.voteAverage <= cond.value;
 
     case "status":
-      if (media.status == null) return false;
+      if (media.status === null) return false;
       if (cond.op === "eq") return media.status === cond.value;
-      if (cond.op === "in") return Array.isArray(cond.value) ? cond.value.includes(media.status) : media.status === cond.value;
-      return false;
+      return Array.isArray(cond.value)
+        ? cond.value.includes(media.status)
+        : media.status === cond.value;
 
     case "watchProvider": {
       if (!media.watchProviders) return false;
-      const inRegion = media.watchProviders.filter((w) => w.region === cond.value.region);
-      const hasAny = cond.value.providers.some((p) => inRegion.some((w) => w.providerId === p));
+      const inRegion = media.watchProviders.filter(
+        (w) => w.region === cond.value.region,
+      );
+      const hasAny = cond.value.providers.some((p) =>
+        inRegion.some((w) => w.providerId === p),
+      );
       if (cond.op === "contains_any") return hasAny;
-      if (cond.op === "not_contains_any") return !hasAny;
-      return false;
+      return !hasAny;
     }
 
     default:
@@ -171,7 +174,7 @@ function legacyToRoutingRules(group: RuleGroup): RoutingRules {
  * Accepts new shape, legacy AND/OR group, or null. Legacy data is converted via DNF expansion.
  */
 export function normalizeFolderRules(raw: PersistedFolderRules | null | undefined): RoutingRules | null {
-  if (raw == null) return null;
+  if (raw === null || raw === undefined) return null;
   if (isRoutingRules(raw)) return raw;
   if (isLegacyGroup(raw)) return legacyToRoutingRules(raw);
   return null;

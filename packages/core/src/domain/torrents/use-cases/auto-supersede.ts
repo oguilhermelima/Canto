@@ -4,16 +4,13 @@
 
 import type { Database } from "@canto/db/client";
 
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
+import { resolveMediaFlavor } from "@canto/core/domain/shared/rules/media-flavor";
 import { compareToProfile } from "@canto/core/domain/torrents/rules/download-profile";
 import { detectReleaseGroup } from "@canto/core/domain/torrents/rules/parsing-release";
-import { resolveMediaFlavor } from "@canto/core/domain/shared/rules/media-flavor";
-import { findDownloadById } from "@canto/core/infra/torrents/download-repository";
-import { findMediaById } from "@canto/core/infra/media/media-repository";
-import { findMediaFilesByDownloadId } from "@canto/core/infra/media/media-file-repository";
-import { findActiveDownloadProfile } from "@canto/core/infra/torrents/download-profile-repository";
-import type { Quality, Source } from "@canto/core/domain/torrents/types/common";
+import type { TorrentsRepositoryPort } from "@canto/core/domain/torrents/ports/torrents-repository.port";
 import type { SearchResult } from "@canto/core/domain/torrents/use-cases/search-torrents";
 import { replaceTorrent } from "@canto/core/domain/torrents/use-cases/download-torrent";
 
@@ -37,10 +34,14 @@ export type AutoSupersedeOutcome =
     };
 
 export interface AutoSupersedeArgs {
-  /** Existing download row that the candidate is meant to replace. */
   currentDownloadId: string;
-  /** Search-result candidate (parsed attributes already populated). */
   candidate: SearchResult;
+}
+
+export interface AutoSupersedeDeps {
+  logger: LoggerPort;
+  media: MediaRepositoryPort;
+  torrents: TorrentsRepositoryPort;
 }
 
 /**
@@ -48,44 +49,37 @@ export interface AutoSupersedeArgs {
  *
  * Conditions for a replacement to fire:
  *   1. Current download exists and has at least one media_file linked.
- *   2. Same release group (case-insensitive) as the current download —
- *      different groups would change the encode, not just refresh it.
+ *   2. Same release group (case-insensitive) as the current download.
  *   3. Same quality and source — repack supersede only swaps within a
  *      profile slot.
  *   4. Strictly higher repackCount (REPACK > original; REPACK2 > REPACK1).
  *   5. If a download profile is active, the candidate combo must not be
- *      `"candidate-not-allowed"` and must not be a `"downgrade"` — i.e.
- *      it's still in the profile and at least equivalent.
- *
- * Pure for everything except the final {@link replaceTorrent} call. The
- * caller (the BullMQ job) decides which `(currentDownloadId, candidate)`
- * pairs to attempt; this function is the strict gate.
+ *      `"candidate-not-allowed"` and must not be a `"downgrade"`.
  */
 export async function autoSupersedeWithRepack(
   db: Database,
-  deps: { logger: LoggerPort },
+  deps: AutoSupersedeDeps,
   args: AutoSupersedeArgs,
   qbClient: DownloadClientPort,
 ): Promise<AutoSupersedeOutcome> {
-  const current = await findDownloadById(db, args.currentDownloadId);
+  const current = await deps.torrents.findDownloadById(args.currentDownloadId);
   if (!current) return { replaced: false, reason: "no-current-download" };
 
   const candidate = args.candidate;
 
-  // (3) Same quality + source slot — supersede is intra-profile-slot.
-  if (current.quality !== candidate.quality || current.source !== candidate.source) {
+  if (
+    current.quality !== candidate.quality ||
+    current.source !== candidate.source
+  ) {
     return { replaced: false, reason: "different-quality-or-source" };
   }
 
-  // (4) Strict repack upgrade.
   if (candidate.repackCount <= current.repackCount) {
     return { replaced: false, reason: "lower-or-equal-repack" };
   }
 
-  // (2) Same release group, lookup case-insensitive. Prefer the
-  // snapshotted column written at insert time; fall back to parsing the
-  // title for legacy rows that pre-date the column.
-  const currentGroup = current.releaseGroup ?? detectReleaseGroup(current.title);
+  const currentGroup =
+    current.releaseGroup ?? detectReleaseGroup(current.title);
   const candidateGroup = candidate.releaseGroup;
   if (
     !currentGroup ||
@@ -98,11 +92,9 @@ export async function autoSupersedeWithRepack(
   if (!current.mediaId) {
     return { replaced: false, reason: "media-not-found" };
   }
-  const mediaRow = await findMediaById(db, current.mediaId);
+  const mediaRow = await deps.media.findById(current.mediaId);
   if (!mediaRow) return { replaced: false, reason: "media-not-found" };
 
-  // (5) Profile gate. Skip when no profile is set — the supersede then
-  // relies on (2)/(3)/(4) alone.
   const flavor = resolveMediaFlavor({
     type: mediaRow.type as "movie" | "show",
     originCountry: mediaRow.originCountry,
@@ -110,7 +102,7 @@ export async function autoSupersedeWithRepack(
     genres: mediaRow.genres,
     genreIds: mediaRow.genreIds,
   });
-  const profile = await findActiveDownloadProfile(db, {
+  const profile = await deps.torrents.findActiveDownloadProfile({
     mediaDownloadProfileId: mediaRow.downloadProfileId ?? null,
     folderDownloadProfileId: null,
     flavor,
@@ -121,24 +113,19 @@ export async function autoSupersedeWithRepack(
       { quality: candidate.quality, source: candidate.source },
       profile,
     );
-    // Equivalent is the expected verdict for a same-slot repack — that's
-    // fine; only block hard rejects.
     if (verdict === "candidate-not-allowed" || verdict === "downgrade") {
       return { replaced: false, reason: "profile-rejected" };
     }
   }
 
-  // (1) Pull the linked media_file IDs so the replace flow knows what
-  // to swap. A download with no files linked is bookkeeping-only and
-  // shouldn't be auto-superseded — the manual flow is the safer path.
-  const linkedFiles = await findMediaFilesByDownloadId(db, current.id);
+  const linkedFiles = await deps.torrents.findMediaFilesByDownloadId(current.id);
   if (linkedFiles.length === 0) {
     return { replaced: false, reason: "no-current-files" };
   }
 
   await replaceTorrent(
     db,
-    { logger: deps.logger },
+    { logger: deps.logger, torrents: deps.torrents, media: deps.media },
     {
       mediaId: current.mediaId,
       title: candidate.title,

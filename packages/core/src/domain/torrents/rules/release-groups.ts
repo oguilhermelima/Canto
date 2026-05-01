@@ -41,6 +41,9 @@ export type ReleaseGroupTierSets = Record<
   Set<string>
 >;
 
+/** Per-flavor map of release-group tier sets (movie / show / anime). */
+export type ReleaseGroupLookups = Record<ReleaseFlavor, ReleaseGroupTierSets>;
+
 /**
  * Classify a release group within the context of a media flavor. Pure —
  * the lookup table is supplied by the caller (loaded once per search

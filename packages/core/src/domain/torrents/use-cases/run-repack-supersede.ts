@@ -1,21 +1,21 @@
 import type { Database } from "@canto/db/client";
 
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
+import { runWithConcurrency } from "@canto/core/domain/shared/services/run-with-concurrency";
 import type { ScoringRules } from "@canto/core/domain/shared/rules/scoring-rules";
 import type { IndexerPort } from "@canto/core/domain/torrents/ports/indexer";
-import { findRecentImportedDownloads } from "@canto/core/infra/torrents/download-repository";
-import { runWithConcurrency } from "@canto/core/platform/concurrency/run-with-concurrency";
+import type { TorrentsRepositoryPort } from "@canto/core/domain/torrents/ports/torrents-repository.port";
 import {
-  autoSupersedeWithRepack
-  
+  autoSupersedeWithRepack,
 } from "@canto/core/domain/torrents/use-cases/auto-supersede";
-import type {AutoSupersedeOutcome} from "@canto/core/domain/torrents/use-cases/auto-supersede";
+import type { AutoSupersedeOutcome } from "@canto/core/domain/torrents/use-cases/auto-supersede";
 import {
-  searchTorrents
-  
+  searchTorrents,
 } from "@canto/core/domain/torrents/use-cases/search-torrents";
-import type {SearchResult} from "@canto/core/domain/torrents/use-cases/search-torrents";
+import type { SearchResult } from "@canto/core/domain/torrents/use-cases/search-torrents";
 
 export interface RunRepackSupersedeOpts {
   /** How far back to scan for imported downloads. */
@@ -27,13 +27,8 @@ export interface RunRepackSupersedeOpts {
 export interface RepackSupersedeOutcome {
   scanned: number;
   replaced: number;
-  /** Counts of skip reasons emitted by `autoSupersedeWithRepack`. */
   skips: Record<string, number>;
-  /** Per-row failures with the original error message. */
   failures: Array<{ downloadId: string; title: string; error: string }>;
-  /** Pairs of (oldTitle, repackTitle) for each successful supersede.
-   *  Lets the caller emit a notification or log line per replacement
-   *  without rebuilding the data. */
   replacements: Array<{
     downloadId: string;
     oldTitle: string;
@@ -42,11 +37,14 @@ export interface RepackSupersedeOutcome {
   }>;
 }
 
-interface Deps {
+export interface RunRepackSupersedeDeps {
   indexers: IndexerPort[];
   qbClient: DownloadClientPort;
   rules: ScoringRules;
   logger: LoggerPort;
+  torrents: TorrentsRepositoryPort;
+  media: MediaRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
 }
 
 const DEFAULT_LOOKBACK_DAYS = 14;
@@ -59,20 +57,20 @@ const SEARCH_CONCURRENCY = 4;
  * one whose strict repack candidate exists. The strict gate lives in
  * {@link autoSupersedeWithRepack}; this orchestrator only picks the best
  * candidate per row (highest repackCount, ties broken by confidence).
- *
- * Returns aggregated stats so the caller (the BullMQ handler today, a
- * scheduled report tomorrow) can log or notify without re-walking.
  */
 export async function runRepackSupersede(
   db: Database,
-  deps: Deps,
+  deps: RunRepackSupersedeDeps,
   opts: RunRepackSupersedeOpts = {},
 ): Promise<RepackSupersedeOutcome> {
   const lookbackDays = opts.lookbackDays ?? DEFAULT_LOOKBACK_DAYS;
   const maxPerRun = opts.maxPerRun ?? DEFAULT_MAX_PER_RUN;
   const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
 
-  const candidates = await findRecentImportedDownloads(db, since, maxPerRun);
+  const candidates = await deps.torrents.findRecentImportedDownloads(
+    since,
+    maxPerRun,
+  );
   const outcome: RepackSupersedeOutcome = {
     scanned: 0,
     replaced: 0,
@@ -82,43 +80,50 @@ export async function runRepackSupersede(
   };
   if (candidates.length === 0) return outcome;
 
-  // Drop candidates that can't be scanned, so the concurrency cap doesn't
-  // get spent on no-ops.
-  const scannable = candidates.filter((row) => row.mediaId != null);
+  const scannable = candidates.filter(
+    (row): row is typeof row & { mediaId: string } => row.mediaId !== null,
+  );
   outcome.scanned = scannable.length;
 
-  // Phase 1 — fan out the indexer searches (rate-limited at SEARCH_CONCURRENCY).
+  type Scannable = (typeof scannable)[number];
   type SearchOutcome =
-    | { row: (typeof scannable)[number]; results: SearchResult[]; error: null }
-    | { row: (typeof scannable)[number]; results: null; error: string };
+    | { row: Scannable; results: SearchResult[]; error: null }
+    | { row: Scannable; results: null; error: string };
 
-  const searchOutcomes = await runWithConcurrency<
-    (typeof scannable)[number],
-    SearchOutcome
-  >(scannable, SEARCH_CONCURRENCY, async (row) => {
-    try {
-      const out = await searchTorrents(
-        db,
-        {
-          mediaId: row.mediaId!,
-          seasonNumber: row.seasonNumber ?? undefined,
-          episodeNumbers: row.episodeNumbers ?? undefined,
-          pageSize: 50,
-        },
-        { indexers: deps.indexers, rules: deps.rules },
-      );
-      return { row, results: out.results, error: null };
-    } catch (err) {
-      return {
-        row,
-        results: null,
-        error: err instanceof Error ? err.message : String(err),
-      };
-    }
-  });
+  const searchOutcomes = await runWithConcurrency<Scannable, SearchOutcome>(
+    scannable,
+    SEARCH_CONCURRENCY,
+    async (row) => {
+      try {
+        const out = await searchTorrents(
+          db,
+          {
+            mediaId: row.mediaId,
+            seasonNumber: row.seasonNumber ?? undefined,
+            episodeNumbers: row.episodeNumbers ?? undefined,
+            pageSize: 50,
+          },
+          {
+            indexers: deps.indexers,
+            rules: deps.rules,
+            torrents: deps.torrents,
+            media: deps.media,
+            localization: deps.localization,
+          },
+        );
+        return { row, results: out.results, error: null };
+      } catch (err) {
+        return {
+          row,
+          results: null,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+  );
 
-  // Phase 2 — apply supersedes sequentially. autoSupersedeWithRepack writes to
-  // qBit + DB; parallelizing it would risk racing on the same hash slot.
+  // Apply supersedes sequentially — autoSupersedeWithRepack writes to qBit + DB,
+  // and parallelizing risks racing on the same hash slot.
   for (const item of searchOutcomes) {
     if (item.error !== null) {
       outcome.failures.push({
@@ -136,7 +141,11 @@ export async function runRepackSupersede(
     try {
       supersede = await autoSupersedeWithRepack(
         db,
-        { logger: deps.logger },
+        {
+          logger: deps.logger,
+          media: deps.media,
+          torrents: deps.torrents,
+        },
         { currentDownloadId: item.row.id, candidate: best },
         deps.qbClient,
       );

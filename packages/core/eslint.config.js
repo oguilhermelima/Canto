@@ -177,4 +177,15 @@ export default [
       eqeqeq: ["error", "always"],
     },
   },
+  {
+    // Torrents context — boundary lockdown is `error`. The other rules stay
+    // at the default warn level until the parsing-episodes regex helpers and
+    // the folder-routing rule narrowing are reworked (the residue is
+    // pre-existing pure-rule code, not boundary leaks).
+    files: ["src/domain/torrents/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "error",
+      "@typescript-eslint/prefer-nullish-coalescing": "error",
+    },
+  },
 ];

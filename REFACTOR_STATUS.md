@@ -365,18 +365,6 @@ Antes do replanejamento vertical, primeira passada por categoria de leak. Mantid
 | Stitching | `8a83790a` | post-merge: manage-list-items conflict, log-watched branded IDs, rebuild-recs imports/casts |
 | W11C cleanup | `fd3b1912` | refresh-extras: drop unnecessary conditions + non-null assertions |
 
-### Wave 10 round 3 (vertical Context Waves) — em progresso (2026-05-01)
-
-| Wave | Commits | Estado |
-|---|---|---|
-| **W10.4** content-enrichment | `ce2fce23` (pool-scoring) · `473277cc` (translate-episodes + LoggerPort) · `75528241` (sync-tmdb-certifications boundary) · `e31958ac` (eslint override) | ✅ done — domain/content-enrichment 0 lint warnings, per-folder override at error |
-| **W10.5** user-media | `503e6298` (log-watched + get-watch-next minor lint) | ⚠️ partial — only quick lint fixes applied. Boundary cleanup deferred (see notes) |
-
-**W10.5 deferral notes** (Teammate H):
-- The 4 read-only feed use cases (`get-continue-watching`, `get-library-history`, `get-upcoming-schedule`, `get-watch-next`) reach into 5 infra repos (`library-feed-repository`, `watch-history-repository`, `playback-progress-repository`, `state-repository`, `content-enrichment/extras-repository`). A clean port-first design needs a new `LibraryFeedRepositoryPort` (or extension of `UserMediaRepositoryPort` for the heavy joins). Defer to a follow-up because the surface is large (~15 methods).
-- `push-playback-position.ts` and `push-watch-state.ts` import `infra/media-servers/{plex,jellyfin}.adapter` for write operations not currently exposed by `MediaServerPort` (test/list/scan/fetchInfo only). Deferred to W10.10 (media-servers context) where the port should be extended with `setPlaybackPosition`, `markWatched`, `markUnwatched`, `findItemIdByProvider` etc — that's the right place to design the writeable surface alongside the existing read methods.
-- Working-tree race conditions during the round 1 parallel run made multi-file refactors difficult (changes were repeatedly clobbered by sibling teammates' branch switches in the shared checkout). Single-file lint sweeps committed cleanly; multi-file boundary work needed atomic commits I couldn't reliably stage.
-
 ### Wave 10 round 2 ✅ (2026-05-01 — port wireup horizontal antes do pivot vertical)
 
 Continuou o slicing horizontal antes do replanejamento. Reduziu boundary warnings de 263 → ~90.
@@ -425,6 +413,47 @@ DOD (a-j): boundary clean, drizzle-orm clean, port com `listMemberVotes` adicion
 DOD (a-j): boundary leaks 5 → 0 em platform; drizzle-orm clean; typed errors n/a (recs use cases não throw); anti-bad-smells: dead `??` removidos, magic TTLs em const nomeada (`TOP_10_TTL_SECONDS`, etc). Override parcial — nota inline no eslint config explica por que `no-non-null-assertion` fica em warn.
 
 **Deferido**: `getSetting`/`setSetting` em `get-spotlight` (db helper, não infra/platform — tecnicamente não viola o lint atual mas é cross-context); 13 non-null assertions em array-iteration helpers; rename de `find*` array methods em `RecommendationsRepositoryPort`.
+
+#### W10.4 — `content-enrichment` ✅ (Teammate H, 2026-05-01)
+
+| Commit | Escopo |
+|---|---|
+| `6d3f7829` | drop dead nullish em `pool-scoring` |
+| `c21351eb` | `translate-episodes` lint sweep + LoggerPort thread |
+| `f7f78067` | `sync-tmdb-certifications` boundary cleanup (extras port required) |
+| `063532c8` | eslint per-folder override (4 rules → error) em `src/domain/content-enrichment/**` |
+
+DOD (a-j): zero infra/platform imports; sem drizzle; sem `throw new Error`; anti-bad-smells (`?? "tmdb"` morto, `||` → `??`, `console.log` → logger, magic 500 → `TVDB_PAGE_SIZE`). Callers wired em `packages/api/src/routers/{settings/core,provider/filters}.ts`. Lint clean (0 warnings em `domain/content-enrichment/**`).
+
+#### W10.5 — `user-media` ⚠️ partial (Teammate H, 2026-05-01)
+
+| Commit | Escopo |
+|---|---|
+| `b486730e` | drop dead nullish + unused `MediaType` import em `log-watched`/`get-watch-next` |
+
+**Deferrals justificados** (movidos para round 2):
+
+- **Read-only feed use cases** (`get-continue-watching`, `get-library-history`, `get-upcoming-schedule`, `get-watch-next`) usam 5 infra repos (`library-feed-repository`, `watch-history-repository`, `playback-progress-repository`, `state-repository`, `content-enrichment/extras-repository`). Port-first design exige novo **`LibraryFeedRepositoryPort`** (~15 métodos: `findContinueWatchingFeed`, `findUserPlaybackProgressFeed`, `findUserWatchHistoryFeed`, `findUserListMediaCandidates`, `findUserMediaPaginated`, `findUserMediaCounts`, `findLibraryGenres`, `findEpisodesByMediaIds`, `findUserWatchHistoryByMediaIds`, `findUserCompletedPlaybackByMediaIds`, `findUserContinueWatchingMediaIds`, `findUserWatchingShowsMetadata`, `findUserMediaStatesByMediaIds`). Cross-context (media + episode + season) → **mover para W10.8** quando media wave for tratada.
+- **`push-playback-position.ts` + `push-watch-state.ts`** importam `infra/media-servers/{plex,jellyfin}.adapter` direto pra writes (`setPlaybackPosition`, `markPlayed`, `markUnplayed`, `findItemIdByProvider`) **que `MediaServerPort` ainda não expõe** (só `testConnection`/`listLibraries`/`scanLibrary`/`fetchItemMediaInfo`). **Mover para W10.10** quando media-servers wave estender o port com a write surface.
+
+#### W10.6 — `file-organization` ✅ (Teammate I, 2026-05-01)
+
+| Commit | Escopo |
+|---|---|
+| `a1736918` | lift pure helpers (`runWithConcurrency`, `resolveDownloadUrl`, `parseVideoFiles`/`buildSubtitleName`/`ParsedFile`) de `platform/*` → `domain/shared/services` e `domain/torrents/rules` (preliminar para W10.6/W10.7) |
+| `abc71b96` | port-first cleanup: 3 use cases threadam MediaRepositoryPort, TorrentsRepositoryPort, FoldersRepositoryPort, MediaLocalizationRepositoryPort, MediaAspectStateRepositoryPort, ListsRepositoryPort, MediaProviderPort, FileSystemPort, LoggerPort, JobDispatcherPort. Typed errors: `ReorganizeWhileImportingError`, `ReorganizeRequiresClientError`. TorrentsRepositoryPort gains `findMediaFilesByMediaId`. ESLint per-folder block (4 rules @ error). Callers wired: `apps/worker/src/jobs/folder-scan.ts`, `packages/api/src/routers/folder/paths.ts`, `packages/api/src/routers/media/versioning.ts`. |
+
+DOD (a-j): boundary 6 → 0; drizzle clean; typed errors via `domain/file-organization/errors.ts`; lint clean. Caller-side `apps/worker/src/jobs/folder-scan.ts` ainda importa `findAllFolders`/`findMediaPathsByFolder` direto (composition root, fine).
+
+#### W10.7 — `torrents` ✅ partial (Teammate I, 2026-05-01)
+
+| Commit | Escopo |
+|---|---|
+| `9a60da3b` | port-first cleanup: 17 use cases threadam TorrentsRepositoryPort + MediaRepositoryPort + MediaLocalizationRepositoryPort + FoldersRepositoryPort + MediaExtrasRepositoryPort + NotificationsRepositoryPort. Port gains `findActiveDownloadProfile`, `findDownloadConfig`, `findReleaseGroupLookups`. `ReleaseGroupLookups` promovido para `domain/torrents/rules/release-groups`. Typed errors: `MissingDownloadUrlError`, `TorrentMissingHashError`, `TorrentEmptyError`, `TorrentNotFoundInClientError` (4 `throw new Error` substituídos). `folder-routing.ts` collapsa narrows e troca `==` por `===`. ESLint per-folder block (`no-restricted-imports` + `prefer-nullish-coalescing` @ error). Callers wired: `apps/worker/src/jobs/{import-torrents,repack-supersede,rss-sync,stall-detection}.ts`, `packages/api/src/routers/torrent/{import,list,manage,search}.ts`. |
+
+DOD (a-j): boundary 25 → 0; drizzle clean; typed errors via `domain/torrents/errors.ts`. Lint partial: `no-non-null-assertion` + `eqeqeq` ficam em warn — `parsing-episodes.ts` tem 23 `!` em regex captures (pre-existing pattern, low ROI to refactor). Cross-context cast em `list-live-torrents.ts` (`as unknown as` em `mergeLiveData`) flagged para W10.8.
+
+**Deferrals**: 23 `!` em `parsing-episodes.ts` (W11-final / W12 cleanup); `mergeLiveData` boundary leak ainda em `domain/media` (W10.8); `folder-scan.ts` worker importa infra/file-organization caller-side (composition root, ok).
 
 ### Convenção de paths de imports (decidida 2026-04-30, em adoção desde Wave 1)
 

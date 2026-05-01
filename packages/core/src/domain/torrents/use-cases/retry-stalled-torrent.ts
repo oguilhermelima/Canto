@@ -3,14 +3,15 @@
 /* -------------------------------------------------------------------------- */
 
 import type { Database } from "@canto/db/client";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
+import { applyAdminDownloadPolicy } from "@canto/core/domain/shared/rules/scoring-rules";
 import type { IndexerPort } from "@canto/core/domain/torrents/ports/indexer";
 import type { TorrentsRepositoryPort } from "@canto/core/domain/torrents/ports/torrents-repository.port";
-import { searchTorrents } from "@canto/core/domain/torrents/use-cases/search-torrents";
 import { downloadTorrent } from "@canto/core/domain/torrents/use-cases/download-torrent";
-import { findDownloadConfig } from "@canto/core/infra/torrents/download-config-repository";
-import { applyAdminDownloadPolicy } from "@canto/core/domain/shared/rules/scoring-rules";
+import { searchTorrents } from "@canto/core/domain/torrents/use-cases/search-torrents";
 
 interface StalledTorrent {
   id: string;
@@ -20,16 +21,22 @@ interface StalledTorrent {
   episodeNumbers: number[] | null;
 }
 
+export interface RetryStalledTorrentDeps {
+  torrents: TorrentsRepositoryPort;
+  media: MediaRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
+  logger: LoggerPort;
+}
+
 export async function retryStalledTorrent(
   db: Database,
-  deps: { torrents: TorrentsRepositoryPort; logger: LoggerPort },
+  deps: RetryStalledTorrentDeps,
   row: StalledTorrent,
   indexers: IndexerPort[],
   qbClient: DownloadClientPort,
 ): Promise<void> {
   if (!row.mediaId) return;
 
-  // Blocklist the stalled torrent
   try {
     await deps.torrents.createBlocklistEntry({
       mediaId: row.mediaId,
@@ -40,7 +47,6 @@ export async function retryStalledTorrent(
     // May already be blocklisted
   }
 
-  // Remove stalled torrent from qBit
   try {
     const stalledRow = await deps.torrents.findDownloadById(row.id);
     if (stalledRow?.hash) {
@@ -50,11 +56,10 @@ export async function retryStalledTorrent(
     // qBit may not have it
   }
 
-  // Search for alternative
   if (indexers.length === 0) return;
 
   try {
-    const config = await findDownloadConfig(db);
+    const config = await deps.torrents.findDownloadConfig();
     const rules = applyAdminDownloadPolicy(config.rules, config.policy);
     const { results } = await searchTorrents(
       db,
@@ -63,24 +68,34 @@ export async function retryStalledTorrent(
         seasonNumber: row.seasonNumber ?? undefined,
         episodeNumbers: row.episodeNumbers ?? undefined,
       },
-      { indexers, rules },
+      {
+        indexers,
+        rules,
+        torrents: deps.torrents,
+        media: deps.media,
+        localization: deps.localization,
+      },
     );
 
-    if (results.length === 0) {
-      console.log(
+    const best = results[0];
+    if (!best) {
+      deps.logger.info?.(
         `[stall-detection] No alternative found for "${row.title}"`,
       );
       return;
     }
 
-    const best = results[0]!;
-    console.log(
+    deps.logger.info?.(
       `[stall-detection] Auto-retrying with "${best.title}" (confidence: ${best.confidence})`,
     );
 
     await downloadTorrent(
       db,
-      { logger: deps.logger },
+      {
+        logger: deps.logger,
+        torrents: deps.torrents,
+        media: deps.media,
+      },
       {
         mediaId: row.mediaId,
         title: best.title,
@@ -92,9 +107,9 @@ export async function retryStalledTorrent(
       qbClient,
     );
   } catch (err) {
-    console.warn(
-      `[stall-detection] Auto-retry failed for "${row.title}":`,
-      err instanceof Error ? err.message : err,
+    deps.logger.warn(
+      `[stall-detection] Auto-retry failed for "${row.title}"`,
+      { error: err instanceof Error ? err.message : String(err) },
     );
   }
 }

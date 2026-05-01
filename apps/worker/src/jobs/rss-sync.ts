@@ -10,12 +10,11 @@ import { matchRssTitle } from "@canto/core/domain/torrents/rules/rss-matching";
 import { detectMissingEpisodes } from "@canto/core/domain/media/use-cases/detect-episode-gaps";
 import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
 import { getProwlarrClient } from "@canto/core/infra/indexers/prowlarr.adapter";
+import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
+import { makeFoldersRepository } from "@canto/core/infra/file-organization/folders-repository.adapter";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
 import { makeTorrentsRepository } from "@canto/core/infra/torrents/torrents-repository.adapter";
-import {
-  findDownloadConfig,
-  findReleaseGroupLookups,
-} from "@canto/core/infra/torrents/download-config-repository";
 import { applyAdminDownloadPolicy } from "@canto/core/domain/shared/rules/scoring-rules";
 
 /**
@@ -64,8 +63,8 @@ export async function handleRssSync(): Promise<void> {
   // is admin-scoped (no per-user context), so apply admin policy and
   // skip the per-user prefs layer.
   const [config, allLookups] = await Promise.all([
-    findDownloadConfig(db),
-    findReleaseGroupLookups(db),
+    torrents.findDownloadConfig(),
+    torrents.findReleaseGroupLookups(),
   ]);
   const rules = applyAdminDownloadPolicy(config.rules, config.policy);
 
@@ -148,7 +147,14 @@ export async function handleRssSync(): Promise<void> {
       const qb = await getDownloadClient();
       await downloadTorrent(
         db,
-        { logger: makeConsoleLogger() },
+        {
+          logger: makeConsoleLogger(),
+          torrents,
+          media,
+          folders: makeFoldersRepository(db),
+          extras: makeMediaExtrasRepository(db),
+          notifications: makeNotificationsRepository(db),
+        },
         {
           mediaId: matchedShow.id,
           title: item.title,

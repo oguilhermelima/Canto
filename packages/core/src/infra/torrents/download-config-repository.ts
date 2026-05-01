@@ -14,28 +14,14 @@ import type {
 } from "@canto/core/domain/shared/rules/scoring-rules";
 import type {
   ReleaseFlavor,
+  ReleaseGroupLookups,
   ReleaseGroupTier,
+  ReleaseGroupTierSets,
 } from "@canto/core/domain/torrents/rules/release-groups";
+import type { DownloadConfig } from "@canto/core/domain/torrents/ports/torrents-repository.port";
 
-/**
- * Indexable lookup tables built from the `download_release_group` rows.
- * Mirrors the shape the (now-deleted) hardcoded constant used so the
- * pure `classifyReleaseGroup` helper stays an O(1) set membership check.
- *
- * `neutral` is implicit — a group absent from every set falls through to
- * neutral. Only the four scored tiers carry sets.
- */
-export type ReleaseGroupTierSets = Record<
-  Exclude<ReleaseGroupTier, "neutral">,
-  Set<string>
->;
-
-export type ReleaseGroupLookups = Record<ReleaseFlavor, ReleaseGroupTierSets>;
-
-export interface DownloadConfig {
-  rules: ScoringRules;
-  policy: AdminDownloadPolicy;
-}
+// Re-export so legacy callers pulling these from infra keep working.
+export type { ReleaseGroupLookups, ReleaseGroupTierSets, DownloadConfig };
 
 const av1StanceSchema = z.enum(["neutral", "prefer", "avoid"]);
 const stringArraySchema = z.array(z.string());

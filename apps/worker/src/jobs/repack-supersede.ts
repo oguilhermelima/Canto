@@ -2,9 +2,11 @@ import { db } from "@canto/db/client";
 
 import { runRepackSupersede } from "@canto/core/domain/torrents/use-cases/run-repack-supersede";
 import { applyAdminDownloadPolicy } from "@canto/core/domain/shared/rules/scoring-rules";
-import { findDownloadConfig } from "@canto/core/infra/torrents/download-config-repository";
 import { buildIndexers } from "@canto/core/infra/indexers/indexer-factory";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
+import { makeTorrentsRepository } from "@canto/core/infra/torrents/torrents-repository.adapter";
 import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 
 import type { JobLogger } from "../lib/job-logger";
@@ -18,9 +20,18 @@ export async function handleRepackSupersede(log: JobLogger): Promise<void> {
   const qbClient = await getDownloadClient().catch(() => null);
   if (!qbClient) return;
 
-  const config = await findDownloadConfig(db);
+  const torrents = makeTorrentsRepository(db);
+  const config = await torrents.findDownloadConfig();
   const rules = applyAdminDownloadPolicy(config.rules, config.policy);
-  const outcome = await runRepackSupersede(db, { indexers, qbClient, rules, logger: makeConsoleLogger() });
+  const outcome = await runRepackSupersede(db, {
+    indexers,
+    qbClient,
+    rules,
+    logger: makeConsoleLogger(),
+    torrents,
+    media: makeMediaRepository(db),
+    localization: makeMediaLocalizationRepository(db),
+  });
 
   if (outcome.scanned === 0 && outcome.replaced === 0) return;
   for (const r of outcome.replacements) {

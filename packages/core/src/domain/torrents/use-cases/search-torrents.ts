@@ -1,53 +1,45 @@
 import type { Database } from "@canto/db/client";
 
-import { IndexerSearchError } from "@canto/core/domain/torrents/errors";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
-import {
-  explainConfidence
-  
-} from "@canto/core/domain/shared/rules/scoring";
-import type {ConfidenceBreakdown} from "@canto/core/domain/shared/rules/scoring";
-import type { ScoringRules } from "@canto/core/domain/shared/rules/scoring-rules";
 import { resolveMediaFlavor } from "@canto/core/domain/shared/rules/media-flavor";
 import {
-  parseReleaseAttributes
-  
-} from "@canto/core/domain/torrents/rules/release-attributes";
-import type {ReleaseAttributes} from "@canto/core/domain/torrents/rules/release-attributes";
+  explainConfidence,
+} from "@canto/core/domain/shared/rules/scoring";
+import type { ConfidenceBreakdown } from "@canto/core/domain/shared/rules/scoring";
+import type { ScoringRules } from "@canto/core/domain/shared/rules/scoring-rules";
+import { IndexerSearchError } from "@canto/core/domain/torrents/errors";
+import type { IndexerPort } from "@canto/core/domain/torrents/ports/indexer";
+import type { TorrentsRepositoryPort } from "@canto/core/domain/torrents/ports/torrents-repository.port";
 import {
   applyDownloadProfile,
-  meetsCutoff
-  
+  meetsCutoff,
 } from "@canto/core/domain/torrents/rules/download-profile";
-import type {DownloadProfile} from "@canto/core/domain/torrents/rules/download-profile";
+import type { DownloadProfile } from "@canto/core/domain/torrents/rules/download-profile";
+import {
+  matchesSearchIntent,
+} from "@canto/core/domain/torrents/rules/parsing-episodes";
+import type { SearchIntent } from "@canto/core/domain/torrents/rules/parsing-episodes";
+import {
+  parseReleaseAttributes,
+} from "@canto/core/domain/torrents/rules/release-attributes";
+import type { ReleaseAttributes } from "@canto/core/domain/torrents/rules/release-attributes";
 import type {
   ReleaseFlavor,
   ReleaseGroupTierSets,
 } from "@canto/core/domain/torrents/rules/release-groups";
+import { extractHashFromMagnet } from "@canto/core/domain/torrents/rules/torrent-rules";
 import type { ConfidenceContext } from "@canto/core/domain/torrents/types/common";
 import type {
   IndexerResult,
   SearchContext,
 } from "@canto/core/domain/torrents/types/torrent";
-import type { IndexerPort } from "@canto/core/domain/torrents/ports/indexer";
-import { findMediaById } from "@canto/core/infra/media/media-repository";
-import { makeTorrentsRepository } from "@canto/core/infra/torrents/torrents-repository.adapter";
-import { findMediaLocalized } from "@canto/core/infra/media/media-localized-repository";
-import { findActiveDownloadProfile } from "@canto/core/infra/torrents/download-profile-repository";
-import { findReleaseGroupLookups } from "@canto/core/infra/torrents/download-config-repository";
-import { extractHashFromMagnet } from "@canto/core/domain/torrents/rules/torrent-rules";
-import {
-  matchesSearchIntent
-  
-} from "@canto/core/domain/torrents/rules/parsing-episodes";
-import type {SearchIntent} from "@canto/core/domain/torrents/rules/parsing-episodes";
 
 /**
  * Stable dedupe key. Prefers the magnet info-hash so the same release
  * picked up by two indexers collapses regardless of title casing /
- * trailing tag differences. Falls back to lowercased title when the
- * indexer didn't expose a magnet (rare; usually means a .torrent file
- * whose hash isn't surfaced until we add it to the client).
+ * trailing tag differences.
  */
 function dedupeKey(r: { magnetUrl: string | null; title: string }): string {
   if (r.magnetUrl) {
@@ -69,13 +61,8 @@ export interface SearchResult extends ReleaseAttributes {
   categories: Array<{ id: number; name: string }>;
   indexerLanguage: string | null;
   confidence: number;
-  /** Per-component breakdown of how `confidence` was reached. Drives
-   *  the explainability tooltip on the download modal — clicking the
-   *  chip shows which rules contributed. */
   breakdown: ConfidenceBreakdown;
-  /** True when this release meets or exceeds the active profile's cutoff.
-   *  False when the profile has no cutoff or the release falls below.
-   *  Drives upgrade-flow decisions and the UI cutoff badge. */
+  /** True when this release meets or exceeds the active profile's cutoff. */
   aboveCutoff: boolean;
 }
 
@@ -83,7 +70,6 @@ export interface PaginatedSearchResults {
   results: SearchResult[];
   page: number;
   pageSize: number;
-  /** Whether indexers returned a full page (i.e. there's likely more) */
   hasMore: boolean;
 }
 
@@ -96,13 +82,8 @@ export interface SearchInput {
   pageSize?: number;
 }
 
-/* ─── Shared prep + scoring helpers ─── */
+const DEFAULT_PAGE_SIZE = 50;
 
-/**
- * Everything a search needs that *isn't* the indexer roundtrip itself.
- * Built once per search invocation so per-indexer fan-out (Phase 6b) can
- * reuse it cheaply across parallel calls.
- */
 interface PreparedSearch {
   ctx: SearchContext;
   queryVariants: string[];
@@ -112,47 +93,38 @@ interface PreparedSearch {
   flavor: ReleaseFlavor;
   releaseGroupLookups: ReleaseGroupTierSets;
   blockedTitles: Set<string>;
-  /** Null for movies and custom (advanced) queries. Set for show
-   *  searches so {@link matchesSearchIntent} can drop releases that
-   *  target the wrong season/episode bucket. */
   intent: SearchIntent | null;
   page: number;
   pageSize: number;
 }
 
 async function prepareSearch(
-  db: Database,
+  deps: SearchDeps,
   input: SearchInput,
   rules: ScoringRules,
 ): Promise<PreparedSearch> {
-  const torrentsRepo = makeTorrentsRepository(db);
   const [allLookups, row, blockedRows] = await Promise.all([
-    findReleaseGroupLookups(db),
-    findMediaById(db, input.mediaId),
-    torrentsRepo.findBlocklistByMediaId(input.mediaId),
+    deps.torrents.findReleaseGroupLookups(),
+    deps.media.findById(input.mediaId),
+    deps.torrents.findBlocklistByMediaId(input.mediaId),
   ]);
   if (!row) throw new MediaNotFoundError(input.mediaId);
 
   const page = input.page ?? 0;
-  const pageSize = input.pageSize ?? 50;
+  const pageSize = input.pageSize ?? DEFAULT_PAGE_SIZE;
 
-  // Build text query — use custom query if provided (advanced search)
-  const isCustomQuery = !!input.query;
+  const isCustomQuery = input.query !== undefined && input.query.length > 0;
   let query: string;
-  if (isCustomQuery) {
-    query = input.query!;
+  if (isCustomQuery && input.query) {
+    query = input.query;
   } else {
-    // Indexer queries match against release-group naming, which is en-US.
-    const enLoc = await findMediaLocalized(db, row.id, "en-US");
+    const enLoc = await deps.localization.findOne(row.id, "en-US");
     query = enLoc?.title ?? "";
     if (input.seasonNumber !== undefined) {
       const paddedSeason = String(input.seasonNumber).padStart(2, "0");
-      if (
-        input.episodeNumbers &&
-        input.episodeNumbers.length === 1 &&
-        input.episodeNumbers[0] !== undefined
-      ) {
-        const paddedEp = String(input.episodeNumbers[0]).padStart(2, "0");
+      const eps = input.episodeNumbers;
+      if (eps && eps.length === 1 && eps[0] !== undefined) {
+        const paddedEp = String(eps[0]).padStart(2, "0");
         query += ` S${paddedSeason}E${paddedEp}`;
       } else {
         query += ` S${paddedSeason}`;
@@ -163,28 +135,28 @@ async function prepareSearch(
   const ctx: SearchContext = {
     query,
     mediaType: row.type as "movie" | "show",
-    tmdbId: isCustomQuery ? undefined : (row.provider === "tmdb" ? row.externalId : undefined),
+    tmdbId: isCustomQuery
+      ? undefined
+      : row.provider === "tmdb"
+        ? row.externalId
+        : undefined,
     imdbId: isCustomQuery ? undefined : (row.imdbId ?? undefined),
     tvdbId: isCustomQuery ? undefined : (row.tvdbId ?? undefined),
     seasonNumber: isCustomQuery ? undefined : input.seasonNumber,
-    episodeNumbers: isCustomQuery ? undefined : (input.episodeNumbers ?? undefined),
+    episodeNumbers: isCustomQuery
+      ? undefined
+      : (input.episodeNumbers ?? undefined),
     categories: row.type === "movie" ? [2000] : [5000],
     limit: pageSize,
     offset: page * pageSize,
   };
 
-  // Full-show fan-out: also fire `${title} Complete` so indexers that
-  // index season packs under that token aren't missed. Dedupe-by-title
-  // collapses overlap.
   const isShowFullScan =
-    !isCustomQuery &&
-    row.type === "show" &&
-    input.seasonNumber === undefined;
+    !isCustomQuery && row.type === "show" && input.seasonNumber === undefined;
   const queryVariants: string[] = isShowFullScan
     ? [query, `${query} Complete`]
     : [query];
 
-  // Determine if media has a digital release (drives CAM penalty)
   const isShow = row.type === "show";
   const releaseDate = row.releaseDate ? new Date(row.releaseDate) : null;
   const monthsSinceRelease = releaseDate
@@ -201,10 +173,7 @@ async function prepareSearch(
     genreIds: row.genreIds,
   });
 
-  // Resolve and apply the active download profile. media.downloadProfileId
-  // wins (snapshot-on-add); fallback to system default per flavor.
-  // folder.downloadProfileId can layer between the two.
-  const profile = await findActiveDownloadProfile(db, {
+  const profile = await deps.torrents.findActiveDownloadProfile({
     mediaDownloadProfileId: row.downloadProfileId ?? null,
     folderDownloadProfileId: null,
     flavor,
@@ -213,9 +182,7 @@ async function prepareSearch(
     ? applyDownloadProfile(rules, profile)
     : rules;
 
-  const blockedTitles = new Set(
-    blockedRows.map((b) => b.title.toLowerCase()),
-  );
+  const blockedTitles = new Set(blockedRows.map((b) => b.title.toLowerCase()));
 
   const intent: SearchIntent | null =
     !isCustomQuery && row.type === "show"
@@ -241,11 +208,6 @@ async function prepareSearch(
   };
 }
 
-/**
- * Run a single indexer with the prepared context, for every query
- * variant, and concatenate the raw results. Errors are swallowed —
- * caller decides whether one indexer's failure is fatal.
- */
 async function runOneIndexer(
   idx: IndexerPort,
   prep: PreparedSearch,
@@ -260,12 +222,6 @@ async function runOneIndexer(
   return out;
 }
 
-/**
- * Score the raw indexer results against the prepared profile + rules,
- * filtering out blocked titles and zero-confidence releases. Caller
- * decides ordering (per-indexer streaming may want chronological;
- * batch wants confidence-sorted).
- */
 function scoreRawResults(
   raw: IndexerResult[],
   prep: PreparedSearch,
@@ -279,16 +235,12 @@ function scoreRawResults(
     const attrs = parseReleaseAttributes({
       title: r.title,
       seeders: r.seeders,
-      age: r.age ?? 0,
-      flags: r.indexerFlags ?? [],
+      age: r.age,
+      flags: r.indexerFlags,
       flavor: prep.flavor,
       releaseGroupLookups: prep.releaseGroupLookups,
     });
-    const breakdown = explainConfidence(
-      attrs,
-      prep.confidenceCtx,
-      prep.rules,
-    );
+    const breakdown = explainConfidence(attrs, prep.confidenceCtx, prep.rules);
     if (breakdown.score <= 0) continue;
 
     out.push({
@@ -314,28 +266,29 @@ function scoreRawResults(
   return out;
 }
 
-/* ─── Public use-cases ─── */
-
 export interface SearchDeps {
   indexers: IndexerPort[];
-  /** Per-call scoring rules. Callers that have a user context (the tRPC
-   *  search procedure) layer the user's download preferences on top of
-   *  the admin config via {@link composeDownloadRules}. Background jobs
-   *  with no user (continuous-download, rss-sync) pass the admin config
-   *  rules untouched — see {@link findDownloadConfig}. */
   rules: ScoringRules;
+  torrents: TorrentsRepositoryPort;
+  media: MediaRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
 }
 
 export async function searchTorrents(
-  db: Database,
+  _db: Database,
   input: SearchInput,
   deps: SearchDeps,
 ): Promise<PaginatedSearchResults> {
   const { indexers, rules } = deps;
-  const prep = await prepareSearch(db, input, rules);
+  const prep = await prepareSearch(deps, input, rules);
 
   if (indexers.length === 0) {
-    return { results: [], page: prep.page, pageSize: prep.pageSize, hasMore: false };
+    return {
+      results: [],
+      page: prep.page,
+      pageSize: prep.pageSize,
+      hasMore: false,
+    };
   }
 
   let raw: IndexerResult[];
@@ -347,8 +300,6 @@ export async function searchTorrents(
     for (const r of indexerResults) {
       if (r.status === "fulfilled") raw.push(...r.value);
     }
-    // Dedupe across indexers — same release on two trackers shares the
-    // info-hash even if titles differ slightly.
     const seen = new Set<string>();
     raw = raw.filter((r) => {
       const key = dedupeKey(r);
@@ -367,7 +318,12 @@ export async function searchTorrents(
 
   const hasMore = scored.length > prep.pageSize;
   const truncated = scored.slice(0, prep.pageSize);
-  return { results: truncated, page: prep.page, pageSize: prep.pageSize, hasMore };
+  return {
+    results: truncated,
+    page: prep.page,
+    pageSize: prep.pageSize,
+    hasMore,
+  };
 }
 
 export interface SearchOnIndexerInput extends SearchInput {
@@ -381,18 +337,8 @@ export interface IndexerSearchResult {
   tookMs: number;
 }
 
-/**
- * Single-indexer search. Used by the per-indexer streaming UI (Phase 6b)
- * via tRPC `useQueries` — each enabled indexer becomes its own query so
- * the modal lights up chips as each one responds rather than waiting for
- * the slowest.
- *
- * Reuses the same prep + scoring helpers as {@link searchTorrents}; the
- * only difference is who orchestrates the fan-out (server here vs
- * client).
- */
 export async function searchOnIndexer(
-  db: Database,
+  _db: Database,
   input: SearchOnIndexerInput,
   deps: SearchDeps,
 ): Promise<IndexerSearchResult> {
@@ -406,14 +352,10 @@ export async function searchOnIndexer(
     };
   }
 
-  const prep = await prepareSearch(db, input, rules);
+  const prep = await prepareSearch(deps, input, rules);
 
   const start = Date.now();
   const raw = await runOneIndexer(idx, prep);
-  // Dedupe within this indexer (same release returned twice across
-  // query variants — e.g. bare title + " Complete"). Hash-based so the
-  // collision check is stable when an indexer normalises the title
-  // differently between query variants.
   const seen = new Set<string>();
   const deduped = raw.filter((r) => {
     const key = dedupeKey(r);
@@ -437,11 +379,6 @@ export interface IndexerInfo {
   name: string;
 }
 
-/**
- * Snapshot of every enabled indexer's id + display name. Used by the
- * Phase 6b streaming UI to render one chip per indexer before any
- * search fires.
- */
 export function listIndexerInfo(indexers: IndexerPort[]): IndexerInfo[] {
   return indexers.map((idx) => ({ id: idx.id, name: idx.name }));
 }

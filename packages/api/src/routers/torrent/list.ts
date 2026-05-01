@@ -7,6 +7,9 @@ import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-cl
 import { listLiveTorrents } from "@canto/core/domain/torrents/use-cases/list-live-torrents";
 import { mergeLiveData } from "@canto/core/domain/media/use-cases/merge-live-data";
 import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { makeTorrentsRepository } from "@canto/core/infra/torrents/torrents-repository.adapter";
 import {
   findAllDownloads,
   findDownloadsByMediaId,
@@ -25,7 +28,19 @@ export const torrentListRouter = createTRPCRouter({
     .input(listLiveTorrentsInput)
     .query(async ({ ctx, input }) => {
       const qb = await getDownloadClient();
-      return listLiveTorrents(ctx.db, { logger: makeConsoleLogger() }, ctx.session.user.language, input.limit, input.cursor, qb);
+      return listLiveTorrents(
+        ctx.db,
+        {
+          logger: makeConsoleLogger(),
+          torrents: makeTorrentsRepository(ctx.db),
+          media: makeMediaRepository(ctx.db),
+          localization: makeMediaLocalizationRepository(ctx.db),
+        },
+        ctx.session.user.language,
+        input.limit,
+        input.cursor,
+        qb,
+      );
     }),
 
   listLiveByMedia: adminProcedure

@@ -49,6 +49,11 @@ import {
   toDomain as blocklistToDomain,
   toRow as blocklistToRow,
 } from "@canto/core/infra/torrents/blocklist.mapper";
+import { findActiveDownloadProfile } from "@canto/core/infra/torrents/download-profile-repository";
+import {
+  findDownloadConfig,
+  findReleaseGroupLookups,
+} from "@canto/core/infra/torrents/download-config-repository";
 
 export function makeTorrentsRepository(db: Database): TorrentsRepositoryPort {
   return {
@@ -176,5 +181,10 @@ export function makeTorrentsRepository(db: Database): TorrentsRepositoryPort {
       if (!row) throw new Error("createBlocklistEntry returned no row");
       return blocklistToDomain(row);
     },
+
+    // ── Download profile / config ──
+    findActiveDownloadProfile: (args) => findActiveDownloadProfile(db, args),
+    findDownloadConfig: () => findDownloadConfig(db),
+    findReleaseGroupLookups: () => findReleaseGroupLookups(db),
   };
 }

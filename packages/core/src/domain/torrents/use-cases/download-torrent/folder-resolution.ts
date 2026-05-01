@@ -1,16 +1,10 @@
-import type { Database } from "@canto/db/client";
-
+import type { FoldersRepositoryPort } from "@canto/core/domain/file-organization/ports/folders-repository.port";
+import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import {
-  findAllFolders,
-  findFolderById,
-} from "@canto/core/infra/file-organization/folder-repository";
-import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
-import { updateMedia } from "@canto/core/infra/media/media-repository";
-import {
-  resolveFolder
-  
+  resolveFolder,
 } from "@canto/core/domain/torrents/rules/folder-routing";
-import type {RoutableMedia} from "@canto/core/domain/torrents/rules/folder-routing";
+import type { RoutableMedia } from "@canto/core/domain/torrents/rules/folder-routing";
 
 export interface RoutableMediaRow {
   id: string;
@@ -34,6 +28,12 @@ export interface ResolvedDownloadConfig {
   folderId: string | undefined;
 }
 
+export interface ResolveDownloadConfigDeps {
+  folders: FoldersRepositoryPort;
+  media: MediaRepositoryPort;
+  extras: MediaExtrasRepositoryPort;
+}
+
 /**
  * Resolve download folder via:
  * 1. Explicit folderId from input
@@ -42,15 +42,15 @@ export interface ResolvedDownloadConfig {
  * Persists the resolved folderId onto media for future reference.
  */
 export async function resolveDownloadConfig(
-  db: Database,
+  deps: ResolveDownloadConfigDeps,
   mediaRow: RoutableMediaRow,
   inputFolderId?: string,
 ): Promise<ResolvedDownloadConfig> {
   if (inputFolderId) {
-    const folder = await findFolderById(db, inputFolderId);
+    const folder = await deps.folders.findFolderById(inputFolderId);
     if (folder?.enabled) {
       if (mediaRow.libraryId !== folder.id) {
-        await updateMedia(db, mediaRow.id, { libraryId: folder.id });
+        await deps.media.updateMedia(mediaRow.id, { libraryId: folder.id });
       }
       return {
         category: folder.qbitCategory ?? "default",
@@ -61,7 +61,7 @@ export async function resolveDownloadConfig(
   }
 
   if (mediaRow.libraryId) {
-    const folder = await findFolderById(db, mediaRow.libraryId);
+    const folder = await deps.folders.findFolderById(mediaRow.libraryId);
     if (folder?.enabled) {
       return {
         category: folder.qbitCategory ?? "default",
@@ -71,10 +71,9 @@ export async function resolveDownloadConfig(
     }
   }
 
-  const extras = makeMediaExtrasRepository(db);
   const [folders, watchProviders] = await Promise.all([
-    findAllFolders(db),
-    extras.findWatchProvidersByMediaId(mediaRow.id),
+    deps.folders.findAllFolders(),
+    deps.extras.findWatchProvidersByMediaId(mediaRow.id),
   ]);
   const routable: RoutableMedia = {
     type: mediaRow.type,
@@ -88,13 +87,18 @@ export async function resolveDownloadConfig(
     runtime: mediaRow.runtime,
     voteAverage: mediaRow.voteAverage,
     status: mediaRow.status,
-    watchProviders: watchProviders.map((w) => ({ providerId: w.providerId, region: w.region })),
+    watchProviders: watchProviders.map((w) => ({
+      providerId: w.providerId,
+      region: w.region,
+    })),
   };
   const resolvedId = resolveFolder(folders, routable);
-  const resolved = resolvedId ? folders.find((f) => f.id === resolvedId) : null;
+  const resolved = resolvedId
+    ? (folders.find((f) => f.id === resolvedId) ?? null)
+    : null;
 
   if (resolved && mediaRow.libraryId !== resolved.id) {
-    await updateMedia(db, mediaRow.id, { libraryId: resolved.id });
+    await deps.media.updateMedia(mediaRow.id, { libraryId: resolved.id });
   }
 
   return {

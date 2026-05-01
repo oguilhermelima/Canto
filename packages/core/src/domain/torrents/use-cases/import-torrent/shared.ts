@@ -1,12 +1,9 @@
 import path from "node:path";
 
-import type { Database } from "@canto/db/client";
 import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
-import {
-  createMediaFileNoConflict,
-  updateMediaFile,
-} from "@canto/core/infra/media/media-file-repository";
-import type { ParsedFile } from "@canto/core/platform/fs/filesystem";
+import { TorrentNotFoundInClientError } from "@canto/core/domain/torrents/errors";
+import type { TorrentsRepositoryPort } from "@canto/core/domain/torrents/ports/torrents-repository.port";
+import type { ParsedFile } from "@canto/core/domain/torrents/rules/parse-video-files";
 
 /**
  * Resolve the save path qBittorrent reports for a given hash. Used to locate
@@ -18,7 +15,7 @@ export async function resolveSavePath(
 ): Promise<string> {
   const torrents = await client.listTorrents({ hashes: [hash] });
   const torrent = torrents[0];
-  if (!torrent) throw new Error(`Torrent ${hash} not found in download client`);
+  if (!torrent) throw new TorrentNotFoundInClientError(hash);
   return path.normalize(torrent.save_path);
 }
 
@@ -31,7 +28,7 @@ export async function resolveSavePath(
  * Returns 1 when a row was written (either updated or inserted), 0 otherwise.
  */
 export async function upsertMediaFile(
-  db: Database,
+  torrents: TorrentsRepositoryPort,
   pf: ParsedFile,
   finalPath: string,
   placeholders: Array<{ id: string; episodeId: string | null }>,
@@ -50,14 +47,14 @@ export async function upsertMediaFile(
   if (pf.episodeId) {
     const placeholder = placeholders.find((p) => p.episodeId === pf.episodeId);
     if (placeholder) {
-      await updateMediaFile(db, placeholder.id, {
+      await torrents.updateMediaFile(placeholder.id, {
         filePath: finalPath,
         sizeBytes: pf.file.size,
         status: "imported",
       });
       return 1;
     }
-    await createMediaFileNoConflict(db, {
+    await torrents.createMediaFileNoConflict({
       mediaId: mediaRow.id,
       episodeId: pf.episodeId,
       downloadId: torrentRow.id,
@@ -73,14 +70,14 @@ export async function upsertMediaFile(
   if (mediaRow.id) {
     const placeholder = placeholders.find((p) => !p.episodeId);
     if (placeholder) {
-      await updateMediaFile(db, placeholder.id, {
+      await torrents.updateMediaFile(placeholder.id, {
         filePath: finalPath,
         sizeBytes: pf.file.size,
         status: "imported",
       });
       return 1;
     }
-    await createMediaFileNoConflict(db, {
+    await torrents.createMediaFileNoConflict({
       mediaId: mediaRow.id,
       downloadId: torrentRow.id,
       filePath: finalPath,

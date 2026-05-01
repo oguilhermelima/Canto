@@ -13,6 +13,26 @@ import type {
   NewMediaFile,
   UpdateMediaFileInput,
 } from "@canto/core/domain/torrents/types/media-file";
+import type { DownloadProfile } from "@canto/core/domain/torrents/rules/download-profile";
+import type {
+  ReleaseFlavor,
+  ReleaseGroupLookups,
+} from "@canto/core/domain/torrents/rules/release-groups";
+import type {
+  AdminDownloadPolicy,
+  ScoringRules,
+} from "@canto/core/domain/shared/rules/scoring-rules";
+
+export interface DownloadConfig {
+  rules: ScoringRules;
+  policy: AdminDownloadPolicy;
+}
+
+export interface ActiveProfileQuery {
+  mediaDownloadProfileId: string | null;
+  folderDownloadProfileId: string | null;
+  flavor: ReleaseFlavor;
+}
 
 /**
  * Single port covering the four torrent-context tables — `download`,
@@ -85,4 +105,19 @@ export interface TorrentsRepositoryPort {
   findBlocklistByMediaId(mediaId: string): Promise<{ title: string }[]>;
   findBlocklistEntry(mediaId: string, title: string): Promise<BlocklistEntry | null>;
   createBlocklistEntry(input: NewBlocklistEntry): Promise<BlocklistEntry>;
+
+  // ── Download profile / config ──
+
+  /** Resolve the active download profile for a media using the precedence
+   *  chain (media → folder → flavor default). Returns null when no profile
+   *  applies. */
+  findActiveDownloadProfile(
+    args: ActiveProfileQuery,
+  ): Promise<DownloadProfile | null>;
+
+  /** Read the admin download config row (scoring rules + admin policy). */
+  findDownloadConfig(): Promise<DownloadConfig>;
+
+  /** Hydrate the per-flavor, per-tier set maps the scoring engine consumes. */
+  findReleaseGroupLookups(): Promise<ReleaseGroupLookups>;
 }

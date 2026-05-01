@@ -10,6 +10,12 @@ import {
 import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
 import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
 import { autoImportTorrent } from "@canto/core/domain/torrents/use-cases/import-torrent";
+import { makeFoldersRepository } from "@canto/core/infra/file-organization/folders-repository.adapter";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
+import { makeTorrentsRepository } from "@canto/core/infra/torrents/torrents-repository.adapter";
+import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 import {
   extractHashFromMagnet,
   inferDownloadMeta,
@@ -239,13 +245,22 @@ export const torrentImportRouter = createTRPCRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Torrent must be completed and linked to a media item to import" });
       }
 
-      const claimed = await claimDownloadForImport(ctx.db, row.id);
+      const torrentsRepo = makeTorrentsRepository(ctx.db);
+      const claimed = await torrentsRepo.claimDownloadForImport(row.id);
       if (!claimed) return { success: true, message: "Import already in progress" };
 
       try {
         const qb = await getDownloadClient();
         const fs = createNodeFileSystemAdapter();
-        await autoImportTorrent(ctx.db, claimed, qb, { fs });
+        await autoImportTorrent(ctx.db, claimed, qb, {
+          fs,
+          logger: makeConsoleLogger(),
+          torrents: torrentsRepo,
+          media: makeMediaRepository(ctx.db),
+          localization: makeMediaLocalizationRepository(ctx.db),
+          folders: makeFoldersRepository(ctx.db),
+          notifications: makeNotificationsRepository(ctx.db),
+        });
         return { success: true };
       } catch (err) {
         await updateDownload(ctx.db, row.id, { importing: false });

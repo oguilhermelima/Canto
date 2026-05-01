@@ -18,6 +18,9 @@ import {
 import { retryTorrent } from "@canto/core/domain/torrents/use-cases/retry-torrent";
 import { renameTorrent } from "@canto/core/domain/torrents/use-cases/rename-torrent";
 import { makeFoldersRepository } from "@canto/core/infra/file-organization/folders-repository.adapter";
+import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
 import { makeTorrentsRepository } from "@canto/core/infra/torrents/torrents-repository.adapter";
 import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 import {
@@ -37,14 +40,38 @@ export const torrentManageRouter = createTRPCRouter({
     .input(torrentDownloadInput)
     .mutation(async ({ ctx, input }) => {
       const qb = await getDownloadClient();
-      return downloadTorrent(ctx.db, { logger: makeConsoleLogger() }, input, qb);
+      return downloadTorrent(
+        ctx.db,
+        {
+          logger: makeConsoleLogger(),
+          torrents: makeTorrentsRepository(ctx.db),
+          media: makeMediaRepository(ctx.db),
+          folders: makeFoldersRepository(ctx.db),
+          extras: makeMediaExtrasRepository(ctx.db),
+          notifications: makeNotificationsRepository(ctx.db),
+        },
+        input,
+        qb,
+      );
     }),
 
   replace: adminProcedure
     .input(torrentReplaceInput)
     .mutation(async ({ ctx, input }) => {
       const qb = await getDownloadClient();
-      return replaceTorrent(ctx.db, { logger: makeConsoleLogger() }, input, qb);
+      return replaceTorrent(
+        ctx.db,
+        {
+          logger: makeConsoleLogger(),
+          torrents: makeTorrentsRepository(ctx.db),
+          media: makeMediaRepository(ctx.db),
+          folders: makeFoldersRepository(ctx.db),
+          extras: makeMediaExtrasRepository(ctx.db),
+          notifications: makeNotificationsRepository(ctx.db),
+        },
+        input,
+        qb,
+      );
     }),
 
   retry: adminProcedure
@@ -52,10 +79,10 @@ export const torrentManageRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const qb = await getDownloadClient();
       const result = await retryTorrent(
-        ctx.db,
         {
           torrents: makeTorrentsRepository(ctx.db),
           folders: makeFoldersRepository(ctx.db),
+          media: makeMediaRepository(ctx.db),
         },
         input.id,
         qb,
@@ -158,7 +185,10 @@ export const torrentManageRouter = createTRPCRouter({
     .input(renameTorrentInput)
     .mutation(async ({ ctx, input }) => {
       const result = await renameTorrent(
-        { repo: makeTorrentsRepository(ctx.db) },
+        {
+          repo: makeTorrentsRepository(ctx.db),
+          client: await getDownloadClient(),
+        },
         input.id,
         input.newName,
       );

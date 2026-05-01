@@ -1,16 +1,16 @@
 import type { Database } from "@canto/db/client";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import { mergeLiveData } from "@canto/core/domain/media/use-cases/merge-live-data";
 import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
-import {
-  findAllDownloadsPaginated,
-  countAllDownloads,
-} from "@canto/core/infra/torrents/download-repository";
-import { findMediaById } from "@canto/core/infra/media/media-repository";
-import { findMediaLocalizedMany } from "@canto/core/infra/media/media-localized-repository";
-import { mergeLiveData } from "@canto/core/domain/media/use-cases/merge-live-data";
+import type { TorrentsRepositoryPort } from "@canto/core/domain/torrents/ports/torrents-repository.port";
 
 export interface ListLiveTorrentsDeps {
   logger: LoggerPort;
+  torrents: TorrentsRepositoryPort;
+  media: MediaRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
 }
 
 /**
@@ -26,21 +26,41 @@ export async function listLiveTorrents(
   qb: DownloadClientPort,
 ) {
   const [dbRows, total] = await Promise.all([
-    findAllDownloadsPaginated(db, limit, offset),
-    countAllDownloads(db),
+    deps.torrents.findAllDownloadsPaginated(limit, offset),
+    deps.torrents.countAllDownloads(),
   ]);
-  const merged = await mergeLiveData(db, deps, dbRows, qb);
+  // mergeLiveData lives in the media context and still types its input as
+  // the raw drizzle download row. The domain Download we feed it carries the
+  // same field shape — see W10.8 for the cross-context realignment.
+  const merged = await mergeLiveData(
+    db,
+    deps,
+    dbRows as unknown as Parameters<typeof mergeLiveData>[2],
+    qb,
+  );
 
-  // Batch-fetch linked media info; title/posterPath now live on
-  // media_localization, so resolve them via the user's language with en-US
-  // fallback in a single query.
-  const mediaIds = [...new Set(dbRows.map((r) => r.mediaId).filter(Boolean))] as string[];
-  const mediaMap = new Map<string, { id: string; title: string; posterPath: string | null; type: string; year: number | null; externalId: number }>();
+  const mediaIds = [
+    ...new Set(dbRows.map((r) => r.mediaId).filter(Boolean)),
+  ] as string[];
+  const mediaMap = new Map<
+    string,
+    {
+      id: string;
+      title: string;
+      posterPath: string | null;
+      type: string;
+      year: number | null;
+      externalId: number;
+    }
+  >();
   if (mediaIds.length > 0) {
-    const localized = await findMediaLocalizedMany(db, mediaIds, language);
+    const localized = await deps.localization.findLocalizedManyByIds(
+      mediaIds,
+      language,
+    );
     const localizedById = new Map(localized.map((l) => [l.id, l]));
     for (const id of mediaIds) {
-      const m = await findMediaById(db, id);
+      const m = await deps.media.findById(id);
       if (m) {
         const loc = localizedById.get(id);
         mediaMap.set(m.id, {
@@ -58,7 +78,7 @@ export async function listLiveTorrents(
   return {
     items: merged.map((item) => ({
       ...item.row,
-      media: item.row.mediaId ? mediaMap.get(item.row.mediaId) ?? null : null,
+      media: item.row.mediaId ? (mediaMap.get(item.row.mediaId) ?? null) : null,
       live: item.live,
     })),
     total,

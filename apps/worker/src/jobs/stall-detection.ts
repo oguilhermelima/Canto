@@ -2,6 +2,8 @@ import { db } from "@canto/db/client";
 import { getDownloadClient } from "@canto/core/infra/torrent-clients/download-client-factory";
 import { buildIndexers } from "@canto/core/infra/indexers/indexer-factory";
 import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
 import { retryStalledTorrent } from "@canto/core/domain/torrents/use-cases/retry-stalled-torrent";
 import { makeTorrentsRepository } from "@canto/core/infra/torrents/torrents-repository.adapter";
@@ -84,7 +86,12 @@ export async function handleStallDetection(): Promise<void> {
       if (row.mediaId) {
         await retryStalledTorrent(
           db,
-          { torrents: makeTorrentsRepository(db), logger: makeConsoleLogger() },
+          {
+            torrents: makeTorrentsRepository(db),
+            media: makeMediaRepository(db),
+            localization: makeMediaLocalizationRepository(db),
+            logger: makeConsoleLogger(),
+          },
           row,
           indexers,
           qb,

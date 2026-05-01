@@ -1,15 +1,14 @@
 import type { Database } from "@canto/db/client";
 
 import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
-import { deleteMediaFile } from "@canto/core/infra/media/media-file-repository";
-import type { findDownloadByTitle } from "@canto/core/infra/torrents/download-repository";
 import {
-  coreDownload
-
+  coreDownload,
 } from "@canto/core/domain/torrents/use-cases/download-torrent/core";
-import type {DownloadInput, DownloadTorrentDeps} from "@canto/core/domain/torrents/use-cases/download-torrent/core";
-
-type TorrentRow = NonNullable<Awaited<ReturnType<typeof findDownloadByTitle>>>;
+import type {
+  DownloadInput,
+  DownloadTorrentDeps,
+  TorrentRow,
+} from "@canto/core/domain/torrents/use-cases/download-torrent/core";
 
 export interface ReplaceInput extends DownloadInput {
   replaceFileIds: string[];
@@ -27,7 +26,7 @@ export async function replaceTorrent(
   qbClient: DownloadClientPort,
 ): Promise<TorrentRow> {
   for (const fileId of input.replaceFileIds) {
-    await deleteMediaFile(db, fileId);
+    await deps.torrents.deleteMediaFile(fileId);
   }
 
   return coreDownload(db, deps, input, { skipDedup: true }, qbClient);

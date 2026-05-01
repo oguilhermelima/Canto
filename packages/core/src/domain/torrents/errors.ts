@@ -31,3 +31,35 @@ export class TorrentPersistenceError extends DomainError {
 export class InvalidDownloadInputError extends DomainError {
   readonly code = "BAD_REQUEST" as const;
 }
+
+export class MissingDownloadUrlError extends DomainError {
+  readonly code = "BAD_REQUEST" as const;
+
+  constructor() {
+    super("No download URL saved for this torrent.");
+  }
+}
+
+export class TorrentMissingHashError extends DomainError {
+  readonly code = "BAD_REQUEST" as const;
+
+  constructor() {
+    super("Torrent has no hash");
+  }
+}
+
+export class TorrentEmptyError extends DomainError {
+  readonly code = "BAD_REQUEST" as const;
+
+  constructor() {
+    super("No files in torrent");
+  }
+}
+
+export class TorrentNotFoundInClientError extends DomainError {
+  readonly code = "NOT_FOUND" as const;
+
+  constructor(hash: string) {
+    super(`Torrent ${hash} not found in download client`);
+  }
+}

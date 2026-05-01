@@ -1,19 +1,21 @@
-import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
 import type { FoldersRepositoryPort } from "@canto/core/domain/file-organization/ports/folders-repository.port";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
+import { MissingDownloadUrlError } from "@canto/core/domain/torrents/errors";
 import type { TorrentsRepositoryPort } from "@canto/core/domain/torrents/ports/torrents-repository.port";
-import { findMediaById } from "@canto/core/infra/media/media-repository";
-import type { Database } from "@canto/db/client";
+
+export interface RetryTorrentDeps {
+  torrents: TorrentsRepositoryPort;
+  folders: FoldersRepositoryPort;
+  media: MediaRepositoryPort;
+}
 
 /**
  * Re-download a torrent that was removed or errored.
  * Resolves the correct qBittorrent category and re-adds the torrent.
  */
 export async function retryTorrent(
-  db: Database,
-  deps: {
-    torrents: TorrentsRepositoryPort;
-    folders: FoldersRepositoryPort;
-  },
+  deps: RetryTorrentDeps,
   torrentId: string,
   qb: DownloadClientPort,
 ) {
@@ -21,9 +23,9 @@ export async function retryTorrent(
   if (!row) return null;
 
   const url = row.magnetUrl ?? row.downloadUrl;
-  if (!url) throw new Error("No download URL saved for this torrent.");
+  if (!url) throw new MissingDownloadUrlError();
 
-  const linkedMedia = row.mediaId ? await findMediaById(db, row.mediaId) : null;
+  const linkedMedia = row.mediaId ? await deps.media.findById(row.mediaId) : null;
   let retryCategory: string;
   if (linkedMedia?.libraryId) {
     const folder = await deps.folders.findFolderById(linkedMedia.libraryId);

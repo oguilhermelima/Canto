@@ -3,13 +3,15 @@
 /* -------------------------------------------------------------------------- */
 
 import type { Database } from "@canto/db/client";
+import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
-import type { IndexerPort } from "@canto/core/domain/torrents/ports/indexer";
-import { searchTorrents } from "@canto/core/domain/torrents/use-cases/search-torrents";
-import { downloadTorrent } from "@canto/core/domain/torrents/use-cases/download-torrent";
 import { applyAdminDownloadPolicy } from "@canto/core/domain/shared/rules/scoring-rules";
-import { findDownloadConfig } from "@canto/core/infra/torrents/download-config-repository";
+import type { IndexerPort } from "@canto/core/domain/torrents/ports/indexer";
+import type { TorrentsRepositoryPort } from "@canto/core/domain/torrents/ports/torrents-repository.port";
+import { downloadTorrent } from "@canto/core/domain/torrents/use-cases/download-torrent";
+import { searchTorrents } from "@canto/core/domain/torrents/use-cases/search-torrents";
 
 interface ContinuousDownloadMedia {
   id: string;
@@ -20,6 +22,9 @@ interface ContinuousDownloadMedia {
 
 export interface TryContinuousDownloadDeps {
   logger: LoggerPort;
+  torrents: TorrentsRepositoryPort;
+  media: MediaRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
 }
 
 export async function tryContinuousDownload(
@@ -38,10 +43,12 @@ export async function tryContinuousDownload(
   const lastImportedEp = Math.max(...importedEpisodeNumbers);
   const nextEp = lastImportedEp + 1;
 
-  console.log(`[continuous-download] Searching next episode S${String(importedSeasonNumber).padStart(2, "0")}E${String(nextEp).padStart(2, "0")} for "${mediaRow.title}"`);
+  deps.logger.info?.(
+    `[continuous-download] Searching next episode S${String(importedSeasonNumber).padStart(2, "0")}E${String(nextEp).padStart(2, "0")} for "${mediaRow.title}"`,
+  );
 
   try {
-    const config = await findDownloadConfig(db);
+    const config = await deps.torrents.findDownloadConfig();
     const rules = applyAdminDownloadPolicy(config.rules, config.policy);
     const { results } = await searchTorrents(
       db,
@@ -50,36 +57,55 @@ export async function tryContinuousDownload(
         seasonNumber: importedSeasonNumber,
         episodeNumbers: [nextEp],
       },
-      { indexers, rules },
+      {
+        indexers,
+        rules,
+        torrents: deps.torrents,
+        media: deps.media,
+        localization: deps.localization,
+      },
     );
 
     if (results.length === 0) {
-      console.log(`[continuous-download] No results for next episode`);
+      deps.logger.info?.(`[continuous-download] No results for next episode`);
       return;
     }
 
-    // Prefer results matching the quality/source of the previously imported episode
-    let best = results[0]!;
+    let best = results[0];
+    if (!best) return;
     if (preferredQuality && preferredQuality.quality !== "unknown") {
       const matching = results.find(
-        (r) => r.quality === preferredQuality.quality && (preferredQuality.source === "unknown" || r.source === preferredQuality.source),
+        (r) =>
+          r.quality === preferredQuality.quality &&
+          (preferredQuality.source === "unknown" ||
+            r.source === preferredQuality.source),
       );
       if (matching) best = matching;
     }
-    console.log(`[continuous-download] Auto-downloading "${best.title}" (confidence: ${best.confidence})`);
-
-    await downloadTorrent(db, deps, {
-      mediaId: mediaRow.id,
-      title: best.title,
-      magnetUrl: best.magnetUrl ?? undefined,
-      torrentUrl: best.downloadUrl ?? undefined,
-      seasonNumber: importedSeasonNumber,
-      episodeNumbers: [nextEp],
-    }, qbClient);
-  } catch (err) {
-    console.warn(
-      `[continuous-download] Failed for "${mediaRow.title}":`,
-      err instanceof Error ? err.message : err,
+    deps.logger.info?.(
+      `[continuous-download] Auto-downloading "${best.title}" (confidence: ${best.confidence})`,
     );
+
+    await downloadTorrent(
+      db,
+      {
+        logger: deps.logger,
+        torrents: deps.torrents,
+        media: deps.media,
+      },
+      {
+        mediaId: mediaRow.id,
+        title: best.title,
+        magnetUrl: best.magnetUrl ?? undefined,
+        torrentUrl: best.downloadUrl ?? undefined,
+        seasonNumber: importedSeasonNumber,
+        episodeNumbers: [nextEp],
+      },
+      qbClient,
+    );
+  } catch (err) {
+    deps.logger.warn(`[continuous-download] Failed for "${mediaRow.title}"`, {
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }

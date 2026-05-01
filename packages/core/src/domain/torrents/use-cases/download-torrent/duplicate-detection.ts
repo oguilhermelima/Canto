@@ -1,9 +1,4 @@
-import type { Database } from "@canto/db/client";
-
-import {
-  findDuplicateMovieFile,
-  findDuplicateEpisodeFile,
-} from "@canto/core/infra/media/media-file-repository";
+import type { TorrentsRepositoryPort } from "@canto/core/domain/torrents/ports/torrents-repository.port";
 
 export interface EpisodeRef {
   id: string;
@@ -45,11 +40,20 @@ export function resolveEpisodeIds(
       if (parsedEpisodes.length > 0) {
         for (const epNum of parsedEpisodes) {
           const ep = seasonRow.episodes.find((e) => e.number === epNum);
-          if (ep) episodeIds.push({ id: ep.id, seasonNumber: seasonNum, episodeNumber: epNum });
+          if (ep)
+            episodeIds.push({
+              id: ep.id,
+              seasonNumber: seasonNum,
+              episodeNumber: epNum,
+            });
         }
       } else {
         for (const ep of seasonRow.episodes) {
-          episodeIds.push({ id: ep.id, seasonNumber: seasonNum, episodeNumber: ep.number });
+          episodeIds.push({
+            id: ep.id,
+            seasonNumber: seasonNum,
+            episodeNumber: ep.number,
+          });
         }
       }
     }
@@ -64,7 +68,7 @@ export function resolveEpisodeIds(
  * duplicates are detected.
  */
 export async function detectDuplicates(
-  db: Database,
+  torrents: TorrentsRepositoryPort,
   mediaRow: MediaRowForDuplicates & { id?: string },
   mediaId: string,
   quality: string,
@@ -74,14 +78,24 @@ export async function detectDuplicates(
   const duplicates: string[] = [];
 
   if (mediaRow.type === "movie") {
-    const existingFile = await findDuplicateMovieFile(db, mediaId, quality, source);
+    const existingFile = await torrents.findDuplicateMovieFile(
+      mediaId,
+      quality,
+      source,
+    );
     if (existingFile) {
-      const label = mediaRow.title ? `${mediaRow.title} (${quality} ${source})` : `(${quality} ${source})`;
+      const label = mediaRow.title
+        ? `${mediaRow.title} (${quality} ${source})`
+        : `(${quality} ${source})`;
       duplicates.push(label);
     }
   } else {
     for (const ep of episodeIds) {
-      const existingFile = await findDuplicateEpisodeFile(db, ep.id, quality, source);
+      const existingFile = await torrents.findDuplicateEpisodeFile(
+        ep.id,
+        quality,
+        source,
+      );
       if (existingFile) {
         duplicates.push(
           `S${String(ep.seasonNumber).padStart(2, "0")}E${String(ep.episodeNumber).padStart(2, "0")}`,
