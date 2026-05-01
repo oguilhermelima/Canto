@@ -131,7 +131,7 @@ export function HistoryCalendarFilter({
         {days.map((day) => {
           const inMonth = day.getMonth() === viewMonth.getMonth();
           const isToday = isSameDay(day, today);
-          const isSelected = selected != null && isSameDay(day, selected);
+          const isSelected = selected !== null && isSameDay(day, selected);
           const isFuture = day.getTime() > today.getTime();
 
           return (

@@ -74,7 +74,7 @@ function ClientTorrentRow({
   item: ClientTorrentItem;
   onSelect: (item: ClientTorrentItem) => void;
 }): React.JSX.Element {
-  const tracked = item.tracked && item.trackedMediaId != null;
+  const tracked = item.tracked && item.trackedMediaId !== null;
   return (
     <div className="rounded-xl border border-border p-3">
       <div className="flex items-start justify-between gap-3">

@@ -58,7 +58,7 @@ export default function ReviewsPage(): React.JSX.Element {
 
   const { data, isLoading } = trpc.userMedia.getMediaReviews.useQuery(
     {
-      mediaId: mediaId!,
+      mediaId: mediaId ?? "",
       limit: 100,
       episodeId: scopeFilter === "episode" && episodeFilter ? episodeFilter : undefined,
       sortBy,
@@ -81,7 +81,12 @@ export default function ReviewsPage(): React.JSX.Element {
   // Rating distribution
   const ratingDistribution = useMemo(() => {
     const dist = Array.from({ length: 10 }, () => 0);
-    for (const r of allReviews) dist[r.rating - 1]!++;
+    for (const r of allReviews) {
+      const idx = r.rating - 1;
+      if (idx >= 0 && idx < dist.length) {
+        dist[idx] = (dist[idx] ?? 0) + 1;
+      }
+    }
     return dist;
   }, [allReviews]);
   const maxCount = Math.max(...ratingDistribution, 1);
@@ -118,7 +123,7 @@ export default function ReviewsPage(): React.JSX.Element {
   const backHref = `/${params.type}/${params.id}`;
 
   function reviewLabel(r: { seasonNumber: number | null; episodeNumber: number | null; episodeTitle: string | null; seasonId: string | null; episodeId: string | null }): string {
-    if (r.episodeNumber != null) {
+    if (r.episodeNumber !== null) {
       const tag = `S${String(r.seasonNumber ?? 0).padStart(2, "0")}E${String(r.episodeNumber).padStart(2, "0")}`;
       return r.episodeTitle ? `${tag} · ${r.episodeTitle}` : tag;
     }

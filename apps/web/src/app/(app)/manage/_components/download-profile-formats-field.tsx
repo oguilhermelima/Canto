@@ -30,8 +30,10 @@ export function DownloadProfileFormatsField({
   onChange,
 }: DownloadProfileFormatsFieldProps): React.JSX.Element {
   const updateRow = (i: number, patch: Partial<AllowedFormat>): void => {
+    const current = value[i];
+    if (!current) return;
     const next = [...value];
-    next[i] = { ...next[i]!, ...patch };
+    next[i] = { ...current, ...patch };
     onChange(next);
   };
 

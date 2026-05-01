@@ -60,7 +60,8 @@ function buildBuckets(
       (releaseStart.getTime() - todayStart.getTime()) / 86_400_000,
     );
     if (diffDays >= 0 && diffDays < daysToShow) {
-      buckets[diffDays]!.items.push(item);
+      const bucket = buckets[diffDays];
+      if (bucket) bucket.items.push(item);
     }
   }
 
@@ -201,9 +202,10 @@ export function UpcomingCalendarMonth({
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const daysToShow = useMemo(() => {
-    if (items.length === 0) return 14;
+    const lastItem = items[items.length - 1];
+    if (!lastItem) return 14;
     const today = startOfDay(new Date());
-    const last = startOfDay(new Date(items[items.length - 1]!.releaseAt));
+    const last = startOfDay(new Date(lastItem.releaseAt));
     const diff = Math.round((last.getTime() - today.getTime()) / 86_400_000);
     return Math.max(14, diff + MIN_DAYS_AFTER_LAST_ITEM + 1);
   }, [items]);

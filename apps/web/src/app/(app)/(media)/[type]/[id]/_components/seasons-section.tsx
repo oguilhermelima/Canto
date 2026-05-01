@@ -63,7 +63,7 @@ export function SeasonsSection({
   mediaServers,
 }: SeasonsSectionProps): React.JSX.Element | null {
   const { data: userRatings } = trpc.userMedia.getRatings.useQuery(
-    { mediaId: mediaId! },
+    { mediaId: mediaId ?? "" },
     { enabled: !!mediaId },
   );
 

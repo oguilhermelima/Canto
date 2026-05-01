@@ -48,13 +48,17 @@ export function CollectionMembersDialog({
   const utils = trpc.useUtils();
 
   const { data, isLoading } = trpc.list.getMembers.useQuery(
-    { listId: listId! },
+    { listId: listId ?? "" },
     { enabled: !!listId && open },
   );
 
+  const invalidateMembers = (): void => {
+    if (listId) void utils.list.getMembers.invalidate({ listId });
+  };
+
   const createInvitation = trpc.list.createInvitation.useMutation({
     onSuccess: (invitation) => {
-      void utils.list.getMembers.invalidate({ listId: listId! });
+      invalidateMembers();
       setInviteEmail("");
       toast.success("Invitation created");
       if (invitation.token) {
@@ -70,7 +74,7 @@ export function CollectionMembersDialog({
 
   const removeMember = trpc.list.removeMember.useMutation({
     onSuccess: () => {
-      void utils.list.getMembers.invalidate({ listId: listId! });
+      invalidateMembers();
       toast.success("Member removed");
     },
     onError: (err) => toast.error(err.message),
@@ -78,7 +82,7 @@ export function CollectionMembersDialog({
 
   const updateMember = trpc.list.updateMember.useMutation({
     onSuccess: () => {
-      void utils.list.getMembers.invalidate({ listId: listId! });
+      invalidateMembers();
       toast.success("Role updated");
     },
     onError: (err) => toast.error(err.message),
@@ -219,7 +223,10 @@ export function CollectionMembersDialog({
                     </div>
                     <Select
                       value={member.role}
-                      onValueChange={(v) => updateMember.mutate({ listId: listId!, userId: member.userId, role: v as "viewer" | "editor" | "admin" })}
+                      onValueChange={(v) => {
+                        if (!listId) return;
+                        updateMember.mutate({ listId, userId: member.userId, role: v as "viewer" | "editor" | "admin" });
+                      }}
                     >
                       <SelectTrigger className="h-7 w-24 rounded-lg border-none bg-accent text-xs">
                         <SelectValue />
@@ -232,7 +239,10 @@ export function CollectionMembersDialog({
                     </Select>
                     <button
                       type="button"
-                      onClick={() => removeMember.mutate({ listId: listId!, userId: member.userId })}
+                      onClick={() => {
+                        if (!listId) return;
+                        removeMember.mutate({ listId, userId: member.userId });
+                      }}
                       className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400"
                     >
                       <Trash2 className="h-3.5 w-3.5" />

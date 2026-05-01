@@ -32,7 +32,7 @@ export function EpisodePrevNextNav({
           <div>
             <span className="text-xs text-muted-foreground">Previous</span>
             <p className="mt-0.5 font-medium text-foreground">
-              E{String(prev.number).padStart(2, "0")} — {prev.title || `Episode ${prev.number}`}
+              E{String(prev.number).padStart(2, "0")} — {prev.title ?? `Episode ${prev.number}`}
             </p>
           </div>
         </Link>
@@ -47,7 +47,7 @@ export function EpisodePrevNextNav({
           <div>
             <span className="text-xs text-muted-foreground">Next</span>
             <p className="mt-0.5 font-medium text-foreground">
-              E{String(next.number).padStart(2, "0")} — {next.title || `Episode ${next.number}`}
+              E{String(next.number).padStart(2, "0")} — {next.title ?? `Episode ${next.number}`}
             </p>
           </div>
           <ChevronRight size={16} className="text-muted-foreground transition-colors group-hover:text-foreground" />

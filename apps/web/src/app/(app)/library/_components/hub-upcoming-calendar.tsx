@@ -167,12 +167,13 @@ function PillRowSkeleton(): React.JSX.Element {
 export function HubUpcomingCalendar(): React.JSX.Element {
   const today = useMemo(() => startOfDay(new Date()), []);
   const days = useMemo(() => buildDays(today), [today]);
-  const fromDate = days[0]!;
+  const fromDate = days[0] ?? today;
   const toDate = useMemo(() => {
-    const end = new Date(days[days.length - 1]!);
+    const last = days[days.length - 1] ?? today;
+    const end = new Date(last);
     end.setDate(end.getDate() + 1);
     return end;
-  }, [days]);
+  }, [days, today]);
 
   const query = trpc.userMedia.getUpcomingSchedule.useInfiniteQuery(
     {

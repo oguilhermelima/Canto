@@ -37,7 +37,7 @@ export function EpisodeInfo({
       </div>
 
       <h1 className={`mt-2 max-w-3xl text-2xl font-bold tracking-tight ${isHero ? "text-white md:text-4xl" : "text-foreground"}`}>
-        {episode.title || `Episode ${episode.number}`}
+        {episode.title ?? `Episode ${episode.number}`}
       </h1>
 
       <div className={`mt-3 flex flex-wrap items-center gap-4 text-sm ${isHero ? "text-white/70" : "text-muted-foreground"}`}>
@@ -51,13 +51,13 @@ export function EpisodeInfo({
             })}
           </div>
         )}
-        {episode.runtime != null && episode.runtime > 0 && (
+        {episode.runtime !== null && episode.runtime !== undefined && episode.runtime > 0 && (
           <div className="flex items-center gap-1.5">
             <Clock size={14} />
             {episode.runtime}min
           </div>
         )}
-        {episode.voteAverage != null && episode.voteAverage > 0 && (
+        {episode.voteAverage !== null && episode.voteAverage !== undefined && episode.voteAverage > 0 && (
           <div className="flex items-center gap-1.5" title="TMDB rating">
             <Star size={14} className="fill-yellow-500 text-yellow-500" />
             <span>{episode.voteAverage.toFixed(1)}</span>

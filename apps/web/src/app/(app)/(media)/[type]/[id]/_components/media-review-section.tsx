@@ -62,7 +62,7 @@ export function MediaReviewSection({
   const reviewsPath = `${basePath}/reviews`;
 
   function reviewLabel(r: { seasonNumber: number | null; episodeNumber: number | null; episodeTitle: string | null; seasonId: string | null; episodeId: string | null }): string {
-    if (r.episodeNumber != null) {
+    if (r.episodeNumber !== null) {
       const tag = `S${String(r.seasonNumber ?? 0).padStart(2, "0")}E${String(r.episodeNumber).padStart(2, "0")}`;
       return r.episodeTitle ? `${tag} · ${r.episodeTitle}` : tag;
     }

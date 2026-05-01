@@ -44,7 +44,7 @@ export default function SeasonDetailPage(): React.JSX.Element {
 
   // User ratings for episode badges
   const { data: userRatings } = trpc.userMedia.getRatings.useQuery(
-    { mediaId: mediaId! },
+    { mediaId: mediaId ?? "" },
     { enabled: !!mediaId },
   );
   const userRatingMap = useMemo(() => {

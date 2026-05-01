@@ -65,7 +65,7 @@ export default function ReviewDetailPage(): React.JSX.Element {
     );
   }
 
-  const label = review.episodeNumber != null
+  const label = review.episodeNumber !== null
     ? `S${String(review.seasonNumber ?? 0).padStart(2, "0")}E${String(review.episodeNumber).padStart(2, "0")}${review.episodeTitle ? ` · ${review.episodeTitle}` : ""}`
     : review.seasonId && !review.episodeId
       ? `Season ${review.seasonNumber ?? "?"}`
