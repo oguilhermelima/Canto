@@ -37,33 +37,35 @@ tooling/
 └── typescript/       # Shared tsconfig
 ```
 
-## Architecture Principles
+## Architecture
 
-- **Single Media entity**: Movies and TV shows share one `media` table with a `type` discriminator. No separate movie/show tables.
-- **Provider-agnostic**: All metadata providers (TMDB, AniList, TVDB) normalize to the same `NormalizedMedia` type. Provider quirks are handled in the provider layer, never in the service/router layer.
-- **Persist on visit**: When a user previews a media item, we fetch full metadata and persist it. Adding to library is just flipping `in_library = true`.
-- **Extras are cached, not re-fetched**: Credits, similar, recommendations are fetched once and cached in DB. Core metadata (genres, score, backdrop) lives directly on the media row.
-- **UUIDv7 everywhere**: All primary keys use UUIDv7 (time-sortable, globally unique).
-- **One router, all platforms**: tRPC procedures are defined once in `packages/api`, consumed by both Next.js and Expo.
+`packages/core` is ports-and-adapters (hexagonal):
 
-## Commit Rules
+- **Domain** (`domain/<context>/`) — pure business logic. No framework imports, no direct I/O, no `drizzle-orm` runtime helpers. Use cases declare deps via interface (`deps: { repo: FooRepositoryPort, logger: LoggerPort, ... }`).
+- **Ports** (`domain/<context>/ports/*.port.ts` + `domain/shared/ports/*.port.ts`) — interfaces that domain depends on.
+- **Infra** (`infra/<context>/`) — adapters that implement ports against Drizzle, qBittorrent, TMDB, etc.
+- **Composition root** (`composition/core-deps.ts`) — `buildCoreDeps(db)` wires every port to its adapter. Worker entry + tRPC context call it instead of constructing each adapter manually.
+
+Single Media entity (movies + shows in one `media` table, `type` discriminator). Provider-agnostic (TMDB/TVDB/AniList → `NormalizedMedia`). UUIDv7 keys everywhere. tRPC procedures defined once in `packages/api`, consumed by web + mobile.
+
+Detailed rules + port maps + anti-patterns in `.claude/skills/handbook/SKILL.md` and the per-scope files (`core.md`, `api.md`, `frontend.md`, `worker.md`). Refactor history archived at `.claude/handbook/refactor-history.md`.
+
+## Critical rules
+
+1. **No comments inline by default.** Code well-named already says what it does. Use JSDoc above public functions only when WHY is non-obvious (1 sentence + 1 particularity).
+2. **Port-first / deps injection in `domain/`.** Never import `@canto/core/infra/*` or `@canto/core/platform/*` from `domain/**`. Thread via interface deps.
+3. **Imports use `@canto/<pkg>/<full-path>` everywhere.** Zero `./` or `../`. Move-safe + consistent.
+4. **No `any`, no `==/!=` (use `===/!==`), no `||` where `??` is correct.** No `!` non-null assertions — use guard clauses, optional chains, or `find()` with narrowing.
+5. **Drizzle runtime helpers stay in `infra/`.** `import type` from `drizzle-orm` is fine in domain types.
+
+## Commit rules
 
 - Conventional commits in English: `feat:`, `fix:`, `refactor:`, `chore:`, `docs:`
-- Atomic commits — one logical change per commit
+- Subject < 60 chars when possible. Format: `<type>(<scope>): <verb> <object>`
+- Atomic — one logical change per commit
 - No co-author tags
-- No emojis in commit messages
-
-## Code Style
-
-- TypeScript strict mode
-- Prefer `const` over `let`
-- Prefer explicit return types on exported functions
-- Drizzle schema is the single source of truth for DB types
-- tRPC procedures use Zod for input validation
-- Tailwind for styling, no CSS modules
-- No `any` types — use `unknown` and narrow
-- React components: function components only, no class components
-- File naming: kebab-case for files, PascalCase for components
+- No emojis
+- No wave/phase/round identifiers in subject or body — refactor history lives in git log + PR descriptions
 
 ## What NOT to do
 
@@ -73,3 +75,4 @@ tooling/
 - Don't create separate endpoints for movies and shows when the logic is identical
 - Don't put business logic in React components — keep it in tRPC procedures
 - Don't use `useEffect` for data fetching — use tRPC hooks (`useQuery`, `useMutation`)
+- Don't use `useEffect` to sync state from props — use the "adjust state during render" pattern (`useState` + `if (prev !== current) setX(current)`)
