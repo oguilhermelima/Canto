@@ -1,18 +1,16 @@
 import type { Database } from "@canto/db/client";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
 import type { RecommendationsRepositoryPort } from "@canto/core/domain/recommendations/ports/recommendations-repository.port";
-import {
-  findEpisodesByMediaIds,
-  findUserWatchHistoryByMediaIds,
-} from "@canto/core/infra/user-media/watch-history-repository";
-import { findTrailerKeysForMediaIds } from "@canto/core/infra/content-enrichment/extras-repository";
-import {
-  findUserCompletedPlaybackByMediaIds,
-  findUserContinueWatchingMediaIds,
-  findUserWatchingShowsMetadata,
-} from "@canto/core/infra/user-media/playback-progress-repository";
-import { findUserListMediaCandidates } from "@canto/core/infra/user-media/library-feed-repository";
-import { findUserMediaStatesByMediaIds } from "@canto/core/infra/user-media/state-repository";
+import type { LibraryFeedRepositoryPort } from "@canto/core/domain/user-media/ports/library-feed-repository.port";
+import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
+import type {
+  CompletedPlaybackEpisodeRow,
+  EpisodeByMediaRow,
+  UserListMediaCandidateRow,
+  UserMediaStateByMediaRow,
+  UserWatchHistoryByMediaRow,
+  WatchingShowMetadataRow,
+} from "@canto/core/domain/user-media/types/library-feed";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
 import {
   hasConfirmedPastAirDate,
@@ -28,6 +26,8 @@ import type {
 export interface GetWatchNextDeps {
   userMedia: UserMediaRepositoryPort;
   recs: RecommendationsRepositoryPort;
+  libraryFeed: LibraryFeedRepositoryPort;
+  extras: MediaExtrasRepositoryPort;
 }
 
 export type {
@@ -59,22 +59,12 @@ interface ListCandidate {
   isFromWatchlist: boolean;
 }
 
-type ListMediaRow = Awaited<
-  ReturnType<typeof findUserListMediaCandidates>
->[number];
-type WatchingShowRow = Awaited<
-  ReturnType<typeof findUserWatchingShowsMetadata>
->[number];
-type HistoryRow = Awaited<
-  ReturnType<typeof findUserWatchHistoryByMediaIds>
->[number];
-type CompletedPlaybackRow = Awaited<
-  ReturnType<typeof findUserCompletedPlaybackByMediaIds>
->[number];
-type EpisodeRow = Awaited<ReturnType<typeof findEpisodesByMediaIds>>[number];
-type StateRow = Awaited<
-  ReturnType<typeof findUserMediaStatesByMediaIds>
->[number];
+type ListMediaRow = UserListMediaCandidateRow;
+type WatchingShowRow = WatchingShowMetadataRow;
+type HistoryRow = UserWatchHistoryByMediaRow;
+type CompletedPlaybackRow = CompletedPlaybackEpisodeRow;
+type EpisodeRow = EpisodeByMediaRow;
+type StateRow = UserMediaStateByMediaRow;
 
 /**
  * Watch Next feed — combines two sources:
@@ -111,7 +101,7 @@ export async function getWatchNext(
   const [nextEpisodeItems, becauseWatchedItems] = await Promise.all([
     input.mediaType === "movie"
       ? Promise.resolve<WatchNextItem[]>([])
-      : buildShowNextEpisodeItems(db, userId, userLang, input, cursor, limit),
+      : buildShowNextEpisodeItems(deps, userId, userLang, input, cursor, limit),
     buildBecauseWatched(deps, userId, input.mediaType, userLang),
   ]);
 
@@ -136,10 +126,8 @@ export async function getWatchNext(
   const missingTrailerIds = pageItems
     .filter((item) => !item.trailerKey)
     .map((item) => item.mediaId);
-  const trailerByMediaId = await findTrailerKeysForMediaIds(
-    db,
-    missingTrailerIds,
-  );
+  const trailerByMediaId =
+    await deps.extras.findTrailerKeysForMediaIds(missingTrailerIds);
   const decoratedItems = pageItems.map((item) =>
     item.trailerKey
       ? item
@@ -150,7 +138,7 @@ export async function getWatchNext(
 }
 
 async function buildShowNextEpisodeItems(
-  db: Database,
+  deps: GetWatchNextDeps,
   userId: string,
   userLang: string,
   input: GetWatchNextInput,
@@ -164,15 +152,18 @@ async function buildShowNextEpisodeItems(
   const now = new Date();
 
   const [listMediaRows, watchingShows, continueMediaIds] = await Promise.all([
-    findUserListMediaCandidates(
-      db,
+    deps.libraryFeed.findUserListMediaCandidates(
       userId,
       userLang,
       input.mediaType,
       candidateBudget,
     ),
-    findUserWatchingShowsMetadata(db, userId, userLang, candidateBudget),
-    findUserContinueWatchingMediaIds(db, userId, input.mediaType),
+    deps.libraryFeed.findUserWatchingShowsMetadata(
+      userId,
+      userLang,
+      candidateBudget,
+    ),
+    deps.libraryFeed.findUserContinueWatchingMediaIds(userId, input.mediaType),
   ]);
 
   const rawListMediaMap = buildListCandidateMap(listMediaRows, watchingShows);
@@ -191,10 +182,13 @@ async function buildShowNextEpisodeItems(
   const candidateMediaIds = [...listMediaMap.keys()];
   const [states, historyRows, completedPlaybackRows, episodeRows] =
     await Promise.all([
-      findUserMediaStatesByMediaIds(db, userId, candidateMediaIds),
-      findUserWatchHistoryByMediaIds(db, userId, candidateMediaIds),
-      findUserCompletedPlaybackByMediaIds(db, userId, candidateMediaIds),
-      findEpisodesByMediaIds(db, candidateMediaIds, userLang),
+      deps.libraryFeed.findUserMediaStatesByMediaIds(userId, candidateMediaIds),
+      deps.libraryFeed.findUserWatchHistoryByMediaIds(userId, candidateMediaIds),
+      deps.libraryFeed.findUserCompletedPlaybackByMediaIds(
+        userId,
+        candidateMediaIds,
+      ),
+      deps.libraryFeed.findEpisodesByMediaIds(candidateMediaIds, userLang),
     ]);
 
   const stateByMediaId = new Map(

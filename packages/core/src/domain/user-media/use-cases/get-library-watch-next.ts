@@ -108,7 +108,7 @@ export async function getLibraryWatchNext(
   input: GetLibraryWatchNextInput,
 ) {
   if (input.view === "continue") {
-    const result = await getContinueWatching(db, userId, {
+    const result = await getContinueWatching(db, deps, userId, {
       limit: input.limit,
       cursor: null,
       ...toFilterPayload(input),
@@ -139,7 +139,7 @@ export async function getLibraryWatchNext(
 
   // view === "all" — interleave the first page of each focused endpoint.
   const [continueResult, watchNextResult] = await Promise.all([
-    getContinueWatching(db, userId, {
+    getContinueWatching(db, deps, userId, {
       limit: input.limit,
       cursor: null,
       ...toFilterPayload(input),

@@ -10,10 +10,7 @@ import {
   findListItems,
 } from "@canto/core/infra/lists/list-repository";
 import { findProfileSections } from "@canto/core/infra/profile/profile-section-repository";
-import {
-  findUserMediaPaginated,
-  findUserMediaCounts,
-} from "@canto/core/infra/user-media/library-feed-repository";
+import { makeLibraryFeedRepository } from "@canto/core/infra/user-media/library-feed-repository.adapter";
 import { findUserWatchTimeStats } from "@canto/core/infra/user-media/stats-repository";
 import {
   findUserTopGenres,
@@ -119,6 +116,7 @@ export const publicProfileRouter = createTRPCRouter({
     await requireVisibleUser(ctx.db, input.id, ctx.session.user.id);
     const userId = input.id;
     const viewerLang = ctx.session.user.language;
+    const libraryFeed = makeLibraryFeedRepository(ctx.db);
 
     const [
       stats,
@@ -133,39 +131,39 @@ export const publicProfileRouter = createTRPCRouter({
       recentAny,
     ] = await Promise.all([
       findUserWatchTimeStats(ctx.db, userId, viewerLang),
-      findUserMediaCounts(ctx.db, userId),
+      libraryFeed.findUserMediaCounts(userId),
       findUserTopGenres(ctx.db, userId),
       findUserProfileInsights(ctx.db, userId, viewerLang),
       findUserRecentActivity(ctx.db, userId, viewerLang, 8),
-      findUserMediaPaginated(ctx.db, userId, viewerLang, {
+      libraryFeed.findUserMediaPaginated(userId, viewerLang, {
         status: "watching",
         limit: 12,
         sortBy: "updatedAt",
         sortOrder: "desc",
         offset: 0,
       }),
-      findUserMediaPaginated(ctx.db, userId, viewerLang, {
+      libraryFeed.findUserMediaPaginated(userId, viewerLang, {
         status: "planned",
         limit: 8,
         sortBy: "updatedAt",
         sortOrder: "desc",
         offset: 0,
       }),
-      findUserMediaPaginated(ctx.db, userId, viewerLang, {
+      libraryFeed.findUserMediaPaginated(userId, viewerLang, {
         isFavorite: true,
         limit: 50,
         sortBy: "rating",
         sortOrder: "desc",
         offset: 0,
       }),
-      findUserMediaPaginated(ctx.db, userId, viewerLang, {
+      libraryFeed.findUserMediaPaginated(userId, viewerLang, {
         status: "completed",
         limit: 24,
         sortBy: "updatedAt",
         sortOrder: "desc",
         offset: 0,
       }),
-      findUserMediaPaginated(ctx.db, userId, viewerLang, {
+      libraryFeed.findUserMediaPaginated(userId, viewerLang, {
         limit: 4,
         sortBy: "updatedAt",
         sortOrder: "desc",

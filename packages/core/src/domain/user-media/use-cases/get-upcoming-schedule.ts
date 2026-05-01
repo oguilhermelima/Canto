@@ -1,12 +1,15 @@
 import type { Database } from "@canto/db/client";
-import {
-  findEpisodesByMediaIds,
-  findUserWatchHistoryByMediaIds,
-} from "@canto/core/infra/user-media/watch-history-repository";
-import { findUserListMediaCandidates } from "@canto/core/infra/user-media/library-feed-repository";
-import { findUserMediaStatesByMediaIds } from "@canto/core/infra/user-media/state-repository";
+import type { LibraryFeedRepositoryPort } from "@canto/core/domain/user-media/ports/library-feed-repository.port";
+import type {
+  EpisodeByMediaRow,
+  UserListMediaCandidateRow,
+} from "@canto/core/domain/user-media/types/library-feed";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
 import { parseDateLike } from "@canto/core/domain/user-media/rules/user-media-rules";
+
+export interface GetUpcomingScheduleDeps {
+  libraryFeed: LibraryFeedRepositoryPort;
+}
 
 export interface GetUpcomingScheduleInput {
   limit: number;
@@ -18,10 +21,8 @@ export interface GetUpcomingScheduleInput {
   to?: Date;
 }
 
-type ListMediaRow = Awaited<
-  ReturnType<typeof findUserListMediaCandidates>
->[number];
-type EpisodeRow = Awaited<ReturnType<typeof findEpisodesByMediaIds>>[number];
+type ListMediaRow = UserListMediaCandidateRow;
+type EpisodeRow = EpisodeByMediaRow;
 
 interface ListCandidate {
   mediaId: string;
@@ -67,6 +68,7 @@ export interface UpcomingItem {
 
 export async function getUpcomingSchedule(
   db: Database,
+  deps: GetUpcomingScheduleDeps,
   userId: string,
   input: GetUpcomingScheduleInput,
 ) {
@@ -76,20 +78,19 @@ export async function getUpcomingSchedule(
   const qNormalized = input.q?.trim().toLowerCase() ?? "";
 
   const userLang = await getUserLanguage(db, userId);
-  const listMediaRows = await findUserListMediaCandidates(
-    db,
+  const listMediaRows = await deps.libraryFeed.findUserListMediaCandidates(
     userId,
     userLang,
     input.mediaType,
+    undefined,
   );
   const listMediaMap = buildListCandidateMap(listMediaRows, qNormalized);
 
   const candidateMediaIds = [...listMediaMap.keys()];
   const [states, historyRows, episodeRows] = await Promise.all([
-    findUserMediaStatesByMediaIds(db, userId, candidateMediaIds),
-    findUserWatchHistoryByMediaIds(db, userId, candidateMediaIds),
-    findEpisodesByMediaIds(
-      db,
+    deps.libraryFeed.findUserMediaStatesByMediaIds(userId, candidateMediaIds),
+    deps.libraryFeed.findUserWatchHistoryByMediaIds(userId, candidateMediaIds),
+    deps.libraryFeed.findEpisodesByMediaIds(
       candidateMediaIds.filter(
         (mediaId) => listMediaMap.get(mediaId)?.mediaType === "show",
       ),

@@ -1,17 +1,21 @@
 import type { Database } from "@canto/db/client";
-import {
-  findContinueWatchingFeed
-  
-  
-  
-} from "@canto/core/infra/user-media/library-feed-repository";
-import type { ContinueWatchingFeedRow, ContinueWatchingKeysetCursor, LibraryFeedFilterOptions } from "@canto/core/domain/user-media/types/library-feed";
-import { findTrailerKeysForMediaIds } from "@canto/core/infra/content-enrichment/extras-repository";
+import type { LibraryFeedRepositoryPort } from "@canto/core/domain/user-media/ports/library-feed-repository.port";
+import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
+import type {
+  ContinueWatchingFeedRow,
+  ContinueWatchingKeysetCursor,
+  LibraryFeedFilterOptions,
+} from "@canto/core/domain/user-media/types/library-feed";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
 import {
   toDurationSeconds,
   toProgressPercent,
 } from "@canto/core/domain/user-media/rules/user-media-rules";
+
+export interface GetContinueWatchingDeps {
+  libraryFeed: LibraryFeedRepositoryPort;
+  extras: MediaExtrasRepositoryPort;
+}
 
 export interface GetContinueWatchingInput {
   limit: number;
@@ -81,6 +85,7 @@ export interface GetContinueWatchingResult {
  */
 export async function getContinueWatching(
   db: Database,
+  deps: GetContinueWatchingDeps,
   userId: string,
   input: GetContinueWatchingInput,
 ): Promise<GetContinueWatchingResult> {
@@ -103,13 +108,16 @@ export async function getContinueWatching(
 
   const userLang = await getUserLanguage(db, userId);
 
-  // Fetch limit + 1 so we can derive the next cursor without a count query.
-  const rows = await findContinueWatchingFeed(db, userId, userLang, {
-    limit: limit + 1,
-    cursor: input.cursor ?? null,
-    mediaType: input.mediaType,
-    filters,
-  });
+  const rows = await deps.libraryFeed.findContinueWatchingFeed(
+    userId,
+    userLang,
+    {
+      limit: limit + 1,
+      cursor: input.cursor ?? null,
+      mediaType: input.mediaType,
+      filters,
+    },
+  );
 
   const hasMore = rows.length > limit;
   const pageRows = hasMore ? rows.slice(0, limit) : rows;
@@ -126,10 +134,7 @@ export async function getContinueWatching(
     dedupedRows.push(row);
   }
 
-  // Batch-load trailer keys instead of pulling them via the per-row
-  // correlated subquery in mediaI18n.trailerKey.
-  const trailerByMediaId = await findTrailerKeysForMediaIds(
-    db,
+  const trailerByMediaId = await deps.extras.findTrailerKeysForMediaIds(
     dedupedRows.map((row) => row.mediaId),
   );
 

@@ -1,14 +1,10 @@
 import type { Database } from "@canto/db/client";
-import {
-  findEpisodesByMediaIds,
-  findUserWatchHistoryByMediaIds,
-} from "@canto/core/infra/user-media/watch-history-repository";
-import {
-  findUserPlaybackProgressFeed,
-  findUserWatchHistoryFeed
-  
-} from "@canto/core/infra/user-media/library-feed-repository";
-import type { LibraryFeedFilterOptions } from "@canto/core/domain/user-media/types/library-feed";
+import type { LibraryFeedRepositoryPort } from "@canto/core/domain/user-media/ports/library-feed-repository.port";
+import type {
+  LibraryFeedFilterOptions,
+  UserPlaybackProgressFeedRow,
+  UserWatchHistoryFeedRow,
+} from "@canto/core/domain/user-media/types/library-feed";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
 import {
   isReleasedOnOrBefore,
@@ -17,6 +13,10 @@ import {
   toMinuteKey,
   toProgressPercent,
 } from "@canto/core/domain/user-media/rules/user-media-rules";
+
+export interface GetLibraryHistoryDeps {
+  libraryFeed: LibraryFeedRepositoryPort;
+}
 
 type WatchStatus = "in_progress" | "completed" | "not_started";
 
@@ -70,13 +70,9 @@ interface TimelineEntry {
   durationSeconds: number | null;
 }
 
-type HistoryFeedRow = Awaited<ReturnType<typeof findUserWatchHistoryFeed>>[number];
-type PlaybackFeedRow = Awaited<
-  ReturnType<typeof findUserPlaybackProgressFeed>
->[number];
-
 export async function getLibraryHistory(
   db: Database,
+  deps: GetLibraryHistoryDeps,
   userId: string,
   input: GetLibraryHistoryInput,
 ) {
@@ -104,8 +100,19 @@ export async function getLibraryHistory(
 
   const userLang = await getUserLanguage(db, userId);
   const [historyRows, playbackRows] = await Promise.all([
-    findUserWatchHistoryFeed(db, userId, userLang, fetchLimit, input.mediaType, filters),
-    findUserPlaybackProgressFeed(db, userId, userLang, input.mediaType, filters),
+    deps.libraryFeed.findUserWatchHistoryFeed(
+      userId,
+      userLang,
+      fetchLimit,
+      input.mediaType,
+      filters,
+    ),
+    deps.libraryFeed.findUserPlaybackProgressFeed(
+      userId,
+      userLang,
+      input.mediaType,
+      filters,
+    ),
   ]);
 
   const timelineEntries: TimelineEntry[] = [];
@@ -123,7 +130,7 @@ export async function getLibraryHistory(
 
   const pageItems = deduped.slice(cursor, cursor + limit);
   const [watchedEpisodesByMediaId, availableEpisodesByMediaId] =
-    await loadShowProgressMaps(db, userId, userLang, pageItems);
+    await loadShowProgressMaps(deps, userId, userLang, pageItems);
 
   const items = pageItems.map((entry) =>
     decorateEntry(entry, watchedEpisodesByMediaId, availableEpisodesByMediaId),
@@ -134,7 +141,7 @@ export async function getLibraryHistory(
   return { items, total: deduped.length, nextCursor };
 }
 
-function buildHistoryEntry(row: HistoryFeedRow): TimelineEntry | null {
+function buildHistoryEntry(row: UserWatchHistoryFeedRow): TimelineEntry | null {
   const serverFallbackEpisode =
     row.mediaType === "show" && !row.episodeId && isServerSource(row.source)
       ? {
@@ -179,7 +186,9 @@ function buildHistoryEntry(row: HistoryFeedRow): TimelineEntry | null {
   };
 }
 
-function buildPlaybackEntry(row: PlaybackFeedRow): TimelineEntry | null {
+function buildPlaybackEntry(
+  row: UserPlaybackProgressFeedRow,
+): TimelineEntry | null {
   if (!row.lastWatchedAt) return null;
   if (!row.isCompleted && row.positionSeconds <= 0) return null;
   if (!isServerSource(row.source)) return null;
@@ -279,7 +288,7 @@ function dedupeAndFilter(
 }
 
 async function loadShowProgressMaps(
-  db: Database,
+  deps: GetLibraryHistoryDeps,
   userId: string,
   language: string,
   pageItems: TimelineEntry[],
@@ -294,8 +303,8 @@ async function loadShowProgressMaps(
   const [showHistoryRows, showEpisodeRows] =
     showMediaIds.length > 0
       ? await Promise.all([
-          findUserWatchHistoryByMediaIds(db, userId, showMediaIds),
-          findEpisodesByMediaIds(db, showMediaIds, language),
+          deps.libraryFeed.findUserWatchHistoryByMediaIds(userId, showMediaIds),
+          deps.libraryFeed.findEpisodesByMediaIds(showMediaIds, language),
         ])
       : [[], []];
 
