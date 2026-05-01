@@ -3,6 +3,10 @@ import type { Database } from "@canto/db/client";
 import { list, listMember, listInvitation, user, userMediaState } from "@canto/db/schema";
 import crypto from "crypto";
 
+import { MS_PER_DAY } from "@canto/core/domain/shared/constants";
+
+const INVITATION_TTL_MS = 7 * MS_PER_DAY;
+
 // ── Members ──
 
 export async function findListMembers(db: Database, listId: string) {
@@ -93,7 +97,7 @@ export async function createInvitation(
   },
 ) {
   const token = crypto.randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+  const expiresAt = new Date(Date.now() + INVITATION_TTL_MS);
 
   const [row] = await db
     .insert(listInvitation)
