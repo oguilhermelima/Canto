@@ -1,10 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import { Check, Monitor, Sun, Moon } from "lucide-react";
 import { cn } from "@canto/ui/cn";
 import { SettingsSection } from "@/components/settings/shared";
+
+// Returns true on the client (after hydration), false on the server.
+const noopSubscribe = (): (() => void) => () => undefined;
+const getMountedClient = (): boolean => true;
+const getMountedServer = (): boolean => false;
 
 const themeOptions = [
   {
@@ -84,8 +89,7 @@ function SystemPreview(): React.JSX.Element {
 
 export function AppearanceSection(): React.JSX.Element {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useSyncExternalStore(noopSubscribe, getMountedClient, getMountedServer);
 
   return (
     <SettingsSection title="Appearance" description="Choose a theme for the interface.">
