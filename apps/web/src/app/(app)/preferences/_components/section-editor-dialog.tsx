@@ -168,7 +168,7 @@ function initConditions(cfg: Record<string, unknown>): TmdbCondition[] {
     conds.push({
       field: "yearRange",
       op: "between",
-      value: { from: String(cfg.dateFrom || ""), to: String(cfg.dateTo || "") },
+      value: { from: String(cfg.dateFrom ?? ""), to: String(cfg.dateTo ?? "") },
     });
   }
   return conds;
@@ -595,7 +595,7 @@ export function SectionEditorDialog({
 
   // Collection state
   const cfg = (section?.config ?? {}) as Record<string, unknown>;
-  const [selectedListId, setSelectedListId] = useState(() => String(cfg.listId || ""));
+  const [selectedListId, setSelectedListId] = useState(() => String(cfg.listId ?? ""));
 
   // TMDB conditions
   const [conditions, setConditions] = useState<TmdbCondition[]>(() => initConditions(cfg));
@@ -607,7 +607,7 @@ export function SectionEditorDialog({
     setStyle(s?.style ?? "card");
     setActiveTab(deriveActiveTab(s));
     setDbSourceKey(s?.sourceKey ?? "recommendations");
-    setSelectedListId(String(c.listId || ""));
+    setSelectedListId(String(c.listId ?? ""));
     setConditions(initConditions(c));
   }, []);
 
@@ -680,7 +680,7 @@ export function SectionEditorDialog({
     } else {
       const tmdbConfig = buildTmdbConfig(conditions);
       finalSourceType = "tmdb";
-      finalSourceKey = String(tmdbConfig.mode || "trending");
+      finalSourceKey = String(tmdbConfig.mode ?? "trending");
       config = tmdbConfig as HomeSectionConfig;
     }
 
