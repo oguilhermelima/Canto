@@ -8,6 +8,7 @@ import {
   startTraktDeviceAuth,
 } from "@canto/core/domain/media-servers/use-cases/authenticate";
 import { TraktConfigurationError, TraktHttpError } from "@canto/core/infra/trakt/trakt-shim";
+import { makeTraktApi } from "@canto/core/infra/trakt/trakt-api.adapter-bindings";
 import { makePlexAdapter } from "@canto/core/infra/media-servers/plex.adapter-bindings";
 import { makeUserConnectionRepository } from "@canto/core/infra/media-servers/user-connection-repository.adapter";
 import { dispatchUserTraktSync } from "@canto/core/platform/queue/bullmq-dispatcher";
@@ -64,7 +65,7 @@ export const oauthRouter = createTRPCRouter({
 
   traktDeviceCreate: protectedProcedure.mutation(async () => {
     try {
-      return await startTraktDeviceAuth();
+      return await startTraktDeviceAuth({ trakt: makeTraktApi() });
     } catch (err) {
       if (err instanceof TraktConfigurationError) {
         throw new TRPCError({ code: "BAD_REQUEST", message: err.message });
@@ -84,6 +85,7 @@ export const oauthRouter = createTRPCRouter({
           ctx.session.user.id,
           input.deviceCode,
           {
+            trakt: makeTraktApi(),
             repo: makeUserConnectionRepository(ctx.db),
             dispatchUserTraktSync,
           },

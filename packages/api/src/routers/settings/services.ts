@@ -33,6 +33,7 @@ import {
 } from "@canto/core/domain/media-servers/use-cases/authenticate";
 import { makeJellyfinAdapter } from "@canto/core/infra/media-servers/jellyfin.adapter-bindings";
 import { makePlexAdapter } from "@canto/core/infra/media-servers/plex.adapter-bindings";
+import { makeTraktApi } from "@canto/core/infra/trakt/trakt-api.adapter-bindings";
 
 const ALL_SERVICES = serviceEnum.options;
 
@@ -147,7 +148,7 @@ export const settingsServicesRouter = createTRPCRouter({
 
   authenticateTrakt: setupOrAdminProcedure
     .input(authenticateTraktInput)
-    .mutation(({ input }) => authenticateTrakt(input)),
+    .mutation(({ input }) => authenticateTrakt(input, { trakt: makeTraktApi() })),
 
   loginPlex: setupOrAdminProcedure
     .input(loginPlexInput)

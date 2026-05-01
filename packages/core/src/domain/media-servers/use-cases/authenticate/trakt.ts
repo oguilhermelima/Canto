@@ -1,33 +1,29 @@
+import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
 import type { UserConnectionRepositoryPort } from "@canto/core/domain/media-servers/ports/user-connection-repository.port";
-import {
-  createTraktDeviceCode,
-  exchangeTraktDeviceCode,
-  getTraktUserSettings,
-  pingTraktClientId,
-  TraktHttpError,
-  validateTraktClientCredentials
-  
-} from "@canto/core/infra/trakt/trakt-shim";
-import type {TraktDeviceCodeResponse} from "@canto/core/infra/trakt/trakt-shim";
+import type { TraktDeviceCodeResponse } from "@canto/core/domain/trakt/types/trakt-api";
 
 export interface TraktAuthResult {
   success: boolean;
   error?: string;
 }
 
+export interface TraktAuthDeps {
+  trakt: TraktApiPort;
+}
+
 /**
  * Validate Trakt OAuth credentials before persisting them. Runs two checks:
  *   1. Public API ping with the client_id as `trakt-api-key` — catches typos in
  *      the id with a cheap GET.
- *   2. Device-token probe with a bogus device_code — Trakt validates the
- *      client_id + client_secret pair before rejecting the code, so 401
- *      `invalid_client` cleanly separates bad secrets from bad codes.
+ *   2. Device-token probe — Trakt validates client_id + client_secret pair
+ *      before rejecting the bogus device_code, so 401 `invalid_client` cleanly
+ *      separates bad secrets from bad codes.
  */
-export async function authenticateTrakt(input: {
-  clientId: string;
-  clientSecret: string;
-}): Promise<TraktAuthResult> {
-  const idCheck = await pingTraktClientId(input.clientId);
+export async function authenticateTrakt(
+  input: { clientId: string; clientSecret: string },
+  deps: TraktAuthDeps,
+): Promise<TraktAuthResult> {
+  const idCheck = await deps.trakt.pingClientId(input.clientId);
   if (!idCheck.ok) {
     if (idCheck.status === 401 || idCheck.status === 403) {
       return { success: false, error: "Invalid Trakt Client ID" };
@@ -38,7 +34,10 @@ export async function authenticateTrakt(input: {
     return { success: false, error: idCheck.reason };
   }
 
-  const secretCheck = await validateTraktClientCredentials(input.clientId, input.clientSecret);
+  const secretCheck = await deps.trakt.validateClientCredentials(
+    input.clientId,
+    input.clientSecret,
+  );
   if (!secretCheck.ok) {
     if (secretCheck.status === 0) {
       return { success: false, error: "Cannot reach Trakt. Check your network and try again." };
@@ -58,8 +57,10 @@ export async function authenticateTrakt(input: {
  * consumes the stored connection once the protocol completes.
  */
 
-export function startTraktDeviceAuth(): Promise<TraktDeviceCodeResponse> {
-  return createTraktDeviceCode();
+export function startTraktDeviceAuth(
+  deps: TraktAuthDeps,
+): Promise<TraktDeviceCodeResponse> {
+  return deps.trakt.createDeviceCode();
 }
 
 export type TraktDeviceAuthCheckResult =
@@ -68,8 +69,23 @@ export type TraktDeviceAuthCheckResult =
   | { authenticated: false; pending: false; expired: true };
 
 export interface CompleteTraktDeviceAuthDeps {
+  trakt: TraktApiPort;
   repo: UserConnectionRepositoryPort;
   dispatchUserTraktSync: (userId: string) => Promise<boolean> | Promise<void>;
+}
+
+interface TraktHttpErrorShape {
+  name: string;
+  status: number;
+  message: string;
+}
+
+function isTraktHttpError(err: unknown): err is Error & TraktHttpErrorShape {
+  return (
+    err instanceof Error
+    && err.name === "TraktHttpError"
+    && typeof (err as { status?: unknown }).status === "number"
+  );
 }
 
 /**
@@ -84,8 +100,8 @@ export async function completeTraktDeviceAuth(
   deps: CompleteTraktDeviceAuthDeps,
 ): Promise<TraktDeviceAuthCheckResult> {
   try {
-    const tokenData = await exchangeTraktDeviceCode(deviceCode);
-    const userSettings = await getTraktUserSettings(tokenData.access_token);
+    const tokenData = await deps.trakt.exchangeDeviceCode(deviceCode);
+    const userSettings = await deps.trakt.getUserSettings(tokenData.access_token);
     const externalUserId =
       userSettings.user.ids.slug || userSettings.user.username;
     const expiresAt = new Date(
@@ -115,7 +131,7 @@ export async function completeTraktDeviceAuth(
     void deps.dispatchUserTraktSync(userId);
     return { authenticated: true, pending: false, expired: false };
   } catch (err) {
-    if (err instanceof TraktHttpError && err.status === 400) {
+    if (isTraktHttpError(err) && err.status === 400) {
       const message = err.message.toLowerCase();
       if (
         message.includes("expired_token") ||
