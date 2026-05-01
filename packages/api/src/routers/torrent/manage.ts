@@ -17,12 +17,7 @@ import {
 } from "@canto/core/domain/torrents/use-cases/download-torrent";
 import { retryTorrent } from "@canto/core/domain/torrents/use-cases/retry-torrent";
 import { renameTorrent } from "@canto/core/domain/torrents/use-cases/rename-torrent";
-import { makeFoldersRepository } from "@canto/core/infra/file-organization/folders-repository.adapter";
-import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
-import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
-import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
-import { makeTorrentsRepository } from "@canto/core/infra/torrents/torrents-repository.adapter";
-import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
+import { buildCoreDeps } from "@canto/core/composition/core-deps";
 import {
   deleteDownload as deleteTorrentRecord,
   findDownloadById,
@@ -40,15 +35,16 @@ export const torrentManageRouter = createTRPCRouter({
     .input(torrentDownloadInput)
     .mutation(async ({ ctx, input }) => {
       const qb = await getDownloadClient();
+      const core = buildCoreDeps(ctx.db);
       return downloadTorrent(
         ctx.db,
         {
-          logger: makeConsoleLogger(),
-          torrents: makeTorrentsRepository(ctx.db),
-          media: makeMediaRepository(ctx.db),
-          folders: makeFoldersRepository(ctx.db),
-          extras: makeMediaExtrasRepository(ctx.db),
-          notifications: makeNotificationsRepository(ctx.db),
+          logger: core.logger,
+          torrents: core.torrents,
+          media: core.media,
+          folders: core.folders,
+          extras: core.extras,
+          notifications: core.notifications,
         },
         input,
         qb,
@@ -59,15 +55,16 @@ export const torrentManageRouter = createTRPCRouter({
     .input(torrentReplaceInput)
     .mutation(async ({ ctx, input }) => {
       const qb = await getDownloadClient();
+      const core = buildCoreDeps(ctx.db);
       return replaceTorrent(
         ctx.db,
         {
-          logger: makeConsoleLogger(),
-          torrents: makeTorrentsRepository(ctx.db),
-          media: makeMediaRepository(ctx.db),
-          folders: makeFoldersRepository(ctx.db),
-          extras: makeMediaExtrasRepository(ctx.db),
-          notifications: makeNotificationsRepository(ctx.db),
+          logger: core.logger,
+          torrents: core.torrents,
+          media: core.media,
+          folders: core.folders,
+          extras: core.extras,
+          notifications: core.notifications,
         },
         input,
         qb,
@@ -78,11 +75,12 @@ export const torrentManageRouter = createTRPCRouter({
     .input(getByIdInput)
     .mutation(async ({ ctx, input }) => {
       const qb = await getDownloadClient();
+      const core = buildCoreDeps(ctx.db);
       const result = await retryTorrent(
         {
-          torrents: makeTorrentsRepository(ctx.db),
-          folders: makeFoldersRepository(ctx.db),
-          media: makeMediaRepository(ctx.db),
+          torrents: core.torrents,
+          folders: core.folders,
+          media: core.media,
         },
         input.id,
         qb,
@@ -184,9 +182,10 @@ export const torrentManageRouter = createTRPCRouter({
   rename: adminProcedure
     .input(renameTorrentInput)
     .mutation(async ({ ctx, input }) => {
+      const core = buildCoreDeps(ctx.db);
       const result = await renameTorrent(
         {
-          repo: makeTorrentsRepository(ctx.db),
+          repo: core.torrents,
           client: await getDownloadClient(),
         },
         input.id,

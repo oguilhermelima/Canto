@@ -24,10 +24,8 @@ import type { RunSectionInput } from "@canto/core/domain/trakt/run-section";
 import { handleTraktListDelete, handleTraktListDeleteSweep } from "./jobs/trakt-list-delete";
 import { rebuildUserRecs } from "@canto/core/domain/recommendations/use-cases/rebuild-user-recs";
 import { enqueueDailyRecsRebuild } from "@canto/core/domain/recommendations/use-cases/enqueue-daily-recs-rebuild";
-import { makeRecommendationsRepository } from "@canto/core/infra/recommendations/recommendations-repository.adapter";
-import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
-import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
 import { ensureMedia } from "@canto/core/domain/media/use-cases/ensure-media";
+import { buildCoreDeps } from "@canto/core/composition/core-deps";
 import { makePersistDeps } from "@canto/core/composition/persist-deps";
 import type { EnsureMediaJob } from "@canto/core/platform/queue/bullmq-dispatcher";
 import { QUEUES } from "@canto/core/platform/queue/queue-names";
@@ -258,9 +256,10 @@ const workers = [
   makeWorker(QUEUES.rssSync, () => handleRssSync()),
 
   makeWorker(QUEUES.dailyRecsCheck, async (_data, log) => {
+    const core = buildCoreDeps(db);
     const dispatched = await enqueueDailyRecsRebuild({
-      repo: makeRecommendationsRepository(db),
-      jobs: jobDispatcher,
+      repo: core.recommendations,
+      jobs: core.dispatcher,
     });
     if (dispatched > 0) log.info({ users: dispatched }, "recs refresh dispatched");
   }),
@@ -279,11 +278,13 @@ const workers = [
 
   makeWorker<{ userId: string }>(
     QUEUES.rebuildUserRecs,
-    ({ userId }) =>
-      rebuildUserRecs(
-        { recs: makeRecommendationsRepository(db), userMedia: makeUserMediaRepository(db) },
+    ({ userId }) => {
+      const core = buildCoreDeps(db);
+      return rebuildUserRecs(
+        { recs: core.recommendations, userMedia: core.userMedia },
         userId,
-      ),
+      );
+    },
     { concurrency: 2 },
   ),
 
