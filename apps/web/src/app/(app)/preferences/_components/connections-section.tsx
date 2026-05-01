@@ -397,7 +397,10 @@ function AddConnectionForm({
   const [traktPollInterval, setTraktPollInterval] = useState(3_000);
   const [traktAuthError, setTraktAuthError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // React docs: adjust state during render rather than syncing in an effect.
+  const [prevProvider, setPrevProvider] = useState(provider);
+  if (prevProvider !== provider) {
+    setPrevProvider(provider);
     setAuthMode(provider === "plex" ? "oauth" : provider === "trakt" ? "device" : "credentials");
     setLoading(false);
     setPolling(false);
@@ -407,7 +410,7 @@ function AddConnectionForm({
     setTraktUserCode(null);
     setTraktVerificationUrl(null);
     setTraktAuthError(null);
-  }, [provider]);
+  }
 
   const plexPinCheck = trpc.userConnection.plexPinCheck.useQuery(
     { pinId: pinData?.pinId ?? 0, clientId: pinData?.clientId ?? "" },
