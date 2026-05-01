@@ -22,6 +22,13 @@ export interface MediaContentRatingRepositoryPort {
     region: string,
   ): Promise<MediaContentRating | null>;
 
+  /** Batch sibling of `findByMediaIdAndRegion`. One row per `(mediaId, region)`
+   *  match; missing pairs are simply absent from the result. */
+  findByMediaIdsAndRegion(
+    mediaIds: string[],
+    region: string,
+  ): Promise<MediaContentRating[]>;
+
   /** Number of content-rating rows persisted for a media — drives the
    *  cadence gap detector. */
   countByMediaId(mediaId: string): Promise<number>;

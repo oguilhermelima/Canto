@@ -1,6 +1,8 @@
-import { and, eq, inArray } from "drizzle-orm";
-import type { Database } from "@canto/db/client";
-import { mediaContentRating } from "@canto/db/schema";
+import type { MediaContentRatingRepositoryPort } from "@canto/core/domain/media/ports/media-content-rating-repository.port";
+
+export interface ContentRatingServiceDeps {
+  contentRating: MediaContentRatingRepositoryPort;
+}
 
 /**
  * Override `contentRating` on a media row using the user's region. Falls back
@@ -9,15 +11,17 @@ import { mediaContentRating } from "@canto/db/schema";
  */
 export async function applyMediaContentRating<
   T extends { id: string; contentRating?: string | null },
->(db: Database, mediaRow: T, region: string | null | undefined): Promise<T> {
+>(
+  deps: ContentRatingServiceDeps,
+  mediaRow: T,
+  region: string | null | undefined,
+): Promise<T> {
   if (!region || region === "US") return mediaRow;
 
-  const row = await db.query.mediaContentRating.findFirst({
-    where: and(
-      eq(mediaContentRating.mediaId, mediaRow.id),
-      eq(mediaContentRating.region, region),
-    ),
-  });
+  const row = await deps.contentRating.findByMediaIdAndRegion(
+    mediaRow.id,
+    region,
+  );
 
   if (!row) return mediaRow;
 
@@ -30,19 +34,20 @@ export async function applyMediaContentRating<
  */
 export async function applyMediaContentRatings<
   T extends { id: string; contentRating?: string | null },
->(db: Database, mediaRows: T[], region: string | null | undefined): Promise<T[]> {
+>(
+  deps: ContentRatingServiceDeps,
+  mediaRows: T[],
+  region: string | null | undefined,
+): Promise<T[]> {
   if (!region || region === "US" || mediaRows.length === 0) return mediaRows;
 
   const ids = mediaRows.map((m) => m.id);
-  const rows = await db.query.mediaContentRating.findMany({
-    where: and(
-      inArray(mediaContentRating.mediaId, ids),
-      eq(mediaContentRating.region, region),
-    ),
-  });
+  const rows = await deps.contentRating.findByMediaIdsAndRegion(ids, region);
   if (rows.length === 0) return mediaRows;
 
-  const byMedia = new Map(rows.map((r) => [r.mediaId, r.rating]));
+  const byMedia = new Map<string, string>(
+    rows.map((r) => [r.mediaId, r.rating]),
+  );
   return mediaRows.map((m) => {
     const rating = byMedia.get(m.id);
     return rating ? { ...m, contentRating: rating } : m;

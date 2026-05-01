@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import type { Database } from "@canto/db/client";
 import { mediaContentRating } from "@canto/db/schema";
@@ -26,10 +26,27 @@ export function makeMediaContentRatingRepository(
         .select()
         .from(mediaContentRating)
         .where(
-          sql`${mediaContentRating.mediaId} = ${mediaId} AND ${mediaContentRating.region} = ${region}`,
+          and(
+            eq(mediaContentRating.mediaId, mediaId),
+            eq(mediaContentRating.region, region),
+          ),
         )
         .limit(1);
       return row ? contentRatingToDomain(row) : null;
+    },
+
+    findByMediaIdsAndRegion: async (mediaIds, region) => {
+      if (mediaIds.length === 0) return [];
+      const rows = await db
+        .select()
+        .from(mediaContentRating)
+        .where(
+          and(
+            inArray(mediaContentRating.mediaId, mediaIds),
+            eq(mediaContentRating.region, region),
+          ),
+        );
+      return rows.map(contentRatingToDomain);
     },
 
     countByMediaId: async (mediaId) => {

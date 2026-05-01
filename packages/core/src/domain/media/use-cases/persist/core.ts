@@ -599,7 +599,7 @@ export async function resolveMedia(
     const localized = await applyMediaLocalizationOverlay(existing, lang, {
       localization: deps.localization,
     });
-    const withRating = await applyMediaContentRating(db, localized, watchRegion);
+    const withRating = await applyMediaContentRating(deps, localized, watchRegion);
     const finalMedia =
       withRating.seasons.length > 0
         ? {
@@ -649,7 +649,7 @@ export async function resolveMedia(
     const localized = await applyMediaLocalizationOverlay(persisted, lang, {
       localization: deps.localization,
     });
-    const withRating = await applyMediaContentRating(db, localized, watchRegion);
+    const withRating = await applyMediaContentRating(deps, localized, watchRegion);
     const finalMedia =
       withRating.seasons.length > 0
         ? {
