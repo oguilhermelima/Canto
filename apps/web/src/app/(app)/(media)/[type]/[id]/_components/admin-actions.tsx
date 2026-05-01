@@ -92,12 +92,20 @@ export function AdminActions({
   );
   const [downloadedTitleIndex, setDownloadedTitleIndex] = useState(0);
   const [isLoopResetting, setIsLoopResetting] = useState(false);
-  useEffect(() => {
+
+  // Reset loop state when buttonState transitions away from "downloaded" —
+  // useState snapshot pattern (React docs: "You Might Not Need an Effect").
+  const [prevButtonState, setPrevButtonState] = useState(buttonState);
+  if (buttonState !== prevButtonState) {
+    setPrevButtonState(buttonState);
     if (buttonState !== "downloaded") {
       setDownloadedTitleIndex(0);
       setIsLoopResetting(false);
-      return;
     }
+  }
+
+  useEffect(() => {
+    if (buttonState !== "downloaded") return;
     const timer = window.setInterval(() => {
       setDownloadedTitleIndex((current) => current + 1);
     }, 3400);

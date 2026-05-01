@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, MessageSquareText, MoreHorizontal, Pencil, SquarePen, Star, Trash2 } from "lucide-react";
@@ -343,8 +343,18 @@ function ReviewForm({
   const [selectedRating, setSelectedRating] = useState<number | null>(userRating?.rating ?? null);
   const [comment, setComment] = useState(userRating?.comment ?? "");
 
-  useEffect(() => { setSelectedRating(userRating?.rating ?? null); }, [userRating?.rating]);
-  useEffect(() => { setComment(userRating?.comment ?? ""); }, [userRating?.comment]);
+  // Sync local edits with server data when it changes — useState snapshot
+  // pattern (React docs: "You Might Not Need an Effect").
+  const [lastSyncedRating, setLastSyncedRating] = useState(userRating?.rating ?? null);
+  if ((userRating?.rating ?? null) !== lastSyncedRating) {
+    setLastSyncedRating(userRating?.rating ?? null);
+    setSelectedRating(userRating?.rating ?? null);
+  }
+  const [lastSyncedComment, setLastSyncedComment] = useState(userRating?.comment ?? "");
+  if ((userRating?.comment ?? "") !== lastSyncedComment) {
+    setLastSyncedComment(userRating?.comment ?? "");
+    setComment(userRating?.comment ?? "");
+  }
 
   const rateMutation = trpc.userMedia.rate.useMutation({
     onSuccess: () => { onSuccess(); toast.success("Review saved"); },

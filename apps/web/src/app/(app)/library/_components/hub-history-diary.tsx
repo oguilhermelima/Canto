@@ -134,7 +134,7 @@ function DiaryCard({
           {time}
         </div>
 
-        {entry.userRating !== null && entry.userRating !== undefined && entry.userRating > 0 && (
+        {entry.userRating !== null && entry.userRating > 0 && (
           <div className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-md bg-black/85 px-1.5 py-[3px] text-[11px] font-bold tabular-nums leading-none text-amber-400 shadow-md ring-1 ring-white/10 backdrop-blur-md">
             <Star className="h-2.5 w-2.5 fill-current" />
             {entry.userRating}

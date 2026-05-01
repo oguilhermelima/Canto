@@ -230,11 +230,15 @@ export function useWatchedToggle({
     }
   }, [open, mediaType, scope, scopedEpisodes]);
 
-  useEffect(() => {
+  // Clear history selection when leaving the history tab — useState snapshot
+  // pattern (React docs: "You Might Not Need an Effect").
+  const [prevActiveTab, setPrevActiveTab] = useState(activeTab);
+  if (activeTab !== prevActiveTab) {
+    setPrevActiveTab(activeTab);
     if (activeTab !== "history") {
       setSelectedHistoryEntryIds([]);
     }
-  }, [activeTab]);
+  }
 
   const applyState = (state: UserMediaStatePayload): void => {
     utils.userMedia.getState.setData({ mediaId }, state);
