@@ -10,6 +10,7 @@ import type { MediaContentRatingRepositoryPort } from "@canto/core/domain/media/
 import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { TvdbOverlayRepositoryPort } from "@canto/core/domain/media/ports/tvdb-overlay-repository.port";
 import type { NotificationsRepositoryPort } from "@canto/core/domain/notifications/ports/notifications-repository.port";
 import type { RecommendationsRepositoryPort } from "@canto/core/domain/recommendations/ports/recommendations-repository.port";
 import type { CachePort } from "@canto/core/domain/shared/ports/cache";
@@ -33,6 +34,7 @@ import { makeMediaContentRatingRepository } from "@canto/core/infra/media/media-
 import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { makeMediaVersionRepository } from "@canto/core/infra/media/media-version-repository.adapter";
+import { makeTvdbOverlayRepository } from "@canto/core/infra/media/tvdb-overlay-repository.adapter";
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import { makeNotificationsRepository } from "@canto/core/infra/notifications/notifications-repository.adapter";
 import { makeRecommendationsRepository } from "@canto/core/infra/recommendations/recommendations-repository.adapter";
@@ -77,6 +79,7 @@ export interface CoreDeps {
   aspectState: MediaAspectStateRepositoryPort;
   contentRating: MediaContentRatingRepositoryPort;
   mediaVersion: MediaVersionRepositoryPort;
+  tvdbOverlay: TvdbOverlayRepositoryPort;
 
   // ── Platform / shared ports ──
   credentials: ServerCredentialsPort;
@@ -117,6 +120,7 @@ export function buildCoreDeps(db: Database): CoreDeps {
     aspectState: makeMediaAspectStateRepository(db),
     contentRating: makeMediaContentRatingRepository(db),
     mediaVersion: makeMediaVersionRepository(db),
+    tvdbOverlay: makeTvdbOverlayRepository(db),
 
     credentials: makeServerCredentials(),
     traktAuth: makeTraktAuth(),

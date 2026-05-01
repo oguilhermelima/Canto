@@ -43,6 +43,7 @@ export const structureStrategy: MediaEnrichmentStrategy<
         {
           media: ctx.deps.media,
           localization: ctx.deps.localization,
+          tvdbOverlay: ctx.deps.tvdbOverlay,
           tmdb: deps.tmdb,
           tvdb: deps.tvdb,
           logger: ctx.deps.logger,

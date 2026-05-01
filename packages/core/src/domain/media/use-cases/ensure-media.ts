@@ -6,6 +6,7 @@ import type { MediaContentRatingRepositoryPort } from "@canto/core/domain/media/
 import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { TvdbOverlayRepositoryPort } from "@canto/core/domain/media/ports/tvdb-overlay-repository.port";
 import type {
   Aspect,
   MediaAspectState,
@@ -58,6 +59,7 @@ export interface EnsureMediaDeps {
   aspectState: MediaAspectStateRepositoryPort;
   contentRating: MediaContentRatingRepositoryPort;
   extras: MediaExtrasRepositoryPort;
+  tvdbOverlay: TvdbOverlayRepositoryPort;
   tmdb: MediaProviderPort;
   tvdb: MediaProviderPort;
   logger: LoggerPort;

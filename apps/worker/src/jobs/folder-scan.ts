@@ -11,6 +11,7 @@ import { makeMediaContentRatingRepository } from "@canto/core/infra/media/media-
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { makeTvdbOverlayRepository } from "@canto/core/infra/media/tvdb-overlay-repository.adapter";
 import { makeUserPreferences } from "@canto/core/infra/user/user-preferences.adapter";
 import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
@@ -34,6 +35,7 @@ export async function handleFolderScan(): Promise<void> {
   const localization = makeMediaLocalizationRepository(db);
   const contentRating = makeMediaContentRatingRepository(db);
   const extras = makeMediaExtrasRepository(db);
+  const tvdbOverlay = makeTvdbOverlayRepository(db);
 
   let totalImported = 0;
   let totalSkipped = 0;
@@ -63,6 +65,7 @@ export async function handleFolderScan(): Promise<void> {
         localization,
         contentRating,
         extras,
+        tvdbOverlay,
         userPrefs: makeUserPreferences(db),
       });
       totalImported += result.imported;

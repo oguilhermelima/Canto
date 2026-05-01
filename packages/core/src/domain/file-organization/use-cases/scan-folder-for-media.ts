@@ -12,6 +12,7 @@ import type { MediaContentRatingRepositoryPort } from "@canto/core/domain/media/
 import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { TvdbOverlayRepositoryPort } from "@canto/core/domain/media/ports/tvdb-overlay-repository.port";
 import { persistMedia } from "@canto/core/domain/media/use-cases/persist";
 import { runWithConcurrency } from "@canto/core/domain/shared/services/run-with-concurrency";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
@@ -85,6 +86,7 @@ export interface ScanFolderForMediaDeps {
   localization: MediaLocalizationRepositoryPort;
   contentRating: MediaContentRatingRepositoryPort;
   extras: MediaExtrasRepositoryPort;
+  tvdbOverlay: TvdbOverlayRepositoryPort;
   userPrefs: UserPreferencesPort;
 }
 

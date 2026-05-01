@@ -8,6 +8,7 @@ import type { MediaContentRatingRepositoryPort } from "@canto/core/domain/media/
 import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { TvdbOverlayRepositoryPort } from "@canto/core/domain/media/ports/tvdb-overlay-repository.port";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import { loadCadenceKnobs } from "@canto/core/domain/media/use-cases/cadence/cadence-knobs";
@@ -54,6 +55,7 @@ export interface PersistDeps {
   aspectState: MediaAspectStateRepositoryPort;
   contentRating: MediaContentRatingRepositoryPort;
   extras: MediaExtrasRepositoryPort;
+  tvdbOverlay: TvdbOverlayRepositoryPort;
   logger: LoggerPort;
   dispatcher: JobDispatcherPort;
   userPrefs: UserPreferencesPort;
@@ -398,9 +400,10 @@ export async function persistFullMedia(
   }
 
   if (tvdbSeasons && tvdbSeasons.length > 0) {
-    await applyTvdbSeasons(db, mediaId, tvdbSeasons, normalized, {
+    await applyTvdbSeasons(mediaId, tvdbSeasons, normalized, {
       media: deps.media,
       localization: deps.localization,
+      tvdbOverlay: deps.tvdbOverlay,
     });
     if (tvdbId) {
       await deps.media.updateMedia(mediaId, { tvdbId });

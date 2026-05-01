@@ -16,6 +16,7 @@ import {
 } from "@canto/core/infra/media/media-repository";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
+import { makeTvdbOverlayRepository } from "@canto/core/infra/media/tvdb-overlay-repository.adapter";
 import { makePersistDeps } from "@canto/core/composition/persist-deps";
 import { findMediaFilesByMediaId } from "@canto/core/infra/media/media-file-repository";
 import { findMediaVersionsByMediaId } from "@canto/core/infra/media/media-version-repository";
@@ -74,6 +75,7 @@ export const mediaVersioningRouter = createTRPCRouter({
           {
             media,
             localization: makeMediaLocalizationRepository(ctx.db),
+            tvdbOverlay: makeTvdbOverlayRepository(ctx.db),
             tmdb,
             tvdb,
             dispatcher: jobDispatcher,

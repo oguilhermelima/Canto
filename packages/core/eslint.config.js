@@ -257,15 +257,4 @@ export default [
       eqeqeq: ["error", "always"],
     },
   },
-  {
-    // Documented boundary-leak grandfathers — the `no-restricted-imports`
-    // rule is silenced on these files. `tvdb-overlay.ts` still owns the
-    // detach/re-attach flow with an explicit `db.transaction` that crosses
-    // into user-media and torrents tables; porting needs a cross-context
-    // tx-scoped port.
-    files: ["src/domain/media/use-cases/persist/tvdb-overlay.ts"],
-    rules: {
-      "no-restricted-imports": "off",
-    },
-  },
 ];

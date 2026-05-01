@@ -10,6 +10,7 @@ import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-
 import type { UserPreferencesPort } from "@canto/core/domain/user/ports/user-preferences.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { TvdbOverlayRepositoryPort } from "@canto/core/domain/media/ports/tvdb-overlay-repository.port";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
@@ -20,6 +21,7 @@ import { upsertMediaLocalization } from "@canto/core/domain/shared/localization/
 export interface ReconcileShowStructureDeps {
   media: MediaRepositoryPort;
   localization: MediaLocalizationRepositoryPort;
+  tvdbOverlay: TvdbOverlayRepositoryPort;
   tmdb: MediaProviderPort;
   tvdb: MediaProviderPort;
   logger: LoggerPort;
@@ -97,9 +99,10 @@ export async function reconcileShowStructure(
       if (tmdbData.seasons) tmdbNormalized.seasons = tmdbData.seasons;
     } catch { /* keep TVDB seasons if TMDB fails */ }
 
-    await applyTvdbSeasons(db, mediaId, tvdbData.seasons, tmdbNormalized, {
+    await applyTvdbSeasons(mediaId, tvdbData.seasons, tmdbNormalized, {
       media: deps.media,
       localization: deps.localization,
+      tvdbOverlay: deps.tvdbOverlay,
     });
   }
 
@@ -126,8 +129,8 @@ export async function reconcileShowStructure(
       // For TVDB-native shows, also overlay stills (TMDB-native already done in applyTvdbSeasons)
       if (isAlreadyTvdb && tmdbMeta.seasons) {
         const tmdbEpMap = buildTmdbEpisodeMap(tmdbMeta.seasons);
-        await overlayTmdbEpisodeData(db, mediaId, tmdbEpMap);
-        await overlayTmdbSeasonData(db, mediaId, tmdbMeta.seasons);
+        await overlayTmdbEpisodeData({ tvdbOverlay: deps.tvdbOverlay }, mediaId, tmdbEpMap);
+        await overlayTmdbSeasonData({ tvdbOverlay: deps.tvdbOverlay }, mediaId, tmdbMeta.seasons);
       }
 
       // Update base media (only language-agnostic fields after Phase 1C-δ).
