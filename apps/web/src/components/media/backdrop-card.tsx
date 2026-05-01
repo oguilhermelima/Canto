@@ -74,8 +74,10 @@ export function BackdropCard({
   }, [externalId, provider, type, utils]);
 
   const typeLabel = type === "movie" ? "MOVIE" : "TV SHOW";
-  const hasPublicRating = voteAverage != null && voteAverage > 0;
-  const hasUserRating = userRating != null && userRating > 0;
+  const hasPublicRating =
+    voteAverage !== null && voteAverage !== undefined && voteAverage > 0;
+  const hasUserRating =
+    userRating !== null && userRating !== undefined && userRating > 0;
   const hasAnyRating = hasPublicRating || hasUserRating;
 
   return (

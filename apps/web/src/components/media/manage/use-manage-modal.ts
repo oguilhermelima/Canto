@@ -180,10 +180,14 @@ export function useManageModal(
     for (const f of mediaFiles) {
       const sn = f.episode?.season.number;
       const en = f.episode?.number;
-      if (sn == null || en == null) continue;
+      if (sn === undefined || en === undefined) continue;
       const key = epKey(sn, en);
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(f);
+      const bucket = map.get(key);
+      if (bucket) {
+        bucket.push(f);
+      } else {
+        map.set(key, [f]);
+      }
     }
     return map;
   }, [mediaFiles]);
@@ -198,8 +202,12 @@ export function useManageModal(
     if (!liveTorrents) return map;
     for (const t of liveTorrents) {
       const sn = t.seasonNumber ?? -1;
-      if (!map.has(sn)) map.set(sn, []);
-      map.get(sn)!.push(t);
+      const bucket = map.get(sn);
+      if (bucket) {
+        bucket.push(t);
+      } else {
+        map.set(sn, [t]);
+      }
     }
     return map;
   }, [liveTorrents]);

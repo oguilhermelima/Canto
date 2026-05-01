@@ -70,7 +70,9 @@ function Top10Card({ item, rank }: Top10CardProps): React.JSX.Element {
   const utils = trpc.useUtils();
   const [imageReady, setImageReady] = useState(!item.posterPath);
   const typeLabel = item.type === "movie" ? "MOVIE" : "TV SHOW";
-  const hasRating = item.voteAverage != null && item.voteAverage > 0;
+  const voteAverage = item.voteAverage;
+  const hasRating =
+    voteAverage !== null && voteAverage !== undefined && voteAverage > 0;
 
   const handlePrefetch = useCallback(() => {
     void utils.media.resolve.prefetch({
@@ -161,7 +163,7 @@ function Top10Card({ item, rank }: Top10CardProps): React.JSX.Element {
         {hasRating && (
           <div className="flex items-center gap-1 text-[10px] font-medium tracking-wide text-muted-foreground md:text-xs">
             <Star size={12} className="fill-current text-yellow-400" />
-            <span className="tabular-nums">{formatRating(item.voteAverage!)}</span>
+            <span className="tabular-nums">{formatRating(voteAverage)}</span>
           </div>
         )}
       </Link>

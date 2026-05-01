@@ -194,7 +194,7 @@ export function FeaturedCard({
 
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-bold uppercase tracking-wider text-white/80">
             <span>{item.type === "movie" ? "Movie" : "TV Show"}</span>
-            {item.voteAverage != null && item.voteAverage > 0 && (
+            {item.voteAverage !== null && item.voteAverage !== undefined && item.voteAverage > 0 && (
               <>
                 <span className="opacity-40" aria-hidden>•</span>
                 <RatingInline variant="public" value={item.voteAverage} />

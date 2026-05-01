@@ -40,9 +40,9 @@ export function ContinueWatchingSource({ sectionId, title, style }: ContinueWatc
       genreIds: (item.genreIds as number[] | null) ?? undefined,
       year: item.year,
       progress:
-        item.progressPercent != null &&
-        item.progressValue != null &&
-        item.progressTotal != null
+        item.progressPercent !== null &&
+        item.progressValue !== null &&
+        item.progressTotal !== null
           ? {
               percent: item.progressPercent,
               value: item.progressValue,

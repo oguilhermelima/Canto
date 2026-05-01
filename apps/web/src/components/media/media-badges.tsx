@@ -45,7 +45,7 @@ export function MediaBadges({
         </span>
       )}
       {/* 2. Rating — how good */}
-      {voteAverage != null && voteAverage > 0 && (
+      {voteAverage !== null && voteAverage !== undefined && voteAverage > 0 && (
         <span className={cn(badgeBase, "bg-yellow-500/90 text-black")}>
           <Star className={cn("fill-current", isSm ? "h-2.5 w-2.5" : "h-3 w-3")} />
           {voteAverage.toFixed(1)}

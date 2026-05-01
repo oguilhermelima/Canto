@@ -51,7 +51,7 @@ export function SpotlightContent({
       </Link>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground sm:text-xs">
         <span>{item.type === "movie" ? "Movie" : "TV Show"}</span>
-        {item.voteAverage != null && item.voteAverage > 0 && (
+        {item.voteAverage !== null && item.voteAverage !== undefined && item.voteAverage > 0 && (
           <>
             <span className="opacity-40" aria-hidden>•</span>
             <RatingInline variant="public" value={item.voteAverage} />

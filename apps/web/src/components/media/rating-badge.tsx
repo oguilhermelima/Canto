@@ -44,7 +44,7 @@ export function RatingBadge({
 }: RatingBadgeProps): React.JSX.Element {
   const cfg = VARIANT_CONFIG[variant];
   const titleAttr =
-    count != null && count > 0
+    count !== undefined && count > 0
       ? `${cfg.title} (${count} vote${count === 1 ? "" : "s"})`
       : cfg.title;
   return (
@@ -61,7 +61,7 @@ export function RatingBadge({
       </span>
       <Star size={11} className="fill-current" />
       <span className="tabular-nums">{formatRating(value)}</span>
-      {count != null && count > 0 && (
+      {count !== undefined && count > 0 && (
         <span className="text-[10px] font-semibold tabular-nums">
           ({count})
         </span>
@@ -83,7 +83,7 @@ export function RatingInline({
 }: RatingBadgeProps): React.JSX.Element {
   const cfg = VARIANT_CONFIG[variant];
   const titleAttr =
-    count != null && count > 0
+    count !== undefined && count > 0
       ? `${cfg.title} (${count} vote${count === 1 ? "" : "s"})`
       : cfg.title;
   return (
@@ -100,7 +100,7 @@ export function RatingInline({
       </span>
       <Star size={11} className="fill-current" />
       <span className="tabular-nums">{formatRating(value)}</span>
-      {count != null && count > 0 && (
+      {count !== undefined && count > 0 && (
         <span className="text-[10px] font-medium tabular-nums opacity-80">
           ({count})
         </span>
@@ -122,9 +122,12 @@ export function RatingBadgeStack({
   membersCount?: number | null;
   className?: string;
 }): React.JSX.Element | null {
-  const hasPublic = voteAverage != null && voteAverage > 0;
-  const hasUser = userRating != null && userRating > 0;
-  const hasMembers = membersAvg != null && membersAvg > 0;
+  const hasPublic =
+    voteAverage !== null && voteAverage !== undefined && voteAverage > 0;
+  const hasUser =
+    userRating !== null && userRating !== undefined && userRating > 0;
+  const hasMembers =
+    membersAvg !== null && membersAvg !== undefined && membersAvg > 0;
   if (!hasPublic && !hasUser && !hasMembers) return null;
 
   return (

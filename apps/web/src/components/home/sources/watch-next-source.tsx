@@ -40,10 +40,10 @@ export function WatchNextSource({ sectionId, title, style }: WatchNextSourceProp
       genreIds: (item.genreIds as number[] | null) ?? undefined,
       year: item.year,
       progress:
-        item.progressPercent != null &&
-        item.progressValue != null &&
-        item.progressTotal != null &&
-        item.progressUnit != null
+        item.progressPercent !== null &&
+        item.progressValue !== null &&
+        item.progressTotal !== null &&
+        item.progressUnit !== null
           ? {
               percent: item.progressPercent,
               value: item.progressValue,

@@ -40,7 +40,11 @@ function formatWatchedDate(value: Date | string | null | undefined): string | nu
 }
 
 function episodeLabel(item: BrowseItem): string | null {
-  if (item.episode?.seasonNumber != null && item.episode.number != null) {
+  if (
+    item.episode?.seasonNumber !== null &&
+    item.episode?.seasonNumber !== undefined &&
+    item.episode.number !== null
+  ) {
     const ep = `S${String(item.episode.seasonNumber).padStart(2, "0")}E${String(item.episode.number).padStart(2, "0")}`;
     return item.episode.title ? `${ep} · ${item.episode.title}` : ep;
   }

@@ -112,7 +112,7 @@ export function ServersTab({
                     {server.source?.videoCodec &&
                       ` \u00b7 ${server.source.videoCodec}`}
                     {mediaType === "show" &&
-                      server.source?.episodeCount != null &&
+                      server.source?.episodeCount !== undefined &&
                       ` \u00b7 ${server.source.episodeCount} episodes`}
                   </p>
                 </div>

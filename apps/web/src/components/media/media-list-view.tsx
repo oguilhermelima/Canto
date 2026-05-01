@@ -72,7 +72,7 @@ export function MediaListItem({ item }: { item: MediaItem }): React.JSX.Element 
         </p>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
           <span>{item.type === "movie" ? "Movie" : "TV Show"}</span>
-          {item.voteAverage != null && item.voteAverage > 0 && (
+          {item.voteAverage !== null && item.voteAverage !== undefined && item.voteAverage > 0 && (
             <>
               <span className="opacity-40" aria-hidden>•</span>
               <RatingInline variant="public" value={item.voteAverage} />
@@ -92,7 +92,7 @@ export function MediaListItem({ item }: { item: MediaItem }): React.JSX.Element 
         )}
       </div>
 
-      {item.totalRating != null && item.voteCount != null && item.voteCount > 0 && (
+      {item.totalRating !== undefined && item.voteCount !== undefined && item.voteCount > 0 && (
         <div className="flex shrink-0 flex-col items-center justify-center gap-0.5 px-2">
           <span className="text-lg font-bold text-primary">{item.totalRating}</span>
           <span className="text-[10px] text-muted-foreground">

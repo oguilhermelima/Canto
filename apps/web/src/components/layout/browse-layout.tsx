@@ -200,11 +200,12 @@ export function BrowseLayout({
   const showTypeTabs = onMediaTypeChange && visibleTabs.length >= 1;
 
   // Results count
-  const resultsCount = totalResults != null && totalResults > 0 && !isLoading ? (
-    <span className="hidden text-sm text-muted-foreground md:inline">
-      {totalResults.toLocaleString()} results
-    </span>
-  ) : undefined;
+  const resultsCount =
+    totalResults !== undefined && totalResults > 0 && !isLoading ? (
+      <span className="hidden text-sm text-muted-foreground md:inline">
+        {totalResults.toLocaleString()} results
+      </span>
+    ) : undefined;
 
   // Trailing element for TabBar
   const trailing = resultsCount;
@@ -268,10 +269,9 @@ export function BrowseLayout({
           )}
 
           {/* Error state */}
-          {errorState ? (
-            errorState
-          ) : /* Loading state */
-          isLoading ? (
+          {errorState ??
+            (/* Loading state */
+            isLoading ? (
             viewMode === "grid" ? (
               <div className={cn("grid gap-6", cols)}>
                 {Array.from({ length: skeletonCount }).map((_, i) => (
@@ -327,7 +327,7 @@ export function BrowseLayout({
                 <StateMessage preset="endOfItems" inline />
               )}
             </>
-          )}
+          ))}
         </div>
       </div>
     </div>

@@ -155,7 +155,7 @@ export function SearchCommand({
                           {result.year}
                         </span>
                       )}
-                      {result.voteAverage != null && result.voteAverage > 0 && (
+                      {result.voteAverage !== null && result.voteAverage !== undefined && result.voteAverage > 0 && (
                         <RatingInline variant="public" value={result.voteAverage} className="text-xs" />
                       )}
                     </div>

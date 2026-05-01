@@ -28,7 +28,7 @@ function CardRating({
   return (
     <span
       title={
-        count != null && count > 0
+        count !== null && count !== undefined && count > 0
           ? `${title} (${count} vote${count === 1 ? "" : "s"})`
           : title
       }
@@ -110,9 +110,12 @@ export function MediaCard({
   const typeLabel = type === "movie" ? "MOVIE" : "TV SHOW";
   const subtitle = slots?.subtitle;
   const extra = slots?.extra;
-  const hasPublicRating = voteAverage != null && voteAverage > 0;
-  const hasUserRating = userRating != null && userRating > 0;
-  const hasMembersRating = membersAvg != null && membersAvg > 0;
+  const hasPublicRating =
+    voteAverage !== null && voteAverage !== undefined && voteAverage > 0;
+  const hasUserRating =
+    userRating !== null && userRating !== undefined && userRating > 0;
+  const hasMembersRating =
+    membersAvg !== null && membersAvg !== undefined && membersAvg > 0;
   const hasAnyRating = hasPublicRating || hasUserRating || hasMembersRating;
 
   return (

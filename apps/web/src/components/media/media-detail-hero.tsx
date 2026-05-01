@@ -124,7 +124,7 @@ function Overview({ text }: { text: string }): React.JSX.Element {
     <div>
       <div
         className="relative overflow-hidden transition-[height] duration-300 ease-out"
-        style={currentHeight != null ? { height: currentHeight } : undefined}
+        style={currentHeight !== null ? { height: currentHeight } : undefined}
       >
         <p
           ref={paragraphRef}
@@ -249,7 +249,7 @@ export function MediaDetailHero({
   const _trailers = (videos ?? []).slice(0, 4);
 
   // Watch providers
-  const hasServers = servers?.jellyfin || servers?.plex;
+  const hasServers = Boolean(servers?.jellyfin ?? servers?.plex);
   const allProviders = [...(flatrateProviders ?? []), ...(rentBuyProviders ?? [])];
   const hasProviders = allProviders.length > 0;
 
@@ -317,7 +317,7 @@ export function MediaDetailHero({
           {/* Meta line */}
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold uppercase tracking-wider text-foreground sm:text-xs">
             <span>{type === "movie" ? "Movie" : "TV Show"}</span>
-            {voteAverage != null && voteAverage > 0 && (
+            {voteAverage !== null && voteAverage !== undefined && voteAverage > 0 && (
               <>
                 <span className="opacity-40" aria-hidden>•</span>
                 <RatingInline variant="public" value={voteAverage} />
@@ -337,7 +337,7 @@ export function MediaDetailHero({
                 </span>
               </>
             )}
-            {runtime != null && runtime > 0 && (
+            {runtime !== null && runtime !== undefined && runtime > 0 && (
               <>
                 <span className="opacity-40" aria-hidden>•</span>
                 <span className="tabular-nums">{formatRuntime(runtime)}</span>
@@ -365,7 +365,7 @@ export function MediaDetailHero({
           </div>
 
           {/* External links */}
-          {(tmdbUrl || tvdbUrl || imdbUrl || traktUrl) && (
+          {(tmdbUrl ?? tvdbUrl ?? imdbUrl ?? traktUrl) !== null && (
             <div className="flex flex-wrap items-center gap-2">
               {tmdbUrl && (
                 <ExternalLinkIcon

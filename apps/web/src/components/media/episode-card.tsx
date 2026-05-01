@@ -94,7 +94,7 @@ export function EpisodeCard({
         )}
 
         {/* Runtime badge — bottom right */}
-        {episode.runtime != null && episode.runtime > 0 && (
+        {episode.runtime !== null && episode.runtime !== undefined && episode.runtime > 0 && (
           <div className="absolute bottom-1.5 right-1.5 rounded-md bg-black/70 px-1.5 py-0.5 text-xs font-medium text-white/80 backdrop-blur-sm">
             {episode.runtime}m
           </div>

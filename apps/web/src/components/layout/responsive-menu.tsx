@@ -48,7 +48,7 @@ export function ResponsiveMenu({
 }: ResponsiveMenuProps): React.JSX.Element {
   const isMobile = useIsMobile();
   const [internalOpen, setInternalOpen] = useState(false);
-  const controlled = open != null;
+  const controlled = open !== undefined;
   const currentOpen = controlled ? open : internalOpen;
 
   const setOpen = useCallback(
