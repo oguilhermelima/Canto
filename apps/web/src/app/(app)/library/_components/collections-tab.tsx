@@ -174,7 +174,7 @@ export function CollectionsTab({
     if (sourceId === targetId) return;
     if (!canReorder) return;
 
-    const currentIds = visibleLists.map((list) => list.id);
+    const currentIds: string[] = visibleLists.map((list) => list.id);
     const sourceIndex = currentIds.indexOf(sourceId);
     const targetIndex = currentIds.indexOf(targetId);
     if (sourceIndex < 0 || targetIndex < 0) return;
@@ -188,7 +188,9 @@ export function CollectionsTab({
     // `reordered`, so preserve non-custom rows (watchlist, server) afterwards.
     utils.list.getAll.setData(undefined, (prev) => {
       if (!prev) return prev;
-      const map = new Map(prev.map((l) => [l.id, l]));
+      const map = new Map<string, (typeof prev)[number]>(
+        prev.map((l) => [l.id, l]),
+      );
       const reorderedLists = reordered
         .map((id) => map.get(id))
         .filter((l): l is NonNullable<typeof l> => !!l);

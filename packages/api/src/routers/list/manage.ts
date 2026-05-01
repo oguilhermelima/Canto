@@ -9,7 +9,6 @@ import {
 } from "@canto/validators";
 import { verifyListOwnership } from "@canto/core/domain/lists/rules/list-rules";
 import { makeListsRepository } from "@canto/core/infra/lists/lists-repository.adapter";
-import { findUserListsWithCounts } from "@canto/core/infra/lists/list-repository";
 import { makeTraktRepository } from "@canto/core/infra/trakt/trakt-repository.adapter";
 import { dispatchTraktListDelete } from "@canto/core/platform/queue/bullmq-dispatcher";
 import { createListForUser } from "@canto/core/domain/lists/use-cases/create-list";
@@ -22,9 +21,10 @@ import {
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
 export const listManageRouter = createTRPCRouter({
-  getAll: protectedProcedure.query(({ ctx }) =>
-    findUserListsWithCounts(ctx.db, ctx.session.user.id, ctx.session.user.language),
-  ),
+  getAll: protectedProcedure.query(({ ctx }) => {
+    const repo = makeListsRepository(ctx.db);
+    return repo.findUserListsWithCounts(ctx.session.user.id, ctx.session.user.language);
+  }),
 
   getCollectionLayout: protectedProcedure.query(({ ctx }) => {
     const repo = makeListsRepository(ctx.db);
