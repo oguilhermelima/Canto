@@ -9,7 +9,6 @@ import {
 } from "@canto/validators";
 import { verifyListOwnership } from "@canto/core/domain/lists/rules/list-rules";
 import { makeListsRepository } from "@canto/core/infra/lists/lists-repository.adapter";
-import { getListMemberVotes } from "@canto/core/infra/lists/member-repository";
 import { getListSharing } from "@canto/core/domain/lists/use-cases/get-members";
 import { removeMemberFromList } from "@canto/core/domain/lists/use-cases/remove-member";
 import { acceptListInvitation } from "@canto/core/domain/lists/use-cases/accept-invitation";
@@ -111,9 +110,6 @@ export const listSharingRouter = createTRPCRouter({
         ctx.session.user.role,
         { requiredPermission: "view" },
       );
-      // `getListMemberVotes` is a heavy aggregation across listMember + list +
-      // userMediaState; it stays as a direct infra call until a future wave
-      // lifts member-vote aggregation into the port.
-      return getListMemberVotes(ctx.db, input.listId, input.mediaIds);
+      return repo.listMemberVotes(input.listId, input.mediaIds);
     }),
 });

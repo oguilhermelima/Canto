@@ -159,6 +159,15 @@ export interface ListsRepositoryPort {
     opts: FindCollectionItemsOpts,
   ): Promise<{ items: CollectionItemDetail[]; total: number }>;
 
+  /** Aggregated ratings (sum + count) from the list owner and all members
+   *  for the given media ids. Powers the per-item "members rating" badge in
+   *  shared list views. Returns one row per media id that has at least one
+   *  rating; missing ids should be treated as zero votes by the caller. */
+  listMemberVotes(
+    listId: string,
+    mediaIds: string[],
+  ): Promise<Array<{ mediaId: string; totalRating: number; voteCount: number }>>;
+
   // ── User preferences (file-organization context, via library-repository) ──
 
   /** All stored key/value preferences for a user. Returns a plain record with

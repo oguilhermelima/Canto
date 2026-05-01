@@ -49,6 +49,7 @@ import {
   findListMember,
   findListMembers,
   findPendingInvitations,
+  getListMemberVotes,
   removeListMember,
   updateListMemberRole,
 } from "@canto/core/infra/lists/member-repository";
@@ -215,6 +216,9 @@ export function makeListsRepository(db: Database): ListsRepositoryPort {
       const result = await findUserCustomCollectionItems(db, userId, userLang, hiddenListIds, opts);
       return result as unknown as CollectionItemsResult;
     },
+
+    listMemberVotes: (listId, mediaIds) =>
+      getListMemberVotes(db, listId, mediaIds),
 
     // ── User preferences ──
     findUserPreferences: async (userId) => {
