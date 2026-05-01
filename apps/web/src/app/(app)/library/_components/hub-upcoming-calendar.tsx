@@ -222,10 +222,13 @@ export function HubUpcomingCalendar(): React.JSX.Element {
   const dayTitle = DAY_TITLE_FORMATTER.format(selectedDay);
 
   const [expanded, setExpanded] = useState(false);
-  // Reset to collapsed whenever the active day changes.
-  useEffect(() => {
+  // Reset to collapsed whenever the active day changes — useState snapshot
+  // pattern (see React docs "You Might Not Need an Effect").
+  const [prevSelectedKey, setPrevSelectedKey] = useState(selectedKey);
+  if (selectedKey !== prevSelectedKey) {
+    setPrevSelectedKey(selectedKey);
     setExpanded(false);
-  }, [selectedKey]);
+  }
 
   const collapsedCount = 3;
   const visibleItems = expanded

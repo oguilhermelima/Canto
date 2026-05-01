@@ -106,7 +106,14 @@ export default function ReviewsPage(): React.JSX.Element {
     return eps;
   }, [media, mediaType]);
 
-  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [scopeFilter, episodeFilter, sortBy]);
+  // Reset pagination when filters change — useState snapshot pattern (React
+  // docs: "You Might Not Need an Effect").
+  const filterKey = `${scopeFilter}|${episodeFilter ?? ""}|${sortBy}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setVisibleCount(PAGE_SIZE);
+  }
   useEffect(() => { window.scrollTo(0, 0); }, []);
 
   const handleFetchNext = useCallback(() => {

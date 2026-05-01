@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@canto/ui/cn";
 import { Button } from "@canto/ui/button";
@@ -110,10 +110,13 @@ function PersonalPreferences(): React.JSX.Element {
   });
 
   const [draft, setDraft] = useState<UserPrefs | null>(null);
-
-  useEffect(() => {
-    if (data) setDraft(data);
-  }, [data]);
+  // Sync draft from server data when it arrives — useState snapshot pattern
+  // (React docs: "You Might Not Need an Effect").
+  const [lastSyncedData, setLastSyncedData] = useState(data);
+  if (data && data !== lastSyncedData) {
+    setLastSyncedData(data);
+    setDraft(data);
+  }
 
   const dirty = useMemo(() => {
     if (!data || !draft) return false;
@@ -196,10 +199,13 @@ function ServerPolicy(): React.JSX.Element {
   });
 
   const [draft, setDraft] = useState<AdminPolicy | null>(null);
-
-  useEffect(() => {
-    if (data) setDraft(data);
-  }, [data]);
+  // Sync draft from server data when it arrives — useState snapshot pattern
+  // (React docs: "You Might Not Need an Effect").
+  const [lastSyncedAdminData, setLastSyncedAdminData] = useState(data);
+  if (data && data !== lastSyncedAdminData) {
+    setLastSyncedAdminData(data);
+    setDraft(data);
+  }
 
   const dirty = useMemo(() => {
     if (!data || !draft) return false;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ExternalLink, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@canto/ui/button";
@@ -33,14 +33,17 @@ export function TraktSection(): React.JSX.Element {
   });
   const [dirty, setDirty] = useState(false);
 
-  useEffect(() => {
-    if (!allSettings) return;
+  // Sync values from server settings when they arrive — useState snapshot
+  // pattern (React docs: "You Might Not Need an Effect").
+  const [lastSyncedSettings, setLastSyncedSettings] = useState(allSettings);
+  if (allSettings && allSettings !== lastSyncedSettings) {
+    setLastSyncedSettings(allSettings);
     setValues({
       "trakt.clientId": (allSettings["trakt.clientId"] as string | undefined) ?? "",
       "trakt.clientSecret": (allSettings["trakt.clientSecret"] as string | undefined) ?? "",
     });
     setDirty(false);
-  }, [allSettings]);
+  }
 
   const handleSave = (): void => {
     setMany.mutate(

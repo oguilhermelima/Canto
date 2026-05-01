@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { cn } from "@canto/ui/cn";
 import {
   Dialog,
@@ -56,10 +56,14 @@ export function ManageModal({
   );
   const activeTabMeta = TABS.find((tab) => tab.value === activeTab) ?? TABS[0];
 
-  // Reset tab when modal closes
-  useEffect(() => {
+  // Reset tab when modal transitions closed (state-sync via useState snapshot
+  // is the documented React way to derive state from a prop change without an
+  // effect — see "You Might Not Need an Effect").
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (!open) setActiveTab("preferences");
-  }, [open]);
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

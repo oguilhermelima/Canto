@@ -20,7 +20,7 @@ import {
   Moon,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useState, useEffect, useCallback, useRef, memo } from "react";
+import { useState, useEffect, useCallback, useRef, useSyncExternalStore, memo } from "react";
 import { useTheme } from "next-themes";
 import { authClient } from "@/lib/auth-client";
 
@@ -120,11 +120,14 @@ const UserMenu = memo(function UserMenu(): React.JSX.Element {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { data: session } = authClient.useSession();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => { setMounted(true); }, []);
 
   // Close on click outside
   useEffect(() => {

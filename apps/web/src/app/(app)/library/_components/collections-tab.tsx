@@ -141,14 +141,14 @@ export function CollectionsTab({
   );
 
   const visibleListIds = visibleLists.map((list) => list.id).join("|");
-  useEffect(() => {
+  // Reset pagination when filters or list set change — useState snapshot
+  // pattern (see React docs "You Might Not Need an Effect").
+  const filterKey = `${String(showHidden)}|${searchQuery}|${visibleLists.length}|${visibleListIds}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
     setVisibleCount(PAGE_SIZE);
-  }, [
-    showHidden,
-    searchQuery,
-    visibleLists.length,
-    visibleListIds,
-  ]);
+  }
 
   const renderedLists = useMemo(
     () => visibleLists.slice(0, visibleCount),

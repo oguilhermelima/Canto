@@ -26,7 +26,7 @@ import {
   Sun,
   Moon,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import { authClient } from "@/lib/auth-client";
 
@@ -41,8 +41,11 @@ export function BottomNavbar(): React.JSX.Element {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
   const { data: session } = authClient.useSession();
   const role = (session?.user as { role?: string } | undefined)?.role;
   const isAdmin = role === "admin";
