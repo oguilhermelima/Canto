@@ -31,6 +31,8 @@ import { makeTorrentsRepository } from "@canto/core/infra/torrents/torrents-repo
 import { updateMediaServerMetadata } from "@canto/core/domain/media-servers/use-cases/update-metadata";
 import { makeJellyfinAdapter } from "@canto/core/infra/media-servers/jellyfin.adapter-bindings";
 import { makePlexAdapter } from "@canto/core/infra/media-servers/plex.adapter-bindings";
+import { makeServerCredentials } from "@canto/core/infra/media-servers/server-credentials.adapter";
+import { makeMediaVersionRepository } from "@canto/core/infra/media/media-version-repository.adapter";
 
 export const mediaVersioningRouter = createTRPCRouter({
   previewProviderOverride: adminProcedure
@@ -103,7 +105,11 @@ export const mediaVersioningRouter = createTRPCRouter({
       }
 
       if (input.updateMediaServer) {
-        await updateMediaServerMetadata(ctx.db, input.id, {
+        await updateMediaServerMetadata(input.id, {
+          media: makeMediaRepository(ctx.db),
+          mediaVersions: makeMediaVersionRepository(ctx.db),
+          localization: makeMediaLocalizationRepository(ctx.db),
+          credentials: makeServerCredentials(),
           plex: makePlexAdapter(),
           jellyfin: makeJellyfinAdapter(),
         });

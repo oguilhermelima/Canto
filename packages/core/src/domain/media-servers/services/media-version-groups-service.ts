@@ -7,15 +7,12 @@
 /*  because the working set is a single user's server library.                */
 /* -------------------------------------------------------------------------- */
 
-import type { Database } from "@canto/db/client";
-
-import type { ServerSource } from "../../sync/types";
-import {
-  fetchMediaVersionsWithMedia
-  
-  
-} from "../../../infra/media/media-version-repository";
-import type {MediaSummary, MediaVersionRow} from "../../../infra/media/media-version-repository";
+import type { MediaVersionRepositoryPort } from "@canto/core/domain/media-servers/ports/media-version-repository.port";
+import type {
+  MediaSummary,
+  MediaVersionRow,
+} from "@canto/core/domain/media-servers/types/media-version";
+import type { ServerSource } from "@canto/core/domain/sync/types";
 
 export type MediaVersionGroupsTab =
   | "all"
@@ -97,20 +94,18 @@ function matchesTab(
     return media === null;
   }
   if (tab === "failed") {
-    // Matched groups with any failed version. Standalone unmatched rows are
-    // not "failed" — they live in their own bucket.
     if (media === null) return false;
     return versions.some((v) => v.result === "failed");
   }
-  if (tab === "imported") {
-    // Matched groups where every version is imported or skipped — i.e. the
-    // media is fully settled across all physical observations.
-    if (media === null) return false;
-    return versions.every(
-      (v) => v.result === "imported" || v.result === "skipped",
-    );
-  }
-  return true;
+  // tab === "imported": matched groups where every version is imported or skipped.
+  if (media === null) return false;
+  return versions.every(
+    (v) => v.result === "imported" || v.result === "skipped",
+  );
+}
+
+export interface ListMediaVersionGroupsDeps {
+  mediaVersions: MediaVersionRepositoryPort;
 }
 
 /**
@@ -120,20 +115,17 @@ function matchesTab(
  * unmatched items through a single list structure.
  */
 export async function listMediaVersionGroups(
-  db: Database,
+  deps: ListMediaVersionGroupsDeps,
   language: string,
   filters: MediaVersionGroupsFilters,
   page: number,
   pageSize: number,
 ): Promise<MediaVersionGroupsPage> {
-  const rows = await fetchMediaVersionsWithMedia(db, language, {
+  const rows = await deps.mediaVersions.findWithMedia(language, {
     server: filters.server,
     search: filters.search,
   });
 
-  // Group matched rows by mediaId; standalone unmatched rows become singleton
-  // groups. Insertion order is the order returned by the repository (media
-  // title asc, then server item title asc), so pagination is stable.
   const byMediaId = new Map<string, MediaVersionGroup>();
   const unmatchedGroups: MediaVersionGroup[] = [];
 

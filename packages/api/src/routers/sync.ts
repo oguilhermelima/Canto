@@ -23,6 +23,7 @@ import {
   resolveMediaVersionPreview,
 } from "@canto/core/domain/media/use-cases/resolve-media-version";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import { discoverServerLibraries } from "@canto/core/domain/media-servers/use-cases/discover-libraries";
 import { updateMediaServerMetadata } from "@canto/core/domain/media-servers/use-cases/update-metadata";
 import { getMediaAvailability } from "@canto/core/domain/media/services/media-availability-service";
@@ -83,7 +84,7 @@ export const syncRouter = createTRPCRouter({
     .input(listMediaVersionGroupsInput)
     .query(({ ctx, input }) =>
       listMediaVersionGroups(
-        ctx.db,
+        { mediaVersions: makeMediaVersionRepository(ctx.db) },
         ctx.session.user.language,
         { server: input.server, tab: input.tab, search: input.search },
         input.page,
@@ -148,7 +149,11 @@ export const syncRouter = createTRPCRouter({
 
       const mutated = result as { mediaId: string; suggestedName: string };
       if (input.updateMediaServer && mutated.mediaId) {
-        await updateMediaServerMetadata(ctx.db, mutated.mediaId, {
+        await updateMediaServerMetadata(mutated.mediaId, {
+          media,
+          mediaVersions: makeMediaVersionRepository(ctx.db),
+          localization: makeMediaLocalizationRepository(ctx.db),
+          credentials: makeServerCredentials(),
           plex: makePlexAdapter(),
           jellyfin: makeJellyfinAdapter(),
         }).catch(
