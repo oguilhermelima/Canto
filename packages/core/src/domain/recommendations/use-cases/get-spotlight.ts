@@ -8,6 +8,7 @@ import {
   buildExclusionSet,
 } from "@canto/core/domain/recommendations/use-cases/recommendation-service";
 import type { BuildExclusionSetDeps } from "@canto/core/domain/recommendations/use-cases/recommendation-service";
+import { MS_PER_HOUR } from "@canto/core/domain/shared/constants";
 import { applyMediaItemsLocalizationOverlay } from "@canto/core/domain/shared/localization/localization-service";
 import { mapPoolItem } from "@canto/core/domain/shared/mappers/media-mapper";
 
@@ -65,10 +66,8 @@ export async function getSpotlight(
   }
 
   // Path 3: TMDB trending fallback (fresh install)
-  const ONE_HOUR_MS = 60 * 60 * 1000;
-
   const cachedData = await getSetting("cache.spotlight");
-  if (cachedData && Date.now() - new Date(cachedData.updatedAt).getTime() < ONE_HOUR_MS) {
+  if (cachedData && Date.now() - new Date(cachedData.updatedAt).getTime() < MS_PER_HOUR) {
     // The cache stores the raw English TMDB shape (it's a global setting,
     // shared across users). Apply the per-language overlay on read so the
     // user sees localized text/posters/logos for any items already

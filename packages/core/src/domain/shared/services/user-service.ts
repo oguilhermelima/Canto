@@ -3,6 +3,8 @@ import type { Database } from "@canto/db/client";
 import { user } from "@canto/db/schema";
 import { getSetting } from "@canto/db/settings";
 
+import { MS_PER_MINUTE } from "@canto/core/domain/shared/constants";
+
 /** Resolve user's preferred language (defaults to en-US) */
 export async function getUserLanguage(db: Database, userId: string): Promise<string> {
   const row = await db.query.user.findFirst({
@@ -32,7 +34,7 @@ export async function getUserWatchPreferences(
 
 let activeUserLanguagesCache: Set<string> | null = null;
 let activeUserLanguagesCacheTime = 0;
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_TTL_MS = 5 * MS_PER_MINUTE;
 
 /**
  * Return the set of languages for which at least one user is active, always

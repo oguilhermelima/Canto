@@ -17,8 +17,7 @@ import {
   applySeasonsLocalizationOverlay,
 } from "@canto/core/domain/shared/localization/localization-service";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
-
-const EXTRAS_STALE_MS = 30 * 24 * 60 * 60 * 1000;
+import { EXTRAS_TTL_MS } from "@canto/core/domain/media/use-cases/ensure-media.types";
 
 interface GetByExternalInput {
   externalId: number;
@@ -74,7 +73,7 @@ export async function getByExternal(
     );
     const isStale =
       !extrasSucceededAt ||
-      Date.now() - extrasSucceededAt.getTime() > EXTRAS_STALE_MS;
+      Date.now() - extrasSucceededAt.getTime() > EXTRAS_TTL_MS;
     if (isStale) {
       void deps.dispatcher
         .enrichMedia(existing.id, { aspects: ["extras"] })

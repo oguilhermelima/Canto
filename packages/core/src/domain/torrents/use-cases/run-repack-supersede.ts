@@ -2,6 +2,7 @@ import type { Database } from "@canto/db/client";
 
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import { MS_PER_DAY } from "@canto/core/domain/shared/constants";
 import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import { runWithConcurrency } from "@canto/core/domain/shared/services/run-with-concurrency";
@@ -65,7 +66,7 @@ export async function runRepackSupersede(
 ): Promise<RepackSupersedeOutcome> {
   const lookbackDays = opts.lookbackDays ?? DEFAULT_LOOKBACK_DAYS;
   const maxPerRun = opts.maxPerRun ?? DEFAULT_MAX_PER_RUN;
-  const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
+  const since = new Date(Date.now() - lookbackDays * MS_PER_DAY);
 
   const candidates = await deps.torrents.findRecentImportedDownloads(
     since,

@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { createNotification } from "@canto/core/domain/notifications/use-cases/create-notification";
 import type { NotificationsRepositoryPort } from "@canto/core/domain/notifications/ports/notifications-repository.port";
+import { MS_PER_MINUTE } from "@canto/core/domain/shared/constants";
 import type {
   DownloadClientPort,
   TorrentFileInfo,
@@ -32,7 +33,7 @@ export interface ImportRemoteDeps {
   logger: LoggerPort;
 }
 
-const MAX_MOVE_MS = 30 * 60 * 1000;
+const MAX_MOVE_MS = 30 * MS_PER_MINUTE;
 const POLL_INTERVAL_MS = 3000;
 
 export async function importRemoteVideoFiles(

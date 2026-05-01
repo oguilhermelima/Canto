@@ -11,6 +11,7 @@ import type {
   TraktIds,
   TraktMediaRef,
 } from "@canto/core/domain/trakt/types/trakt-api";
+import { MS_PER_MINUTE } from "@canto/core/domain/shared/constants";
 import { slugify } from "@canto/core/domain/shared/rules/slugify";
 import { persistMediaUseCase } from "@canto/core/domain/media/use-cases/persist";
 import type { PersistDeps } from "@canto/core/domain/media/use-cases/persist/core";
@@ -20,7 +21,7 @@ import type { PersistDeps } from "@canto/core/domain/media/use-cases/persist/cor
  * powers ratings/favorites sync. List membership now uses `reconcileListItem`
  * with positive signals.
  */
-export const CONFLICT_WINDOW_MS = 10 * 60 * 1000;
+export const CONFLICT_WINDOW_MS = 10 * MS_PER_MINUTE;
 
 /**
  * After a successful push, the remote may take a moment to surface the new
@@ -28,7 +29,7 @@ export const CONFLICT_WINDOW_MS = 10 * 60 * 1000;
  * sync immediately afterwards still sees `local && !remote`, we treat that
  * as in-flight rather than as evidence the remote deleted the item.
  */
-export const PUSH_GRACE_MS = 5 * 60 * 1000;
+export const PUSH_GRACE_MS = 5 * MS_PER_MINUTE;
 
 export interface LocalMediaRef {
   mediaId: string;

@@ -2,6 +2,7 @@ import type { Database } from "@canto/db/client";
 
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import { MS_PER_DAY } from "@canto/core/domain/shared/constants";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import { resolveMediaFlavor } from "@canto/core/domain/shared/rules/media-flavor";
 import {
@@ -159,8 +160,11 @@ async function prepareSearch(
 
   const isShow = row.type === "show";
   const releaseDate = row.releaseDate ? new Date(row.releaseDate) : null;
+  // 30-day approximation — drives the "movie has had time to hit digital
+  // shelves" gate, not a precise calendar-month difference.
+  const MS_PER_MONTH_APPROX = 30 * MS_PER_DAY;
   const monthsSinceRelease = releaseDate
-    ? (Date.now() - releaseDate.getTime()) / (1000 * 60 * 60 * 24 * 30)
+    ? (Date.now() - releaseDate.getTime()) / MS_PER_MONTH_APPROX
     : Infinity;
   const hasDigitalRelease = isShow || monthsSinceRelease > 3;
   const confidenceCtx: ConfidenceContext = { hasDigitalRelease };

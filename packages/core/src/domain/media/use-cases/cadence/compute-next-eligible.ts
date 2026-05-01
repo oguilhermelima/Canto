@@ -1,5 +1,9 @@
 import type { Aspect } from "@canto/core/domain/media/types/media-aspect-state";
 import type { CadenceKnobs } from "@canto/core/domain/media/use-cases/cadence/cadence-knobs";
+import {
+  MS_PER_DAY,
+  MS_PER_MINUTE,
+} from "@canto/core/domain/shared/constants";
 
 /**
  * Outcomes recorded against a `media_aspect_state` row. Mirrors the
@@ -25,8 +29,8 @@ export interface AspectStateInput {
   consecutive_fails: number;
 }
 
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-const ONE_MIN_MS = 60 * 1000;
+const ONE_DAY_MS = MS_PER_DAY;
+const ONE_MIN_MS = MS_PER_MINUTE;
 const TWENTY_FOUR_HOURS_MIN = 24 * 60;
 /** Sentinel "permanent skip" used for permanently-failing 4xx rows. */
 const PARKED_FOREVER = new Date("2099-01-01T00:00:00.000Z");

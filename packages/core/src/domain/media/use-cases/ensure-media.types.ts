@@ -16,6 +16,7 @@
  */
 export type { Aspect } from "@canto/core/domain/media/types/media-aspect-state";
 import type { Aspect } from "@canto/core/domain/media/types/media-aspect-state";
+import { MS_PER_DAY } from "@canto/core/domain/shared/constants";
 
 export const ALL_ASPECTS: Aspect[] = [
   "metadata",
@@ -75,5 +76,5 @@ export interface EnsureMediaResult {
 }
 
 /** Staleness thresholds. Only `metadata` and `extras` expire. */
-export const METADATA_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-export const EXTRAS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export const METADATA_TTL_MS = 30 * MS_PER_DAY;
+export const EXTRAS_TTL_MS = 30 * MS_PER_DAY;
