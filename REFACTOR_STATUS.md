@@ -455,6 +455,39 @@ DOD (a-j): boundary 25 → 0; drizzle clean; typed errors via `domain/torrents/e
 
 **Deferrals**: 23 `!` em `parsing-episodes.ts` (W11-final / W12 cleanup); `mergeLiveData` boundary leak ainda em `domain/media` (W10.8); `folder-scan.ts` worker importa infra/file-organization caller-side (composition root, ok).
 
+#### W10.9 — `sync` ✅ (Teammate K, 2026-05-01)
+
+| Commit | Escopo |
+|---|---|
+| `69899fd3` | `sync-pipeline` threada com `MediaRepositoryPort` + `MediaVersionRepositoryPort` + `MediaAspectStateRepositoryPort` + `ListsRepositoryPort` + `UserMediaRepositoryPort` + `ServerCredentialsPort` (já tinha LoggerPort + JobDispatcherPort + Jellyfin/PlexAdapterPort). `ListsRepositoryPort` ganha `reconcileServerLibrary(tag)`. Batch resolvers (drizzle-heavy) movidos de `domain/sync/media-resolution-cache.ts` → `infra/sync/batch-resolvers.ts` — domain cache módulo só retém o anchor cache em memória, drizzle-free. |
+| `0d780009` | (compartilhado com W10.10) sweep `eqeqeq` em scanners + LoggerPort wireup pra console.log/warn/error |
+| `ecd684df` | eslint per-folder override (4 rules @ error) em `src/domain/sync/**`. Tests block keeps `no-non-null-assertion` em warn (~33 `!` em fixtures de bracket access). |
+
+DOD (a-j): boundary 5 → 0 + 1 drizzle-helpers leak no domain (movido pra infra); typed errors n/a (sync não throw novo); anti-bad-smells: console.log → LoggerPort, drop unused MediaKind import. Caller `apps/worker/src/jobs/reverse-sync.ts` agora wira 6 ports adicionais; importa batch resolvers de infra/sync diretamente (composition root concern).
+
+#### W10.10 — `media-servers` ✅ (Teammate K, 2026-05-01)
+
+| Commit | Escopo |
+|---|---|
+| `13c86e7d` | extend `MediaServerPort` com write surface (`setPlaybackPosition`, `markPlayed`, `markUnplayed`, `findItemIdByProvider`) + Plex/Jellyfin bindings |
+| `22a39c28` | adiciona `MediaVersionRepositoryPort` + `ServerCredentialsPort` (domain owns row-shape types em `domain/media-servers/types/{media-version,streams}.ts`); infra adapters wiram pra existing functions |
+| `e615af6d` | port-first stream fetch: lifta tipos de stream Plex/Jellyfin pra domain, estende `PlexAdapterPort` + `JellyfinAdapterPort` com `fetchItemWithMedia`/`fetchShowLeavesWithMedia` (Plex) e `fetchItemWithStreams`/`fetchShowEpisodesWithStreams` (Jellyfin); `fetchPlexMediaInfo`/`fetchJellyfinMediaInfo` recebem adapter port via deps. MediaServer bindings viram factories (`makePlexMediaServer`/`makeJellyfinMediaServer`). |
+| `6f2fe090` | port-first phase 1: `discover-libraries`, `trigger-scans`, `sync-libraries/{plex,jellyfin}`, `shared/sync-helpers`, `services/user-connection-service` threadam `ServerCredentialsPort` + `FoldersRepositoryPort`; typed errors via `domain/media-servers/errors.ts` (`ServerNotConfiguredError`, `UserConnectionMissingAuthError`, `InvalidServiceUrlError`); 3 `throw new Error` substituídos |
+| `f378318e` | port-first phase 2: `update-metadata` + `media-version-groups-service` threadam `MediaRepositoryPort` + `MediaVersionRepositoryPort` + `MediaLocalizationRepositoryPort` + `ServerCredentialsPort` |
+| `829cc902` | `authenticate/trakt` thread `TraktApiPort` (do trakt context) em vez de `infra/trakt/trakt-shim`; detecção de `TraktHttpError` via duck-typing (name + status) pra evitar tocar `domain/trakt/` |
+| `0d780009` | sweep latent errors: `eqeqeq` (`!=` → `!==`/`!== undefined`), drop unused imports, `console.log/warn/error` → `LoggerPort` (`info?`/`warn`/`error`) com structured context, autoMergeVersions check colapsado |
+| `ecd684df` | eslint per-folder override (4 rules @ error) em `src/domain/media-servers/**` |
+
+DOD (a-j): boundary 9 → 0; drizzle-orm clean (apenas re-exports type-only); typed errors via `domain/media-servers/errors.ts`; `MediaServerPort` agora exposta a 8 methods (4 read + 4 write), com 0 consumers infra-side antes → wired em push-state + composition root. Anti-bad-smells: `console.*` movidos pra LoggerPort, `??=` collapse em push-watch-state. Lint clean (0 warnings em `domain/media-servers/**`).
+
+#### W10.5 absorbed — push-state ✅ (Teammate K, 2026-05-01)
+
+| Commit | Escopo |
+|---|---|
+| `7e554280` | `push-playback-position` + `push-watch-state` threadam `MediaServerPort` + `MediaRepositoryPort` + `MediaVersionRepositoryPort` + `MediaLocalizationRepositoryPort` + `UserConnectionRepositoryPort` + `ServerCredentialsPort` via deps. Novo `MediaServerPushPort` (`domain/user-media/ports/`) abstrai a fan-out, evitando explosão de deps em `mark-dropped`/`clear-tracking`/`log-watched`/`remove-history-entries` (todos passam a depender só de `push: MediaServerPushPort`). Adapter `makeMediaServerPush(db)` em `infra/media-servers/`. Callers wired: `api/userMedia/{history,state}` + `worker/reverse-sync`. |
+
+DOD: 5 infra leaks (1 jellyfin.adapter, 1 plex.adapter, 1 user-connection-repository, 1 media-repository, 1 media-version-repository) eliminados em `push-playback-position.ts` + `push-watch-state.ts`. 4 `db: Database` parameters dropados das user-media use cases consumidoras.
+
 #### W10.11 — `trakt` ✅ (Teammate L, 2026-05-01)
 
 | Commit | Escopo |
@@ -464,7 +497,7 @@ DOD (a-j): boundary 25 → 0; drizzle clean; typed errors via `domain/torrents/e
 | `0583184c` | drizzle helpers gone (8 sites): `lists.findUserCustomLists` / `findUserListByType` / `findUserTombstonedListIds` / `findItemsForSync`; `userMedia.findFavoritesForSync` / `findOverrideRatingsForSync` / `findUnpushedHistoryForTrakt` / `findHistoryByExactWatch`. Cross-context sync projections (`UserFavoriteSyncRow`, `UserRatingSyncRow`, `UserWatchHistoryPushRow`, `ListItemSyncRow`) live alongside their owning domain types. |
 | `d8cb6e3e` | `logSyncDecision` routes through `LoggerPort.info` instead of `console.log`; `logger` threaded into `RunTraktSectionDeps` + `SyncListMembershipDeps`, wired in `apps/worker/src/jobs/trakt-sync.ts`. |
 
-DOD (a-j): boundary 3 → 0; drizzle 8 → 0; zero `throw new Error` (already true); zero `console.log` (1 → 0); ESLint per-folder override at `error` for `no-restricted-imports` + `no-non-null-assertion` + `prefer-nullish-coalescing` + `eqeqeq`. `coordinateTraktSync` signature trimmed (no Database). 10/10 typecheck + 152/152 tests green per commit.
+DOD (a-j): boundary 3 → 0; drizzle 8 → 0; zero `throw new Error` (already true); zero `console.log` (1 → 0); ESLint per-folder override at `error` for `no-restricted-imports` + `no-non-null-assertion` + `prefer-nullish-coalescing` + `eqeqeq`. `coordinateTraktSync` signature trimmed (no Database).
 
 ### Convenção de paths de imports (decidida 2026-04-30, em adoção desde Wave 1)
 
