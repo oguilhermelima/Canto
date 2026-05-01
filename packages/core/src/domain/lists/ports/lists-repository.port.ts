@@ -106,6 +106,14 @@ export interface ListsRepositoryPort {
     mediaIds: string[],
   ): Promise<void>;
   reorderItems(listId: string, orderedItemIds: string[]): Promise<void>;
+  /** Stamp `last_pushed_at` on the listed media ids — the positive signal
+   *  the Trakt sync uses to distinguish "never reached Trakt" from "reached
+   *  Trakt and was later removed there". Skips tombstoned rows. */
+  markItemsPushed(
+    listId: string,
+    mediaIds: string[],
+    pushedAt: Date,
+  ): Promise<void>;
   findMediaInLists(
     mediaId: string,
     userId: string,

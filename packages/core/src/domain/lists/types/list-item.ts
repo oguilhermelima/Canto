@@ -23,6 +23,10 @@ export interface NewListItem {
   listId: string;
   mediaId: string;
   notes?: string | null;
+  /** Override the row's `addedAt` — used by Trakt sync to honour the real
+   *  `listed_at` from the remote so the library "added on" sort isn't
+   *  collapsed to the sync-run timestamp. Omit for user-driven inserts. */
+  addedAt?: Date;
 }
 
 /** Projection used by the "in N other collections" hint on collection cards

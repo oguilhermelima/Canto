@@ -29,6 +29,7 @@ export function toRow(input: NewListItem): ListItemInsert {
     listId: input.listId,
     mediaId: input.mediaId,
     notes: input.notes ?? undefined,
+    addedAt: input.addedAt,
   };
 }
 

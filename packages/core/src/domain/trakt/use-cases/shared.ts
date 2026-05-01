@@ -1,16 +1,11 @@
 import { and, eq } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
-import { list, listItem, media } from "@canto/db/schema";
-import {
-  addListItem,
-  markListItemsPushed,
-  removeListItem,
-} from "@canto/core/infra/lists/list-repository";
+import { listItem, media } from "@canto/db/schema";
+import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
 import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
 import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
 import type { UserConnectionRepositoryPort } from "@canto/core/domain/media-servers/ports/user-connection-repository.port";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
-import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import type {
@@ -195,6 +190,10 @@ export function toTraktRatingsBody(
 export interface ResolveMediaDeps {
   media: MediaRepositoryPort;
   providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort };
+}
+
+export interface SyncListMembershipDeps extends ResolveMediaDeps {
+  lists: ListsRepositoryPort;
 }
 
 export async function resolveMediaFromTraktRef(
@@ -430,8 +429,6 @@ function logSyncDecision(
   );
 }
 
-export type SyncListMembershipDeps = ResolveMediaDeps;
-
 export async function syncSingleListMembership(
   ctx: SyncContext,
   deps: SyncListMembershipDeps,
@@ -548,14 +545,11 @@ export async function syncSingleListMembership(
   const uniqueRemoveLocal = [...new Set(removeLocalMediaIds)];
 
   for (const [mediaId, addedAt] of earliestByMediaId) {
-    // `addListItem` accepts an `addedAt` in the row insert payload; the
-    // domain `lists` port doesn't surface that field today (TODO: extend
-    // `NewListItem` so this can flow through `deps.lists.addItem`).
-    await addListItem(ctx.db, { listId: localListId, mediaId, addedAt });
+    await deps.lists.addItem({ listId: localListId, mediaId, addedAt });
   }
 
   for (const mediaId of uniqueRemoveLocal) {
-    await removeListItem(ctx.db, localListId, mediaId, "trakt-sync");
+    await deps.lists.removeItem(localListId, mediaId, "trakt-sync");
   }
 
   const dedupedRemoteAdds = dedupeByKey(addRemoteRefs);
@@ -567,11 +561,8 @@ export async function syncSingleListMembership(
     );
     // Mark `last_pushed_at` *after* the API returns 2xx — this is the positive
     // signal `reconcileListItem` uses to distinguish "never reached Trakt"
-    // from "reached Trakt and was later removed there". `markListItemsPushed`
-    // is not in the lists port yet (lacks an `actor`-scoped write), tracked
-    // for a future lists-wave extension.
-    await markListItemsPushed(
-      ctx.db,
+    // from "reached Trakt and was later removed there".
+    await deps.lists.markItemsPushed(
       localListId,
       dedupedRemoteAdds.map((r) => r.mediaId),
       ctx.now,
@@ -583,7 +574,7 @@ export async function syncSingleListMembership(
 }
 
 export async function findOrCreateUniqueListSlug(
-  db: Database,
+  lists: ListsRepositoryPort,
   userId: string,
   baseSlug: string,
 ): Promise<string> {
@@ -592,9 +583,7 @@ export async function findOrCreateUniqueListSlug(
   let i = 1;
 
   while (true) {
-    const existing = await db.query.list.findFirst({
-      where: and(eq(list.userId, userId), eq(list.slug, candidate)),
-    });
+    const existing = await lists.findBySlug(candidate, userId);
     if (!existing) return candidate;
     i += 1;
     candidate = `${normalized}-${i}`;

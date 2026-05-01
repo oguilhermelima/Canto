@@ -28,6 +28,7 @@ import {
   findUserListExternalIds,
   findUserListsWithCounts,
   hardDeleteList,
+  markListItemsPushed,
   moveListItems,
   removeListItem,
   removeListItems,
@@ -152,6 +153,9 @@ export function makeListsRepository(db: Database): ListsRepositoryPort {
     },
     reorderItems: async (listId, orderedItemIds) => {
       await reorderListItems(db, listId, orderedItemIds);
+    },
+    markItemsPushed: async (listId, mediaIds, pushedAt) => {
+      await markListItemsPushed(db, listId, mediaIds, pushedAt);
     },
     findMediaInLists: async (mediaId, userId) => {
       const rows = await findMediaInLists(db, mediaId, userId);

@@ -98,7 +98,7 @@ export async function syncCustomLists(
 
     if (!localListId) {
       const slug = await findOrCreateUniqueListSlug(
-        ctx.db,
+        deps.lists,
         ctx.userId,
         remote.ids.slug,
       );
