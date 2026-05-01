@@ -379,6 +379,41 @@ Continuou o slicing horizontal antes do replanejamento. Reduziu boundary warning
 
 **Resultado**: LoggerPort + JobDispatcherPort + MediaLocalizationRepositoryPort 100% wired no domain. Restante (~90 leaks) endereçado pelas Context Waves W10.1–W10.11.
 
+### Wave 10 round 3 (vertical Context Waves) — ⏳ em curso
+
+#### W10.1 — `notifications` ✅ (Teammate G, 2026-05-01)
+
+| Commit | Escopo |
+|---|---|
+| `ae9c32da` | eslint per-folder override (3 files, contexto já clean — quick win) |
+
+DOD (a-j): contexto já estava sem leaks/`!`/throws/cast antes do wave; commit promove `no-restricted-imports` + `no-non-null-assertion` + `prefer-nullish-coalescing` + `eqeqeq` para `error` em `src/domain/notifications/**`.
+
+#### W10.2 — `lists` ✅ (Teammate G, 2026-05-01)
+
+| Commit | Escopo |
+|---|---|
+| `63be7be7` | drop unused `_db: Database` parameter de `viewListBySlug` / `viewAllCollectionItems` / `getCollectionLayout` / `updateCollectionLayout` (4 use cases + 2 callers em `api/list/{manage,items}.ts`) |
+| `9189fa93` | adiciona `listMemberVotes` ao `ListsRepositoryPort` (era leak direto em `api/list/sharing.ts` via `@canto/core/infra/lists/member-repository`) |
+| `07b99561` | `list.getAll` tRPC procedure agora roteia via `repo.findUserListsWithCounts` (último import direto de `infra/lists/list-repository` em api). Side effect: branded `ListId` exposto, `collections-tab.tsx` ajusta `currentIds`/Map para `string[]` |
+| `f83481ce` | eslint per-folder override completo (4 rules → error) em `src/domain/lists/**` |
+
+DOD (a-j): boundary clean, drizzle-orm clean, port com `listMemberVotes` adicionado (naming já consistente para a maioria dos métodos — `find*` array methods deferidos). Typed errors via `lists/errors.ts` (já existia). Anti-bad-smells pass: dropped `_db: Database` passthrough. Override completo.
+
+**Deferido**: rename de `find*` array methods (`findMembers`, `findPendingInvitations`, `findUserListsWithCounts`, etc) para `list*` — toca ~128 call sites; melhor fazer numa wave dedicada (W11-final ou folow-up).
+
+#### W10.3 — `recommendations` ✅ (Teammate G, 2026-05-01)
+
+| Commit | Escopo |
+|---|---|
+| `0525ed2a` | boundary cleanup: 5 use cases (`get-top-10`, `get-genre-tiles`, `get-filter-options`, `get-user-watch-providers`, `search-filter-entities`) trocam `cached()` + `getTmdbProvider()` + `fetchFromTmdb()` por deps. Adiciona `CachePort.wrap` + `makeCache()` adapter, promove `getTrending`/`discover` em `MediaProviderPort`, cria `RecommendationsCatalogPort` + `makeRecommendationsCatalog()` adapter. Wireup em `api/provider/{discovery,filters}.ts` |
+| `f1823eea` | drop dead `?? "tmdb"` / `?? null` / `?? []` em `get-recommendations`/`get-spotlight` (LHS já não-nullable). Mantém `?? null` em `posterPath`/`backdropPath` (genuinamente `string \| undefined` no `SearchResult`) |
+| `0faa51f0` | eslint per-folder override em `src/domain/recommendations/**` (3 rules → error; `no-non-null-assertion` fica em warn por causa de 13 assertions inherited em `rebuild-user-recs`/`get-recommendations`/`get-spotlight`) |
+
+DOD (a-j): boundary leaks 5 → 0 em platform; drizzle-orm clean; typed errors n/a (recs use cases não throw); anti-bad-smells: dead `??` removidos, magic TTLs em const nomeada (`TOP_10_TTL_SECONDS`, etc). Override parcial — nota inline no eslint config explica por que `no-non-null-assertion` fica em warn.
+
+**Deferido**: `getSetting`/`setSetting` em `get-spotlight` (db helper, não infra/platform — tecnicamente não viola o lint atual mas é cross-context); 13 non-null assertions em array-iteration helpers; rename de `find*` array methods em `RecommendationsRepositoryPort`.
+
 ### Convenção de paths de imports (decidida 2026-04-30, em adoção desde Wave 1)
 
 **Regra única**: TODO import usa o nome do package (`@canto/<pkg>/<full-path>`). Zero `./` ou `../`.
