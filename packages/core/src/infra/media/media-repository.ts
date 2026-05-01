@@ -26,7 +26,6 @@ import {
 import type { ListInput } from "@canto/validators";
 import { mediaI18n  } from "../shared/media-i18n";
 import type {MediaI18n} from "../shared/media-i18n";
-import { findMediaLocalized } from "./media-localized-repository";
 
 type MediaRow = typeof media.$inferSelect;
 
@@ -42,11 +41,17 @@ type LocalizedMediaRow = MediaRow & {
   tagline: string | null;
 };
 
+// Drizzle's relational `orderBy` callback uses inferred parameters that don't
+// flow through this `as const` literal — the callbacks are typed inline by the
+// query API at the use site. Annotating with `any` is the documented escape
+// for this surface; eslint-disable applies only to these two callbacks.
 const withSeasonsAndEpisodes = {
   seasons: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     orderBy: (s: any, { asc }: any) => [asc(s.number)],
     with: {
       episodes: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         orderBy: (e: any, { asc }: any) => [asc(e.number)],
       },
     },

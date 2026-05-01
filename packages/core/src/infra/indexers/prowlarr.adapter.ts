@@ -63,8 +63,8 @@ export class ProwlarrClient implements IndexerPort {
       .filter((idx) => idx.enable)
       .map((idx) => ({
         id: idx.id,
-        name: idx.name ?? "unknown",
-        language: idx.language ?? "en-US",
+        name: idx.name,
+        language: idx.language,
         tvSearch: (idx.capabilities.tvSearchParams?.length ?? 0) > 0,
         tvSearchParams: idx.capabilities.tvSearchParams ?? [],
         movieSearch: (idx.capabilities.movieSearchParams?.length ?? 0) > 0,

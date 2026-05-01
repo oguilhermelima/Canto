@@ -145,7 +145,7 @@ function parseCategories(
     const obj = c as Record<string, unknown> | string | number;
     let id: number;
     let name: string;
-    if (typeof obj === "object" && obj !== null) {
+    if (typeof obj === "object") {
       id = parseInt(text(obj["@_id"]) || text(obj["#text"]), 10);
       name = text(obj["@_name"]) || text(obj["#text"]) || String(id);
     } else {

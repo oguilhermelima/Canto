@@ -1,4 +1,4 @@
-import { and, desc, eq, getTableColumns, inArray, isNotNull, not, sql } from "drizzle-orm";
+import { and, eq, getTableColumns, inArray, isNotNull, not, sql } from "drizzle-orm";
 import { getQualityFilters, getWeightedScoreOrder } from "@canto/core/infra/recommendations/recommendation-filters";
 import type { Database } from "@canto/db/client";
 import {

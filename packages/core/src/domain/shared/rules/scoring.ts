@@ -179,10 +179,10 @@ export function explainConfidence(
     score += entry.weight;
     push("Profile match", entry.weight, `${attrs.quality} ${attrs.source}`);
   } else {
-    const q = rules.quality[attrs.quality] ?? 0;
+    const q = rules.quality[attrs.quality];
     score += q;
     push("Quality", q, attrs.quality);
-    const s = rules.source[attrs.source] ?? 0;
+    const s = rules.source[attrs.source];
     score += s;
     push("Source", s, attrs.source);
   }
@@ -280,7 +280,7 @@ export function explainConfidence(
   }
 
   // Release group tier
-  const gt = rules.groupTier[attrs.groupTier] ?? 0;
+  const gt = rules.groupTier[attrs.groupTier];
   if (gt !== 0 || attrs.releaseGroup) {
     score += gt;
     push("Group tier", gt, `${attrs.groupTier}${attrs.releaseGroup ? `: ${attrs.releaseGroup}` : ""}`);

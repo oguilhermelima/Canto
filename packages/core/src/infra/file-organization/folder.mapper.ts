@@ -5,7 +5,7 @@ import type {
   UpdateFolderInput,
 } from "@canto/core/domain/file-organization/types/folder";
 import { normalizeFolderRules } from "@canto/core/domain/torrents/rules/folder-routing";
-import type { downloadFolder, PersistedFolderRules, RoutingRules } from "@canto/db/schema";
+import type { downloadFolder, RoutingRules } from "@canto/db/schema";
 
 type Row = typeof downloadFolder.$inferSelect;
 type Insert = typeof downloadFolder.$inferInsert;

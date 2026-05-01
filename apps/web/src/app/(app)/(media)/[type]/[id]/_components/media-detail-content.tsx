@@ -75,7 +75,7 @@ export function MediaDetailContent({
       {/* Hero */}
       <MediaDetailHero
         id={media.id}
-        type={media.type as "movie" | "show"}
+        type={media.type}
         title={media.title}
         overview={media.overview}
         backdropPath={media.backdropPath}
@@ -193,7 +193,7 @@ export function MediaDetailContent({
         open={detail.downloadModalOpen}
         onOpenChange={detail.setDownloadModalOpen}
         mediaId={detail.mediaId}
-        mediaType={media.type as "movie" | "show"}
+        mediaType={media.type}
         mediaTitle={media.title}
         isAdmin={detail.isAdmin}
         seasons={media.seasons.map((s) => ({
@@ -220,7 +220,7 @@ export function MediaDetailContent({
           open={detail.preferencesOpen}
           onOpenChange={detail.setPreferencesOpen}
           mediaId={detail.mediaId}
-          mediaType={media.type as "movie" | "show"}
+          mediaType={media.type}
           mediaTitle={media.title}
         />
       )}

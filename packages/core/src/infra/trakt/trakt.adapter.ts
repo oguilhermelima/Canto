@@ -250,7 +250,7 @@ interface TraktListItemResponse {
   show?: { ids: TraktIds };
 }
 
-interface TraktWatchlistItemResponse extends TraktListItemResponse {}
+type TraktWatchlistItemResponse = TraktListItemResponse;
 
 interface TraktRatedItemResponse {
   rated_at: string;
@@ -708,13 +708,11 @@ export async function listTraktWatchedMovies(
     "/sync/watched/movies",
     { accessToken },
   );
-  return rows
-    .filter((row) => !!row.movie?.ids)
-    .map((row) => ({
-      ids: row.movie.ids,
-      plays: row.plays,
-      lastWatchedAt: row.last_watched_at,
-    }));
+  return rows.map((row) => ({
+    ids: row.movie.ids,
+    plays: row.plays,
+    lastWatchedAt: row.last_watched_at,
+  }));
 }
 
 export async function listTraktWatchedShows(
@@ -724,9 +722,7 @@ export async function listTraktWatchedShows(
     "/sync/watched/shows",
     { accessToken },
   );
-  return rows
-    .filter((row) => !!row.show?.ids)
-    .map((row) => ({
+  return rows.map((row) => ({
       ids: row.show.ids,
       plays: row.plays,
       lastWatchedAt: row.last_watched_at,

@@ -9,7 +9,6 @@ import {
 
 import type {
   AdminDownloadPolicy,
-  Av1Stance,
   ScoringRules,
 } from "@canto/core/domain/shared/rules/scoring-rules";
 import type {

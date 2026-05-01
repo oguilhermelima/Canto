@@ -1,4 +1,4 @@
-import type { Episode, EpisodeId } from "@canto/core/domain/media/types/episode";
+import type { EpisodeId } from "@canto/core/domain/media/types/episode";
 import type { MediaId } from "@canto/core/domain/media/types/media";
 import type {
   NewSeason,

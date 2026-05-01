@@ -3,7 +3,6 @@ import type {
   MediaRecommendation,
   MediaRecommendationId,
   NewMediaRecommendation,
-  RecommendationSourceType,
 } from "@canto/core/domain/media/types/media-recommendation";
 import type { mediaRecommendation } from "@canto/db/schema";
 

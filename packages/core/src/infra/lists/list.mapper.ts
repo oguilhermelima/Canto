@@ -1,6 +1,5 @@
 import type { list } from "@canto/db/schema";
 import type {
-  CollectionDefaultSort,
   List,
   ListId,
   ListOwnerSummary,

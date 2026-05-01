@@ -105,11 +105,7 @@ export async function batchResolveMediaByExternalRefs(
   const tvdbSet = new Set(tvdbIdList);
 
   for (const row of rows) {
-    if (
-      row.provider === "tmdb" &&
-      row.externalId !== null &&
-      tmdbSet.has(row.externalId)
-    ) {
+    if (row.provider === "tmdb" && tmdbSet.has(row.externalId)) {
       result.byTmdb.set(row.externalId, row);
     }
     if (row.imdbId && imdbSet.has(row.imdbId)) {

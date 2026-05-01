@@ -1,4 +1,4 @@
-import { and, avg, desc, eq, isNull, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { Database } from "@canto/db/client";
 import { episode, media, season, user, userMediaState, userRating } from "@canto/db/schema";
 import type { UserRatingSyncRow } from "@canto/core/domain/user-media/types/user-rating";
@@ -303,21 +303,7 @@ export async function computeAndSyncSeasonRating(
   });
 
   if (!seasonOverride) {
-    // Compute average from episode ratings for this season
-    const [result] = await db
-      .select({ avg: avg(userRating.rating) })
-      .from(userRating)
-      .where(
-        and(
-          eq(userRating.userId, userId),
-          eq(userRating.mediaId, mediaId),
-          eq(userRating.seasonId, seasonId),
-          // episode-level ratings only (episodeId IS NOT NULL)
-          // We can't use isNotNull here, so we filter by having episodeId set
-        ),
-      );
-
-    // Filter to only episode-level rows by checking episodeId is not null
+    // Compute average from episode-level ratings for this season.
     const episodeRatings = await db.query.userRating.findMany({
       where: and(
         eq(userRating.userId, userId),

@@ -31,9 +31,7 @@ export async function upsertUserMediaState(
   const now = new Date();
   const incomingUpdatedAt = data.updatedAt instanceof Date
     ? data.updatedAt
-    : data.updatedAt
-      ? new Date(data.updatedAt)
-      : null;
+    : null;
 
   const insertValues = {
     ...data,

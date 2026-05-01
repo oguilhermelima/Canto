@@ -80,9 +80,7 @@ export async function upsertUserPlaybackProgress(
     if (existing.deletedAt) {
       const incomingAt = data.lastWatchedAt instanceof Date
         ? data.lastWatchedAt
-        : data.lastWatchedAt
-          ? new Date(data.lastWatchedAt)
-          : null;
+        : null;
       if (!incomingAt || incomingAt.getTime() <= existing.deletedAt.getTime()) {
         // Tombstoned row, no revive — caller sees no previous state so the
         // echo guard treats this like a brand-new observation (matches the

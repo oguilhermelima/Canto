@@ -28,7 +28,6 @@ import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
 import { updateMedia } from "@canto/core/infra/media/media-repository";
 import {
-  claimDownloadForImport,
   createDownload,
   findDownloadByHash,
   findDownloadById,

@@ -250,7 +250,7 @@ export async function getPlexSections(
       Directory: Array<{ key: string; title: string; type: string; Location: Array<{ path: string }> }>;
     };
   }>(url, token, "/library/sections");
-  return data.MediaContainer.Directory ?? [];
+  return data.MediaContainer.Directory;
 }
 
 /**
