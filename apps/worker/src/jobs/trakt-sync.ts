@@ -45,6 +45,7 @@ export async function handleTraktSync(): Promise<void> {
       traktAuth: makeTraktAuth(),
       trakt: makeTraktRepository(db),
       userConnection: makeUserConnectionRepository(db),
+      logger: makeConsoleLogger(),
     },
     jobDispatcher,
   );
@@ -62,6 +63,7 @@ export async function handleTraktSyncUser(userId: string): Promise<void> {
     traktAuth: makeTraktAuth(),
     trakt: makeTraktRepository(db),
     userConnection: userConnections,
+    logger: makeConsoleLogger(),
   };
   const connections = await userConnections.findByUserId(userId);
   for (const conn of connections) {

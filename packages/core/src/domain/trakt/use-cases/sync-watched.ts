@@ -48,9 +48,9 @@ async function promoteSafely(
       },
     );
   } catch (err) {
-    console.warn(
-      `[trakt-sync] promote state failed for media ${mediaId}:`,
-      err instanceof Error ? err.message : err,
+    deps.logger.warn(
+      `[trakt-sync] promote state failed for media ${mediaId}`,
+      { err: err instanceof Error ? err.message : String(err) },
     );
   }
 }

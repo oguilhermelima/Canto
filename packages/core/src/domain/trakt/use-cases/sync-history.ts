@@ -114,9 +114,9 @@ export async function pullHistory(
         syncedDirection: "pull",
       });
     } catch (err) {
-      console.warn(
-        `[trakt-sync] pullHistory: skipped remote=${remote.remoteHistoryId}:`,
-        err instanceof Error ? err.message : err,
+      deps.logger.warn(
+        `[trakt-sync] pullHistory: skipped remote=${remote.remoteHistoryId}`,
+        { err: err instanceof Error ? err.message : String(err) },
       );
     }
   }

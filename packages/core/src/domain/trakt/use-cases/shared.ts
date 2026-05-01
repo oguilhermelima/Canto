@@ -192,11 +192,11 @@ export interface ResolveMediaDeps {
   media: MediaRepositoryPort;
   providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort };
   persist: PersistDeps;
+  logger: LoggerPort;
 }
 
 export interface SyncListMembershipDeps extends ResolveMediaDeps {
   lists: ListsRepositoryPort;
-  logger: LoggerPort;
 }
 
 export async function resolveMediaFromTraktRef(
@@ -239,9 +239,9 @@ export async function resolveMediaFromTraktRef(
         return persisted.id;
       }
     } catch (err) {
-      console.warn(
-        `[trakt-sync] Failed to persist TMDB media ${ref.ids.tmdb}:`,
-        err instanceof Error ? err.message : err,
+      deps.logger.warn(
+        `[trakt-sync] Failed to persist TMDB media ${ref.ids.tmdb}`,
+        { err: err instanceof Error ? err.message : String(err) },
       );
     }
   }
@@ -263,9 +263,9 @@ export async function resolveMediaFromTraktRef(
         return persisted.id;
       }
     } catch (err) {
-      console.warn(
-        `[trakt-sync] Failed to persist TVDB media ${ref.ids.tvdb}:`,
-        err instanceof Error ? err.message : err,
+      deps.logger.warn(
+        `[trakt-sync] Failed to persist TVDB media ${ref.ids.tvdb}`,
+        { err: err instanceof Error ? err.message : String(err) },
       );
     }
   }

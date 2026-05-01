@@ -30,6 +30,7 @@ import type { UserConnectionRepositoryPort } from "@canto/core/domain/media-serv
 import type { TraktLastActivities } from "@canto/core/domain/trakt/types/trakt-api";
 import type { TraktSection } from "@canto/core/domain/trakt/types/trakt-section";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 
 /* Sections that pull AND push. We always dispatch these so locally-pending
  * pushes don't sit forever waiting for a remote-side change. The section
@@ -162,6 +163,7 @@ export interface CoordinateTraktSyncDeps {
   traktAuth: TraktAuthPort;
   trakt: TraktRepositoryPort;
   userConnection: UserConnectionRepositoryPort;
+  logger: LoggerPort;
 }
 
 export async function coordinateTraktSync(
@@ -193,9 +195,9 @@ export async function coordinateTraktSync(
       );
       activities = await deps.traktApi.getLastActivities(accessToken);
     } catch (err) {
-      console.warn(
-        `[trakt-sync] coordinator: probe failed for connection ${conn.id}:`,
-        err instanceof Error ? err.message : err,
+      deps.logger.warn(
+        `[trakt-sync] coordinator: probe failed for connection ${conn.id}`,
+        { err: err instanceof Error ? err.message : String(err) },
       );
       skipped += ALL_SECTIONS.length;
       return;
@@ -223,9 +225,9 @@ export async function coordinateTraktSync(
         await dispatcher.traktSyncSection(conn.id, section, remoteAtIso);
         dispatched += 1;
       } catch (err) {
-        console.warn(
-          `[trakt-sync] coordinator: dispatch failed for ${conn.id}/${section}:`,
-          err instanceof Error ? err.message : err,
+        deps.logger.warn(
+          `[trakt-sync] coordinator: dispatch failed for ${conn.id}/${section}`,
+          { err: err instanceof Error ? err.message : String(err) },
         );
         skipped += 1;
       }

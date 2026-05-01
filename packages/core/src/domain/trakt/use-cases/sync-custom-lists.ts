@@ -62,9 +62,9 @@ export async function syncCustomLists(
       try {
         await deps.traktApi.deleteList(ctx.accessToken, link.traktListId);
       } catch (err) {
-        console.warn(
-          `[trakt-sync] Failed to delete remote Trakt list ${link.traktListId}:`,
-          err instanceof Error ? err.message : err,
+        deps.logger.warn(
+          `[trakt-sync] Failed to delete remote Trakt list ${link.traktListId}`,
+          { err: err instanceof Error ? err.message : String(err) },
         );
       }
       await deps.trakt.deleteListLinkById(link.id);
