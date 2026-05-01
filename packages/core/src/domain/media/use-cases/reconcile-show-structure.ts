@@ -9,7 +9,6 @@ import {
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
-import { findMediaLocalized } from "@canto/core/infra/media/media-localized-repository";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
@@ -54,7 +53,7 @@ export async function reconcileShowStructure(
 
   // Title for log messages + TVDB title-search fallback comes from en-US
   // localization (the only post-1C-δ home for the canonical English title).
-  const enLoc = await findMediaLocalized(db, row.id, "en-US");
+  const enLoc = await deps.localization.findLocalizedById(row.id, "en-US");
   const enTitle = enLoc?.title ?? "";
 
   // Resolve TVDB ID

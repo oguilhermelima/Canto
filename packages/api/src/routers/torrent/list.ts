@@ -46,10 +46,15 @@ export const torrentListRouter = createTRPCRouter({
   listLiveByMedia: adminProcedure
     .input(getByMediaIdInput)
     .query(async ({ ctx, input }) => {
-      const dbRows = await findDownloadsByMediaId(ctx.db, input.mediaId);
+      const torrents = makeTorrentsRepository(ctx.db);
+      const dbRows = await torrents.findDownloadsByMediaId(input.mediaId);
       if (dbRows.length === 0) return [];
       const qb = await getDownloadClient();
-      const merged = await mergeLiveData(ctx.db, { logger: makeConsoleLogger() }, dbRows, qb);
+      const merged = await mergeLiveData(
+        { logger: makeConsoleLogger(), torrents },
+        dbRows,
+        qb,
+      );
       return merged.map((item) => ({ ...item.row, live: item.live }));
     }),
 

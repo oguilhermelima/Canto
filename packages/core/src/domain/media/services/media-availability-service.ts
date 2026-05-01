@@ -1,13 +1,20 @@
-import type { Database } from "@canto/db/client";
-import { findMediaVersionsWithEpisodes } from "@canto/core/infra/media/media-version-repository";
+import type { MediaVersionRepositoryPort } from "@canto/core/domain/media/ports/media-version-repository.port";
+
+export interface MediaAvailabilityDeps {
+  mediaVersion: MediaVersionRepositoryPort;
+}
 
 /**
  * Get media availability across all sources (downloads, Jellyfin, Plex).
  * Returns source-level info + episode-level availability for shows. Each
  * media_version is one physical file on one server — we surface them 1:1.
  */
-export async function getMediaAvailability(db: Database, mediaId: string) {
-  const versions = await findMediaVersionsWithEpisodes(db, mediaId);
+export async function getMediaAvailability(
+  deps: MediaAvailabilityDeps,
+  mediaId: string,
+) {
+  const versions =
+    await deps.mediaVersion.findVersionsWithEpisodesByMediaId(mediaId);
 
   const sources: Array<{
     type: "jellyfin" | "plex";
@@ -16,7 +23,10 @@ export async function getMediaAvailability(db: Database, mediaId: string) {
     episodeCount?: number;
   }> = [];
 
-  const episodeMap: Record<string, Array<{ type: string; resolution?: string | null }>> = {};
+  const episodeMap: Record<
+    string,
+    Array<{ type: string; resolution?: string | null }>
+  > = {};
 
   for (const version of versions) {
     const srcType = version.source as "jellyfin" | "plex";
@@ -42,10 +52,11 @@ export async function getMediaAvailability(db: Database, mediaId: string) {
     });
 
     for (const ep of version.episodes) {
-      if (ep.seasonNumber == null || ep.episodeNumber == null) continue;
+      if (ep.seasonNumber === null || ep.episodeNumber === null) continue;
       const key = `S${String(ep.seasonNumber).padStart(2, "0")}E${String(ep.episodeNumber).padStart(2, "0")}`;
-      if (!episodeMap[key]) episodeMap[key] = [];
-      episodeMap[key].push({ type: srcType, resolution: ep.resolution });
+      const bucket = episodeMap[key] ?? [];
+      bucket.push({ type: srcType, resolution: ep.resolution });
+      episodeMap[key] = bucket;
     }
   }
 

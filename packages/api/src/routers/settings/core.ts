@@ -27,6 +27,7 @@ import { ensureMediaMany } from "@canto/core/domain/media/use-cases/ensure-media
 import { syncTmdbCertifications } from "@canto/core/domain/content-enrichment/use-cases/sync-tmdb-certifications";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
+import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 
 export const settingsCoreRouter = createTRPCRouter({
   getAll: adminProcedure.query(() => getAllSettings()),
@@ -109,7 +110,7 @@ export const settingsCoreRouter = createTRPCRouter({
           } catch (err) {
             console.error("[settings.refreshMedia] cert sync failed:", err);
           }
-          await ensureMediaMany(ctx.db, { dispatcher: jobDispatcher }, filter, spec);
+          await ensureMediaMany(ctx.db, { dispatcher: jobDispatcher, media: makeMediaRepository(ctx.db) }, filter, spec);
         })().catch((err) => {
           console.error("[settings.refreshMedia] bulk dispatch failed:", err);
         });
@@ -129,7 +130,7 @@ export const settingsCoreRouter = createTRPCRouter({
         };
       }
 
-      return ensureMediaMany(ctx.db, { dispatcher: jobDispatcher }, filter, spec, { dryRun: input.dryRun });
+      return ensureMediaMany(ctx.db, { dispatcher: jobDispatcher, media: makeMediaRepository(ctx.db) }, filter, spec, { dryRun: input.dryRun });
     }),
 
   rebuildUserRecommendations: adminProcedure.mutation(async ({ ctx }) => {

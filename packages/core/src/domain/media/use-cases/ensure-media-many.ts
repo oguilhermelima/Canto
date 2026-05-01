@@ -3,13 +3,13 @@ import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-r
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import { detectGaps } from "@canto/core/domain/media/use-cases/detect-gaps";
 import {
-  ALL_ASPECTS
-
-
+  ALL_ASPECTS,
 } from "@canto/core/domain/media/use-cases/ensure-media.types";
-import type {Aspect, EnsureMediaSpec} from "@canto/core/domain/media/use-cases/ensure-media.types";
+import type {
+  Aspect,
+  EnsureMediaSpec,
+} from "@canto/core/domain/media/use-cases/ensure-media.types";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
-import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 
 export interface EnsureMediaManyFilter {
   mediaIds?: string[];
@@ -32,8 +32,7 @@ export interface EnsureMediaManyResult {
 
 export interface EnsureMediaManyDeps {
   dispatcher: JobDispatcherPort;
-  /** Optional — falls back to building from `db` when not supplied. */
-  media?: MediaRepositoryPort;
+  media: MediaRepositoryPort;
 }
 
 /**
@@ -55,9 +54,8 @@ export async function ensureMediaMany(
   opts: EnsureMediaManyOptions = {},
 ): Promise<EnsureMediaManyResult> {
   const languages = spec.languages ?? [...(await getActiveUserLanguages(db))];
-  const mediaRepo = deps.media ?? makeMediaRepository(db);
 
-  const rows = await mediaRepo.findEligibleForEnrichment({
+  const rows = await deps.media.findEligibleForEnrichment({
     mediaIds: filter.mediaIds,
     type: filter.type,
     hasTvdbId: filter.hasTvdbId,

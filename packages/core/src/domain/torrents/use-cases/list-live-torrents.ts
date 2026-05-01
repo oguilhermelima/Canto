@@ -29,15 +29,7 @@ export async function listLiveTorrents(
     deps.torrents.findAllDownloadsPaginated(limit, offset),
     deps.torrents.countAllDownloads(),
   ]);
-  // mergeLiveData lives in the media context and still types its input as
-  // the raw drizzle download row. The domain Download we feed it carries the
-  // same field shape — see W10.8 for the cross-context realignment.
-  const merged = await mergeLiveData(
-    db,
-    deps,
-    dbRows as unknown as Parameters<typeof mergeLiveData>[2],
-    qb,
-  );
+  const merged = await mergeLiveData(deps, dbRows, qb);
 
   const mediaIds = [
     ...new Set(dbRows.map((r) => r.mediaId).filter(Boolean)),

@@ -221,7 +221,12 @@ export const syncRouter = createTRPCRouter({
 
   mediaAvailability: protectedProcedure
     .input(getByMediaIdInput)
-    .query(({ ctx, input }) => getMediaAvailability(ctx.db, input.mediaId)),
+    .query(({ ctx, input }) =>
+      getMediaAvailability(
+        { mediaVersion: makeMediaVersionRepository(ctx.db) },
+        input.mediaId,
+      ),
+    ),
 
   scanFolders: adminProcedure.mutation(async () => {
     const started = await dispatchFolderScan();

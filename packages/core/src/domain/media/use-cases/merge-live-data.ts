@@ -1,24 +1,19 @@
-import type { Database } from "@canto/db/client";
 import type { DownloadClientPort } from "@canto/core/domain/shared/ports/download-client";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
+import type { TorrentsRepositoryPort } from "@canto/core/domain/torrents/ports/torrents-repository.port";
+import type { Download } from "@canto/core/domain/torrents/types/download";
 import type { LiveData } from "@canto/core/domain/torrents/types/torrent";
-import {
-  updateDownload,
-  updateDownloadBatch,
-} from "@canto/core/infra/torrents/download-repository";
-
-type TorrentRow = Awaited<ReturnType<Database["query"]["download"]["findMany"]>>[number];
 
 export interface MergeLiveDataDeps {
   logger: LoggerPort;
+  torrents: TorrentsRepositoryPort;
 }
 
 export async function mergeLiveData(
-  db: Database,
   deps: MergeLiveDataDeps,
-  dbRows: TorrentRow[],
+  dbRows: Download[],
   qbClient: DownloadClientPort,
-): Promise<Array<{ row: TorrentRow; live: LiveData | null }>> {
+): Promise<Array<{ row: Download; live: LiveData | null }>> {
   let liveTorrents: Array<{
     hash: string;
     name: string;
@@ -51,7 +46,7 @@ export async function mergeLiveData(
   for (const row of dbRows) {
     const live = row.hash ? liveMap.get(row.hash) : undefined;
     if (live) {
-      const updates: Record<string, unknown> = {
+      const updates: { progress: number; contentPath?: string; fileSize?: number } = {
         progress: live.progress,
       };
       if (live.content_path && !row.contentPath) {
@@ -63,12 +58,14 @@ export async function mergeLiveData(
         (row as { fileSize: number | null }).fileSize = live.size;
       }
       (row as { progress: number }).progress = live.progress;
-      void updateDownload(db, row.id, updates).catch(deps.logger.logAndSwallow("merge-live-data updateDownload"));
+      void deps.torrents
+        .updateDownload(row.id, updates)
+        .catch(deps.logger.logAndSwallow("merge-live-data updateDownload"));
     }
   }
 
   // 2. Status transitions
-  const statusUpdates = new Map<string, string>();
+  const statusUpdates = new Map<string, Download["status"]>();
 
   for (const row of dbRows) {
     const live = row.hash ? liveMap.get(row.hash) : undefined;
@@ -82,7 +79,8 @@ export async function mergeLiveData(
       } else if (live.state === "pausedUP") {
         if (row.status !== "completed") statusUpdates.set(row.id, "completed");
       } else if (live.state === "metaDL") {
-        if (row.status !== "downloading") statusUpdates.set(row.id, "downloading");
+        if (row.status !== "downloading")
+          statusUpdates.set(row.id, "downloading");
       }
     } else if (
       row.hash &&
@@ -97,19 +95,22 @@ export async function mergeLiveData(
     }
   }
 
-  const byStatus = new Map<string, string[]>();
+  const byStatus = new Map<Download["status"], string[]>();
   for (const [id, status] of statusUpdates) {
-    if (!byStatus.has(status)) byStatus.set(status, []);
-    byStatus.get(status)!.push(id);
+    const bucket = byStatus.get(status) ?? [];
+    bucket.push(id);
+    byStatus.set(status, bucket);
   }
   for (const [status, ids] of byStatus) {
-    void updateDownloadBatch(db, ids, { status }).catch(deps.logger.logAndSwallow("merge-live-data updateDownloadBatch"));
+    void deps.torrents
+      .updateDownloadBatch(ids, { status })
+      .catch(deps.logger.logAndSwallow("merge-live-data updateDownloadBatch"));
   }
 
   // Update in-memory statuses
   for (const row of dbRows) {
     const newStatus = statusUpdates.get(row.id);
-    if (newStatus) (row as { status: string }).status = newStatus;
+    if (newStatus) (row as { status: Download["status"] }).status = newStatus;
   }
 
   return dbRows.map((row) => {
