@@ -1,7 +1,7 @@
 import type { Database } from "@canto/db/client";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
-import { logAndSwallow } from "@canto/core/platform/logger/log-error";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import { MediaNotFoundError } from "@canto/core/domain/shared/errors";
 import {
   computeTrackingStatus,
@@ -20,6 +20,7 @@ import { pushWatchStateToServers } from "@canto/core/domain/user-media/use-cases
 export interface RemoveHistoryEntriesDeps {
   repo: UserMediaRepositoryPort;
   mediaRepo: MediaRepositoryPort;
+  logger: LoggerPort;
 }
 
 export interface RemoveHistoryEntriesInput {
@@ -79,7 +80,7 @@ export async function removeHistoryEntries(
 
   if (history.length === 0) {
     void pushWatchStateToServers(db, userId, input.mediaId, false).catch(
-      logAndSwallow("userMedia.removeHistoryEntries:pushWatchStateToServers"),
+      deps.logger.logAndSwallow("userMedia.removeHistoryEntries:pushWatchStateToServers"),
     );
   }
 

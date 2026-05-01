@@ -38,6 +38,7 @@ import { enrichmentRegistry } from "@canto/core/domain/media/enrichment/registry
 import { fireSharedCapabilities } from "@canto/core/domain/media/enrichment/fire-call";
 import { topoSortPlanItems } from "@canto/core/domain/media/enrichment/topo-sort";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 import { findMediaById } from "@canto/core/infra/media/media-repository";
 import { makeMediaAspectStateRepository } from "@canto/core/infra/media/media-aspect-state-repository.adapter";
@@ -45,6 +46,7 @@ import { makeMediaContentRatingRepository } from "@canto/core/infra/media/media-
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
 
@@ -65,6 +67,7 @@ export interface EnsureMediaDeps {
   extras: MediaExtrasRepositoryPort;
   tmdb: MediaProviderPort;
   tvdb: MediaProviderPort;
+  logger: LoggerPort;
 }
 
 /**
@@ -207,6 +210,7 @@ async function resolveDeps(
     extras: partial?.extras ?? makeMediaExtrasRepository(db),
     tmdb: partial?.tmdb ?? (await getTmdbProvider()),
     tvdb: partial?.tvdb ?? (await getTvdbProvider()),
+    logger: partial?.logger ?? makeConsoleLogger(),
   };
 }
 

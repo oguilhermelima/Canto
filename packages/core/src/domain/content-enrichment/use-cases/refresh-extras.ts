@@ -6,9 +6,9 @@ import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-disp
 import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import { mapSearchResultToMediaFields } from "@canto/core/domain/content-enrichment/rules/pool-scoring";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
-import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 
 const EN = "en-US";
 
@@ -17,6 +17,7 @@ export interface RefreshExtrasDeps {
   extras: MediaExtrasRepositoryPort;
   localization: MediaLocalizationRepositoryPort;
   media: MediaRepositoryPort;
+  logger: LoggerPort;
   // FIXME(wave-10): make required once domain/media/enrichment/strategies/extras.ts threads dispatcher
   dispatcher?: JobDispatcherPort;
 }
@@ -210,7 +211,7 @@ export async function refreshExtras(
       // fetch so the row is filled in before any user-facing query surfaces
       // it (read paths filter on the metadata aspect having succeeded).
       void deps.dispatcher?.enrichMedia(inserted.id).catch(
-        logAndSwallow("refresh-extras dispatchEnsureMedia"),
+        deps.logger.logAndSwallow("refresh-extras dispatchEnsureMedia"),
       );
     }
   }

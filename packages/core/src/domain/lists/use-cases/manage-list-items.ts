@@ -2,9 +2,9 @@ import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-r
 import type { RecommendationsRepositoryPort } from "@canto/core/domain/recommendations/ports/recommendations-repository.port";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import { verifyListOwnership } from "@canto/core/domain/lists/rules/list-rules";
 import { addMediaToUserRecs } from "@canto/core/domain/recommendations/use-cases/rebuild-user-recs";
-import { logAndSwallow } from "@canto/core/platform/logger/log-error";
 
 /**
  * Cross-context use case. Lists CRUD via `ListsRepositoryPort`,
@@ -15,6 +15,7 @@ export interface ManageListItemsDeps {
   repo: ListsRepositoryPort;
   recs: RecommendationsRepositoryPort;
   userMedia: UserMediaRepositoryPort;
+  logger: LoggerPort;
   // FIXME(wave-10): make required once callers in packages/api wire this port
   dispatcher?: JobDispatcherPort;
 }
@@ -42,16 +43,16 @@ export async function addItemToList(
   });
 
   void deps.recs.removeMediaFromUserRecs(userId, input.mediaId).catch(
-    logAndSwallow("list:addItem removeMediaFromUserRecs"),
+    deps.logger.logAndSwallow("list:addItem removeMediaFromUserRecs"),
   );
   void deps.dispatcher?.enrichMedia(input.mediaId).catch(
-    logAndSwallow("list:addItem dispatchEnsureMedia"),
+    deps.logger.logAndSwallow("list:addItem dispatchEnsureMedia"),
   );
   void addMediaToUserRecs(
     { recs: deps.recs, userMedia: deps.userMedia },
     userId,
     input.mediaId,
-  ).catch(logAndSwallow("list:addItem addMediaToUserRecs"));
+  ).catch(deps.logger.logAndSwallow("list:addItem addMediaToUserRecs"));
 
   return item;
 }
@@ -72,7 +73,7 @@ export async function removeItemFromList(
   await deps.repo.removeItem(input.listId, input.mediaId);
 
   void deps.recs.deleteUserRecommendationsForSource(userId, input.mediaId).catch(
-    logAndSwallow("list:removeItem deleteUserRecommendationsForSource"),
+    deps.logger.logAndSwallow("list:removeItem deleteUserRecommendationsForSource"),
   );
 
   return { success: true };
@@ -96,7 +97,7 @@ export async function removeItemsFromList(
 
   for (const mediaId of input.mediaIds) {
     void deps.recs.deleteUserRecommendationsForSource(userId, mediaId).catch(
-      logAndSwallow("list:removeItems deleteUserRecommendationsForSource"),
+      deps.logger.logAndSwallow("list:removeItems deleteUserRecommendationsForSource"),
     );
   }
 

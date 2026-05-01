@@ -27,6 +27,7 @@ export const extrasStrategy: MediaEnrichmentStrategy<undefined> = {
       extras: ctx.deps.extras,
       localization: ctx.deps.localization,
       media: ctx.deps.media,
+      logger: ctx.deps.logger,
     });
     ctx.result.providerCalls.tmdb += 1;
     ctx.result.aspectsExecuted.push("extras");

@@ -15,6 +15,7 @@ import type { CadenceMediaRow } from "@canto/core/domain/media/use-cases/cadence
 import type { Outcome } from "@canto/core/domain/media/use-cases/cadence/compute-next-eligible";
 import type { MediaMetadata } from "@canto/core/domain/media/use-cases/fetch-media-metadata";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 
 /**
  * Provider-shaped capability tags. The orchestrator coalesces strategies by
@@ -62,6 +63,7 @@ export interface EnrichmentDeps {
   extras: MediaExtrasRepositoryPort;
   tmdb: MediaProviderPort;
   tvdb: MediaProviderPort;
+  logger: LoggerPort;
 }
 
 /**
