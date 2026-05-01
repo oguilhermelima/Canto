@@ -14,6 +14,7 @@ import type { MediaVersionRepositoryPort } from "@canto/core/domain/media-server
 import type { ServerCredentialsPort } from "@canto/core/domain/media-servers/ports/server-credentials.port";
 import type { UserConnectionRepositoryPort } from "@canto/core/domain/media-servers/ports/user-connection-repository.port";
 import type { UserConnection } from "@canto/core/domain/media-servers/types/user-connection";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { MediaServerPort } from "@canto/core/domain/shared/ports/media-server.port";
 
 export interface PushWatchStateDeps {
@@ -24,6 +25,7 @@ export interface PushWatchStateDeps {
   credentials: ServerCredentialsPort;
   jellyfinServer: MediaServerPort;
   plexServer: MediaServerPort;
+  logger?: LoggerPort;
 }
 
 interface MediaWithTitle {
@@ -33,10 +35,15 @@ interface MediaWithTitle {
   type: string;
 }
 
-function logError(scope: string, userId: string, err: unknown): void {
-  console.error(
-    `[push-watch-state] ${scope} failed for user ${userId}:`,
-    err instanceof Error ? err.message : err,
+function logError(
+  deps: PushWatchStateDeps,
+  scope: string,
+  userId: string,
+  err: unknown,
+): void {
+  deps.logger?.error(
+    `[push-watch-state] ${scope} failed for user ${userId}`,
+    { err: err instanceof Error ? err.message : err },
   );
 }
 
@@ -71,14 +78,14 @@ export async function pushWatchStateToServers(
     ...(jellyfinCreds
       ? jellyfinConns.map((conn) =>
           pushJellyfin(deps, jellyfinCreds, conn, mediaId, mediaWithTitle, watched).catch(
-            (err) => logError(`jellyfin ${conn.id}`, userId, err),
+            (err) => logError(deps, `jellyfin ${conn.id}`, userId, err),
           ),
         )
       : []),
     ...(plexCreds
       ? plexConns.map((conn) =>
           pushPlex(deps, plexCreds, conn, mediaId, mediaWithTitle, watched).catch((err) =>
-            logError(`plex ${conn.id}`, userId, err),
+            logError(deps, `plex ${conn.id}`, userId, err),
           ),
         )
       : []),
@@ -95,7 +102,7 @@ async function pushJellyfin(
 ): Promise<void> {
   if (!conn.token) return;
   if (!conn.externalUserId) {
-    console.warn(
+    deps.logger?.warn(
       `[push-watch-state] Jellyfin connection ${conn.id} missing externalUserId, skipping`,
     );
     return;
@@ -117,7 +124,7 @@ async function pushJellyfin(
     },
   );
   if (!itemId) {
-    console.warn(
+    deps.logger?.warn(
       `[push-watch-state] No Jellyfin item found for media ${mediaId} (tmdb ${mediaRow.externalId}) on connection ${conn.id}`,
     );
     return;
@@ -174,7 +181,7 @@ async function pushPlex(
   }
 
   if (!ratingKey) {
-    console.warn(
+    deps.logger?.warn(
       `[push-watch-state] No Plex item found for media ${mediaId} (${mediaRow.provider} ${mediaRow.externalId}) on connection ${conn.id}`,
     );
     return;

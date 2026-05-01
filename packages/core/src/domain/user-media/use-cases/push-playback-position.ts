@@ -24,6 +24,7 @@ import type {
   MediaVersionRow,
 } from "@canto/core/domain/media-servers/types/media-version";
 import type { UserConnection } from "@canto/core/domain/media-servers/types/user-connection";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { MediaServerPort } from "@canto/core/domain/shared/ports/media-server.port";
 import type { ServerSource } from "@canto/core/domain/sync/types";
 
@@ -36,12 +37,18 @@ export interface PushPlaybackPositionDeps {
   credentials: ServerCredentialsPort;
   jellyfinServer: MediaServerPort;
   plexServer: MediaServerPort;
+  logger?: LoggerPort;
 }
 
-function logError(scope: string, userId: string, err: unknown): void {
-  console.error(
-    `[push-playback-position] ${scope} failed for user ${userId}:`,
-    err instanceof Error ? err.message : err,
+function logError(
+  deps: PushPlaybackPositionDeps,
+  scope: string,
+  userId: string,
+  err: unknown,
+): void {
+  deps.logger?.error(
+    `[push-playback-position] ${scope} failed for user ${userId}`,
+    { err: err instanceof Error ? err.message : err },
   );
 }
 
@@ -79,17 +86,18 @@ async function pushOne(
   positionSeconds: number,
   isCompleted: boolean,
   mediaId: string,
+  logger?: LoggerPort,
 ): Promise<void> {
   if (!conn.token) return;
   if (source === "jellyfin" && !conn.externalUserId) {
-    console.warn(
+    logger?.warn(
       `[push-playback-position] Jellyfin connection ${conn.id} missing externalUserId, skipping`,
     );
     return;
   }
   const itemId = resolveServerItemId(versions, source, episodeNumbers);
   if (!itemId) {
-    console.warn(
+    logger?.warn(
       `[push-playback-position] No ${source} item resolved for media ${mediaId}${
         episodeNumbers
           ? ` S${episodeNumbers.seasonNumber}E${episodeNumbers.episodeNumber}`
@@ -126,7 +134,7 @@ export async function pushPlaybackPositionToServers(
   if (episodeId) {
     episodeNumbers = await deps.media.findEpisodeNumbersById(episodeId);
     if (!episodeNumbers) {
-      console.warn(
+      deps.logger?.warn(
         `[push-playback-position] Could not resolve episode numbers for ${episodeId}`,
       );
       return;
@@ -158,7 +166,8 @@ export async function pushPlaybackPositionToServers(
             positionSeconds,
             isCompleted,
             mediaId,
-          ).catch((err) => logError(`jellyfin ${conn.id}`, userId, err)),
+            deps.logger,
+          ).catch((err) => logError(deps, `jellyfin ${conn.id}`, userId, err)),
         )
       : []),
     ...(plexCreds
@@ -173,7 +182,8 @@ export async function pushPlaybackPositionToServers(
             positionSeconds,
             isCompleted,
             mediaId,
-          ).catch((err) => logError(`plex ${conn.id}`, userId, err)),
+            deps.logger,
+          ).catch((err) => logError(deps, `plex ${conn.id}`, userId, err)),
         )
       : []),
   ]);
