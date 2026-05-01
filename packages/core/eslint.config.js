@@ -159,4 +159,13 @@ export default [
       // see the smell without the build collapsing on inherited debt.
     },
   },
+  {
+    files: ["src/domain/content-enrichment/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "error",
+      "@typescript-eslint/no-non-null-assertion": "error",
+      "@typescript-eslint/prefer-nullish-coalescing": "error",
+      eqeqeq: ["error", "always"],
+    },
+  },
 ];
