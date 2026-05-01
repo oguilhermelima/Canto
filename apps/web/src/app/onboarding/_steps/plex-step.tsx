@@ -61,6 +61,7 @@ export function PlexStep({
     if (!data) return;
 
     if (data.authenticated && data.token) {
+      const token = data.token;
       setPolling(false);
       setPinData(null);
       void (async () => {
@@ -68,7 +69,7 @@ export function PlexStep({
           const toSave: Array<{ key: string; value: unknown }> = [
             { key: "plex.url", value: url },
             { key: "plex.enabled", value: true },
-            { key: "plex.token", value: data.token! },
+            { key: "plex.token", value: token },
           ];
           if (data.machineId) toSave.push({ key: "plex.machineId", value: data.machineId });
           await saveSettings.mutateAsync({ settings: toSave as never });

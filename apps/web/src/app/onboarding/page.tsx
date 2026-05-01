@@ -94,7 +94,7 @@ export default function OnboardingPage(): React.JSX.Element {
     if (currentStep > steps.length - 1) setCurrentStep(steps.length - 1);
   }, [steps.length, currentStep]);
 
-  const step = steps[Math.min(currentStep, steps.length - 1)]!;
+  const step = steps[Math.min(currentStep, steps.length - 1)] ?? "welcome";
 
   useEffect(() => {
     if (isCompleted === true) router.replace("/");
