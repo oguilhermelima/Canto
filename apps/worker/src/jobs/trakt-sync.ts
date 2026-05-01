@@ -14,6 +14,7 @@ import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
+import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
 import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
 
 async function buildSectionDeps(): Promise<RunTraktSectionDeps> {
@@ -25,6 +26,7 @@ async function buildSectionDeps(): Promise<RunTraktSectionDeps> {
     userConnection: makeUserConnectionRepository(db),
     userMedia: makeUserMediaRepository(db),
     lists: makeListsRepository(db),
+    logger: makeConsoleLogger(),
     media: makeMediaRepository(db),
     providers: { tmdb, tvdb },
   };

@@ -1,4 +1,5 @@
 import type { Database } from "@canto/db/client";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
 import type { TraktApiPort } from "@canto/core/domain/trakt/ports/trakt-api.port";
 import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-repository.port";
@@ -192,6 +193,7 @@ export interface ResolveMediaDeps {
 
 export interface SyncListMembershipDeps extends ResolveMediaDeps {
   lists: ListsRepositoryPort;
+  logger: LoggerPort;
 }
 
 export async function resolveMediaFromTraktRef(
@@ -397,19 +399,23 @@ export async function loadLocalListRefs(
  *  every sync-driven mutation after the fact — the missing tool that made
  *  the recent data-loss incident impossible to forensically investigate. */
 function logSyncDecision(
+  logger: LoggerPort,
   listId: string,
   decision: ReconcileAction,
   ctx: { local: LocalMediaRef | null; remote: TraktMediaRef | null; now: Date },
 ): void {
   if (decision.kind === "noop" || decision.kind === "wait") return;
-  const localPart = ctx.local
-    ? `local.mediaId=${ctx.local.mediaId} local.lastPushedAt=${ctx.local.lastPushedAt?.toISOString() ?? "null"}`
-    : "local=null";
-  const remotePart = ctx.remote
-    ? `remote.listedAt=${ctx.remote.listedAt}`
-    : "remote=null";
-  console.log(
-    `[trakt-sync] list=${listId} action=${decision.kind} reason=${decision.reason} ${localPart} ${remotePart} now=${ctx.now.toISOString()}`,
+  logger.info?.(
+    `[trakt-sync] reconcile decision`,
+    {
+      listId,
+      action: decision.kind,
+      reason: decision.reason,
+      localMediaId: ctx.local?.mediaId ?? null,
+      localLastPushedAt: ctx.local?.lastPushedAt?.toISOString() ?? null,
+      remoteListedAt: ctx.remote?.listedAt ?? null,
+      now: ctx.now.toISOString(),
+    },
   );
 }
 
@@ -478,7 +484,11 @@ export async function syncSingleListMembership(
       initialSync: ctx.initialSync,
     });
 
-    logSyncDecision(localListId, decision, { local, remote, now: ctx.now });
+    logSyncDecision(deps.logger, localListId, decision, {
+      local,
+      remote,
+      now: ctx.now,
+    });
 
     switch (decision.kind) {
       case "noop":

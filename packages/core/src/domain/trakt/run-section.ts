@@ -18,6 +18,7 @@ import type { TraktRepositoryPort } from "@canto/core/domain/trakt/ports/trakt-r
 import type { UserConnectionRepositoryPort } from "@canto/core/domain/media-servers/ports/user-connection-repository.port";
 import type { UserMediaRepositoryPort } from "@canto/core/domain/user-media/ports/user-media-repository.port";
 import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
+import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import type { TraktSection } from "@canto/core/domain/trakt/types/trakt-section";
@@ -44,6 +45,7 @@ export interface RunTraktSectionDeps {
   userConnection: UserConnectionRepositoryPort;
   userMedia: UserMediaRepositoryPort;
   lists: ListsRepositoryPort;
+  logger: LoggerPort;
   media: MediaRepositoryPort;
   providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort };
 }
