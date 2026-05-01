@@ -15,9 +15,12 @@ import {
 import type { NormalizedMedia, NormalizedSeason } from "@canto/providers";
 
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
-import { persistSeasons } from "@canto/core/domain/media/use-cases/persist/core";
+import {
+  persistSeasons,
+  type PersistDeps,
+} from "@canto/core/domain/media/use-cases/persist/core";
 
-interface TvdbOverlayDeps {
+interface TvdbOverlayDeps extends Pick<PersistDeps, "media"> {
   localization: MediaLocalizationRepositoryPort;
 }
 
@@ -298,7 +301,11 @@ export async function applyTvdbSeasons(
 
   await db.transaction(async (tx) => {
     await tx.delete(season).where(eq(season.mediaId, mediaId));
-    await persistSeasons(tx as unknown as Database, mediaId, {
+    // persistSeasons goes through deps.media; the surrounding transaction
+    // is enforced by the underlying connection. Future work: thread `tx`
+    // into a tx-scoped MediaRepositoryPort instance once the port supports
+    // explicit transaction boundaries.
+    await persistSeasons(deps, mediaId, {
       ...normalized,
       type: "show",
       seasons: tvdbSeasons,

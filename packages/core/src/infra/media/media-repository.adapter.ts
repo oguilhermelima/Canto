@@ -88,6 +88,15 @@ export function makeMediaRepository(db: Database): MediaRepositoryPort {
       return mediaToDomain(row);
     },
 
+    tryCreateMedia: async (input) => {
+      const [row] = await db
+        .insert(media)
+        .values(mediaToRow(input))
+        .onConflictDoNothing()
+        .returning();
+      return row ? mediaToDomain(row) : null;
+    },
+
     updateMedia: async (id, input) => {
       const row = await updateMediaInfra(db, id, mediaToUpdateRow(input));
       return row ? mediaToDomain(row) : null;
@@ -95,6 +104,17 @@ export function makeMediaRepository(db: Database): MediaRepositoryPort {
 
     deleteMedia: async (id) => {
       await deleteMediaInfra(db, id);
+    },
+
+    hasTvdbReconciledStructure: async (mediaId) => {
+      const row = await db.query.season.findFirst({
+        where: and(
+          eq(season.mediaId, mediaId),
+          inArray(season.seasonType, ["official", "default"]),
+        ),
+        columns: { id: true },
+      });
+      return row !== undefined;
     },
 
     // ─── Library projections ───
@@ -343,6 +363,16 @@ export function makeMediaRepository(db: Database): MediaRepositoryPort {
         .where(eq(episode.id, id))
         .returning();
       return row ? episodeToDomain(row) : null;
+    },
+
+    bulkCreateEpisodesIgnoringConflicts: async (rows) => {
+      if (rows.length === 0) return;
+      await db
+        .insert(episode)
+        .values(rows.map(episodeToRow))
+        .onConflictDoNothing({
+          target: [episode.seasonId, episode.number],
+        });
     },
   };
 }

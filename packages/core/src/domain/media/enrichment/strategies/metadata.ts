@@ -27,9 +27,7 @@ export const metadataStrategy: MediaEnrichmentStrategy<
     const { db, mediaId, ctx, response } = args;
     if (!response) return "error_5xx";
 
-    await updateMediaFromNormalized(db, mediaId, response.media, {
-      deps: ctx.deps,
-    });
+    await updateMediaFromNormalized(db, mediaId, response.media, ctx.deps);
     ctx.result.writes.media = true;
     ctx.result.aspectsExecuted.push("metadata");
     return "data";

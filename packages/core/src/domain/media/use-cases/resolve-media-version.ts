@@ -9,15 +9,17 @@
 
 import type { Database } from "@canto/db/client";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
+import type { MediaVersionRepositoryPort } from "@canto/core/domain/media-servers/ports/media-version-repository.port";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import type { MediaVersionRow } from "@canto/core/domain/media-servers/types/media-version";
 import { persistMedia } from "@canto/core/domain/media/use-cases/persist";
+import type { PersistDeps } from "@canto/core/domain/media/use-cases/persist/core";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 import {
-  findMediaVersionById,
-  findMediaVersionsByMediaId,
-  updateMediaVersion,
-} from "@canto/core/infra/media/media-version-repository";
-import { findMediaLocalized } from "@canto/core/infra/media/media-localized-repository";
+  EmptyVersionListError,
+  MediaVersionNotFoundError,
+} from "@canto/core/domain/media/errors";
 
 export type ResolveMediaVersionInput =
   | { versionId: string; tmdbId: number; type: "movie" | "show" }
@@ -38,8 +40,10 @@ export interface ResolutionResult {
   orphanedMediaDeleted: number;
 }
 
-export interface ResolveMediaVersionDeps {
+export interface ResolveMediaVersionDeps extends PersistDeps {
   media: MediaRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
+  mediaVersion: MediaVersionRepositoryPort;
 }
 
 /**
@@ -53,7 +57,9 @@ export async function resolveMediaVersionPreview(
   input: ResolveMediaVersionInput,
   tmdb: MediaProviderPort,
 ): Promise<ResolutionPreview> {
-  return (await resolveMediaVersion(db, deps, input, tmdb, { dryRun: true })) as ResolutionPreview;
+  return (await resolveMediaVersion(db, deps, input, tmdb, {
+    dryRun: true,
+  })) as ResolutionPreview;
 }
 
 /**
@@ -63,12 +69,6 @@ export async function resolveMediaVersionPreview(
  * orphaned.
  *
  * In `dryRun` mode no mutations are performed — returns a ResolutionPreview.
- *
- * Note: `media_version` reads/writes still go through the legacy infra
- * repo (`media-version-repository`) — those are Wave 8 territory and were
- * partially ported on the torrents port. A future cross-context
- * coordination point will fold version updates into a higher-level use
- * case; until then this use case touches both ports' tables directly.
  */
 export async function resolveMediaVersion(
   db: Database,
@@ -79,8 +79,8 @@ export async function resolveMediaVersion(
 ): Promise<ResolutionResult | ResolutionPreview> {
   const dryRun = opts.dryRun === true;
 
-  const versions = await loadTargetVersions(db, input);
-  if (versions.length === 0) throw new Error("No versions to resolve");
+  const versions = await loadTargetVersions(deps.mediaVersion, input);
+  if (versions.length === 0) throw new EmptyVersionListError();
 
   const oldMediaIds = new Set<string>();
   for (const v of versions) if (v.mediaId) oldMediaIds.add(v.mediaId);
@@ -93,11 +93,13 @@ export async function resolveMediaVersion(
 
   if (existingTarget) {
     targetMediaId = existingTarget.id;
-    const targetLoc = await findMediaLocalized(db, existingTarget.id, "en-US");
+    const targetLoc = await deps.localization.findLocalizedById(
+      existingTarget.id,
+      "en-US",
+    );
     targetTitle = targetLoc?.title ?? "";
     targetYear = existingTarget.year ?? null;
   } else {
-    // Pull metadata upfront so dryRun can surface an accurate preview.
     const supportedLangs = [...(await getActiveUserLanguages(db))];
     const normalized = await tmdb.getMetadata(input.tmdbId, input.type, {
       supportedLanguages: supportedLangs,
@@ -108,8 +110,9 @@ export async function resolveMediaVersion(
     if (dryRun) {
       targetMediaId = "(new)";
     } else {
-      const inserted = await persistMedia(db, normalized);
-      const firstPath = versions.find((v) => v.serverItemPath)?.serverItemPath ?? null;
+      const inserted = await persistMedia(db, normalized, deps);
+      const firstPath =
+        versions.find((v) => v.serverItemPath)?.serverItemPath ?? null;
       const mediaUpdates: Record<string, unknown> = {
         inLibrary: true,
         downloaded: true,
@@ -126,27 +129,33 @@ export async function resolveMediaVersion(
   // mediaId input the answer is trivially "all of them" since every
   // version is being moved.
   const versionIds = new Set(versions.map((v) => v.id));
-  const orphanedMedia: Array<{ id: string; title: string; year: number | null }> = [];
+  const orphanedMedia: Array<{
+    id: string;
+    title: string;
+    year: number | null;
+  }> = [];
 
   for (const oldId of oldMediaIds) {
     if (oldId === targetMediaId) continue;
 
-    // Count versions that would still point to oldId after the move:
-    // fetch current versions, subtract the ones we're repointing.
-    const current = await findMediaVersionsByMediaId(db, oldId);
+    const current = await deps.mediaVersion.findByMediaId(oldId);
     const remaining = current.filter((v) => !versionIds.has(v.id));
     if (remaining.length > 0) continue;
 
-    // Still need to check torrents via isMediaOrphaned — pass a sentinel
-    // exclude so the version-count side of the check matches our logic.
-    // Since `remaining` is already 0 we just need the torrent check:
     const orphaned = await deps.media.isMediaOrphaned(oldId, versions[0]?.id);
     if (!orphaned) continue;
 
     const row = await deps.media.findById(oldId);
     if (row) {
-      const orphanLoc = await findMediaLocalized(db, row.id, "en-US");
-      orphanedMedia.push({ id: row.id, title: orphanLoc?.title ?? "", year: row.year ?? null });
+      const orphanLoc = await deps.localization.findLocalizedById(
+        row.id,
+        "en-US",
+      );
+      orphanedMedia.push({
+        id: row.id,
+        title: orphanLoc?.title ?? "",
+        year: row.year ?? null,
+      });
     }
   }
 
@@ -160,9 +169,8 @@ export async function resolveMediaVersion(
     };
   }
 
-  // Commit phase: update each version row.
   for (const v of versions) {
-    await updateMediaVersion(db, v.id, {
+    await deps.mediaVersion.update(v.id, {
       mediaId: targetMediaId,
       tmdbId: input.tmdbId,
       result: "imported",
@@ -170,7 +178,6 @@ export async function resolveMediaVersion(
     });
   }
 
-  // GC old media rows that are now orphaned.
   let orphanedDeleted = 0;
   for (const oldId of oldMediaIds) {
     if (oldId === targetMediaId) continue;
@@ -178,7 +185,9 @@ export async function resolveMediaVersion(
     if (stillOrphaned) {
       await deps.media.deleteMedia(oldId);
       orphanedDeleted++;
-      console.log(`[resolve-media-version] Deleted orphaned media ${oldId}`);
+      deps.logger.info?.(
+        `[resolve-media-version] Deleted orphaned media ${oldId}`,
+      );
     }
   }
 
@@ -190,11 +199,14 @@ export async function resolveMediaVersion(
   };
 }
 
-async function loadTargetVersions(db: Database, input: ResolveMediaVersionInput) {
+async function loadTargetVersions(
+  mediaVersion: MediaVersionRepositoryPort,
+  input: ResolveMediaVersionInput,
+): Promise<MediaVersionRow[]> {
   if ("versionId" in input) {
-    const row = await findMediaVersionById(db, input.versionId);
-    if (!row) throw new Error("Media version not found");
+    const row = await mediaVersion.findById(input.versionId);
+    if (!row) throw new MediaVersionNotFoundError();
     return [row];
   }
-  return findMediaVersionsByMediaId(db, input.mediaId);
+  return mediaVersion.findByMediaId(input.mediaId);
 }

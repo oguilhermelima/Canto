@@ -13,6 +13,7 @@ import type {
 } from "@canto/core/domain/trakt/types/trakt-api";
 import { slugify } from "@canto/core/domain/shared/rules/slugify";
 import { persistMediaUseCase } from "@canto/core/domain/media/use-cases/persist";
+import type { PersistDeps } from "@canto/core/domain/media/use-cases/persist/core";
 
 /**
  * @deprecated Used only by the legacy `decidePresenceAction` path that still
@@ -189,6 +190,7 @@ export function toTraktRatingsBody(
 export interface ResolveMediaDeps {
   media: MediaRepositoryPort;
   providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort };
+  persist: PersistDeps;
 }
 
 export interface SyncListMembershipDeps extends ResolveMediaDeps {
@@ -229,6 +231,7 @@ export async function resolveMediaFromTraktRef(
           type: ref.type,
         },
         deps.providers,
+        deps.persist,
       );
       if (persisted?.id) {
         cache.set(key, persisted.id);
@@ -252,6 +255,7 @@ export async function resolveMediaFromTraktRef(
           type: ref.type,
         },
         deps.providers,
+        deps.persist,
       );
       if (persisted?.id) {
         cache.set(key, persisted.id);

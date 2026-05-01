@@ -8,6 +8,9 @@ import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
 import type { MediaAspectStateRepositoryPort } from "@canto/core/domain/media/ports/media-aspect-state-repository.port";
+import type { MediaContentRatingRepositoryPort } from "@canto/core/domain/media/ports/media-content-rating-repository.port";
+import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
+import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import { persistMedia } from "@canto/core/domain/media/use-cases/persist";
 import { runWithConcurrency } from "@canto/core/domain/shared/services/run-with-concurrency";
@@ -78,6 +81,9 @@ export interface ScanFolderForMediaDeps {
   media: MediaRepositoryPort;
   aspectState: MediaAspectStateRepositoryPort;
   lists: ListsRepositoryPort;
+  localization: MediaLocalizationRepositoryPort;
+  contentRating: MediaContentRatingRepositoryPort;
+  extras: MediaExtrasRepositoryPort;
 }
 
 export async function scanFolderForMedia(
@@ -211,7 +217,7 @@ export async function scanFolderForMedia(
         const normalized = await deps.tmdb.getMetadata(tmdbId, resolvedType, {
           supportedLanguages: supportedLangs,
         });
-        const inserted = await persistMedia(db, normalized);
+        const inserted = await persistMedia(db, normalized, deps);
         await deps.media.updateMedia(inserted.id, {
           inLibrary: true,
           downloaded: true,

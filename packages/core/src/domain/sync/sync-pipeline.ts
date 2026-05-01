@@ -13,6 +13,7 @@ import { getSetting, setSettingRaw } from "@canto/db/settings";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import type { PersistDeps } from "@canto/core/domain/media/use-cases/persist/core";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
 
 import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-repository.port";
@@ -88,6 +89,7 @@ export interface RunSyncPipelineDeps {
   lists: ListsRepositoryPort;
   userMedia: UserMediaRepositoryPort;
   credentials: ServerCredentialsPort;
+  persist: PersistDeps;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -264,7 +266,9 @@ async function ensureMediaAnchor(
       supportedLanguages: supportedLangs as string[],
     }),
   );
-  const inserted = await persistMedia(db, normalized, { crossRefLookup: tvdbEnabled });
+  const inserted = await persistMedia(db, normalized, deps.persist, {
+    crossRefLookup: tvdbEnabled,
+  });
   const mediaUpdates: UpdateMediaInput = {
     inLibrary: true,
     downloaded: true,
@@ -440,6 +444,7 @@ export async function runSyncPipeline(
           syncRunStart,
           summary,
           opts,
+          persist: deps.persist,
         });
         summary.processed++;
         await persistStatus(tag, summary);
@@ -492,6 +497,7 @@ interface ProcessCtx {
   syncRunStart: Date;
   summary: SyncSummary;
   opts: SyncPipelineOptions;
+  persist: PersistDeps;
 }
 
 async function processOne(

@@ -1,10 +1,8 @@
-import { and, eq, inArray, or, sql } from "drizzle-orm";
-
 import type { Database } from "@canto/db/client";
-import { episode, media, season } from "@canto/db/schema";
 import type { MediaType, NormalizedMedia, ProviderName } from "@canto/providers";
 import { getSetting } from "@canto/db/settings";
 
+import type { Media } from "@canto/core/domain/media/types/media";
 import type { MediaAspectStateRepositoryPort } from "@canto/core/domain/media/ports/media-aspect-state-repository.port";
 import type { MediaContentRatingRepositoryPort } from "@canto/core/domain/media/ports/media-content-rating-repository.port";
 import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
@@ -19,15 +17,19 @@ import {
 } from "@canto/core/domain/media/use-cases/cadence/aspect-state-writer";
 import { detectGaps } from "@canto/core/domain/media/use-cases/detect-gaps";
 import {
-  fetchMediaMetadata
-  
+  fetchMediaMetadata,
 } from "@canto/core/domain/media/use-cases/fetch-media-metadata";
-import type {MediaMetadata} from "@canto/core/domain/media/use-cases/fetch-media-metadata";
+import type { MediaMetadata } from "@canto/core/domain/media/use-cases/fetch-media-metadata";
 import { persistContentRatings } from "@canto/core/domain/media/use-cases/persist/content-ratings";
 import { persistExtras } from "@canto/core/domain/media/use-cases/persist/extras";
 import { persistTranslations } from "@canto/core/domain/media/use-cases/persist/translations";
 import { applyTvdbSeasons } from "@canto/core/domain/media/use-cases/persist/tvdb-overlay";
 import { loadExtrasFromDB } from "@canto/core/domain/media/services/extras-service";
+import {
+  MediaInsertConflictError,
+  MediaPostInsertNotFoundError,
+  MediaUpdateFailedError,
+} from "@canto/core/domain/media/errors";
 import { applyMediaContentRating } from "@canto/core/domain/shared/services/content-rating-service";
 import {
   getActiveUserLanguages,
@@ -35,19 +37,6 @@ import {
 } from "@canto/core/domain/shared/services/user-service";
 import { normalizedMediaToResponse } from "@canto/core/domain/shared/mappers/media-mapper";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
-import { makeMediaAspectStateRepository } from "@canto/core/infra/media/media-aspect-state-repository.adapter";
-import { makeMediaContentRatingRepository } from "@canto/core/infra/media/media-content-rating-repository.adapter";
-import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
-import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
-import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
-import { findAspectSucceededAt } from "@canto/core/infra/media/media-aspect-state-repository";
-import {
-  findMediaByAnyReference,
-  findMediaByExternalId,
-  findMediaByIdWithSeasons,
-} from "@canto/core/infra/media/media-repository";
-import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
-import { jobDispatcher } from "@canto/core/platform/queue/job-dispatcher.adapter";
 import {
   applyMediaLocalizationOverlay,
   applySeasonsLocalizationOverlay,
@@ -69,24 +58,6 @@ export interface PersistDeps {
   extras: MediaExtrasRepositoryPort;
   logger: LoggerPort;
   dispatcher: JobDispatcherPort;
-}
-
-function withFallback(
-  db: Database,
-  partial: Partial<PersistDeps> | undefined,
-): PersistDeps {
-  return {
-    media: partial?.media ?? makeMediaRepository(db),
-    localization:
-      partial?.localization ?? makeMediaLocalizationRepository(db),
-    aspectState:
-      partial?.aspectState ?? makeMediaAspectStateRepository(db),
-    contentRating:
-      partial?.contentRating ?? makeMediaContentRatingRepository(db),
-    extras: partial?.extras ?? makeMediaExtrasRepository(db),
-    logger: partial?.logger ?? makeConsoleLogger(),
-    dispatcher: partial?.dispatcher ?? jobDispatcher,
-  };
 }
 
 /**
@@ -117,83 +88,41 @@ async function detectAndEnqueueLazyFill(
 export async function persistMedia(
   db: Database,
   normalized: NormalizedMedia,
-  opts?: { crossRefLookup?: boolean; deps?: Partial<PersistDeps> },
-): Promise<typeof media.$inferSelect> {
-  const deps = withFallback(db, opts?.deps);
-
-  const conditions = [
-    and(eq(media.externalId, normalized.externalId), eq(media.provider, normalized.provider), eq(media.type, normalized.type)),
-  ];
-
-  if (normalized.imdbId) conditions.push(eq(media.imdbId, normalized.imdbId));
-
-  if (opts?.crossRefLookup && normalized.tvdbId) {
-    conditions.push(eq(media.tvdbId, normalized.tvdbId));
-  }
-
-  const existing = await db.query.media.findFirst({
-    where: or(...conditions),
-  });
+  deps: PersistDeps,
+  opts?: { crossRefLookup?: boolean },
+): Promise<Media> {
+  const existing = await deps.media.findByAnyReference(
+    normalized.externalId,
+    normalized.provider,
+    normalized.imdbId ?? undefined,
+    opts?.crossRefLookup ? (normalized.tvdbId ?? undefined) : undefined,
+    normalized.type,
+  );
 
   if (existing) {
     if (existing.provider !== normalized.provider) {
       if (normalized.imdbId && !existing.imdbId) {
-        await db.update(media).set({ imdbId: normalized.imdbId }).where(eq(media.id, existing.id));
+        await deps.media.updateMedia(existing.id, {
+          imdbId: normalized.imdbId,
+        });
       }
       return existing;
     }
-    return updateMediaFromNormalized(db, existing.id, normalized, { deps });
+    return updateMediaFromNormalized(db, existing.id, normalized, deps);
   }
 
-  const [inserted] = await db
-    .insert(media)
-    .values({
-      type: normalized.type,
-      externalId: normalized.externalId,
-      provider: normalized.provider,
-      originalTitle: normalized.originalTitle,
-      releaseDate: normalized.releaseDate || null,
-      year: normalized.year,
-      lastAirDate: normalized.lastAirDate || null,
-      status: normalized.status,
-      genres: normalized.genres,
-      genreIds: normalized.genreIds ?? [],
-      contentRating: normalized.contentRating,
-      originalLanguage: normalized.originalLanguage,
-      spokenLanguages: normalized.spokenLanguages,
-      originCountry: normalized.originCountry,
-      voteAverage: normalized.voteAverage,
-      voteCount: normalized.voteCount,
-      popularity: normalized.popularity,
-      runtime: normalized.runtime,
-      backdropPath: normalized.backdropPath,
-      imdbId: normalized.imdbId,
-      tvdbId: normalized.tvdbId,
-      numberOfSeasons: normalized.numberOfSeasons,
-      numberOfEpisodes: normalized.numberOfEpisodes,
-      inProduction: normalized.inProduction,
-      nextAirDate: normalized.nextAirDate || null,
-      airsTime: normalized.airsTime ?? null,
-      networks: normalized.networks,
-      budget: normalized.budget,
-      revenue: normalized.revenue,
-      collection: normalized.collection,
-      productionCompanies: normalized.productionCompanies,
-      productionCountries: normalized.productionCountries,
-    })
-    .onConflictDoNothing()
-    .returning();
+  const inserted = await deps.media.tryCreateMedia(buildMediaInsert(normalized));
 
   if (!inserted) {
-    const conflict = await db.query.media.findFirst({
-      where: and(
-        eq(media.externalId, normalized.externalId),
-        eq(media.provider, normalized.provider),
-        eq(media.type, normalized.type),
-      ),
-    });
-    if (conflict) return updateMediaFromNormalized(db, conflict.id, normalized, { deps });
-    throw new Error("Failed to insert media — conflict without existing row");
+    const conflict = await deps.media.findByExternalId(
+      normalized.externalId,
+      normalized.provider,
+      normalized.type,
+    );
+    if (conflict) {
+      return updateMediaFromNormalized(db, conflict.id, normalized, deps);
+    }
+    throw new MediaInsertConflictError();
   }
 
   // Persist en-US localization. After Phase 1C-δ this is the only home for
@@ -212,8 +141,10 @@ export async function persistMedia(
     "original",
   );
 
-  await persistSeasons(db, inserted.id, normalized);
-  await persistTranslations(db, inserted.id, normalized, { localization: deps.localization });
+  await persistSeasons(deps, inserted.id, normalized);
+  await persistTranslations(db, inserted.id, normalized, {
+    localization: deps.localization,
+  });
   await persistContentRatings(inserted.id, normalized, { deps });
   return inserted;
 }
@@ -226,64 +157,21 @@ export async function updateMediaFromNormalized(
   db: Database,
   mediaId: string,
   normalized: NormalizedMedia,
-  opts?: { deps?: Partial<PersistDeps> },
-): Promise<typeof media.$inferSelect> {
-  const deps = withFallback(db, opts?.deps);
-
+  deps: PersistDeps,
+): Promise<Media> {
   // TVDB seasons can have seasonType "official" or "default" depending on the show.
   // When present, preserve numberOfSeasons/numberOfEpisodes (managed by applyTvdbSeasons).
-  const hasTvdbSeasons = normalized.type === "show"
-    ? await db.query.season.findFirst({
-        where: and(
-          eq(season.mediaId, mediaId),
-          inArray(season.seasonType, ["official", "default"]),
-        ),
-        columns: { id: true },
-      })
-    : null;
+  const hasTvdbSeasons =
+    normalized.type === "show"
+      ? await deps.media.hasTvdbReconciledStructure(mediaId)
+      : false;
 
-  const [updated] = await db
-    .update(media)
-    .set({
-      externalId: normalized.externalId,
-      provider: normalized.provider,
-      originalTitle: normalized.originalTitle,
-      releaseDate: normalized.releaseDate || null,
-      year: normalized.year,
-      lastAirDate: normalized.lastAirDate || null,
-      status: normalized.status,
-      genres: normalized.genres,
-      genreIds: normalized.genreIds ?? [],
-      contentRating: normalized.contentRating,
-      originalLanguage: normalized.originalLanguage,
-      spokenLanguages: normalized.spokenLanguages,
-      originCountry: normalized.originCountry,
-      voteAverage: normalized.voteAverage,
-      voteCount: normalized.voteCount,
-      popularity: normalized.popularity,
-      runtime: normalized.runtime,
-      backdropPath: normalized.backdropPath,
-      imdbId: normalized.imdbId,
-      tvdbId: normalized.tvdbId,
-      ...(hasTvdbSeasons ? {} : {
-        numberOfSeasons: normalized.numberOfSeasons,
-        numberOfEpisodes: normalized.numberOfEpisodes,
-      }),
-      inProduction: normalized.inProduction,
-      nextAirDate: normalized.nextAirDate || null,
-      airsTime: normalized.airsTime ?? null,
-      networks: normalized.networks,
-      budget: normalized.budget,
-      revenue: normalized.revenue,
-      collection: normalized.collection,
-      productionCompanies: normalized.productionCompanies,
-      productionCountries: normalized.productionCountries,
-      updatedAt: new Date(),
-    })
-    .where(eq(media.id, mediaId))
-    .returning();
+  const updated = await deps.media.updateMedia(
+    mediaId,
+    buildMediaUpdate(normalized, hasTvdbSeasons),
+  );
 
-  if (!updated) throw new Error("Failed to update media");
+  if (!updated) throw new MediaUpdateFailedError();
 
   // Persist en-US localization. After Phase 1C-δ this is the only home for
   // per-language title/overview/tagline/posterPath/logoPath — base media row
@@ -304,64 +192,138 @@ export async function updateMediaFromNormalized(
   // Skip season upsert if TVDB-reconciled to avoid re-adding TMDB's flat structure
   // on top of TVDB's granular arcs.
   if (normalized.type === "show" && normalized.seasons && !hasTvdbSeasons) {
-    await upsertSeasons(db, mediaId, normalized);
+    await upsertSeasons(deps, mediaId, normalized);
   }
 
-  await persistTranslations(db, mediaId, normalized, { localization: deps.localization });
+  await persistTranslations(db, mediaId, normalized, {
+    localization: deps.localization,
+  });
   await persistContentRatings(mediaId, normalized, { deps });
 
   return updated;
 }
 
+function buildMediaInsert(normalized: NormalizedMedia) {
+  return {
+    type: normalized.type,
+    externalId: normalized.externalId,
+    provider: normalized.provider,
+    originalTitle: normalized.originalTitle,
+    releaseDate: normalized.releaseDate || null,
+    year: normalized.year,
+    lastAirDate: normalized.lastAirDate || null,
+    status: normalized.status,
+    genres: normalized.genres,
+    genreIds: normalized.genreIds ?? [],
+    contentRating: normalized.contentRating,
+    originalLanguage: normalized.originalLanguage,
+    spokenLanguages: normalized.spokenLanguages,
+    originCountry: normalized.originCountry,
+    voteAverage: normalized.voteAverage,
+    voteCount: normalized.voteCount,
+    popularity: normalized.popularity,
+    runtime: normalized.runtime,
+    backdropPath: normalized.backdropPath,
+    imdbId: normalized.imdbId,
+    tvdbId: normalized.tvdbId,
+    numberOfSeasons: normalized.numberOfSeasons,
+    numberOfEpisodes: normalized.numberOfEpisodes,
+    inProduction: normalized.inProduction,
+    nextAirDate: normalized.nextAirDate || null,
+    airsTime: normalized.airsTime ?? null,
+    networks: normalized.networks,
+    budget: normalized.budget,
+    revenue: normalized.revenue,
+    collection: normalized.collection,
+    productionCompanies: normalized.productionCompanies,
+    productionCountries: normalized.productionCountries,
+  };
+}
+
+function buildMediaUpdate(
+  normalized: NormalizedMedia,
+  hasTvdbSeasons: boolean,
+) {
+  return {
+    externalId: normalized.externalId,
+    provider: normalized.provider,
+    originalTitle: normalized.originalTitle,
+    releaseDate: normalized.releaseDate || null,
+    year: normalized.year,
+    lastAirDate: normalized.lastAirDate || null,
+    status: normalized.status,
+    genres: normalized.genres,
+    genreIds: normalized.genreIds ?? [],
+    contentRating: normalized.contentRating,
+    originalLanguage: normalized.originalLanguage,
+    spokenLanguages: normalized.spokenLanguages,
+    originCountry: normalized.originCountry,
+    voteAverage: normalized.voteAverage,
+    voteCount: normalized.voteCount,
+    popularity: normalized.popularity,
+    runtime: normalized.runtime,
+    backdropPath: normalized.backdropPath,
+    imdbId: normalized.imdbId,
+    tvdbId: normalized.tvdbId,
+    ...(hasTvdbSeasons
+      ? {}
+      : {
+          numberOfSeasons: normalized.numberOfSeasons,
+          numberOfEpisodes: normalized.numberOfEpisodes,
+        }),
+    inProduction: normalized.inProduction,
+    nextAirDate: normalized.nextAirDate || null,
+    airsTime: normalized.airsTime ?? null,
+    networks: normalized.networks,
+    budget: normalized.budget,
+    revenue: normalized.revenue,
+    collection: normalized.collection,
+    productionCompanies: normalized.productionCompanies,
+    productionCountries: normalized.productionCountries,
+  };
+}
+
 export async function persistSeasons(
-  db: Database,
+  deps: Pick<PersistDeps, "media">,
   mediaId: string,
   normalized: NormalizedMedia,
 ): Promise<void> {
   if (normalized.type !== "show" || !normalized.seasons) return;
 
   for (const s of normalized.seasons) {
-    const [insertedSeason] = await db
-      .insert(season)
-      .values({
-        mediaId,
-        number: s.number,
-        externalId: s.externalId,
-        name: s.name,
-        overview: s.overview,
-        airDate: s.airDate || null,
-        posterPath: s.posterPath,
-        episodeCount: s.episodeCount,
-        seasonType: s.seasonType,
-        voteAverage: s.voteAverage,
-      })
-      .returning();
+    const insertedSeason = await deps.media.createSeason({
+      mediaId,
+      number: s.number,
+      externalId: s.externalId,
+      name: s.name,
+      overview: s.overview,
+      airDate: s.airDate || null,
+      posterPath: s.posterPath,
+      episodeCount: s.episodeCount,
+      seasonType: s.seasonType,
+      voteAverage: s.voteAverage,
+    });
 
-    if (insertedSeason && s.episodes && s.episodes.length > 0) {
-      await db
-        .insert(episode)
-        .values(
-          s.episodes.map((ep) => ({
-            seasonId: insertedSeason.id,
-            number: ep.number,
-            externalId: ep.externalId,
-            title: ep.title,
-            overview: ep.overview,
-            airDate: ep.airDate || null,
-            runtime: ep.runtime,
-            stillPath: ep.stillPath,
-            voteAverage: ep.voteAverage,
-            voteCount: ep.voteCount,
-            absoluteNumber: ep.absoluteNumber,
-            finaleType: ep.finaleType,
-            episodeType: ep.episodeType,
-            crew: ep.crew,
-            guestStars: ep.guestStars,
-          })),
-        )
-        .onConflictDoNothing({
-          target: [episode.seasonId, episode.number],
-        });
+    if (s.episodes && s.episodes.length > 0) {
+      await deps.media.bulkCreateEpisodesIgnoringConflicts(
+        s.episodes.map((ep) => ({
+          seasonId: insertedSeason.id,
+          number: ep.number,
+          externalId: ep.externalId,
+          title: ep.title,
+          overview: ep.overview,
+          airDate: ep.airDate || null,
+          runtime: ep.runtime,
+          stillPath: ep.stillPath,
+          voteAverage: ep.voteAverage,
+          voteCount: ep.voteCount,
+          absoluteNumber: ep.absoluteNumber,
+          finaleType: ep.finaleType,
+          episodeType: ep.episodeType,
+          crew: ep.crew,
+          guestStars: ep.guestStars,
+        })),
+      );
     }
   }
 }
@@ -372,81 +334,45 @@ export async function persistSeasons(
  * translations, and any other data that the enrich pipeline previously built.
  */
 async function upsertSeasons(
-  db: Database,
+  deps: PersistDeps,
   mediaId: string,
   normalized: NormalizedMedia,
 ): Promise<void> {
   if (normalized.type !== "show" || !normalized.seasons) return;
 
   for (const s of normalized.seasons) {
-    const [upserted] = await db
-      .insert(season)
-      .values({
-        mediaId,
-        number: s.number,
-        externalId: s.externalId,
-        name: s.name,
-        overview: s.overview,
-        airDate: s.airDate || null,
-        posterPath: s.posterPath,
-        episodeCount: s.episodeCount,
-        seasonType: s.seasonType,
-        voteAverage: s.voteAverage,
-      })
-      .onConflictDoUpdate({
-        target: [season.mediaId, season.number],
-        set: {
-          externalId: sql`EXCLUDED.external_id`,
-          name: sql`EXCLUDED.name`,
-          overview: sql`EXCLUDED.overview`,
-          airDate: sql`EXCLUDED.air_date`,
-          posterPath: sql`COALESCE(EXCLUDED.poster_path, ${season.posterPath})`,
-          episodeCount: sql`EXCLUDED.episode_count`,
-          seasonType: sql`EXCLUDED.season_type`,
-          voteAverage: sql`COALESCE(EXCLUDED.vote_average, ${season.voteAverage})`,
-        },
-      })
-      .returning();
+    const upserted = await deps.media.upsertSeason({
+      mediaId,
+      number: s.number,
+      externalId: s.externalId,
+      name: s.name,
+      overview: s.overview,
+      airDate: s.airDate || null,
+      posterPath: s.posterPath,
+      episodeCount: s.episodeCount,
+      seasonType: s.seasonType,
+      voteAverage: s.voteAverage,
+    });
 
-    if (upserted && s.episodes && s.episodes.length > 0) {
+    if (s.episodes && s.episodes.length > 0) {
       for (const ep of s.episodes) {
-        await db
-          .insert(episode)
-          .values({
-            seasonId: upserted.id,
-            number: ep.number,
-            externalId: ep.externalId,
-            title: ep.title,
-            overview: ep.overview,
-            airDate: ep.airDate || null,
-            runtime: ep.runtime,
-            stillPath: ep.stillPath,
-            voteAverage: ep.voteAverage,
-            voteCount: ep.voteCount,
-            absoluteNumber: ep.absoluteNumber,
-            finaleType: ep.finaleType,
-            episodeType: ep.episodeType,
-            crew: ep.crew,
-            guestStars: ep.guestStars,
-          })
-          .onConflictDoUpdate({
-            target: [episode.seasonId, episode.number],
-            set: {
-              externalId: sql`EXCLUDED.external_id`,
-              title: sql`COALESCE(EXCLUDED.title, ${episode.title})`,
-              overview: sql`COALESCE(EXCLUDED.overview, ${episode.overview})`,
-              airDate: sql`EXCLUDED.air_date`,
-              runtime: sql`EXCLUDED.runtime`,
-              stillPath: sql`COALESCE(EXCLUDED.still_path, ${episode.stillPath})`,
-              voteAverage: sql`COALESCE(EXCLUDED.vote_average, ${episode.voteAverage})`,
-              voteCount: sql`COALESCE(EXCLUDED.vote_count, ${episode.voteCount})`,
-              absoluteNumber: sql`EXCLUDED.absolute_number`,
-              finaleType: sql`EXCLUDED.finale_type`,
-              episodeType: sql`EXCLUDED.episode_type`,
-              crew: sql`COALESCE(EXCLUDED.crew, ${episode.crew})`,
-              guestStars: sql`COALESCE(EXCLUDED.guest_stars, ${episode.guestStars})`,
-            },
-          });
+        await deps.media.upsertEpisode({
+          seasonId: upserted.id,
+          number: ep.number,
+          externalId: ep.externalId,
+          title: ep.title,
+          overview: ep.overview,
+          airDate: ep.airDate || null,
+          runtime: ep.runtime,
+          stillPath: ep.stillPath,
+          voteAverage: ep.voteAverage,
+          voteCount: ep.voteCount,
+          absoluteNumber: ep.absoluteNumber,
+          finaleType: ep.finaleType,
+          episodeType: ep.episodeType,
+          crew: ep.crew,
+          guestStars: ep.guestStars,
+        });
       }
     }
   }
@@ -460,31 +386,29 @@ async function upsertSeasons(
 export async function persistFullMedia(
   db: Database,
   metadata: MediaMetadata,
+  deps: PersistDeps,
   existingMediaId?: string,
-  opts?: { deps?: Partial<PersistDeps> },
 ): Promise<string> {
-  const deps = withFallback(db, opts?.deps);
   const { media: normalized, extras, tvdbSeasons, tvdbId } = metadata;
 
   let mediaId: string;
   if (existingMediaId) {
-    await updateMediaFromNormalized(db, existingMediaId, normalized, { deps });
+    await updateMediaFromNormalized(db, existingMediaId, normalized, deps);
     mediaId = existingMediaId;
   } else {
-    const inserted = await persistMedia(db, normalized, {
+    const inserted = await persistMedia(db, normalized, deps, {
       crossRefLookup: !!tvdbId,
-      deps,
     });
     mediaId = inserted.id;
   }
 
   if (tvdbSeasons && tvdbSeasons.length > 0) {
-    await applyTvdbSeasons(db, mediaId, tvdbSeasons, normalized, { localization: deps.localization });
+    await applyTvdbSeasons(db, mediaId, tvdbSeasons, normalized, {
+      media: deps.media,
+      localization: deps.localization,
+    });
     if (tvdbId) {
-      await db
-        .update(media)
-        .set({ tvdbId, updatedAt: new Date() })
-        .where(eq(media.id, mediaId));
+      await deps.media.updateMedia(mediaId, { tvdbId });
     }
   }
 
@@ -495,13 +419,7 @@ export async function persistFullMedia(
     dispatcher: deps.dispatcher,
   });
 
-  await db
-    .update(media)
-    .set({
-      processingStatus: "ready",
-      updatedAt: new Date(),
-    })
-    .where(eq(media.id, mediaId));
+  await deps.media.updateMedia(mediaId, { processingStatus: "ready" });
 
   // Seed media_aspect_state so subsequent fast-path reads short-circuit.
   // Replaces the legacy `metadata_updated_at` / `extras_updated_at` markers.
@@ -570,8 +488,6 @@ interface PersistMediaInput {
   type: MediaType;
 }
 
-type MediaRow = typeof media.$inferSelect;
-
 /**
  * Shared pipeline: decide useTVDBSeasons, fetch normalized metadata, persist,
  * and dispatch TVDB episode-translation jobs for non-English languages.
@@ -580,7 +496,7 @@ async function fetchPersistAndDispatch(
   db: Database,
   input: PersistMediaInput,
   providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort },
-  existing: MediaRow | null | undefined,
+  existing: Media | null,
   tag: string,
   deps: PersistDeps,
 ): Promise<{ mediaId: string; result: MediaMetadata }> {
@@ -589,23 +505,27 @@ async function fetchPersistAndDispatch(
     ? getEffectiveProviderSync(existing, globalTvdbEnabled) === "tvdb"
     : globalTvdbEnabled;
 
-  const supportedLangs = [...await getActiveUserLanguages(db)];
+  const supportedLangs = [...(await getActiveUserLanguages(db))];
 
   const result = await fetchMediaMetadata(
-    input.externalId, input.provider, input.type,
+    input.externalId,
+    input.provider,
+    input.type,
     providers,
     { useTVDBSeasons, supportedLanguages: supportedLangs },
   );
 
-  const mediaId = await persistFullMedia(db, result, existing?.id, { deps });
+  const mediaId = await persistFullMedia(db, result, deps, existing?.id);
 
   if (result.tvdbId && result.tvdbSeasons?.length) {
     const nonEnLangs = supportedLangs.filter((l) => !l.startsWith("en"));
     for (const lang of nonEnLangs) {
-      void deps.dispatcher.enrichMedia(mediaId, {
-        aspects: ["translations"],
-        languages: [lang],
-      }).catch(deps.logger.logAndSwallow(`${tag} dispatchEnsureMedia(translations)`));
+      void deps.dispatcher
+        .enrichMedia(mediaId, {
+          aspects: ["translations"],
+          languages: [lang],
+        })
+        .catch(deps.logger.logAndSwallow(`${tag} dispatchEnsureMedia(translations)`));
     }
   }
 
@@ -620,17 +540,29 @@ export async function persistMediaUseCase(
   db: Database,
   input: PersistMediaInput,
   providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort },
-  opts?: { deps?: Partial<PersistDeps> },
+  deps: PersistDeps,
 ) {
-  const deps = withFallback(db, opts?.deps);
   const globalTvdbEnabled = (await getSetting("tvdb.defaultShows")) === true;
 
   const existing = globalTvdbEnabled
-    ? await findMediaByAnyReference(db, input.externalId, input.provider, undefined, undefined, input.type)
-    : await findMediaByExternalId(db, input.externalId, input.provider, input.type);
+    ? await deps.media.findByAnyReference(
+        input.externalId,
+        input.provider,
+        undefined,
+        undefined,
+        input.type,
+      )
+    : await deps.media.findByExternalId(
+        input.externalId,
+        input.provider,
+        input.type,
+      );
 
   if (existing) {
-    const metadataSucceededAt = await findAspectSucceededAt(db, existing.id, "metadata");
+    const metadataSucceededAt = await deps.aspectState.findSucceededAt(
+      existing.id,
+      "metadata",
+    );
     if (metadataSucceededAt) return existing;
   }
 
@@ -642,7 +574,7 @@ export async function persistMediaUseCase(
     "media:persist",
     deps,
   );
-  return findMediaByIdWithSeasons(db, mediaId);
+  return deps.media.findByIdWithSeasons(mediaId);
 }
 
 /**
@@ -661,35 +593,42 @@ export async function resolveMedia(
   input: PersistMediaInput,
   userId: string,
   providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort },
-  opts?: { deps?: Partial<PersistDeps> },
+  deps: PersistDeps,
 ) {
-  const deps = withFallback(db, opts?.deps);
-  const existing = await findMediaByExternalId(db, input.externalId, input.provider, input.type);
+  const existing = await deps.media.findByExternalId(
+    input.externalId,
+    input.provider,
+    input.type,
+  );
 
   const [metadataSucceededAt, extrasSucceededAt] = existing
     ? await Promise.all([
-        findAspectSucceededAt(db, existing.id, "metadata"),
-        findAspectSucceededAt(db, existing.id, "extras"),
+        deps.aspectState.findSucceededAt(existing.id, "metadata"),
+        deps.aspectState.findSucceededAt(existing.id, "extras"),
       ])
     : [null, null];
 
   if (existing && metadataSucceededAt && extrasSucceededAt) {
-    const { language: lang, watchRegion } = await getUserWatchPreferences(db, userId);
+    const { language: lang, watchRegion } = await getUserWatchPreferences(
+      db,
+      userId,
+    );
     const localized = await applyMediaLocalizationOverlay(existing, lang, {
       localization: deps.localization,
     });
     const withRating = await applyMediaContentRating(db, localized, watchRegion);
-    const finalMedia = withRating.seasons && withRating.seasons.length > 0
-      ? {
-          ...withRating,
-          seasons: await applySeasonsLocalizationOverlay(
-            existing.id,
-            withRating.seasons,
-            lang,
-            { localization: deps.localization },
-          ),
-        }
-      : withRating;
+    const finalMedia =
+      withRating.seasons && withRating.seasons.length > 0
+        ? {
+            ...withRating,
+            seasons: await applySeasonsLocalizationOverlay(
+              existing.id,
+              withRating.seasons,
+              lang,
+              { localization: deps.localization },
+            ),
+          }
+        : withRating;
     const extras = await loadExtrasFromDB(existing.id, lang, {
       extras: deps.extras,
       localization: deps.localization,
@@ -697,7 +636,9 @@ export async function resolveMedia(
 
     // Lazy fill: if this user's language has gaps, enqueue an ensureMedia
     // job in the background so the next visit has everything.
-    void detectAndEnqueueLazyFill(db, deps.dispatcher, existing.id, lang).catch(() => {});
+    void detectAndEnqueueLazyFill(db, deps.dispatcher, existing.id, lang).catch(
+      () => {},
+    );
 
     return {
       source: "db" as const,
@@ -718,24 +659,28 @@ export async function resolveMedia(
     "resolveMedia",
     deps,
   );
-  const persisted = await findMediaByIdWithSeasons(db, mediaId);
+  const persisted = await deps.media.findByIdWithSeasons(mediaId);
   if (persisted) {
-    const { language: lang, watchRegion } = await getUserWatchPreferences(db, userId);
+    const { language: lang, watchRegion } = await getUserWatchPreferences(
+      db,
+      userId,
+    );
     const localized = await applyMediaLocalizationOverlay(persisted, lang, {
       localization: deps.localization,
     });
     const withRating = await applyMediaContentRating(db, localized, watchRegion);
-    const finalMedia = withRating.seasons && withRating.seasons.length > 0
-      ? {
-          ...withRating,
-          seasons: await applySeasonsLocalizationOverlay(
-            persisted.id,
-            withRating.seasons,
-            lang,
-            { localization: deps.localization },
-          ),
-        }
-      : withRating;
+    const finalMedia =
+      withRating.seasons && withRating.seasons.length > 0
+        ? {
+            ...withRating,
+            seasons: await applySeasonsLocalizationOverlay(
+              persisted.id,
+              withRating.seasons,
+              lang,
+              { localization: deps.localization },
+            ),
+          }
+        : withRating;
     const extras = await loadExtrasFromDB(persisted.id, lang, {
       extras: deps.extras,
       localization: deps.localization,
@@ -752,8 +697,13 @@ export async function resolveMedia(
     };
   }
 
-  // Fallback: return live data if re-read somehow fails
-  const { language: lang, watchRegion } = await getUserWatchPreferences(db, userId);
+  // Fallback: the row genuinely vanished between persist and re-read. Use
+  // the live response with the user-language overlay applied client-side
+  // so the caller still gets a coherent result instead of a hard error.
+  const { language: lang, watchRegion } = await getUserWatchPreferences(
+    db,
+    userId,
+  );
   const response = normalizedMediaToResponse(result.media, result.tvdbSeasons);
   if (lang && !lang.startsWith("en") && result.media.translations) {
     const trans = result.media.translations.find((t) => t.language === lang);
@@ -766,9 +716,13 @@ export async function resolveMedia(
     }
   }
   if (watchRegion && watchRegion !== "US" && result.media.contentRatings) {
-    const rating = result.media.contentRatings.find((c) => c.region === watchRegion);
+    const rating = result.media.contentRatings.find(
+      (c) => c.region === watchRegion,
+    );
     if (rating) response.contentRating = rating.rating;
   }
+
+  if (!mediaId) throw new MediaPostInsertNotFoundError();
 
   return {
     source: "live" as const,

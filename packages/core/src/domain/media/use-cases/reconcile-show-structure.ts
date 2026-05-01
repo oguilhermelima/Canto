@@ -91,6 +91,7 @@ export async function reconcileShowStructure(
     } catch { /* keep TVDB seasons if TMDB fails */ }
 
     await applyTvdbSeasons(db, mediaId, tvdbData.seasons, tmdbNormalized, {
+      media: deps.media,
       localization: deps.localization,
     });
   }

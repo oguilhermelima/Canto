@@ -21,6 +21,7 @@ import type { ListsRepositoryPort } from "@canto/core/domain/lists/ports/lists-r
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
+import type { PersistDeps } from "@canto/core/domain/media/use-cases/persist/core";
 import type { TraktSection } from "@canto/core/domain/trakt/types/trakt-section";
 import type { SyncContext } from "@canto/core/domain/trakt/use-cases/shared";
 import { syncWatchlist } from "@canto/core/domain/trakt/use-cases/sync-watchlist";
@@ -48,6 +49,7 @@ export interface RunTraktSectionDeps {
   logger: LoggerPort;
   media: MediaRepositoryPort;
   providers: { tmdb: MediaProviderPort; tvdb: MediaProviderPort };
+  persist: PersistDeps;
 }
 
 async function executeSection(

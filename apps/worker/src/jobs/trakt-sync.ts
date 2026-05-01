@@ -12,6 +12,7 @@ import { makeTraktAuth } from "@canto/core/infra/trakt/trakt-auth.adapter";
 import { makeTraktRepository } from "@canto/core/infra/trakt/trakt-repository.adapter";
 import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { makePersistDeps } from "@canto/core/composition/persist-deps";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
 import { makeConsoleLogger } from "@canto/core/platform/logger/console-logger.adapter";
@@ -29,6 +30,7 @@ async function buildSectionDeps(): Promise<RunTraktSectionDeps> {
     logger: makeConsoleLogger(),
     media: makeMediaRepository(db),
     providers: { tmdb, tvdb },
+    persist: makePersistDeps(db),
   };
 }
 

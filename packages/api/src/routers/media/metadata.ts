@@ -22,6 +22,7 @@ import {
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
 import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
+import { makePersistDeps } from "@canto/core/composition/persist-deps";
 import {
   applyMediaLocalizationOverlay,
   applySeasonsLocalizationOverlay,
@@ -69,15 +70,10 @@ export const mediaMetadataRouter = createTRPCRouter({
   getByExternal: protectedProcedure
     .input(getByExternalInput)
     .query(async ({ ctx, input }) => {
-      const media = makeMediaRepository(ctx.db);
+      const persist = makePersistDeps(ctx.db);
       const result = await getByExternal(
         ctx.db,
-        {
-          media,
-          localization: makeMediaLocalizationRepository(ctx.db),
-          logger: makeConsoleLogger(),
-          dispatcher: jobDispatcher,
-        },
+        persist,
         input,
         ctx.session.user.id,
         getProviderWithKey,
@@ -90,14 +86,25 @@ export const mediaMetadataRouter = createTRPCRouter({
     .input(resolveMediaInput)
     .query(async ({ ctx, input }) => {
       const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
-      return resolveMedia(ctx.db, input, ctx.session.user.id, { tmdb, tvdb });
+      return resolveMedia(
+        ctx.db,
+        input,
+        ctx.session.user.id,
+        { tmdb, tvdb },
+        makePersistDeps(ctx.db),
+      );
     }),
 
   persist: protectedProcedure
     .input(resolveMediaInput)
     .mutation(async ({ ctx, input }) => {
       const [tmdb, tvdb] = await Promise.all([getTmdbProvider(), getTvdbProvider()]);
-      return persistMediaUseCase(ctx.db, input, { tmdb, tvdb });
+      return persistMediaUseCase(
+        ctx.db,
+        input,
+        { tmdb, tvdb },
+        makePersistDeps(ctx.db),
+      );
     }),
 
   getExtras: publicProcedure
@@ -149,7 +156,7 @@ export const mediaMetadataRouter = createTRPCRouter({
         { reprocess: true, useTVDBSeasons: effectiveProvider === "tvdb", supportedLanguages: supportedLangs },
       );
 
-      await persistFullMedia(ctx.db, result, row.id);
+      await persistFullMedia(ctx.db, result, makePersistDeps(ctx.db), row.id);
 
       // Fallback: if TVDB is effective but no TVDB seasons exist after persist
       // (e.g. show created before TVDB was enabled, or TVDB fetch failed),

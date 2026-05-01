@@ -16,6 +16,7 @@ import {
 } from "@canto/core/infra/media/media-repository";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
+import { makePersistDeps } from "@canto/core/composition/persist-deps";
 import { findMediaFilesByMediaId } from "@canto/core/infra/media/media-file-repository";
 import { findMediaVersionsByMediaId } from "@canto/core/infra/media/media-version-repository";
 import { getActiveUserLanguages } from "@canto/core/domain/shared/services/user-service";
@@ -89,7 +90,7 @@ export const mediaVersioningRouter = createTRPCRouter({
           { tmdb, tvdb },
           { reprocess: true, useTVDBSeasons: false, supportedLanguages: supportedLangs },
         );
-        await persistFullMedia(ctx.db, result, row.id);
+        await persistFullMedia(ctx.db, result, makePersistDeps(ctx.db), row.id);
       }
 
       if (input.renameFiles) {

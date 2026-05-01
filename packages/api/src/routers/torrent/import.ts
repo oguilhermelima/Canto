@@ -23,6 +23,7 @@ import {
   waitForTorrent,
 } from "@canto/core/domain/torrents/rules/torrent-rules";
 import { resolveMedia } from "@canto/core/domain/media/use-cases/persist";
+import { makePersistDeps } from "@canto/core/composition/persist-deps";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
 import { getTvdbProvider } from "@canto/core/platform/http/tvdb-client";
 import { updateMedia } from "@canto/core/infra/media/media-repository";
@@ -190,6 +191,7 @@ export const torrentImportRouter = createTRPCRouter({
         },
         ctx.session.user.id,
         { tmdb, tvdb },
+        makePersistDeps(ctx.db),
       );
 
       await updateMedia(ctx.db, resolved.mediaId, { inLibrary: true, addedAt: new Date() });

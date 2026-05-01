@@ -83,6 +83,14 @@ export interface MediaRepositoryPort {
   createMedia(input: NewMedia): Promise<Media>;
 
   /**
+   * Insert with conflict-skip semantics. Returns the inserted row, or
+   * `null` when an existing row collides on the unique constraint
+   * `(externalId, provider, type)`. Used by the persist pipeline so the
+   * caller can re-resolve the conflicting row and update it.
+   */
+  tryCreateMedia(input: NewMedia): Promise<Media | null>;
+
+  /**
    * Update an existing media row. The adapter bumps `updatedAt` for you;
    * pass only the columns you want changed.
    */
@@ -91,6 +99,13 @@ export interface MediaRepositoryPort {
   /** Hard delete. Cascades to `season` → `episode` via FK. Used by the
    *  orphan GC in `resolve-media-version`. */
   deleteMedia(id: string): Promise<void>;
+
+  /**
+   * True when the media has at least one season with `seasonType IN
+   * ('official', 'default')` — the marker the persist pipeline uses to
+   * detect TVDB-reconciled structure and skip the TMDB season upsert.
+   */
+  hasTvdbReconciledStructure(mediaId: string): Promise<boolean>;
 
   // ─── Library projections ───
 
@@ -203,4 +218,12 @@ export interface MediaRepositoryPort {
   /** Apply a partial patch to an existing episode (TMDB still / vote
    *  overlay onto a TVDB-sourced row, etc.). */
   patchEpisode(id: string, patch: EpisodePatch): Promise<Episode | null>;
+
+  /**
+   * Bulk insert episodes, skipping any row whose `(seasonId, number)`
+   * already exists. Used when a season is freshly inserted and the
+   * episode payload is known to be unique to it; conflicts on a re-run
+   * are silent so the operation stays idempotent.
+   */
+  bulkCreateEpisodesIgnoringConflicts(rows: NewEpisode[]): Promise<void>;
 }

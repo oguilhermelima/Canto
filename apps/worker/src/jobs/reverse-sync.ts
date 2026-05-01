@@ -42,6 +42,7 @@ import {
 import { reconcileMediaInLibrary } from "@canto/core/infra/media/media-repository";
 import { makeUserMediaRepository } from "@canto/core/infra/user-media/user-media-repository.adapter";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
+import { makePersistDeps } from "@canto/core/composition/persist-deps";
 import { promoteUserMediaStateFromPlayback } from "@canto/core/domain/user-media/use-cases/promote-user-media-state-from-playback";
 import {
   scanJellyfinLibraries,
@@ -561,6 +562,7 @@ export async function runReverseSync(options: ReverseSyncOptions = {}): Promise<
             lists: makeListsRepository(db),
             userMedia: makeUserMediaRepository(db),
             credentials: makeServerCredentials(),
+            persist: makePersistDeps(db),
           },
           needGlobalSync,
           `${provider}-sync`,

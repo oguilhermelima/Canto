@@ -1,18 +1,24 @@
 import type { Database } from "@canto/db/client";
+import type { MediaAspectStateRepositoryPort } from "@canto/core/domain/media/ports/media-aspect-state-repository.port";
+import type { MediaContentRatingRepositoryPort } from "@canto/core/domain/media/ports/media-content-rating-repository.port";
+import type { MediaExtrasRepositoryPort } from "@canto/core/domain/media/ports/media-extras-repository.port";
 import type { MediaLocalizationRepositoryPort } from "@canto/core/domain/media/ports/media-localization-repository.port";
 import type { MediaRepositoryPort } from "@canto/core/domain/media/ports/media-repository.port";
 import type { MediaProviderPort } from "@canto/core/domain/shared/ports/media-provider.port";
 import type { LoggerPort } from "@canto/core/domain/shared/ports/logger.port";
 import type { JobDispatcherPort } from "@canto/core/domain/shared/ports/job-dispatcher.port";
 import type { MediaType, ProviderName } from "@canto/providers";
+import type { SeasonWithEpisodes } from "@canto/core/domain/media/types/season";
 import { persistMedia } from "@canto/core/domain/media/use-cases/persist";
 import { getSetting } from "@canto/db/settings";
-import { findAspectSucceededAt } from "@canto/core/infra/media/media-aspect-state-repository";
+import { MediaPostInsertNotFoundError } from "@canto/core/domain/media/errors";
 import {
   applyMediaLocalizationOverlay,
   applySeasonsLocalizationOverlay,
 } from "@canto/core/domain/shared/localization/localization-service";
 import { getUserLanguage } from "@canto/core/domain/shared/services/user-service";
+
+const EXTRAS_STALE_MS = 30 * 24 * 60 * 60 * 1000;
 
 interface GetByExternalInput {
   externalId: number;
@@ -23,6 +29,9 @@ interface GetByExternalInput {
 export interface GetByExternalDeps {
   media: MediaRepositoryPort;
   localization: MediaLocalizationRepositoryPort;
+  aspectState: MediaAspectStateRepositoryPort;
+  contentRating: MediaContentRatingRepositoryPort;
+  extras: MediaExtrasRepositoryPort;
   logger: LoggerPort;
   dispatcher: JobDispatcherPort;
 }
@@ -30,11 +39,6 @@ export interface GetByExternalDeps {
 /**
  * "Persist on visit" — check DB first, otherwise fetch from provider and
  * insert media + seasons + episodes, then return the DB record.
- *
- * Note: localization overlay (`applyMediaLocalizationOverlay`,
- * `applySeasonsLocalizationOverlay`) and aspect-state cadence reads still
- * resolve via the legacy infra helpers — those land on dedicated ports in
- * Wave 9B (localization) and 9B's cadence carve-out.
  */
 export async function getByExternal(
   db: Database,
@@ -64,32 +68,30 @@ export async function getByExternal(
   const getUserLang = () => getUserLanguage(db, userId);
 
   if (existing) {
-    const STALE_MS = 30 * 24 * 60 * 60 * 1000;
-    const extrasSucceededAt = await findAspectSucceededAt(db, existing.id, "extras");
-    const isStale = !extrasSucceededAt || Date.now() - extrasSucceededAt.getTime() > STALE_MS;
-    if (isStale)
-      void deps.dispatcher.enrichMedia(existing.id, { aspects: ["extras"] }).catch(
-        deps.logger.logAndSwallow("media:getByExternal dispatchEnsureMedia(extras)"),
-      );
-    const lang = await getUserLang();
-    const localized = await applyMediaLocalizationOverlay(existing, lang, {
-      localization,
-    });
-    if (localized.seasons && localized.seasons.length > 0) {
-      const overlayed = await applySeasonsLocalizationOverlay(
-        existing.id,
-        localized.seasons as any,
-        lang,
-        { localization },
-      );
-      return { ...localized, seasons: overlayed };
+    const extrasSucceededAt = await deps.aspectState.findSucceededAt(
+      existing.id,
+      "extras",
+    );
+    const isStale =
+      !extrasSucceededAt ||
+      Date.now() - extrasSucceededAt.getTime() > EXTRAS_STALE_MS;
+    if (isStale) {
+      void deps.dispatcher
+        .enrichMedia(existing.id, { aspects: ["extras"] })
+        .catch(
+          deps.logger.logAndSwallow(
+            "media:getByExternal dispatchEnsureMedia(extras)",
+          ),
+        );
     }
-    return localized;
+    return localizeMediaForUser(existing, await getUserLang(), localization);
   }
 
   const provider = await providerFactory(input.provider);
   const supportedLangs = await getSupportedLangs();
-  const normalized = await provider.getMetadata(input.externalId, input.type, { supportedLanguages: supportedLangs });
+  const normalized = await provider.getMetadata(input.externalId, input.type, {
+    supportedLanguages: supportedLangs,
+  });
 
   if (tvdbEnabled) {
     const crossRef = await deps.media.findByAnyReference(
@@ -99,42 +101,46 @@ export async function getByExternal(
       normalized.tvdbId ?? undefined,
     );
     if (crossRef) {
-      const lang = await getUserLang();
-      const localized = await applyMediaLocalizationOverlay(crossRef, lang, {
-        localization,
-      });
-      if (localized.seasons && localized.seasons.length > 0) {
-        const overlayed = await applySeasonsLocalizationOverlay(
-          crossRef.id,
-          localized.seasons as any,
-          lang,
-          { localization },
-        );
-        return { ...localized, seasons: overlayed };
-      }
-      return localized;
+      return localizeMediaForUser(crossRef, await getUserLang(), localization);
     }
   }
 
-  const inserted = await persistMedia(db, normalized, { crossRefLookup: tvdbEnabled });
+  const inserted = await persistMedia(db, normalized, deps, {
+    crossRefLookup: tvdbEnabled,
+  });
 
-  if (tvdbEnabled && normalized.type === "show" && normalized.provider === "tmdb") {
-    void deps.dispatcher.enrichMedia(inserted.id, {
-      aspects: ["structure"],
-      force: true,
-    }).catch(deps.logger.logAndSwallow("media:getByExternal dispatchEnsureMedia(structure)"));
+  if (
+    tvdbEnabled &&
+    normalized.type === "show" &&
+    normalized.provider === "tmdb"
+  ) {
+    void deps.dispatcher
+      .enrichMedia(inserted.id, {
+        aspects: ["structure"],
+        force: true,
+      })
+      .catch(
+        deps.logger.logAndSwallow(
+          "media:getByExternal dispatchEnsureMedia(structure)",
+        ),
+      );
   }
 
   const result = await deps.media.findByIdWithSeasons(inserted.id);
-  if (!result) throw new Error("Media not found after insert");
-  const lang = await getUserLang();
-  const localized = await applyMediaLocalizationOverlay(result, lang, {
+  if (!result) throw new MediaPostInsertNotFoundError();
+  return localizeMediaForUser(result, await getUserLang(), localization);
+}
+
+async function localizeMediaForUser<
+  T extends { id: string; seasons?: SeasonWithEpisodes[] | null },
+>(media: T, lang: string, localization: MediaLocalizationRepositoryPort) {
+  const localized = await applyMediaLocalizationOverlay(media, lang, {
     localization,
   });
   if (localized.seasons && localized.seasons.length > 0) {
     const overlayed = await applySeasonsLocalizationOverlay(
-      result.id,
-      localized.seasons as any,
+      media.id,
+      localized.seasons,
       lang,
       { localization },
     );

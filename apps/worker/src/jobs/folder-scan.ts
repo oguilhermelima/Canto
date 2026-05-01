@@ -7,6 +7,9 @@ import {
 } from "@canto/core/infra/file-organization/folder-repository";
 import { makeListsRepository } from "@canto/core/infra/lists/lists-repository.adapter";
 import { makeMediaAspectStateRepository } from "@canto/core/infra/media/media-aspect-state-repository.adapter";
+import { makeMediaContentRatingRepository } from "@canto/core/infra/media/media-content-rating-repository.adapter";
+import { makeMediaExtrasRepository } from "@canto/core/infra/content-enrichment/media-extras-repository.adapter";
+import { makeMediaLocalizationRepository } from "@canto/core/infra/media/media-localization-repository.adapter";
 import { makeMediaRepository } from "@canto/core/infra/media/media-repository.adapter";
 import { createNodeFileSystemAdapter } from "@canto/core/platform/fs/filesystem";
 import { getTmdbProvider } from "@canto/core/platform/http/tmdb-client";
@@ -27,6 +30,9 @@ export async function handleFolderScan(): Promise<void> {
   const media = makeMediaRepository(db);
   const aspectState = makeMediaAspectStateRepository(db);
   const lists = makeListsRepository(db);
+  const localization = makeMediaLocalizationRepository(db);
+  const contentRating = makeMediaContentRatingRepository(db);
+  const extras = makeMediaExtrasRepository(db);
 
   let totalImported = 0;
   let totalSkipped = 0;
@@ -53,6 +59,9 @@ export async function handleFolderScan(): Promise<void> {
         media,
         aspectState,
         lists,
+        localization,
+        contentRating,
+        extras,
       });
       totalImported += result.imported;
       totalSkipped += result.skipped;
